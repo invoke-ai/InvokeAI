@@ -1,12 +1,12 @@
 import { ButtonGroup, Flex, Icon, IconButton, spinAnimation, Tooltip, useShiftModifier } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
 import { ToolChooser } from 'features/controlLayers/components/Tool/ToolChooser';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useDeleteAllExceptCurrentQueueItemDialog } from 'features/queue/components/DeleteAllExceptCurrentQueueItemConfirmationAlertDialog';
 import { InvokeButtonTooltip } from 'features/queue/components/InvokeButtonTooltip/InvokeButtonTooltip';
 import { useDeleteCurrentQueueItem } from 'features/queue/hooks/useDeleteCurrentQueueItem';
 import { useInvoke } from 'features/queue/hooks/useInvoke';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
+import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -19,18 +19,11 @@ import {
 } from 'react-icons/pi';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
-export const FloatingLeftPanelButtons = memo((props: { onToggle: () => void }) => {
-  const tab = useAppSelector(selectActiveTab);
-
+export const FloatingLeftPanelButtons = memo(() => {
   return (
     <Flex pos="absolute" transform="translate(0, -50%)" top="50%" insetInlineStart={2} direction="column" gap={2}>
-      {tab === 'canvas' && (
-        <CanvasManagerProviderGate>
-          <ToolChooser />
-        </CanvasManagerProviderGate>
-      )}
       <ButtonGroup orientation="vertical" h={48}>
-        <ToggleLeftPanelButton onToggle={props.onToggle} />
+        <ToggleLeftPanelButton />
         <InvokeIconButton />
         <DeleteCurrentIconButton />
         <DeleteAllExceptCurrentIconButton />
@@ -41,13 +34,37 @@ export const FloatingLeftPanelButtons = memo((props: { onToggle: () => void }) =
 
 FloatingLeftPanelButtons.displayName = 'FloatingLeftPanelButtons';
 
-const ToggleLeftPanelButton = memo((props: { onToggle: () => void }) => {
+export const FloatingCanvasLeftPanelButtons = memo(() => {
+  return (
+    <Flex pos="absolute" transform="translate(0, -50%)" top="50%" insetInlineStart={2} direction="column" gap={2}>
+      <CanvasManagerProviderGate>
+        <ToolChooser />
+      </CanvasManagerProviderGate>
+      <ButtonGroup orientation="vertical" h={48}>
+        <ToggleLeftPanelButton />
+        <InvokeIconButton />
+        <DeleteCurrentIconButton />
+        <DeleteAllExceptCurrentIconButton />
+      </ButtonGroup>
+    </Flex>
+  );
+});
+
+FloatingCanvasLeftPanelButtons.displayName = 'FloatingCanvasLeftPanelButtons';
+
+const ToggleLeftPanelButton = memo(() => {
+  const { toggleLeftPanel } = useAutoLayoutContext();
+  useRegisteredHotkeys({
+    category: 'app',
+    id: 'toggleLeftPanel',
+    callback: toggleLeftPanel,
+  });
   const { t } = useTranslation();
   return (
     <Tooltip label={t('accessibility.toggleLeftPanel')} placement="end">
       <IconButton
         aria-label={t('accessibility.toggleLeftPanel')}
-        onClick={props.onToggle}
+        onClick={toggleLeftPanel}
         icon={<PiSlidersHorizontalBold />}
         flexGrow={1}
       />

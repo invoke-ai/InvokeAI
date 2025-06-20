@@ -1,5 +1,5 @@
 import type { GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
-import { DockviewReact, GridviewReact, Orientation } from 'dockview';
+import { DockviewReact, GridviewReact, LayoutPriority, Orientation } from 'dockview';
 import { WorkflowsLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/WorkflowsLaunchpadPanel';
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
 import { GalleryPanel } from 'features/gallery/components/Gallery';
@@ -7,6 +7,8 @@ import { GenerationProgressPanel } from 'features/gallery/components/ImageViewer
 import { ImageViewerPanel } from 'features/gallery/components/ImageViewer/ImageViewerPanel';
 import NodeEditor from 'features/nodes/components/NodeEditor';
 import WorkflowsTabLeftPanel from 'features/nodes/components/sidePanel/WorkflowsTabLeftPanel';
+import { FloatingLeftPanelButtons } from 'features/ui/components/FloatingLeftPanelButtons';
+import { FloatingRightPanelButtons } from 'features/ui/components/FloatingRightPanelButtons';
 import { AutoLayoutProvider } from 'features/ui/layouts/auto-layout-context';
 import { TabWithoutCloseButton } from 'features/ui/layouts/TabWithoutCloseButton';
 import { LEFT_PANEL_MIN_SIZE_PX, RIGHT_PANEL_MIN_SIZE_PX } from 'features/ui/store/uiSlice';
@@ -83,58 +85,38 @@ const onReadyMainPanel: IDockviewReactProps['onReady'] = (event) => {
 
 const MainPanel = memo(() => {
   return (
-    <DockviewReact
-      disableDnd={true}
-      locked={true}
-      disableFloatingGroups={true}
-      dndEdges={false}
-      defaultTabComponent={TabWithoutCloseButton}
-      components={dockviewComponents}
-      onReady={onReadyMainPanel}
-      theme={dockviewTheme}
-    />
+    <>
+      <DockviewReact
+        disableDnd={true}
+        locked={true}
+        disableFloatingGroups={true}
+        dndEdges={false}
+        defaultTabComponent={TabWithoutCloseButton}
+        components={dockviewComponents}
+        onReady={onReadyMainPanel}
+        theme={dockviewTheme}
+      />
+      <FloatingLeftPanelButtons />
+      <FloatingRightPanelButtons />
+    </>
   );
 });
 MainPanel.displayName = 'MainPanel';
 
-const LEFT_PANEL_ID = 'left';
-const MAIN_PANEL_ID = 'main';
 const BOARDS_PANEL_ID = 'boards';
 const GALLERY_PANEL_ID = 'gallery';
 
-export const gridviewComponents: IGridviewReactProps['components'] = {
-  [LEFT_PANEL_ID]: WorkflowsTabLeftPanel,
-  [MAIN_PANEL_ID]: MainPanel,
+const rightPanelComponents: IGridviewReactProps['components'] = {
   [BOARDS_PANEL_ID]: BoardsPanel,
   [GALLERY_PANEL_ID]: GalleryPanel,
 };
 
-export const initializeLayout = (api: GridviewApi) => {
-  api.addPanel({
-    id: MAIN_PANEL_ID,
-    component: MAIN_PANEL_ID,
-    // priority: LayoutPriority.High,
-  });
-  api.addPanel({
-    id: LEFT_PANEL_ID,
-    component: LEFT_PANEL_ID,
-    minimumWidth: LEFT_PANEL_MIN_SIZE_PX,
-    position: {
-      direction: 'left',
-      referencePanel: MAIN_PANEL_ID,
-    },
-    // priority: LayoutPriority.High,
-  });
+export const initializeRightLayout = (api: GridviewApi) => {
   api.addPanel({
     id: GALLERY_PANEL_ID,
     component: GALLERY_PANEL_ID,
     minimumWidth: RIGHT_PANEL_MIN_SIZE_PX,
     minimumHeight: 232,
-    position: {
-      direction: 'right',
-      referencePanel: MAIN_PANEL_ID,
-    },
-    // priority: LayoutPriority.High,
   });
   api.addPanel({
     id: BOARDS_PANEL_ID,
@@ -144,10 +126,64 @@ export const initializeLayout = (api: GridviewApi) => {
       direction: 'above',
       referencePanel: GALLERY_PANEL_ID,
     },
-    // priority: LayoutPriority.High,
+  });
+  api.getPanel(BOARDS_PANEL_ID)?.api.setSize({ height: 256, width: RIGHT_PANEL_MIN_SIZE_PX });
+};
+
+const onReadyRightPanel: IGridviewReactProps['onReady'] = (event) => {
+  initializeRightLayout(event.api);
+};
+
+const RightPanel = memo(() => {
+  return (
+    <>
+      <GridviewReact
+        className="dockview-theme-invoke"
+        orientation={Orientation.VERTICAL}
+        components={rightPanelComponents}
+        onReady={onReadyRightPanel}
+      />
+    </>
+  );
+});
+RightPanel.displayName = 'RightPanel';
+
+const LEFT_PANEL_ID = 'left';
+const MAIN_PANEL_ID = 'main';
+const RIGHT_PANEL_ID = 'right';
+
+export const rootComponents: IGridviewReactProps['components'] = {
+  [LEFT_PANEL_ID]: WorkflowsTabLeftPanel,
+  [MAIN_PANEL_ID]: MainPanel,
+  [RIGHT_PANEL_ID]: RightPanel,
+};
+
+export const initializeRootLayout = (api: GridviewApi) => {
+  api.addPanel({
+    id: MAIN_PANEL_ID,
+    component: MAIN_PANEL_ID,
+    priority: LayoutPriority.High,
+  });
+  api.addPanel({
+    id: LEFT_PANEL_ID,
+    component: LEFT_PANEL_ID,
+    minimumWidth: LEFT_PANEL_MIN_SIZE_PX,
+    position: {
+      direction: 'left',
+      referencePanel: MAIN_PANEL_ID,
+    },
+  });
+  api.addPanel({
+    id: RIGHT_PANEL_ID,
+    component: RIGHT_PANEL_ID,
+    minimumWidth: RIGHT_PANEL_MIN_SIZE_PX,
+    position: {
+      direction: 'right',
+      referencePanel: MAIN_PANEL_ID,
+    },
   });
   api.getPanel(LEFT_PANEL_ID)?.api.setSize({ width: LEFT_PANEL_MIN_SIZE_PX });
-  api.getPanel(BOARDS_PANEL_ID)?.api.setSize({ height: 256, width: RIGHT_PANEL_MIN_SIZE_PX });
+  api.getPanel(RIGHT_PANEL_ID)?.api.setSize({ width: RIGHT_PANEL_MIN_SIZE_PX });
   api.getPanel(MAIN_PANEL_ID)?.api.setActive();
 };
 
@@ -157,7 +193,7 @@ export const WorkflowsTabAutoLayout = memo(() => {
   const onReady = useCallback<IGridviewReactProps['onReady']>(
     (event) => {
       $api.set(event.api);
-      initializeLayout(event.api);
+      initializeRootLayout(event.api);
     },
     [$api]
   );
@@ -187,13 +223,47 @@ export const WorkflowsTabAutoLayout = memo(() => {
     setSize();
   }, [$api]);
   useOnFirstVisible(ref, resizeMainPanelOnFirstVisible);
+  const toggleLeftPanel = useCallback(() => {
+    const api = $api.get();
+    if (!api) {
+      return;
+    }
+    const left = api.getPanel(LEFT_PANEL_ID);
+    if (!left) {
+      return;
+    }
+    if (left.maximumWidth === 0) {
+      left.api.setConstraints({ maximumWidth: Number.MAX_SAFE_INTEGER, minimumWidth: LEFT_PANEL_MIN_SIZE_PX });
+      left.api.setSize({ width: LEFT_PANEL_MIN_SIZE_PX });
+    } else {
+      left.api.setConstraints({ maximumWidth: 0, minimumWidth: 0 });
+      left.api.setSize({ width: 0 });
+    }
+  }, [$api]);
+  const toggleRightPanel = useCallback(() => {
+    const api = $api.get();
+    if (!api) {
+      return;
+    }
+    const right = api.getPanel(RIGHT_PANEL_ID);
+    if (!right) {
+      return;
+    }
+    if (right.maximumWidth === 0) {
+      right.api.setConstraints({ maximumWidth: Number.MAX_SAFE_INTEGER, minimumWidth: RIGHT_PANEL_MIN_SIZE_PX });
+      right.api.setSize({ width: RIGHT_PANEL_MIN_SIZE_PX });
+    } else {
+      right.api.setConstraints({ maximumWidth: 0, minimumWidth: 0 });
+      right.api.setSize({ width: 0 });
+    }
+  }, [$api]);
 
   return (
-    <AutoLayoutProvider $api={$api}>
+    <AutoLayoutProvider $api={$api} toggleLeftPanel={toggleLeftPanel} toggleRightPanel={toggleRightPanel}>
       <GridviewReact
         ref={ref}
         className="dockview-theme-invoke"
-        components={gridviewComponents}
+        components={rootComponents}
         onReady={onReady}
         orientation={Orientation.VERTICAL}
       />
