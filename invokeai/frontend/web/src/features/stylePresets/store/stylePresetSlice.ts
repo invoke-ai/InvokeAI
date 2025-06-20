@@ -2,7 +2,7 @@ import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
-import { newSessionRequested } from 'features/controlLayers/store/actions';
+import { paramsReset } from 'features/controlLayers/store/paramsSlice';
 import { atom } from 'nanostores';
 import { stylePresetsApi } from 'services/api/endpoints/stylePresets';
 
@@ -29,6 +29,9 @@ export const stylePresetSlice = createSlice({
     },
   },
   extraReducers(builder) {
+    builder.addCase(paramsReset, () => {
+      return deepClone(initialState);
+    });
     builder.addMatcher(stylePresetsApi.endpoints.deleteStylePreset.matchFulfilled, (state, action) => {
       if (state.activeStylePresetId === null) {
         return;
@@ -46,9 +49,6 @@ export const stylePresetSlice = createSlice({
       if (!ids.includes(state.activeStylePresetId)) {
         state.activeStylePresetId = null;
       }
-    });
-    builder.addMatcher(newSessionRequested, () => {
-      return deepClone(initialState);
     });
   },
 });

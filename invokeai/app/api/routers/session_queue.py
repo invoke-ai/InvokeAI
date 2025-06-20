@@ -14,13 +14,14 @@ from invokeai.app.services.session_queue.session_queue_common import (
     CancelByBatchIDsResult,
     CancelByDestinationResult,
     ClearResult,
+    DeleteAllExceptCurrentResult,
+    DeleteByDestinationResult,
     EnqueueBatchResult,
     FieldIdentifier,
     PruneResult,
     RetryItemsResult,
     SessionQueueCountsByDestination,
     SessionQueueItem,
-    SessionQueueItemDTO,
     SessionQueueStatus,
 )
 from invokeai.app.services.shared.pagination import CursorPaginatedResults
@@ -68,7 +69,7 @@ async def enqueue_batch(
     "/{queue_id}/list",
     operation_id="list_queue_items",
     responses={
-        200: {"model": CursorPaginatedResults[SessionQueueItemDTO]},
+        200: {"model": CursorPaginatedResults[SessionQueueItem]},
     },
 )
 async def list_queue_items(
@@ -77,11 +78,36 @@ async def list_queue_items(
     status: Optional[QUEUE_ITEM_STATUS] = Query(default=None, description="The status of items to fetch"),
     cursor: Optional[int] = Query(default=None, description="The pagination cursor"),
     priority: int = Query(default=0, description="The pagination cursor priority"),
-) -> CursorPaginatedResults[SessionQueueItemDTO]:
-    """Gets all queue items (without graphs)"""
+    destination: Optional[str] = Query(default=None, description="The destination of queue items to fetch"),
+) -> CursorPaginatedResults[SessionQueueItem]:
+    """Gets cursor-paginated queue items"""
 
     return ApiDependencies.invoker.services.session_queue.list_queue_items(
-        queue_id=queue_id, limit=limit, status=status, cursor=cursor, priority=priority
+        queue_id=queue_id,
+        limit=limit,
+        status=status,
+        cursor=cursor,
+        priority=priority,
+        destination=destination,
+    )
+
+
+@session_queue_router.get(
+    "/{queue_id}/list_all",
+    operation_id="list_all_queue_items",
+    responses={
+        200: {"model": list[SessionQueueItem]},
+    },
+)
+async def list_all_queue_items(
+    queue_id: str = Path(description="The queue id to perform this operation on"),
+    destination: Optional[str] = Query(default=None, description="The destination of queue items to fetch"),
+) -> list[SessionQueueItem]:
+    """Gets all queue items"""
+
+    return ApiDependencies.invoker.services.session_queue.list_all_queue_items(
+        queue_id=queue_id,
+        destination=destination,
     )
 
 
@@ -119,6 +145,18 @@ async def cancel_all_except_current(
 ) -> CancelAllExceptCurrentResult:
     """Immediately cancels all queue items except in-processing items"""
     return ApiDependencies.invoker.services.session_queue.cancel_all_except_current(queue_id=queue_id)
+
+
+@session_queue_router.put(
+    "/{queue_id}/delete_all_except_current",
+    operation_id="delete_all_except_current",
+    responses={200: {"model": DeleteAllExceptCurrentResult}},
+)
+async def delete_all_except_current(
+    queue_id: str = Path(description="The queue id to perform this operation on"),
+) -> DeleteAllExceptCurrentResult:
+    """Immediately deletes all queue items except in-processing items"""
+    return ApiDependencies.invoker.services.session_queue.delete_all_except_current(queue_id=queue_id)
 
 
 @session_queue_router.put(
@@ -269,6 +307,18 @@ async def get_queue_item(
     return ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
 
 
+@session_queue_router.delete(
+    "/{queue_id}/i/{item_id}",
+    operation_id="delete_queue_item",
+)
+async def delete_queue_item(
+    queue_id: str = Path(description="The queue id to perform this operation on"),
+    item_id: int = Path(description="The queue item to delete"),
+) -> None:
+    """Deletes a queue item"""
+    ApiDependencies.invoker.services.session_queue.delete_queue_item(item_id)
+
+
 @session_queue_router.put(
     "/{queue_id}/i/{item_id}/cancel",
     operation_id="cancel_queue_item",
@@ -296,5 +346,20 @@ async def counts_by_destination(
 ) -> SessionQueueCountsByDestination:
     """Gets the counts of queue items by destination"""
     return ApiDependencies.invoker.services.session_queue.get_counts_by_destination(
+        queue_id=queue_id, destination=destination
+    )
+
+
+@session_queue_router.delete(
+    "/{queue_id}/d/{destination}",
+    operation_id="delete_by_destination",
+    responses={200: {"model": DeleteByDestinationResult}},
+)
+async def delete_by_destination(
+    queue_id: str = Path(description="The queue id to query"),
+    destination: str = Path(description="The destination to query"),
+) -> DeleteByDestinationResult:
+    """Deletes all items with the given destination"""
+    return ApiDependencies.invoker.services.session_queue.delete_by_destination(
         queue_id=queue_id, destination=destination
     )

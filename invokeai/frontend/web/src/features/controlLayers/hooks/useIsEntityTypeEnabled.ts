@@ -1,6 +1,6 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import {
-  selectIsChatGTP4o,
+  selectIsChatGPT4o,
   selectIsCogView4,
   selectIsImagen3,
   selectIsImagen4,
@@ -16,12 +16,10 @@ export const useIsEntityTypeEnabled = (entityType: CanvasEntityType) => {
   const isCogView4 = useAppSelector(selectIsCogView4);
   const isImagen3 = useAppSelector(selectIsImagen3);
   const isImagen4 = useAppSelector(selectIsImagen4);
-  const isChatGPT4o = useAppSelector(selectIsChatGTP4o);
+  const isChatGPT4o = useAppSelector(selectIsChatGPT4o);
 
   const isEntityTypeEnabled = useMemo<boolean>(() => {
     switch (entityType) {
-      case 'reference_image':
-        return !isSD3 && !isCogView4 && !isImagen3 && !isImagen4;
       case 'regional_guidance':
         return !isSD3 && !isCogView4 && !isImagen3 && !isImagen4 && !isChatGPT4o;
       case 'control_layer':

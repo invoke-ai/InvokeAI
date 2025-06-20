@@ -4,7 +4,6 @@ import { containsFiles, getFiles } from '@atlaskit/pragmatic-drag-and-drop/exter
 import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Heading } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import { getStore } from 'app/store/nanostores/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { $focusedRegion } from 'common/hooks/focus';
@@ -12,7 +11,6 @@ import { useClientSideUpload } from 'common/hooks/useClientSideUpload';
 import { setFileToPaste } from 'features/controlLayers/components/CanvasPasteModal';
 import { DndDropOverlay } from 'features/dnd/DndDropOverlay';
 import type { DndTargetState } from 'features/dnd/types';
-import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { selectIsClientSideUploadEnabled } from 'features/system/store/configSlice';
 import { toast } from 'features/toast/toast';
@@ -70,7 +68,6 @@ export const FullscreenDropzone = memo(() => {
   const ref = useRef<HTMLDivElement>(null);
   const [dndState, setDndState] = useState<DndTargetState>('idle');
   const activeTab = useAppSelector(selectActiveTab);
-  const isImageViewerOpen = useStore($imageViewer);
   const isClientSideUploadEnabled = useAppSelector(selectIsClientSideUploadEnabled);
   const clientSideUpload = useClientSideUpload();
 
@@ -96,13 +93,7 @@ export const FullscreenDropzone = memo(() => {
       // While on the canvas tab and when pasting a single image, canvas may want to create a new layer. Let it handle
       // the paste event.
       const [firstImageFile] = files;
-      if (
-        focusedRegion === 'canvas' &&
-        !isImageViewerOpen &&
-        activeTab === 'canvas' &&
-        files.length === 1 &&
-        firstImageFile
-      ) {
+      if (focusedRegion === 'canvas' && activeTab === 'canvas' && files.length === 1 && firstImageFile) {
         setFileToPaste(firstImageFile);
         return;
       }
@@ -125,7 +116,7 @@ export const FullscreenDropzone = memo(() => {
         uploadImages(uploadArgs);
       }
     },
-    [activeTab, isImageViewerOpen, t, isClientSideUploadEnabled, clientSideUpload]
+    [activeTab, t, isClientSideUploadEnabled, clientSideUpload]
   );
 
   const onPaste = useCallback(

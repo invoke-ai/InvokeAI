@@ -2,11 +2,10 @@ import { Button, Flex, Heading } from '@invoke-ai/ui-library';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import {
   useAddControlLayer,
-  useAddGlobalReferenceImage,
   useAddInpaintMask,
+  useAddNewRegionalGuidanceWithARefImage,
   useAddRasterLayer,
   useAddRegionalGuidance,
-  useAddRegionalReferenceImage,
 } from 'features/controlLayers/hooks/addLayerHooks';
 import { useIsEntityTypeEnabled } from 'features/controlLayers/hooks/useIsEntityTypeEnabled';
 import { memo } from 'react';
@@ -19,9 +18,7 @@ export const CanvasAddEntityButtons = memo(() => {
   const addRegionalGuidance = useAddRegionalGuidance();
   const addRasterLayer = useAddRasterLayer();
   const addControlLayer = useAddControlLayer();
-  const addGlobalReferenceImage = useAddGlobalReferenceImage();
-  const addRegionalReferenceImage = useAddRegionalReferenceImage();
-  const isReferenceImageEnabled = useIsEntityTypeEnabled('reference_image');
+  const addRegionalReferenceImage = useAddNewRegionalGuidanceWithARefImage();
   const isRegionalGuidanceEnabled = useIsEntityTypeEnabled('regional_guidance');
   const isControlLayerEnabled = useIsEntityTypeEnabled('control_layer');
   const isInpaintLayerEnabled = useIsEntityTypeEnabled('inpaint_mask');
@@ -29,21 +26,6 @@ export const CanvasAddEntityButtons = memo(() => {
   return (
     <Flex w="full" h="full" justifyContent="center" gap={4}>
       <Flex position="relative" flexDir="column" gap={4} top="20%">
-        <Flex flexDir="column" justifyContent="flex-start" gap={2}>
-          <Heading size="xs">{t('controlLayers.global')}</Heading>
-          <InformationalPopover feature="globalReferenceImage">
-            <Button
-              size="sm"
-              variant="ghost"
-              justifyContent="flex-start"
-              leftIcon={<PiPlusBold />}
-              onClick={addGlobalReferenceImage}
-              isDisabled={!isReferenceImageEnabled}
-            >
-              {t('controlLayers.globalReferenceImage')}
-            </Button>
-          </InformationalPopover>
-        </Flex>
         <Flex flexDir="column" gap={2}>
           <Heading size="xs">{t('controlLayers.regional')}</Heading>
           <InformationalPopover feature="inpainting">

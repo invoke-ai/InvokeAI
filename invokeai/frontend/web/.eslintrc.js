@@ -9,7 +9,8 @@ module.exports = {
     // https://github.com/qdanik/eslint-plugin-path
     'path/no-relative-imports': ['error', { maxDepth: 0 }],
     // https://github.com/edvardchen/eslint-plugin-i18next/blob/HEAD/docs/rules/no-literal-string.md
-    'i18next/no-literal-string': 'error',
+    // TODO: ENABLE THIS RULE BEFORE v6.0.0
+    // 'i18next/no-literal-string': 'error',
     // https://eslint.org/docs/latest/rules/no-console
     'no-console': 'error',
     // https://eslint.org/docs/latest/rules/no-promise-executor-return

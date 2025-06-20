@@ -1,6 +1,11 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { createParamsSelector, selectIsChatGTP4o, selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
+import { RefImageList } from 'features/controlLayers/components/RefImage/RefImageList';
+import {
+  createParamsSelector,
+  selectHasNegativePrompt,
+  selectModelSupportsNegativePrompt,
+} from 'features/controlLayers/store/paramsSlice';
 import { ParamNegativePrompt } from 'features/parameters/components/Core/ParamNegativePrompt';
 import { ParamPositivePrompt } from 'features/parameters/components/Core/ParamPositivePrompt';
 import { ParamSDXLNegativeStylePrompt } from 'features/sdxl/components/SDXLPrompts/ParamSDXLNegativeStylePrompt';
@@ -15,14 +20,15 @@ const selectWithStylePrompts = createParamsSelector((params) => {
 
 export const Prompts = memo(() => {
   const withStylePrompts = useAppSelector(selectWithStylePrompts);
-  const isFLUX = useAppSelector(selectIsFLUX);
-  const isChatGPT4o = useAppSelector(selectIsChatGTP4o);
+  const modelSupportsNegativePrompt = useAppSelector(selectModelSupportsNegativePrompt);
+  const hasNegativePrompt = useAppSelector(selectHasNegativePrompt);
   return (
     <Flex flexDir="column" gap={2}>
       <ParamPositivePrompt />
       {withStylePrompts && <ParamSDXLPositiveStylePrompt />}
-      {!isFLUX && !isChatGPT4o && <ParamNegativePrompt />}
+      {modelSupportsNegativePrompt && hasNegativePrompt && <ParamNegativePrompt />}
       {withStylePrompts && <ParamSDXLNegativeStylePrompt />}
+      <RefImageList />
     </Flex>
   );
 });

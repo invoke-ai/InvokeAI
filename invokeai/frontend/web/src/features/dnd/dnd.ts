@@ -1,16 +1,16 @@
 import { logger } from 'app/logging/logger';
-import type { AppDispatch, RootState } from 'app/store/store';
+import type { AppDispatch, AppGetState } from 'app/store/store';
+import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type {
-  CanvasEntityIdentifier,
-  CanvasEntityType,
-  CanvasRenderableEntityIdentifier,
-} from 'features/controlLayers/store/types';
+import { refImageAdded } from 'features/controlLayers/store/refImagesSlice';
+import type { CanvasEntityIdentifier, CanvasEntityType } from 'features/controlLayers/store/types';
+import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
 import { selectComparisonImages } from 'features/gallery/components/ImageViewer/common';
 import type { BoardId } from 'features/gallery/store/types';
 import {
   addImagesToBoard,
   createNewCanvasEntityFromImage,
+  newCanvasFromImage,
   removeImagesFromBoard,
   replaceCanvasEntityObjectsWithImage,
   setComparisonImage,
@@ -117,13 +117,13 @@ type DndTarget<TargetData extends DndData, SourceData extends DndData> = {
     sourceData: RecordUnknown;
     targetData: TargetData;
     dispatch: AppDispatch;
-    getState: () => RootState;
+    getState: AppGetState;
   }) => boolean;
   handler: (arg: {
     sourceData: SourceData;
     targetData: TargetData;
     dispatch: AppDispatch;
-    getState: () => RootState;
+    getState: AppGetState;
   }) => void;
 };
 
@@ -132,7 +132,7 @@ const _setGlobalReferenceImage = buildTypeAndKey('set-global-reference-image');
 export type SetGlobalReferenceImageDndTargetData = DndData<
   typeof _setGlobalReferenceImage.type,
   typeof _setGlobalReferenceImage.key,
-  { entityIdentifier: CanvasEntityIdentifier<'reference_image'> }
+  { id: string }
 >;
 export const setGlobalReferenceImageDndTarget: DndTarget<
   SetGlobalReferenceImageDndTargetData,
@@ -149,8 +149,36 @@ export const setGlobalReferenceImageDndTarget: DndTarget<
   },
   handler: ({ sourceData, targetData, dispatch }) => {
     const { imageDTO } = sourceData.payload;
-    const { entityIdentifier } = targetData.payload;
-    setGlobalReferenceImage({ entityIdentifier, imageDTO, dispatch });
+    const { id } = targetData.payload;
+    setGlobalReferenceImage({ id, imageDTO, dispatch });
+  },
+};
+//#endregion
+
+//#region Add Global Reference Image
+const _addGlobalReferenceImage = buildTypeAndKey('add-global-reference-image');
+export type AddGlobalReferenceImageDndTargetData = DndData<
+  typeof _addGlobalReferenceImage.type,
+  typeof _addGlobalReferenceImage.key
+>;
+export const addGlobalReferenceImageDndTarget: DndTarget<
+  AddGlobalReferenceImageDndTargetData,
+  SingleImageDndSourceData
+> = {
+  ..._addGlobalReferenceImage,
+  typeGuard: buildTypeGuard(_addGlobalReferenceImage.key),
+  getData: buildGetData(_addGlobalReferenceImage.key, _addGlobalReferenceImage.type),
+  isValid: ({ sourceData }) => {
+    if (singleImageDndSource.typeGuard(sourceData)) {
+      return true;
+    }
+    return false;
+  },
+  handler: ({ sourceData, dispatch, getState }) => {
+    const { imageDTO } = sourceData.payload;
+    const config = getDefaultRefImageConfig(getState);
+    config.image = imageDTOToImageWithDims(imageDTO);
+    dispatch(refImageAdded({ overrides: { config } }));
   },
 };
 //#endregion
@@ -343,7 +371,34 @@ export const newCanvasEntityFromImageDndTarget: DndTarget<
     createNewCanvasEntityFromImage({ type, imageDTO, dispatch, getState });
   },
 };
+//#endregion
 
+//#region New Canvas from Image
+const _newCanvas = buildTypeAndKey('new-canvas-entity-from-image');
+type NewCanvasFromImageDndTargetData = DndData<
+  typeof _newCanvas.type,
+  typeof _newCanvas.key,
+  {
+    type: CanvasEntityType | 'regional_guidance_with_reference_image' | 'reference_image';
+    withResize?: boolean;
+    withInpaintMask?: boolean;
+  }
+>;
+export const newCanvasFromImageDndTarget: DndTarget<NewCanvasFromImageDndTargetData, SingleImageDndSourceData> = {
+  ..._newCanvas,
+  typeGuard: buildTypeGuard(_newCanvas.key),
+  getData: buildGetData(_newCanvas.key, _newCanvas.type),
+  isValid: ({ sourceData }) => {
+    if (!singleImageDndSource.typeGuard(sourceData)) {
+      return false;
+    }
+    return true;
+  },
+  handler: ({ sourceData, targetData, dispatch, getState }) => {
+    const { imageDTO } = sourceData.payload;
+    newCanvasFromImage({ imageDTO, dispatch, getState, ...targetData.payload });
+  },
+};
 //#endregion
 
 //#region Replace Canvas Entity Objects With Image
@@ -351,7 +406,7 @@ const _replaceCanvasEntityObjectsWithImage = buildTypeAndKey('replace-canvas-ent
 export type ReplaceCanvasEntityObjectsWithImageDndTargetData = DndData<
   typeof _replaceCanvasEntityObjectsWithImage.type,
   typeof _replaceCanvasEntityObjectsWithImage.key,
-  { entityIdentifier: CanvasRenderableEntityIdentifier }
+  { entityIdentifier: CanvasEntityIdentifier }
 >;
 export const replaceCanvasEntityObjectsWithImageDndTarget: DndTarget<
   ReplaceCanvasEntityObjectsWithImageDndTargetData,
@@ -471,6 +526,8 @@ export const dndTargets = [
   replaceCanvasEntityObjectsWithImageDndTarget,
   addImageToBoardDndTarget,
   removeImageFromBoardDndTarget,
+  newCanvasFromImageDndTarget,
+  addGlobalReferenceImageDndTarget,
   // Single or Multiple Image
   addImageToBoardDndTarget,
   removeImageFromBoardDndTarget,

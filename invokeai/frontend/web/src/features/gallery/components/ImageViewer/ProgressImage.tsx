@@ -1,20 +1,21 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Image } from '@invoke-ai/ui-library';
+import { Flex, Image } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
+import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { memo, useMemo } from 'react';
-import { $isProgressFromCanvas, $progressImage } from 'services/events/stores';
+import { PiPulseBold } from 'react-icons/pi';
+import { $lastProgressImage } from 'services/events/stores';
 
 const selectShouldAntialiasProgressImage = createSelector(
   selectSystemSlice,
   (system) => system.shouldAntialiasProgressImage
 );
 
-const CurrentImagePreview = () => {
-  const progressImage = useStore($progressImage);
-  const isProgressFromCanvas = useStore($isProgressFromCanvas);
+export const ProgressImage = memo(() => {
+  const progressImage = useStore($lastProgressImage);
   const shouldAntialiasProgressImage = useAppSelector(selectShouldAntialiasProgressImage);
 
   const sx = useMemo<SystemStyleObject>(
@@ -24,25 +25,32 @@ const CurrentImagePreview = () => {
     [shouldAntialiasProgressImage]
   );
 
-  if (!progressImage || isProgressFromCanvas) {
-    return null;
+  if (!progressImage) {
+    return (
+      <Flex width="full" height="full" alignItems="center" justifyContent="center">
+        <IAINoContentFallback icon={PiPulseBold} label="No Generation in Progress" />
+      </Flex>
+    );
   }
 
   return (
-    <Image
-      src={progressImage.dataURL}
-      width={progressImage.width}
-      height={progressImage.height}
-      draggable={false}
-      data-testid="progress-image"
-      objectFit="contain"
-      maxWidth="full"
-      maxHeight="full"
-      position="absolute"
-      borderRadius="base"
-      sx={sx}
-    />
+    <Flex width="full" height="full" alignItems="center" justifyContent="center" minW={0} minH={0}>
+      <Image
+        src={progressImage.dataURL}
+        width={progressImage.width}
+        height={progressImage.height}
+        draggable={false}
+        data-testid="progress-image"
+        objectFit="contain"
+        maxWidth="full"
+        maxHeight="full"
+        borderRadius="base"
+        sx={sx}
+        minH={0}
+        minW={0}
+      />
+    </Flex>
   );
-};
+});
 
-export default memo(CurrentImagePreview);
+ProgressImage.displayName = 'ProgressImage';

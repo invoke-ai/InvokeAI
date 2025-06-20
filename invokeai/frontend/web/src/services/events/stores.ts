@@ -1,3 +1,4 @@
+import type { EphemeralProgressImage } from 'features/controlLayers/store/types';
 import { round } from 'lodash-es';
 import { atom, computed, map } from 'nanostores';
 import type { S } from 'services/api/types';
@@ -8,10 +9,15 @@ export const $socket = atom<AppSocket | null>(null);
 export const $socketOptions = map<Partial<ManagerOptions & SocketOptions>>({});
 export const $isConnected = atom<boolean>(false);
 export const $lastProgressEvent = atom<S['InvocationProgressEvent'] | null>(null);
-export const $progressImage = computed($lastProgressEvent, (val) => val?.image ?? null);
-export const $hasProgressImage = computed($lastProgressEvent, (val) => Boolean(val?.image));
-export const $isProgressFromCanvas = computed($lastProgressEvent, (val) => val?.destination === 'canvas');
-export const $invocationProgressMessage = computed($lastProgressEvent, (val) => {
+
+export const $lastWorkflowsProgressEvent = atom<S['InvocationProgressEvent'] | null>(null);
+export const $lastWorkflowsProgressImage = atom<EphemeralProgressImage | null>(null);
+export const $lastUpscalingProgressEvent = atom<S['InvocationProgressEvent'] | null>(null);
+export const $lastUpscalingProgressImage = atom<EphemeralProgressImage | null>(null);
+
+export const $lastProgressImage = computed($lastProgressEvent, (val) => val?.image ?? null);
+export const $hasLastProgressImage = computed($lastProgressEvent, (val) => Boolean(val?.image));
+export const $lastProgressMessage = computed($lastProgressEvent, (val) => {
   if (!val) {
     return null;
   }

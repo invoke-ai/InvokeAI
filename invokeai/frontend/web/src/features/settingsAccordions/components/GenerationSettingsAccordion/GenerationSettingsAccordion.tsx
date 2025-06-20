@@ -12,14 +12,11 @@ import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import { DisabledModelWarning } from 'features/parameters/components/MainModel/DisabledModelWarning';
-import ParamUpscaleCFGScale from 'features/parameters/components/Upscale/ParamUpscaleCFGScale';
-import ParamUpscaleScheduler from 'features/parameters/components/Upscale/ParamUpscaleScheduler';
 import { useIsApiModel } from 'features/parameters/hooks/useIsApiModel';
 import { API_BASE_MODELS } from 'features/parameters/types/constants';
 import { MainModelPicker } from 'features/settingsAccordions/components/GenerationSettingsAccordion/MainModelPicker';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
@@ -32,16 +29,12 @@ const formLabelProps: FormLabelProps = {
 export const GenerationSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const modelConfig = useSelectedModelConfig();
-  const activeTabName = useAppSelector(selectActiveTab);
   const isFLUX = useAppSelector(selectIsFLUX);
   const isSD3 = useAppSelector(selectIsSD3);
   const isCogView4 = useAppSelector(selectIsCogView4);
 
   const isApiModel = useIsApiModel();
 
-  const isUpscaling = useMemo(() => {
-    return activeTabName === 'upscaling';
-  }, [activeTabName]);
   const selectBadges = useMemo(
     () =>
       createMemoizedSelector(selectLoRAsSlice, (loras) => {
@@ -63,8 +56,8 @@ export const GenerationSettingsAccordion = memo(() => {
     defaultIsOpen: false,
   });
   const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } = useStandaloneAccordionToggle({
-    id: `generation-settings-${activeTabName}`,
-    defaultIsOpen: activeTabName !== 'upscaling',
+    id: `generation-settings-generate`,
+    defaultIsOpen: true,
   });
 
   return (
@@ -85,12 +78,10 @@ export const GenerationSettingsAccordion = memo(() => {
           <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
             <Flex gap={4} flexDir="column" pb={4}>
               <FormControlGroup formLabelProps={formLabelProps}>
-                {!isFLUX && !isSD3 && !isCogView4 && !isUpscaling && <ParamScheduler />}
-                {isUpscaling && <ParamUpscaleScheduler />}
+                {!isFLUX && !isSD3 && !isCogView4 && <ParamScheduler />}
                 <ParamSteps />
                 {isFLUX && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}
-                {isUpscaling && <ParamUpscaleCFGScale />}
-                {!isFLUX && !isUpscaling && <ParamCFGScale />}
+                {!isFLUX && <ParamCFGScale />}
               </FormControlGroup>
             </Flex>
           </Expander>

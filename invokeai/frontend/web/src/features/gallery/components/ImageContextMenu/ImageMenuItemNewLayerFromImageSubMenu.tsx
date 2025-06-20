@@ -3,7 +3,6 @@ import { useAppStore } from 'app/store/nanostores/store';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
 import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';
-import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { sentImageToCanvas } from 'features/gallery/store/actions';
 import { createNewCanvasEntityFromImage } from 'features/imageActions/actions';
@@ -18,7 +17,6 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
   const subMenu = useSubMenu();
   const store = useAppStore();
   const imageDTO = useImageDTOContext();
-  const imageViewer = useImageViewer();
   const isBusy = useCanvasIsBusySafe();
 
   const onClickNewRasterLayerFromImage = useCallback(() => {
@@ -26,78 +24,60 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
     createNewCanvasEntityFromImage({ imageDTO, type: 'raster_layer', dispatch, getState });
     dispatch(sentImageToCanvas());
     dispatch(setActiveTab('canvas'));
-    imageViewer.close();
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
       status: 'success',
     });
-  }, [imageDTO, imageViewer, store, t]);
+  }, [imageDTO, store, t]);
 
   const onClickNewControlLayerFromImage = useCallback(() => {
     const { dispatch, getState } = store;
     createNewCanvasEntityFromImage({ imageDTO, type: 'control_layer', dispatch, getState });
     dispatch(sentImageToCanvas());
     dispatch(setActiveTab('canvas'));
-    imageViewer.close();
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
       status: 'success',
     });
-  }, [imageDTO, imageViewer, store, t]);
+  }, [imageDTO, store, t]);
 
   const onClickNewInpaintMaskFromImage = useCallback(() => {
     const { dispatch, getState } = store;
     createNewCanvasEntityFromImage({ imageDTO, type: 'inpaint_mask', dispatch, getState });
     dispatch(sentImageToCanvas());
     dispatch(setActiveTab('canvas'));
-    imageViewer.close();
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
       status: 'success',
     });
-  }, [imageDTO, imageViewer, store, t]);
+  }, [imageDTO, store, t]);
 
   const onClickNewRegionalGuidanceFromImage = useCallback(() => {
     const { dispatch, getState } = store;
     createNewCanvasEntityFromImage({ imageDTO, type: 'regional_guidance', dispatch, getState });
     dispatch(sentImageToCanvas());
     dispatch(setActiveTab('canvas'));
-    imageViewer.close();
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
       status: 'success',
     });
-  }, [imageDTO, imageViewer, store, t]);
-
-  const onClickNewGlobalReferenceImageFromImage = useCallback(() => {
-    const { dispatch, getState } = store;
-    createNewCanvasEntityFromImage({ imageDTO, type: 'reference_image', dispatch, getState });
-    dispatch(sentImageToCanvas());
-    dispatch(setActiveTab('canvas'));
-    imageViewer.close();
-    toast({
-      id: 'SENT_TO_CANVAS',
-      title: t('toast.sentToCanvas'),
-      status: 'success',
-    });
-  }, [imageDTO, imageViewer, store, t]);
+  }, [imageDTO, store, t]);
 
   const onClickNewRegionalReferenceImageFromImage = useCallback(() => {
     const { dispatch, getState } = store;
     createNewCanvasEntityFromImage({ imageDTO, type: 'regional_guidance_with_reference_image', dispatch, getState });
     dispatch(sentImageToCanvas());
     dispatch(setActiveTab('canvas'));
-    imageViewer.close();
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
       status: 'success',
     });
-  }, [imageDTO, imageViewer, store, t]);
+  }, [imageDTO, store, t]);
 
   return (
     <MenuItem {...subMenu.parentMenuItemProps} icon={<PiPlusBold />}>
@@ -124,13 +104,6 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
             isDisabled={isBusy}
           >
             {t('controlLayers.referenceImageRegional')}
-          </MenuItem>
-          <MenuItem
-            icon={<NewLayerIcon />}
-            onClickCapture={onClickNewGlobalReferenceImageFromImage}
-            isDisabled={isBusy}
-          >
-            {t('controlLayers.referenceImageGlobal')}
           </MenuItem>
         </MenuList>
       </Menu>

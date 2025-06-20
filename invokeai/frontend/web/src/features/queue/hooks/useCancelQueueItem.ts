@@ -5,26 +5,29 @@ import { useTranslation } from 'react-i18next';
 import { useCancelQueueItemMutation } from 'services/api/endpoints/queue';
 import { $isConnected } from 'services/events/stores';
 
-export const useCancelQueueItem = (item_id: number) => {
+export const useCancelQueueItem = () => {
   const isConnected = useStore($isConnected);
-  const [trigger, { isLoading }] = useCancelQueueItemMutation();
+  const [_trigger, { isLoading }] = useCancelQueueItemMutation();
   const { t } = useTranslation();
-  const cancelQueueItem = useCallback(async () => {
-    try {
-      await trigger(item_id).unwrap();
-      toast({
-        id: 'QUEUE_CANCEL_SUCCEEDED',
-        title: t('queue.cancelSucceeded'),
-        status: 'success',
-      });
-    } catch {
-      toast({
-        id: 'QUEUE_CANCEL_FAILED',
-        title: t('queue.cancelFailed'),
-        status: 'error',
-      });
-    }
-  }, [item_id, t, trigger]);
+  const trigger = useCallback(
+    async (item_id: number) => {
+      try {
+        await _trigger({ item_id }).unwrap();
+        toast({
+          id: 'QUEUE_CANCEL_SUCCEEDED',
+          title: t('queue.cancelSucceeded'),
+          status: 'success',
+        });
+      } catch {
+        toast({
+          id: 'QUEUE_CANCEL_FAILED',
+          title: t('queue.cancelFailed'),
+          status: 'error',
+        });
+      }
+    },
+    [t, _trigger]
+  );
 
-  return { cancelQueueItem, isLoading, isDisabled: !isConnected };
+  return { trigger, isLoading, isDisabled: !isConnected };
 };

@@ -26,7 +26,7 @@ import {
 } from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityIdentifier,
-  CanvasRenderableEntityState,
+  CanvasEntityState,
   LifecycleCallback,
   Rect,
 } from 'features/controlLayers/store/types';
@@ -41,10 +41,7 @@ import stableHash from 'stable-hash';
 import { assert } from 'tsafe';
 import type { Jsonifiable, JsonObject } from 'type-fest';
 
-export abstract class CanvasEntityAdapterBase<
-  T extends CanvasRenderableEntityState,
-  U extends string,
-> extends CanvasModuleBase {
+export abstract class CanvasEntityAdapterBase<T extends CanvasEntityState, U extends string> extends CanvasModuleBase {
   readonly type: U;
   readonly id: string;
   readonly path: string[];

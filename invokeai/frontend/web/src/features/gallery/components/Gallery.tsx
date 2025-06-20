@@ -18,12 +18,12 @@ import { useGallerySearchTerm } from 'features/gallery/components/ImageGrid/useG
 import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
 import { galleryViewChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import type { CSSProperties } from 'react';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiMagnifyingGlassBold } from 'react-icons/pi';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
-import GallerySettingsPopover from './GallerySettingsPopover/GallerySettingsPopover';
+import { GallerySettingsPopover } from './GallerySettingsPopover/GallerySettingsPopover';
 import { GalleryUploadButton } from './GalleryUploadButton';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
 import { GalleryPagination } from './ImageGrid/GalleryPagination';
@@ -46,7 +46,7 @@ const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0, width: '10
 const selectGalleryView = createSelector(selectGallerySlice, (gallery) => gallery.galleryView);
 const selectSearchTerm = createSelector(selectGallerySlice, (gallery) => gallery.searchTerm);
 
-export const Gallery = () => {
+export const GalleryPanel = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const galleryView = useAppSelector(selectGalleryView);
@@ -70,7 +70,7 @@ export const Gallery = () => {
   const boardName = useBoardName(selectedBoardId);
 
   return (
-    <Flex flexDirection="column" alignItems="center" justifyContent="space-between" h="full" w="full" pt={1} minH={0}>
+    <Flex flexDirection="column" alignItems="center" justifyContent="space-between" h="full" w="full" p={2} minH={0}>
       <Tabs index={galleryView === 'images' ? 0 : 1} variant="enclosed" display="flex" flexDir="column" w="full">
         <TabList gap={2} fontSize="sm" borderColor="base.800" alignItems="center" w="full">
           <Text fontSize="sm" fontWeight="semibold" noOfLines={1} px="2" wordBreak="break-all">
@@ -116,4 +116,5 @@ export const Gallery = () => {
       <GalleryPagination />
     </Flex>
   );
-};
+});
+GalleryPanel.displayName = 'Gallery';

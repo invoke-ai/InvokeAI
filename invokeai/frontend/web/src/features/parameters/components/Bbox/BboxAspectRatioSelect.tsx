@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { bboxAspectRatioIdChanged } from 'features/controlLayers/store/canvasSlice';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { selectIsChatGTP4o, selectIsImagen3, selectIsImagen4 } from 'features/controlLayers/store/paramsSlice';
+import { selectIsChatGPT4o, selectIsImagen3, selectIsImagen4 } from 'features/controlLayers/store/paramsSlice';
 import { selectAspectRatioID } from 'features/controlLayers/store/selectors';
 import {
   isAspectRatioID,
@@ -22,7 +22,7 @@ export const BboxAspectRatioSelect = memo(() => {
   const id = useAppSelector(selectAspectRatioID);
   const isStaging = useAppSelector(selectIsStaging);
   const isImagen3 = useAppSelector(selectIsImagen3);
-  const isChatGPT4o = useAppSelector(selectIsChatGTP4o);
+  const isChatGPT4o = useAppSelector(selectIsChatGPT4o);
   const isImagen4 = useAppSelector(selectIsImagen4);
   const options = useMemo(() => {
     // Imagen3 and ChatGPT4o have different aspect ratio options, and do not support freeform sizes
