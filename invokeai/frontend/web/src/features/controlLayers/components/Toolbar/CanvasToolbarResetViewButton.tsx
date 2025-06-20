@@ -2,7 +2,7 @@ import { IconButton } from '@invoke-ai/ui-library';
 import { useIsRegionFocused } from 'common/hooks/focus';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsOutBold } from 'react-icons/pi';
 
@@ -10,6 +10,10 @@ export const CanvasToolbarResetViewButton = memo(() => {
   const { t } = useTranslation();
   const canvasManager = useCanvasManager();
   const isCanvasFocused = useIsRegionFocused('canvas');
+
+  const fitLayersToStage = useCallback(() => {
+    canvasManager.stage.fitLayersToStage();
+  }, [canvasManager.stage]);
 
   useRegisteredHotkeys({
     id: 'fitLayersToCanvas',
@@ -58,7 +62,7 @@ export const CanvasToolbarResetViewButton = memo(() => {
     <IconButton
       tooltip={t('hotkeys.canvas.fitLayersToCanvas.title')}
       aria-label={t('hotkeys.canvas.fitLayersToCanvas.title')}
-      onClick={canvasManager.stage.fitLayersToStage}
+      onClick={fitLayersToStage}
       icon={<PiArrowsOutBold />}
       variant="link"
       alignSelf="stretch"

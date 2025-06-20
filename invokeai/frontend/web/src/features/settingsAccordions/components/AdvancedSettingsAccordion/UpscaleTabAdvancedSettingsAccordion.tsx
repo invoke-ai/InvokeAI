@@ -1,4 +1,3 @@
-import type { FormLabelProps } from '@invoke-ai/ui-library';
 import { Flex, StandaloneAccordion } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
@@ -12,14 +11,6 @@ import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
-
-const formLabelProps: FormLabelProps = {
-  minW: '9.2rem',
-};
-
-const formLabelProps2: FormLabelProps = {
-  flexGrow: 1,
-};
 
 export const AdvancedSettingsAccordion = memo(() => {
   const vaeKey = useAppSelector(selectVAEKey);
