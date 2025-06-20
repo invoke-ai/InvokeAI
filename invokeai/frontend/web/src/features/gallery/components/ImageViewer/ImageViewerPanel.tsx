@@ -1,6 +1,6 @@
 import { Divider, Flex } from '@invoke-ai/ui-library';
-import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer2';
-import { ViewerToolbar } from 'features/gallery/components/ImageViewer/ViewerToolbar2';
+import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
+import { ViewerToolbar } from 'features/gallery/components/ImageViewer/ViewerToolbar';
 import { memo } from 'react';
 
 export const ImageViewerPanel = memo(() => (
