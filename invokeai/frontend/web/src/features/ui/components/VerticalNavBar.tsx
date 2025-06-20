@@ -27,7 +27,7 @@ export const VerticalNavBar = memo(() => {
   return (
     <Flex flexDir="column" alignItems="center" py={6} px={4} gap={4} minW={0}>
       <InvokeAILogoComponent />
-      <Flex gap={4} pt={6} h="full" flexDir="column">
+      <Flex gap={6} pt={6} h="full" flexDir="column">
         <TabMountGate tab="generate">
           <TabButton tab="generate" icon={<PiTextAaBold />} label="Generate" />
         </TabMountGate>

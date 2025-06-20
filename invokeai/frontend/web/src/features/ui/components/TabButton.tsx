@@ -1,5 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { IconButton, Tab, Tooltip } from '@invoke-ai/ui-library';
+import { IconButton, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useCallbackOnDragEnter } from 'common/hooks/useCallbackOnDragEnter';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -26,7 +26,6 @@ export const TabButton = memo(({ tab, icon, label }: { tab: TabName; icon: React
   return (
     <Tooltip label={label} placement="end">
       <IconButton
-        as={Tab}
         p={0}
         ref={ref}
         onClick={selectTab}
