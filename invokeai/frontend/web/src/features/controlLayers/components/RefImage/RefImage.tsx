@@ -2,6 +2,7 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import {
   Divider,
   Flex,
+  Icon,
   IconButton,
   Image,
   Popover,
@@ -25,7 +26,7 @@ import { useRefImageIdContext } from 'features/controlLayers/contexts/RefImageId
 import { isIPAdapterConfig } from 'features/controlLayers/store/types';
 import { round } from 'lodash-es';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PiImageBold } from 'react-icons/pi';
+import { PiExclamationMarkBold, PiImageBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
 // There is some awkwardness here with closing the popover when clicking outside of it, related to Chakra's
@@ -93,6 +94,10 @@ const baseSx: SystemStyleObject = {
   },
   '&[data-is-open="true"]': {
     opacity: 1,
+  },
+  '&[data-is-error="true"]': {
+    borderColor: 'error.500',
+    borderWidth: 2,
   },
 };
 
@@ -182,6 +187,7 @@ const Thumbnail = memo(({ disclosure }: { disclosure: UseDisclosure }) => {
         flexShrink={0}
         sx={sx}
         data-is-open={disclosure.isOpen}
+        data-is-error={!entity.config.model}
         id={getRefImagePopoverTriggerId(id)}
         role="button"
         onClick={disclosure.toggle}
@@ -212,6 +218,18 @@ const Thumbnail = memo(({ disclosure }: { disclosure: UseDisclosure }) => {
               {`${round(entity.config.weight * 100, 2)}%`}
             </Text>
           </Flex>
+        )}
+        {!entity.config.model && (
+          <Icon
+            position="absolute"
+            top="50%"
+            left="50%"
+            transform="translateX(-50%) translateY(-50%)"
+            filter="drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 2px rgba(0, 0, 0, 1))"
+            color="error.500"
+            boxSize={16}
+            as={PiExclamationMarkBold}
+          />
         )}
       </Flex>
     </PopoverAnchor>
