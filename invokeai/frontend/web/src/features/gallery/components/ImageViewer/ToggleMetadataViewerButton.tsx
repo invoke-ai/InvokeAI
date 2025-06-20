@@ -14,16 +14,14 @@ export const ToggleMetadataViewerButton = memo(() => {
   const imageDTO = useAppSelector(selectLastSelectedImage);
   const { t } = useTranslation();
 
-  const toggleMetadataViewer = useCallback(
-    () => dispatch(setShouldShowImageDetails(!shouldShowImageDetails)),
-    [dispatch, shouldShowImageDetails]
-  );
+  const toggleMetadataViewer = useCallback(() => {
+    dispatch(setShouldShowImageDetails(!shouldShowImageDetails));
+  }, [dispatch, shouldShowImageDetails]);
 
   useRegisteredHotkeys({
     id: 'toggleMetadata',
     category: 'viewer',
     callback: toggleMetadataViewer,
-    options: { enabled: Boolean(imageDTO) },
     dependencies: [imageDTO, shouldShowImageDetails],
   });
 
@@ -33,7 +31,6 @@ export const ToggleMetadataViewerButton = memo(() => {
       tooltip={`${t('parameters.info')} (I)`}
       aria-label={`${t('parameters.info')} (I)`}
       onClick={toggleMetadataViewer}
-      isDisabled={!imageDTO}
       variant="link"
       alignSelf="stretch"
       colorScheme={shouldShowImageDetails ? 'invokeBlue' : 'base'}

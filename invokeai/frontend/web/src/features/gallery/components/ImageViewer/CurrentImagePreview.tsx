@@ -1,21 +1,18 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasAlertsInvocationProgress } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsInvocationProgress';
 import { DndImage } from 'features/dnd/DndImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
-import { selectShouldShowImageDetails, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
+import { selectShouldShowImageDetails } from 'features/ui/store/uiSelectors';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useCallback, useRef, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
-import { $hasLastProgressImage } from 'services/events/stores';
 
 import { NoContentForViewer } from './NoContentForViewer';
-import ProgressImage from './ProgressImage';
 
-const CurrentImagePreview = ({ imageDTO }: { imageDTO?: ImageDTO }) => {
+export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO?: ImageDTO }) => {
   const shouldShowImageDetails = useAppSelector(selectShouldShowImageDetails);
 
   // Show and hide the next/prev buttons on mouse move
@@ -79,18 +76,10 @@ const CurrentImagePreview = ({ imageDTO }: { imageDTO?: ImageDTO }) => {
       </AnimatePresence>
     </Flex>
   );
-};
-
-export default memo(CurrentImagePreview);
+});
+CurrentImagePreview.displayName = 'CurrentImagePreview';
 
 const ImageContent = memo(({ imageDTO }: { imageDTO?: ImageDTO }) => {
-  const hasProgressImage = useStore($hasLastProgressImage);
-  const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
-
-  if (hasProgressImage && shouldShowProgressInViewer) {
-    return <ProgressImage />;
-  }
-
   if (!imageDTO) {
     return <NoContentForViewer />;
   }

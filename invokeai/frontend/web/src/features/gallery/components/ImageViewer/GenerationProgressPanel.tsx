@@ -1,5 +1,5 @@
 import { Flex } from '@invoke-ai/ui-library';
-import { ProgressImage } from 'features/gallery/components/ImageViewer/ProgressImage2';
+import { ProgressImage } from 'features/gallery/components/ImageViewer/ProgressImage';
 import { memo } from 'react';
 
 export const GenerationProgressPanel = memo(() => (
