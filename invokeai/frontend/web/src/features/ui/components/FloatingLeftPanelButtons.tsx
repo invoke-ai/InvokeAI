@@ -5,7 +5,6 @@ import { useDeleteAllExceptCurrentQueueItemDialog } from 'features/queue/compone
 import { InvokeButtonTooltip } from 'features/queue/components/InvokeButtonTooltip/InvokeButtonTooltip';
 import { useDeleteCurrentQueueItem } from 'features/queue/hooks/useDeleteCurrentQueueItem';
 import { useInvoke } from 'features/queue/hooks/useInvoke';
-import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -54,11 +53,6 @@ FloatingCanvasLeftPanelButtons.displayName = 'FloatingCanvasLeftPanelButtons';
 
 const ToggleLeftPanelButton = memo(() => {
   const { toggleLeftPanel } = useAutoLayoutContext();
-  useRegisteredHotkeys({
-    category: 'app',
-    id: 'toggleLeftPanel',
-    callback: toggleLeftPanel,
-  });
   const { t } = useTranslation();
   return (
     <Tooltip label={t('accessibility.toggleLeftPanel')} placement="end">

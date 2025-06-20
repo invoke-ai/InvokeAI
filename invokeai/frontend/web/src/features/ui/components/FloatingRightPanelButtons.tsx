@@ -1,5 +1,4 @@
 import { Flex, IconButton, Tooltip } from '@invoke-ai/ui-library';
-import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,11 +16,6 @@ FloatingRightPanelButtons.displayName = 'FloatingRightPanelButtons';
 const ToggleRightPanelButton = memo(() => {
   const { t } = useTranslation();
   const { toggleRightPanel } = useAutoLayoutContext();
-  useRegisteredHotkeys({
-    category: 'app',
-    id: 'toggleRightPanel',
-    callback: toggleRightPanel,
-  });
 
   return (
     <Tooltip label={t('accessibility.toggleRightPanel')} placement="start">

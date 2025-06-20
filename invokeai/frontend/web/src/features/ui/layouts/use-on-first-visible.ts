@@ -1,5 +1,9 @@
+import type { GridviewApi } from 'dockview';
+import type { Atom } from 'nanostores';
 import type { RefObject } from 'react';
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
+
+import { MAIN_PANEL_ID } from './shared';
 
 export const useOnFirstVisible = (elementRef: RefObject<HTMLElement>, callback: () => void): void => {
   useEffect(() => {
@@ -45,4 +49,33 @@ export const useOnFirstVisible = (elementRef: RefObject<HTMLElement>, callback: 
       observer.disconnect();
     };
   }, [elementRef, callback]);
+};
+
+export const useResizeMainPanelOnFirstVisit = ($api: Atom<GridviewApi | null>, ref: RefObject<HTMLElement>) => {
+  const resizeMainPanelOnFirstVisible = useCallback(() => {
+    const api = $api.get();
+    if (!api) {
+      return;
+    }
+    const mainPanel = api.getPanel(MAIN_PANEL_ID);
+    if (!mainPanel) {
+      return;
+    }
+    if (mainPanel.width !== 0) {
+      return;
+    }
+    let count = 0;
+    const setSize = () => {
+      if (count++ > 50) {
+        return;
+      }
+      mainPanel.api.setSize({ width: Number.MAX_SAFE_INTEGER });
+      if (mainPanel.width === 0) {
+        requestAnimationFrame(setSize);
+        return;
+      }
+    };
+    setSize();
+  }, [$api]);
+  useOnFirstVisible(ref, resizeMainPanelOnFirstVisible);
 };
