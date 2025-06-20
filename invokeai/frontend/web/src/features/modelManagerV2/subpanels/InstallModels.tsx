@@ -1,7 +1,7 @@
 import { Box, Button, Flex, Heading, Tab, TabList, TabPanel, TabPanels, Tabs, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { StarterModelsForm } from 'features/modelManagerV2/subpanels/AddModelPanel/StarterModels/StarterModelsForm';
 import { $installModelsTab } from 'features/modelManagerV2/store/installModelsStore';
+import { StarterModelsForm } from 'features/modelManagerV2/subpanels/AddModelPanel/StarterModels/StarterModelsForm';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiInfoBold } from 'react-icons/pi';
