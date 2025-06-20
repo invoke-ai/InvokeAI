@@ -5,12 +5,13 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
+import { useRecallMetadataWithConfirmation } from 'features/gallery/components/ImageGrid/RecallMetadataConfirmationAlertDialog';
 import { useImageActions } from 'features/gallery/hooks/useImageActions';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { $hasTemplates } from 'features/nodes/store/nodesSlice';
 import { PostProcessingPopover } from 'features/parameters/components/PostProcessing/PostProcessingPopover';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiArrowsCounterClockwiseBold,
@@ -43,6 +44,15 @@ const CurrentImageButtonsContent = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
   const imageActions = useImageActions(imageDTO);
   const isStaging = useAppSelector(selectIsStaging);
   const isUpscalingEnabled = useFeatureStatus('upscaling');
+  const { recallWithConfirmation } = useRecallMetadataWithConfirmation();
+
+  const handleRecallAll = useCallback(() => {
+    if (imageActions.hasMetadata) {
+      recallWithConfirmation(() => {
+        imageActions.recallAll();
+      });
+    }
+  }, [imageActions, recallWithConfirmation]);
 
   return (
     <>
@@ -105,15 +115,14 @@ const CurrentImageButtonsContent = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
         alignSelf="stretch"
         onClick={imageActions.recallSize}
         isDisabled={isStaging}
-      />
-      <IconButton
+      />      <IconButton
         icon={<PiAsteriskBold />}
         tooltip={`${t('parameters.useAll')} (A)`}
         aria-label={`${t('parameters.useAll')} (A)`}
         isDisabled={!imageActions.hasMetadata}
         variant="link"
         alignSelf="stretch"
-        onClick={imageActions.recallAll}
+        onClick={handleRecallAll}
       />
 
       {isUpscalingEnabled && <PostProcessingPopover imageDTO={imageDTO} />}

@@ -152,8 +152,8 @@
         "orderBy": "Order By",
         "outpaint": "outpaint",
         "outputs": "Outputs",
-        "postprocessing": "Post Processing",
-        "random": "Random",
+        "postprocessing": "Post Processing",        "random": "Random",
+        "recall": "Recall",
         "reportBugLabel": "Report Bug",
         "safetensors": "Safetensors",
         "save": "Save",
@@ -393,10 +393,11 @@
         "compareHelp1": "Hold <Kbd>Alt</Kbd> while clicking a gallery image or using the arrow keys to change the compare image.",
         "compareHelp2": "Press <Kbd>M</Kbd> to cycle through comparison modes.",
         "compareHelp3": "Press <Kbd>C</Kbd> to swap the compared images.",
-        "compareHelp4": "Press <Kbd>Z</Kbd> or <Kbd>Esc</Kbd> to exit.",
-        "openViewer": "Open Viewer",
+        "compareHelp4": "Press <Kbd>Z</Kbd> or <Kbd>Esc</Kbd> to exit.",        "openViewer": "Open Viewer",
         "closeViewer": "Close Viewer",
-        "move": "Move"
+        "move": "Move",
+        "recallParametersCanvasWarning": "Recalling parameters will potentially overwrite your current canvas settings and may affect active layers. Some canvas parameters may be overwritten.",
+        "activeCanvasData": "Active Canvas Data: {{data}}"
     },
     "hotkeys": {
         "hotkeys": "Hotkeys",
