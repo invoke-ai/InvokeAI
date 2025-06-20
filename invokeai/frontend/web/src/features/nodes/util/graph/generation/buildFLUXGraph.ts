@@ -27,6 +27,7 @@ import {
   type ImageOutputNodes,
   UnsupportedGenerationModeError,
 } from 'features/nodes/util/graph/types';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
@@ -37,8 +38,9 @@ import { addIPAdapters } from './addIPAdapters';
 
 const log = logger('system');
 
-export const buildFLUXGraph = async (state: RootState, manager?: CanvasManager | null): Promise<GraphBuilderReturn> => {
-  const generationMode = await getGenerationMode(manager);
+export const buildFLUXGraph = async (state: RootState, manager: CanvasManager | null): Promise<GraphBuilderReturn> => {
+  const tab = selectActiveTab(state);
+  const generationMode = await getGenerationMode(manager, tab);
   log.debug({ generationMode }, 'Building FLUX graph');
 
   const params = selectParamsSlice(state);

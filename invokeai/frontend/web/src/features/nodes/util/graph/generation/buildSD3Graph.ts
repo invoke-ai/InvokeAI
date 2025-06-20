@@ -18,14 +18,16 @@ import {
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 const log = logger('system');
 
-export const buildSD3Graph = async (state: RootState, manager?: CanvasManager | null): Promise<GraphBuilderReturn> => {
-  const generationMode = await getGenerationMode(manager);
+export const buildSD3Graph = async (state: RootState, manager: CanvasManager | null): Promise<GraphBuilderReturn> => {
+  const tab = selectActiveTab(state);
+  const generationMode = await getGenerationMode(manager, tab);
   log.debug({ generationMode }, 'Building SD3 graph');
 
   const model = selectMainModelConfig(state);

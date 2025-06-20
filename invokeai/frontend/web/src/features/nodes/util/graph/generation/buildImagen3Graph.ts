@@ -10,6 +10,7 @@ import { getGenerationMode } from 'features/nodes/util/graph/generation/getGener
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import { type GraphBuilderReturn, UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
@@ -18,9 +19,10 @@ const log = logger('system');
 
 export const buildImagen3Graph = async (
   state: RootState,
-  manager?: CanvasManager | null
+  manager: CanvasManager | null
 ): Promise<GraphBuilderReturn> => {
-  const generationMode = await getGenerationMode(manager);
+  const tab = selectActiveTab(state);
+  const generationMode = await getGenerationMode(manager, tab);
 
   if (generationMode !== 'txt2img') {
     throw new UnsupportedGenerationModeError(t('toast.imagenIncompatibleGenerationMode', { model: 'Imagen3' }));
