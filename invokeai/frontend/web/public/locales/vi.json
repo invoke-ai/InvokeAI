@@ -2439,8 +2439,8 @@
         "watchRecentReleaseVideos": "Xem Video Phát Hành Mới Nhất",
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
         "items": [
-            "Nvidia 50xx GPUs: Invoke sử dụng PyTorch 2.7.0, thứ tối quan trọng cho những GPU trên.",
-            "Mối Quan Hệ Model: Kết nối LoRA với model chính, và LoRA đó sẽ được hiển thị đầu danh sách."
+            "Trình Inpaint: Cấp độ nhiễu theo lớp phủ và giới hạn khử nhiễu.",
+            "Canvas: Tỉ lệ giao diện thông minh hơn cho SDXL và nâng cấp tính năng lăn để phóng to."
         ]
     },
     "upsell": {
