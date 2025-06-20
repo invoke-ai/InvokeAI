@@ -10,6 +10,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useCallback, useRef, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
+import { ImageMetadataMini } from './ImageMetadataMini';
 import { NoContentForViewer } from './NoContentForViewer';
 
 export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO?: ImageDTO }) => {
@@ -39,16 +40,9 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO?: ImageDTO }) 
       position="relative"
     >
       <ImageContent imageDTO={imageDTO} />
-      <Flex
-        flexDir="column"
-        gap={2}
-        position="absolute"
-        top={0}
-        insetInlineStart={0}
-        pointerEvents="none"
-        alignItems="flex-start"
-      >
+      <Flex flexDir="column" gap={2} position="absolute" top={0} insetInlineStart={0} alignItems="flex-start">
         <CanvasAlertsInvocationProgress />
+        {imageDTO && <ImageMetadataMini imageName={imageDTO.image_name} />}
       </Flex>
       {shouldShowImageDetails && imageDTO && (
         <Box position="absolute" opacity={0.8} top={0} width="full" height="full" borderRadius="base">
