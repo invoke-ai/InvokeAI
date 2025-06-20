@@ -19,6 +19,7 @@ import {
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import type { Equals } from 'tsafe';
@@ -28,9 +29,10 @@ const log = logger('system');
 
 export const buildCogView4Graph = async (
   state: RootState,
-  manager?: CanvasManager | null
+  manager: CanvasManager | null
 ): Promise<GraphBuilderReturn> => {
-  const generationMode = await getGenerationMode(manager);
+  const tab = selectActiveTab(state);
+  const generationMode = await getGenerationMode(manager, tab);
   log.debug({ generationMode }, 'Building CogView4 graph');
 
   const params = selectParamsSlice(state);
