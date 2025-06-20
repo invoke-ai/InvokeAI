@@ -1,5 +1,4 @@
 import { DndImageIcon } from 'features/dnd/DndImageIcon';
-import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsOutBold } from 'react-icons/pi';
@@ -10,12 +9,12 @@ type Props = {
 };
 
 export const GalleryImageOpenInViewerIconButton = memo(({ imageDTO }: Props) => {
-  const imageViewer = useImageViewer();
   const { t } = useTranslation();
 
   const onClick = useCallback(() => {
-    imageViewer.openImageInViewer(imageDTO);
-  }, [imageDTO, imageViewer]);
+    // TODO
+    imageDTO.image_name;
+  }, [imageDTO]);
 
   return (
     <DndImageIcon
