@@ -62,6 +62,15 @@ export const useGlobalHotkeys = () => {
   });
 
   useRegisteredHotkeys({
+    id: 'selectGenerateTab',
+    category: 'app',
+    callback: () => {
+      dispatch(setActiveTab('generate'));
+    },
+    dependencies: [dispatch],
+  });
+
+  useRegisteredHotkeys({
     id: 'selectCanvasTab',
     category: 'app',
     callback: () => {
