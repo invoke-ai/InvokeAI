@@ -7,7 +7,6 @@ import { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
 import { paramsReset } from 'features/controlLayers/store/paramsSlice';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
-import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { sentImageToCanvas } from 'features/gallery/store/actions';
 import { parseAndRecallAllMetadata } from 'features/metadata/util/handlers';
 import { $hasTemplates } from 'features/nodes/store/nodesSlice';
@@ -94,7 +93,6 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
       store.dispatch(canvasReset());
       store.dispatch(rasterLayerAdded({ overrides, isSelected: true }));
       store.dispatch(sentImageToCanvas());
-      $imageViewer.set(false);
       toast({
         title: t('toast.sentToCanvas'),
         status: 'info',
@@ -164,12 +162,10 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
           // Go to the canvas tab, open the image viewer, and enable send-to-gallery mode
           store.dispatch(paramsReset());
           store.dispatch(activeTabCanvasRightPanelChanged('gallery'));
-          $imageViewer.set(true);
           break;
         case 'canvas':
           // Go to the canvas tab, close the image viewer, and disable send-to-gallery mode
           store.dispatch(canvasReset());
-          $imageViewer.set(false);
           break;
         case 'workflows':
           // Go to the workflows tab
