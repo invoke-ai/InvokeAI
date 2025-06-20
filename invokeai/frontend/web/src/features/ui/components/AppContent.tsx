@@ -24,52 +24,8 @@ const onLeftPanelCollapse = (isCollapsed: boolean) => $isLeftPanelOpen.set(!isCo
 const onRightPanelCollapse = (isCollapsed: boolean) => $isRightPanelOpen.set(!isCollapsed);
 
 export const AppContent = memo(() => {
-  // const tab = useAppSelector(selectActiveTab);
   const tabIndex = useAppSelector(selectActiveTabIndex);
-  // const imperativePanelGroupRef = useRef<ImperativePanelGroupHandle>(null);
   useDndMonitor();
-
-  // const withLeftPanel = useAppSelector(selectWithLeftPanel);
-  // const leftPanelUsePanelOptions = useMemo<UsePanelOptions>(
-  //   () => ({
-  //     id: 'left-panel',
-  //     minSizePx: LEFT_PANEL_MIN_SIZE_PX,
-  //     defaultSizePx: LEFT_PANEL_MIN_SIZE_PX,
-  //     imperativePanelGroupRef,
-  //     panelGroupDirection: 'horizontal',
-  //     onCollapse: onLeftPanelCollapse,
-  //   }),
-  //   []
-  // );
-  // const leftPanel = usePanel(leftPanelUsePanelOptions);
-  // useRegisteredHotkeys({
-  //   id: 'toggleLeftPanel',
-  //   category: 'app',
-  //   callback: leftPanel.toggle,
-  //   options: { enabled: withLeftPanel },
-  //   dependencies: [leftPanel.toggle, withLeftPanel],
-  // });
-
-  // const withRightPanel = useAppSelector(selectWithRightPanel);
-  // const rightPanelUsePanelOptions = useMemo<UsePanelOptions>(
-  //   () => ({
-  //     id: 'right-panel',
-  //     minSizePx: RIGHT_PANEL_MIN_SIZE_PX,
-  //     defaultSizePx: RIGHT_PANEL_MIN_SIZE_PX,
-  //     imperativePanelGroupRef,
-  //     panelGroupDirection: 'horizontal',
-  //     onCollapse: onRightPanelCollapse,
-  //   }),
-  //   []
-  // );
-  // const rightPanel = usePanel(rightPanelUsePanelOptions);
-  // useRegisteredHotkeys({
-  //   id: 'toggleRightPanel',
-  //   category: 'app',
-  //   callback: rightPanel.toggle,
-  //   options: { enabled: withRightPanel },
-  //   dependencies: [rightPanel.toggle, withRightPanel],
-  // });
 
   // useRegisteredHotkeys({
   //   id: 'resetPanelLayout',

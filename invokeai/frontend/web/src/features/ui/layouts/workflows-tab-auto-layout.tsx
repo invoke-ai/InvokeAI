@@ -9,14 +9,20 @@ import NodeEditor from 'features/nodes/components/NodeEditor';
 import WorkflowsTabLeftPanel from 'features/nodes/components/sidePanel/WorkflowsTabLeftPanel';
 import { FloatingLeftPanelButtons } from 'features/ui/components/FloatingLeftPanelButtons';
 import { FloatingRightPanelButtons } from 'features/ui/components/FloatingRightPanelButtons';
-import { AutoLayoutProvider } from 'features/ui/layouts/auto-layout-context';
+import { AutoLayoutProvider, PanelHotkeysLogical } from 'features/ui/layouts/auto-layout-context';
 import { TabWithoutCloseButton } from 'features/ui/layouts/TabWithoutCloseButton';
-import { LEFT_PANEL_MIN_SIZE_PX, RIGHT_PANEL_MIN_SIZE_PX } from 'features/ui/store/uiSlice';
 import { dockviewTheme } from 'features/ui/styles/theme';
 import { atom } from 'nanostores';
 import { memo, useCallback, useRef, useState } from 'react';
 
-import { useOnFirstVisible } from './use-on-first-visible';
+import {
+  LEFT_PANEL_ID,
+  LEFT_PANEL_MIN_SIZE_PX,
+  MAIN_PANEL_ID,
+  RIGHT_PANEL_ID,
+  RIGHT_PANEL_MIN_SIZE_PX,
+} from './shared';
+import { useResizeMainPanelOnFirstVisit } from './use-on-first-visible';
 
 const LAUNCHPAD_PANEL_ID = 'launchpad';
 const WORKSPACE_PANEL_ID = 'workspace';
@@ -98,6 +104,7 @@ const MainPanel = memo(() => {
       />
       <FloatingLeftPanelButtons />
       <FloatingRightPanelButtons />
+      <PanelHotkeysLogical />
     </>
   );
 });
@@ -148,10 +155,6 @@ const RightPanel = memo(() => {
 });
 RightPanel.displayName = 'RightPanel';
 
-const LEFT_PANEL_ID = 'left';
-const MAIN_PANEL_ID = 'main';
-const RIGHT_PANEL_ID = 'right';
-
 export const rootComponents: IGridviewReactProps['components'] = {
   [LEFT_PANEL_ID]: WorkflowsTabLeftPanel,
   [MAIN_PANEL_ID]: MainPanel,
@@ -197,69 +200,10 @@ export const WorkflowsTabAutoLayout = memo(() => {
     },
     [$api]
   );
-  const resizeMainPanelOnFirstVisible = useCallback(() => {
-    const api = $api.get();
-    if (!api) {
-      return;
-    }
-    const mainPanel = api.getPanel(MAIN_PANEL_ID);
-    if (!mainPanel) {
-      return;
-    }
-    if (mainPanel.width !== 0) {
-      return;
-    }
-    let count = 0;
-    const setSize = () => {
-      if (count++ > 50) {
-        return;
-      }
-      mainPanel.api.setSize({ width: Number.MAX_SAFE_INTEGER });
-      if (mainPanel.width === 0) {
-        requestAnimationFrame(setSize);
-        return;
-      }
-    };
-    setSize();
-  }, [$api]);
-  useOnFirstVisible(ref, resizeMainPanelOnFirstVisible);
-  const toggleLeftPanel = useCallback(() => {
-    const api = $api.get();
-    if (!api) {
-      return;
-    }
-    const left = api.getPanel(LEFT_PANEL_ID);
-    if (!left) {
-      return;
-    }
-    if (left.maximumWidth === 0) {
-      left.api.setConstraints({ maximumWidth: Number.MAX_SAFE_INTEGER, minimumWidth: LEFT_PANEL_MIN_SIZE_PX });
-      left.api.setSize({ width: LEFT_PANEL_MIN_SIZE_PX });
-    } else {
-      left.api.setConstraints({ maximumWidth: 0, minimumWidth: 0 });
-      left.api.setSize({ width: 0 });
-    }
-  }, [$api]);
-  const toggleRightPanel = useCallback(() => {
-    const api = $api.get();
-    if (!api) {
-      return;
-    }
-    const right = api.getPanel(RIGHT_PANEL_ID);
-    if (!right) {
-      return;
-    }
-    if (right.maximumWidth === 0) {
-      right.api.setConstraints({ maximumWidth: Number.MAX_SAFE_INTEGER, minimumWidth: RIGHT_PANEL_MIN_SIZE_PX });
-      right.api.setSize({ width: RIGHT_PANEL_MIN_SIZE_PX });
-    } else {
-      right.api.setConstraints({ maximumWidth: 0, minimumWidth: 0 });
-      right.api.setSize({ width: 0 });
-    }
-  }, [$api]);
+  useResizeMainPanelOnFirstVisit($api, ref);
 
   return (
-    <AutoLayoutProvider $api={$api} toggleLeftPanel={toggleLeftPanel} toggleRightPanel={toggleRightPanel}>
+    <AutoLayoutProvider $api={$api}>
       <GridviewReact
         ref={ref}
         className="dockview-theme-invoke"
