@@ -14,8 +14,8 @@ export const GenerateLaunchpadPanel = memo(() => {
   }, [dispatch]);
 
   return (
-    <Flex flexDir="column" h="full" w="full" alignItems="center" justifyContent="center" gap={2}>
-      <Flex flexDir="column" w="full" h="full" justifyContent="center" gap={4} px={14} maxW={768}>
+    <Flex flexDir="column" h="full" w="full" alignItems="center" gap={2}>
+      <Flex flexDir="column" w="full" gap={4} px={14} maxW={768} pt="20vh">
         <Heading mb={4}>Generate images from text prompts.</Heading>
         <Flex flexDir="column" gap={8}>
           <Grid gridTemplateColumns="1fr 1fr" gap={8}>
