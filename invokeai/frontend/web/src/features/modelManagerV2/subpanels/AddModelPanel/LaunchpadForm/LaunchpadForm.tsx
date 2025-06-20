@@ -1,7 +1,7 @@
 import { Box, Button, Flex, Grid, Heading, Text } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { flattenStarterModel, useBuildModelInstallArg } from 'features/modelManagerV2/hooks/useBuildModelsToInstall';
-import { $installModelsTab } from 'features/modelManagerV2/subpanels/InstallModels';
+import { $installModelsTab } from 'features/modelManagerV2/store/installModelsStore';
 import { toast } from 'features/toast/toast';
 import { flatMap, negate, uniqWith } from 'lodash-es';
 import { memo, useCallback } from 'react';
