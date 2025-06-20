@@ -10,53 +10,15 @@ import { GenerateTabAutoLayout } from 'features/ui/layouts/generate-tab-auto-lay
 import { UpscalingTabAutoLayout } from 'features/ui/layouts/upscaling-tab-auto-layout';
 import { WorkflowsTabAutoLayout } from 'features/ui/layouts/workflows-tab-auto-layout';
 import { selectActiveTabIndex } from 'features/ui/store/uiSelectors';
-import { $isLeftPanelOpen, $isRightPanelOpen } from 'features/ui/store/uiSlice';
-import type { CSSProperties } from 'react';
 import { memo } from 'react';
 
 import { TabMountGate } from './TabMountGate';
 import ModelManagerTab from './tabs/ModelManagerTab';
 import QueueTab from './tabs/QueueTab';
 
-const panelStyles: CSSProperties = { position: 'relative', height: '100%', width: '100%', minWidth: 0 };
-
-const onLeftPanelCollapse = (isCollapsed: boolean) => $isLeftPanelOpen.set(!isCollapsed);
-const onRightPanelCollapse = (isCollapsed: boolean) => $isRightPanelOpen.set(!isCollapsed);
-
 export const AppContent = memo(() => {
   const tabIndex = useAppSelector(selectActiveTabIndex);
   useDndMonitor();
-
-  // useRegisteredHotkeys({
-  //   id: 'resetPanelLayout',
-  //   category: 'app',
-  //   callback: () => {
-  //     leftPanel.reset();
-  //     rightPanel.reset();
-  //   },
-  //   dependencies: [leftPanel.reset, rightPanel.reset],
-  // });
-  // useRegisteredHotkeys({
-  //   id: 'togglePanels',
-  //   category: 'app',
-  //   callback: () => {
-  //     if (leftPanel.isCollapsed || rightPanel.isCollapsed) {
-  //       leftPanel.expand();
-  //       rightPanel.expand();
-  //     } else {
-  //       leftPanel.collapse();
-  //       rightPanel.collapse();
-  //     }
-  //   },
-  //   dependencies: [
-  //     leftPanel.isCollapsed,
-  //     rightPanel.isCollapsed,
-  //     leftPanel.expand,
-  //     rightPanel.expand,
-  //     leftPanel.collapse,
-  //     rightPanel.collapse,
-  //   ],
-  // });
 
   return (
     <Tabs index={tabIndex} display="flex" w="full" h="full" p={0} overflow="hidden">
