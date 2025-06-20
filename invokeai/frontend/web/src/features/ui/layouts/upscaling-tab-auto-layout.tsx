@@ -1,4 +1,4 @@
-import type { GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
+import type { DockviewApi, GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
 import { DockviewReact, GridviewReact, LayoutPriority, Orientation } from 'dockview';
 import { UpscalingLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/UpscalingLaunchpadPanel';
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
@@ -7,34 +7,35 @@ import { GenerationProgressPanel } from 'features/gallery/components/ImageViewer
 import { ImageViewerPanel } from 'features/gallery/components/ImageViewer/ImageViewerPanel';
 import { FloatingLeftPanelButtons } from 'features/ui/components/FloatingLeftPanelButtons';
 import { FloatingRightPanelButtons } from 'features/ui/components/FloatingRightPanelButtons';
-import { AutoLayoutProvider, PanelHotkeysLogical } from 'features/ui/layouts/auto-layout-context';
+import { AutoLayoutProvider, PanelHotkeysLogical, useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
 import { TabWithoutCloseButton } from 'features/ui/layouts/TabWithoutCloseButton';
 import { dockviewTheme } from 'features/ui/styles/theme';
 import { atom } from 'nanostores';
 import { memo, useCallback, useRef, useState } from 'react';
 
 import {
+  BOARDS_PANEL_ID,
+  GALLERY_PANEL_ID,
+  LAUNCHPAD_PANEL_ID,
   LEFT_PANEL_ID,
   LEFT_PANEL_MIN_SIZE_PX,
   MAIN_PANEL_ID,
+  PROGRESS_PANEL_ID,
   RIGHT_PANEL_ID,
   RIGHT_PANEL_MIN_SIZE_PX,
+  SETTINGS_PANEL_ID,
+  VIEWER_PANEL_ID,
 } from './shared';
 import { UpscalingTabLeftPanel } from './UpscalingTabLeftPanel';
 import { useResizeMainPanelOnFirstVisit } from './use-on-first-visible';
 
-const LAUNCHPAD_PANEL_ID = 'launchpad';
-const VIEWER_PANEL_ID = 'viewer';
-const PROGRESS_PANEL_ID = 'progress';
-
-const dockviewComponents: IDockviewReactProps['components'] = {
+const centerComponents: IDockviewReactProps['components'] = {
   [LAUNCHPAD_PANEL_ID]: UpscalingLaunchpadPanel,
   [VIEWER_PANEL_ID]: ImageViewerPanel,
   [PROGRESS_PANEL_ID]: GenerationProgressPanel,
 };
 
-const onReadyMainPanel: IDockviewReactProps['onReady'] = (event) => {
-  const { api } = event;
+const initializeCenterLayout = (api: DockviewApi) => {
   api.addPanel({
     id: LAUNCHPAD_PANEL_ID,
     component: LAUNCHPAD_PANEL_ID,
@@ -60,24 +61,30 @@ const onReadyMainPanel: IDockviewReactProps['onReady'] = (event) => {
   });
 
   api.getPanel(LAUNCHPAD_PANEL_ID)?.api.setActive();
-
-  const disposables = [
-    api.onWillShowOverlay((e) => {
-      if (e.kind === 'header_space' || e.kind === 'tab') {
-        return;
-      }
-      e.preventDefault();
-    }),
-  ];
-
-  return () => {
-    disposables.forEach((disposable) => {
-      disposable.dispose();
-    });
-  };
 };
+const CenterPanel = memo(() => {
+  const ctx = useAutoLayoutContext();
+  const onReady = useCallback<IDockviewReactProps['onReady']>(
+    (event) => {
+      initializeCenterLayout(event.api);
+      ctx._$centerPanelApi.set(event.api);
+      const disposables = [
+        event.api.onWillShowOverlay((e) => {
+          if (e.kind === 'header_space' || e.kind === 'tab') {
+            return;
+          }
+          e.preventDefault();
+        }),
+      ];
 
-const MainPanel = memo(() => {
+      return () => {
+        disposables.forEach((disposable) => {
+          disposable.dispose();
+        });
+      };
+    },
+    [ctx._$centerPanelApi]
+  );
   return (
     <>
       <DockviewReact
@@ -86,8 +93,8 @@ const MainPanel = memo(() => {
         disableFloatingGroups={true}
         dndEdges={false}
         defaultTabComponent={TabWithoutCloseButton}
-        components={dockviewComponents}
-        onReady={onReadyMainPanel}
+        components={centerComponents}
+        onReady={onReady}
         theme={dockviewTheme}
       />
       <FloatingLeftPanelButtons />
@@ -96,17 +103,14 @@ const MainPanel = memo(() => {
     </>
   );
 });
-MainPanel.displayName = 'MainPanel';
-
-const BOARDS_PANEL_ID = 'boards';
-const GALLERY_PANEL_ID = 'gallery';
+CenterPanel.displayName = 'CenterPanel';
 
 const rightPanelComponents: IGridviewReactProps['components'] = {
   [BOARDS_PANEL_ID]: BoardsPanel,
   [GALLERY_PANEL_ID]: GalleryPanel,
 };
 
-export const initializeRightLayout = (api: GridviewApi) => {
+export const initializeRightPanelLayout = (api: GridviewApi) => {
   api.addPanel({
     id: GALLERY_PANEL_ID,
     component: GALLERY_PANEL_ID,
@@ -126,7 +130,7 @@ export const initializeRightLayout = (api: GridviewApi) => {
 };
 
 const onReadyRightPanel: IGridviewReactProps['onReady'] = (event) => {
-  initializeRightLayout(event.api);
+  initializeRightPanelLayout(event.api);
 };
 
 const RightPanel = memo(() => {
@@ -143,13 +147,46 @@ const RightPanel = memo(() => {
 });
 RightPanel.displayName = 'RightPanel';
 
-export const rootComponents: IGridviewReactProps['components'] = {
-  [LEFT_PANEL_ID]: UpscalingTabLeftPanel,
-  [MAIN_PANEL_ID]: MainPanel,
+const leftPanelComponents: IGridviewReactProps['components'] = {
+  [SETTINGS_PANEL_ID]: UpscalingTabLeftPanel,
+};
+
+export const initializeLeftPanelLayout = (api: GridviewApi) => {
+  api.addPanel({
+    id: SETTINGS_PANEL_ID,
+    component: SETTINGS_PANEL_ID,
+  });
+};
+
+const LeftPanel = memo(() => {
+  const ctx = useAutoLayoutContext();
+  const onReady = useCallback<IGridviewReactProps['onReady']>(
+    (event) => {
+      initializeLeftPanelLayout(event.api);
+      ctx._$leftPanelApi.set(event.api);
+    },
+    [ctx._$leftPanelApi]
+  );
+  return (
+    <>
+      <GridviewReact
+        className="dockview-theme-invoke"
+        orientation={Orientation.VERTICAL}
+        components={leftPanelComponents}
+        onReady={onReady}
+      />
+    </>
+  );
+});
+LeftPanel.displayName = 'LeftPanel';
+
+export const rootPanelComponents: IGridviewReactProps['components'] = {
+  [LEFT_PANEL_ID]: LeftPanel,
+  [MAIN_PANEL_ID]: CenterPanel,
   [RIGHT_PANEL_ID]: RightPanel,
 };
 
-export const initializeRootLayout = (api: GridviewApi) => {
+export const initializeRootPanelLayout = (api: GridviewApi) => {
   api.addPanel({
     id: MAIN_PANEL_ID,
     component: MAIN_PANEL_ID,
@@ -180,22 +217,22 @@ export const initializeRootLayout = (api: GridviewApi) => {
 
 export const UpscalingTabAutoLayout = memo(() => {
   const ref = useRef<HTMLDivElement>(null);
-  const $api = useState(() => atom<GridviewApi | null>(null))[0];
+  const $rootPanelApi = useState(() => atom<GridviewApi | null>(null))[0];
   const onReady = useCallback<IGridviewReactProps['onReady']>(
     (event) => {
-      $api.set(event.api);
-      initializeRootLayout(event.api);
+      $rootPanelApi.set(event.api);
+      initializeRootPanelLayout(event.api);
     },
-    [$api]
+    [$rootPanelApi]
   );
-  useResizeMainPanelOnFirstVisit($api, ref);
+  useResizeMainPanelOnFirstVisit($rootPanelApi, ref);
 
   return (
-    <AutoLayoutProvider $api={$api}>
+    <AutoLayoutProvider $rootApi={$rootPanelApi}>
       <GridviewReact
         ref={ref}
         className="dockview-theme-invoke"
-        components={rootComponents}
+        components={rootPanelComponents}
         onReady={onReady}
         orientation={Orientation.VERTICAL}
       />
