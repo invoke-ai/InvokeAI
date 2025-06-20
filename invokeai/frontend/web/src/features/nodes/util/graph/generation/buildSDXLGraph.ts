@@ -24,6 +24,7 @@ import {
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
@@ -32,8 +33,9 @@ import { addRegions } from './addRegions';
 
 const log = logger('system');
 
-export const buildSDXLGraph = async (state: RootState, manager?: CanvasManager | null): Promise<GraphBuilderReturn> => {
-  const generationMode = await getGenerationMode(manager);
+export const buildSDXLGraph = async (state: RootState, manager: CanvasManager | null): Promise<GraphBuilderReturn> => {
+  const tab = selectActiveTab(state);
+  const generationMode = await getGenerationMode(manager, tab);
   log.debug({ generationMode }, 'Building SDXL graph');
 
   const model = selectMainModelConfig(state);
