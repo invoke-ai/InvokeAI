@@ -14,7 +14,7 @@ export const TabWithoutCloseButton = (props: IDockviewPanelHeaderProps) => {
   useCallbackOnDragEnter(setActive, ref, 300);
 
   return (
-    <Flex ref={ref}>
+    <Flex ref={ref} alignItems="center" h="full">
       <Text userSelect="none">{props.api.title ?? props.api.id}</Text>
     </Flex>
   );
