@@ -1,17 +1,28 @@
-import type { GridviewApi } from 'dockview';
+import type { DockviewApi, GridviewApi } from 'dockview';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import type { Atom } from 'nanostores';
+import type { WritableAtom } from 'nanostores';
+import { atom } from 'nanostores';
 import type { PropsWithChildren } from 'react';
-import { createContext, memo, useCallback, useContext, useMemo } from 'react';
+import { createContext, memo, useCallback, useContext, useMemo, useState } from 'react';
 
-import { LEFT_PANEL_ID, LEFT_PANEL_MIN_SIZE_PX, RIGHT_PANEL_ID, RIGHT_PANEL_MIN_SIZE_PX } from './shared';
+import {
+  LEFT_PANEL_ID,
+  LEFT_PANEL_MIN_SIZE_PX,
+  RIGHT_PANEL_ID,
+  RIGHT_PANEL_MIN_SIZE_PX,
+  VIEWER_PANEL_ID,
+} from './shared';
 
 type AutoLayoutContextValue = {
-  $api: Atom<GridviewApi | null>;
   toggleLeftPanel: () => void;
   toggleRightPanel: () => void;
   toggleBothPanels: () => void;
   resetPanels: () => void;
+  focusImageViewer: () => void;
+  _$rootPanelApi: WritableAtom<GridviewApi | null>;
+  _$leftPanelApi: WritableAtom<GridviewApi | null>;
+  _$centerPanelApi: WritableAtom<DockviewApi | null>;
+  _$rightPanelApi: WritableAtom<GridviewApi | null>;
 };
 
 const AutoLayoutContext = createContext<AutoLayoutContextValue | null>(null);
@@ -42,9 +53,22 @@ const getIsCollapsed = (api: GridviewApi, panelId: string) => {
   return panel.maximumWidth === 0;
 };
 
-export const AutoLayoutProvider = (props: PropsWithChildren<{ $api: Atom<GridviewApi | null> }>) => {
+const activatePanel = (api: GridviewApi | DockviewApi, panelId: string) => {
+  const panel = api.getPanel(panelId);
+  if (!panel) {
+    return;
+  }
+  panel.api.setActive();
+};
+
+export const AutoLayoutProvider = (props: PropsWithChildren<{ $rootApi: WritableAtom<GridviewApi | null> }>) => {
+  const { $rootApi, children } = props;
+  const $leftApi = useState(() => atom<GridviewApi | null>(null))[0];
+  const $centerApi = useState(() => atom<DockviewApi | null>(null))[0];
+  const $rightApi = useState(() => atom<GridviewApi | null>(null))[0];
+
   const toggleLeftPanel = useCallback(() => {
-    const api = props.$api.get();
+    const api = $rootApi.get();
     if (!api) {
       return;
     }
@@ -53,10 +77,10 @@ export const AutoLayoutProvider = (props: PropsWithChildren<{ $api: Atom<Gridvie
     } else {
       collapsePanel(api, LEFT_PANEL_ID);
     }
-  }, [props.$api]);
+  }, [$rootApi]);
 
   const toggleRightPanel = useCallback(() => {
-    const api = props.$api.get();
+    const api = $rootApi.get();
     if (!api) {
       return;
     }
@@ -65,10 +89,10 @@ export const AutoLayoutProvider = (props: PropsWithChildren<{ $api: Atom<Gridvie
     } else {
       collapsePanel(api, RIGHT_PANEL_ID);
     }
-  }, [props.$api]);
+  }, [$rootApi]);
 
   const toggleBothPanels = useCallback(() => {
-    const api = props.$api.get();
+    const api = $rootApi.get();
     if (!api) {
       return;
     }
@@ -81,28 +105,50 @@ export const AutoLayoutProvider = (props: PropsWithChildren<{ $api: Atom<Gridvie
         collapsePanel(api, RIGHT_PANEL_ID);
       }
     });
-  }, [props.$api]);
+  }, [$rootApi]);
 
   const resetPanels = useCallback(() => {
-    const api = props.$api.get();
+    const api = $rootApi.get();
     if (!api) {
       return;
     }
     expandPanel(api, LEFT_PANEL_ID, LEFT_PANEL_MIN_SIZE_PX);
     expandPanel(api, RIGHT_PANEL_ID, RIGHT_PANEL_MIN_SIZE_PX);
-  }, [props.$api]);
+  }, [$rootApi]);
+
+  const focusImageViewer = useCallback(() => {
+    const api = $centerApi.get();
+    if (!api) {
+      return;
+    }
+    activatePanel(api, VIEWER_PANEL_ID);
+  }, [$centerApi]);
 
   const value = useMemo<AutoLayoutContextValue>(
     () => ({
-      $api: props.$api,
       toggleLeftPanel,
       toggleRightPanel,
       toggleBothPanels,
       resetPanels,
+      focusImageViewer,
+      _$rootPanelApi: $rootApi,
+      _$leftPanelApi: $leftApi,
+      _$centerPanelApi: $centerApi,
+      _$rightPanelApi: $rightApi,
     }),
-    [props.$api, resetPanels, toggleBothPanels, toggleLeftPanel, toggleRightPanel]
+    [
+      $centerApi,
+      $leftApi,
+      $rightApi,
+      $rootApi,
+      focusImageViewer,
+      resetPanels,
+      toggleBothPanels,
+      toggleLeftPanel,
+      toggleRightPanel,
+    ]
   );
-  return <AutoLayoutContext.Provider value={value}>{props.children}</AutoLayoutContext.Provider>;
+  return <AutoLayoutContext.Provider value={value}>{children}</AutoLayoutContext.Provider>;
 };
 
 export const useAutoLayoutContext = () => {
