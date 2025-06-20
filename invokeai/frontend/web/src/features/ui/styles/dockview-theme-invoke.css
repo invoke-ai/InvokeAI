@@ -1,7 +1,7 @@
 .dockview-theme-invoke {
   --dv-paneview-active-outline-color: var(--invoke-colors-invokeBlue-300);
   --dv-tabs-and-actions-container-font-size: var(--invoke-fontSizes-sm);
-  --dv-tabs-and-actions-container-height: var(--invoke-sizes-8);
+  --dv-tabs-and-actions-container-height: var(--invoke-sizes-10);
   --dv-drag-over-background-color: var(--invoke-colors-baseAlpha-400);
   --dv-drag-over-border-color: var(--invoke-colors-base-300);
   --dv-tabs-container-scrollbar-color: #888;
@@ -57,6 +57,8 @@
 
 .dv-tab {
   /* margin-right: 2px; */
+  padding-inline-start: var(--invoke-sizes-4);
+  padding-inline-end: var(--invoke-sizes-4);
 }
 
 .dv-inactive-group .dv-tabs-container.dv-horizontal .dv-tab:not(:first-child)::before {
