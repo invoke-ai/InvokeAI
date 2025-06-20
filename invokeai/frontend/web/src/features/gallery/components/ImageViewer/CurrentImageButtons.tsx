@@ -22,25 +22,13 @@ import {
   PiRulerBold,
 } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import type { ImageDTO } from 'services/api/types';
 
-const CurrentImageButtons = () => {
+export const CurrentImageButtons = memo(() => {
   const lastSelectedImage = useAppSelector(selectLastSelectedImage);
   const { currentData: imageDTO } = useGetImageDTOQuery(lastSelectedImage?.image_name ?? skipToken);
-
-  if (!imageDTO) {
-    return null;
-  }
-
-  return <CurrentImageButtonsContent imageDTO={imageDTO} />;
-};
-
-export default memo(CurrentImageButtons);
-
-const CurrentImageButtonsContent = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
   const { t } = useTranslation();
   const hasTemplates = useStore($hasTemplates);
-  const imageActions = useImageActions(imageDTO);
+  const imageActions = useImageActions(imageDTO ?? null);
   const isStaging = useAppSelector(selectIsStaging);
   const isUpscalingEnabled = useFeatureStatus('upscaling');
 
@@ -65,7 +53,7 @@ const CurrentImageButtonsContent = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
         icon={<PiFlowArrowBold />}
         tooltip={`${t('nodes.loadWorkflow')} (W)`}
         aria-label={`${t('nodes.loadWorkflow')} (W)`}
-        isDisabled={!imageActions.hasWorkflow || !hasTemplates}
+        isDisabled={!imageDTO || !imageActions.hasWorkflow || !hasTemplates}
         variant="link"
         alignSelf="stretch"
         onClick={imageActions.loadWorkflow}
@@ -74,7 +62,7 @@ const CurrentImageButtonsContent = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
         icon={<PiArrowsCounterClockwiseBold />}
         tooltip={`${t('parameters.remixImage')} (R)`}
         aria-label={`${t('parameters.remixImage')} (R)`}
-        isDisabled={!imageActions.hasMetadata}
+        isDisabled={!imageDTO || !imageActions.hasMetadata}
         variant="link"
         alignSelf="stretch"
         onClick={imageActions.remix}
@@ -83,7 +71,7 @@ const CurrentImageButtonsContent = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
         icon={<PiQuotesBold />}
         tooltip={`${t('parameters.usePrompt')} (P)`}
         aria-label={`${t('parameters.usePrompt')} (P)`}
-        isDisabled={!imageActions.hasPrompts}
+        isDisabled={!imageDTO || !imageActions.hasPrompts}
         variant="link"
         alignSelf="stretch"
         onClick={imageActions.recallPrompts}
@@ -92,7 +80,7 @@ const CurrentImageButtonsContent = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
         icon={<PiPlantBold />}
         tooltip={`${t('parameters.useSeed')} (S)`}
         aria-label={`${t('parameters.useSeed')} (S)`}
-        isDisabled={!imageActions.hasSeed}
+        isDisabled={!imageDTO || !imageActions.hasSeed}
         variant="link"
         alignSelf="stretch"
         onClick={imageActions.recallSeed}
@@ -104,13 +92,13 @@ const CurrentImageButtonsContent = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
         variant="link"
         alignSelf="stretch"
         onClick={imageActions.recallSize}
-        isDisabled={isStaging}
+        isDisabled={!imageDTO || isStaging}
       />
       <IconButton
         icon={<PiAsteriskBold />}
         tooltip={`${t('parameters.useAll')} (A)`}
         aria-label={`${t('parameters.useAll')} (A)`}
-        isDisabled={!imageActions.hasMetadata}
+        isDisabled={!imageDTO || !imageActions.hasMetadata}
         variant="link"
         alignSelf="stretch"
         onClick={imageActions.recallAll}
@@ -120,9 +108,9 @@ const CurrentImageButtonsContent = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
 
       <Divider orientation="vertical" h={8} mx={2} />
 
-      <DeleteImageButton onClick={imageActions.delete} />
+      <DeleteImageButton onClick={imageActions.delete} isDisabled={!imageDTO} />
     </>
   );
 });
 
-CurrentImageButtonsContent.displayName = 'CurrentImageButtonsContent';
+CurrentImageButtons.displayName = 'CurrentImageButtons';
