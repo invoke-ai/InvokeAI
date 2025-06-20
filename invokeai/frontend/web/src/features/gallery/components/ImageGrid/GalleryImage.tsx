@@ -16,6 +16,7 @@ import { useImageContextMenu } from 'features/gallery/components/ImageContextMen
 import { GalleryImageHoverIcons } from 'features/gallery/components/ImageGrid/GalleryImageHoverIcons';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
 import { imageToCompareChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
+import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
 import type { MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
@@ -83,6 +84,7 @@ interface Props {
 
 export const GalleryImage = memo(({ imageDTO }: Props) => {
   const store = useAppStore();
+  const autoLayoutContext = useAutoLayoutContext();
   const [isDragging, setIsDragging] = useState(false);
   const [dragPreviewState, setDragPreviewState] = useState<
     DndDragPreviewSingleImageState | DndDragPreviewMultipleImageState | null
@@ -203,7 +205,8 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
 
   const onDoubleClick = useCallback<MouseEventHandler<HTMLDivElement>>(() => {
     store.dispatch(imageToCompareChanged(null));
-  }, [store]);
+    autoLayoutContext.focusImageViewer();
+  }, [autoLayoutContext, store]);
 
   const dataTestId = useMemo(() => getGalleryImageDataTestId(imageDTO.image_name), [imageDTO.image_name]);
 
