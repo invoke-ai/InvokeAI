@@ -1,7 +1,7 @@
 import { Button, Flex, ListItem, Text, UnorderedList } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectModel } from 'features/controlLayers/store/paramsSlice';
-import { $installModelsTab } from 'features/modelManagerV2/subpanels/InstallModels';
+import { $installModelsTab } from 'features/modelManagerV2/store/installModelsStore';
 import { useIsTooLargeToUpscale } from 'features/parameters/hooks/useIsTooLargeToUpscale';
 import {
   selectTileControlNetModel,
