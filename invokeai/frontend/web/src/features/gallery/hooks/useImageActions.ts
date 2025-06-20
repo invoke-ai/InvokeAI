@@ -24,12 +24,12 @@ import { useTranslation } from 'react-i18next';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 import type { ImageDTO } from 'services/api/types';
 
-export const useImageActions = (imageDTO: ImageDTO) => {
+export const useImageActions = (imageDTO: ImageDTO | null) => {
   const { dispatch, getState } = useAppStore();
   const { t } = useTranslation();
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
   const isStaging = useAppSelector(selectIsStaging);
-  const { metadata } = useDebouncedMetadata(imageDTO.image_name);
+  const { metadata } = useDebouncedMetadata(imageDTO?.image_name ?? null);
   const [hasMetadata, setHasMetadata] = useState(false);
   const [hasSeed, setHasSeed] = useState(false);
   const [hasPrompts, setHasPrompts] = useState(false);
@@ -79,15 +79,21 @@ export const useImageActions = (imageDTO: ImageDTO) => {
   }, [dispatch, activeStylePresetId, t]);
 
   const recallAll = useCallback(() => {
+    if (!imageDTO) {
+      return;
+    }
     if (!metadata) {
       return;
     }
     const activeTabName = selectActiveTab(getState());
     parseAndRecallAllMetadata(metadata, activeTabName === 'canvas', isStaging ? ['width', 'height'] : []);
     clearStylePreset();
-  }, [metadata, getState, isStaging, clearStylePreset]);
+  }, [imageDTO, metadata, getState, isStaging, clearStylePreset]);
 
   const remix = useCallback(() => {
+    if (!imageDTO) {
+      return;
+    }
     if (!metadata) {
       return;
     }
@@ -95,9 +101,12 @@ export const useImageActions = (imageDTO: ImageDTO) => {
     // Recalls all metadata parameters except seed
     parseAndRecallAllMetadata(metadata, activeTabName === 'canvas', ['seed']);
     clearStylePreset();
-  }, [metadata, getState, clearStylePreset]);
+  }, [imageDTO, metadata, getState, clearStylePreset]);
 
   const recallSeed = useCallback(() => {
+    if (!imageDTO) {
+      return;
+    }
     if (!metadata) {
       return;
     }
@@ -109,17 +118,23 @@ export const useImageActions = (imageDTO: ImageDTO) => {
       .catch(() => {
         // no-op, the toast will show the error
       });
-  }, [metadata]);
+  }, [imageDTO, metadata]);
 
   const recallPrompts = useCallback(() => {
+    if (!imageDTO) {
+      return;
+    }
     if (!metadata) {
       return;
     }
     parseAndRecallPrompts(metadata);
     clearStylePreset();
-  }, [metadata, clearStylePreset]);
+  }, [imageDTO, metadata, clearStylePreset]);
 
   const createAsPreset = useCallback(async () => {
+    if (!imageDTO) {
+      return;
+    }
     if (!metadata) {
       return;
     }
@@ -153,14 +168,20 @@ export const useImageActions = (imageDTO: ImageDTO) => {
   const loadWorkflowWithDialog = useLoadWorkflowWithDialog();
 
   const loadWorkflowFromImage = useCallback(() => {
+    if (!imageDTO) {
+      return;
+    }
     if (!imageDTO.has_workflow || !hasTemplates) {
       return;
     }
 
     loadWorkflowWithDialog({ type: 'image', data: imageDTO.image_name });
-  }, [hasTemplates, imageDTO.has_workflow, imageDTO.image_name, loadWorkflowWithDialog]);
+  }, [hasTemplates, imageDTO, loadWorkflowWithDialog]);
 
   const recallSize = useCallback(() => {
+    if (!imageDTO) {
+      return;
+    }
     if (isStaging) {
       return;
     }
@@ -168,10 +189,16 @@ export const useImageActions = (imageDTO: ImageDTO) => {
   }, [imageDTO, isStaging]);
 
   const upscale = useCallback(() => {
+    if (!imageDTO) {
+      return;
+    }
     dispatch(adHocPostProcessingRequested({ imageDTO }));
   }, [dispatch, imageDTO]);
 
   const _delete = useCallback(() => {
+    if (!imageDTO) {
+      return;
+    }
     deleteImageModal.delete([imageDTO]);
   }, [deleteImageModal, imageDTO]);
 
@@ -185,7 +212,7 @@ export const useImageActions = (imageDTO: ImageDTO) => {
     recallPrompts,
     createAsPreset,
     loadWorkflow: loadWorkflowFromImage,
-    hasWorkflow: imageDTO.has_workflow,
+    hasWorkflow: imageDTO?.has_workflow ?? false,
     recallSize,
     upscale,
     delete: _delete,
