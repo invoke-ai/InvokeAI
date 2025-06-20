@@ -1,18 +1,32 @@
 import type { GridviewApi } from 'dockview';
 import type { Atom } from 'nanostores';
 import type { PropsWithChildren } from 'react';
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 
-const AutoLayoutContext = createContext<Atom<GridviewApi | null> | null>(null);
+type AutoLayoutContextValue = {
+  $api: Atom<GridviewApi | null>;
+  toggleLeftPanel: () => void;
+  toggleRightPanel: () => void;
+};
 
-export const AutoLayoutProvider = (props: PropsWithChildren<{ $api: Atom<GridviewApi | null> }>) => {
-  return <AutoLayoutContext.Provider value={props.$api}>{props.children}</AutoLayoutContext.Provider>;
+const AutoLayoutContext = createContext<AutoLayoutContextValue | null>(null);
+
+export const AutoLayoutProvider = (props: PropsWithChildren<AutoLayoutContextValue>) => {
+  const value = useMemo<AutoLayoutContextValue>(
+    () => ({
+      $api: props.$api,
+      toggleLeftPanel: props.toggleLeftPanel,
+      toggleRightPanel: props.toggleRightPanel,
+    }),
+    [props.$api, props.toggleLeftPanel, props.toggleRightPanel]
+  );
+  return <AutoLayoutContext.Provider value={value}>{props.children}</AutoLayoutContext.Provider>;
 };
 
 export const useAutoLayoutContext = () => {
-  const api = useContext(AutoLayoutContext);
-  if (!api) {
+  const value = useContext(AutoLayoutContext);
+  if (!value) {
     throw new Error('useAutoLayoutContext must be used within an AutoLayoutProvider');
   }
-  return api;
+  return value;
 };
