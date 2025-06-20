@@ -1,8 +1,9 @@
 import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
+import { useRecallMetadataWithConfirmation } from 'features/gallery/components/ImageGrid/RecallMetadataConfirmationAlertDialog';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { useImageActions } from 'features/gallery/hooks/useImageActions';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiArrowBendUpLeftBold,
@@ -17,9 +18,18 @@ export const ImageMenuItemMetadataRecallActions = memo(() => {
   const { t } = useTranslation();
   const imageDTO = useImageDTOContext();
   const subMenu = useSubMenu();
+  const { recallWithConfirmation } = useRecallMetadataWithConfirmation();
 
   const { recallAll, remix, recallSeed, recallPrompts, hasMetadata, hasSeed, hasPrompts, createAsPreset } =
     useImageActions(imageDTO);
+
+  const handleRecallAll = useCallback(() => {
+    if (hasMetadata) {
+      recallWithConfirmation(() => {
+        recallAll();
+      });
+    }
+  }, [hasMetadata, recallAll, recallWithConfirmation]);
 
   return (
     <MenuItem {...subMenu.parentMenuItemProps} icon={<PiArrowBendUpLeftBold />}>
@@ -36,8 +46,7 @@ export const ImageMenuItemMetadataRecallActions = memo(() => {
           </MenuItem>
           <MenuItem icon={<PiPlantBold />} onClick={recallSeed} isDisabled={!hasSeed}>
             {t('parameters.useSeed')}
-          </MenuItem>
-          <MenuItem icon={<PiAsteriskBold />} onClick={recallAll} isDisabled={!hasMetadata}>
+          </MenuItem>          <MenuItem icon={<PiAsteriskBold />} onClick={handleRecallAll} isDisabled={!hasMetadata}>
             {t('parameters.useAll')}
           </MenuItem>
           <MenuItem icon={<PiPaintBrushBold />} onClick={createAsPreset} isDisabled={!hasPrompts}>
