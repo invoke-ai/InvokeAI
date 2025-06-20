@@ -1,7 +1,7 @@
 import 'dockview/dist/styles/dockview.css';
 import 'features/ui/styles/dockview-theme-invoke.css';
 
-import { TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
+import { TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useDndMonitor } from 'features/dnd/useDndMonitor';
 import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
@@ -22,9 +22,7 @@ export const AppContent = memo(() => {
 
   return (
     <Tabs index={tabIndex} display="flex" w="full" h="full" p={0} overflow="hidden">
-      <TabList>
-        <VerticalNavBar />
-      </TabList>
+      <VerticalNavBar />
       <TabPanels w="full" h="full" p={0}>
         <TabMountGate tab="generate">
           <TabPanel w="full" h="full" p={0}>
