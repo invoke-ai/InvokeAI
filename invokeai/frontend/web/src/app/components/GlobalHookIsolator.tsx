@@ -11,11 +11,9 @@ import { useFocusRegionWatcher } from 'common/hooks/focus';
 import { useCloseChakraTooltipsOnDragFix } from 'common/hooks/useCloseChakraTooltipsOnDragFix';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import { useDynamicPromptsWatcher } from 'features/dynamicPrompts/hooks/useDynamicPromptsWatcher';
-import { toggleImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
 import { useWorkflowBuilderWatcher } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
 import { useReadinessWatcher } from 'features/queue/store/readiness';
-import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { configChanged } from 'features/system/store/configSlice';
 import { selectLanguage } from 'features/system/store/systemSelectors';
 import i18n from 'i18n';
@@ -71,12 +69,6 @@ export const GlobalHookIsolator = memo(
     useFocusRegionWatcher();
     useWorkflowBuilderWatcher();
     useDynamicPromptsWatcher();
-
-    useRegisteredHotkeys({
-      id: 'toggleViewer',
-      category: 'viewer',
-      callback: toggleImageViewer,
-    });
 
     return null;
   }

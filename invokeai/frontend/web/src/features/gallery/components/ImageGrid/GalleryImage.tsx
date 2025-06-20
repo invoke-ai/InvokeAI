@@ -15,7 +15,6 @@ import { firefoxDndFix } from 'features/dnd/util';
 import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { GalleryImageHoverIcons } from 'features/gallery/components/ImageGrid/GalleryImageHoverIcons';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
-import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { imageToCompareChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import type { MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
@@ -203,9 +202,6 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
   );
 
   const onDoubleClick = useCallback<MouseEventHandler<HTMLDivElement>>(() => {
-    // Use the atom here directly instead of the `useImageViewer` to avoid re-rendering the gallery when the viewer
-    // opened state changes.
-    $imageViewer.set(true);
     store.dispatch(imageToCompareChanged(null));
   }, [store]);
 
