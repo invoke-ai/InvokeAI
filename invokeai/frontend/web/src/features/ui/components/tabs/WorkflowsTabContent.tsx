@@ -1,4 +1,3 @@
-import { ReactFlowProvider } from '@xyflow/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
 import NodeEditor from 'features/nodes/components/NodeEditor';
@@ -9,11 +8,7 @@ export const WorkflowsMainPanel = memo(() => {
   const mode = useAppSelector(selectWorkflowMode);
 
   if (mode === 'edit') {
-    return (
-      <ReactFlowProvider>
-        <NodeEditor />
-      </ReactFlowProvider>
-    );
+    return <NodeEditor />;
   }
 
   return <ImageViewer />;

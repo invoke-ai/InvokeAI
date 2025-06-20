@@ -8,10 +8,15 @@ import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
 import { CanvasTabAutoLayout } from 'features/ui/layouts/canvas-tab-auto-layout';
 import { GenerateTabAutoLayout } from 'features/ui/layouts/generate-tab-auto-layout';
 import { UpscalingTabAutoLayout } from 'features/ui/layouts/upscaling-tab-auto-layout';
+import { WorkflowsTabAutoLayout } from 'features/ui/layouts/workflows-tab-auto-layout';
 import { selectActiveTabIndex } from 'features/ui/store/uiSelectors';
 import { $isLeftPanelOpen, $isRightPanelOpen } from 'features/ui/store/uiSlice';
 import type { CSSProperties } from 'react';
 import { memo } from 'react';
+
+import { TabMountGate } from './TabMountGate';
+import ModelManagerTab from './tabs/ModelManagerTab';
+import QueueTab from './tabs/QueueTab';
 
 const panelStyles: CSSProperties = { position: 'relative', height: '100%', width: '100%', minWidth: 0 };
 
@@ -103,15 +108,36 @@ export const AppContent = memo(() => {
         <VerticalNavBar />
       </TabList>
       <TabPanels w="full" h="full" p={0}>
-        <TabPanel w="full" h="full" p={0}>
-          <GenerateTabAutoLayout />
-        </TabPanel>
-        <TabPanel w="full" h="full" p={0}>
-          <CanvasTabAutoLayout />
-        </TabPanel>
-        <TabPanel w="full" h="full" p={0}>
-          <UpscalingTabAutoLayout />
-        </TabPanel>
+        <TabMountGate tab="generate">
+          <TabPanel w="full" h="full" p={0}>
+            <GenerateTabAutoLayout />
+          </TabPanel>
+        </TabMountGate>
+        <TabMountGate tab="canvas">
+          <TabPanel w="full" h="full" p={0}>
+            <CanvasTabAutoLayout />
+          </TabPanel>
+        </TabMountGate>
+        <TabMountGate tab="upscaling">
+          <TabPanel w="full" h="full" p={0}>
+            <UpscalingTabAutoLayout />
+          </TabPanel>
+        </TabMountGate>
+        <TabMountGate tab="workflows">
+          <TabPanel w="full" h="full" p={0}>
+            <WorkflowsTabAutoLayout />
+          </TabPanel>
+        </TabMountGate>
+        <TabMountGate tab="models">
+          <TabPanel w="full" h="full" p={0}>
+            <ModelManagerTab />
+          </TabPanel>
+        </TabMountGate>
+        <TabMountGate tab="queue">
+          <TabPanel w="full" h="full" p={0}>
+            <QueueTab />
+          </TabPanel>
+        </TabMountGate>
       </TabPanels>
     </Tabs>
   );
