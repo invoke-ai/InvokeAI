@@ -30,13 +30,17 @@ export const InstallModels = memo(() => {
         <Button alignItems="center" variant="link" leftIcon={<PiInfoBold />} onClick={onClickLearnMore}>
           <Text variant="subtext">{t('modelManager.learnMoreAboutSupportedModels')}</Text>
         </Button>
-      </Flex>      <Tabs variant="collapse" height="50%" display="flex" flexDir="column" index={index} onChange={onChange}>        <TabList>
+      </Flex>{' '}
+      <Tabs variant="collapse" height="50%" display="flex" flexDir="column" index={index} onChange={onChange}>
+        {' '}
+        <TabList>
           <Tab>{t('modelManager.launchpadTab')}</Tab>
           <Tab>{t('modelManager.urlOrLocalPath')}</Tab>
           <Tab>{t('modelManager.huggingFace')}</Tab>
           <Tab>{t('modelManager.scanFolder')}</Tab>
           <Tab>{t('modelManager.starterModels')}</Tab>
-        </TabList>        <TabPanels p={3} height="100%">
+        </TabList>{' '}
+        <TabPanels p={3} height="100%">
           <TabPanel height="100%">
             <LaunchpadForm />
           </TabPanel>
