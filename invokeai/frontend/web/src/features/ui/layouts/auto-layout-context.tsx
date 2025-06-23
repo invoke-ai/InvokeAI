@@ -5,20 +5,14 @@ import { atom } from 'nanostores';
 import type { PropsWithChildren } from 'react';
 import { createContext, memo, useCallback, useContext, useMemo, useState } from 'react';
 
-import {
-  LEFT_PANEL_ID,
-  LEFT_PANEL_MIN_SIZE_PX,
-  RIGHT_PANEL_ID,
-  RIGHT_PANEL_MIN_SIZE_PX,
-  VIEWER_PANEL_ID,
-} from './shared';
+import { LEFT_PANEL_ID, LEFT_PANEL_MIN_SIZE_PX, RIGHT_PANEL_ID, RIGHT_PANEL_MIN_SIZE_PX } from './shared';
 
 type AutoLayoutContextValue = {
   toggleLeftPanel: () => void;
   toggleRightPanel: () => void;
   toggleBothPanels: () => void;
   resetPanels: () => void;
-  focusImageViewer: () => void;
+  focusPanel: (id: string) => void;
   _$rootPanelApi: WritableAtom<GridviewApi | null>;
   _$leftPanelApi: WritableAtom<GridviewApi | null>;
   _$centerPanelApi: WritableAtom<DockviewApi | null>;
@@ -116,13 +110,16 @@ export const AutoLayoutProvider = (props: PropsWithChildren<{ $rootApi: Writable
     expandPanel(api, RIGHT_PANEL_ID, RIGHT_PANEL_MIN_SIZE_PX);
   }, [$rootApi]);
 
-  const focusImageViewer = useCallback(() => {
-    const api = $centerApi.get();
-    if (!api) {
-      return;
-    }
-    activatePanel(api, VIEWER_PANEL_ID);
-  }, [$centerApi]);
+  const focusPanel = useCallback(
+    (id: string) => {
+      const api = $centerApi.get();
+      if (!api) {
+        return;
+      }
+      activatePanel(api, id);
+    },
+    [$centerApi]
+  );
 
   const value = useMemo<AutoLayoutContextValue>(
     () => ({
@@ -130,7 +127,7 @@ export const AutoLayoutProvider = (props: PropsWithChildren<{ $rootApi: Writable
       toggleRightPanel,
       toggleBothPanels,
       resetPanels,
-      focusImageViewer,
+      focusPanel,
       _$rootPanelApi: $rootApi,
       _$leftPanelApi: $leftApi,
       _$centerPanelApi: $centerApi,
@@ -141,7 +138,7 @@ export const AutoLayoutProvider = (props: PropsWithChildren<{ $rootApi: Writable
       $leftApi,
       $rightApi,
       $rootApi,
-      focusImageViewer,
+      focusPanel,
       resetPanels,
       toggleBothPanels,
       toggleLeftPanel,
@@ -156,6 +153,11 @@ export const useAutoLayoutContext = () => {
   if (!value) {
     throw new Error('useAutoLayoutContext must be used within an AutoLayoutProvider');
   }
+  return value;
+};
+
+export const useAutoLayoutContextSafe = () => {
+  const value = useContext(AutoLayoutContext);
   return value;
 };
 

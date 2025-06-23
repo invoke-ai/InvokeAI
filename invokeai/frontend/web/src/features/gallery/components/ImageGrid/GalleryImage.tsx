@@ -17,6 +17,7 @@ import { GalleryImageHoverIcons } from 'features/gallery/components/ImageGrid/Ga
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
 import { imageToCompareChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
+import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import type { MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
@@ -205,7 +206,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
 
   const onDoubleClick = useCallback<MouseEventHandler<HTMLDivElement>>(() => {
     store.dispatch(imageToCompareChanged(null));
-    autoLayoutContext.focusImageViewer();
+    autoLayoutContext.focusPanel(VIEWER_PANEL_ID);
   }, [autoLayoutContext, store]);
 
   const dataTestId = useMemo(() => getGalleryImageDataTestId(imageDTO.image_name), [imageDTO.image_name]);
