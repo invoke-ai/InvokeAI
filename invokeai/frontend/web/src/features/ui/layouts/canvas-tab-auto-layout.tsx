@@ -69,7 +69,7 @@ const initializeCenterPanelLayout = (api: DockviewApi) => {
     id: VIEWER_PANEL_ID,
     component: VIEWER_PANEL_ID,
     title: 'Image Viewer',
-    tabComponent: DEFAULT_TAB_ID,
+    tabComponent: TAB_WITH_PROGRESS_INDICATOR_ID,
     position: {
       direction: 'within',
       referencePanel: LAUNCHPAD_PANEL_ID,
