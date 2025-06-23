@@ -138,6 +138,7 @@ class FluxLoRAFormat(str, Enum):
     Kohya = "flux.kohya"
     OneTrainer = "flux.onetrainer"
     Control = "flux.control"
+    AIToolkit = "flux.aitoolkit"
 
 
 AnyVariant: TypeAlias = Union[ModelVariantType, ClipVariantType, None]

@@ -582,6 +582,8 @@ def invocation(
 
         fields: dict[str, tuple[Any, FieldInfo]] = {}
 
+        original_model_fields: dict[str, OriginalModelField] = {}
+
         for field_name, field_info in cls.model_fields.items():
             annotation = field_info.annotation
             assert annotation is not None, f"{field_name} on invocation {invocation_type} has no type annotation."
@@ -589,7 +591,7 @@ def invocation(
                 f"{field_name} on invocation {invocation_type} has a non-dict json_schema_extra, did you forget to use InputField?"
             )
 
-            cls._original_model_fields[field_name] = OriginalModelField(annotation=annotation, field_info=field_info)
+            original_model_fields[field_name] = OriginalModelField(annotation=annotation, field_info=field_info)
 
             validate_field_default(cls.__name__, field_name, invocation_type, annotation, field_info)
 
@@ -676,6 +678,7 @@ def invocation(
         docstring = cls.__doc__
         new_class = create_model(cls.__qualname__, __base__=cls, __module__=cls.__module__, **fields)  # type: ignore
         new_class.__doc__ = docstring
+        new_class._original_model_fields = original_model_fields
 
         InvocationRegistry.register_invocation(new_class)
 
