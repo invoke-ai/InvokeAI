@@ -396,3 +396,8 @@ export const selectCanvasQueueCounts = queueApi.endpoints.getQueueCountsByDestin
 export const enqueueMutationFixedCacheKeyOptions = {
   fixedCacheKey: 'enqueueBatch',
 } as const;
+
+export const useIsGenerationInProgress = () => {
+  const { data } = useGetQueueStatusQuery();
+  return data && data.queue.in_progress > 0;
+};
