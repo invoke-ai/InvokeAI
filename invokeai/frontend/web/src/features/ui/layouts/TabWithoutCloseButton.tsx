@@ -15,7 +15,9 @@ export const TabWithoutCloseButton = (props: IDockviewPanelHeaderProps) => {
 
   return (
     <Flex ref={ref} alignItems="center" h="full">
-      <Text userSelect="none">{props.api.title ?? props.api.id}</Text>
+      <Text userSelect="none" px={4}>
+        {props.api.title ?? props.api.id}
+      </Text>
     </Flex>
   );
 };
