@@ -23,7 +23,7 @@ import {
 } from 'react-icons/pi';
 import { useImageDTO } from 'services/api/endpoints/images';
 
-import { useImageViewerContext } from './ImageViewerPanel';
+import { useImageViewerContext } from './context';
 
 export const CurrentImageButtons = memo(() => {
   const { t } = useTranslation();

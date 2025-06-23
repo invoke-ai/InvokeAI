@@ -15,8 +15,6 @@ import { addGalleryOffsetChangedListener } from 'app/store/middleware/listenerMi
 import { addGetOpenAPISchemaListener } from 'app/store/middleware/listenerMiddleware/listeners/getOpenAPISchema';
 import { addImageAddedToBoardFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/imageAddedToBoard';
 import { addImageRemovedFromBoardFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/imageRemovedFromBoard';
-import { addImagesStarredListener } from 'app/store/middleware/listenerMiddleware/listeners/imagesStarred';
-import { addImagesUnstarredListener } from 'app/store/middleware/listenerMiddleware/listeners/imagesUnstarred';
 import { addImageUploadedFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/imageUploaded';
 import { addModelSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/modelSelected';
 import { addModelsLoadedListener } from 'app/store/middleware/listenerMiddleware/listeners/modelsLoaded';
@@ -46,10 +44,6 @@ addImageUploadedFulfilledListener(startAppListening);
 
 // Image deleted
 addDeleteBoardAndImagesFulfilledListener(startAppListening);
-
-// Image starred
-addImagesStarredListener(startAppListening);
-addImagesUnstarredListener(startAppListening);
 
 // Gallery
 addGalleryImageClickedListener(startAppListening);

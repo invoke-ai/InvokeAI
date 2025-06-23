@@ -18,7 +18,7 @@ import { NoContentForViewer } from './NoContentForViewer';
 import { ProgressImage } from './ProgressImage2';
 import { ProgressIndicator } from './ProgressIndicator2';
 
-export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO?: ImageDTO }) => {
+export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | null }) => {
   const shouldShowImageDetails = useAppSelector(selectShouldShowImageDetails);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
 
