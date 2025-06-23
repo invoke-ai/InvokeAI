@@ -1781,15 +1781,15 @@ export type components = {
         /** AddImagesToBoardResult */
         AddImagesToBoardResult: {
             /**
-             * Board Id
-             * @description The id of the board the images were added to
+             * Affected Boards
+             * @description The ids of boards affected by the delete operation
              */
-            board_id: string;
+            affected_boards: string[];
             /**
-             * Added Image Names
+             * Added Images
              * @description The image names that were added to the board
              */
-            added_image_names: string[];
+            added_images: string[];
         };
         /**
          * Add Integers
@@ -5945,9 +5945,17 @@ export type components = {
              */
             deleted: number;
         };
-        /** DeleteImagesFromListResult */
-        DeleteImagesFromListResult: {
-            /** Deleted Images */
+        /** DeleteImagesResult */
+        DeleteImagesResult: {
+            /**
+             * Affected Boards
+             * @description The ids of boards affected by the delete operation
+             */
+            affected_boards: string[];
+            /**
+             * Deleted Images
+             * @description The names of the images that were deleted
+             */
             deleted_images: string[];
         };
         /**
@@ -11018,14 +11026,6 @@ export type components = {
              * @description The name of the bulk download item for which events will be emitted
              */
             bulk_download_item_name?: string | null;
-        };
-        /** ImagesUpdatedFromListResult */
-        ImagesUpdatedFromListResult: {
-            /**
-             * Updated Image Names
-             * @description The image names that were updated
-             */
-            updated_image_names: string[];
         };
         /**
          * Solid Color Infill
@@ -17879,10 +17879,15 @@ export type components = {
         /** RemoveImagesFromBoardResult */
         RemoveImagesFromBoardResult: {
             /**
-             * Removed Image Names
+             * Affected Boards
+             * @description The ids of boards affected by the delete operation
+             */
+            affected_boards: string[];
+            /**
+             * Removed Images
              * @description The image names that were removed from their board
              */
-            removed_image_names: string[];
+            removed_images: string[];
         };
         /**
          * Resize Latents
@@ -19683,6 +19688,19 @@ export type components = {
              */
             type: "spandrel_image_to_image";
         };
+        /** StarredImagesResult */
+        StarredImagesResult: {
+            /**
+             * Affected Boards
+             * @description The ids of boards affected by the delete operation
+             */
+            affected_boards: string[];
+            /**
+             * Starred Images
+             * @description The names of the images that were starred
+             */
+            starred_images: string[];
+        };
         /** StarterModel */
         StarterModel: {
             /** Description */
@@ -21287,6 +21305,19 @@ export type components = {
              * @constant
              */
             type: "unsharp_mask";
+        };
+        /** UnstarredImagesResult */
+        UnstarredImagesResult: {
+            /**
+             * Affected Boards
+             * @description The ids of boards affected by the delete operation
+             */
+            affected_boards: string[];
+            /**
+             * Unstarred Images
+             * @description The names of the images that were unstarred
+             */
+            unstarred_images: string[];
         };
         /** Upscaler */
         Upscaler: {
@@ -23145,7 +23176,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["DeleteImagesResult"];
                 };
             };
             /** @description Validation Error */
@@ -23467,7 +23498,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeleteImagesFromListResult"];
+                    "application/json": components["schemas"]["DeleteImagesResult"];
                 };
             };
             /** @description Validation Error */
@@ -23496,7 +23527,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeleteImagesFromListResult"];
+                    "application/json": components["schemas"]["DeleteImagesResult"];
                 };
             };
         };
@@ -23520,7 +23551,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ImagesUpdatedFromListResult"];
+                    "application/json": components["schemas"]["StarredImagesResult"];
                 };
             };
             /** @description Validation Error */
@@ -23553,7 +23584,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ImagesUpdatedFromListResult"];
+                    "application/json": components["schemas"]["UnstarredImagesResult"];
                 };
             };
             /** @description Validation Error */
@@ -23874,7 +23905,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AddImagesToBoardResult"];
                 };
             };
             /** @description Validation Error */
@@ -23907,7 +23938,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["RemoveImagesFromBoardResult"];
                 };
             };
             /** @description Validation Error */
