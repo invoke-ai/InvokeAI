@@ -10,8 +10,6 @@ def convert_sdxl_keys_to_diffusers_format(state_dict: Dict[str, T]) -> dict[str,
     The input state_dict can be in either Stability AI format or diffusers format. If the state_dict is already in
     diffusers format, then this function will have no effect.
 
-    Keys that start with "bundle_emb" will be dropped/ignored from the output state_dict.
-
     This function is adapted from:
     https://github.com/bmaltais/kohya_ss/blob/2accb1305979ba62f5077a23aabac23b4c37e935/networks/lora_diffusers.py#L385-L409
 
