@@ -11,6 +11,7 @@ import { QueueItemProgressImage } from 'features/controlLayers/components/Simple
 import { QueueItemStatusLabel } from 'features/controlLayers/components/SimpleSession/QueueItemStatusLabel';
 import { getQueueItemElementId } from 'features/controlLayers/components/SimpleSession/shared';
 import { DndImage } from 'features/dnd/DndImage';
+import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
 import type { S } from 'services/api/types';
 
@@ -46,12 +47,28 @@ export const QueueItemPreviewMini = memo(({ item, isSelected, number }: Props) =
     ctx.$selectedItemId.set(item.item_id);
   }, [ctx.$selectedItemId, item.item_id]);
 
+  const onDoubleClick = useCallback(() => {
+    const autoSwitch = ctx.$autoSwitch.get();
+    if (autoSwitch !== 'off') {
+      ctx.$autoSwitch.set('off');
+      toast({
+        title: 'Auto-Switch Disabled',
+      });
+    }
+  }, [ctx.$autoSwitch]);
+
   const onLoad = useCallback(() => {
     ctx.onImageLoad(item.item_id);
   }, [ctx, item.item_id]);
 
   return (
-    <Flex id={getQueueItemElementId(item.item_id)} sx={sx} data-selected={isSelected} onClick={onClick}>
+    <Flex
+      id={getQueueItemElementId(item.item_id)}
+      sx={sx}
+      data-selected={isSelected}
+      onClick={onClick}
+      onDoubleClick={onDoubleClick}
+    >
       <QueueItemStatusLabel item={item} position="absolute" margin="auto" />
       {imageDTO && <DndImage imageDTO={imageDTO} onLoad={onLoad} asThumbnail />}
       {!imageLoaded && <QueueItemProgressImage itemId={item.item_id} position="absolute" />}
