@@ -1,11 +1,10 @@
-import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectImageToCompare } from 'features/gallery/components/ImageViewer/common';
 import { CurrentImagePreview } from 'features/gallery/components/ImageViewer/CurrentImagePreview';
 import { ImageComparison } from 'features/gallery/components/ImageViewer/ImageComparison';
-import { selectLastSelectedImageName } from 'features/gallery/store/gallerySelectors';
+import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { memo } from 'react';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { useImageDTO } from 'services/api/endpoints/images';
 
 // type Props = {
 //   closeButton?: ReactNode;
@@ -28,9 +27,10 @@ import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 // };
 
 export const ImageViewer = memo(() => {
-  const lastSelectedImageName = useAppSelector(selectLastSelectedImageName);
-  const { data: lastSelectedImageDTO } = useGetImageDTOQuery(lastSelectedImageName ?? skipToken);
-  const comparisonImageDTO = useAppSelector(selectImageToCompare);
+  const lastSelectedImageName = useAppSelector(selectLastSelectedImage);
+  const lastSelectedImageDTO = useImageDTO(lastSelectedImageName);
+  const comparisonImageName = useAppSelector(selectImageToCompare);
+  const comparisonImageDTO = useImageDTO(comparisonImageName);
 
   if (lastSelectedImageDTO && comparisonImageDTO) {
     return <ImageComparison firstImage={lastSelectedImageDTO} secondImage={comparisonImageDTO} />;

@@ -91,7 +91,7 @@ const DeleteBoardModal = () => {
     if (!boardToDelete || boardToDelete === 'none') {
       return;
     }
-    deleteBoardOnly(boardToDelete.board_id);
+    deleteBoardOnly({ board_id: boardToDelete.board_id });
     $boardToDelete.set(null);
   }, [boardToDelete, deleteBoardOnly]);
 
@@ -99,7 +99,7 @@ const DeleteBoardModal = () => {
     if (!boardToDelete || boardToDelete === 'none') {
       return;
     }
-    deleteBoardAndImages(boardToDelete.board_id);
+    deleteBoardAndImages({ board_id: boardToDelete.board_id });
     $boardToDelete.set(null);
   }, [boardToDelete, deleteBoardAndImages]);
 

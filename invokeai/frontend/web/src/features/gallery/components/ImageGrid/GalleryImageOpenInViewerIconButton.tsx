@@ -19,7 +19,7 @@ export const GalleryImageOpenInViewerIconButton = memo(({ imageDTO }: Props) => 
 
   const onClick = useCallback(() => {
     dispatch(imageToCompareChanged(null));
-    dispatch(imageSelected(imageDTO));
+    dispatch(imageSelected(imageDTO.image_name));
     focusPanel(VIEWER_PANEL_ID);
   }, [dispatch, focusPanel, imageDTO]);
 

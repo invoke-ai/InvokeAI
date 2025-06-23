@@ -21,10 +21,10 @@ import { Trans, useTranslation } from 'react-i18next';
 import { PiFrameCornersBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
-type Props = { imageDTO?: ImageDTO };
+type Props = { imageDTO: ImageDTO | null; isDisabled: boolean };
 
 export const PostProcessingPopover = memo((props: Props) => {
-  const { imageDTO } = props;
+  const { imageDTO, isDisabled } = props;
   const dispatch = useAppDispatch();
   const postProcessingModel = useAppSelector(selectPostProcessingModel);
   const inProgress = useIsQueueMutationInProgress();
@@ -49,6 +49,7 @@ export const PostProcessingPopover = memo((props: Props) => {
           aria-label={t('parameters.postProcessing')}
           variant="link"
           alignSelf="stretch"
+          isDisabled={isDisabled}
         />
       </PopoverTrigger>
       <PopoverContent>
@@ -56,7 +57,11 @@ export const PostProcessingPopover = memo((props: Props) => {
           <Flex flexDirection="column" gap={4}>
             <ParamPostProcessingModel />
             {!postProcessingModel && <MissingModelWarning />}
-            <Button size="sm" isDisabled={!imageDTO || inProgress || !postProcessingModel} onClick={handleClickUpscale}>
+            <Button
+              size="sm"
+              isDisabled={isDisabled || !imageDTO || inProgress || !postProcessingModel}
+              onClick={handleClickUpscale}
+            >
               {t('parameters.processImage')}
             </Button>
           </Flex>

@@ -19,7 +19,7 @@ export const GallerySelectionCountTag = memo(() => {
   const isGalleryFocused = useIsRegionFocused('gallery');
 
   const onSelectPage = useCallback(() => {
-    dispatch(selectionChanged([...selection, ...imageDTOs]));
+    dispatch(selectionChanged([...selection, ...imageDTOs.map(({ image_name }) => image_name)]));
   }, [dispatch, selection, imageDTOs]);
 
   useRegisteredHotkeys({

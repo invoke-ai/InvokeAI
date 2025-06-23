@@ -12,13 +12,13 @@ export const ImageMenuItemSelectForCompare = memo(() => {
   const dispatch = useAppDispatch();
   const imageDTO = useImageDTOContext();
   const selectMaySelectForCompare = useMemo(
-    () => createSelector(selectGallerySlice, (gallery) => gallery.imageToCompare?.image_name !== imageDTO.image_name),
+    () => createSelector(selectGallerySlice, (gallery) => gallery.imageToCompare !== imageDTO.image_name),
     [imageDTO.image_name]
   );
   const maySelectForCompare = useAppSelector(selectMaySelectForCompare);
 
   const onClick = useCallback(() => {
-    dispatch(imageToCompareChanged(imageDTO));
+    dispatch(imageToCompareChanged(imageDTO.image_name));
   }, [dispatch, imageDTO]);
 
   return (

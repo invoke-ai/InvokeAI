@@ -9,7 +9,7 @@ export const addEnsureImageIsSelectedListener = (startAppListening: AppStartList
     effect: (action, { dispatch, getState }) => {
       const selection = getState().gallery.selection;
       if (selection.length === 0) {
-        dispatch(imageSelected(action.payload.items[0] ?? null));
+        dispatch(imageSelected(action.payload.items[0]?.image_name ?? null));
       }
     },
   });
