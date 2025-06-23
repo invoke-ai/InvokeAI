@@ -199,7 +199,7 @@ export const useImageActions = (imageDTO: ImageDTO | null) => {
     if (!imageDTO) {
       return;
     }
-    deleteImageModal.delete([imageDTO]);
+    deleteImageModal.delete([imageDTO.image_name]);
   }, [deleteImageModal, imageDTO]);
 
   return {

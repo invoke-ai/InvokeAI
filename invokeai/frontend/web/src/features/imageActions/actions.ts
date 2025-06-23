@@ -71,9 +71,9 @@ export const setNodeImageFieldImage = (arg: {
   dispatch(fieldImageValueChanged({ ...fieldIdentifier, value: imageDTO }));
 };
 
-export const setComparisonImage = (arg: { imageDTO: ImageDTO; dispatch: AppDispatch }) => {
-  const { imageDTO, dispatch } = arg;
-  dispatch(imageToCompareChanged(imageDTO));
+export const setComparisonImage = (arg: { image_name: string; dispatch: AppDispatch }) => {
+  const { image_name, dispatch } = arg;
+  dispatch(imageToCompareChanged(image_name));
 };
 
 export const createNewCanvasEntityFromImage = (arg: {
@@ -292,14 +292,14 @@ export const replaceCanvasEntityObjectsWithImage = (arg: {
   );
 };
 
-export const addImagesToBoard = (arg: { imageDTOs: ImageDTO[]; boardId: BoardId; dispatch: AppDispatch }) => {
-  const { imageDTOs, boardId, dispatch } = arg;
-  dispatch(imagesApi.endpoints.addImagesToBoard.initiate({ imageDTOs, board_id: boardId }, { track: false }));
+export const addImagesToBoard = (arg: { image_names: string[]; boardId: BoardId; dispatch: AppDispatch }) => {
+  const { image_names, boardId, dispatch } = arg;
+  dispatch(imagesApi.endpoints.addImagesToBoard.initiate({ image_names, board_id: boardId }, { track: false }));
   dispatch(selectionChanged([]));
 };
 
-export const removeImagesFromBoard = (arg: { imageDTOs: ImageDTO[]; dispatch: AppDispatch }) => {
-  const { imageDTOs, dispatch } = arg;
-  dispatch(imagesApi.endpoints.removeImagesFromBoard.initiate({ imageDTOs }, { track: false }));
+export const removeImagesFromBoard = (arg: { image_names: string[]; dispatch: AppDispatch }) => {
+  const { image_names, dispatch } = arg;
+  dispatch(imagesApi.endpoints.removeImagesFromBoard.initiate({ image_names }, { track: false }));
   dispatch(selectionChanged([]));
 };

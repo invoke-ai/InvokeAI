@@ -17,9 +17,9 @@ export const GalleryImageStarIconButton = memo(({ imageDTO }: Props) => {
 
   const toggleStarredState = useCallback(() => {
     if (imageDTO.starred) {
-      unstarImages({ imageDTOs: [imageDTO] });
+      unstarImages({ image_names: [imageDTO.image_name] });
     } else {
-      starImages({ imageDTOs: [imageDTO] });
+      starImages({ image_names: [imageDTO.image_name] });
     }
   }, [starImages, unstarImages, imageDTO]);
 

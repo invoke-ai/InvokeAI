@@ -6,7 +6,7 @@ import { DndImage } from 'features/dnd/DndImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import type { ProgressImage as ProgressImageType } from 'features/nodes/types/common';
-import { selectShouldShowImageDetails } from 'features/ui/store/uiSelectors';
+import { selectShouldShowImageDetails, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
@@ -20,6 +20,8 @@ import { ProgressIndicator } from './ProgressIndicator2';
 
 export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO?: ImageDTO }) => {
   const shouldShowImageDetails = useAppSelector(selectShouldShowImageDetails);
+  const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
+
   const socket = useStore($socket);
   const [progressEvent, setProgressEvent] = useState<S['InvocationProgressEvent'] | null>(null);
   const [progressImage, setProgressImage] = useState<ProgressImageType | null>(null);
@@ -65,6 +67,8 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO?: ImageDTO }) 
     }
   }, [imageDTO, progressEvent]);
 
+  const withProgress = shouldShowProgressInViewer && progressEvent && progressImage;
+
   return (
     <Flex
       onMouseOver={onMouseOver}
@@ -75,14 +79,13 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO?: ImageDTO }) 
       justifyContent="center"
       position="relative"
     >
-      {imageDTO ? (
+      {imageDTO && (
         <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center">
           <DndImage imageDTO={imageDTO} onLoad={onLoadImage} />
         </Flex>
-      ) : (
-        <NoContentForViewer />
       )}
-      {progressEvent && progressImage && (
+      {!imageDTO && <NoContentForViewer />}
+      {withProgress && (
         <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center" bg="base.900">
           <ProgressImage progressImage={progressImage} />
           <ProgressIndicator progressEvent={progressEvent} position="absolute" top={6} right={6} size={8} />
@@ -90,9 +93,9 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO?: ImageDTO }) 
       )}
       <Flex flexDir="column" gap={2} position="absolute" top={0} insetInlineStart={0} alignItems="flex-start">
         <CanvasAlertsInvocationProgress />
-        {imageDTO && <ImageMetadataMini imageName={imageDTO.image_name} />}
+        {imageDTO && !withProgress && <ImageMetadataMini imageName={imageDTO.image_name} />}
       </Flex>
-      {shouldShowImageDetails && imageDTO && (
+      {shouldShowImageDetails && imageDTO && !withProgress && (
         <Box position="absolute" opacity={0.8} top={0} width="full" height="full" borderRadius="base">
           <ImageMetadataViewer image={imageDTO} />
         </Box>
