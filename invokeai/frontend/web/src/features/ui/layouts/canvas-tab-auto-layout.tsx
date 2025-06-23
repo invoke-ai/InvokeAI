@@ -18,6 +18,7 @@ import { CanvasTabLeftPanel } from './CanvasTabLeftPanel';
 import { CanvasWorkspacePanel } from './CanvasWorkspacePanel';
 import {
   BOARDS_PANEL_ID,
+  DEFAULT_TAB_ID,
   GALLERY_PANEL_ID,
   LAUNCHPAD_PANEL_ID,
   LAYERS_PANEL_ID,
@@ -28,10 +29,17 @@ import {
   RIGHT_PANEL_ID,
   RIGHT_PANEL_MIN_SIZE_PX,
   SETTINGS_PANEL_ID,
+  TAB_WITH_PROGRESS_INDICATOR_ID,
   VIEWER_PANEL_ID,
   WORKSPACE_PANEL_ID,
 } from './shared';
+import { TabWithoutCloseButtonAndWithProgressIndicator } from './TabWithoutCloseButtonAndWithProgressIndicator';
 import { useResizeMainPanelOnFirstVisit } from './use-on-first-visible';
+
+const tabComponents = {
+  [DEFAULT_TAB_ID]: TabWithoutCloseButton,
+  [TAB_WITH_PROGRESS_INDICATOR_ID]: TabWithoutCloseButtonAndWithProgressIndicator,
+};
 
 const centerPanelComponents: IDockviewReactProps['components'] = {
   [LAUNCHPAD_PANEL_ID]: CanvasLaunchpadPanel,
@@ -45,11 +53,13 @@ const initializeCenterPanelLayout = (api: DockviewApi) => {
     id: LAUNCHPAD_PANEL_ID,
     component: LAUNCHPAD_PANEL_ID,
     title: 'Launchpad',
+    tabComponent: DEFAULT_TAB_ID,
   });
   api.addPanel({
     id: WORKSPACE_PANEL_ID,
     component: WORKSPACE_PANEL_ID,
     title: 'Canvas',
+    tabComponent: DEFAULT_TAB_ID,
     position: {
       direction: 'within',
       referencePanel: LAUNCHPAD_PANEL_ID,
@@ -59,6 +69,7 @@ const initializeCenterPanelLayout = (api: DockviewApi) => {
     id: VIEWER_PANEL_ID,
     component: VIEWER_PANEL_ID,
     title: 'Image Viewer',
+    tabComponent: DEFAULT_TAB_ID,
     position: {
       direction: 'within',
       referencePanel: LAUNCHPAD_PANEL_ID,
@@ -68,6 +79,7 @@ const initializeCenterPanelLayout = (api: DockviewApi) => {
     id: PROGRESS_PANEL_ID,
     component: PROGRESS_PANEL_ID,
     title: 'Generation Progress',
+    tabComponent: TAB_WITH_PROGRESS_INDICATOR_ID,
     position: {
       direction: 'within',
       referencePanel: LAUNCHPAD_PANEL_ID,
@@ -107,10 +119,10 @@ const CenterPanel = memo(() => {
         locked={true}
         disableFloatingGroups={true}
         dndEdges={false}
-        defaultTabComponent={TabWithoutCloseButton}
         components={centerPanelComponents}
         onReady={onReady}
         theme={dockviewTheme}
+        tabComponents={tabComponents}
       />
       <FloatingCanvasLeftPanelButtons />
       <FloatingRightPanelButtons />

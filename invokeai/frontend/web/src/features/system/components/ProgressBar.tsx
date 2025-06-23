@@ -1,3 +1,4 @@
+import type { ProgressProps } from '@invoke-ai/ui-library';
 import { Progress } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { memo, useMemo } from 'react';
@@ -5,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 import { $isConnected, $lastProgressEvent } from 'services/events/stores';
 
-const ProgressBar = () => {
+const ProgressBar = (props: ProgressProps) => {
   const { t } = useTranslation();
   const { data: queueStatus } = useGetQueueStatusQuery();
   const isConnected = useStore($isConnected);
@@ -45,6 +46,7 @@ const ProgressBar = () => {
       h={2}
       w="full"
       colorScheme="invokeBlue"
+      {...props}
     />
   );
 };

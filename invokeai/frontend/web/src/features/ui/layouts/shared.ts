@@ -13,5 +13,8 @@ export const LAYERS_PANEL_ID = 'layers';
 
 export const SETTINGS_PANEL_ID = 'settings';
 
+export const DEFAULT_TAB_ID = 'default-tab';
+export const TAB_WITH_PROGRESS_INDICATOR_ID = 'tab-with-progress-indicator';
+
 export const LEFT_PANEL_MIN_SIZE_PX = 420;
 export const RIGHT_PANEL_MIN_SIZE_PX = 420;
