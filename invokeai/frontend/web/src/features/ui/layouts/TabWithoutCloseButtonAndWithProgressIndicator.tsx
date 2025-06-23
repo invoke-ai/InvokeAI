@@ -2,10 +2,10 @@ import { Flex, Text } from '@invoke-ai/ui-library';
 import { useCallbackOnDragEnter } from 'common/hooks/useCallbackOnDragEnter';
 import type { IDockviewPanelHeaderProps } from 'dockview';
 import ProgressBar from 'features/system/components/ProgressBar';
-import { useCallback, useRef } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import { useIsGenerationInProgress } from 'services/api/endpoints/queue';
 
-export const TabWithoutCloseButtonAndWithProgressIndicator = (props: IDockviewPanelHeaderProps) => {
+export const TabWithoutCloseButtonAndWithProgressIndicator = memo((props: IDockviewPanelHeaderProps) => {
   const isGenerationInProgress = useIsGenerationInProgress();
 
   const ref = useRef<HTMLDivElement>(null);
@@ -27,5 +27,5 @@ export const TabWithoutCloseButtonAndWithProgressIndicator = (props: IDockviewPa
       )}
     </Flex>
   );
-};
+});
 TabWithoutCloseButtonAndWithProgressIndicator.displayName = 'TabWithoutCloseButtonAndWithProgressIndicator';

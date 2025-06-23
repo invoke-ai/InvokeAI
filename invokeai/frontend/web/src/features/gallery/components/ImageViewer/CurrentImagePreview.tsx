@@ -1,20 +1,28 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasAlertsInvocationProgress } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsInvocationProgress';
 import { DndImage } from 'features/dnd/DndImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
+import type { ProgressImage as ProgressImageType } from 'features/nodes/types/common';
 import { selectShouldShowImageDetails } from 'features/ui/store/uiSelectors';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
-import { memo, useCallback, useRef, useState } from 'react';
-import type { ImageDTO } from 'services/api/types';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import type { ImageDTO, S } from 'services/api/types';
+import { $socket } from 'services/events/stores';
 
 import { ImageMetadataMini } from './ImageMetadataMini';
 import { NoContentForViewer } from './NoContentForViewer';
+import { ProgressImage } from './ProgressImage2';
+import { ProgressIndicator } from './ProgressIndicator2';
 
 export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO?: ImageDTO }) => {
   const shouldShowImageDetails = useAppSelector(selectShouldShowImageDetails);
+  const socket = useStore($socket);
+  const [progressEvent, setProgressEvent] = useState<S['InvocationProgressEvent'] | null>(null);
+  const [progressImage, setProgressImage] = useState<ProgressImageType | null>(null);
 
   // Show and hide the next/prev buttons on mouse move
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] = useState<boolean>(false);
@@ -29,6 +37,34 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO?: ImageDTO }) 
     }, 500);
   }, []);
 
+  useEffect(() => {
+    if (!socket) {
+      return;
+    }
+
+    const onInvocationProgress = (data: S['InvocationProgressEvent']) => {
+      setProgressEvent(data);
+      if (data.image) {
+        setProgressImage(data.image);
+      }
+    };
+
+    socket.on('invocation_progress', onInvocationProgress);
+
+    return () => {
+      socket.off('invocation_progress', onInvocationProgress);
+    };
+  }, [socket]);
+
+  const onLoadImage = useCallback(() => {
+    if (!progressEvent || !imageDTO) {
+      return;
+    }
+    if (progressEvent.session_id === imageDTO.session_id) {
+      setProgressImage(null);
+    }
+  }, [imageDTO, progressEvent]);
+
   return (
     <Flex
       onMouseOver={onMouseOver}
@@ -39,7 +75,19 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO?: ImageDTO }) 
       justifyContent="center"
       position="relative"
     >
-      <ImageContent imageDTO={imageDTO} />
+      {imageDTO ? (
+        <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center">
+          <DndImage imageDTO={imageDTO} onLoad={onLoadImage} />
+        </Flex>
+      ) : (
+        <NoContentForViewer />
+      )}
+      {progressEvent && progressImage && (
+        <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center" bg="base.900">
+          <ProgressImage progressImage={progressImage} />
+          <ProgressIndicator progressEvent={progressEvent} position="absolute" top={6} right={6} size={8} />
+        </Flex>
+      )}
       <Flex flexDir="column" gap={2} position="absolute" top={0} insetInlineStart={0} alignItems="flex-start">
         <CanvasAlertsInvocationProgress />
         {imageDTO && <ImageMetadataMini imageName={imageDTO.image_name} />}
@@ -72,19 +120,6 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO?: ImageDTO }) 
   );
 });
 CurrentImagePreview.displayName = 'CurrentImagePreview';
-
-const ImageContent = memo(({ imageDTO }: { imageDTO?: ImageDTO }) => {
-  if (!imageDTO) {
-    return <NoContentForViewer />;
-  }
-
-  return (
-    <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center">
-      <DndImage imageDTO={imageDTO} />
-    </Flex>
-  );
-});
-ImageContent.displayName = 'ImageContent';
 
 const initial: AnimationProps['initial'] = {
   opacity: 0,
