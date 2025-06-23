@@ -81,7 +81,10 @@ class LoRALoader(ModelLoader):
             state_dict = torch.load(model_path, map_location="cpu")
 
         # At the time of writing, we support the OMI standard for base models Flux and SDXL
-        if config.format == ModelFormat.OMI and self._model_base in [BaseModelType.StableDiffusionXL, BaseModelType.Flux]:
+        if config.format == ModelFormat.OMI and self._model_base in [
+            BaseModelType.StableDiffusionXL,
+            BaseModelType.Flux,
+        ]:
             state_dict = convert_from_omi(state_dict, config.base)  # type: ignore
 
         # Apply state_dict key conversions, if necessary.
