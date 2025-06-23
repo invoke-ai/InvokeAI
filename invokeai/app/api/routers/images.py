@@ -17,7 +17,13 @@ from invokeai.app.services.image_records.image_records_common import (
     ImageRecordChanges,
     ResourceOrigin,
 )
-from invokeai.app.services.images.images_common import ImageDTO, ImageUrlsDTO
+from invokeai.app.services.images.images_common import (
+    DeleteImagesResult,
+    ImageDTO,
+    ImageUrlsDTO,
+    StarredImagesResult,
+    UnstarredImagesResult,
+)
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.util.controlnet_utils import heuristic_resize_fast
@@ -153,17 +159,29 @@ async def create_image_upload_entry(
     raise HTTPException(status_code=501, detail="Not implemented")
 
 
-@images_router.delete("/i/{image_name}", operation_id="delete_image")
+@images_router.delete("/i/{image_name}", operation_id="delete_image", response_model=DeleteImagesResult)
 async def delete_image(
     image_name: str = Path(description="The name of the image to delete"),
-) -> None:
+) -> DeleteImagesResult:
     """Deletes an image"""
 
+    deleted_images: set[str] = set()
+    affected_boards: set[str] = set()
+
     try:
+        image_dto = ApiDependencies.invoker.services.images.get_dto(image_name)
+        board_id = image_dto.board_id or "none"
         ApiDependencies.invoker.services.images.delete(image_name)
+        deleted_images.add(image_name)
+        affected_boards.add(board_id)
     except Exception:
         # TODO: Does this need any exception handling at all?
         pass
+
+    return DeleteImagesResult(
+        deleted_images=list(deleted_images),
+        affected_boards=list(affected_boards),
+    )
 
 
 @images_router.delete("/intermediates", operation_id="clear_intermediates")
@@ -376,31 +394,32 @@ async def list_image_dtos(
     return image_dtos
 
 
-class DeleteImagesFromListResult(BaseModel):
-    deleted_images: list[str]
-
-
-@images_router.post("/delete", operation_id="delete_images_from_list", response_model=DeleteImagesFromListResult)
+@images_router.post("/delete", operation_id="delete_images_from_list", response_model=DeleteImagesResult)
 async def delete_images_from_list(
     image_names: list[str] = Body(description="The list of names of images to delete", embed=True),
-) -> DeleteImagesFromListResult:
+) -> DeleteImagesResult:
     try:
-        deleted_images: list[str] = []
+        deleted_images: set[str] = set()
+        affected_boards: set[str] = set()
         for image_name in image_names:
             try:
+                image_dto = ApiDependencies.invoker.services.images.get_dto(image_name)
+                board_id = image_dto.board_id or "none"
                 ApiDependencies.invoker.services.images.delete(image_name)
-                deleted_images.append(image_name)
+                deleted_images.add(image_name)
+                affected_boards.add(board_id)
             except Exception:
                 pass
-        return DeleteImagesFromListResult(deleted_images=deleted_images)
+        return DeleteImagesResult(
+            deleted_images=list(deleted_images),
+            affected_boards=list(affected_boards),
+        )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to delete images")
 
 
-@images_router.delete(
-    "/uncategorized", operation_id="delete_uncategorized_images", response_model=DeleteImagesFromListResult
-)
-async def delete_uncategorized_images() -> DeleteImagesFromListResult:
+@images_router.delete("/uncategorized", operation_id="delete_uncategorized_images", response_model=DeleteImagesResult)
+async def delete_uncategorized_images() -> DeleteImagesResult:
     """Deletes all images that are uncategorized"""
 
     image_names = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
@@ -408,14 +427,19 @@ async def delete_uncategorized_images() -> DeleteImagesFromListResult:
     )
 
     try:
-        deleted_images: list[str] = []
+        deleted_images: set[str] = set()
+        affected_boards: set[str] = set()
         for image_name in image_names:
             try:
                 ApiDependencies.invoker.services.images.delete(image_name)
-                deleted_images.append(image_name)
+                deleted_images.add(image_name)
+                affected_boards.add("none")
             except Exception:
                 pass
-        return DeleteImagesFromListResult(deleted_images=deleted_images)
+        return DeleteImagesResult(
+            deleted_images=list(deleted_images),
+            affected_boards=list(affected_boards),
+        )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to delete images")
 
@@ -424,36 +448,50 @@ class ImagesUpdatedFromListResult(BaseModel):
     updated_image_names: list[str] = Field(description="The image names that were updated")
 
 
-@images_router.post("/star", operation_id="star_images_in_list", response_model=ImagesUpdatedFromListResult)
+@images_router.post("/star", operation_id="star_images_in_list", response_model=StarredImagesResult)
 async def star_images_in_list(
     image_names: list[str] = Body(description="The list of names of images to star", embed=True),
-) -> ImagesUpdatedFromListResult:
+) -> StarredImagesResult:
     try:
-        updated_image_names: list[str] = []
+        starred_images: set[str] = set()
+        affected_boards: set[str] = set()
         for image_name in image_names:
             try:
-                ApiDependencies.invoker.services.images.update(image_name, changes=ImageRecordChanges(starred=True))
-                updated_image_names.append(image_name)
+                updated_image_dto = ApiDependencies.invoker.services.images.update(
+                    image_name, changes=ImageRecordChanges(starred=True)
+                )
+                starred_images.add(image_name)
+                affected_boards.add(updated_image_dto.board_id or "none")
             except Exception:
                 pass
-        return ImagesUpdatedFromListResult(updated_image_names=updated_image_names)
+        return StarredImagesResult(
+            starred_images=list(starred_images),
+            affected_boards=list(affected_boards),
+        )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to star images")
 
 
-@images_router.post("/unstar", operation_id="unstar_images_in_list", response_model=ImagesUpdatedFromListResult)
+@images_router.post("/unstar", operation_id="unstar_images_in_list", response_model=UnstarredImagesResult)
 async def unstar_images_in_list(
     image_names: list[str] = Body(description="The list of names of images to unstar", embed=True),
-) -> ImagesUpdatedFromListResult:
+) -> UnstarredImagesResult:
     try:
-        updated_image_names: list[str] = []
+        unstarred_images: set[str] = set()
+        affected_boards: set[str] = set()
         for image_name in image_names:
             try:
-                ApiDependencies.invoker.services.images.update(image_name, changes=ImageRecordChanges(starred=False))
-                updated_image_names.append(image_name)
+                updated_image_dto = ApiDependencies.invoker.services.images.update(
+                    image_name, changes=ImageRecordChanges(starred=False)
+                )
+                unstarred_images.add(image_name)
+                affected_boards.add(updated_image_dto.board_id or "none")
             except Exception:
                 pass
-        return ImagesUpdatedFromListResult(updated_image_names=updated_image_names)
+        return UnstarredImagesResult(
+            unstarred_images=list(unstarred_images),
+            affected_boards=list(affected_boards),
+        )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to unstar images")
 
