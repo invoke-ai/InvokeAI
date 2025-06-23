@@ -41,8 +41,6 @@ from invokeai.backend.patches.lora_conversions.sdxl_lora_conversion_utils import
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.LoRA, format=ModelFormat.OMI)
-@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion1, type=ModelType.LoRA, format=ModelFormat.OMI)
-@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion3, type=ModelType.LoRA, format=ModelFormat.OMI)
 @ModelLoaderRegistry.register(base=BaseModelType.StableDiffusionXL, type=ModelType.LoRA, format=ModelFormat.OMI)
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.LoRA, format=ModelFormat.Diffusers)
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.LoRA, format=ModelFormat.LyCORIS)
@@ -78,7 +76,8 @@ class LoRALoader(ModelLoader):
         else:
             state_dict = torch.load(model_path, map_location="cpu")
 
-        if config.format == ModelFormat.OMI:
+        # At the time of writing, we support the OMI standard for base models Flux and SDXL
+        if config.format == ModelFormat.OMI and self._model_base in [BaseModelType.StableDiffusionXL, BaseModelType.Flux]:
             state_dict = convert_from_omi(state_dict, config.base)  # type: ignore
 
         # Apply state_dict key conversions, if necessary.

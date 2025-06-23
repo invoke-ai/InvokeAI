@@ -12,9 +12,7 @@ def convert_from_omi(weights_sd: StateDict, base: BaseModelType):
     keyset = {
         BaseModelType.Flux: convert_flux_lora_key_sets(),
         BaseModelType.StableDiffusionXL: convert_sdxl_lora_key_sets(),
-        BaseModelType.StableDiffusion1: convert_sd_lora_key_sets(),
-        BaseModelType.StableDiffusion3: convert_sd3_lora_key_sets(),
     }[base]
-
-    target = "diffusers" # alternatively, "legacy_diffusers"
-    return lora_util.__convert(weights_sd, keyset, "omi", target) # type: ignore
+    source = "omi"
+    target = "legacy_diffusers"
+    return lora_util.__convert(weights_sd, keyset, source, target) # type: ignore

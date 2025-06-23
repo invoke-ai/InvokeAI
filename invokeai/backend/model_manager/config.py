@@ -356,15 +356,11 @@ class LoRAOmiConfig(LoRAConfigBase, ModelConfigBase):
         base_str = base_str.lower()
 
         if "stable-diffusion-v1" in base_str:
-            base = BaseModelType.StableDiffusion1
-        elif "stable-diffusion-v3" in base_str:
-            base = BaseModelType.StableDiffusion3
-        elif base_str == "stable-diffusion-xl-v1-base":
             base = BaseModelType.StableDiffusionXL
         elif "flux" in base_str:
             base = BaseModelType.Flux
         else:
-            raise InvalidModelConfigException(f"Unrecognised base architecture for OMI LoRA: {base_str}")
+            raise InvalidModelConfigException(f"Unrecognised/unsupported base architecture for OMI LoRA: {base_str}")
 
         return {"base": base}
 
