@@ -87,7 +87,7 @@ const _multipleImage = buildTypeAndKey('multiple-image');
 export type MultipleImageDndSourceData = DndData<
   typeof _multipleImage.type,
   typeof _multipleImage.key,
-  { imageDTOs: ImageDTO[]; boardId: BoardId }
+  { image_names: string[]; board_id: BoardId }
 >;
 export const multipleImageDndSource: DndSource<MultipleImageDndSourceData> = {
   ..._multipleImage,
@@ -305,7 +305,7 @@ export const addImagesToNodeImageFieldCollectionDndTarget: DndTarget<
     if (singleImageDndSource.typeGuard(sourceData)) {
       newValue.push({ image_name: sourceData.payload.imageDTO.image_name });
     } else {
-      newValue.push(...sourceData.payload.imageDTOs.map(({ image_name }) => ({ image_name })));
+      newValue.push(...sourceData.payload.image_names.map((image_name) => ({ image_name })));
     }
 
     dispatch(fieldImageCollectionValueChanged({ ...fieldIdentifier, value: newValue }));
@@ -330,17 +330,17 @@ export const setComparisonImageDndTarget: DndTarget<SetComparisonImageDndTargetD
     }
     const { firstImage, secondImage } = selectComparisonImages(getState());
     // Do not allow the same images to be selected for comparison
-    if (sourceData.payload.imageDTO.image_name === firstImage?.image_name) {
+    if (sourceData.payload.imageDTO.image_name === firstImage) {
       return false;
     }
-    if (sourceData.payload.imageDTO.image_name === secondImage?.image_name) {
+    if (sourceData.payload.imageDTO.image_name === secondImage) {
       return false;
     }
     return true;
   },
   handler: ({ sourceData, dispatch }) => {
     const { imageDTO } = sourceData.payload;
-    setComparisonImage({ imageDTO, dispatch });
+    setComparisonImage({ image_name: imageDTO.image_name, dispatch });
   },
 };
 //#endregion
@@ -450,7 +450,7 @@ export const addImageToBoardDndTarget: DndTarget<
       return currentBoard !== destinationBoard;
     }
     if (multipleImageDndSource.typeGuard(sourceData)) {
-      const currentBoard = sourceData.payload.boardId;
+      const currentBoard = sourceData.payload.board_id;
       const destinationBoard = targetData.payload.boardId;
       return currentBoard !== destinationBoard;
     }
@@ -460,13 +460,13 @@ export const addImageToBoardDndTarget: DndTarget<
     if (singleImageDndSource.typeGuard(sourceData)) {
       const { imageDTO } = sourceData.payload;
       const { boardId } = targetData.payload;
-      addImagesToBoard({ imageDTOs: [imageDTO], boardId, dispatch });
+      addImagesToBoard({ image_names: [imageDTO.image_name], boardId, dispatch });
     }
 
     if (multipleImageDndSource.typeGuard(sourceData)) {
-      const { imageDTOs } = sourceData.payload;
+      const { image_names } = sourceData.payload;
       const { boardId } = targetData.payload;
-      addImagesToBoard({ imageDTOs, boardId, dispatch });
+      addImagesToBoard({ image_names, boardId, dispatch });
     }
   },
 };
@@ -494,7 +494,7 @@ export const removeImageFromBoardDndTarget: DndTarget<
     }
 
     if (multipleImageDndSource.typeGuard(sourceData)) {
-      const currentBoard = sourceData.payload.boardId;
+      const currentBoard = sourceData.payload.board_id;
       return currentBoard !== 'none';
     }
 
@@ -503,12 +503,12 @@ export const removeImageFromBoardDndTarget: DndTarget<
   handler: ({ sourceData, dispatch }) => {
     if (singleImageDndSource.typeGuard(sourceData)) {
       const { imageDTO } = sourceData.payload;
-      removeImagesFromBoard({ imageDTOs: [imageDTO], dispatch });
+      removeImagesFromBoard({ image_names: [imageDTO.image_name], dispatch });
     }
 
     if (multipleImageDndSource.typeGuard(sourceData)) {
-      const { imageDTOs } = sourceData.payload;
-      removeImagesFromBoard({ imageDTOs, dispatch });
+      const { image_names } = sourceData.payload;
+      removeImagesFromBoard({ image_names, dispatch });
     }
   },
 };

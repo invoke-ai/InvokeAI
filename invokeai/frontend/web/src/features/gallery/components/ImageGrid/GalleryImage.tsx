@@ -93,7 +93,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
   const ref = useRef<HTMLImageElement>(null);
   const dndId = useId();
   const selectIsSelectedForCompare = useMemo(
-    () => createSelector(selectGallerySlice, (gallery) => gallery.imageToCompare?.image_name === imageDTO.image_name),
+    () => createSelector(selectGallerySlice, (gallery) => gallery.imageToCompare === imageDTO.image_name),
     [imageDTO.image_name]
   );
   const isSelectedForCompare = useAppSelector(selectIsSelectedForCompare);
@@ -101,7 +101,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
     () =>
       createSelector(selectGallerySlice, (gallery) => {
         for (const selectedImage of gallery.selection) {
-          if (selectedImage.image_name === imageDTO.image_name) {
+          if (selectedImage === imageDTO.image_name) {
             return true;
           }
         }
@@ -126,11 +126,11 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
           // multi-image drag.
           if (
             gallery.selection.length > 1 &&
-            gallery.selection.find(({ image_name }) => image_name === imageDTO.image_name) !== undefined
+            gallery.selection.find((image_name) => image_name === imageDTO.image_name) !== undefined
           ) {
             return multipleImageDndSource.getData({
-              imageDTOs: gallery.selection,
-              boardId: gallery.selectedBoardId,
+              image_names: gallery.selection,
+              board_id: gallery.selectedBoardId,
             });
           }
 
@@ -167,7 +167,10 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
         onDragStart: ({ source }) => {
           // When we start dragging multiple images, set the dragging state to true if the dragged image is part of the
           // selection. This is called for all drag events.
-          if (multipleImageDndSource.typeGuard(source.data) && source.data.payload.imageDTOs.includes(imageDTO)) {
+          if (
+            multipleImageDndSource.typeGuard(source.data) &&
+            source.data.payload.image_names.includes(imageDTO.image_name)
+          ) {
             setIsDragging(true);
           }
         },
@@ -193,7 +196,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
     (e) => {
       store.dispatch(
         galleryImageClicked({
-          imageDTO,
+          imageName: imageDTO.image_name,
           shiftKey: e.shiftKey,
           ctrlKey: e.ctrlKey,
           metaKey: e.metaKey,

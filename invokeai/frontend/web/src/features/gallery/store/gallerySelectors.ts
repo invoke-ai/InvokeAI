@@ -8,10 +8,6 @@ import type { ListBoardsArgs, ListImagesArgs } from 'services/api/types';
 
 export const selectFirstSelectedImage = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(0));
 export const selectLastSelectedImage = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(-1));
-export const selectLastSelectedImageName = createSelector(
-  selectGallerySlice,
-  (gallery) => gallery.selection.at(-1)?.image_name
-);
 
 export const selectGalleryLimit = createSelector(selectGallerySlice, (gallery) => gallery.limit);
 export const selectListImagesQueryArgs = createMemoizedSelector(

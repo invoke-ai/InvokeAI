@@ -1,7 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import type { ImageDTO } from 'services/api/types';
 
 import { initialState } from './initialState';
 
@@ -12,11 +11,11 @@ export const changeBoardModalSlice = createSlice({
     isModalOpenChanged: (state, action: PayloadAction<boolean>) => {
       state.isModalOpen = action.payload;
     },
-    imagesToChangeSelected: (state, action: PayloadAction<ImageDTO[]>) => {
-      state.imagesToChange = action.payload;
+    imagesToChangeSelected: (state, action: PayloadAction<string[]>) => {
+      state.image_names = action.payload;
     },
     changeBoardReset: (state) => {
-      state.imagesToChange = [];
+      state.image_names = [];
       state.isModalOpen = false;
     },
   },
