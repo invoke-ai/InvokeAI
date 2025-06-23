@@ -9,7 +9,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiInfoBold } from 'react-icons/pi';
 
-import { useImageViewerContext } from './ImageViewerPanel';
+import { useImageViewerContext } from './context';
 
 export const ToggleMetadataViewerButton = memo(() => {
   const dispatch = useAppDispatch();
