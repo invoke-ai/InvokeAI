@@ -438,7 +438,7 @@ class WithWorkflow:
     workflow = None
 
     def __init_subclass__(cls) -> None:
-        logger.warn(
+        logger.warning(
             f"{cls.__module__.split('.')[0]}.{cls.__name__}: WithWorkflow is deprecated. Use `context.workflow` to access the workflow."
         )
         super().__init_subclass__()
@@ -579,7 +579,7 @@ def InputField(
 
     if default_factory is not _Unset and default_factory is not None:
         default = default_factory()
-        logger.warn('"default_factory" is not supported, calling it now to set "default"')
+        logger.warning('"default_factory" is not supported, calling it now to set "default"')
 
     # These are the args we may wish pass to the pydantic `Field()` function
     field_args = {

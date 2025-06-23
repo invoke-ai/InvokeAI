@@ -78,7 +78,7 @@ class ImageService(ImageServiceABC):
                         board_id=board_id, image_name=image_name
                     )
                 except Exception as e:
-                    self.__invoker.services.logger.warn(f"Failed to add image to board {board_id}: {str(e)}")
+                    self.__invoker.services.logger.warning(f"Failed to add image to board {board_id}: {str(e)}")
             self.__invoker.services.image_files.save(
                 image_name=image_name, image=image, metadata=metadata, workflow=workflow, graph=graph
             )

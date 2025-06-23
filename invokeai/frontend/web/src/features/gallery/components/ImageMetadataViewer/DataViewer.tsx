@@ -2,7 +2,7 @@ import type { FlexProps } from '@invoke-ai/ui-library';
 import { Box, chakra, Flex, IconButton, Tooltip, useShiftModifier } from '@invoke-ai/ui-library';
 import { getOverlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { useClipboard } from 'common/hooks/useClipboard';
-import { Formatter } from 'fracturedjsonjs';
+import { Formatter, TableCommaPlacement } from 'fracturedjsonjs';
 import { isString } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
@@ -11,6 +11,8 @@ import { useTranslation } from 'react-i18next';
 import { PiCopyBold, PiDownloadSimpleBold } from 'react-icons/pi';
 
 const formatter = new Formatter();
+formatter.Options.TableCommaPlacement = TableCommaPlacement.BeforePadding;
+formatter.Options.OmitTrailingWhitespace = true;
 
 type Props = {
   label: string;

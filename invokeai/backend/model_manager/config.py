@@ -296,7 +296,7 @@ class LoRAConfigBase(ABC, BaseModel):
         from invokeai.backend.patches.lora_conversions.formats import flux_format_from_state_dict
 
         sd = mod.load_state_dict(mod.path)
-        value = flux_format_from_state_dict(sd)
+        value = flux_format_from_state_dict(sd, mod.metadata())
         mod.cache[key] = value
         return value
 

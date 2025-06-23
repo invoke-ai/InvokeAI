@@ -148,7 +148,7 @@ class ModelInstallService(ModelInstallServiceBase):
     def _clear_pending_jobs(self) -> None:
         for job in self.list_jobs():
             if not job.in_terminal_state:
-                self._logger.warning("Cancelling job {job.id}")
+                self._logger.warning(f"Cancelling job {job.id}")
                 self.cancel_job(job)
         while True:
             try:
