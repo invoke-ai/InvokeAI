@@ -15,6 +15,7 @@ import { memo, useCallback, useRef, useState } from 'react';
 
 import {
   BOARDS_PANEL_ID,
+  DEFAULT_TAB_ID,
   GALLERY_PANEL_ID,
   LAUNCHPAD_PANEL_ID,
   LEFT_PANEL_ID,
@@ -24,10 +25,17 @@ import {
   RIGHT_PANEL_ID,
   RIGHT_PANEL_MIN_SIZE_PX,
   SETTINGS_PANEL_ID,
+  TAB_WITH_PROGRESS_INDICATOR_ID,
   VIEWER_PANEL_ID,
 } from './shared';
+import { TabWithoutCloseButtonAndWithProgressIndicator } from './TabWithoutCloseButtonAndWithProgressIndicator';
 import { UpscalingTabLeftPanel } from './UpscalingTabLeftPanel';
 import { useResizeMainPanelOnFirstVisit } from './use-on-first-visible';
+
+const tabComponents = {
+  [DEFAULT_TAB_ID]: TabWithoutCloseButton,
+  [TAB_WITH_PROGRESS_INDICATOR_ID]: TabWithoutCloseButtonAndWithProgressIndicator,
+};
 
 const centerComponents: IDockviewReactProps['components'] = {
   [LAUNCHPAD_PANEL_ID]: UpscalingLaunchpadPanel,
@@ -40,11 +48,13 @@ const initializeCenterLayout = (api: DockviewApi) => {
     id: LAUNCHPAD_PANEL_ID,
     component: LAUNCHPAD_PANEL_ID,
     title: 'Launchpad',
+    tabComponent: DEFAULT_TAB_ID,
   });
   api.addPanel({
     id: VIEWER_PANEL_ID,
     component: VIEWER_PANEL_ID,
     title: 'Image Viewer',
+    tabComponent: DEFAULT_TAB_ID,
     position: {
       direction: 'within',
       referencePanel: LAUNCHPAD_PANEL_ID,
@@ -54,6 +64,7 @@ const initializeCenterLayout = (api: DockviewApi) => {
     id: PROGRESS_PANEL_ID,
     component: PROGRESS_PANEL_ID,
     title: 'Generation Progress',
+    tabComponent: TAB_WITH_PROGRESS_INDICATOR_ID,
     position: {
       direction: 'within',
       referencePanel: LAUNCHPAD_PANEL_ID,
@@ -92,7 +103,7 @@ const CenterPanel = memo(() => {
         locked={true}
         disableFloatingGroups={true}
         dndEdges={false}
-        defaultTabComponent={TabWithoutCloseButton}
+        tabComponents={tabComponents}
         components={centerComponents}
         onReady={onReady}
         theme={dockviewTheme}

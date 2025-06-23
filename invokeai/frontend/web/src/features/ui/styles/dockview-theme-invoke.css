@@ -57,8 +57,9 @@
 
 .dv-tab {
   /* margin-right: 2px; */
-  padding-inline-start: var(--invoke-sizes-4);
-  padding-inline-end: var(--invoke-sizes-4);
+  /* padding-inline-start: var(--invoke-sizes-4);
+  padding-inline-end: var(--invoke-sizes-4); */
+  padding: 0px;
 }
 
 .dv-inactive-group .dv-tabs-container.dv-horizontal .dv-tab:not(:first-child)::before {
