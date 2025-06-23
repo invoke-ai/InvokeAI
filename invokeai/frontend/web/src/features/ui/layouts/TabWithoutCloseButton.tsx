@@ -1,9 +1,9 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { useCallbackOnDragEnter } from 'common/hooks/useCallbackOnDragEnter';
 import type { IDockviewPanelHeaderProps } from 'dockview';
-import { useCallback, useRef } from 'react';
+import { memo, useCallback, useRef } from 'react';
 
-export const TabWithoutCloseButton = (props: IDockviewPanelHeaderProps) => {
+export const TabWithoutCloseButton = memo((props: IDockviewPanelHeaderProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const setActive = useCallback(() => {
     if (!props.api.isActive) {
@@ -20,5 +20,5 @@ export const TabWithoutCloseButton = (props: IDockviewPanelHeaderProps) => {
       </Text>
     </Flex>
   );
-};
+});
 TabWithoutCloseButton.displayName = 'TabWithoutCloseButton';
