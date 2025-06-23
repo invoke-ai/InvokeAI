@@ -1539,6 +1539,22 @@ export const canvasSlice = createSlice({
           break;
       }
     },
+    allNonRasterLayersIsHiddenToggled: (state) => {
+      // Toggle visibility for all non-raster layer categories
+      // Check if any non-raster layers are currently visible
+      const hasVisibleNonRasterLayers = 
+        !state.controlLayers.isHidden ||
+        !state.inpaintMasks.isHidden ||
+        !state.regionalGuidance.isHidden;
+      
+      // If any are visible, hide all; if all are hidden, show all
+      const shouldHide = hasVisibleNonRasterLayers;
+      
+      state.controlLayers.isHidden = shouldHide;
+      state.inpaintMasks.isHidden = shouldHide;
+      state.regionalGuidance.isHidden = shouldHide;
+      // Note: reference_image doesn't have isHidden property, so it's not included
+    },
     allEntitiesDeleted: (state) => {
       // Deleting all entities is equivalent to resetting the state for each entity type
       const initialState = getInitialCanvasState();
@@ -1648,6 +1664,7 @@ export const {
   entitiesReordered,
   allEntitiesDeleted,
   allEntitiesOfTypeIsHiddenToggled,
+  allNonRasterLayersIsHiddenToggled,
   // bbox
   bboxChangedFromCanvas,
   bboxScaledWidthChanged,

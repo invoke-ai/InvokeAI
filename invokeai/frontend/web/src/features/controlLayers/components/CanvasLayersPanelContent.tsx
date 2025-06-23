@@ -4,6 +4,7 @@ import { CanvasAddEntityButtons } from 'features/controlLayers/components/Canvas
 import { CanvasEntityList } from 'features/controlLayers/components/CanvasEntityList/CanvasEntityList';
 import { EntityListSelectedEntityActionBar } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBar';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useCanvasToggleNonRasterLayersHotkey } from 'features/controlLayers/hooks/useCanvasToggleNonRasterLayersHotkey';
 import { selectHasEntities } from 'features/controlLayers/store/selectors';
 import { memo } from 'react';
 
@@ -11,6 +12,7 @@ import { ParamDenoisingStrength } from './ParamDenoisingStrength';
 
 export const CanvasLayersPanel = memo(() => {
   const hasEntities = useAppSelector(selectHasEntities);
+  useCanvasToggleNonRasterLayersHotkey();
 
   return (
     <CanvasManagerProviderGate>
