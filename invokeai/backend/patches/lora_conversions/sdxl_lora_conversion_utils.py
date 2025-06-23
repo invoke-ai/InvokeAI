@@ -22,7 +22,7 @@ def convert_sdxl_keys_to_diffusers_format(state_dict: Dict[str, T]) -> dict[str,
         ValueError: If state_dict contains an unrecognized key, or not all keys could be converted.
 
     Returns:
-        Dict[str, Tensor]: The diffusers-format state_dict with bundle_emb keys removed.
+        Dict[str, Tensor]: The diffusers-format state_dict.
     """
     converted_count = 0  # The number of Stability AI keys converted to diffusers format.
     not_converted_count = 0  # The number of keys that were not converted.
@@ -35,10 +35,7 @@ def convert_sdxl_keys_to_diffusers_format(state_dict: Dict[str, T]) -> dict[str,
 
     new_state_dict: dict[str, T] = {}
     for full_key, value in state_dict.items():
-        # Skip keys that start with "bundle_emb"
-        if full_key.startswith("bundle_emb"):
-            continue
-            
+
         if full_key.startswith("lora_unet_"):
             search_key = full_key.replace("lora_unet_", "")
             # Use bisect to find the key in stability_unet_keys that *may* match the search_key's prefix.
