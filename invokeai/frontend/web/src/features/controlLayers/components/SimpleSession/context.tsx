@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppStore } from 'app/store/nanostores/store';
+import { buildZodTypeGuard } from 'common/util/zodUtils';
 import { getOutputImageName } from 'features/controlLayers/components/SimpleSession/shared';
 import type { ProgressImage } from 'features/nodes/types/common';
 import type { Atom, MapStore, StoreValue, WritableAtom } from 'nanostores';
@@ -13,6 +14,11 @@ import { queueApi } from 'services/api/endpoints/queue';
 import type { ImageDTO, S } from 'services/api/types';
 import { $socket } from 'services/events/stores';
 import { assert, objectEntries } from 'tsafe';
+import { z } from 'zod';
+
+const zAutoSwitchMode = z.enum(['off', 'switch_on_start', 'switch_on_finish']);
+export const isAutoSwitchMode = buildZodTypeGuard(zAutoSwitchMode);
+export type AutoSwitchMode = z.infer<typeof zAutoSwitchMode>;
 
 export type ProgressData = {
   itemId: number;
@@ -91,7 +97,7 @@ type CanvasSessionContextValue = {
   $selectedItem: Atom<S['SessionQueueItem'] | null>;
   $selectedItemIndex: Atom<number | null>;
   $selectedItemOutputImageDTO: Atom<ImageDTO | null>;
-  $autoSwitch: WritableAtom<boolean>;
+  $autoSwitch: WritableAtom<AutoSwitchMode>;
   selectNext: () => void;
   selectPrev: () => void;
   selectFirst: () => void;
@@ -116,7 +122,16 @@ export const CanvasSessionContextProvider = memo(
     const store = useAppStore();
 
     const socket = useStore($socket);
+
+    /**
+     * Track the last completed item. Used to implement autoswitch.
+     */
     const $lastCompletedItemId = useState(() => atom<number | null>(null))[0];
+
+    /**
+     * Track the last started item. Used to implement autoswitch.
+     */
+    const $lastStartedItemId = useState(() => atom<number | null>(null))[0];
 
     /**
      * Manually-synced atom containing queue items for the current session. This is populated from the RTK Query cache
@@ -127,7 +142,7 @@ export const CanvasSessionContextProvider = memo(
     /**
      * Whether auto-switch is enabled.
      */
-    const $autoSwitch = useState(() => atom(true))[0];
+    const $autoSwitch = useState(() => atom<AutoSwitchMode>('switch_on_start'))[0];
 
     /**
      * An internal flag used to work around race conditions with auto-switch switching to queue items before their
@@ -277,12 +292,12 @@ export const CanvasSessionContextProvider = memo(
             imageLoaded: true,
           });
         }
-        if ($lastCompletedItemId.get() === itemId) {
+        if ($lastCompletedItemId.get() === itemId && $autoSwitch.get() === 'switch_on_finish') {
           $selectedItemId.set(itemId);
           $lastCompletedItemId.set(null);
         }
       },
-      [$lastCompletedItemId, $progressData, $selectedItemId]
+      [$autoSwitch, $lastCompletedItemId, $progressData, $selectedItemId]
     );
 
     // Set up socket listeners
@@ -305,6 +320,9 @@ export const CanvasSessionContextProvider = memo(
         if (data.status === 'completed') {
           $lastCompletedItemId.set(data.item_id);
         }
+        if (data.status === 'in_progress') {
+          $lastStartedItemId.set(data.item_id);
+        }
       };
 
       socket.on('invocation_progress', onProgress);
@@ -314,7 +332,7 @@ export const CanvasSessionContextProvider = memo(
         socket.off('invocation_progress', onProgress);
         socket.off('queue_item_status_changed', onQueueItemStatusChanged);
       };
-    }, [$autoSwitch, $lastCompletedItemId, $progressData, $selectedItemId, session.id, socket]);
+    }, [$autoSwitch, $lastCompletedItemId, $lastStartedItemId, $progressData, $selectedItemId, session.id, socket]);
 
     // Set up state subscriptions and effects
     useEffect(() => {
@@ -333,29 +351,38 @@ export const CanvasSessionContextProvider = memo(
       });
 
       // Handle cases that could result in a nonexistent queue item being selected.
-      const unsubEnsureSelectedItemIdExists = effect([$items, $selectedItemId], (items, selectedItemId) => {
-        // If there are no items, cannot have a selected item.
-        if (items.length === 0) {
-          $selectedItemId.set(null);
-          return;
-        }
-        // If there is no selected item but there are items, select the first one.
-        if (selectedItemId === null && items.length > 0) {
-          $selectedItemId.set(items[0]?.item_id ?? null);
-          return;
-        }
-        // If an item is selected and it is not in the list of items, un-set it. This effect will run again and we'll
-        // the above case, selecting the first item if there are any.
-        if (selectedItemId !== null && items.findIndex(({ item_id }) => item_id === selectedItemId) === -1) {
-          let prevIndex = _prevItems.findIndex(({ item_id }) => item_id === selectedItemId);
-          if (prevIndex >= items.length) {
-            prevIndex = items.length - 1;
+      const unsubEnsureSelectedItemIdExists = effect(
+        [$items, $selectedItemId, $lastStartedItemId],
+        (items, selectedItemId, lastStartedItemId) => {
+          // If there are no items, cannot have a selected item.
+          if (items.length === 0) {
+            $selectedItemId.set(null);
+            return;
           }
-          const nextItem = items[prevIndex];
-          $selectedItemId.set(nextItem?.item_id ?? null);
-          return;
+          // If there is no selected item but there are items, select the first one.
+          if (selectedItemId === null && items.length > 0) {
+            $selectedItemId.set(items[0]?.item_id ?? null);
+            return;
+          }
+          if (
+            $autoSwitch.get() === 'switch_on_start' &&
+            items.findIndex(({ item_id }) => item_id === lastStartedItemId) !== -1
+          ) {
+            $selectedItemId.set(lastStartedItemId);
+          }
+          // If an item is selected and it is not in the list of items, un-set it. This effect will run again and we'll
+          // the above case, selecting the first item if there are any.
+          if (selectedItemId !== null && items.findIndex(({ item_id }) => item_id === selectedItemId) === -1) {
+            let prevIndex = _prevItems.findIndex(({ item_id }) => item_id === selectedItemId);
+            if (prevIndex >= items.length) {
+              prevIndex = items.length - 1;
+            }
+            const nextItem = items[prevIndex];
+            $selectedItemId.set(nextItem?.item_id ?? null);
+            return;
+          }
         }
-      });
+      );
 
       // Clean up the progress data when a queue item is discarded.
       const unsubCleanUpProgressData = $items.subscribe(async (items) => {
@@ -438,7 +465,7 @@ export const CanvasSessionContextProvider = memo(
         if (lastLoadedItemId === null) {
           return;
         }
-        if ($autoSwitch.get()) {
+        if ($autoSwitch.get() === 'switch_on_finish') {
           $selectedItemId.set(lastLoadedItemId);
         }
         $lastLoadedItemId.set(null);
@@ -461,7 +488,17 @@ export const CanvasSessionContextProvider = memo(
         $progressData.set({});
         $selectedItemId.set(null);
       };
-    }, [$autoSwitch, $items, $lastLoadedItemId, $progressData, $selectedItemId, selectQueueItems, session.id, store]);
+    }, [
+      $autoSwitch,
+      $items,
+      $lastLoadedItemId,
+      $lastStartedItemId,
+      $progressData,
+      $selectedItemId,
+      selectQueueItems,
+      session.id,
+      store,
+    ]);
 
     const value = useMemo<CanvasSessionContextValue>(
       () => ({
