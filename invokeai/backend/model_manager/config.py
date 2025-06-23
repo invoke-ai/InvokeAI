@@ -355,7 +355,7 @@ class LoRAOmiConfig(LoRAConfigBase, ModelConfigBase):
         base_str, _ = metadata["modelspec.architecture"].split("/")
         base_str = base_str.lower()
 
-        if "stable-diffusion-v1" in base_str:
+        if "stable-diffusion-xl-v1-base" in base_str:
             base = BaseModelType.StableDiffusionXL
         elif "flux" in base_str:
             base = BaseModelType.Flux
