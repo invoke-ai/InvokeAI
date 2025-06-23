@@ -2,6 +2,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { DndImageIcon } from 'features/dnd/DndImageIcon';
 import { imageSelected, imageToCompareChanged } from 'features/gallery/store/gallerySlice';
 import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
+import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsOutBold } from 'react-icons/pi';
@@ -13,14 +14,14 @@ type Props = {
 
 export const GalleryImageOpenInViewerIconButton = memo(({ imageDTO }: Props) => {
   const dispatch = useAppDispatch();
-  const { focusImageViewer } = useAutoLayoutContext();
+  const { focusPanel } = useAutoLayoutContext();
   const { t } = useTranslation();
 
   const onClick = useCallback(() => {
     dispatch(imageToCompareChanged(null));
     dispatch(imageSelected(imageDTO));
-    focusImageViewer();
-  }, [dispatch, focusImageViewer, imageDTO]);
+    focusPanel(VIEWER_PANEL_ID);
+  }, [dispatch, focusPanel, imageDTO]);
 
   return (
     <DndImageIcon
