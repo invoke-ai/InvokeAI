@@ -48,6 +48,7 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
         return;
       }
       if (progressEvent.session_id === imageDTO.session_id) {
+        $progressEvent.set(null);
         $progressImage.set(null);
       }
     },
