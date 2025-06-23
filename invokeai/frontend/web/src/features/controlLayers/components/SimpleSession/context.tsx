@@ -369,6 +369,7 @@ export const CanvasSessionContextProvider = memo(
             items.findIndex(({ item_id }) => item_id === lastStartedItemId) !== -1
           ) {
             $selectedItemId.set(lastStartedItemId);
+            $lastStartedItemId.set(null);
           }
           // If an item is selected and it is not in the list of items, un-set it. This effect will run again and we'll
           // the above case, selecting the first item if there are any.
