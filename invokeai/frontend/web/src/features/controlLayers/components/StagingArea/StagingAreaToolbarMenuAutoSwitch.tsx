@@ -17,7 +17,7 @@ export const StagingAreaToolbarMenuAutoSwitch = memo(() => {
   );
 
   return (
-    <MenuOptionGroup value={autoSwitch} onChange={onChange} title="Auto Switch" type="radio">
+    <MenuOptionGroup value={autoSwitch} onChange={onChange} title="Auto-Switch" type="radio">
       <MenuItemOption value="off" closeOnSelect={false}>
         Off
       </MenuItemOption>
