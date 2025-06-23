@@ -80,6 +80,10 @@ class LoRALoader(ModelLoader):
         else:
             state_dict = torch.load(model_path, map_location="cpu")
 
+        # Strip 'bundle_emb' keys - these are unused and currently cause downstream errors.
+        # To revisit later to determine if they're needed/useful.
+        state_dict = { k: v for k, v in state_dict.items() if not k.startswith("bundle_emb") }
+
         # At the time of writing, we support the OMI standard for base models Flux and SDXL
         if config.format == ModelFormat.OMI and self._model_base in [
             BaseModelType.StableDiffusionXL,
