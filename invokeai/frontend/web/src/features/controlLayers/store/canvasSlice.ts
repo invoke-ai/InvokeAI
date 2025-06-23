@@ -1340,22 +1340,27 @@ export const canvasSlice = createSlice({
         state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
         state.bbox.aspectRatio.isLocked = true;
       } else if (state.bbox.modelBase === 'flux-kontext' && isFluxKontextAspectRatioID(id)) {
-        // Flux Kontext has specific output sizes that are not exactly the same as the aspect ratio. Need special handling.
-        if (id === '1:1') {
-          state.bbox.rect.width = 1024;
-          state.bbox.rect.height = 1024;
+        if (id === '3:4') {
+          state.bbox.rect.width = 880;
+          state.bbox.rect.height = 1184;
         } else if (id === '4:3') {
-          state.bbox.rect.width = 896;
-          state.bbox.rect.height = 1280;
-        } else if (id === '3:4') {
-          state.bbox.rect.width = 1280;
-          state.bbox.rect.height = 896;
+          state.bbox.rect.width = 1184;
+          state.bbox.rect.height = 880;
+        } else if (id === '9:16') {
+          state.bbox.rect.width = 752;
+          state.bbox.rect.height = 1392;
+        } else if (id === '16:9') {
+          state.bbox.rect.width = 1392;
+          state.bbox.rect.height = 752;
         } else if (id === '21:9') {
-          state.bbox.rect.width = 1408;
-          state.bbox.rect.height = 768;
+          state.bbox.rect.width = 1568;
+          state.bbox.rect.height = 672;
         } else if (id === '9:21') {
-          state.bbox.rect.width = 768;
-          state.bbox.rect.height = 1408;
+          state.bbox.rect.width = 672;
+          state.bbox.rect.height = 1568;
+        } else if (id === '1:1') {
+          state.bbox.rect.width = 880;
+          state.bbox.rect.height = 880;
         }
         state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
         state.bbox.aspectRatio.isLocked = true;
