@@ -19,17 +19,16 @@ import { isImageFieldCollectionInputInstance, isImageFieldInputInstance } from '
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { selectUpscaleSlice, type UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectSystemShouldConfirmOnDelete } from 'features/system/store/systemSlice';
-import { forEach, intersectionBy, some } from 'lodash-es';
+import { forEach, intersection, some } from 'lodash-es';
 import { atom } from 'nanostores';
 import { useMemo } from 'react';
 import { imagesApi } from 'services/api/endpoints/images';
-import type { ImageDTO } from 'services/api/types';
 import type { Param0 } from 'tsafe';
 
 // Implements an awaitable modal dialog for deleting images
 
 type DeleteImagesModalState = {
-  imageDTOs: ImageDTO[];
+  image_names: string[];
   usagePerImage: ImageUsage[];
   usageSummary: ImageUsage;
   isOpen: boolean;
@@ -38,7 +37,7 @@ type DeleteImagesModalState = {
 };
 
 const getInitialState = (): DeleteImagesModalState => ({
-  imageDTOs: [],
+  image_names: [],
   usagePerImage: [],
   usageSummary: {
     isControlLayerImage: false,
@@ -54,21 +53,21 @@ const getInitialState = (): DeleteImagesModalState => ({
 
 const $deleteModalState = atom<DeleteImagesModalState>(getInitialState());
 
-const deleteImagesWithDialog = async (imageDTOs: ImageDTO[]): Promise<void> => {
+const deleteImagesWithDialog = async (image_names: string[]): Promise<void> => {
   const { getState, dispatch } = getStore();
-  const imageUsage = getImageUsageFromImageDTOs(imageDTOs, getState());
+  const imageUsage = getImageUsageFromImageNames(image_names, getState());
   const shouldConfirmOnDelete = selectSystemShouldConfirmOnDelete(getState());
 
   if (!shouldConfirmOnDelete && !isAnyImageInUse(imageUsage)) {
     // If we don't need to confirm and the images are not in use, delete them directly
-    await handleDeletions(imageDTOs, dispatch, getState);
+    await handleDeletions(image_names, dispatch, getState);
   }
 
   return new Promise<void>((resolve, reject) => {
     $deleteModalState.set({
       usagePerImage: imageUsage,
       usageSummary: getImageUsageSummary(imageUsage),
-      imageDTOs,
+      image_names,
       isOpen: true,
       resolve,
       reject,
@@ -76,12 +75,12 @@ const deleteImagesWithDialog = async (imageDTOs: ImageDTO[]): Promise<void> => {
   });
 };
 
-const handleDeletions = async (imageDTOs: ImageDTO[], dispatch: AppDispatch, getState: AppGetState) => {
+const handleDeletions = async (image_names: string[], dispatch: AppDispatch, getState: AppGetState) => {
   try {
     const state = getState();
-    await dispatch(imagesApi.endpoints.deleteImages.initiate({ imageDTOs })).unwrap();
+    await dispatch(imagesApi.endpoints.deleteImages.initiate({ image_names }, { track: false })).unwrap();
 
-    if (intersectionBy(state.gallery.selection, imageDTOs, 'image_name').length > 0) {
+    if (intersection(state.gallery.selection, image_names).length > 0) {
       // Some selected images were deleted, need to select the next image
       const queryArgs = selectListImagesQueryArgs(state);
       const { data } = imagesApi.endpoints.listImages.select(queryArgs)(state);
@@ -93,11 +92,11 @@ const handleDeletions = async (imageDTOs: ImageDTO[], dispatch: AppDispatch, get
     }
 
     // We need to reset the features where the image is in use - none of these work if their image(s) don't exist
-    for (const imageDTO of imageDTOs) {
-      deleteNodesImages(state, dispatch, imageDTO);
-      deleteControlLayerImages(state, dispatch, imageDTO);
-      deleteReferenceImages(state, dispatch, imageDTO);
-      deleteRasterLayerImages(state, dispatch, imageDTO);
+    for (const image_name of image_names) {
+      deleteNodesImages(state, dispatch, image_name);
+      deleteControlLayerImages(state, dispatch, image_name);
+      deleteReferenceImages(state, dispatch, image_name);
+      deleteRasterLayerImages(state, dispatch, image_name);
     }
   } catch {
     // no-op
@@ -106,7 +105,7 @@ const handleDeletions = async (imageDTOs: ImageDTO[], dispatch: AppDispatch, get
 
 const confirmDeletion = async (dispatch: AppDispatch, getState: AppGetState) => {
   const state = $deleteModalState.get();
-  await handleDeletions(state.imageDTOs, dispatch, getState);
+  await handleDeletions(state.image_names, dispatch, getState);
   state.resolve?.();
   closeSilently();
 };
@@ -142,8 +141,8 @@ export const useDeleteImageModalApi = () => {
   return api;
 };
 
-const getImageUsageFromImageDTOs = (imageDTOs: ImageDTO[], state: RootState): ImageUsage[] => {
-  if (imageDTOs.length === 0) {
+const getImageUsageFromImageNames = (image_names: string[], state: RootState): ImageUsage[] => {
+  if (image_names.length === 0) {
     return [];
   }
 
@@ -152,7 +151,7 @@ const getImageUsageFromImageDTOs = (imageDTOs: ImageDTO[], state: RootState): Im
   const upscale = selectUpscaleSlice(state);
   const refImages = selectRefImagesSlice(state);
 
-  return imageDTOs.map(({ image_name }) => getImageUsage(nodes, canvas, upscale, refImages, image_name));
+  return image_names.map((image_name) => getImageUsage(nodes, canvas, upscale, refImages, image_name));
 };
 
 const getImageUsageSummary = (imageUsage: ImageUsage[]): ImageUsage => ({
@@ -178,7 +177,7 @@ const isAnyImageInUse = (imageUsage: ImageUsage[]): boolean =>
   );
 
 // Some utils to delete images from different parts of the app
-const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
+const deleteNodesImages = (state: RootState, dispatch: AppDispatch, image_name: string) => {
   const actions: Param0<typeof dispatch>[] = [];
   state.nodes.present.nodes.forEach((node) => {
     if (!isInvocationNode(node)) {
@@ -186,7 +185,7 @@ const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: Im
     }
 
     forEach(node.data.inputs, (input) => {
-      if (isImageFieldInputInstance(input) && input.value?.image_name === imageDTO.image_name) {
+      if (isImageFieldInputInstance(input) && input.value?.image_name === image_name) {
         actions.push(
           fieldImageValueChanged({
             nodeId: node.data.id,
@@ -201,7 +200,7 @@ const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: Im
           fieldImageCollectionValueChanged({
             nodeId: node.data.id,
             fieldName: input.name,
-            value: input.value?.filter((value) => value?.image_name !== imageDTO.image_name),
+            value: input.value?.filter((value) => value?.image_name !== image_name),
           })
         );
       }
@@ -211,11 +210,11 @@ const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: Im
   actions.forEach(dispatch);
 };
 
-const deleteControlLayerImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
+const deleteControlLayerImages = (state: RootState, dispatch: AppDispatch, image_name: string) => {
   selectCanvasSlice(state).controlLayers.entities.forEach(({ id, objects }) => {
     let shouldDelete = false;
     for (const obj of objects) {
-      if (obj.type === 'image' && 'image_name' in obj.image && obj.image.image_name === imageDTO.image_name) {
+      if (obj.type === 'image' && 'image_name' in obj.image && obj.image.image_name === image_name) {
         shouldDelete = true;
         break;
       }
@@ -226,19 +225,19 @@ const deleteControlLayerImages = (state: RootState, dispatch: AppDispatch, image
   });
 };
 
-const deleteReferenceImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
+const deleteReferenceImages = (state: RootState, dispatch: AppDispatch, image_name: string) => {
   selectReferenceImageEntities(state).forEach((entity) => {
-    if (entity.config.image?.image_name === imageDTO.image_name) {
+    if (entity.config.image?.image_name === image_name) {
       dispatch(refImageImageChanged({ id: entity.id, imageDTO: null }));
     }
   });
 };
 
-const deleteRasterLayerImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
+const deleteRasterLayerImages = (state: RootState, dispatch: AppDispatch, image_name: string) => {
   selectCanvasSlice(state).rasterLayers.entities.forEach(({ id, objects }) => {
     let shouldDelete = false;
     for (const obj of objects) {
-      if (obj.type === 'image' && 'image_name' in obj.image && obj.image.image_name === imageDTO.image_name) {
+      if (obj.type === 'image' && 'image_name' in obj.image && obj.image.image_name === image_name) {
         shouldDelete = true;
         break;
       }

@@ -177,7 +177,7 @@ export const useGalleryNavigation = (): UseGalleryNavigationReturn => {
     if (imageDTOs.length === 0 || !lastSelectedImage) {
       return 0;
     }
-    return imageDTOs.findIndex((i) => i.image_name === lastSelectedImage.image_name);
+    return imageDTOs.findIndex((i) => i.image_name === lastSelectedImage);
   }, [imageDTOs, lastSelectedImage]);
 
   const handleNavigation = useCallback(
@@ -187,9 +187,9 @@ export const useGalleryNavigation = (): UseGalleryNavigationReturn => {
         return;
       }
       if (alt) {
-        dispatch(imageToCompareChanged(image));
+        dispatch(imageToCompareChanged(image.image_name));
       } else {
-        dispatch(imageSelected(image));
+        dispatch(imageSelected(image.image_name));
       }
       scrollToImage(image.image_name, index);
     },

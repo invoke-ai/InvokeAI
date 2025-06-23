@@ -12,7 +12,7 @@ export const ImageMenuItemChangeBoard = memo(() => {
   const imageDTO = useImageDTOContext();
 
   const onClick = useCallback(() => {
-    dispatch(imagesToChangeSelected([imageDTO]));
+    dispatch(imagesToChangeSelected([imageDTO.image_name]));
     dispatch(isModalOpenChanged(true));
   }, [dispatch, imageDTO]);
 

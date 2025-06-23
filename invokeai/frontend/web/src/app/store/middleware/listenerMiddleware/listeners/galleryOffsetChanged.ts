@@ -84,14 +84,14 @@ export const addGalleryOffsetChangedListener = (startAppListening: AppStartListe
         if (offset < prevOffset) {
           // We've gone backwards
           const lastImage = imageDTOs[imageDTOs.length - 1];
-          if (!selection.some((selectedImage) => selectedImage.image_name === lastImage?.image_name)) {
-            dispatch(selectionChanged(lastImage ? [lastImage] : []));
+          if (!selection.some((selectedImage) => selectedImage === lastImage?.image_name)) {
+            dispatch(selectionChanged(lastImage ? [lastImage.image_name] : []));
           }
         } else {
           // We've gone forwards
           const firstImage = imageDTOs[0];
-          if (!selection.some((selectedImage) => selectedImage.image_name === firstImage?.image_name)) {
-            dispatch(selectionChanged(firstImage ? [firstImage] : []));
+          if (!selection.some((selectedImage) => selectedImage === firstImage?.image_name)) {
+            dispatch(selectionChanged(firstImage ? [firstImage.image_name] : []));
           }
         }
         return;
@@ -102,14 +102,14 @@ export const addGalleryOffsetChangedListener = (startAppListening: AppStartListe
         if (offset < prevOffset) {
           // We've gone backwards
           const lastImage = imageDTOs[imageDTOs.length - 1];
-          if (lastImage && imageToCompare?.image_name !== lastImage.image_name) {
-            dispatch(imageToCompareChanged(lastImage));
+          if (lastImage && imageToCompare !== lastImage.image_name) {
+            dispatch(imageToCompareChanged(lastImage.image_name));
           }
         } else {
           // We've gone forwards
           const firstImage = imageDTOs[0];
-          if (firstImage && imageToCompare?.image_name !== firstImage.image_name) {
-            dispatch(imageToCompareChanged(firstImage));
+          if (firstImage && imageToCompare !== firstImage.image_name) {
+            dispatch(imageToCompareChanged(firstImage.image_name));
           }
         }
         return;

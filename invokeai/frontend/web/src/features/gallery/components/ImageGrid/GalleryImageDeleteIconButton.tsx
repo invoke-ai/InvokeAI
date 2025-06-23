@@ -22,7 +22,7 @@ export const GalleryImageDeleteIconButton = memo(({ imageDTO }: Props) => {
       if (!imageDTO) {
         return;
       }
-      deleteImageModal.delete([imageDTO]);
+      deleteImageModal.delete([imageDTO.image_name]);
     },
     [deleteImageModal, imageDTO]
   );

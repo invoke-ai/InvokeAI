@@ -16,13 +16,13 @@ export const ImageMenuItemStarUnstar = memo(() => {
 
   const starImage = useCallback(() => {
     if (imageDTO) {
-      starImages({ imageDTOs: [imageDTO] });
+      starImages({ image_names: [imageDTO.image_name] });
     }
   }, [starImages, imageDTO]);
 
   const unstarImage = useCallback(() => {
     if (imageDTO) {
-      unstarImages({ imageDTOs: [imageDTO] });
+      unstarImages({ image_names: [imageDTO.image_name] });
     }
   }, [unstarImages, imageDTO]);
 

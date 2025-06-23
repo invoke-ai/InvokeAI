@@ -75,16 +75,6 @@ const initializeCenterPanelLayout = (api: DockviewApi) => {
       referencePanel: LAUNCHPAD_PANEL_ID,
     },
   });
-  api.addPanel({
-    id: PROGRESS_PANEL_ID,
-    component: PROGRESS_PANEL_ID,
-    title: 'Generation Progress',
-    tabComponent: TAB_WITH_PROGRESS_INDICATOR_ID,
-    position: {
-      direction: 'within',
-      referencePanel: LAUNCHPAD_PANEL_ID,
-    },
-  });
 
   api.getPanel(LAUNCHPAD_PANEL_ID)?.api.setActive();
 };

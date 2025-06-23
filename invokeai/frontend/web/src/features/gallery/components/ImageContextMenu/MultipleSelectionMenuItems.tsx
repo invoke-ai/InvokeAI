@@ -5,7 +5,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { imagesToChangeSelected, isModalOpenChanged } from 'features/changeBoardModal/store/slice';
 import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDownloadSimpleBold, PiFoldersBold, PiStarBold, PiStarFill, PiTrashSimpleBold } from 'react-icons/pi';
 import {
@@ -37,37 +37,25 @@ const MultipleSelectionMenuItems = () => {
   }, [deleteImageModal, selection]);
 
   const handleStarSelection = useCallback(() => {
-    starImages({ imageDTOs: selection });
+    starImages({ image_names: selection });
   }, [starImages, selection]);
 
   const handleUnstarSelection = useCallback(() => {
-    unstarImages({ imageDTOs: selection });
+    unstarImages({ image_names: selection });
   }, [unstarImages, selection]);
 
   const handleBulkDownload = useCallback(() => {
-    bulkDownload({ image_names: selection.map((img) => img.image_name) });
+    bulkDownload({ image_names: selection });
   }, [selection, bulkDownload]);
-
-  const areAllStarred = useMemo(() => {
-    return selection.every((img) => img.starred);
-  }, [selection]);
-
-  const areAllUnstarred = useMemo(() => {
-    return selection.every((img) => !img.starred);
-  }, [selection]);
 
   return (
     <>
-      {areAllStarred && (
-        <MenuItem icon={customStarUi ? customStarUi.on.icon : <PiStarBold />} onClickCapture={handleUnstarSelection}>
-          {customStarUi ? customStarUi.off.text : `Unstar All`}
-        </MenuItem>
-      )}
-      {(areAllUnstarred || (!areAllStarred && !areAllUnstarred)) && (
-        <MenuItem icon={customStarUi ? customStarUi.on.icon : <PiStarFill />} onClickCapture={handleStarSelection}>
-          {customStarUi ? customStarUi.on.text : `Star All`}
-        </MenuItem>
-      )}
+      <MenuItem icon={customStarUi ? customStarUi.on.icon : <PiStarBold />} onClickCapture={handleUnstarSelection}>
+        {customStarUi ? customStarUi.off.text : `Unstar All`}
+      </MenuItem>
+      <MenuItem icon={customStarUi ? customStarUi.on.icon : <PiStarFill />} onClickCapture={handleStarSelection}>
+        {customStarUi ? customStarUi.on.text : `Star All`}
+      </MenuItem>
       {isBulkDownloadEnabled && (
         <MenuItem icon={<PiDownloadSimpleBold />} onClickCapture={handleBulkDownload}>
           {t('gallery.downloadSelection')}

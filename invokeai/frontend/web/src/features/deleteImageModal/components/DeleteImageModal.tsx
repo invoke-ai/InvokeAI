@@ -22,7 +22,7 @@ export const DeleteImageModal = memo(() => {
 
   return (
     <ConfirmationAlertDialog
-      title={`${t('gallery.deleteImage', { count: state.imageDTOs.length })}2`}
+      title={`${t('gallery.deleteImage', { count: state.image_names.length })}2`}
       isOpen={state.isOpen}
       onClose={api.close}
       cancelButtonText={t('common.cancel')}

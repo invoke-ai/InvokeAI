@@ -117,7 +117,7 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
         );
       } else {
         // Else just select the image, no need to switch boards
-        dispatch(imageSelected(lastImageDTO));
+        dispatch(imageSelected(lastImageDTO.image_name));
 
         if (galleryView !== 'images') {
           // We also need to update the gallery view to images. This also updates the offset.

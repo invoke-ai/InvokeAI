@@ -1,4 +1,4 @@
-import type { BoardRecordOrderBy, ImageCategory, ImageDTO } from 'services/api/types';
+import type { BoardRecordOrderBy, ImageCategory } from 'services/api/types';
 
 export const IMAGE_CATEGORIES: ImageCategory[] = ['general'];
 export const ASSETS_CATEGORIES: ImageCategory[] = ['control', 'mask', 'user', 'other'];
@@ -10,7 +10,7 @@ export type ComparisonFit = 'contain' | 'fill';
 export type OrderDir = 'ASC' | 'DESC';
 
 export type GalleryState = {
-  selection: ImageDTO[];
+  selection: string[];
   shouldAutoSwitch: boolean;
   autoAssignBoardOnClick: boolean;
   autoAddBoardId: BoardId;
@@ -24,7 +24,7 @@ export type GalleryState = {
   orderDir: OrderDir;
   searchTerm: string;
   alwaysShowImageSizeBadge: boolean;
-  imageToCompare: ImageDTO | null;
+  imageToCompare: string | null;
   comparisonMode: ComparisonMode;
   comparisonFit: ComparisonFit;
   shouldShowArchivedBoards: boolean;

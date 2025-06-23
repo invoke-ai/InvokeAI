@@ -8,16 +8,16 @@ export const addImageAddedToBoardFulfilledListener = (startAppListening: AppStar
   startAppListening({
     matcher: imagesApi.endpoints.addImageToBoard.matchFulfilled,
     effect: (action) => {
-      const { board_id, imageDTO } = action.meta.arg.originalArgs;
-      log.debug({ board_id, imageDTO }, 'Image added to board');
+      const { board_id, image_name } = action.meta.arg.originalArgs;
+      log.debug({ board_id, image_name }, 'Image added to board');
     },
   });
 
   startAppListening({
     matcher: imagesApi.endpoints.addImageToBoard.matchRejected,
     effect: (action) => {
-      const { board_id, imageDTO } = action.meta.arg.originalArgs;
-      log.debug({ board_id, imageDTO }, 'Problem adding image to board');
+      const { board_id, image_name } = action.meta.arg.originalArgs;
+      log.debug({ board_id, image_name }, 'Problem adding image to board');
     },
   });
 };

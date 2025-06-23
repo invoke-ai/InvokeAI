@@ -6,10 +6,9 @@ import { DND_IMAGE_DRAG_PREVIEW_SIZE, preserveOffsetOnSourceFallbackCentered } f
 import { memo } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import type { ImageDTO } from 'services/api/types';
 import type { Param0 } from 'tsafe';
 
-const DndDragPreviewMultipleImage = memo(({ imageDTOs }: { imageDTOs: ImageDTO[] }) => {
+const DndDragPreviewMultipleImage = memo(({ image_names }: { image_names: string[] }) => {
   const { t } = useTranslation();
   return (
     <Flex
@@ -21,7 +20,7 @@ const DndDragPreviewMultipleImage = memo(({ imageDTOs }: { imageDTOs: ImageDTO[]
       bg="base.900"
       borderRadius="base"
     >
-      <Heading>{imageDTOs.length}</Heading>
+      <Heading>{image_names.length}</Heading>
       <Heading size="sm">{t('parameters.images')}</Heading>
     </Flex>
   );
@@ -32,11 +31,11 @@ DndDragPreviewMultipleImage.displayName = 'DndDragPreviewMultipleImage';
 export type DndDragPreviewMultipleImageState = {
   type: 'multiple-image';
   container: HTMLElement;
-  imageDTOs: ImageDTO[];
+  image_names: string[];
 };
 
 export const createMultipleImageDragPreview = (arg: DndDragPreviewMultipleImageState) =>
-  createPortal(<DndDragPreviewMultipleImage imageDTOs={arg.imageDTOs} />, arg.container);
+  createPortal(<DndDragPreviewMultipleImage image_names={arg.image_names} />, arg.container);
 
 type SetMultipleDragPreviewArg = {
   multipleImageDndData: MultipleImageDndSourceData;
@@ -52,7 +51,7 @@ export const setMultipleImageDragPreview = ({
   const { nativeSetDragImage, source, location } = onGenerateDragPreviewArgs;
   setCustomNativeDragPreview({
     render({ container }) {
-      setDragPreviewState({ type: 'multiple-image', container, imageDTOs: multipleImageDndData.payload.imageDTOs });
+      setDragPreviewState({ type: 'multiple-image', container, image_names: multipleImageDndData.payload.image_names });
       return () => setDragPreviewState(null);
     },
     nativeSetDragImage,

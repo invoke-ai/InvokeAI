@@ -12,7 +12,7 @@ export const ImageMenuItemOpenInViewer = memo(() => {
   const imageDTO = useImageDTOContext();
   const onClick = useCallback(() => {
     dispatch(imageToCompareChanged(null));
-    dispatch(imageSelected(imageDTO));
+    dispatch(imageSelected(imageDTO.image_name));
     // TODO: figure out how to select the closest image viewer...
   }, [dispatch, imageDTO]);
 

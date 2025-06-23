@@ -16,7 +16,7 @@ import { useAddImagesToBoardMutation, useRemoveImagesFromBoardMutation } from 's
 
 const selectImagesToChange = createMemoizedSelector(
   selectChangeBoardModalSlice,
-  (changeBoardModal) => changeBoardModal.imagesToChange
+  (changeBoardModal) => changeBoardModal.image_names
 );
 
 const selectIsModalOpen = createSelector(
@@ -57,10 +57,10 @@ const ChangeBoardModal = () => {
     }
 
     if (selectedBoard === 'none') {
-      removeImagesFromBoard({ imageDTOs: imagesToChange });
+      removeImagesFromBoard({ image_names: imagesToChange });
     } else {
       addImagesToBoard({
-        imageDTOs: imagesToChange,
+        image_names: imagesToChange,
         board_id: selectedBoard,
       });
     }

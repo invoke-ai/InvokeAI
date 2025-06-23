@@ -1,8 +1,8 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { isEqual, uniqBy } from 'lodash-es';
-import type { BoardRecordOrderBy, ImageDTO } from 'services/api/types';
+import { isEqual, uniq } from 'lodash-es';
+import type { BoardRecordOrderBy } from 'services/api/types';
 
 import type { BoardId, ComparisonMode, GalleryState, GalleryView, OrderDir } from './types';
 
@@ -33,14 +33,14 @@ export const gallerySlice = createSlice({
   name: 'gallery',
   initialState: initialGalleryState,
   reducers: {
-    imageSelected: (state, action: PayloadAction<ImageDTO | null>) => {
+    imageSelected: (state, action: PayloadAction<string | null>) => {
       // Let's be efficient here and not update the selection unless it has actually changed. This helps to prevent
       // unnecessary re-renders of the gallery.
 
-      const selectedImage = action.payload;
+      const selectedImageName = action.payload;
 
       // If we got `null`, clear the selection
-      if (!selectedImage) {
+      if (!selectedImageName) {
         // But only if we have images selected
         if (state.selection.length > 0) {
           state.selection = [];
@@ -50,24 +50,24 @@ export const gallerySlice = createSlice({
 
       // If we have multiple images selected, clear the selection and select the new image
       if (state.selection.length !== 1) {
-        state.selection = [selectedImage];
+        state.selection = [selectedImageName];
         return;
       }
 
       // If the selected image is different from the current selection, clear the selection and select the new image
-      if (!isEqual(state.selection[0], selectedImage)) {
-        state.selection = [selectedImage];
+      if (!isEqual(state.selection[0], selectedImageName)) {
+        state.selection = [selectedImageName];
         return;
       }
 
       // Else we have the same image selected, do nothing
     },
-    selectionChanged: (state, action: PayloadAction<ImageDTO[]>) => {
+    selectionChanged: (state, action: PayloadAction<string[]>) => {
       // Let's be efficient here and not update the selection unless it has actually changed. This helps to prevent
       // unnecessary re-renders of the gallery.
 
       // Remove duplicates from the selection
-      const newSelection = uniqBy(action.payload, (i) => i.image_name);
+      const newSelection = uniq(action.payload);
 
       // If the new selection has a different length, update the selection
       if (newSelection.length !== state.selection.length) {
@@ -83,7 +83,7 @@ export const gallerySlice = createSlice({
 
       // Else we have the same selection, do nothing
     },
-    imageToCompareChanged: (state, action: PayloadAction<ImageDTO | null>) => {
+    imageToCompareChanged: (state, action: PayloadAction<string | null>) => {
       state.imageToCompare = action.payload;
     },
     comparisonModeChanged: (state, action: PayloadAction<ComparisonMode>) => {

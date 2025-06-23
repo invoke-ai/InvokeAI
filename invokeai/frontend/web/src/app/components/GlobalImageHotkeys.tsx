@@ -7,11 +7,13 @@ import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
+import { useImageDTO } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
 export const GlobalImageHotkeys = memo(() => {
   useAssertSingleton('GlobalImageHotkeys');
-  const imageDTO = useAppSelector(selectLastSelectedImage);
+  const imageName = useAppSelector(selectLastSelectedImage);
+  const imageDTO = useImageDTO(imageName);
 
   if (!imageDTO) {
     return null;

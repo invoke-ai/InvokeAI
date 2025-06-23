@@ -30,9 +30,9 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
           const selectedImage = boardImagesData.items.find(
             (item) => item.image_name === action.payload.selectedImageName
           );
-          dispatch(imageSelected(selectedImage || null));
+          dispatch(imageSelected(selectedImage?.image_name ?? null));
         } else if (boardImagesData) {
-          dispatch(imageSelected(boardImagesData.items[0] || null));
+          dispatch(imageSelected(boardImagesData.items[0]?.image_name ?? null));
         } else {
           // board has no images - deselect
           dispatch(imageSelected(null));

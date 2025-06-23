@@ -2,11 +2,11 @@ import { createAction } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
+import { uniq } from 'lodash-es';
 import { imagesApi } from 'services/api/endpoints/images';
-import type { ImageDTO } from 'services/api/types';
 
 export const galleryImageClicked = createAction<{
-  imageDTO: ImageDTO;
+  imageName: string;
   shiftKey: boolean;
   ctrlKey: boolean;
   metaKey: boolean;
@@ -28,7 +28,7 @@ export const addGalleryImageClickedListener = (startAppListening: AppStartListen
   startAppListening({
     actionCreator: galleryImageClicked,
     effect: (action, { dispatch, getState }) => {
-      const { imageDTO, shiftKey, ctrlKey, metaKey, altKey } = action.payload;
+      const { imageName, shiftKey, ctrlKey, metaKey, altKey } = action.payload;
       const state = getState();
       const queryArgs = selectListImagesQueryArgs(state);
       const queryResult = imagesApi.endpoints.listImages.select(queryArgs)(state);
@@ -42,31 +42,31 @@ export const addGalleryImageClickedListener = (startAppListening: AppStartListen
       const selection = state.gallery.selection;
 
       if (altKey) {
-        if (state.gallery.imageToCompare?.image_name === imageDTO.image_name) {
+        if (state.gallery.imageToCompare === imageName) {
           dispatch(imageToCompareChanged(null));
         } else {
-          dispatch(imageToCompareChanged(imageDTO));
+          dispatch(imageToCompareChanged(imageName));
         }
       } else if (shiftKey) {
-        const rangeEndImageName = imageDTO.image_name;
-        const lastSelectedImage = selection[selection.length - 1]?.image_name;
+        const rangeEndImageName = imageName;
+        const lastSelectedImage = selection.at(-1);
         const lastClickedIndex = imageDTOs.findIndex((n) => n.image_name === lastSelectedImage);
         const currentClickedIndex = imageDTOs.findIndex((n) => n.image_name === rangeEndImageName);
         if (lastClickedIndex > -1 && currentClickedIndex > -1) {
           // We have a valid range!
           const start = Math.min(lastClickedIndex, currentClickedIndex);
           const end = Math.max(lastClickedIndex, currentClickedIndex);
-          const imagesToSelect = imageDTOs.slice(start, end + 1);
-          dispatch(selectionChanged(selection.concat(imagesToSelect)));
+          const imagesToSelect = imageDTOs.slice(start, end + 1).map(({ image_name }) => image_name);
+          dispatch(selectionChanged(uniq(selection.concat(imagesToSelect))));
         }
       } else if (ctrlKey || metaKey) {
-        if (selection.some((i) => i.image_name === imageDTO.image_name) && selection.length > 1) {
-          dispatch(selectionChanged(selection.filter((n) => n.image_name !== imageDTO.image_name)));
+        if (selection.some((n) => n === imageName) && selection.length > 1) {
+          dispatch(selectionChanged(uniq(selection.filter((n) => n !== imageName))));
         } else {
-          dispatch(selectionChanged(selection.concat(imageDTO)));
+          dispatch(selectionChanged(uniq(selection.concat(imageName))));
         }
       } else {
-        dispatch(selectionChanged([imageDTO]));
+        dispatch(selectionChanged([imageName]));
       }
     },
   });

@@ -1,6 +1,4 @@
-import type { ImageDTO } from 'services/api/types';
-
 export type ChangeBoardModalState = {
   isModalOpen: boolean;
-  imagesToChange: ImageDTO[];
+  image_names: string[];
 };
