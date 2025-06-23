@@ -1,5 +1,5 @@
 import { Mutex } from 'async-mutex';
-import type { ProgressDataMap } from 'features/controlLayers/components/SimpleSession/context';
+import type { ProgressData, ProgressDataMap } from 'features/controlLayers/components/SimpleSession/context';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
@@ -135,8 +135,8 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     this.$isStaging.set(this.manager.stateApi.runSelector(selectIsStaging));
   };
 
-  connectToSession = ($selectedItemId: Atom<number | null>, $progressData: ProgressDataMap) =>
-    effect([$selectedItemId, $progressData], (selectedItemId, progressData) => {
+  connectToSession = ($selectedItemId: Atom<number | null>, $progressData: ProgressDataMap) => {
+    const cb = (selectedItemId: number | null, progressData: Record<number, ProgressData | undefined>) => {
       if (!selectedItemId) {
         this.$imageSrc.set(null);
         return;
@@ -153,7 +153,14 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
       } else {
         this.$imageSrc.set(null);
       }
-    });
+    };
+
+    // Run the effect & forcibly render once to initialize
+    cb($selectedItemId.get(), $progressData.get());
+    this.render();
+
+    return effect([$selectedItemId, $progressData], cb);
+  };
 
   private _getImageFromSrc = (
     { type, data }: ImageNameSrc | DataURLSrc,
