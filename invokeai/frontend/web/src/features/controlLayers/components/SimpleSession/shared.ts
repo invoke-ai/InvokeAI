@@ -1,19 +1,14 @@
 import { isImageField } from 'features/nodes/types/common';
 import { isCanvasOutputNodeId } from 'features/nodes/util/graph/graphBuilderUtils';
-import { round } from 'lodash-es';
 import type { S } from 'services/api/types';
+import { formatProgressMessage } from 'services/events/stores';
 import { objectEntries } from 'tsafe';
 
 export const getProgressMessage = (data?: S['InvocationProgressEvent'] | null) => {
   if (!data) {
     return 'Generating';
   }
-
-  let message = data.message;
-  if (data.percentage) {
-    message += ` (${round(data.percentage * 100)}%)`;
-  }
-  return message;
+  return formatProgressMessage(data);
 };
 
 export const DROP_SHADOW = 'drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 4px rgba(0, 0, 0, 0.3))';

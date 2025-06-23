@@ -21,10 +21,12 @@ export const $lastProgressMessage = computed($lastProgressEvent, (val) => {
   if (!val) {
     return null;
   }
-
-  let message = val.message;
-  if (val.percentage) {
-    message += ` (${round(val.percentage * 100)}%)`;
+  return formatProgressMessage(val);
+});
+export const formatProgressMessage = (data: S['InvocationProgressEvent']): string => {
+  let message = data.message;
+  if (data.percentage) {
+    message += ` (${round(data.percentage * 100)}%)`;
   }
   return message;
-});
+};
