@@ -1,6 +1,6 @@
 .os-scrollbar {
   /*      The size of the scrollbar */
-  --os-size: 9px;
+  --os-size: 7px;
   /*      The axis-perpedicular padding of the scrollbar (horizontal: padding-y, vertical: padding-x) */
   /* --os-padding-perpendicular: 0; */
   /*      The axis padding of the scrollbar (horizontal: padding-x, vertical: padding-y) */
@@ -22,11 +22,11 @@
   /*      The border radius of the scrollbar handle */
   /* --os-handle-border-radius: 2px; */
   /*      The background of the scrollbar handle */
-  /* --os-handle-bg: var(--invokeai-colors-accentAlpha-500); */
+  --os-handle-bg: var(--invoke-colors-base-600);
   /*      The :hover background of the scrollbar handle */
-  /* --os-handle-bg-hover: var(--invokeai-colors-accentAlpha-700); */
+  --os-handle-bg-hover: var(--invoke-colors-base-500);
   /*      The :active background of the scrollbar handle */
-  /* --os-handle-bg-active: var(--invokeai-colors-accentAlpha-800); */
+  --os-handle-bg-active: var(--invoke-colors-base-400);
   /*      The border of the scrollbar handle */
   /* --os-handle-border: none; */
   /*      The :hover border of the scrollbar handle */
@@ -34,7 +34,7 @@
   /*      The :active border of the scrollbar handle */
   /* --os-handle-border-active: none; */
   /*      The min size of the scrollbar handle */
-  --os-handle-min-size: 50px;
+  /* --os-handle-min-size: 50px; */
   /*      The max size of the scrollbar handle */
   /* --os-handle-max-size: none; */
   /*      The axis-perpedicular size of the scrollbar handle (horizontal: height, vertical: width) */
@@ -48,9 +48,9 @@
 }
 
 .os-scrollbar-handle {
-  cursor: grab;
+  /* cursor: grab; */
 }
 
 .os-scrollbar-handle:active {
-  cursor: grabbing;
+  /* cursor: grabbing; */
 }

@@ -1,207 +1,190 @@
-import { Box, Flex, forwardRef, Grid, GridItem, Image, Skeleton, Spinner, Text } from '@invoke-ai/ui-library';
-import { skipToken } from '@reduxjs/toolkit/query';
+import { Box, Flex, forwardRef, Grid, GridItem, Skeleton, Spinner, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
   selectGalleryImageMinimumWidth,
   selectImageCollectionQueryArgs,
 } from 'features/gallery/store/gallerySelectors';
-import { memo, useCallback } from 'react';
+import { useOverlayScrollbars } from 'overlayscrollbars-react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { GridComponents, ListRange, ScrollSeekConfiguration, VirtuosoGridHandle } from 'react-virtuoso';
 import { VirtuosoGrid } from 'react-virtuoso';
-import {
-  useGetImageCollectionCountsQuery,
-  useGetImageCollectionQuery,
-  useLazyGetImageCollectionQuery,
-} from 'services/api/endpoints/images';
-import type { ImageDTO } from 'services/api/types';
+import { useGetImageCollectionCountsQuery, useGetImageCollectionQuery } from 'services/api/endpoints/images';
+import type { ImageCategory, SQLiteDirection } from 'services/api/types';
+import { useDebounce } from 'use-debounce';
 
-// Types for range management
+import { GalleryImage } from './ImageGrid/GalleryImage';
+
+// Type for image collection query arguments
+type ImageCollectionQueryArgs = {
+  board_id?: string;
+  categories?: ImageCategory[];
+  search_term?: string;
+  order_dir?: SQLiteDirection;
+  is_intermediate: boolean;
+};
+
+// Types
 type Collection = 'starred' | 'unstarred';
 
-interface RangeKey {
+interface PositionInfo {
   collection: Collection;
   offset: number;
-  limit: number;
+  itemIndex: number;
 }
 
-interface PositionQuery extends RangeKey {
-  imageIndex: number;
-}
+// Constants
+const RANGE_SIZE = 50;
 
-type PositionInfo = {
-  totalCount: number;
-  starredCount: number;
-  unstarredCount: number;
-  starredEnd: number;
-};
-
-// Query options factory functions to prevent recreation on every render
-const countsQueryOptions = {
-  selectFromResult: ({ data, isLoading }) => {
-    const positionInfo: PositionInfo | null = data
-      ? {
-          totalCount: data.total_count ?? 0,
-          starredCount: data.starred_count ?? 0,
-          unstarredCount: data.unstarred_count ?? 0,
-          starredEnd: (data.starred_count ?? 0) - 1,
-        }
-      : null;
-
+// Helper to calculate which collection and range an index belongs to
+const getPositionInfo = (index: number, starredCount: number): PositionInfo => {
+  if (index < starredCount) {
+    // Starred collection
+    const offset = Math.floor(index / RANGE_SIZE) * RANGE_SIZE;
     return {
-      positionInfo,
-      isLoading,
+      collection: 'starred',
+      offset,
+      itemIndex: index - offset,
     };
-  },
-} satisfies Parameters<typeof useGetImageCollectionCountsQuery>[1];
-
-const createImageCollectionQueryOptions = (queryParams: PositionQuery | null) =>
-  ({
-    skip: !queryParams,
-    selectFromResult: (result) => {
-      return {
-        imageDTO: (queryParams && result.data?.items?.[queryParams.imageIndex]) || null,
-      };
-    },
-  }) satisfies Parameters<typeof useGetImageCollectionQuery>[1];
-
-// Placeholder image component for now
-const ImagePlaceholder = memo(({ imageDTO }: { imageDTO: ImageDTO }) => (
-  <Image src={imageDTO.thumbnail_url} w="full" h="full" objectFit="contain" />
-));
-
-ImagePlaceholder.displayName = 'ImagePlaceholder';
-
-// Loading skeleton component
-const ImageSkeleton = memo(() => <Skeleton w="full" h="full" />);
-
-ImageSkeleton.displayName = 'ImageSkeleton';
-
-// Hook to manage position calculations and range loading
-const useVirtualImageData = () => {
-  const queryArgs = useAppSelector(selectImageCollectionQueryArgs);
-
-  // Get position info derived from counts using selectFromResult
-  const { positionInfo, isLoading } = useGetImageCollectionCountsQuery(queryArgs, countsQueryOptions);
-
-  const [triggerGetImageCollection] = useLazyGetImageCollectionQuery();
-
-  // Function to get query params for a specific position
-  const getQueryParamsForPosition = useCallback(
-    (index: number): PositionQuery | null => {
-      if (!positionInfo) {
-        return null;
-      }
-
-      if (positionInfo.starredCount === 0 || index >= positionInfo.starredCount) {
-        // This position is in the unstarred collection
-        const unstarredOffset = index - positionInfo.starredCount;
-        const rangeOffset = Math.floor(unstarredOffset / 50) * 50;
-        return {
-          collection: 'unstarred',
-          offset: rangeOffset,
-          limit: 50,
-          imageIndex: unstarredOffset % 50,
-        };
-      } else {
-        // This position is in the starred collection
-        const rangeOffset = Math.floor(index / 50) * 50;
-        return {
-          collection: 'starred',
-          offset: rangeOffset,
-          limit: 50,
-          imageIndex: index % 50,
-        };
-      }
-    },
-    [positionInfo]
-  );
-
-  // Function to calculate required ranges for a viewport and trigger lazy queries
-  const updateRequiredRanges = useCallback(
-    (startIndex: number, endIndex: number) => {
-      if (!positionInfo) {
-        return;
-      }
-
-      for (let i = startIndex; i <= endIndex; i++) {
-        const queryParams = getQueryParamsForPosition(i);
-        if (queryParams) {
-          const { collection, offset, limit } = queryParams;
-          triggerGetImageCollection(
-            {
-              collection,
-              offset,
-              limit,
-              ...queryArgs,
-            },
-            true
-          );
-        }
-      }
-    },
-    [positionInfo, getQueryParamsForPosition, triggerGetImageCollection, queryArgs]
-  );
-
-  return {
-    positionInfo,
-    isLoading,
-    getQueryParamsForPosition,
-    queryArgs,
-    updateRequiredRanges,
-  };
+  } else {
+    // Unstarred collection
+    const unstarredIndex = index - starredCount;
+    const offset = Math.floor(unstarredIndex / RANGE_SIZE) * RANGE_SIZE;
+    return {
+      collection: 'unstarred',
+      offset,
+      itemIndex: unstarredIndex - offset,
+    };
+  }
 };
 
-// Hook to get image data for a specific position using selectFromResult
-const useImageAtPosition = (index: number) => {
-  const { getQueryParamsForPosition, queryArgs } = useVirtualImageData();
+// Hook to get image at a specific position
+const useImageAtPosition = (index: number, starredCount: number, queryArgs: ImageCollectionQueryArgs) => {
+  const positionInfo = useMemo(() => getPositionInfo(index, starredCount), [index, starredCount]);
 
-  const queryParams = getQueryParamsForPosition(index);
-
-  const { imageDTO } = useGetImageCollectionQuery(
-    queryParams
-      ? {
-          collection: queryParams.collection,
-          offset: queryParams.offset,
-          limit: queryParams.limit,
-          ...queryArgs,
-        }
-      : skipToken,
-    createImageCollectionQueryOptions(queryParams)
+  const arg = useMemo(
+    () =>
+      ({
+        collection: positionInfo.collection,
+        offset: positionInfo.offset,
+        limit: RANGE_SIZE,
+        ...queryArgs,
+      }) satisfies Parameters<typeof useGetImageCollectionQuery>[0],
+    [positionInfo.collection, positionInfo.offset, queryArgs]
   );
+
+  const options = useMemo(
+    () =>
+      ({
+        selectFromResult: ({ data }) => {
+          if (!data) {
+            return { imageDTO: null };
+          } else {
+            return {
+              imageDTO: data.items[positionInfo.itemIndex] || null,
+            };
+          }
+        },
+      }) satisfies Parameters<typeof useGetImageCollectionQuery>[1],
+    [positionInfo.itemIndex]
+  );
+
+  const { imageDTO } = useGetImageCollectionQuery(arg, options);
 
   return imageDTO;
 };
 
-// Component to render a single image at a position
-const ImageAtPosition = memo(({ index }: { index: number }) => {
-  const imageDTO = useImageAtPosition(index);
+type ImageAtPositionProps = {
+  index: number;
+  starredCount: number;
+  queryArgs: ImageCollectionQueryArgs;
+};
 
-  if (imageDTO) {
-    return <ImagePlaceholder imageDTO={imageDTO} />;
+// Individual image component
+const ImageAtPosition = memo(({ index, starredCount, queryArgs }: ImageAtPositionProps) => {
+  const imageDTO = useImageAtPosition(index, starredCount, queryArgs);
+
+  if (!imageDTO) {
+    return <Skeleton w="full" h="full" />;
   }
 
-  return <ImageSkeleton />;
+  return <GalleryImage imageDTO={imageDTO} />;
 });
 
 ImageAtPosition.displayName = 'ImageAtPosition';
 
-export const NewGallery = memo(() => {
-  const { positionInfo, isLoading, updateRequiredRanges } = useVirtualImageData();
+export const useDebouncedImageCollectionQueryArgs = () => {
+  const _queryArgs = useAppSelector(selectImageCollectionQueryArgs);
+  const [queryArgs] = useDebounce(_queryArgs, 500);
+  return queryArgs;
+};
 
-  // Handle range changes from VirtuosoGrid
-  const handleRangeChanged = useCallback(
-    (range: { startIndex: number; endIndex: number }) => {
-      updateRequiredRanges(range.startIndex, range.endIndex);
+// Main gallery component
+export const NewGallery = memo(() => {
+  const queryArgs = useDebouncedImageCollectionQueryArgs();
+  const virtuosoRef = useRef<VirtuosoGridHandle>(null);
+
+  const { data: counts, isLoading } = useGetImageCollectionCountsQuery(queryArgs);
+
+  const starredCount = counts?.starred_count ?? 0;
+  const totalCount = counts?.total_count ?? 0;
+
+  // Reset scroll position when query parameters change
+  useEffect(() => {
+    if (virtuosoRef.current && totalCount > 0) {
+      virtuosoRef.current.scrollToIndex({ index: 0, behavior: 'auto' });
+    }
+  }, [queryArgs, totalCount]);
+
+  // Memoized item content function
+  const itemContent = useCallback(
+    (index: number) => {
+      return <ImageAtPosition index={index} starredCount={starredCount} queryArgs={queryArgs} />;
     },
-    [updateRequiredRanges]
+    [starredCount, queryArgs]
   );
 
-  // Render item at specific index
-  const itemContent = useCallback((index: number) => {
-    return <ImageAtPosition index={index} />;
+  // Memoized compute key function
+  const computeItemKey = useCallback(
+    (index: number) => {
+      return `${JSON.stringify(queryArgs)}-${index}`;
+    },
+    [queryArgs]
+  );
+
+  // Handle range changes (for prefetching)
+  const handleRangeChanged = useCallback((_range: ListRange) => {
+    // RTK Query will automatically handle caching and deduplication
+    // No need to manually trigger queries here
   }, []);
 
-  // Compute item key using position index - let RTK Query handle the caching
-  const computeItemKey = useCallback((index: number) => `position-${index}`, []);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [scroller, setScroller] = useState<HTMLElement | null>(null);
+  const [initialize, osInstance] = useOverlayScrollbars({
+    defer: true,
+    events: {
+      initialized(osInstance) {
+        // force overflow styles
+        const { viewport } = osInstance.elements();
+        viewport.style.overflowX = `var(--os-viewport-overflow-x)`;
+        viewport.style.overflowY = `var(--os-viewport-overflow-y)`;
+      },
+    },
+  });
+
+  useEffect(() => {
+    const { current: root } = rootRef;
+
+    if (scroller && root) {
+      initialize({
+        target: root,
+        elements: {
+          viewport: scroller,
+        },
+      });
+    }
+
+    return () => osInstance()?.destroy();
+  }, [scroller, initialize, osInstance]);
 
   if (isLoading) {
     return (
@@ -212,7 +195,7 @@ export const NewGallery = memo(() => {
     );
   }
 
-  if (!positionInfo || positionInfo.totalCount === 0) {
+  if (totalCount === 0) {
     return (
       <Flex height="100%" alignItems="center" justifyContent="center">
         <Text color="gray.500">No images found</Text>
@@ -221,15 +204,18 @@ export const NewGallery = memo(() => {
   }
 
   return (
-    <Box height="100%" width="100%">
+    <Box data-overlayscrollbars-initialize="" ref={rootRef} w="full" h="full">
       <VirtuosoGrid
-        totalCount={positionInfo.totalCount}
+        ref={virtuosoRef}
+        totalCount={totalCount}
         increaseViewportBy={1024}
         rangeChanged={handleRangeChanged}
         itemContent={itemContent}
-        style={style}
         computeItemKey={computeItemKey}
         components={components}
+        style={style}
+        scrollerRef={setScroller}
+        scrollSeekConfiguration={scrollSeekConfiguration}
       />
     </Box>
   );
@@ -237,9 +223,18 @@ export const NewGallery = memo(() => {
 
 NewGallery.displayName = 'NewGallery';
 
+const scrollSeekConfiguration: ScrollSeekConfiguration = {
+  enter: (velocity) => {
+    return velocity > 500;
+  },
+  exit: (velocity) => velocity < 500,
+};
+
+// Styles
 const style = { height: '100%', width: '100%' };
 
-const ListComponent = forwardRef((props, ref) => {
+// Grid components
+const ListComponent: GridComponents['List'] = forwardRef((props, ref) => {
   const galleryImageMinimumWidth = useAppSelector(selectGalleryImageMinimumWidth);
 
   return (
@@ -247,15 +242,26 @@ const ListComponent = forwardRef((props, ref) => {
       ref={ref}
       gridTemplateColumns={`repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, 1fr))`}
       gap={2}
-      padding={2}
       {...props}
     />
   );
 });
+ListComponent.displayName = 'ListComponent';
 
-const ItemComponent = forwardRef((props, ref) => <GridItem ref={ref} aspectRatio="1/1" {...props} />);
+const ItemComponent: GridComponents['Item'] = forwardRef((props, ref) => (
+  <GridItem ref={ref} aspectRatio="1/1" {...props} />
+));
+ItemComponent.displayName = 'ItemComponent';
 
-const components = {
+const FillSkeleton: GridComponents['ScrollSeekPlaceholder'] = forwardRef((props, ref) => (
+  <GridItem ref={ref} {...props}>
+    <Skeleton w="full" h="full" />
+  </GridItem>
+));
+FillSkeleton.displayName = 'FillSkeleton';
+
+const components: GridComponents = {
   Item: ItemComponent,
   List: ListComponent,
+  ScrollSeekPlaceholder: FillSkeleton,
 };
