@@ -208,6 +208,7 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
         has_workflow=has_workflow,
     )
 
+
 class ImageCollectionCounts(BaseModel):
     starred_count: int = Field(description="The number of starred images in the collection.")
     unstarred_count: int = Field(description="The number of unstarred images in the collection.")
