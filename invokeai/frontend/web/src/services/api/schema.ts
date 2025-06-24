@@ -21515,6 +21515,13 @@ export type components = {
              * @description The output fields for the published workflow
              */
             output_fields: components["schemas"]["FieldIdentifier"][];
+            /**
+             * Sanitized Field Names
+             * @description Mapping from nodeId:fieldName to sanitized field names
+             */
+            sanitized_field_names?: {
+                [key: string]: string;
+            };
         };
         /** Workflow */
         Workflow: {

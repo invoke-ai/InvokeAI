@@ -5,6 +5,9 @@ import {
 } from 'features/nodes/components/sidePanel/workflow/publish';
 import { useMemo } from 'react';
 
+import { useInputFieldTemplateTitleOrThrow } from './useInputFieldTemplateTitleOrThrow';
+import { useInputFieldUserTitleOrThrow } from './useInputFieldUserTitleOrThrow';
+
 // Helper function to sanitize a field name
 const sanitizeFieldName = (name: string): string => {
   return name
@@ -17,9 +20,8 @@ const sanitizeFieldName = (name: string): string => {
  * Hook that calculates all sanitized and deduplicated field keys for publishable inputs.
  *
  * This hook processes all publishable inputs at once to ensure field name uniqueness
- * across the entire workflow. It uses a grouping algorithm:
- * 1. Group all inputs by their sanitized base name
- * 2. For each group, assign unique names (base name for single items, numbered for conflicts)
+ * across the entire workflow. It uses a single-pass algorithm that groups by sanitized
+ * base names and assigns unique names efficiently.
  *
  * @returns A map of nodeId -> fieldName -> sanitized field key
  *
@@ -36,62 +38,53 @@ export const useAllInputFieldKeys = () => {
   return useMemo(() => {
     const fieldKeysMap = new Map<string, Map<string, string>>();
 
-    // Group inputs by their sanitized base name
-    const inputsByBaseName = new Map<
-      string,
-      Array<{
-        input: (typeof publishInputs.publishable)[0];
-        fieldIdentifier: (typeof fieldIdentifiersWithTypes)[0] | undefined;
-        title: string;
-        baseName: string;
-      }>
-    >();
+    // Create a lookup map for field identifiers to avoid repeated array searches
+    const fieldIdentifierMap = new Map<string, { nodeId: string; fieldName: string; type: string; label?: string }>();
+    for (const fieldIdentifier of fieldIdentifiersWithTypes) {
+      const key = `${fieldIdentifier.nodeId}:${fieldIdentifier.fieldName}`;
+      fieldIdentifierMap.set(key, fieldIdentifier);
+    }
 
-    // First pass: group all inputs by their base sanitized name
+    // Group inputs by their sanitized base name in a single pass
+    const baseNameGroups = new Map<string, Array<{ nodeId: string; fieldName: string; title: string }>>();
+
     for (const input of publishInputs.publishable) {
-      const fieldIdentifier = fieldIdentifiersWithTypes.find(
-        (fi) => fi.nodeId === input.nodeId && fi.fieldName === input.fieldName
-      );
+      const key = `${input.nodeId}:${input.fieldName}`;
+      const fieldIdentifier = fieldIdentifierMap.get(key);
 
+      // Get the title (user label or fallback to field name)
       const title = fieldIdentifier?.label || input.fieldName;
       const baseName = sanitizeFieldName(title);
 
-      if (!inputsByBaseName.has(baseName)) {
-        inputsByBaseName.set(baseName, []);
+      if (!baseNameGroups.has(baseName)) {
+        baseNameGroups.set(baseName, []);
       }
-      inputsByBaseName.get(baseName)!.push({
-        input,
-        fieldIdentifier,
+      baseNameGroups.get(baseName)!.push({
+        nodeId: input.nodeId,
+        fieldName: input.fieldName,
         title,
-        baseName,
       });
     }
 
-    // Second pass: process each group and assign unique names
-    for (const [baseName, inputs] of inputsByBaseName) {
+    // Process each group and assign unique names
+    for (const [baseName, inputs] of baseNameGroups) {
       if (inputs.length === 1) {
         // No conflict, use the base name
-        const input = inputs[0];
-        if (!input) {
-          continue; // Skip if input is undefined
+        const { nodeId, fieldName } = inputs[0];
+        if (!fieldKeysMap.has(nodeId)) {
+          fieldKeysMap.set(nodeId, new Map());
         }
-        if (!fieldKeysMap.has(input.input.nodeId)) {
-          fieldKeysMap.set(input.input.nodeId, new Map());
-        }
-        fieldKeysMap.get(input.input.nodeId)!.set(input.input.fieldName, baseName);
+        fieldKeysMap.get(nodeId)!.set(fieldName, baseName);
       } else {
         // Conflict detected, assign numbered names
         for (let i = 0; i < inputs.length; i++) {
-          const input = inputs[i];
-          if (!input) {
-            continue; // Skip if input is undefined
-          }
+          const { nodeId, fieldName } = inputs[i];
           const uniqueName = i === 0 ? baseName : `${baseName}_${i}`;
 
-          if (!fieldKeysMap.has(input.input.nodeId)) {
-            fieldKeysMap.set(input.input.nodeId, new Map());
+          if (!fieldKeysMap.has(nodeId)) {
+            fieldKeysMap.set(nodeId, new Map());
           }
-          fieldKeysMap.get(input.input.nodeId)!.set(input.input.fieldName, uniqueName);
+          fieldKeysMap.get(nodeId)!.set(fieldName, uniqueName);
         }
       }
     }
@@ -133,4 +126,32 @@ export const getFieldKeyFromMap = (
   }
 
   return fieldKey;
+};
+
+/**
+ * Hook that returns the sanitized field key for a specific node and field
+ * @param nodeId The ID of the node
+ * @param fieldName The name of the field
+ * @returns The sanitized and deduplicated field key
+ */
+export const useInputFieldKey = (nodeId: string, fieldName: string) => {
+  const allFieldKeys = useAllInputFieldKeys();
+  const fieldUserTitle = useInputFieldUserTitleOrThrow(nodeId, fieldName);
+  const fieldTemplateTitle = useInputFieldTemplateTitleOrThrow(nodeId, fieldName);
+
+  return useMemo(() => {
+    const nodeFieldKeys = allFieldKeys.get(nodeId);
+    if (!nodeFieldKeys) {
+      // Fallback to the old method if the field is not in publishable inputs
+      return sanitizeFieldName(fieldUserTitle || fieldTemplateTitle);
+    }
+
+    const fieldKey = nodeFieldKeys.get(fieldName);
+    if (!fieldKey) {
+      // Fallback to the old method if the field is not in publishable inputs
+      return sanitizeFieldName(fieldUserTitle || fieldTemplateTitle);
+    }
+
+    return fieldKey;
+  }, [allFieldKeys, nodeId, fieldName, fieldUserTitle, fieldTemplateTitle]);
 };
