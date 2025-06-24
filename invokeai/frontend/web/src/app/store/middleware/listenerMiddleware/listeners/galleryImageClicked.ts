@@ -27,15 +27,13 @@ const getCachedImageList = (state: RootState, queryArgs: ImageCollectionQueryArg
     return [];
   }
 
-  const starredCount = countsQueryResult.data.starred_count ?? 0;
-  const totalCount = countsQueryResult.data.total_count ?? 0;
-  const unstarredCount = totalCount - starredCount;
+  const { starred_count, unstarred_count } = countsQueryResult.data;
 
   const imageDTOs: ImageDTO[] = [];
 
   // Add starred images first (in order)
-  if (starredCount > 0) {
-    for (let offset = 0; offset < starredCount; offset += 50) {
+  if (starred_count > 0) {
+    for (let offset = 0; offset < starred_count; offset += 50) {
       const queryResult = imagesApi.endpoints.getImageCollection.select({
         collection: 'starred',
         offset,
@@ -50,8 +48,8 @@ const getCachedImageList = (state: RootState, queryArgs: ImageCollectionQueryArg
   }
 
   // Add unstarred images (in order)
-  if (unstarredCount > 0) {
-    for (let offset = 0; offset < unstarredCount; offset += 50) {
+  if (unstarred_count > 0) {
+    for (let offset = 0; offset < unstarred_count; offset += 50) {
       const queryResult = imagesApi.endpoints.getImageCollection.select({
         collection: 'unstarred',
         offset,

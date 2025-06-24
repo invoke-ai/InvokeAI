@@ -9839,6 +9839,19 @@ export type components = {
              */
             type: "img_channel_offset";
         };
+        /** ImageCollectionCounts */
+        ImageCollectionCounts: {
+            /**
+             * Starred Count
+             * @description The number of starred images in the collection.
+             */
+            starred_count: number;
+            /**
+             * Unstarred Count
+             * @description The number of unstarred images in the collection.
+             */
+            unstarred_count: number;
+        };
         /**
          * Image Collection Primitive
          * @description A collection of image primitive values
@@ -23655,9 +23668,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: number;
-                    };
+                    "application/json": components["schemas"]["ImageCollectionCounts"];
                 };
             };
             /** @description Validation Error */
