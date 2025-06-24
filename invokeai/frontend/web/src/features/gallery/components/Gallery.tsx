@@ -70,7 +70,7 @@ export const GalleryPanel = memo(() => {
 
   return (
     <Flex flexDirection="column" alignItems="center" justifyContent="space-between" h="full" w="full" p={2} minH={0}>
-      <Tabs index={galleryView === 'images' ? 0 : 1} variant="enclosed" display="flex" flexDir="column" w="full">
+      <Tabs index={galleryView === 'images' ? 0 : 1} variant="enclosed" display="flex" flexDir="column" w="full" pb={2}>
         <TabList gap={2} fontSize="sm" borderColor="base.800" alignItems="center" w="full">
           <Text fontSize="sm" fontWeight="semibold" noOfLines={1} px="2" wordBreak="break-all">
             {boardName}
@@ -89,6 +89,7 @@ export const GalleryPanel = memo(() => {
           <Flex h="full" justifyContent="flex-end">
             <GalleryUploadButton />
             <GallerySettingsPopover />
+
             <IconButton
               size="sm"
               variant="link"
@@ -100,17 +101,17 @@ export const GalleryPanel = memo(() => {
             />
           </Flex>
         </TabList>
+        <Collapse in={searchDisclosure.isOpen} style={COLLAPSE_STYLES}>
+          <Box w="full" pt={2}>
+            <GallerySearch
+              searchTerm={searchTerm}
+              onChangeSearchTerm={onChangeSearchTerm}
+              onResetSearchTerm={onResetSearchTerm}
+            />
+          </Box>
+        </Collapse>
       </Tabs>
 
-      <Collapse in={searchDisclosure.isOpen} style={COLLAPSE_STYLES}>
-        <Box w="full" pt={2}>
-          <GallerySearch
-            searchTerm={searchTerm}
-            onChangeSearchTerm={onChangeSearchTerm}
-            onResetSearchTerm={onResetSearchTerm}
-          />
-        </Box>
-      </Collapse>
       {/* <GalleryImageGrid />
       <GalleryPagination /> */}
       <NewGallery />
