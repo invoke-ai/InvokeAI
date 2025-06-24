@@ -88,6 +88,7 @@ class ModelVariantType(str, Enum):
 class ModelFormat(str, Enum):
     """Storage format of model."""
 
+    OMI = "omi"
     Diffusers = "diffusers"
     Checkpoint = "checkpoint"
     LyCORIS = "lycoris"

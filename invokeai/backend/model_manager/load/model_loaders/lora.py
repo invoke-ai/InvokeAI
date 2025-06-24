@@ -13,6 +13,7 @@ from invokeai.backend.model_manager.config import AnyModelConfig
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.omi import convert_from_omi
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     BaseModelType,
@@ -43,6 +44,8 @@ from invokeai.backend.patches.lora_conversions.sd_lora_conversion_utils import l
 from invokeai.backend.patches.lora_conversions.sdxl_lora_conversion_utils import convert_sdxl_keys_to_diffusers_format
 
 
+@ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.LoRA, format=ModelFormat.OMI)
+@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusionXL, type=ModelType.LoRA, format=ModelFormat.OMI)
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.LoRA, format=ModelFormat.Diffusers)
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.LoRA, format=ModelFormat.LyCORIS)
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.ControlLoRa, format=ModelFormat.LyCORIS)
@@ -77,12 +80,23 @@ class LoRALoader(ModelLoader):
         else:
             state_dict = torch.load(model_path, map_location="cpu")
 
+        # Strip 'bundle_emb' keys - these are unused and currently cause downstream errors.
+        # To revisit later to determine if they're needed/useful.
+        state_dict = {k: v for k, v in state_dict.items() if not k.startswith("bundle_emb")}
+
+        # At the time of writing, we support the OMI standard for base models Flux and SDXL
+        if config.format == ModelFormat.OMI and self._model_base in [
+            BaseModelType.StableDiffusionXL,
+            BaseModelType.Flux,
+        ]:
+            state_dict = convert_from_omi(state_dict, config.base)  # type: ignore
+
         # Apply state_dict key conversions, if necessary.
         if self._model_base == BaseModelType.StableDiffusionXL:
             state_dict = convert_sdxl_keys_to_diffusers_format(state_dict)
             model = lora_model_from_sd_state_dict(state_dict=state_dict)
         elif self._model_base == BaseModelType.Flux:
-            if config.format == ModelFormat.Diffusers:
+            if config.format in [ModelFormat.Diffusers, ModelFormat.OMI]:
                 # HACK(ryand): We set alpha=None for diffusers PEFT format models. These models are typically
                 # distributed as a single file without the associated metadata containing the alpha value. We chose
                 # alpha=None, because this is treated as alpha=rank internally in `LoRALayerBase.scale()`. alpha=rank
@@ -99,7 +113,7 @@ class LoRALoader(ModelLoader):
                 elif is_state_dict_likely_in_flux_aitoolkit_format(state_dict=state_dict):
                     model = lora_model_from_flux_aitoolkit_state_dict(state_dict=state_dict)
                 else:
-                    raise ValueError(f"LoRA model is in unsupported FLUX format: {config.format}")
+                    raise ValueError("LoRA model is in unsupported FLUX format")
             else:
                 raise ValueError(f"LoRA model is in unsupported FLUX format: {config.format}")
         elif self._model_base in [BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2]:
