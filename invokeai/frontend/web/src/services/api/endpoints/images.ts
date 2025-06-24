@@ -50,10 +50,10 @@ export const imagesApi = api.injectEndpoints({
         url: getListImagesUrl(queryArgs),
         method: 'GET',
       }),
-      providesTags: (result, error, { board_id, categories }) => {
+      providesTags: (result, error, queryArgs) => {
         return [
           // Make the tags the same as the cache key
-          { type: 'ImageList', id: getListImagesUrl({ board_id, categories }) },
+          { type: 'ImageList', id: JSON.stringify(queryArgs) },
           'FetchOnReconnect',
         ];
       },
@@ -493,6 +493,45 @@ export const imagesApi = api.injectEndpoints({
       }),
       providesTags: ['ImageNameList', 'FetchOnReconnect'],
     }),
+    /**
+     * Get paginated images with starred first (unified list)
+     */
+    getUnifiedImageList: build.query<
+      ListImagesResponse,
+      {
+        offset?: number;
+        limit?: number;
+        image_origin?: 'internal' | 'external' | null;
+        categories?: ImageCategory[] | null;
+        is_intermediate?: boolean | null;
+        board_id?: string | null;
+        search_term?: string | null;
+        order_dir?: SQLiteDirection;
+      }
+    >({
+      query: (queryArgs) => ({
+        url: getListImagesUrl({ ...queryArgs, starred_first: true }),
+        method: 'GET',
+      }),
+      providesTags: (result, error, { board_id, categories }) => [
+        { type: 'ImageList', id: getListImagesUrl({ board_id, categories }) },
+        'FetchOnReconnect',
+      ],
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        // Populate the getImageDTO cache with these images
+        const res = await queryFulfilled;
+        const imageDTOs = res.data.items;
+        const updates: Param0<typeof imagesApi.util.upsertQueryEntries> = [];
+        for (const imageDTO of imageDTOs) {
+          updates.push({
+            endpointName: 'getImageDTO',
+            arg: imageDTO.image_name,
+            value: imageDTO,
+          });
+        }
+        dispatch(imagesApi.util.upsertQueryEntries(updates));
+      },
+    }),
   }),
 });
 
@@ -518,6 +557,7 @@ export const {
   useGetImageCollectionQuery,
   useLazyGetImageCollectionQuery,
   useGetImageNamesQuery,
+  useGetUnifiedImageListQuery,
 } = imagesApi;
 
 /**

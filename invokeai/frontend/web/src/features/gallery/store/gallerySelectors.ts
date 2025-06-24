@@ -45,6 +45,7 @@ export const selectImageCollectionQueryArgs = createMemoizedSelector(selectGalle
   search_term: gallery.searchTerm || undefined,
   order_dir: gallery.orderDir as SQLiteDirection,
   is_intermediate: false,
+  starred_first: true,
 }));
 export const selectAutoAssignBoardOnClick = createSelector(
   selectGallerySlice,

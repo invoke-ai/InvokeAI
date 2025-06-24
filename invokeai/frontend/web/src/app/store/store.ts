@@ -170,8 +170,6 @@ export const createStore = (uniqueStoreKey?: string, persist = true) =>
     reducer: rememberedRootReducer,
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({
-        // serializableCheck: false,
-        // immutableCheck: false,
         serializableCheck: import.meta.env.MODE === 'development',
         immutableCheck: import.meta.env.MODE === 'development',
       })
