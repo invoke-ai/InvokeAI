@@ -752,6 +752,46 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/images/collections/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Image Collection Counts
+         * @description Gets counts for starred and unstarred image collections
+         */
+        get: operations["get_image_collection_counts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/images/collections/{collection}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Image Collection
+         * @description Gets images from a specific collection (starred or unstarred)
+         */
+        get: operations["get_image_collection"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/boards/": {
         parameters: {
             query?: never;
@@ -23658,6 +23698,97 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_image_collection_counts: {
+        parameters: {
+            query?: {
+                /** @description The origin of images to count. */
+                image_origin?: components["schemas"]["ResourceOrigin"] | null;
+                /** @description The categories of image to include. */
+                categories?: components["schemas"]["ImageCategory"][] | null;
+                /** @description Whether to include intermediate images. */
+                is_intermediate?: boolean | null;
+                /** @description The board id to filter by. Use 'none' to find images without a board. */
+                board_id?: string | null;
+                /** @description The term to search for */
+                search_term?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_image_collection: {
+        parameters: {
+            query?: {
+                /** @description The origin of images to list. */
+                image_origin?: components["schemas"]["ResourceOrigin"] | null;
+                /** @description The categories of image to include. */
+                categories?: components["schemas"]["ImageCategory"][] | null;
+                /** @description Whether to list intermediate images. */
+                is_intermediate?: boolean | null;
+                /** @description The board id to filter by. Use 'none' to find images without a board. */
+                board_id?: string | null;
+                /** @description The offset within the collection */
+                offset?: number;
+                /** @description The number of images to return */
+                limit?: number;
+                /** @description The order of sort */
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                /** @description The term to search for */
+                search_term?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description The collection to retrieve from */
+                collection: "starred" | "unstarred";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OffsetPaginatedResults_ImageDTO_"];
+                };
             };
             /** @description Validation Error */
             422: {

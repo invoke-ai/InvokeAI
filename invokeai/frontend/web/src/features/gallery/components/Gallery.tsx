@@ -25,9 +25,8 @@ import { useBoardName } from 'services/api/hooks/useBoardName';
 
 import { GallerySettingsPopover } from './GallerySettingsPopover/GallerySettingsPopover';
 import { GalleryUploadButton } from './GalleryUploadButton';
-import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
-import { GalleryPagination } from './ImageGrid/GalleryPagination';
 import { GallerySearch } from './ImageGrid/GallerySearch';
+import { NewGallery } from './NewGallery';
 
 const BASE_STYLES: ChakraProps['sx'] = {
   fontWeight: 'semibold',
@@ -112,8 +111,9 @@ export const GalleryPanel = memo(() => {
           />
         </Box>
       </Collapse>
-      <GalleryImageGrid />
-      <GalleryPagination />
+      {/* <GalleryImageGrid />
+      <GalleryPagination /> */}
+      <NewGallery />
     </Flex>
   );
 });

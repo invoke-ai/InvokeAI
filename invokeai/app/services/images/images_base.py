@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Optional
+from typing import Callable, Literal, Optional
 
 from PIL.Image import Image as PILImageType
 
@@ -146,4 +146,32 @@ class ImageServiceABC(ABC):
     @abstractmethod
     def delete_images_on_board(self, board_id: str):
         """Deletes all images on a board."""
+        pass
+
+    @abstractmethod
+    def get_collection_counts(
+        self,
+        image_origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+    ) -> dict[str, int]:
+        """Gets counts for starred and unstarred image collections."""
+        pass
+
+    @abstractmethod
+    def get_collection_images(
+        self,
+        collection: Literal["starred", "unstarred"],
+        offset: int = 0,
+        limit: int = 10,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        image_origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+    ) -> OffsetPaginatedResults[ImageDTO]:
+        """Gets images from a specific collection (starred or unstarred)."""
         pass

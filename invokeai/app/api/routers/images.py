@@ -1,7 +1,7 @@
 import io
 import json
 import traceback
-from typing import ClassVar, Optional
+from typing import ClassVar, Literal, Optional
 
 from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
@@ -562,3 +562,63 @@ async def get_bulk_download_item(
         return response
     except Exception:
         raise HTTPException(status_code=404)
+
+
+@images_router.get("/collections/counts", operation_id="get_image_collection_counts")
+async def get_image_collection_counts(
+    image_origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of images to count."),
+    categories: Optional[list[ImageCategory]] = Query(default=None, description="The categories of image to include."),
+    is_intermediate: Optional[bool] = Query(default=None, description="Whether to include intermediate images."),
+    board_id: Optional[str] = Query(
+        default=None,
+        description="The board id to filter by. Use 'none' to find images without a board.",
+    ),
+    search_term: Optional[str] = Query(default=None, description="The term to search for"),
+) -> dict[str, int]:
+    """Gets counts for starred and unstarred image collections"""
+
+    try:
+        counts = ApiDependencies.invoker.services.images.get_collection_counts(
+            image_origin=image_origin,
+            categories=categories,
+            is_intermediate=is_intermediate,
+            board_id=board_id,
+            search_term=search_term,
+        )
+        return counts
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to get collection counts")
+
+
+@images_router.get("/collections/{collection}", operation_id="get_image_collection")
+async def get_image_collection(
+    collection: Literal["starred", "unstarred"] = Path(..., description="The collection to retrieve from"),
+    image_origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of images to list."),
+    categories: Optional[list[ImageCategory]] = Query(default=None, description="The categories of image to include."),
+    is_intermediate: Optional[bool] = Query(default=None, description="Whether to list intermediate images."),
+    board_id: Optional[str] = Query(
+        default=None,
+        description="The board id to filter by. Use 'none' to find images without a board.",
+    ),
+    offset: int = Query(default=0, description="The offset within the collection"),
+    limit: int = Query(default=50, description="The number of images to return"),
+    order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
+    search_term: Optional[str] = Query(default=None, description="The term to search for"),
+) -> OffsetPaginatedResults[ImageDTO]:
+    """Gets images from a specific collection (starred or unstarred)"""
+
+    try:
+        image_dtos = ApiDependencies.invoker.services.images.get_collection_images(
+            collection=collection,
+            offset=offset,
+            limit=limit,
+            order_dir=order_dir,
+            image_origin=image_origin,
+            categories=categories,
+            is_intermediate=is_intermediate,
+            board_id=board_id,
+            search_term=search_term,
+        )
+        return image_dtos
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to get collection images")
