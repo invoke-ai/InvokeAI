@@ -5,8 +5,14 @@ import {
   selectImageCollectionQueryArgs,
 } from 'features/gallery/store/gallerySelectors';
 import { useOverlayScrollbars } from 'overlayscrollbars-react';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { GridComponents, ListRange, ScrollSeekConfiguration, VirtuosoGridHandle } from 'react-virtuoso';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import type {
+  GridComponents,
+  GridComputeItemKey,
+  GridItemContent,
+  ScrollSeekConfiguration,
+  VirtuosoGridHandle,
+} from 'react-virtuoso';
 import { VirtuosoGrid } from 'react-virtuoso';
 import { useGetImageCollectionCountsQuery, useGetImageCollectionQuery } from 'services/api/endpoints/images';
 import type { ImageCategory, SQLiteDirection } from 'services/api/types';
@@ -99,6 +105,15 @@ type ImageAtPositionProps = {
   queryArgs: ImageCollectionQueryArgs;
 };
 
+type GridContext = {
+  queryArgs: ImageCollectionQueryArgs;
+  counts: {
+    starred_count: number;
+    unstarred_count: number;
+    total_count: number;
+  };
+};
+
 // Individual image component
 const ImageAtPosition = memo(({ index, starredCount, queryArgs }: ImageAtPositionProps) => {
   const imageDTO = useImageAtPosition(index, starredCount, queryArgs);
@@ -118,44 +133,46 @@ export const useDebouncedImageCollectionQueryArgs = () => {
   return queryArgs;
 };
 
+const getImageCollectionCountsOptions = {
+  selectFromResult: ({ data, isLoading }) => ({
+    counts: data
+      ? {
+          starred_count: data.starred_count,
+          unstarred_count: data.unstarred_count,
+          total_count: data.starred_count + data.unstarred_count,
+        }
+      : {
+          starred_count: 0,
+          unstarred_count: 0,
+          total_count: 0,
+        },
+    isLoading,
+  }),
+} satisfies Parameters<typeof useGetImageCollectionCountsQuery>[1];
+
+// Memoized item content function
+const itemContent: GridItemContent<null, GridContext> = (index, _item, { queryArgs, counts }) => {
+  return <ImageAtPosition index={index} starredCount={counts.starred_count} queryArgs={queryArgs} />;
+};
+
+// Memoized compute key function
+const computeItemKey: GridComputeItemKey<null, GridContext> = (index, _item, { queryArgs }) => {
+  return `${JSON.stringify(queryArgs)}-${index}`;
+};
+
 // Main gallery component
 export const NewGallery = memo(() => {
   const queryArgs = useDebouncedImageCollectionQueryArgs();
   const virtuosoRef = useRef<VirtuosoGridHandle>(null);
 
-  const { data: counts, isLoading } = useGetImageCollectionCountsQuery(queryArgs);
-
-  const starredCount = counts?.starred_count ?? 0;
-  const totalCount = counts?.total_count ?? 0;
+  const { counts, isLoading } = useGetImageCollectionCountsQuery(queryArgs, getImageCollectionCountsOptions);
 
   // Reset scroll position when query parameters change
   useEffect(() => {
-    if (virtuosoRef.current && totalCount > 0) {
+    if (virtuosoRef.current && counts.total_count > 0) {
       virtuosoRef.current.scrollToIndex({ index: 0, behavior: 'auto' });
     }
-  }, [queryArgs, totalCount]);
-
-  // Memoized item content function
-  const itemContent = useCallback(
-    (index: number) => {
-      return <ImageAtPosition index={index} starredCount={starredCount} queryArgs={queryArgs} />;
-    },
-    [starredCount, queryArgs]
-  );
-
-  // Memoized compute key function
-  const computeItemKey = useCallback(
-    (index: number) => {
-      return `${JSON.stringify(queryArgs)}-${index}`;
-    },
-    [queryArgs]
-  );
-
-  // Handle range changes (for prefetching)
-  const handleRangeChanged = useCallback((_range: ListRange) => {
-    // RTK Query will automatically handle caching and deduplication
-    // No need to manually trigger queries here
-  }, []);
+  }, [counts.total_count, queryArgs]);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const [scroller, setScroller] = useState<HTMLElement | null>(null);
@@ -183,33 +200,44 @@ export const NewGallery = memo(() => {
       });
     }
 
-    return () => osInstance()?.destroy();
+    return () => {
+      osInstance()?.destroy();
+    };
   }, [scroller, initialize, osInstance]);
+
+  const context = useMemo(
+    () =>
+      ({
+        counts,
+        queryArgs,
+      }) satisfies GridContext,
+    [counts, queryArgs]
+  );
 
   if (isLoading) {
     return (
       <Flex height="100%" alignItems="center" justifyContent="center">
-        <Spinner size="lg" />
+        <Spinner size="lg" opacity={0.3} />
         <Text ml={4}>Loading gallery...</Text>
       </Flex>
     );
   }
 
-  if (totalCount === 0) {
+  if (counts.total_count === 0) {
     return (
       <Flex height="100%" alignItems="center" justifyContent="center">
-        <Text color="gray.500">No images found</Text>
+        <Text color="base.300">No images found</Text>
       </Flex>
     );
   }
 
   return (
     <Box data-overlayscrollbars-initialize="" ref={rootRef} w="full" h="full">
-      <VirtuosoGrid
+      <VirtuosoGrid<null, GridContext>
         ref={virtuosoRef}
-        totalCount={totalCount}
+        context={context}
+        totalCount={counts.total_count}
         increaseViewportBy={1024}
-        rangeChanged={handleRangeChanged}
         itemContent={itemContent}
         computeItemKey={computeItemKey}
         components={components}
@@ -224,17 +252,15 @@ export const NewGallery = memo(() => {
 NewGallery.displayName = 'NewGallery';
 
 const scrollSeekConfiguration: ScrollSeekConfiguration = {
-  enter: (velocity) => {
-    return velocity > 500;
-  },
-  exit: (velocity) => velocity < 500,
+  enter: (velocity) => velocity > 1000,
+  exit: (velocity) => velocity === 0,
 };
 
 // Styles
 const style = { height: '100%', width: '100%' };
 
 // Grid components
-const ListComponent: GridComponents['List'] = forwardRef((props, ref) => {
+const ListComponent: GridComponents<GridContext>['List'] = forwardRef((props, ref) => {
   const galleryImageMinimumWidth = useAppSelector(selectGalleryImageMinimumWidth);
 
   return (
@@ -248,20 +274,22 @@ const ListComponent: GridComponents['List'] = forwardRef((props, ref) => {
 });
 ListComponent.displayName = 'ListComponent';
 
-const ItemComponent: GridComponents['Item'] = forwardRef((props, ref) => (
+const ItemComponent: GridComponents<GridContext>['Item'] = forwardRef((props, ref) => (
   <GridItem ref={ref} aspectRatio="1/1" {...props} />
 ));
 ItemComponent.displayName = 'ItemComponent';
 
-const FillSkeleton: GridComponents['ScrollSeekPlaceholder'] = forwardRef((props, ref) => (
-  <GridItem ref={ref} {...props}>
-    <Skeleton w="full" h="full" />
-  </GridItem>
-));
-FillSkeleton.displayName = 'FillSkeleton';
+const ScrollSeekPlaceholderComponent: GridComponents<GridContext>['ScrollSeekPlaceholder'] = forwardRef(
+  (props, ref) => (
+    <GridItem ref={ref} aspectRatio="1/1" {...props}>
+      <Skeleton w="full" h="full" />
+    </GridItem>
+  )
+);
+ScrollSeekPlaceholderComponent.displayName = 'ScrollSeekPlaceholderComponent';
 
-const components: GridComponents = {
+const components: GridComponents<GridContext> = {
   Item: ItemComponent,
   List: ListComponent,
-  ScrollSeekPlaceholder: FillSkeleton,
+  ScrollSeekPlaceholder: ScrollSeekPlaceholderComponent,
 };

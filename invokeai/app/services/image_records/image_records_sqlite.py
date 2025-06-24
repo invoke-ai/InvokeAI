@@ -7,6 +7,7 @@ from invokeai.app.services.image_records.image_records_base import ImageRecordSt
 from invokeai.app.services.image_records.image_records_common import (
     IMAGE_DTO_COLS,
     ImageCategory,
+    ImageCollectionCounts,
     ImageRecord,
     ImageRecordChanges,
     ImageRecordDeleteException,
@@ -394,7 +395,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
-    ) -> dict[str, int]:
+    ) -> ImageCollectionCounts:
         cursor = self._conn.cursor()
 
         # Build the base query conditions (same as get_many)
@@ -458,11 +459,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         cursor.execute(unstarred_query, query_params)
         unstarred_count = cast(int, cursor.fetchone()[0])
 
-        return {
-            "starred_count": starred_count,
-            "unstarred_count": unstarred_count,
-            "total_count": starred_count + unstarred_count,
-        }
+        return ImageCollectionCounts(starred_count=starred_count, unstarred_count=unstarred_count)
 
     def get_collection_images(
         self,

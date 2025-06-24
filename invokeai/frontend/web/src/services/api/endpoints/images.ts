@@ -203,7 +203,8 @@ export const imagesApi = api.injectEndpoints({
           ...getTagsToInvalidateForImageMutation(result.starred_images),
           ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
           'ImageCollectionCounts',
-          { type: 'ImageCollection', id: LIST_TAG },
+          { type: 'ImageCollection', id: 'starred' },
+          { type: 'ImageCollection', id: 'unstarred' },
         ];
       },
     }),
@@ -227,7 +228,8 @@ export const imagesApi = api.injectEndpoints({
           ...getTagsToInvalidateForImageMutation(result.unstarred_images),
           ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
           'ImageCollectionCounts',
-          { type: 'ImageCollection', id: LIST_TAG },
+          { type: 'ImageCollection', id: 'starred' },
+          { type: 'ImageCollection', id: 'unstarred' },
         ];
       },
     }),
@@ -448,22 +450,26 @@ export const imagesApi = api.injectEndpoints({
       }),
       providesTags: (result, error, { collection, board_id, categories }) => {
         const cacheKey = `${collection}-${board_id || 'all'}-${categories?.join(',') || 'all'}`;
-        return [{ type: 'ImageCollection', id: cacheKey }, 'FetchOnReconnect'];
+        return [
+          { type: 'ImageCollection', id: collection },
+          { type: 'ImageCollection', id: cacheKey },
+          'FetchOnReconnect',
+        ];
       },
-      // async onQueryStarted(_, { dispatch, queryFulfilled }) {
-      //   // Populate the getImageDTO cache with these images, similar to listImages
-      //   const res = await queryFulfilled;
-      //   const imageDTOs = res.data.items;
-      //   const updates: Param0<typeof imagesApi.util.upsertQueryEntries> = [];
-      //   for (const imageDTO of imageDTOs) {
-      //     updates.push({
-      //       endpointName: 'getImageDTO',
-      //       arg: imageDTO.image_name,
-      //       value: imageDTO,
-      //     });
-      //   }
-      //   dispatch(imagesApi.util.upsertQueryEntries(updates));
-      // },
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        // Populate the getImageDTO cache with these images, similar to listImages
+        const res = await queryFulfilled;
+        const imageDTOs = res.data.items;
+        const updates: Param0<typeof imagesApi.util.upsertQueryEntries> = [];
+        for (const imageDTO of imageDTOs) {
+          updates.push({
+            endpointName: 'getImageDTO',
+            arg: imageDTO.image_name,
+            value: imageDTO,
+          });
+        }
+        dispatch(imagesApi.util.upsertQueryEntries(updates));
+      },
     }),
   }),
 });
