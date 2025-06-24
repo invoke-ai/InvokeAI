@@ -1,5 +1,5 @@
 import { Flex, Spacer } from '@invoke-ai/ui-library';
-import { CanvasNonRasterLayersIsHiddenToggle } from 'features/controlLayers/components/common/CanvasNonRasterLayersIsHiddenToggle';
+import { EntityListNonRasterLayerToggle } from 'features/controlLayers/components/common/CanvasNonRasterLayersIsHiddenToggle';
 import { EntityListGlobalActionBarAddLayerMenu } from 'features/controlLayers/components/CanvasEntityList/EntityListGlobalActionBarAddLayerMenu';
 import { EntityListSelectedEntityActionBarDuplicateButton } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarDuplicateButton';
 import { EntityListSelectedEntityActionBarFill } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarFill';
@@ -23,7 +23,7 @@ export const EntityListSelectedEntityActionBar = memo(() => {
         <EntityListSelectedEntityActionBarTransformButton />
         <EntityListSelectedEntityActionBarSaveToAssetsButton />
         <EntityListSelectedEntityActionBarDuplicateButton />
-        <CanvasNonRasterLayersIsHiddenToggle />
+        <EntityListNonRasterLayerToggle />
         <EntityListGlobalActionBarAddLayerMenu />
       </Flex>
     </Flex>
