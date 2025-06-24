@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
@@ -96,4 +96,32 @@ class ImageRecordStorageBase(ABC):
     @abstractmethod
     def get_most_recent_image_for_board(self, board_id: str) -> Optional[ImageRecord]:
         """Gets the most recent image for a board."""
+        pass
+
+    @abstractmethod
+    def get_collection_counts(
+        self,
+        image_origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+    ) -> dict[str, int]:
+        """Gets counts for starred and unstarred image collections."""
+        pass
+
+    @abstractmethod
+    def get_collection_images(
+        self,
+        collection: Literal["starred", "unstarred"],
+        offset: int = 0,
+        limit: int = 10,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        image_origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+    ) -> OffsetPaginatedResults[ImageRecord]:
+        """Gets images from a specific collection (starred or unstarred)."""
         pass

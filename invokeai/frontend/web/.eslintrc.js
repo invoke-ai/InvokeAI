@@ -12,11 +12,13 @@ module.exports = {
     // TODO: ENABLE THIS RULE BEFORE v6.0.0
     // 'i18next/no-literal-string': 'error',
     // https://eslint.org/docs/latest/rules/no-console
-    'no-console': 'error',
+    'no-console': 'warn',
     // https://eslint.org/docs/latest/rules/no-promise-executor-return
     'no-promise-executor-return': 'error',
     // https://eslint.org/docs/latest/rules/require-await
     'require-await': 'error',
+    // TODO: ENABLE THIS RULE BEFORE v6.0.0
+    'react/display-name': 'off',
     'no-restricted-properties': [
       'error',
       {

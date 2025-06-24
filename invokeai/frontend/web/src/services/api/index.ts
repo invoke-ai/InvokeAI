@@ -23,6 +23,8 @@ const tagTypes = [
   'ImageList',
   'ImageMetadata',
   'ImageWorkflow',
+  'ImageCollectionCounts',
+  'ImageCollection',
   'ImageMetadataFromFile',
   'IntermediatesCount',
   'SessionQueueItem',
