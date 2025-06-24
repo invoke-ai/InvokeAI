@@ -1,5 +1,6 @@
 import { Box, Flex, forwardRef, Grid, GridItem, Skeleton, Spinner, Text } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
+import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   selectGalleryImageMinimumWidth,
@@ -303,6 +304,13 @@ const useKeyboardNavigation = (
   }, [handleKeyDown]);
 };
 
+const getImageNamesQueryOptions = {
+  selectFromResult: ({ data, isLoading }) => ({
+    imageNames: data ?? EMPTY_ARRAY,
+    isLoading,
+  }),
+} satisfies Parameters<typeof useGetImageNamesQuery>[1];
+
 // Main gallery component
 export const NewGallery = memo(() => {
   const queryArgs = useDebouncedImageCollectionQueryArgs();
@@ -310,7 +318,7 @@ export const NewGallery = memo(() => {
   const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
 
   // Get the ordered list of image names - this is our primary data source for virtualization
-  const { data: imageNames = [], isLoading } = useGetImageNamesQuery(queryArgs);
+  const { imageNames, isLoading } = useGetImageNamesQuery(queryArgs, getImageNamesQueryOptions);
 
   // Reset scroll position when query parameters change
   useEffect(() => {
