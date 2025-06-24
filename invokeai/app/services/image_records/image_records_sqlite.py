@@ -626,9 +626,12 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             query_params.append(f"%{search_term.lower()}%")
 
         # Order by starred first, then by created_at
-        query += query_conditions + f"""--sql
+        query += (
+            query_conditions
+            + f"""--sql
         ORDER BY images.starred DESC, images.created_at {order_dir.value}
         """
+        )
 
         cursor.execute(query, query_params)
         result = cast(list[sqlite3.Row], cursor.fetchall())

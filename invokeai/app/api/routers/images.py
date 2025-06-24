@@ -565,7 +565,9 @@ async def get_bulk_download_item(
         raise HTTPException(status_code=404)
 
 
-@images_router.get("/collections/counts", operation_id="get_image_collection_counts", response_model=ImageCollectionCounts)
+@images_router.get(
+    "/collections/counts", operation_id="get_image_collection_counts", response_model=ImageCollectionCounts
+)
 async def get_image_collection_counts(
     image_origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of images to count."),
     categories: Optional[list[ImageCategory]] = Query(default=None, description="The categories of image to include."),
