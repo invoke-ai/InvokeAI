@@ -661,7 +661,7 @@ export const imageDTOToFile = async (imageDTO: ImageDTO): Promise<File> => {
 };
 
 export const useImageDTO = (imageName: string | null | undefined) => {
-  const { currentData: imageDTO } = useGetImageDTOQuery(imageName ?? skipToken);
+  const { data: imageDTO } = useGetImageDTOQuery(imageName ?? skipToken);
   return imageDTO ?? null;
 };
 
