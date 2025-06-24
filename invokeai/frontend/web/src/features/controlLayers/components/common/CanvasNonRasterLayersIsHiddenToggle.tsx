@@ -7,7 +7,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiEyeBold, PiEyeClosedBold } from 'react-icons/pi';
 
-export const CanvasNonRasterLayersIsHiddenToggle = memo(() => {
+export const EntityListNonRasterLayerToggle = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isHidden = useNonRasterLayersIsHidden();
@@ -33,4 +33,4 @@ export const CanvasNonRasterLayersIsHiddenToggle = memo(() => {
   );
 });
 
-CanvasNonRasterLayersIsHiddenToggle.displayName = 'CanvasNonRasterLayersIsHiddenToggle';
+EntityListNonRasterLayerToggle.displayName = 'EntityListNonRasterLayerToggle'; 

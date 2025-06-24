@@ -406,3 +406,11 @@ export const selectIsCanvasEmpty = createCanvasSelector(
     );
   }
 );
+
+/**
+ * Selects whether all non-raster layer categories (control layers, inpaint masks, regional guidance) are hidden.
+ * This is used to determine the state of the toggle button that shows/hides all non-raster layers.
+ */
+export const selectNonRasterLayersIsHidden = createSelector(selectCanvasSlice, (canvas) => {
+  return canvas.controlLayers.isHidden && canvas.inpaintMasks.isHidden && canvas.regionalGuidance.isHidden;
+});

@@ -13,6 +13,7 @@ import { useCanvasDeleteLayerHotkey } from 'features/controlLayers/hooks/useCanv
 import { useCanvasEntityQuickSwitchHotkey } from 'features/controlLayers/hooks/useCanvasEntityQuickSwitchHotkey';
 import { useCanvasFilterHotkey } from 'features/controlLayers/hooks/useCanvasFilterHotkey';
 import { useCanvasResetLayerHotkey } from 'features/controlLayers/hooks/useCanvasResetLayerHotkey';
+import { useCanvasToggleNonRasterLayersHotkey } from 'features/controlLayers/hooks/useCanvasToggleNonRasterLayersHotkey';
 import { useCanvasTransformHotkey } from 'features/controlLayers/hooks/useCanvasTransformHotkey';
 import { useCanvasUndoRedoHotkeys } from 'features/controlLayers/hooks/useCanvasUndoRedoHotkeys';
 import { useNextPrevEntityHotkeys } from 'features/controlLayers/hooks/useNextPrevEntity';
@@ -26,6 +27,7 @@ export const CanvasToolbar = memo(() => {
   useNextPrevEntityHotkeys();
   useCanvasTransformHotkey();
   useCanvasFilterHotkey();
+  useCanvasToggleNonRasterLayersHotkey();
 
   return (
     <Flex w="full" gap={2} alignItems="center" px={2}>
