@@ -5,11 +5,13 @@ import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/type
 import type { components, paths } from 'services/api/schema';
 import type {
   GraphAndWorkflowResponse,
+  ImageCategory,
   ImageDTO,
   ImageUploadEntryRequest,
   ImageUploadEntryResponse,
   ListImagesArgs,
   ListImagesResponse,
+  SQLiteDirection,
   UploadImageArg,
 } from 'services/api/types';
 import { getCategories, getListImagesUrl } from 'services/api/util';
@@ -471,6 +473,26 @@ export const imagesApi = api.injectEndpoints({
         dispatch(imagesApi.util.upsertQueryEntries(updates));
       },
     }),
+    /**
+     * Get ordered list of image names for selection operations
+     */
+    getImageNames: build.query<
+      string[],
+      {
+        image_origin?: 'internal' | 'external' | null;
+        categories?: ImageCategory[] | null;
+        is_intermediate?: boolean | null;
+        board_id?: string | null;
+        search_term?: string | null;
+        order_dir?: SQLiteDirection;
+      }
+    >({
+      query: (queryArgs) => ({
+        url: buildImagesUrl('names', queryArgs),
+        method: 'GET',
+      }),
+      providesTags: ['ImageNameList', 'FetchOnReconnect'],
+    }),
   }),
 });
 
@@ -495,6 +517,7 @@ export const {
   useGetImageCollectionCountsQuery,
   useGetImageCollectionQuery,
   useLazyGetImageCollectionQuery,
+  useGetImageNamesQuery,
 } = imagesApi;
 
 /**

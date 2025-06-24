@@ -376,3 +376,25 @@ class ImageService(ImageServiceABC):
         except Exception as e:
             self.__invoker.services.logger.error("Problem getting collection images")
             raise e
+
+    def get_image_names(
+        self,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        image_origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+    ) -> list[str]:
+        try:
+            return self.__invoker.services.image_records.get_image_names(
+                order_dir=order_dir,
+                image_origin=image_origin,
+                categories=categories,
+                is_intermediate=is_intermediate,
+                board_id=board_id,
+                search_term=search_term,
+            )
+        except Exception as e:
+            self.__invoker.services.logger.error("Problem getting image names")
+            raise e

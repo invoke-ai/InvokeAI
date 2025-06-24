@@ -561,3 +561,76 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         count = cast(int, cursor.fetchone()[0])
 
         return OffsetPaginatedResults(items=images, offset=offset, limit=limit, total=count)
+
+    def get_image_names(
+        self,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        image_origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+    ) -> list[str]:
+        cursor = self._conn.cursor()
+
+        # Base query to get image names in order (starred first, then unstarred)
+        query = """--sql
+        SELECT images.image_name
+        FROM images
+        LEFT JOIN board_images ON board_images.image_name = images.image_name
+        WHERE 1=1
+        """
+
+        query_conditions = ""
+        query_params: list[Union[int, str, bool]] = []
+
+        if image_origin is not None:
+            query_conditions += """--sql
+            AND images.image_origin = ?
+            """
+            query_params.append(image_origin.value)
+
+        if categories is not None:
+            category_strings = [c.value for c in set(categories)]
+            placeholders = ",".join("?" * len(category_strings))
+            query_conditions += f"""--sql
+            AND images.image_category IN ( {placeholders} )
+            """
+            for c in category_strings:
+                query_params.append(c)
+
+        if is_intermediate is not None:
+            query_conditions += """--sql
+            AND images.is_intermediate = ?
+            """
+            query_params.append(is_intermediate)
+
+        if board_id == "none":
+            query_conditions += """--sql
+            AND board_images.board_id IS NULL
+            """
+        elif board_id is not None:
+            query_conditions += """--sql
+            AND board_images.board_id = ?
+            """
+            query_params.append(board_id)
+
+        if search_term:
+            query_conditions += """--sql
+            AND (
+                images.metadata LIKE ?
+                OR images.created_at LIKE ?
+            )
+            """
+            query_params.append(f"%{search_term.lower()}%")
+            query_params.append(f"%{search_term.lower()}%")
+
+        # Order by starred first, then by created_at
+        query += query_conditions + f"""--sql
+        ORDER BY images.starred DESC, images.created_at {order_dir.value}
+        """
+
+        cursor.execute(query, query_params)
+        result = cast(list[sqlite3.Row], cursor.fetchall())
+
+        return [row[0] for row in result]

@@ -126,3 +126,16 @@ class ImageRecordStorageBase(ABC):
     ) -> OffsetPaginatedResults[ImageRecord]:
         """Gets images from a specific collection (starred or unstarred)."""
         pass
+
+    @abstractmethod
+    def get_image_names(
+        self,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        image_origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+    ) -> list[str]:
+        """Gets ordered list of all image names (starred first, then unstarred)."""
+        pass
