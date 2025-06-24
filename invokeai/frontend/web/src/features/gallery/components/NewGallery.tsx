@@ -481,7 +481,7 @@ export const NewGallery = memo(() => {
         context={context}
         totalCount={imageNames.length}
         data={imageNames}
-        overscan={VIEWPORT_BUFFER}
+        increaseViewportBy={VIEWPORT_BUFFER}
         itemContent={itemContent}
         computeItemKey={computeItemKey}
         components={components}
