@@ -357,7 +357,7 @@
         "gallerySettings": "Gallery Settings",
         "go": "Go",
         "image": "image",
-        "imagesTab": "Images you’ve created and saved within Invoke.",
+        "imagesTab": "Images you've created and saved within Invoke.",
         "imagesSettings": "Gallery Images Settings",
         "jump": "Jump",
         "loading": "Loading",
@@ -1849,7 +1849,8 @@
             "publishingValidationRunInProgress": "Publishing validation run in progress.",
             "publishedWorkflowsLocked": "Published workflows are locked and cannot be edited or run. Either unpublish the workflow or save a copy to edit or run this workflow.",
             "selectingOutputNode": "Selecting output node",
-            "selectingOutputNodeDesc": "Click a node to select it as the workflow's output node."
+            "selectingOutputNodeDesc": "Click a node to select it as the workflow's output node.",
+            "fieldInputKey": "Field Input Key"
         }
     },
     "controlLayers": {

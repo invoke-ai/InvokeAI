@@ -5,6 +5,7 @@ import {
   getPublishInputs,
   selectFieldIdentifiersWithInvocationTypes,
 } from 'features/nodes/components/sidePanel/workflow/publish';
+import { useAllInputFieldKeys } from 'features/nodes/hooks/useInputFieldKey';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectNodeData, selectNodesSlice } from 'features/nodes/store/selectors';
 import { isBatchNode, isInvocationNode } from 'features/nodes/types/invocation';
@@ -21,6 +22,8 @@ const enqueueRequestedWorkflows = createAction('app/enqueueRequestedWorkflows');
 
 export const useEnqueueWorkflows = () => {
   const { getState, dispatch } = useAppStore();
+  const allInputFieldKeys = useAllInputFieldKeys();
+
   const enqueue = useCallback(
     async (prepend: boolean, isApiValidationRun: boolean) => {
       dispatch(enqueueRequestedWorkflows());
@@ -106,11 +109,22 @@ export const useEnqueueWorkflows = () => {
         // Derive the input fields from the builder's selected node field elements
         const fieldIdentifiers = selectFieldIdentifiersWithInvocationTypes(state);
         const inputs = getPublishInputs(fieldIdentifiers, templates);
+
+        // Create a mapping from original field names to sanitized field names
+        const sanitizedFieldNames: Record<string, string> = {};
+
         const api_input_fields = inputs.publishable.map(({ nodeId, fieldName }) => {
+          // Get the sanitized field key for this field
+          const sanitizedFieldName = allInputFieldKeys.get(nodeId)?.get(fieldName) || fieldName;
+
+          // Store the mapping for the backend
+          const key = `${nodeId}:${fieldName}`;
+          sanitizedFieldNames[key] = sanitizedFieldName;
+
           return {
             kind: 'input',
             node_id: nodeId,
-            field_name: fieldName,
+            field_name: fieldName, // Use original field name for lookups
           } as const;
         });
 
@@ -135,6 +149,7 @@ export const useEnqueueWorkflows = () => {
           workflow_id: nodesState.id,
           input_fields: api_input_fields,
           output_fields: api_output_fields,
+          sanitized_field_names: sanitizedFieldNames, // Add the mapping as additional metadata
         };
 
         // If the batch is an API validation run, we only want to run it once
@@ -148,7 +163,7 @@ export const useEnqueueWorkflows = () => {
       const enqueueResult = await req.unwrap();
       return { batchConfig, enqueueResult };
     },
-    [dispatch, getState]
+    [dispatch, getState, allInputFieldKeys]
   );
 
   return enqueue;

@@ -30,6 +30,7 @@ import {
   selectHasUnpublishableNodes,
   usePublishInputs,
 } from 'features/nodes/components/sidePanel/workflow/publish';
+import { getFieldKeyFromMap, useAllInputFieldKeys } from 'features/nodes/hooks/useInputFieldKey';
 import { useInputFieldTemplateTitleOrThrow } from 'features/nodes/hooks/useInputFieldTemplateTitleOrThrow';
 import { useInputFieldUserTitleOrThrow } from 'features/nodes/hooks/useInputFieldUserTitleOrThrow';
 import { useMouseOverFormField } from 'features/nodes/hooks/useMouseOverNode';
@@ -295,7 +296,16 @@ const NodeInputFieldPreview = memo(({ nodeId, fieldName }: { nodeId: string; fie
   const nodeTemplateTitle = useNodeTemplateTitleOrThrow(nodeId);
   const fieldUserTitle = useInputFieldUserTitleOrThrow(nodeId, fieldName);
   const fieldTemplateTitle = useInputFieldTemplateTitleOrThrow(nodeId, fieldName);
+  const allInputFieldKeys = useAllInputFieldKeys();
+  const inputFieldKey = useMemo(() => {
+    try {
+      return getFieldKeyFromMap(allInputFieldKeys, nodeId, fieldName);
+    } catch (error) {
+      return fieldName;
+    }
+  }, [allInputFieldKeys, nodeId, fieldName]);
   const zoomToNode = useZoomToNode(nodeId);
+  const { t } = useTranslation();
 
   return (
     <Flex
@@ -309,6 +319,9 @@ const NodeInputFieldPreview = memo(({ nodeId, fieldName }: { nodeId: string; fie
     >
       <Text fontWeight="semibold">{`${nodeUserTitle || nodeTemplateTitle} -> ${fieldUserTitle || fieldTemplateTitle}`}</Text>
       <Text variant="subtext">{`${nodeId} -> ${fieldName}`}</Text>
+      <Text variant="subtext" fontWeight="semibold">
+        {t('workflows.builder.fieldInputKey')}: {`${inputFieldKey}`}
+      </Text>
       <NodeFieldElementOverlay nodeId={nodeId} />
     </Flex>
   );

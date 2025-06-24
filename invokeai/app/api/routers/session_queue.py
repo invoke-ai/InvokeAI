@@ -39,6 +39,9 @@ class ValidationRunData(BaseModel):
     workflow_id: str = Field(description="The id of the workflow being published.")
     input_fields: list[FieldIdentifier] = Body(description="The input fields for the published workflow")
     output_fields: list[FieldIdentifier] = Body(description="The output fields for the published workflow")
+    sanitized_field_names: dict[str, str] = Field(
+        default_factory=dict, description="Mapping from nodeId:fieldName to sanitized field names"
+    )
 
 
 @session_queue_router.post(

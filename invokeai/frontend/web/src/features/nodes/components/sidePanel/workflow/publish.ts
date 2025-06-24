@@ -54,11 +54,12 @@ export const selectFieldIdentifiersWithInvocationTypes = createSelector(
   selectWorkflowFormNodeFieldFieldIdentifiersDeduped,
   selectNodesSlice,
   (fieldIdentifiers, nodes) => {
-    const result: { nodeId: string; fieldName: string; type: string }[] = [];
+    const result: { nodeId: string; fieldName: string; type: string, label: string | undefined }[] = [];
     for (const fieldIdentifier of fieldIdentifiers) {
       const node = nodes.nodes.find((node) => node.id === fieldIdentifier.nodeId);
       assert(isInvocationNode(node), `Node ${fieldIdentifier.nodeId} not found`);
-      result.push({ nodeId: fieldIdentifier.nodeId, fieldName: fieldIdentifier.fieldName, type: node.data.type });
+      const fieldLabel = node.data.inputs[fieldIdentifier.fieldName]?.label;
+      result.push({ nodeId: fieldIdentifier.nodeId, fieldName: fieldIdentifier.fieldName, type: node.data.type, label: fieldLabel });
     }
 
     return result;
