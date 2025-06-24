@@ -5,6 +5,7 @@ from typing import Literal, Optional
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
+    ImageCollectionCounts,
     ImageRecord,
     ImageRecordChanges,
     ResourceOrigin,
@@ -106,7 +107,7 @@ class ImageRecordStorageBase(ABC):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
-    ) -> dict[str, int]:
+    ) -> ImageCollectionCounts:
         """Gets counts for starred and unstarred image collections."""
         pass
 

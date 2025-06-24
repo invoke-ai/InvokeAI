@@ -3,7 +3,7 @@ import datetime
 from enum import Enum
 from typing import Optional, Union
 
-from pydantic import Field, StrictBool, StrictStr
+from pydantic import BaseModel, Field, StrictBool, StrictStr
 
 from invokeai.app.util.metaenum import MetaEnum
 from invokeai.app.util.misc import get_iso_timestamp
@@ -207,3 +207,7 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
         starred=starred,
         has_workflow=has_workflow,
     )
+
+class ImageCollectionCounts(BaseModel):
+    starred_count: int = Field(description="The number of starred images in the collection.")
+    unstarred_count: int = Field(description="The number of unstarred images in the collection.")

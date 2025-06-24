@@ -11,6 +11,7 @@ from invokeai.app.services.image_files.image_files_common import (
 )
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
+    ImageCollectionCounts,
     ImageRecord,
     ImageRecordChanges,
     ImageRecordDeleteException,
@@ -318,7 +319,7 @@ class ImageService(ImageServiceABC):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
-    ) -> dict[str, int]:
+    ) -> ImageCollectionCounts:
         try:
             return self.__invoker.services.image_records.get_collection_counts(
                 image_origin=image_origin,
