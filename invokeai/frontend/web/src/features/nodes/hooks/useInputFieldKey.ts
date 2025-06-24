@@ -5,9 +5,6 @@ import {
 } from 'features/nodes/components/sidePanel/workflow/publish';
 import { useMemo } from 'react';
 
-import { useInputFieldTemplateTitleOrThrow } from './useInputFieldTemplateTitleOrThrow';
-import { useInputFieldUserTitleOrThrow } from './useInputFieldUserTitleOrThrow';
-
 // Helper function to sanitize a field name
 const sanitizeFieldName = (name: string): string => {
   return name
@@ -68,7 +65,7 @@ export const useAllInputFieldKeys = () => {
 
     // Process each group and assign unique names
     for (const [baseName, inputs] of baseNameGroups) {
-      if (inputs.length === 1) {
+      if (inputs.length === 1 && inputs[0]) {
         // No conflict, use the base name
         const { nodeId, fieldName } = inputs[0];
         if (!fieldKeysMap.has(nodeId)) {
@@ -78,7 +75,11 @@ export const useAllInputFieldKeys = () => {
       } else {
         // Conflict detected, assign numbered names
         for (let i = 0; i < inputs.length; i++) {
-          const { nodeId, fieldName } = inputs[i];
+          const input = inputs[i];
+          if (!input) {
+            continue;
+          }
+          const { nodeId, fieldName } = input;
           const uniqueName = i === 0 ? baseName : `${baseName}_${i}`;
 
           if (!fieldKeysMap.has(nodeId)) {
@@ -126,32 +127,4 @@ export const getFieldKeyFromMap = (
   }
 
   return fieldKey;
-};
-
-/**
- * Hook that returns the sanitized field key for a specific node and field
- * @param nodeId The ID of the node
- * @param fieldName The name of the field
- * @returns The sanitized and deduplicated field key
- */
-export const useInputFieldKey = (nodeId: string, fieldName: string) => {
-  const allFieldKeys = useAllInputFieldKeys();
-  const fieldUserTitle = useInputFieldUserTitleOrThrow(nodeId, fieldName);
-  const fieldTemplateTitle = useInputFieldTemplateTitleOrThrow(nodeId, fieldName);
-
-  return useMemo(() => {
-    const nodeFieldKeys = allFieldKeys.get(nodeId);
-    if (!nodeFieldKeys) {
-      // Fallback to the old method if the field is not in publishable inputs
-      return sanitizeFieldName(fieldUserTitle || fieldTemplateTitle);
-    }
-
-    const fieldKey = nodeFieldKeys.get(fieldName);
-    if (!fieldKey) {
-      // Fallback to the old method if the field is not in publishable inputs
-      return sanitizeFieldName(fieldUserTitle || fieldTemplateTitle);
-    }
-
-    return fieldKey;
-  }, [allFieldKeys, nodeId, fieldName, fieldUserTitle, fieldTemplateTitle]);
 };
