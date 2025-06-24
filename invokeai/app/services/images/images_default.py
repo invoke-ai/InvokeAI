@@ -1,3 +1,4 @@
+from time import time
 from typing import Literal, Optional
 
 from PIL.Image import Image as PILImageType

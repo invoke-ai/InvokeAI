@@ -1,8 +1,7 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectSearchTerm } from 'features/gallery/store/gallerySelectors';
 import { searchTermChanged } from 'features/gallery/store/gallerySlice';
-import { debounce } from 'lodash-es';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback } from 'react';
 
 export const useGallerySearchTerm = () => {
   // Highlander!
@@ -11,27 +10,16 @@ export const useGallerySearchTerm = () => {
   const dispatch = useAppDispatch();
   const searchTerm = useAppSelector(selectSearchTerm);
 
-  const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
-
-  const debouncedSetSearchTerm = useMemo(() => {
-    return debounce((val: string) => {
-      dispatch(searchTermChanged(val));
-    }, 1000);
-  }, [dispatch]);
-
   const onChange = useCallback(
     (val: string) => {
-      setLocalSearchTerm(val);
-      debouncedSetSearchTerm(val);
+      dispatch(searchTermChanged(val));
     },
-    [debouncedSetSearchTerm]
+    [dispatch]
   );
 
   const onReset = useCallback(() => {
-    debouncedSetSearchTerm.cancel();
-    setLocalSearchTerm('');
     dispatch(searchTermChanged(''));
-  }, [debouncedSetSearchTerm, dispatch]);
+  }, [dispatch]);
 
-  return [localSearchTerm, onChange, onReset] as const;
+  return [searchTerm, onChange, onReset] as const;
 };
