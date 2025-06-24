@@ -126,7 +126,7 @@ class ImageServiceABC(ABC):
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
     ) -> OffsetPaginatedResults[ImageDTO]:
-        """Gets a paginated list of image DTOs."""
+        """Gets a paginated list of image DTOs with starred images first when starred_first=True."""
         pass
 
     @abstractmethod
