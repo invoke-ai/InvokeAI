@@ -1,6 +1,6 @@
 import sqlite3
 from datetime import datetime
-from typing import Optional, Union, cast
+from typing import Literal, Optional, Union, cast
 
 from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
 from invokeai.app.services.image_records.image_records_base import ImageRecordStorageBase
@@ -386,3 +386,181 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             return None
 
         return deserialize_image_record(dict(result))
+
+    def get_collection_counts(
+        self,
+        image_origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+    ) -> dict[str, int]:
+        cursor = self._conn.cursor()
+
+        # Build the base query conditions (same as get_many)
+        base_query = """--sql
+        FROM images
+        LEFT JOIN board_images ON board_images.image_name = images.image_name
+        WHERE 1=1
+        """
+
+        query_conditions = ""
+        query_params: list[Union[int, str, bool]] = []
+
+        if image_origin is not None:
+            query_conditions += """--sql
+            AND images.image_origin = ?
+            """
+            query_params.append(image_origin.value)
+
+        if categories is not None:
+            category_strings = [c.value for c in set(categories)]
+            placeholders = ",".join("?" * len(category_strings))
+            query_conditions += f"""--sql
+            AND images.image_category IN ( {placeholders} )
+            """
+            for c in category_strings:
+                query_params.append(c)
+
+        if is_intermediate is not None:
+            query_conditions += """--sql
+            AND images.is_intermediate = ?
+            """
+            query_params.append(is_intermediate)
+
+        if board_id == "none":
+            query_conditions += """--sql
+            AND board_images.board_id IS NULL
+            """
+        elif board_id is not None:
+            query_conditions += """--sql
+            AND board_images.board_id = ?
+            """
+            query_params.append(board_id)
+
+        if search_term:
+            query_conditions += """--sql
+            AND (
+                images.metadata LIKE ?
+                OR images.created_at LIKE ?
+            )
+            """
+            query_params.append(f"%{search_term.lower()}%")
+            query_params.append(f"%{search_term.lower()}%")
+
+        # Get starred count
+        starred_query = f"SELECT COUNT(*) {base_query} {query_conditions} AND images.starred = TRUE;"
+        cursor.execute(starred_query, query_params)
+        starred_count = cast(int, cursor.fetchone()[0])
+
+        # Get unstarred count
+        unstarred_query = f"SELECT COUNT(*) {base_query} {query_conditions} AND images.starred = FALSE;"
+        cursor.execute(unstarred_query, query_params)
+        unstarred_count = cast(int, cursor.fetchone()[0])
+
+        return {
+            "starred_count": starred_count,
+            "unstarred_count": unstarred_count,
+            "total_count": starred_count + unstarred_count,
+        }
+
+    def get_collection_images(
+        self,
+        collection: Literal["starred", "unstarred"],
+        offset: int = 0,
+        limit: int = 10,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        image_origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+    ) -> OffsetPaginatedResults[ImageRecord]:
+        cursor = self._conn.cursor()
+
+        # Base queries
+        count_query = """--sql
+        SELECT COUNT(*)
+        FROM images
+        LEFT JOIN board_images ON board_images.image_name = images.image_name
+        WHERE 1=1
+        """
+
+        images_query = f"""--sql
+        SELECT {IMAGE_DTO_COLS}
+        FROM images
+        LEFT JOIN board_images ON board_images.image_name = images.image_name
+        WHERE 1=1
+        """
+
+        query_conditions = ""
+        query_params: list[Union[int, str, bool]] = []
+
+        # Add starred/unstarred filter
+        is_starred = collection == "starred"
+        query_conditions += """--sql
+        AND images.starred = ?
+        """
+        query_params.append(is_starred)
+
+        if image_origin is not None:
+            query_conditions += """--sql
+            AND images.image_origin = ?
+            """
+            query_params.append(image_origin.value)
+
+        if categories is not None:
+            category_strings = [c.value for c in set(categories)]
+            placeholders = ",".join("?" * len(category_strings))
+            query_conditions += f"""--sql
+            AND images.image_category IN ( {placeholders} )
+            """
+            for c in category_strings:
+                query_params.append(c)
+
+        if is_intermediate is not None:
+            query_conditions += """--sql
+            AND images.is_intermediate = ?
+            """
+            query_params.append(is_intermediate)
+
+        if board_id == "none":
+            query_conditions += """--sql
+            AND board_images.board_id IS NULL
+            """
+        elif board_id is not None:
+            query_conditions += """--sql
+            AND board_images.board_id = ?
+            """
+            query_params.append(board_id)
+
+        if search_term:
+            query_conditions += """--sql
+            AND (
+                images.metadata LIKE ?
+                OR images.created_at LIKE ?
+            )
+            """
+            query_params.append(f"%{search_term.lower()}%")
+            query_params.append(f"%{search_term.lower()}%")
+
+        # Add ordering and pagination
+        query_pagination = f"""--sql
+        ORDER BY images.created_at {order_dir.value} LIMIT ? OFFSET ?
+        """
+
+        # Execute images query
+        images_query += query_conditions + query_pagination + ";"
+        images_params = query_params.copy()
+        images_params.extend([limit, offset])
+
+        cursor.execute(images_query, images_params)
+        result = cast(list[sqlite3.Row], cursor.fetchall())
+        images = [deserialize_image_record(dict(r)) for r in result]
+
+        # Execute count query
+        count_query += query_conditions + ";"
+        cursor.execute(count_query, query_params)
+        count = cast(int, cursor.fetchone()[0])
+
+        return OffsetPaginatedResults(items=images, offset=offset, limit=limit, total=count)

@@ -4,7 +4,7 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
-import type { ListBoardsArgs, ListImagesArgs } from 'services/api/types';
+import type { ListBoardsArgs, ListImagesArgs, SQLiteDirection } from 'services/api/types';
 
 export const selectFirstSelectedImage = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(0));
 export const selectLastSelectedImage = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(-1));
@@ -38,6 +38,14 @@ export const selectListBoardsQueryArgs = createMemoizedSelector(
 
 export const selectAutoAddBoardId = createSelector(selectGallerySlice, (gallery) => gallery.autoAddBoardId);
 export const selectSelectedBoardId = createSelector(selectGallerySlice, (gallery) => gallery.selectedBoardId);
+
+export const selectImageCollectionQueryArgs = createMemoizedSelector(selectGallerySlice, (gallery) => ({
+  board_id: gallery.selectedBoardId === 'none' ? undefined : gallery.selectedBoardId,
+  categories: gallery.galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
+  search_term: gallery.searchTerm || undefined,
+  order_dir: gallery.orderDir as SQLiteDirection,
+  is_intermediate: false,
+}));
 export const selectAutoAssignBoardOnClick = createSelector(
   selectGallerySlice,
   (gallery) => gallery.autoAssignBoardOnClick
