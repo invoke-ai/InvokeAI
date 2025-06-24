@@ -5,7 +5,7 @@ import { selectImageCollectionQueryArgs } from 'features/gallery/store/gallerySe
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { uniq } from 'lodash-es';
 import { imagesApi } from 'services/api/endpoints/images';
-import type { ImageCategory, ImageDTO, SQLiteDirection } from 'services/api/types';
+import type { ImageCategory, SQLiteDirection } from 'services/api/types';
 
 // Type for image collection query arguments
 type ImageCollectionQueryArgs = {
@@ -17,53 +17,12 @@ type ImageCollectionQueryArgs = {
 };
 
 /**
- * Helper function to get all cached image data from collection queries
- * Returns a combined array of starred images followed by unstarred images
+ * Helper function to get cached image names list for selection operations
+ * Returns an ordered array of image names (starred first, then unstarred)
  */
-const getCachedImageList = (state: RootState, queryArgs: ImageCollectionQueryArgs): ImageDTO[] => {
-  const countsQueryResult = imagesApi.endpoints.getImageCollectionCounts.select(queryArgs)(state);
-
-  if (!countsQueryResult.data) {
-    return [];
-  }
-
-  const { starred_count, unstarred_count } = countsQueryResult.data;
-
-  const imageDTOs: ImageDTO[] = [];
-
-  // Add starred images first (in order)
-  if (starred_count > 0) {
-    for (let offset = 0; offset < starred_count; offset += 50) {
-      const queryResult = imagesApi.endpoints.getImageCollection.select({
-        collection: 'starred',
-        offset,
-        limit: 50,
-        ...queryArgs,
-      })(state);
-
-      if (queryResult.data?.items) {
-        imageDTOs.push(...queryResult.data.items);
-      }
-    }
-  }
-
-  // Add unstarred images (in order)
-  if (unstarred_count > 0) {
-    for (let offset = 0; offset < unstarred_count; offset += 50) {
-      const queryResult = imagesApi.endpoints.getImageCollection.select({
-        collection: 'unstarred',
-        offset,
-        limit: 50,
-        ...queryArgs,
-      })(state);
-
-      if (queryResult.data?.items) {
-        imageDTOs.push(...queryResult.data.items);
-      }
-    }
-  }
-
-  return imageDTOs;
+const getCachedImageNames = (state: RootState, queryArgs: ImageCollectionQueryArgs): string[] => {
+  const queryResult = imagesApi.endpoints.getImageNames.select(queryArgs)(state);
+  return queryResult.data || [];
 };
 
 export const galleryImageClicked = createAction<{
@@ -93,12 +52,12 @@ export const addGalleryImageClickedListener = (startAppListening: AppStartListen
       const state = getState();
       const queryArgs = selectImageCollectionQueryArgs(state);
 
-      // Get all cached image data
-      const imageDTOs = getCachedImageList(state, queryArgs);
+      // Get cached image names for selection operations
+      const imageNames = getCachedImageNames(state, queryArgs);
 
-      // If we don't have the image data cached, we can't perform selection operations
-      // This can happen if the user clicks on an image before all data is loaded
-      if (imageDTOs.length === 0) {
+      // If we don't have the image names cached, we can't perform selection operations
+      // This can happen if the user clicks on an image before the names are loaded
+      if (imageNames.length === 0) {
         // For basic click without modifiers, we can still set selection
         if (!shiftKey && !ctrlKey && !metaKey && !altKey) {
           dispatch(selectionChanged([imageName]));
@@ -117,13 +76,13 @@ export const addGalleryImageClickedListener = (startAppListening: AppStartListen
       } else if (shiftKey) {
         const rangeEndImageName = imageName;
         const lastSelectedImage = selection.at(-1);
-        const lastClickedIndex = imageDTOs.findIndex((n) => n.image_name === lastSelectedImage);
-        const currentClickedIndex = imageDTOs.findIndex((n) => n.image_name === rangeEndImageName);
+        const lastClickedIndex = imageNames.findIndex((name) => name === lastSelectedImage);
+        const currentClickedIndex = imageNames.findIndex((name) => name === rangeEndImageName);
         if (lastClickedIndex > -1 && currentClickedIndex > -1) {
           // We have a valid range!
           const start = Math.min(lastClickedIndex, currentClickedIndex);
           const end = Math.max(lastClickedIndex, currentClickedIndex);
-          const imagesToSelect = imageDTOs.slice(start, end + 1).map(({ image_name }) => image_name);
+          const imagesToSelect = imageNames.slice(start, end + 1);
           dispatch(selectionChanged(uniq(selection.concat(imagesToSelect))));
         }
       } else if (ctrlKey || metaKey) {

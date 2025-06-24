@@ -622,3 +622,31 @@ async def get_image_collection(
         return image_dtos
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to get collection images")
+
+
+@images_router.get("/names", operation_id="get_image_names")
+async def get_image_names(
+    image_origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of images to list."),
+    categories: Optional[list[ImageCategory]] = Query(default=None, description="The categories of image to include."),
+    is_intermediate: Optional[bool] = Query(default=None, description="Whether to list intermediate images."),
+    board_id: Optional[str] = Query(
+        default=None,
+        description="The board id to filter by. Use 'none' to find images without a board.",
+    ),
+    order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
+    search_term: Optional[str] = Query(default=None, description="The term to search for"),
+) -> list[str]:
+    """Gets ordered list of all image names (starred first, then unstarred)"""
+
+    try:
+        image_names = ApiDependencies.invoker.services.images.get_image_names(
+            order_dir=order_dir,
+            image_origin=image_origin,
+            categories=categories,
+            is_intermediate=is_intermediate,
+            board_id=board_id,
+            search_term=search_term,
+        )
+        return image_names
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to get image names")

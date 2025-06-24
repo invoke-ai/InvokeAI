@@ -14,7 +14,11 @@ import type {
   VirtuosoGridHandle,
 } from 'react-virtuoso';
 import { VirtuosoGrid } from 'react-virtuoso';
-import { useGetImageCollectionCountsQuery, useGetImageCollectionQuery } from 'services/api/endpoints/images';
+import {
+  useGetImageCollectionCountsQuery,
+  useGetImageCollectionQuery,
+  useGetImageNamesQuery,
+} from 'services/api/endpoints/images';
 import type { ImageCategory, SQLiteDirection } from 'services/api/types';
 import { useDebounce } from 'use-debounce';
 
@@ -166,6 +170,10 @@ export const NewGallery = memo(() => {
   const virtuosoRef = useRef<VirtuosoGridHandle>(null);
 
   const { counts, isLoading } = useGetImageCollectionCountsQuery(queryArgs, getImageCollectionCountsOptions);
+
+  // Load image names for selection operations - this is lightweight and ensures
+  // selection operations work even before image data is fully loaded
+  useGetImageNamesQuery(queryArgs);
 
   // Reset scroll position when query parameters change
   useEffect(() => {
