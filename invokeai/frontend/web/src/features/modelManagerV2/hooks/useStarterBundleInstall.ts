@@ -1,10 +1,11 @@
+import { toast } from 'features/toast/toast';
 import { flatMap, negate, uniqWith } from 'lodash-es';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useInstallModelMutation } from 'services/api/endpoints/models';
-import { toast } from 'features/toast/toast';
-import { flattenStarterModel, useBuildModelInstallArg } from './useBuildModelsToInstall';
 import type { StarterModel } from 'services/api/types';
+
+import { flattenStarterModel, useBuildModelInstallArg } from './useBuildModelsToInstall';
 
 export const useStarterBundleInstall = () => {
   const [installModel] = useInstallModelMutation();

@@ -1,7 +1,7 @@
 import { Box, Button, Flex, Grid, Heading, Text } from '@invoke-ai/ui-library';
-import { $installModelsTab } from 'features/modelManagerV2/store/installModelsStore';
-import { useStarterBundleInstall } from 'features/modelManagerV2/hooks/useStarterBundleInstall';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
+import { useStarterBundleInstall } from 'features/modelManagerV2/hooks/useStarterBundleInstall';
+import { $installModelsTab } from 'features/modelManagerV2/store/installModelsStore';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFolderOpenBold, PiLinkBold, PiStarBold } from 'react-icons/pi';
@@ -185,7 +185,7 @@ export const LaunchpadForm = memo(() => {
                     whiteSpace="normal"
                   >
                     <Text fontSize="sm" fontWeight="bold" noOfLines={1}>
-                      Stable Diffusion 1.5
+                      {t('modelManager.launchpad.stableDiffusion15')}
                     </Text>
                   </Button>
                   <Button
@@ -201,7 +201,7 @@ export const LaunchpadForm = memo(() => {
                     whiteSpace="normal"
                   >
                     <Text fontSize="sm" fontWeight="bold" noOfLines={1}>
-                      SDXL
+                      {t('modelManager.launchpad.sdxl')}
                     </Text>
                   </Button>
                   <Button
@@ -217,7 +217,7 @@ export const LaunchpadForm = memo(() => {
                     whiteSpace="normal"
                   >
                     <Text fontSize="sm" fontWeight="bold" noOfLines={1}>
-                      FLUX.1 [dev]
+                      {t('modelManager.launchpad.fluxDev')}
                     </Text>
                   </Button>
                 </Grid>
