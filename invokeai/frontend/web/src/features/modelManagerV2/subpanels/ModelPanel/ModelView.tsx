@@ -84,7 +84,7 @@ export const ModelView = memo(({ modelConfig }: Props) => {
             )}
           </Box>
         )}
-        <Box maxH="200px" overflowY="auto" layerStyle="second" borderRadius="base" p={4}>
+        <Box maxH={50} overflowY="auto" layerStyle="second" borderRadius="base" p={4}>
           <RelatedModels modelConfig={modelConfig} />
         </Box>
       </Flex>

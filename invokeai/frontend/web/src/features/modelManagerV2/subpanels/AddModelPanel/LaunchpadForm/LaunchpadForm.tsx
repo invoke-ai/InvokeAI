@@ -1,22 +1,21 @@
 import { Box, Button, Flex, Grid, Heading, Text } from '@invoke-ai/ui-library';
-import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { flattenStarterModel, useBuildModelInstallArg } from 'features/modelManagerV2/hooks/useBuildModelsToInstall';
+import { useStore } from '@nanostores/react';
 import { $installModelsTab } from 'features/modelManagerV2/store/installModelsStore';
-import { toast } from 'features/toast/toast';
-import { flatMap, negate, uniqWith } from 'lodash-es';
+import { useStarterBundleInstall } from 'features/modelManagerV2/hooks/useStarterBundleInstall';
+import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFolderOpenBold, PiLinkBold, PiStarBold } from 'react-icons/pi';
 import { SiHuggingface } from 'react-icons/si';
-import { useGetStarterModelsQuery, useInstallModelMutation } from 'services/api/endpoints/models';
+import { useGetStarterModelsQuery } from 'services/api/endpoints/models';
 
 export const LaunchpadForm = memo(() => {
   const { t } = useTranslation();
-  const [installModel] = useInstallModelMutation();
-  const { getIsInstalled, buildModelInstallArg } = useBuildModelInstallArg();
+  const { installBundle } = useStarterBundleInstall();
   const { data: starterModelsData } = useGetStarterModelsQuery();
+
   // Function to install models from a bundle
-  const installBundle = useCallback(
+  const handleBundleInstall = useCallback(
     (bundleName: string) => {
       if (!starterModelsData?.starter_bundles) {
         return;
@@ -27,40 +26,9 @@ export const LaunchpadForm = memo(() => {
         return;
       }
 
-      // Flatten the models and remove duplicates, which is expected as models can have the same dependencies
-      const flattenedModels = flatMap(bundle, flattenStarterModel);
-      const uniqueModels = uniqWith(
-        flattenedModels,
-        (m1, m2) => m1.source === m2.source || (m1.name === m2.name && m1.base === m2.base && m1.type === m2.type)
-      );
-      // We want to install models that are not installed and skip models that are already installed
-      const install = uniqueModels.filter(negate(getIsInstalled)).map(buildModelInstallArg);
-      const skip = uniqueModels.filter(getIsInstalled).map(buildModelInstallArg);
-
-      if (install.length === 0) {
-        toast({
-          status: 'info',
-          title: t('modelManager.bundleAlreadyInstalled', { bundleName }),
-          description: t('modelManager.allModelsAlreadyInstalled'),
-        });
-        return;
-      }
-
-      // Install all models in the bundle
-      install.forEach(installModel);
-
-      let description = t('modelManager.installingXModels', { count: install.length });
-      if (skip.length > 1) {
-        description += t('modelManager.skippingXDuplicates', { count: skip.length - 1 });
-      }
-
-      toast({
-        status: 'info',
-        title: t('modelManager.installingBundle'),
-        description,
-      });
+      installBundle(bundle, bundleName);
     },
-    [starterModelsData, getIsInstalled, buildModelInstallArg, installModel, t]
+    [starterModelsData, installBundle]
   );
 
   const navigateToUrlTab = useCallback(() => {
@@ -78,17 +46,19 @@ export const LaunchpadForm = memo(() => {
   const navigateToStarterModelsTab = useCallback(() => {
     $installModelsTab.set(4); // Starter Models tab (now index 4)
   }, []);
+
   const handleSD15BundleClick = useCallback(() => {
-    installBundle('sd-1');
-  }, [installBundle]);
+    handleBundleInstall('sd-1');
+  }, [handleBundleInstall]);
 
   const handleSDXLBundleClick = useCallback(() => {
-    installBundle('sdxl');
-  }, [installBundle]);
+    handleBundleInstall('sdxl');
+  }, [handleBundleInstall]);
 
   const handleFluxBundleClick = useCallback(() => {
-    installBundle('flux');
-  }, [installBundle]);
+    handleBundleInstall('flux');
+  }, [handleBundleInstall]);
+
   return (
     <Flex flexDir="column" height="100%" gap={3}>
       <ScrollableContent>
@@ -106,35 +76,94 @@ export const LaunchpadForm = memo(() => {
           <Box>
             <Heading size="sm" mb={2}>
               {t('modelManager.launchpad.manualInstall')}
-            </Heading>{' '}
+            </Heading>
             <Grid templateColumns="repeat(auto-fit, minmax(280px, 1fr))" gap={3}>
-              <LaunchpadCard
-                title={t('modelManager.urlOrLocalPath')}
-                description={t('modelManager.launchpad.urlDescription')}
-                icon={<PiLinkBold size={24} />}
+              <Button
                 onClick={navigateToUrlTab}
-              />
-              <LaunchpadCard
-                title={t('modelManager.huggingFace')}
-                description={t('modelManager.launchpad.huggingFaceDescription')}
-                icon={<SiHuggingface size={24} />}
+                variant="outline"
+                h="auto"
+                minH={12}
+                p={4}
+                textAlign="left"
+                justifyContent="flex-start"
+                alignItems="flex-start"
+                flexDir="column"
+                gap={2}
+                borderRadius="lg"
+                whiteSpace="normal"
+              >
+                <Flex alignItems="center" gap={2} w="full">
+                  <Box color="base.300" flexShrink={0}>
+                    <PiLinkBold size={24} />
+                  </Box>
+                  <Heading size="sm" color="base.100" noOfLines={2}>
+                    {t('modelManager.urlOrLocalPath')}
+                  </Heading>
+                </Flex>
+                <Text fontSize="sm" color="base.400" lineHeight="1.4" flex="1" whiteSpace="normal" wordBreak="break-word">
+                  {t('modelManager.launchpad.urlDescription')}
+                </Text>
+              </Button>
+              <Button
                 onClick={navigateToHuggingFaceTab}
-              />
-              <LaunchpadCard
-                title={t('modelManager.scanFolder')}
-                description={t('modelManager.launchpad.scanFolderDescription')}
-                icon={<PiFolderOpenBold size={24} />}
+                variant="outline"
+                h="auto"
+                minH={12}
+                p={4}
+                textAlign="left"
+                justifyContent="flex-start"
+                alignItems="flex-start"
+                flexDir="column"
+                gap={2}
+                borderRadius="lg"
+                whiteSpace="normal"
+              >
+                <Flex alignItems="center" gap={2} w="full">
+                  <Box color="base.300" flexShrink={0}>
+                    <SiHuggingface size={24} />
+                  </Box>
+                  <Heading size="sm" color="base.100" noOfLines={2}>
+                    {t('modelManager.huggingFace')}
+                  </Heading>
+                </Flex>
+                <Text fontSize="sm" color="base.400" lineHeight="1.4" flex="1" whiteSpace="normal" wordBreak="break-word">
+                  {t('modelManager.launchpad.huggingFaceDescription')}
+                </Text>
+              </Button>
+              <Button
                 onClick={navigateToScanFolderTab}
-              />
+                variant="outline"
+                h="auto"
+                minH={12}
+                p={4}
+                textAlign="left"
+                justifyContent="flex-start"
+                alignItems="flex-start"
+                flexDir="column"
+                gap={2}
+                borderRadius="lg"
+                whiteSpace="normal"
+              >
+                <Flex alignItems="center" gap={2} w="full">
+                  <Box color="base.300" flexShrink={0}>
+                    <PiFolderOpenBold size={24} />
+                  </Box>
+                  <Heading size="sm" color="base.100" noOfLines={2}>
+                    {t('modelManager.scanFolder')}
+                  </Heading>
+                </Flex>
+                <Text fontSize="sm" color="base.400" lineHeight="1.4" flex="1" whiteSpace="normal" wordBreak="break-word">
+                  {t('modelManager.launchpad.scanFolderDescription')}
+                </Text>
+              </Button>
             </Grid>
-          </Box>{' '}
+          </Box>
           {/* Recommended Section */}
           <Box>
             <Heading size="sm" mb={2}>
               {t('modelManager.launchpad.recommendedModels')}
             </Heading>
             <Flex flexDir="column" gap={2}>
-              {' '}
               {/* Starter Model Bundles - More Prominent */}
               <Box>
                 <Heading size="xs" color="base.100" mb={1}>
@@ -142,13 +171,58 @@ export const LaunchpadForm = memo(() => {
                 </Heading>
                 <Text fontSize="xs" color="base.300" mb={2}>
                   {t('modelManager.launchpad.bundleDescription')}
-                </Text>{' '}
+                </Text>
                 <Grid templateColumns="repeat(auto-fit, minmax(180px, 1fr))" gap={2}>
-                  <LaunchpadBundleCard title="Stable Diffusion 1.5" onClick={handleSD15BundleClick} />
-                  <LaunchpadBundleCard title="SDXL" onClick={handleSDXLBundleClick} />
-                  <LaunchpadBundleCard title="FLUX.1 [dev]" onClick={handleFluxBundleClick} />
+                  <Button
+                    onClick={handleSD15BundleClick}
+                    variant="outline"
+                    h="auto"
+                    minH={10}
+                    p={3}
+                    textAlign="center"
+                    justifyContent="center"
+                    alignItems="center"
+                    borderRadius="lg"
+                    whiteSpace="normal"
+                  >
+                    <Text fontSize="sm" fontWeight="bold" noOfLines={1}>
+                      Stable Diffusion 1.5
+                    </Text>
+                  </Button>
+                  <Button
+                    onClick={handleSDXLBundleClick}
+                    variant="outline"
+                    h="auto"
+                    minH={10}
+                    p={3}
+                    textAlign="center"
+                    justifyContent="center"
+                    alignItems="center"
+                    borderRadius="lg"
+                    whiteSpace="normal"
+                  >
+                    <Text fontSize="sm" fontWeight="bold" noOfLines={1}>
+                      SDXL
+                    </Text>
+                  </Button>
+                  <Button
+                    onClick={handleFluxBundleClick}
+                    variant="outline"
+                    h="auto"
+                    minH={10}
+                    p={3}
+                    textAlign="center"
+                    justifyContent="center"
+                    alignItems="center"
+                    borderRadius="lg"
+                    whiteSpace="normal"
+                  >
+                    <Text fontSize="sm" fontWeight="bold" noOfLines={1}>
+                      FLUX.1 [dev]
+                    </Text>
+                  </Button>
                 </Grid>
-              </Box>{' '}
+              </Box>
               {/* Browse All - Simple Link */}
               <Box pt={1} borderTop="1px solid" borderColor="base.700">
                 <Text fontSize="xs" color="base.400" mb={1}>
@@ -163,15 +237,11 @@ export const LaunchpadForm = memo(() => {
                   p={0}
                   h="auto"
                   leftIcon={<PiStarBold size={16} />}
-                  _hover={{
-                    color: 'invokeBlue.200',
-                    textDecoration: 'underline',
-                  }}
                 >
                   {t('modelManager.launchpad.exploreStarter')}
-                </Button>{' '}
-              </Box>{' '}
-            </Flex>{' '}
+                </Button>
+              </Box>
+            </Flex>
           </Box>
         </Flex>
       </ScrollableContent>
@@ -180,106 +250,3 @@ export const LaunchpadForm = memo(() => {
 });
 
 LaunchpadForm.displayName = 'LaunchpadForm';
-
-interface LaunchpadCardProps {
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  onClick: () => void;
-  variant?: 'default' | 'featured';
-}
-
-const LaunchpadCard = memo(({ title, description, icon, onClick, variant = 'default' }: LaunchpadCardProps) => {
-  return (
-    <Button
-      onClick={onClick}
-      variant="outline"
-      h="auto"
-      minH="50px"
-      p={4}
-      borderWidth={variant === 'featured' ? 2 : 1}
-      borderColor={variant === 'featured' ? 'invokeBlue.300' : 'base.700'}
-      bg={variant === 'featured' ? 'invokeBlue.900' : 'base.850'}
-      _hover={{
-        bg: variant === 'featured' ? 'invokeBlue.800' : 'base.800',
-        borderColor: variant === 'featured' ? 'invokeBlue.200' : 'base.600',
-        transform: 'translateY(-2px)',
-      }}
-      _active={{
-        transform: 'translateY(0px)',
-      }}
-      transition="all 0.2s"
-      cursor="pointer"
-      textAlign="left"
-      justifyContent="flex-start"
-      alignItems="flex-start"
-      flexDir="column"
-      gap={2}
-      borderRadius="lg"
-      whiteSpace="normal"
-    >
-      <Flex alignItems="center" gap={2} w="full">
-        <Box color={variant === 'featured' ? 'invokeBlue.200' : 'base.300'} flexShrink={0}>
-          {icon}
-        </Box>
-        <Heading size="sm" color={variant === 'featured' ? 'invokeBlue.50' : 'base.100'} noOfLines={2}>
-          {title}
-        </Heading>
-      </Flex>
-      <Text
-        fontSize="sm"
-        color={variant === 'featured' ? 'invokeBlue.200' : 'base.400'}
-        lineHeight="1.4"
-        flex="1"
-        whiteSpace="normal"
-        wordBreak="break-word"
-      >
-        {description}
-      </Text>
-    </Button>
-  );
-});
-
-LaunchpadCard.displayName = 'LaunchpadCard';
-
-interface LaunchpadBundleCardProps {
-  title: string;
-  onClick: () => void;
-}
-
-const LaunchpadBundleCard = memo(({ title, onClick }: LaunchpadBundleCardProps) => {
-  return (
-    <Button
-      onClick={onClick}
-      variant="outline"
-      h="auto"
-      minH="40px"
-      p={3}
-      borderWidth={2}
-      borderColor="invokeBlue.400"
-      bg="invokeBlue.950"
-      _hover={{
-        bg: 'invokeBlue.900',
-        borderColor: 'invokeBlue.300',
-        transform: 'translateY(-2px)',
-        boxShadow: '0 4px 20px rgba(66, 153, 225, 0.15)',
-      }}
-      _active={{
-        transform: 'translateY(0px)',
-      }}
-      transition="all 0.2s"
-      cursor="pointer"
-      textAlign="center"
-      justifyContent="center"
-      alignItems="center"
-      borderRadius="lg"
-      whiteSpace="normal"
-    >
-      <Text fontSize="sm" fontWeight="bold" color="invokeBlue.100" noOfLines={1}>
-        {title}
-      </Text>
-    </Button>
-  );
-});
-
-LaunchpadBundleCard.displayName = 'LaunchpadBundleCard';
