@@ -11,6 +11,7 @@ import { FullscreenDropzone } from 'features/dnd/FullscreenDropzone';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
 import { ImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
+import { RecallMetadataConfirmationAlertDialog } from 'features/gallery/components/ImageGrid/RecallMetadataConfirmationAlertDialog';
 import { ShareWorkflowModal } from 'features/nodes/components/sidePanel/workflow/WorkflowLibrary/ShareWorkflowModal';
 import { WorkflowLibraryModal } from 'features/nodes/components/sidePanel/workflow/WorkflowLibrary/WorkflowLibraryModal';
 import { CancelAllExceptCurrentQueueItemConfirmationAlertDialog } from 'features/queue/components/CancelAllExceptCurrentQueueItemConfirmationAlertDialog';
@@ -47,9 +48,9 @@ export const GlobalModalIsolator = memo(() => {
       <ShareWorkflowModal />
       <RefreshAfterResetModal />
       <DeleteBoardModal />
-      <GlobalImageHotkeys />
-      <NewGallerySessionDialog />
+      <GlobalImageHotkeys />      <NewGallerySessionDialog />
       <NewCanvasSessionDialog />
+      <RecallMetadataConfirmationAlertDialog />
       <ImageContextMenu />
       <FullscreenDropzone />
       <VideosModal />
