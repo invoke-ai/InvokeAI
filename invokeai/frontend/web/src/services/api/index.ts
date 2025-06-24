@@ -10,6 +10,7 @@ import { buildCreateApi, coreModule, fetchBaseQuery, reactHooksModule } from '@r
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $projectId } from 'app/store/nanostores/projectId';
+import queryString from 'query-string';
 
 const tagTypes = [
   'AppVersion',
@@ -133,5 +134,10 @@ function getCircularReplacer() {
   };
 }
 
-export const buildV1Url = (path: string): string => `api/v1/${path}`;
+export const buildV1Url = (path: string, query?: Parameters<typeof queryString.stringify>[0]): string => {
+  if (!query) {
+    return `api/v1/${path}`;
+  }
+  return `api/v1/${path}?${queryString.stringify(query)}`;
+};
 export const buildV2Url = (path: string): string => `api/v2/${path}`;

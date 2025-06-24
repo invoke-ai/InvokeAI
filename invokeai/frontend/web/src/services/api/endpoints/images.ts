@@ -26,7 +26,8 @@ import { buildBoardsUrl } from './boards';
  * buildImagesUrl('some-path')
  * // '/api/v1/images/some-path'
  */
-const buildImagesUrl = (path: string = '') => buildV1Url(`images/${path}`);
+const buildImagesUrl = (path: string = '', query?: Parameters<typeof buildV1Url>[1]) =>
+  buildV1Url(`images/${path}`, query);
 
 /**
  * Builds an endpoint URL for the board_images router
@@ -428,9 +429,8 @@ export const imagesApi = api.injectEndpoints({
       paths['/api/v1/images/collections/counts']['get']['parameters']['query']
     >({
       query: (queryArgs) => ({
-        url: buildImagesUrl('collections/counts'),
+        url: buildImagesUrl('collections/counts', queryArgs),
         method: 'GET',
-        params: queryArgs,
       }),
       providesTags: ['ImageCollectionCounts', 'FetchOnReconnect'],
     }),
@@ -443,28 +443,27 @@ export const imagesApi = api.injectEndpoints({
         paths['/api/v1/images/collections/{collection}']['get']['parameters']['query']
     >({
       query: ({ collection, ...queryArgs }) => ({
-        url: buildImagesUrl(`collections/${collection}`),
+        url: buildImagesUrl(`collections/${collection}`, queryArgs),
         method: 'GET',
-        params: queryArgs,
       }),
       providesTags: (result, error, { collection, board_id, categories }) => {
         const cacheKey = `${collection}-${board_id || 'all'}-${categories?.join(',') || 'all'}`;
         return [{ type: 'ImageCollection', id: cacheKey }, 'FetchOnReconnect'];
       },
-      async onQueryStarted(_, { dispatch, queryFulfilled }) {
-        // Populate the getImageDTO cache with these images, similar to listImages
-        const res = await queryFulfilled;
-        const imageDTOs = res.data.items;
-        const updates: Param0<typeof imagesApi.util.upsertQueryEntries> = [];
-        for (const imageDTO of imageDTOs) {
-          updates.push({
-            endpointName: 'getImageDTO',
-            arg: imageDTO.image_name,
-            value: imageDTO,
-          });
-        }
-        dispatch(imagesApi.util.upsertQueryEntries(updates));
-      },
+      // async onQueryStarted(_, { dispatch, queryFulfilled }) {
+      //   // Populate the getImageDTO cache with these images, similar to listImages
+      //   const res = await queryFulfilled;
+      //   const imageDTOs = res.data.items;
+      //   const updates: Param0<typeof imagesApi.util.upsertQueryEntries> = [];
+      //   for (const imageDTO of imageDTOs) {
+      //     updates.push({
+      //       endpointName: 'getImageDTO',
+      //       arg: imageDTO.image_name,
+      //       value: imageDTO,
+      //     });
+      //   }
+      //   dispatch(imagesApi.util.upsertQueryEntries(updates));
+      // },
     }),
   }),
 });
