@@ -41,6 +41,8 @@ type ImageCollectionQueryArgs = {
 
 // Constants
 const RANGE_SIZE = 50;
+const VIEWPORT_BUFFER = 2048;
+const SCROLL_SEEK_VELOCITY_THRESHOLD = 2048;
 
 type GridContext = {
   queryArgs: ImageCollectionQueryArgs;
@@ -283,7 +285,7 @@ export const NewGallery = memo(() => {
         context={context}
         totalCount={imageNames.length}
         data={imageNames}
-        increaseViewportBy={2048}
+        increaseViewportBy={VIEWPORT_BUFFER}
         itemContent={itemContent}
         computeItemKey={computeItemKey}
         components={components}
@@ -299,7 +301,7 @@ export const NewGallery = memo(() => {
 NewGallery.displayName = 'NewGallery';
 
 const scrollSeekConfiguration: ScrollSeekConfiguration = {
-  enter: (velocity) => velocity > 2048,
+  enter: (velocity) => velocity > SCROLL_SEEK_VELOCITY_THRESHOLD,
   exit: (velocity) => velocity === 0,
 };
 
