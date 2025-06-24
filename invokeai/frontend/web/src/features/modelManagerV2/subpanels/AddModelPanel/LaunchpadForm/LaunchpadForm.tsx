@@ -1,5 +1,4 @@
 import { Box, Button, Flex, Grid, Heading, Text } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import { $installModelsTab } from 'features/modelManagerV2/store/installModelsStore';
 import { useStarterBundleInstall } from 'features/modelManagerV2/hooks/useStarterBundleInstall';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
