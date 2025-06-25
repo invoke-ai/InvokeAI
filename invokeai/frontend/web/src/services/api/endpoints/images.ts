@@ -601,7 +601,7 @@ export const getTagsToInvalidateForImageMutation = (image_names: string[]): ApiT
 };
 
 export const getTagsToInvalidateForBoardAffectingMutation = (affected_boards: string[]): ApiTagDescription[] => {
-  const tags: ApiTagDescription[] = [];
+  const tags: ApiTagDescription[] = ['ImageNameList'];
 
   for (const board_id of affected_boards) {
     tags.push({
