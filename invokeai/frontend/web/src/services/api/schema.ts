@@ -6996,6 +6996,11 @@ export type components = {
              * @description The name of the field
              */
             field_name: string;
+            /**
+             * User Label
+             * @description The user label of the field, if any
+             */
+            user_label: string | null;
         };
         /**
          * FieldKind

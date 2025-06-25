@@ -19,6 +19,9 @@ import { useGetBatchStatusQuery } from 'services/api/endpoints/queue';
 import { useGetWorkflowQuery } from 'services/api/endpoints/workflows';
 import { assert } from 'tsafe';
 
+type FieldIdentiferWithLabel = FieldIdentifier & { label: string | null };
+type FieldIdentiferWithLabelAndType = FieldIdentiferWithLabel & { type: string };
+
 export const $isPublishing = atom(false);
 export const $isInPublishFlow = atom(false);
 export const $outputNodeId = atom<string | null>(null);
@@ -54,21 +57,26 @@ export const selectFieldIdentifiersWithInvocationTypes = createSelector(
   selectWorkflowFormNodeFieldFieldIdentifiersDeduped,
   selectNodesSlice,
   (fieldIdentifiers, nodes) => {
-    const result: { nodeId: string; fieldName: string; type: string }[] = [];
+    const result: FieldIdentiferWithLabelAndType[] = [];
     for (const fieldIdentifier of fieldIdentifiers) {
       const node = nodes.nodes.find((node) => node.id === fieldIdentifier.nodeId);
       assert(isInvocationNode(node), `Node ${fieldIdentifier.nodeId} not found`);
-      result.push({ nodeId: fieldIdentifier.nodeId, fieldName: fieldIdentifier.fieldName, type: node.data.type });
+      result.push({
+        nodeId: fieldIdentifier.nodeId,
+        fieldName: fieldIdentifier.fieldName,
+        type: node.data.type,
+        label: node.data.inputs[fieldIdentifier.fieldName]?.label ?? null,
+      });
     }
 
     return result;
   }
 );
 
-export const getPublishInputs = (fieldIdentifiers: (FieldIdentifier & { type: string })[], templates: Templates) => {
+export const getPublishInputs = (fieldIdentifiers: FieldIdentiferWithLabelAndType[], templates: Templates) => {
   // Certain field types are not allowed to be input fields on a published workflow
-  const publishable: FieldIdentifier[] = [];
-  const unpublishable: FieldIdentifier[] = [];
+  const publishable: FieldIdentiferWithLabel[] = [];
+  const unpublishable: FieldIdentiferWithLabel[] = [];
   for (const fieldIdentifier of fieldIdentifiers) {
     const fieldTemplate = templates[fieldIdentifier.type]?.inputs[fieldIdentifier.fieldName];
     if (!fieldTemplate) {
