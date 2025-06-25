@@ -88,6 +88,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       return;
     }
     if (progressEvent.session_id === imageDTO.session_id) {
+      setProgressEvent(null);
       setProgressImage(null);
     }
   }, [imageDTO, progressEvent]);
