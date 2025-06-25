@@ -258,6 +258,13 @@ const zChatGPT4oReferenceImageConfig = z.object({
 });
 export type ChatGPT4oReferenceImageConfig = z.infer<typeof zChatGPT4oReferenceImageConfig>;
 
+const zFluxKontextReferenceImageConfig = z.object({
+  type: z.literal('flux_kontext_reference_image'),
+  image: zImageWithDims.nullable(),
+  model: zServerValidatedModelIdentifierField.nullable(),
+});
+export type FluxKontextReferenceImageConfig = z.infer<typeof zFluxKontextReferenceImageConfig>;
+
 const zCanvasEntityBase = z.object({
   id: zId,
   name: zName,
@@ -268,7 +275,12 @@ const zCanvasEntityBase = z.object({
 const zCanvasReferenceImageState = zCanvasEntityBase.extend({
   type: z.literal('reference_image'),
   // This should be named `referenceImage` but we need to keep it as `ipAdapter` for backwards compatibility
-  ipAdapter: z.discriminatedUnion('type', [zIPAdapterConfig, zFLUXReduxConfig, zChatGPT4oReferenceImageConfig]),
+  ipAdapter: z.discriminatedUnion('type', [
+    zIPAdapterConfig,
+    zFLUXReduxConfig,
+    zChatGPT4oReferenceImageConfig,
+    zFluxKontextReferenceImageConfig,
+  ]),
 });
 export type CanvasReferenceImageState = z.infer<typeof zCanvasReferenceImageState>;
 
@@ -280,6 +292,9 @@ export const isFLUXReduxConfig = (config: CanvasReferenceImageState['ipAdapter']
 export const isChatGPT4oReferenceImageConfig = (
   config: CanvasReferenceImageState['ipAdapter']
 ): config is ChatGPT4oReferenceImageConfig => config.type === 'chatgpt_4o_reference_image';
+export const isFluxKontextReferenceImageConfig = (
+  config: CanvasReferenceImageState['ipAdapter']
+): config is FluxKontextReferenceImageConfig => config.type === 'flux_kontext_reference_image';
 
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
 export type FillStyle = z.infer<typeof zFillStyle>;
@@ -406,7 +421,7 @@ export type StagingAreaImage = {
   offsetY: number;
 };
 
-export const zAspectRatioID = z.enum(['Free', '16:9', '3:2', '4:3', '1:1', '3:4', '2:3', '9:16']);
+export const zAspectRatioID = z.enum(['Free', '21:9', '9:21', '16:9', '3:2', '4:3', '1:1', '3:4', '2:3', '9:16']);
 
 export const zImagen3AspectRatioID = z.enum(['16:9', '4:3', '1:1', '3:4', '9:16']);
 export const isImagenAspectRatioID = (v: unknown): v is z.infer<typeof zImagen3AspectRatioID> =>
@@ -415,6 +430,10 @@ export const isImagenAspectRatioID = (v: unknown): v is z.infer<typeof zImagen3A
 export const zChatGPT4oAspectRatioID = z.enum(['3:2', '1:1', '2:3']);
 export const isChatGPT4oAspectRatioID = (v: unknown): v is z.infer<typeof zChatGPT4oAspectRatioID> =>
   zChatGPT4oAspectRatioID.safeParse(v).success;
+
+export const zFluxKontextAspectRatioID = z.enum(['21:9', '4:3', '1:1', '3:4', '9:21', '16:9', '9:16']);
+export const isFluxKontextAspectRatioID = (v: unknown): v is z.infer<typeof zFluxKontextAspectRatioID> =>
+  zFluxKontextAspectRatioID.safeParse(v).success;
 
 export type AspectRatioID = z.infer<typeof zAspectRatioID>;
 export const isAspectRatioID = (v: unknown): v is AspectRatioID => zAspectRatioID.safeParse(v).success;

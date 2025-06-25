@@ -10,6 +10,7 @@ import type {
   ChatGPT4oReferenceImageConfig,
   ControlLoRAConfig,
   ControlNetConfig,
+  FluxKontextReferenceImageConfig,
   FLUXReduxConfig,
   ImageWithDims,
   IPAdapterConfig,
@@ -80,6 +81,11 @@ export const initialFLUXRedux: FLUXReduxConfig = {
 };
 export const initialChatGPT4oReferenceImage: ChatGPT4oReferenceImageConfig = {
   type: 'chatgpt_4o_reference_image',
+  image: null,
+  model: null,
+};
+export const initialFluxKontextReferenceImage: FluxKontextReferenceImageConfig = {
+  type: 'flux_kontext_reference_image',
   image: null,
   model: null,
 };

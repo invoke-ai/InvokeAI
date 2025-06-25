@@ -4,6 +4,7 @@ import { FloatFieldSlider } from 'features/nodes/components/flow/nodes/Invocatio
 import ChatGPT4oModelFieldInputComponent from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ChatGPT4oModelFieldInputComponent';
 import { FloatFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatFieldCollectionInputComponent';
 import { FloatGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatGeneratorFieldComponent';
+import FluxKontextModelFieldInputComponent from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FluxKontextModelFieldInputComponent';
 import { ImageFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ImageFieldCollectionInputComponent';
 import { ImageGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ImageGeneratorFieldComponent';
 import Imagen3ModelFieldInputComponent from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/Imagen3ModelFieldInputComponent';
@@ -50,6 +51,8 @@ import {
   isFloatFieldInputTemplate,
   isFloatGeneratorFieldInputInstance,
   isFloatGeneratorFieldInputTemplate,
+  isFluxKontextModelFieldInputInstance,
+  isFluxKontextModelFieldInputTemplate,
   isFluxMainModelFieldInputInstance,
   isFluxMainModelFieldInputTemplate,
   isFluxReduxModelFieldInputInstance,
@@ -415,6 +418,13 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
       return null;
     }
     return <Imagen4ModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isFluxKontextModelFieldInputTemplate(template)) {
+    if (!isFluxKontextModelFieldInputInstance(field)) {
+      return null;
+    }
+    return <FluxKontextModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
   }
 
   if (isChatGPT4oModelFieldInputTemplate(template)) {
