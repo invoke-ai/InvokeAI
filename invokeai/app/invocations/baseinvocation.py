@@ -587,9 +587,9 @@ def invocation(
         for field_name, field_info in cls.model_fields.items():
             annotation = field_info.annotation
             assert annotation is not None, f"{field_name} on invocation {invocation_type} has no type annotation."
-            assert isinstance(
-                field_info.json_schema_extra, dict
-            ), f"{field_name} on invocation {invocation_type} has a non-dict json_schema_extra, did you forget to use InputField?"
+            assert isinstance(field_info.json_schema_extra, dict), (
+                f"{field_name} on invocation {invocation_type} has a non-dict json_schema_extra, did you forget to use InputField?"
+            )
 
             original_model_fields[field_name] = OriginalModelField(annotation=annotation, field_info=field_info)
 
@@ -712,9 +712,9 @@ def invocation_output(
         for field_name, field_info in cls.model_fields.items():
             annotation = field_info.annotation
             assert annotation is not None, f"{field_name} on invocation output {output_type} has no type annotation."
-            assert isinstance(
-                field_info.json_schema_extra, dict
-            ), f"{field_name} on invocation output {output_type} has a non-dict json_schema_extra, did you forget to use InputField?"
+            assert isinstance(field_info.json_schema_extra, dict), (
+                f"{field_name} on invocation output {output_type} has a non-dict json_schema_extra, did you forget to use InputField?"
+            )
 
             cls._original_model_fields[field_name] = OriginalModelField(annotation=annotation, field_info=field_info)
 
