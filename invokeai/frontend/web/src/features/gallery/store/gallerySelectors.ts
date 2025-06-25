@@ -2,8 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
-import type { ListBoardsArgs, ListImagesArgs } from 'services/api/types';
-import type { SetNonNullable } from 'type-fest';
+import type { ListBoardsArgs } from 'services/api/types';
 
 export const selectFirstSelectedImage = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(0));
 export const selectLastSelectedImage = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(-1));
@@ -28,7 +27,7 @@ export const selectGallerySearchTerm = createSelector(selectGallerySlice, (galle
 export const selectGalleryOrderDir = createSelector(selectGallerySlice, (gallery) => gallery.orderDir);
 export const selectGalleryStarredFirst = createSelector(selectGallerySlice, (gallery) => gallery.starredFirst);
 
-export const selectListImagesQueryArgs = createMemoizedSelector(
+export const selectListImageNamesQueryArgs = createMemoizedSelector(
   [
     selectSelectedBoardId,
     selectGalleryQueryCategories,
@@ -36,17 +35,20 @@ export const selectListImagesQueryArgs = createMemoizedSelector(
     selectGalleryOrderDir,
     selectGalleryStarredFirst,
   ],
-  (board_id, categories, search_term, order_dir, starred_first) =>
-    ({
-      board_id,
-      categories,
-      search_term,
-      order_dir,
-      starred_first,
-      is_intermediate: false, // We don't show intermediate images in the gallery
-      limit: 100, // Page size is _always_ 100
-    }) satisfies SetNonNullable<ListImagesArgs, 'limit'>
+  (board_id, categories, search_term, order_dir, starred_first) => ({
+    board_id,
+    categories,
+    search_term,
+    order_dir,
+    starred_first,
+    is_intermediate: false,
+  })
 );
+export const LIMIT = 100;
+export const selectListImagesBaseQueryArgs = createMemoizedSelector(selectListImageNamesQueryArgs, (baseQueryArgs) => ({
+  ...baseQueryArgs,
+  limit: LIMIT,
+}));
 export const selectAutoAssignBoardOnClick = createSelector(
   selectGallerySlice,
   (gallery) => gallery.autoAssignBoardOnClick

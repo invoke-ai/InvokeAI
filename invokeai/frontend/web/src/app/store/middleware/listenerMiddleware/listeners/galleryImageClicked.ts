@@ -1,29 +1,9 @@
 import { createAction } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import type { RootState } from 'app/store/store';
-import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { selectListImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { uniq } from 'lodash-es';
 import { imagesApi } from 'services/api/endpoints/images';
-import type { ImageCategory, SQLiteDirection } from 'services/api/types';
-
-// Type for image collection query arguments
-type ImageCollectionQueryArgs = {
-  board_id?: string;
-  categories?: ImageCategory[];
-  search_term?: string;
-  order_dir?: SQLiteDirection;
-  is_intermediate: boolean;
-};
-
-/**
- * Helper function to get cached image names list for selection operations
- * Returns an ordered array of image names (starred first, then unstarred)
- */
-const getCachedImageNames = (state: RootState, queryArgs: ImageCollectionQueryArgs): string[] => {
-  const queryResult = imagesApi.endpoints.getImageNames.select(queryArgs)(state);
-  return queryResult.data || [];
-};
 
 export const galleryImageClicked = createAction<{
   imageName: string;
@@ -50,10 +30,8 @@ export const addGalleryImageClickedListener = (startAppListening: AppStartListen
     effect: (action, { dispatch, getState }) => {
       const { imageName, shiftKey, ctrlKey, metaKey, altKey } = action.payload;
       const state = getState();
-      const queryArgs = selectListImagesQueryArgs(state);
-
-      // Get cached image names for selection operations
-      const imageNames = getCachedImageNames(state, queryArgs);
+      const queryArgs = selectListImageNamesQueryArgs(state);
+      const imageNames = imagesApi.endpoints.getImageNames.select(queryArgs)(state).data ?? [];
 
       // If we don't have the image names cached, we can't perform selection operations
       // This can happen if the user clicks on an image before the names are loaded

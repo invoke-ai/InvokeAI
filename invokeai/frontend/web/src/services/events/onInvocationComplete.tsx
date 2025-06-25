@@ -5,7 +5,7 @@ import { deepClone } from 'common/util/deepClone';
 import {
   selectAutoSwitch,
   selectGalleryView,
-  selectListImagesQueryArgs,
+  selectListImagesBaseQueryArgs,
   selectSelectedBoardId,
 } from 'features/gallery/store/gallerySelectors';
 import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
@@ -44,7 +44,7 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
     const boardTotalAdditions: Record<string, number> = {};
     const boardTagIdsToInvalidate: Set<string> = new Set();
     const imageListTagIdsToInvalidate: Set<string> = new Set();
-    const listImagesArg = selectListImagesQueryArgs(getState());
+    const listImagesArg = selectListImagesBaseQueryArgs(getState());
 
     for (const imageDTO of imageDTOs) {
       if (imageDTO.is_intermediate) {
@@ -94,7 +94,7 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
       type: 'ImageList' as const,
       id: imageListId,
     }));
-    dispatch(imagesApi.util.invalidateTags([...boardTags, ...imageListTags]));
+    dispatch(imagesApi.util.invalidateTags(['ImageNameList', ...boardTags, ...imageListTags]));
 
     const autoSwitch = selectAutoSwitch(getState());
 

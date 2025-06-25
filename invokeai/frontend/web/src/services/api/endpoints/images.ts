@@ -428,60 +428,11 @@ export const imagesApi = api.injectEndpoints({
       }),
     }),
     /**
-     * Get counts for starred and unstarred image collections
-     */
-    getImageCollectionCounts: build.query<
-      paths['/api/v1/images/collections/counts']['get']['responses']['200']['content']['application/json'],
-      paths['/api/v1/images/collections/counts']['get']['parameters']['query']
-    >({
-      query: (queryArgs) => ({
-        url: buildImagesUrl('collections/counts', queryArgs),
-        method: 'GET',
-      }),
-      providesTags: ['ImageCollectionCounts', 'FetchOnReconnect'],
-    }),
-    /**
-     * Get images from a specific collection (starred or unstarred)
-     */
-    getImageCollection: build.query<
-      paths['/api/v1/images/collections/{collection}']['get']['responses']['200']['content']['application/json'],
-      paths['/api/v1/images/collections/{collection}']['get']['parameters']['path'] &
-        paths['/api/v1/images/collections/{collection}']['get']['parameters']['query']
-    >({
-      query: ({ collection, ...queryArgs }) => ({
-        url: buildImagesUrl(`collections/${collection}`, queryArgs),
-        method: 'GET',
-      }),
-      providesTags: (result, error, { collection, board_id, categories }) => {
-        const cacheKey = `${collection}-${board_id || 'all'}-${categories?.join(',') || 'all'}`;
-        return [
-          { type: 'ImageCollection', id: collection },
-          { type: 'ImageCollection', id: cacheKey },
-          'FetchOnReconnect',
-        ];
-      },
-      async onQueryStarted(_, { dispatch, queryFulfilled }) {
-        // Populate the getImageDTO cache with these images, similar to listImages
-        const res = await queryFulfilled;
-        const imageDTOs = res.data.items;
-        const updates: Param0<typeof imagesApi.util.upsertQueryEntries> = [];
-        for (const imageDTO of imageDTOs) {
-          updates.push({
-            endpointName: 'getImageDTO',
-            arg: imageDTO.image_name,
-            value: imageDTO,
-          });
-        }
-        dispatch(imagesApi.util.upsertQueryEntries(updates));
-      },
-    }),
-    /**
      * Get ordered list of image names for selection operations
      */
     getImageNames: build.query<
       string[],
       {
-        image_origin?: 'internal' | 'external' | null;
         categories?: ImageCategory[] | null;
         is_intermediate?: boolean | null;
         board_id?: string | null;
@@ -493,46 +444,11 @@ export const imagesApi = api.injectEndpoints({
         url: buildImagesUrl('names', queryArgs),
         method: 'GET',
       }),
-      providesTags: ['ImageNameList', 'FetchOnReconnect'],
-    }),
-    /**
-     * Get paginated images with starred first (unified list)
-     */
-    getUnifiedImageList: build.query<
-      ListImagesResponse,
-      {
-        offset?: number;
-        limit?: number;
-        image_origin?: 'internal' | 'external' | null;
-        categories?: ImageCategory[] | null;
-        is_intermediate?: boolean | null;
-        board_id?: string | null;
-        search_term?: string | null;
-        order_dir?: SQLiteDirection;
-      }
-    >({
-      query: (queryArgs) => ({
-        url: getListImagesUrl({ ...queryArgs, starred_first: true }),
-        method: 'GET',
-      }),
-      providesTags: (result, error, { board_id, categories }) => [
-        { type: 'ImageList', id: getListImagesUrl({ board_id, categories }) },
+      providesTags: (result, error, queryArgs) => [
+        'ImageNameList',
         'FetchOnReconnect',
+        { type: 'ImageNameList', id: stableHash(queryArgs) },
       ],
-      async onQueryStarted(_, { dispatch, queryFulfilled }) {
-        // Populate the getImageDTO cache with these images
-        const res = await queryFulfilled;
-        const imageDTOs = res.data.items;
-        const updates: Param0<typeof imagesApi.util.upsertQueryEntries> = [];
-        for (const imageDTO of imageDTOs) {
-          updates.push({
-            endpointName: 'getImageDTO',
-            arg: imageDTO.image_name,
-            value: imageDTO,
-          });
-        }
-        dispatch(imagesApi.util.upsertQueryEntries(updates));
-      },
     }),
   }),
 });
@@ -555,11 +471,7 @@ export const {
   useStarImagesMutation,
   useUnstarImagesMutation,
   useBulkDownloadImagesMutation,
-  useGetImageCollectionCountsQuery,
-  useGetImageCollectionQuery,
-  useLazyGetImageCollectionQuery,
   useGetImageNamesQuery,
-  useGetUnifiedImageListQuery,
 } = imagesApi;
 
 /**

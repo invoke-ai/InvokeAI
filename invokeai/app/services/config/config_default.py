@@ -482,9 +482,9 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
     try:
         # Meta is not included in the model fields, so we need to validate it separately
         config = InvokeAIAppConfig.model_validate(loaded_config_dict)
-        assert config.schema_version == CONFIG_SCHEMA_VERSION, (
-            f"Invalid schema version, expected {CONFIG_SCHEMA_VERSION}: {config.schema_version}"
-        )
+        assert (
+            config.schema_version == CONFIG_SCHEMA_VERSION
+        ), f"Invalid schema version, expected {CONFIG_SCHEMA_VERSION}: {config.schema_version}"
         return config
     except Exception as e:
         raise RuntimeError(f"Failed to load config file {config_path}: {e}") from e
