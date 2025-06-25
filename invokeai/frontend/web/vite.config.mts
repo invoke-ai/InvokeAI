@@ -1,8 +1,7 @@
 /// <reference types="vitest" />
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
-import { visualizer } from 'rollup-plugin-visualizer';
-import type { PluginOption } from 'vite';
+import Sonda from 'sonda/vite';
 import { defineConfig } from 'vite';
 import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
 import dts from 'vite-plugin-dts';
@@ -17,7 +16,6 @@ export default defineConfig(({ mode }) => {
         react(),
         eslint(),
         tsconfigPaths(),
-        visualizer() as unknown as PluginOption,
         dts({
           insertTypesEntry: true,
         }),
@@ -70,9 +68,10 @@ export default defineConfig(({ mode }) => {
       react(),
       mode !== 'test' && eslint({ failOnError: mode === 'production', failOnWarning: mode === 'production' }),
       tsconfigPaths(),
-      visualizer() as unknown as PluginOption,
+      Sonda(),
     ],
     build: {
+      sourcemap: true,
       chunkSizeWarningLimit: 1500,
     },
     server: {

@@ -14,9 +14,8 @@ import { useStore } from '@nanostores/react';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { typedMemo } from 'common/util/typedMemo';
 import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
-import type { AnyStore, ReadableAtom, Task, WritableAtom } from 'nanostores';
+import type { ReadableAtom, WritableAtom } from 'nanostores';
 import { atom, computed } from 'nanostores';
-import type { StoreValues } from 'nanostores/computed';
 import type { ChangeEvent, MouseEventHandler, PropsWithChildren, RefObject } from 'react';
 import React, {
   createContext,
@@ -472,17 +471,6 @@ const useKeyboardNavigation = <T extends object>() => {
   return keyboardNavProps;
 };
 
-const useAtom = <T,>(initialValue: T) => {
-  return useState(() => atom<T>(initialValue))[0];
-};
-
-const useComputed = <Value, OriginStores extends AnyStore[]>(
-  stores: [...OriginStores],
-  cb: (...values: StoreValues<OriginStores>) => Task<Value> | Value
-) => {
-  return useState(() => computed(stores, cb))[0];
-};
-
 const countOptions = <T extends object>(optionsOrGroups: OptionOrGroup<T>[]) => {
   let count = 0;
   for (const optionOrGroup of optionsOrGroups) {
@@ -515,18 +503,20 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { $groupStatusMap, $areAllGroupsDisabled, toggleGroup } = useTogglableGroups(optionsOrGroups);
-  const $activeOptionId = useAtom(getFirstOptionId(optionsOrGroups, getOptionId));
-  const $compactView = useAtom(true);
-  const $optionsOrGroups = useAtom(optionsOrGroups);
-  const $totalOptionCount = useComputed([$optionsOrGroups], countOptions);
-  const $filteredOptions = useAtom<OptionOrGroup<T>[]>([]);
-  const $flattenedFilteredOptions = useComputed([$filteredOptions], flattenOptions);
-  const $hasOptions = useComputed([$totalOptionCount], (count) => count > 0);
-  const $filteredOptionsCount = useComputed([$flattenedFilteredOptions], (options) => options.length);
-  const $hasFilteredOptions = useComputed([$filteredOptionsCount], (count) => count > 0);
-  const $selectedItem = useAtom<T | undefined>(undefined);
-  const $searchTerm = useAtom('');
-  const $selectedItemId = useComputed([$selectedItem], (item) => (item ? getOptionId(item) : undefined));
+  const $activeOptionId = useState(() => atom(getFirstOptionId(optionsOrGroups, getOptionId)))[0];
+  const $compactView = useState(() => atom(true))[0];
+  const $optionsOrGroups = useState(() => atom(optionsOrGroups))[0];
+  const $totalOptionCount = useState(() => computed([$optionsOrGroups], countOptions))[0];
+  const $filteredOptions = useState(() => atom<OptionOrGroup<T>[]>([]))[0];
+  const $flattenedFilteredOptions = useState(() => computed([$filteredOptions], flattenOptions))[0];
+  const $hasOptions = useState(() => computed([$totalOptionCount], (count) => count > 0))[0];
+  const $filteredOptionsCount = useState(() => computed([$flattenedFilteredOptions], (options) => options.length))[0];
+  const $hasFilteredOptions = useState(() => computed([$filteredOptionsCount], (count) => count > 0))[0];
+  const $selectedItem = useState(() => atom<T | undefined>(undefined))[0];
+  const $searchTerm = useState(() => atom(''))[0];
+  const $selectedItemId = useState(() =>
+    computed([$selectedItem], (item) => (item ? getOptionId(item) : undefined))
+  )[0];
 
   const onSelectById = useCallback(
     (id: string) => {
@@ -809,15 +799,17 @@ SearchInput.displayName = 'SearchInput';
 const GroupToggleButtons = typedMemo(<T extends object>() => {
   const { $optionsOrGroups, $groupStatusMap, $areAllGroupsDisabled } = usePickerContext<T>();
   const { t } = useTranslation();
-  const $groups = useComputed([$optionsOrGroups], (optionsOrGroups) => {
-    const _groups: Group<T>[] = [];
-    for (const optionOrGroup of optionsOrGroups) {
-      if (isGroup(optionOrGroup)) {
-        _groups.push(optionOrGroup);
+  const $groups = useState(() =>
+    computed([$optionsOrGroups], (optionsOrGroups) => {
+      const _groups: Group<T>[] = [];
+      for (const optionOrGroup of optionsOrGroups) {
+        if (isGroup(optionOrGroup)) {
+          _groups.push(optionOrGroup);
+        }
       }
-    }
-    return _groups;
-  });
+      return _groups;
+    })
+  )[0];
   const groups = useStore($groups);
   const areAllGroupsDisabled = useStore($areAllGroupsDisabled);
 
