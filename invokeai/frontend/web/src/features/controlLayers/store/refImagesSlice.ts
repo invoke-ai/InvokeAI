@@ -193,6 +193,9 @@ export const refImagesSlice = createSlice({
       const nextIndex = clamp(currentIndex, 0, state.entities.length - 1);
       const nextEntity = state.entities[nextIndex];
       state.selectedEntityId = nextEntity?.id ?? null;
+      if (state.selectedEntityId === null) {
+        state.isPanelOpen = false;
+      }
     },
     refImageSelected: (state, action: PayloadAction<{ id: string }>) => {
       const { id } = action.payload;
