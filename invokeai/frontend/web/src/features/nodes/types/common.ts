@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 import type { ModelIdentifier as ModelIdentifierV2 } from './v2/common';
 import { zModelIdentifier as zModelIdentifierV2 } from './v2/common';

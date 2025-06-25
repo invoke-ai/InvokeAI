@@ -6,7 +6,7 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 const zMode = z.enum(['fill', 'contain', 'cover']);
 type Mode = z.infer<typeof zMode>;

@@ -2,7 +2,7 @@ import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { buildZodTypeGuard } from 'common/util/zodUtils';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 const zSeedBehaviour = z.enum(['PER_ITERATION', 'PER_PROMPT']);
 export const isSeedBehaviour = buildZodTypeGuard(zSeedBehaviour);

@@ -10,7 +10,7 @@ import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { zWorkflowV3 } from 'features/nodes/types/workflow';
 import i18n from 'i18n';
 import { useCallback } from 'react';
-import { fromZodError } from 'zod-validation-error';
+import { fromZodError } from 'zod-validation-error/v4';
 
 const log = logger('workflows');
 

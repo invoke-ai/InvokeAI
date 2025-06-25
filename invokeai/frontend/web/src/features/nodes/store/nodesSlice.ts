@@ -125,7 +125,7 @@ import {
 import { atom, computed } from 'nanostores';
 import type { MouseEvent } from 'react';
 import type { UndoableOptions } from 'redux-undo';
-import type { z } from 'zod';
+import type { z } from 'zod/v4';
 
 import type { PendingConnection, Templates } from './types';
 
@@ -191,7 +191,7 @@ const getField = (nodeId: string, fieldName: string, state: NodesState) => {
 const fieldValueReducer = <T extends FieldValue>(
   state: NodesState,
   action: FieldValueAction<T>,
-  schema: z.ZodTypeAny
+  schema: z.ZodType<T>
 ) => {
   const { nodeId, fieldName, value } = action.payload;
   const field = getField(nodeId, fieldName, state);

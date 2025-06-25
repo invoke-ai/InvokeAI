@@ -32,7 +32,7 @@ import {
 import { getImageDTOSafe } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 const zId = z.string().min(1);
 const zName = z.string().min(1).nullable();

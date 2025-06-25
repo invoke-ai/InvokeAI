@@ -6,7 +6,7 @@ import MersenneTwister from 'mtwist';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { utilitiesApi } from 'services/api/endpoints/utilities';
 import { assert } from 'tsafe';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 import type { ImageField } from './common';
 import { zBoardField, zColorField, zImageField, zModelIdentifierField, zSchedulerField } from './common';
@@ -57,8 +57,9 @@ const zFieldInputTemplateBase = zFieldTemplateBase.extend({
   fieldKind: z.literal('input'),
   input: zFieldInput,
   required: z.boolean(),
+  default: z.undefined(),
   ui_component: zFieldUIComponent.nullish(),
-  ui_choice_labels: z.record(z.string()).nullish(),
+  ui_choice_labels: z.record(z.string(), z.string()).nullish(),
 });
 const zFieldOutputTemplateBase = zFieldTemplateBase.extend({
   fieldKind: z.literal('output'),
@@ -649,7 +650,7 @@ const zEnumFieldInputTemplate = zFieldInputTemplateBase.extend({
   originalType: zFieldType.optional(),
   default: zEnumFieldValue,
   options: z.array(z.string()),
-  labels: z.record(z.string()).optional(),
+  labels: z.record(z.string(), z.string()).optional(),
 });
 const zEnumFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zEnumFieldType,

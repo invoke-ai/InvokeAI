@@ -14,7 +14,7 @@ import { queueApi } from 'services/api/endpoints/queue';
 import type { ImageDTO, S } from 'services/api/types';
 import { $socket } from 'services/events/stores';
 import { assert, objectEntries } from 'tsafe';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 const zAutoSwitchMode = z.enum(['off', 'switch_on_start', 'switch_on_finish']);
 export const isAutoSwitchMode = buildZodTypeGuard(zAutoSwitchMode);

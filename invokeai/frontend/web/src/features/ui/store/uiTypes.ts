@@ -1,5 +1,5 @@
 import { deepClone } from 'common/util/deepClone';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 const zTabName = z.enum(['generate', 'canvas', 'upscaling', 'workflows', 'models', 'queue']);
 export const ALL_TABS = zTabName.options;
