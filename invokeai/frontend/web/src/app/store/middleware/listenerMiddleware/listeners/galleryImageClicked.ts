@@ -1,7 +1,7 @@
 import { createAction } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import type { RootState } from 'app/store/store';
-import { selectImageCollectionQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { uniq } from 'lodash-es';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -50,7 +50,7 @@ export const addGalleryImageClickedListener = (startAppListening: AppStartListen
     effect: (action, { dispatch, getState }) => {
       const { imageName, shiftKey, ctrlKey, metaKey, altKey } = action.payload;
       const state = getState();
-      const queryArgs = selectImageCollectionQueryArgs(state);
+      const queryArgs = selectListImagesQueryArgs(state);
 
       // Get cached image names for selection operations
       const imageNames = getCachedImageNames(state, queryArgs);

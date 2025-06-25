@@ -15,6 +15,7 @@ import type {
   UploadImageArg,
 } from 'services/api/types';
 import { getCategories, getListImagesUrl } from 'services/api/util';
+import stableHash from 'stable-hash';
 import type { Param0 } from 'tsafe';
 import type { JsonObject } from 'type-fest';
 
@@ -53,7 +54,8 @@ export const imagesApi = api.injectEndpoints({
       providesTags: (result, error, queryArgs) => {
         return [
           // Make the tags the same as the cache key
-          { type: 'ImageList', id: JSON.stringify(queryArgs) },
+          { type: 'ImageList', id: stableHash(queryArgs) },
+          { type: 'Board', id: queryArgs.board_id ?? 'none' },
           'FetchOnReconnect',
         ];
       },

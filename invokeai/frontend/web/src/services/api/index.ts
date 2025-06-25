@@ -11,6 +11,7 @@ import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $projectId } from 'app/store/nanostores/projectId';
 import queryString from 'query-string';
+import stableHash from 'stable-hash';
 
 const tagTypes = [
   'AppVersion',
@@ -110,6 +111,7 @@ export const api = customCreateApi({
   tagTypes,
   endpoints: () => ({}),
   invalidationBehavior: 'immediately',
+  serializeQueryArgs: stableHash,
 });
 
 function getCircularReplacer() {

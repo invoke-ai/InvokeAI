@@ -1,8 +1,6 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { useIsRegionFocused } from 'common/hooks/focus';
 import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
-import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
-import { useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { selectActiveTab, selectActiveTabCanvasRightPanel } from 'features/ui/store/uiSelectors';
@@ -13,8 +11,6 @@ import { useListImagesQuery } from 'services/api/endpoints/images';
  * Registers gallery hotkeys. This hook is a singleton.
  */
 export const useGalleryHotkeys = () => {
-  // useAssertSingleton('useGalleryHotkeys');
-  const { goNext, goPrev, isNextEnabled, isPrevEnabled } = useGalleryPagination();
   const selection = useAppSelector((s) => s.gallery.selection);
   const queryArgs = useAppSelector(selectListImagesQueryArgs);
   const queryResult = useListImagesQuery(queryArgs);
@@ -33,17 +29,6 @@ export const useGalleryHotkeys = () => {
     }
     return canvasRightPanelTab === 'gallery';
   }, [appTab, canvasRightPanelTab]);
-
-  const {
-    handleLeftImage,
-    handleRightImage,
-    handleUpImage,
-    handleDownImage,
-    isOnFirstRow,
-    isOnLastRow,
-    isOnFirstImageOfView,
-    isOnLastImageOfView,
-  } = useGalleryNavigation();
 
   useRegisteredHotkeys({
     id: 'galleryNavLeft',

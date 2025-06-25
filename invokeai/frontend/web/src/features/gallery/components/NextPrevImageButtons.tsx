@@ -1,18 +1,14 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Box, IconButton } from '@invoke-ai/ui-library';
 import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
-import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
-import { useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
 
 const NextPrevImageButtons = ({ inset = 8 }: { inset?: ChakraProps['insetInlineStart' | 'insetInlineEnd'] }) => {
   const { t } = useTranslation();
-  const { prevImage, nextImage, isOnFirstImageOfView, isOnLastImageOfView } = useGalleryNavigation();
 
   const { isFetching } = useGalleryImages().queryResult;
-  const { isNextEnabled, goNext, isPrevEnabled, goPrev } = useGalleryPagination();
 
   const shouldShowLeftArrow = useMemo(() => {
     if (!isOnFirstImageOfView) {
