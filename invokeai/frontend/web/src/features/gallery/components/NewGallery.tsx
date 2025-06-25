@@ -1,4 +1,5 @@
 import { Box, Flex, forwardRef, Grid, GridItem, Skeleton, Spinner, Text } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -33,7 +34,6 @@ const PAGE_SIZE = 100;
 const VIEWPORT_BUFFER = 2048;
 const SCROLL_SEEK_VELOCITY_THRESHOLD = 4096;
 const DEBOUNCE_DELAY = 500;
-const GRID_GAP = 1;
 const SPINNER_OPACITY = 0.3;
 
 type GridContext = {
@@ -428,18 +428,16 @@ const scrollSeekConfiguration: ScrollSeekConfiguration = {
 // Styles
 const style = { height: '100%', width: '100%' };
 
+const selectGridTemplateColumns = createSelector(
+  selectGalleryImageMinimumWidth,
+  (galleryImageMinimumWidth) => `repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, 1fr))`
+);
+
 // Grid components
 const ListComponent: GridComponents<GridContext>['List'] = forwardRef((props, ref) => {
-  const galleryImageMinimumWidth = useAppSelector(selectGalleryImageMinimumWidth);
+  const gridTemplateColumns = useAppSelector(selectGridTemplateColumns);
 
-  return (
-    <Grid
-      ref={ref}
-      gridTemplateColumns={`repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, 1fr))`}
-      gap={GRID_GAP}
-      {...props}
-    />
-  );
+  return <Grid ref={ref} gridTemplateColumns={gridTemplateColumns} gap={1} {...props} />;
 });
 ListComponent.displayName = 'ListComponent';
 
