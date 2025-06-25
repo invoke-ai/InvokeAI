@@ -1,7 +1,7 @@
 import { objectEquals } from '@observ33r/object-equals';
+import { forEach, groupBy, unset, values } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { type ModelIdentifierField, zModelIdentifierField } from 'features/nodes/types/common';
-import { forEach, groupBy, unset, values } from 'lodash-es';
 import type {
   AnyInvocation,
   AnyInvocationIncMetadata,

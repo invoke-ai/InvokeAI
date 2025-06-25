@@ -42,6 +42,15 @@ module.exports = {
             importNames: ['isEqual'],
             message: 'Please use objectEquals from @observ33r/object-equals instead.',
           },
+          {
+            name: 'lodash-es',
+            message: 'Please use es-toolkit instead.',
+          },
+          {
+            name: 'es-toolkit',
+            importNames: ['isEqual'],
+            message: 'Please use objectEquals from @observ33r/object-equals instead.',
+          },
         ],
       },
     ],

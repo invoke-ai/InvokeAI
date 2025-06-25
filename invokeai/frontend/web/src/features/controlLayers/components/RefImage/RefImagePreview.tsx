@@ -2,6 +2,7 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, Icon, IconButton, Image, Skeleton, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { round } from 'es-toolkit/compat';
 import { useRefImageEntity } from 'features/controlLayers/components/RefImage/useRefImageEntity';
 import { useRefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
 import {
@@ -10,7 +11,6 @@ import {
   selectSelectedRefEntityId,
 } from 'features/controlLayers/store/refImagesSlice';
 import { isIPAdapterConfig } from 'features/controlLayers/store/types';
-import { round } from 'lodash-es';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { PiExclamationMarkBold, PiImageBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';

@@ -1,3 +1,4 @@
+import { get, isArray, isString } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { defaultLoRAConfig } from 'features/controlLayers/store/lorasSlice';
 import type {
@@ -73,7 +74,6 @@ import {
   isParameterStrength,
   isParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
-import { get, isArray, isString } from 'lodash-es';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
 import {
   isControlLoRAModelConfig,

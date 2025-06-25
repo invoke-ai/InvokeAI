@@ -2,6 +2,7 @@ import { objectEquals } from '@observ33r/object-equals';
 import { logger } from 'app/logging/logger';
 import { deepClone } from 'common/util/deepClone';
 import { parseify } from 'common/util/serialize';
+import { reduce } from 'es-toolkit/compat';
 import type { Templates } from 'features/nodes/store/types';
 import { FieldParseError } from 'features/nodes/types/error';
 import {
@@ -18,7 +19,6 @@ import {
   isInvocationSchemaObject,
 } from 'features/nodes/types/openapi';
 import { t } from 'i18next';
-import { reduce } from 'lodash-es';
 import type { OpenAPIV3_1 } from 'openapi-types';
 import { serializeError } from 'serialize-error';
 import type { JsonObject } from 'type-fest';

@@ -3,6 +3,7 @@ import type { EdgeChange, NodeChange } from '@xyflow/react';
 import { logger } from 'app/logging/logger';
 import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
+import { uniqWith } from 'es-toolkit/compat';
 import {
   $copiedEdges,
   $copiedNodes,
@@ -17,7 +18,6 @@ import { findUnoccupiedPosition } from 'features/nodes/store/util/findUnoccupied
 import { validateConnection } from 'features/nodes/store/util/validateConnection';
 import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
 import { t } from 'i18next';
-import { uniqWith } from 'lodash-es';
 import { v4 as uuidv4 } from 'uuid';
 
 const log = logger('workflows');

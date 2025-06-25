@@ -1,8 +1,8 @@
 import { createAction } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { uniq } from 'es-toolkit/compat';
 import { selectListImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
-import { uniq } from 'lodash-es';
 import { imagesApi } from 'services/api/endpoints/images';
 
 export const galleryImageClicked = createAction<{

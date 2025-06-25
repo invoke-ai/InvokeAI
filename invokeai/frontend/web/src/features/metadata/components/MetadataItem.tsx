@@ -1,9 +1,9 @@
 import { typedMemo } from '@invoke-ai/ui-library';
+import { isSymbol } from 'es-toolkit/compat';
 import { MetadataItemView } from 'features/metadata/components/MetadataItemView';
 import { useMetadataItem } from 'features/metadata/hooks/useMetadataItem';
 import type { MetadataHandlers } from 'features/metadata/types';
 import { MetadataParseFailedToken } from 'features/metadata/util/parsers';
-import { isSymbol } from 'lodash-es';
 
 type MetadataItemProps<T> = {
   metadata: unknown;

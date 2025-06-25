@@ -1,5 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
+import { pick } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import type { CanvasState, ParamsState } from 'features/controlLayers/store/types';
@@ -8,7 +9,6 @@ import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { buildPresetModifiedPrompt } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
 import { selectStylePresetSlice } from 'features/stylePresets/store/stylePresetSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import { pick } from 'lodash-es';
 import { selectListStylePresetsRequestState } from 'services/api/endpoints/stylePresets';
 import type { Invocation, S } from 'services/api/types';
 import { assert } from 'tsafe';

@@ -1,9 +1,9 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Box, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { clamp } from 'es-toolkit/compat';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
-import { clamp } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';

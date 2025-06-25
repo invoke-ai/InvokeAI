@@ -1,6 +1,7 @@
 import { Flex, Select, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
+import { isNil, round } from 'es-toolkit/compat';
 import { FloatGeneratorArithmeticSequenceSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatGeneratorArithmeticSequenceSettings';
 import { FloatGeneratorLinearDistributionSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatGeneratorLinearDistributionSettings';
 import { FloatGeneratorParseStringSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatGeneratorParseStringSettings';
@@ -17,7 +18,6 @@ import {
   getFloatGeneratorDefaults,
   resolveFloatGeneratorField,
 } from 'features/nodes/types/field';
-import { isNil, round } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';

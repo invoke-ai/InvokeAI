@@ -12,6 +12,7 @@ import {
 import { NUMPY_RAND_MAX } from 'app/constants';
 import { useAppStore } from 'app/store/nanostores/store';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
+import { isNil } from 'es-toolkit/compat';
 import { useInputFieldIsInvalid } from 'features/nodes/hooks/useInputFieldIsInvalid';
 import { fieldIntegerCollectionValueChanged } from 'features/nodes/store/nodesSlice';
 import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
@@ -19,7 +20,6 @@ import type {
   IntegerFieldCollectionInputInstance,
   IntegerFieldCollectionInputTemplate,
 } from 'features/nodes/types/field';
-import { isNil } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

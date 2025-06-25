@@ -1,5 +1,6 @@
 import { deepClone } from 'common/util/deepClone';
 import { withResult, withResultAsync } from 'common/util/result';
+import { debounce } from 'es-toolkit/compat';
 import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterControlLayer';
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
@@ -13,7 +14,6 @@ import type { CanvasEntityType, CanvasImageState } from 'features/controlLayers/
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { toast } from 'features/toast/toast';
 import Konva from 'konva';
-import { debounce } from 'lodash-es';
 import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import { serializeError } from 'serialize-error';

@@ -1,12 +1,12 @@
 import * as dagre from '@dagrejs/dagre';
 import { logger } from 'app/logging/logger';
+import { forEach } from 'es-toolkit/compat';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { NODE_WIDTH } from 'features/nodes/types/constants';
 import type { FieldInputInstance } from 'features/nodes/types/field';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { getDefaultForm } from 'features/nodes/types/workflow';
 import { buildFieldInputInstance } from 'features/nodes/util/schema/buildFieldInputInstance';
-import { forEach } from 'lodash-es';
 import type { NonNullableGraph } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
 

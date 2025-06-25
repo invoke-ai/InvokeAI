@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react';
 import { getStore, useAppStore } from 'app/store/nanostores/store';
 import type { AppDispatch, AppGetState, RootState } from 'app/store/store';
+import { forEach, intersection, some } from 'es-toolkit/compat';
 import { entityDeleted } from 'features/controlLayers/store/canvasSlice';
 import {
   refImageImageChanged,
@@ -18,7 +19,6 @@ import { isImageFieldCollectionInputInstance, isImageFieldInputInstance } from '
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { selectUpscaleSlice, type UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectSystemShouldConfirmOnDelete } from 'features/system/store/systemSlice';
-import { forEach, intersection, some } from 'lodash-es';
 import { atom } from 'nanostores';
 import { useMemo } from 'react';
 import { imagesApi } from 'services/api/endpoints/images';

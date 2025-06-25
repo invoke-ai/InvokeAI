@@ -1,6 +1,6 @@
+import { omit, pick } from 'es-toolkit/compat';
 import { schema, templates } from 'features/nodes/store/util/testUtils';
 import { parseSchema } from 'features/nodes/util/schema/parseSchema';
-import { omit, pick } from 'lodash-es';
 import { describe, expect, it } from 'vitest';
 
 describe('parseSchema', () => {

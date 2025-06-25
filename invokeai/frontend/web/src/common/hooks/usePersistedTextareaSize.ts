@@ -1,7 +1,7 @@
 import { useAppStore } from 'app/store/nanostores/store';
+import { debounce } from 'es-toolkit/compat';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import { selectUiSlice, textAreaSizesStateChanged } from 'features/ui/store/uiSlice';
-import { debounce } from 'lodash-es';
 import { type RefObject, useCallback, useEffect, useMemo } from 'react';
 
 type Options = {

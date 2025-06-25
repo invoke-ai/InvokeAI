@@ -1,9 +1,9 @@
 import type { XYPosition } from '@xyflow/react';
+import { reduce } from 'es-toolkit/compat';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type { FieldInputInstance } from 'features/nodes/types/field';
 import type { InvocationNode, InvocationTemplate } from 'features/nodes/types/invocation';
 import { buildFieldInputInstance } from 'features/nodes/util/schema/buildFieldInputInstance';
-import { reduce } from 'lodash-es';
 import { v4 as uuidv4 } from 'uuid';
 
 export const buildInvocationNode = (position: XYPosition, template: InvocationTemplate): InvocationNode => {

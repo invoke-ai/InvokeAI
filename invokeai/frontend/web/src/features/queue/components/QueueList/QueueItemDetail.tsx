@@ -1,4 +1,5 @@
 import { Button, ButtonGroup, Flex, Heading, Spinner, Text } from '@invoke-ai/ui-library';
+import { get } from 'es-toolkit/compat';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
 import { useDestinationText } from 'features/queue/components/QueueList/useDestinationText';
 import { useOriginText } from 'features/queue/components/QueueList/useOriginText';
@@ -8,7 +9,6 @@ import { useDeleteQueueItem } from 'features/queue/hooks/useDeleteQueueItem';
 import { useRetryQueueItem } from 'features/queue/hooks/useRetryQueueItem';
 import { getSecondsFromTimestamps } from 'features/queue/util/getSecondsFromTimestamps';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { get } from 'lodash-es';
 import type { ReactNode } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

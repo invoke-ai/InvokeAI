@@ -1,7 +1,7 @@
 import { EMPTY_ARRAY } from 'app/store/constants';
 import type { AppDispatch } from 'app/store/store';
+import { isNil, random, trim } from 'es-toolkit/compat';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
-import { isNil, random, trim } from 'lodash-es';
 import MersenneTwister from 'mtwist';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { utilitiesApi } from 'services/api/endpoints/utilities';

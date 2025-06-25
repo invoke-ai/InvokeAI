@@ -8,6 +8,7 @@ import { $bulkDownloadId } from 'app/store/nanostores/bulkDownloadId';
 import { $queueId } from 'app/store/nanostores/queueId';
 import type { AppStore } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
+import { forEach, isNil, round } from 'es-toolkit/compat';
 import {
   $isInPublishFlow,
   $outputNodeId,
@@ -18,7 +19,6 @@ import { zNodeStatus } from 'features/nodes/types/invocation';
 import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { forEach, isNil, round } from 'lodash-es';
 import type { ApiTagDescription } from 'services/api';
 import { api, LIST_ALL_TAG, LIST_TAG } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';

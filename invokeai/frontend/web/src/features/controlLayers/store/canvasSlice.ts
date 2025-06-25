@@ -4,6 +4,7 @@ import type { PersistConfig } from 'app/store/store';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
+import { merge } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasReset } from 'features/controlLayers/store/actions';
 import { modelChanged } from 'features/controlLayers/store/paramsSlice';
@@ -35,7 +36,6 @@ import { ASPECT_RATIO_MAP } from 'features/parameters/components/Bbox/constants'
 import { API_BASE_MODELS } from 'features/parameters/types/constants';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
-import { merge } from 'lodash-es';
 import type { UndoableOptions } from 'redux-undo';
 import {
   type ControlLoRAModelConfig,

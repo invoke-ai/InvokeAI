@@ -1,6 +1,7 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { clamp } from 'es-toolkit/compat';
 import type { ParamsState, RgbaColor } from 'features/controlLayers/store/types';
 import { getInitialParamsState } from 'features/controlLayers/store/types';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
@@ -22,7 +23,6 @@ import type {
   ParameterT5EncoderModel,
   ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
-import { clamp } from 'lodash-es';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 

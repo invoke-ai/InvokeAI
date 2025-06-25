@@ -4,7 +4,7 @@ import type { LogNamespace } from 'app/logging/logger';
 import { zLogNamespace } from 'app/logging/logger';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { uniq } from 'lodash-es';
+import { uniq } from 'es-toolkit/compat';
 
 import type { Language, SystemState } from './types';
 

@@ -1,5 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { useClipboard } from 'common/hooks/useClipboard';
+import { startCase } from 'es-toolkit/compat';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterControlLayer';
 import type { CanvasEntityAdapterInpaintMask } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterInpaintMask';
@@ -7,7 +8,6 @@ import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konv
 import type { CanvasEntityAdapterRegionalGuidance } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRegionalGuidance';
 import { canvasToBlob } from 'features/controlLayers/konva/util';
 import { toast } from 'features/toast/toast';
-import { startCase } from 'lodash-es';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { serializeError } from 'serialize-error';

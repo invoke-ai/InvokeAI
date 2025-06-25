@@ -1,11 +1,11 @@
 import type { Property } from 'csstype';
+import { clamp } from 'es-toolkit/compat';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getKonvaNodeDebugAttrs, getPrefixedId, getRectUnion } from 'features/controlLayers/konva/util';
 import type { Coordinate, Dimensions, Rect, StageAttrs } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
-import { clamp } from 'lodash-es';
 import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 

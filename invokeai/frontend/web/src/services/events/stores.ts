@@ -1,5 +1,5 @@
+import { round } from 'es-toolkit/compat';
 import type { EphemeralProgressImage } from 'features/controlLayers/store/types';
-import { round } from 'lodash-es';
 import { atom, computed, map } from 'nanostores';
 import type { S } from 'services/api/types';
 import type { AppSocket } from 'services/events/types';

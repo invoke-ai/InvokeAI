@@ -1,6 +1,7 @@
 import { Mutex } from 'async-mutex';
 import { withResult, withResultAsync } from 'common/util/result';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
+import { clamp, debounce, get } from 'es-toolkit/compat';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
@@ -17,7 +18,6 @@ import type { Coordinate, LifecycleCallback, Rect, RectWithRotation } from 'feat
 import { toast } from 'features/toast/toast';
 import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
-import { clamp, debounce, get } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { serializeError } from 'serialize-error';
