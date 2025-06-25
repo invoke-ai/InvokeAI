@@ -13,14 +13,15 @@ const NEW_CANVAS_OPTIONS = { type: 'raster_layer', withInpaintMask: true } as co
 
 const dndTargetData = newCanvasFromImageDndTarget.getData(NEW_CANVAS_OPTIONS);
 
-export const LaunchpadEditImageButton = memo(() => {
+export const LaunchpadEditImageButton = memo((props: { extraAction?: () => void }) => {
   const { getState, dispatch } = useAppStore();
 
   const onUpload = useCallback(
     (imageDTO: ImageDTO) => {
       newCanvasFromImage({ imageDTO, getState, dispatch, ...NEW_CANVAS_OPTIONS });
+      props.extraAction?.();
     },
-    [dispatch, getState]
+    [dispatch, getState, props]
   );
   const uploadApi = useImageUploadButton({ allowMultiple: false, onUpload });
 

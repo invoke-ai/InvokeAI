@@ -13,7 +13,7 @@ import type { ImageDTO } from 'services/api/types';
 
 const dndTargetData = addGlobalReferenceImageDndTarget.getData();
 
-export const LaunchpadAddStyleReference = memo(() => {
+export const LaunchpadAddStyleReference = memo((props: { extraAction?: () => void }) => {
   const { dispatch, getState } = useAppStore();
 
   const uploadOptions = useMemo(
@@ -23,10 +23,11 @@ export const LaunchpadAddStyleReference = memo(() => {
           const config = getDefaultRefImageConfig(getState);
           config.image = imageDTOToImageWithDims(imageDTO);
           dispatch(refImageAdded({ overrides: { config } }));
+          props.extraAction?.();
         },
         allowMultiple: false,
       }) as const,
-    [dispatch, getState]
+    [dispatch, getState, props]
   );
 
   const uploadApi = useImageUploadButton(uploadOptions);

@@ -57,7 +57,7 @@ export const ParamNegativePrompt = memo(() => {
     <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
       <Box pos="relative" w="full">
         <Textarea
-          id="negativePrompt"
+          className="negative-prompt-textarea"
           name="negativePrompt"
           ref={textareaRef}
           value={prompt}

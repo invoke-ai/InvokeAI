@@ -247,7 +247,7 @@ export const initializeRootPanelLayout = (api: GridviewApi) => {
 };
 
 export const CanvasTabAutoLayout = memo(() => {
-  const ref = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const $rootPanelApi = useState(() => atom<GridviewApi | null>(null))[0];
   const onReady = useCallback<IGridviewReactProps['onReady']>(
     (event) => {
@@ -256,12 +256,12 @@ export const CanvasTabAutoLayout = memo(() => {
     },
     [$rootPanelApi]
   );
-  useResizeMainPanelOnFirstVisit($rootPanelApi, ref);
+  useResizeMainPanelOnFirstVisit($rootPanelApi, rootRef);
 
   return (
-    <AutoLayoutProvider $rootApi={$rootPanelApi}>
+    <AutoLayoutProvider $rootApi={$rootPanelApi} rootRef={rootRef}>
       <GridviewReact
-        ref={ref}
+        ref={rootRef}
         className="dockview-theme-invoke"
         components={rootPanelComponents}
         onReady={onReady}
