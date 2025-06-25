@@ -1,4 +1,4 @@
-import type { z } from 'zod';
+import type { z } from 'zod/v4';
 
 /**
  * Helper to create a type guard from a zod schema. The type guard will infer the schema's TS type.

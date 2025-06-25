@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 import { zClassification, zProgressImage } from './common';
 import { zFieldInputInstance, zFieldInputTemplate, zFieldOutputTemplate } from './field';
@@ -11,8 +11,8 @@ const zInvocationTemplate = z.object({
   title: z.string(),
   description: z.string(),
   tags: z.array(z.string().min(1)),
-  inputs: z.record(zFieldInputTemplate),
-  outputs: z.record(zFieldOutputTemplate),
+  inputs: z.record(z.string(), zFieldInputTemplate),
+  outputs: z.record(z.string(), zFieldOutputTemplate),
   outputType: z.string().min(1),
   version: zSemVer,
   useCache: z.boolean(),
@@ -30,7 +30,7 @@ export const zInvocationNodeData = z.object({
   label: z.string(),
   notes: z.string(),
   type: z.string().trim().min(1),
-  inputs: z.record(zFieldInputInstance),
+  inputs: z.record(z.string(), zFieldInputInstance),
   isOpen: z.boolean(),
   isIntermediate: z.boolean(),
   useCache: z.boolean(),

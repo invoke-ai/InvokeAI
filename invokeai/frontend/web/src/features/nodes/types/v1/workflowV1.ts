@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 // WorkflowV1 Schema
 
@@ -487,7 +487,7 @@ const zMetadataItemPolymorphicInputFieldValue = zInputFieldValueBase.extend({
   value: z.union([zMetadataItemField, z.array(zMetadataItemField)]).optional(),
 });
 
-const zMetadataField = z.record(z.any());
+const zMetadataField = z.record(z.string(), z.any());
 
 const zMetadataInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('MetadataField'),
@@ -607,8 +607,8 @@ const zInvocationNodeData = z.object({
   // no easy way to build this dynamically, and we don't want to anyways, because this will be used
   // to validate incoming workflows, and we want to allow community nodes.
   type: z.string().trim().min(1),
-  inputs: z.record(zInputFieldValue),
-  outputs: z.record(zOutputFieldValue),
+  inputs: z.record(z.string(), zInputFieldValue),
+  outputs: z.record(z.string(), zOutputFieldValue),
   label: z.string(),
   isOpen: z.boolean(),
   notes: z.string(),

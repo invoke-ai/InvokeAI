@@ -20,7 +20,7 @@ import { useTranslation } from 'react-i18next';
 import { uploadImages } from 'services/api/endpoints/images';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 import type { UploadImageArg } from 'services/api/types';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpg', 'image/jpeg', 'image/webp'];
 const ACCEPTED_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp'];
@@ -43,13 +43,13 @@ const zUploadFile = z
     (file) => {
       return ACCEPTED_IMAGE_TYPES.includes(file.type);
     },
-    (file) => ({ message: `File type ${file.type} is not supported` })
+    { message: `File type is not supported` }
   )
   .refine(
     (file) => {
       return ACCEPTED_FILE_EXTENSIONS.some((ext) => file.name.endsWith(ext));
     },
-    (file) => ({ message: `File extension .${file.name.split('.').at(-1)} is not supported` })
+    { message: `File extension is not supported` }
   );
 
 const sx = {
