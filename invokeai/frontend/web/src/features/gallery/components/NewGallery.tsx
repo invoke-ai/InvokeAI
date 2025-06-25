@@ -434,15 +434,15 @@ const selectGridTemplateColumns = createSelector(
 );
 
 // Grid components
-const ListComponent: GridComponents<GridContext>['List'] = forwardRef((props, ref) => {
+const ListComponent: GridComponents<GridContext>['List'] = forwardRef(({ context: _, ...rest }, ref) => {
   const gridTemplateColumns = useAppSelector(selectGridTemplateColumns);
 
-  return <Grid ref={ref} gridTemplateColumns={gridTemplateColumns} gap={1} {...props} />;
+  return <Grid ref={ref} gridTemplateColumns={gridTemplateColumns} gap={1} {...rest} />;
 });
 ListComponent.displayName = 'ListComponent';
 
-const ItemComponent: GridComponents<GridContext>['Item'] = forwardRef((props, ref) => (
-  <GridItem ref={ref} aspectRatio="1/1" {...props} />
+const ItemComponent: GridComponents<GridContext>['Item'] = forwardRef(({ context: _, ...rest }, ref) => (
+  <GridItem ref={ref} aspectRatio="1/1" {...rest} />
 ));
 ItemComponent.displayName = 'ItemComponent';
 
