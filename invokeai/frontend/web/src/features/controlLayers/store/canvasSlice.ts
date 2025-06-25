@@ -1359,8 +1359,8 @@ export const canvasSlice = createSlice({
           state.bbox.rect.width = 672;
           state.bbox.rect.height = 1568;
         } else if (id === '1:1') {
-          state.bbox.rect.width = 880;
-          state.bbox.rect.height = 880;
+          state.bbox.rect.width = 1024;
+          state.bbox.rect.height = 1024;
         }
         state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
         state.bbox.aspectRatio.isLocked = true;
