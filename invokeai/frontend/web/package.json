@@ -150,7 +150,7 @@
     "openapi-types": "^12.1.3",
     "openapi-typescript": "^7.6.1",
     "prettier": "^3.5.3",
-    "sonda": "^0.8.2",
+    "rollup-plugin-visualizer": "^5.14.0",
     "storybook": "^8.6.12",
     "tsafe": "^1.8.5",
     "type-fest": "^4.40.0",

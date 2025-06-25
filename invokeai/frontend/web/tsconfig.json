@@ -11,7 +11,7 @@
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "module": "ESNext",
-    "moduleResolution": "bundler",
+    "moduleResolution": "Node",
     // TODO: Disabled for IDE performance issues with our translation JSON
     // "resolveJsonModule": true,
     "noUncheckedIndexedAccess": true,

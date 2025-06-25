@@ -190,6 +190,3 @@ installer/update.bat
 installer/update.sh
 installer/InvokeAI-Installer/
 .aider*
-
-# sonda build stat visualizer
-.sonda/
