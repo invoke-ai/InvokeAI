@@ -65,6 +65,7 @@ const useImageDTOFromListQuery = (
           const imageDTO = data?.items?.[index - pageOffset] || null;
           if (imageDTO && imageDTO.image_name !== imageName) {
             log.warn(`Image at index ${index} does not match expected image name ${imageName}`);
+            return { imageDTO: null };
           }
           return { imageDTO };
         },
