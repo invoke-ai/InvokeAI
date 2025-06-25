@@ -33,6 +33,18 @@ module.exports = {
           'The Clipboard API is not available by default in Firefox. Use the `useClipboard` hook instead, which wraps clipboard access to prevent errors.',
       },
     ],
+    'no-restricted-imports': [
+      'error',
+      {
+        paths: [
+          {
+            name: 'lodash-es',
+            importNames: ['isEqual'],
+            message: 'Please use objectEquals from @observ33r/object-equals instead.',
+          },
+        ],
+      },
+    ],
   },
   overrides: [
     /**

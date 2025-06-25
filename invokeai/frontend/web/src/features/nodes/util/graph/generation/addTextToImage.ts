@@ -1,8 +1,8 @@
+import { objectEquals } from '@observ33r/object-equals';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { LatentToImageNodes } from 'features/nodes/util/graph/types';
-import { isEqual } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
 
 type AddTextToImageArg = {
@@ -18,7 +18,7 @@ export const addTextToImage = ({
   originalSize,
   scaledSize,
 }: AddTextToImageArg): Invocation<'img_resize' | 'l2i' | 'flux_vae_decode' | 'sd3_l2i' | 'cogview4_l2i'> => {
-  if (!isEqual(scaledSize, originalSize)) {
+  if (!objectEquals(scaledSize, originalSize)) {
     // We need to resize the output image back to the original size
     const resizeImageToOriginalSize = g.addNode({
       id: getPrefixedId('resize_image_to_original_size'),

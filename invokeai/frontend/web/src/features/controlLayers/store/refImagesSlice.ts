@@ -1,3 +1,4 @@
+import { objectEquals } from '@observ33r/object-equals';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
@@ -6,7 +7,7 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasMetadataRecalled } from 'features/controlLayers/store/canvasSlice';
 import type { FLUXReduxImageInfluence, RefImagesState } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import { clamp, isEqual } from 'lodash-es';
+import { clamp } from 'lodash-es';
 import type { ApiModelConfig, FLUXReduxModelConfig, ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import type { PartialDeep } from 'type-fest';
@@ -102,7 +103,7 @@ export const refImagesSlice = createSlice({
         return;
       }
 
-      if (isEqual(oldModel, entity.config.model)) {
+      if (objectEquals(oldModel, entity.config.model)) {
         // Nothing changed, so we don't need to do anything
         return;
       }

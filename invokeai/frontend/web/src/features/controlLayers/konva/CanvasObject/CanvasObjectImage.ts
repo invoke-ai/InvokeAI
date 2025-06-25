@@ -1,3 +1,4 @@
+import { objectEquals } from '@observ33r/object-equals';
 import { Mutex } from 'async-mutex';
 import { deepClone } from 'common/util/deepClone';
 import { withResultAsync } from 'common/util/result';
@@ -12,7 +13,6 @@ import { getKonvaNodeDebugAttrs, loadImage } from 'features/controlLayers/konva/
 import type { CanvasImageState } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
 import Konva from 'konva';
-import { isEqual } from 'lodash-es';
 import type { Logger } from 'roarr';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
 
@@ -198,7 +198,7 @@ export class CanvasObjectImage extends CanvasModuleBase {
       const { image } = state;
       const { width, height } = image;
 
-      if (force || (!isEqual(this.state, state) && !this.isLoading)) {
+      if (force || (!objectEquals(this.state, state) && !this.isLoading)) {
         const release = await this.mutex.acquire();
 
         try {

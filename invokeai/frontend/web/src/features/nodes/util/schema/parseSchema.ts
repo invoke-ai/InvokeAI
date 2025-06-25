@@ -1,3 +1,4 @@
+import { objectEquals } from '@observ33r/object-equals';
 import { logger } from 'app/logging/logger';
 import { deepClone } from 'common/util/deepClone';
 import { parseify } from 'common/util/serialize';
@@ -17,7 +18,7 @@ import {
   isInvocationSchemaObject,
 } from 'features/nodes/types/openapi';
 import { t } from 'i18next';
-import { isEqual, reduce } from 'lodash-es';
+import { reduce } from 'lodash-es';
 import type { OpenAPIV3_1 } from 'openapi-types';
 import { serializeError } from 'serialize-error';
 import type { JsonObject } from 'type-fest';
@@ -153,7 +154,7 @@ export const parseSchema = (
           return inputsAccumulator;
         }
 
-        if (isStatefulFieldType(fieldType) && originalFieldType && !isEqual(originalFieldType, fieldType)) {
+        if (isStatefulFieldType(fieldType) && originalFieldType && !objectEquals(originalFieldType, fieldType)) {
           fieldType.originalType = deepClone(originalFieldType);
         }
 
@@ -225,7 +226,7 @@ export const parseSchema = (
           return outputsAccumulator;
         }
 
-        if (isStatefulFieldType(fieldType) && originalFieldType && !isEqual(originalFieldType, fieldType)) {
+        if (isStatefulFieldType(fieldType) && originalFieldType && !objectEquals(originalFieldType, fieldType)) {
           fieldType.originalType = deepClone(originalFieldType);
         }
 

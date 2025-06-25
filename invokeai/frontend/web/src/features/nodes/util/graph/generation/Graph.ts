@@ -1,6 +1,7 @@
+import { objectEquals } from '@observ33r/object-equals';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { type ModelIdentifierField, zModelIdentifierField } from 'features/nodes/types/common';
-import { forEach, groupBy, isEqual, unset, values } from 'lodash-es';
+import { forEach, groupBy, unset, values } from 'lodash-es';
 import type {
   AnyInvocation,
   AnyInvocationIncMetadata,
@@ -169,7 +170,7 @@ export class Graph {
       source: { node_id: fromNode.id, field: fromField },
       destination: { node_id: toNode.id, field: toField },
     };
-    const edgeAlreadyExists = this._graph.edges.some((e) => isEqual(e, edge));
+    const edgeAlreadyExists = this._graph.edges.some((e) => objectEquals(e, edge));
     assert(!edgeAlreadyExists, `Edge ${Graph.edgeToString(edge)} already exists`);
     this._graph.edges.push(edge);
     return edge;
@@ -182,7 +183,7 @@ export class Graph {
    * @raises `AssertionError` if an edge with the same source and destination already exists.
    */
   addEdgeFromObj(edge: Edge): Edge {
-    const edgeAlreadyExists = this._graph.edges.some((e) => isEqual(e, edge));
+    const edgeAlreadyExists = this._graph.edges.some((e) => objectEquals(e, edge));
     assert(!edgeAlreadyExists, `Edge ${Graph.edgeToString(edge)} already exists`);
     this._graph.edges.push(edge);
     return edge;
@@ -275,11 +276,11 @@ export class Graph {
   }
 
   /**
-   * INTERNAL: Delete _all_ matching edges from the graph. Uses _.isEqual for comparison.
+   * INTERNAL: Delete _all_ matching edges from the graph. Uses _.objectEquals for comparison.
    * @param edge The edge to delete
    */
   private _deleteEdge(edge: Edge): void {
-    this._graph.edges = this._graph.edges.filter((e) => !isEqual(e, edge));
+    this._graph.edges = this._graph.edges.filter((e) => !objectEquals(e, edge));
   }
 
   /**
@@ -317,7 +318,7 @@ export class Graph {
       this.getNode(edge.source.node_id);
       this.getNode(edge.destination.node_id);
       assert(
-        !this._graph.edges.filter((e) => e !== edge).find((e) => isEqual(e, edge)),
+        !this._graph.edges.filter((e) => e !== edge).find((e) => objectEquals(e, edge)),
         `Duplicate edge: ${Graph.edgeToString(edge)}`
       );
     }
