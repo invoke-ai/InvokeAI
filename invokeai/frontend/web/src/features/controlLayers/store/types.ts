@@ -560,6 +560,8 @@ const zCanvasState = z.object({
 export type CanvasState = z.infer<typeof zCanvasState>;
 
 const zRefImagesState = z.object({
+  selectedEntityId: z.string().nullable().default(null),
+  isPanelOpen: z.boolean().default(false),
   entities: z.array(zRefImageState).default(() => []),
 });
 export type RefImagesState = z.infer<typeof zRefImagesState>;

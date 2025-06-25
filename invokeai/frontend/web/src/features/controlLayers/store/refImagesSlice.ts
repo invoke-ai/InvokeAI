@@ -39,6 +39,8 @@ export const refImagesSlice = createSlice({
         const entityState = getReferenceImageState(id, overrides);
 
         state.entities.push(entityState);
+        state.selectedEntityId = id;
+        state.isPanelOpen = true;
       },
       prepare: (payload?: { overrides?: PartialDeep<RefImageState> }) => ({
         payload: { ...payload, id: getPrefixedId('reference_image') },
@@ -187,6 +189,22 @@ export const refImagesSlice = createSlice({
     refImageDeleted: (state, action: PayloadActionWithId) => {
       const { id } = action.payload;
       state.entities = state.entities.filter((rg) => rg.id !== id);
+      if (state.selectedEntityId === id) {
+        state.selectedEntityId = null;
+      }
+    },
+    refImageSelected: (state, action: PayloadAction<{ id: string }>) => {
+      const { id } = action.payload;
+      const entity = selectRefImageEntity(state, id);
+      if (!entity) {
+        return;
+      }
+      if (state.isPanelOpen && state.selectedEntityId === id) {
+        state.isPanelOpen = false;
+      } else {
+        state.isPanelOpen = true;
+      }
+      state.selectedEntityId = id;
     },
     refImagesReset: () => getInitialRefImagesState(),
   },
@@ -199,6 +217,7 @@ export const refImagesSlice = createSlice({
 });
 
 export const {
+  refImageSelected,
   refImageAdded,
   refImageDeleted,
   refImageImageChanged,
@@ -219,17 +238,25 @@ export const refImagesPersistConfig: PersistConfig<RefImagesState> = {
   name: refImagesSlice.name,
   initialState: getInitialRefImagesState(),
   migrate,
-  persistDenylist: [],
+  persistDenylist: ['isPanelOpen'],
 };
 
 export const selectRefImagesSlice = (state: RootState) => state.refImages;
 
 export const selectReferenceImageEntities = createSelector(selectRefImagesSlice, (state) => state.entities);
+export const selectSelectedRefEntityId = createSelector(selectRefImagesSlice, (state) => state.selectedEntityId);
+export const selectIsRefImagePanelOpen = createSelector(selectRefImagesSlice, (state) => state.isPanelOpen);
 export const selectRefImageEntityIds = createMemoizedSelector(selectReferenceImageEntities, (entities) =>
   entities.map((e) => e.id)
 );
 export const selectRefImageEntity = (state: RefImagesState, id: string) =>
   state.entities.find((entity) => entity.id === id) ?? null;
+export const selectSelectedRefEntity = createSelector(selectRefImagesSlice, (state) => {
+  if (!state.selectedEntityId) {
+    return null;
+  }
+  return selectRefImageEntity(state, state.selectedEntityId);
+});
 
 export function selectRefImageEntityOrThrow(state: RefImagesState, id: string, caller: string): RefImageState {
   const entity = selectRefImageEntity(state, id);

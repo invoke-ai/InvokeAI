@@ -1,38 +1,46 @@
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, IconButton, Text } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { createSelector } from '@reduxjs/toolkit';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useRefImageEntity } from 'features/controlLayers/components/RefImage/useRefImageEntity';
 import { useRefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
-import { refImageDeleted } from 'features/controlLayers/store/refImagesSlice';
-import { memo, useCallback } from 'react';
+import { refImageDeleted, selectRefImageEntityIds } from 'features/controlLayers/store/refImagesSlice';
+import { memo, useCallback, useMemo } from 'react';
 import { PiTrashBold } from 'react-icons/pi';
 
+const textSx: SystemStyleObject = {
+  color: 'base.300',
+  '&[data-is-error="true"]': {
+    color: 'error.300',
+  },
+};
+
 export const RefImageHeader = memo(() => {
-  const id = useRefImageIdContext();
   const dispatch = useAppDispatch();
+  const id = useRefImageIdContext();
+  const selectRefImageNumber = useMemo(
+    () => createSelector(selectRefImageEntityIds, (ids) => ids.indexOf(id) + 1),
+    [id]
+  );
+  const refImageNumber = useAppSelector(selectRefImageNumber);
   const entity = useRefImageEntity(id);
   const deleteRefImage = useCallback(() => {
     dispatch(refImageDeleted({ id }));
   }, [dispatch, id]);
 
   return (
-    <Flex justifyContent="space-between" alignItems="center" w="full">
-      {entity.config.image !== null && (
-        <Text fontWeight="semibold" color="base.300">
-          Reference Image
-        </Text>
-      )}
-      {entity.config.image === null && (
-        <Text fontWeight="semibold" color="base.300">
-          No Reference Image Selected
-        </Text>
-      )}
+    <Flex justifyContent="space-between" alignItems="center" w="full" ps={2}>
+      <Text fontWeight="semibold" sx={textSx} data-is-error={!entity.config.image}>
+        Reference Image #{refImageNumber}
+      </Text>
       <IconButton
+        tooltip="Delete Reference Image"
         size="xs"
         variant="link"
         alignSelf="stretch"
-        icon={<PiTrashBold />}
+        aria-label="Delete ref image"
         onClick={deleteRefImage}
-        aria-label="Delete reference image"
+        icon={<PiTrashBold />}
         colorScheme="error"
       />
     </Flex>
