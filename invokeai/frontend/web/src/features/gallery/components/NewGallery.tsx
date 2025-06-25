@@ -529,7 +529,8 @@ const selectGridTemplateColumns = createSelector(
 
 // Grid components
 const ListComponent: GridComponents<GridContext>['List'] = forwardRef(({ context: _, ...rest }, ref) => {
-  const gridTemplateColumns = useAppSelector(selectGridTemplateColumns);
+  const _gridTemplateColumns = useAppSelector(selectGridTemplateColumns);
+  const [gridTemplateColumns] = useDebounce(_gridTemplateColumns, DEBOUNCE_DELAY);
 
   return <Grid ref={ref} gridTemplateColumns={gridTemplateColumns} gap={1} {...rest} />;
 });
