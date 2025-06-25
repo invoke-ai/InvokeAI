@@ -8,7 +8,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
 
-import { useGalleryImageNames } from './NewGallery';
+import { useGalleryImageNames } from './use-gallery-image-names';
 
 const NextPrevImageButtons = ({ inset = 8 }: { inset?: ChakraProps['insetInlineStart' | 'insetInlineEnd'] }) => {
   const { t } = useTranslation();

@@ -1,14 +1,13 @@
 import { Box, Flex, forwardRef, Grid, GridItem, Skeleton, Spinner, Text } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
-import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import type { selectListImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import {
   LIMIT,
   selectGalleryImageMinimumWidth,
   selectImageToCompare,
   selectLastSelectedImage,
-  selectListImageNamesQueryArgs,
 } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
@@ -24,12 +23,13 @@ import type {
   VirtuosoGridHandle,
 } from 'react-virtuoso';
 import { VirtuosoGrid } from 'react-virtuoso';
-import { useGetImageNamesQuery, useListImagesQuery } from 'services/api/endpoints/images';
+import { useListImagesQuery } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import { useDebounce } from 'use-debounce';
 
 import { GalleryImage } from './ImageGrid/GalleryImage';
 import { GallerySelectionCountTag } from './ImageGrid/GallerySelectionCountTag';
+import { useGalleryImageNames } from './use-gallery-image-names';
 
 const log = logger('gallery');
 
@@ -394,21 +394,6 @@ const useKeepSelectedImageInView = (
     }
     scrollIntoView(index, rootEl, virtuosoGridHandle, range);
   }, [imageName, imageNames, rangeRef, rootRef, virtuosoRef]);
-};
-
-const getImageNamesQueryOptions = {
-  selectFromResult: ({ data, isLoading, isFetching }) => ({
-    imageNames: data ?? EMPTY_ARRAY,
-    isLoading,
-    isFetching,
-  }),
-} satisfies Parameters<typeof useGetImageNamesQuery>[1];
-
-export const useGalleryImageNames = () => {
-  const _queryArgs = useAppSelector(selectListImageNamesQueryArgs);
-  const [queryArgs] = useDebounce(_queryArgs, DEBOUNCE_DELAY);
-  const { imageNames, isLoading, isFetching } = useGetImageNamesQuery(queryArgs, getImageNamesQueryOptions);
-  return { imageNames, isLoading, isFetching, queryArgs };
 };
 
 const useScrollableGallery = (rootRef: RefObject<HTMLDivElement>) => {
