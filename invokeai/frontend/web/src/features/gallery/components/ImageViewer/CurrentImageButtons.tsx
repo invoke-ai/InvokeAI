@@ -30,7 +30,6 @@ export const CurrentImageButtons = memo(() => {
   const ctx = useImageViewerContext();
   const hasProgressImage = useStore(ctx.$hasProgressImage);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
-
   const isDisabledOverride = hasProgressImage && shouldShowProgressInViewer;
 
   const imageName = useAppSelector(selectLastSelectedImage);
