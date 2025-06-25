@@ -74,6 +74,7 @@ dependencies = [
   "python-multipart",
   "requests",
   "semver~=3.0.1",
+  "omi-model-standards @ git+https://github.com/Open-Model-Initiative/OMI-Model-Standards.git@4ad235ceba6b42a97942834b7664379e4ec2d93c"
 ]
 
 [project.optional-dependencies]
