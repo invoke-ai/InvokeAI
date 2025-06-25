@@ -2,6 +2,7 @@ import { Flex, IconButton, ListItem, Text, UnorderedList } from '@invoke-ai/ui-l
 import { createSelector } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
+import { upperFirst } from 'es-toolkit/compat';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useEntityIsEnabled } from 'features/controlLayers/hooks/useEntityIsEnabled';
 import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
@@ -15,7 +16,6 @@ import {
   getRegionalGuidanceWarnings,
 } from 'features/controlLayers/store/validators';
 import type { TFunction } from 'i18next';
-import { upperFirst } from 'lodash-es';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiWarningBold } from 'react-icons/pi';

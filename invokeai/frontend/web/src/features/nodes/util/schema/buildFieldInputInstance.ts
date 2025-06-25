@@ -1,5 +1,5 @@
+import { get } from 'es-toolkit/compat';
 import type { FieldInputInstance, FieldInputTemplate, FieldValue, StatefulFieldType } from 'features/nodes/types/field';
-import { get } from 'lodash-es';
 
 const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = {
   EnumField: '',

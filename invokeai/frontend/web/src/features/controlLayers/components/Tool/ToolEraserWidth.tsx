@@ -13,13 +13,13 @@ import {
 } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { clamp } from 'es-toolkit/compat';
 import { useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
 import {
   selectCanvasSettingsSlice,
   settingsEraserWidthChanged,
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { clamp } from 'lodash-es';
 import type { KeyboardEvent } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { PiCaretDownBold } from 'react-icons/pi';

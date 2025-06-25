@@ -1,7 +1,7 @@
 import { Checkbox, CompositeNumberInput, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { isNil } from 'es-toolkit/compat';
 import { GeneratorTextareaWithFileUpload } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/GeneratorTextareaWithFileUpload';
 import type { StringGeneratorDynamicPromptsRandom } from 'features/nodes/types/field';
-import { isNil } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 

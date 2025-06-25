@@ -1,7 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, Text } from '@invoke-ai/ui-library';
+import { isNil, isString } from 'es-toolkit/compat';
 import type { DndTargetState } from 'features/dnd/types';
-import { isNil, isString } from 'lodash-es';
 import type { ReactNode } from 'react';
 import { memo } from 'react';
 

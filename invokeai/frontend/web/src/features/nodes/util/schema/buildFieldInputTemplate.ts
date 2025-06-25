@@ -1,3 +1,4 @@
+import { isNumber, startCase } from 'es-toolkit/compat';
 import { FieldParseError } from 'features/nodes/types/error';
 import type {
   BoardFieldInputTemplate,
@@ -61,7 +62,6 @@ import {
 import type { InvocationFieldSchema } from 'features/nodes/types/openapi';
 import { isSchemaObject } from 'features/nodes/types/openapi';
 import { t } from 'i18next';
-import { isNumber, startCase } from 'lodash-es';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FieldInputTemplateBuilder<T extends FieldInputTemplate = any> = // valid `any`!

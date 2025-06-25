@@ -1,4 +1,5 @@
 import { deepClone } from 'common/util/deepClone';
+import { merge } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type {
   CanvasControlLayerState,
@@ -17,7 +18,6 @@ import type {
   RgbColor,
   T2IAdapterConfig,
 } from 'features/controlLayers/store/types';
-import { merge } from 'lodash-es';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 import type { PartialDeep } from 'type-fest';

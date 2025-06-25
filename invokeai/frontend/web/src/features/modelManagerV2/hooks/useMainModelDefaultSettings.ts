@@ -1,7 +1,7 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import { isNil } from 'es-toolkit/compat';
 import { selectConfigSlice } from 'features/system/store/configSlice';
-import { isNil } from 'lodash-es';
 import { useMemo } from 'react';
 import type { MainModelConfig } from 'services/api/types';
 

@@ -1,5 +1,5 @@
+import { isNil } from 'es-toolkit/compat';
 import type { FieldInputTemplate, FieldOutputTemplate } from 'features/nodes/types/field';
-import { isNil } from 'lodash-es';
 
 export const getSortedFilteredFieldNames = (fields: FieldInputTemplate[] | FieldOutputTemplate[]): string[] => {
   const visibleFields = fields.filter((field) => !field.ui_hidden);

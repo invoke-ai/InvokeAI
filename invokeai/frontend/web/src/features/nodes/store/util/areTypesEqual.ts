@@ -1,6 +1,6 @@
 import { objectEquals } from '@observ33r/object-equals';
+import { omit } from 'es-toolkit/compat';
 import type { FieldType } from 'features/nodes/types/field';
-import { omit } from 'lodash-es';
 
 /**
  * Checks if two types are equal. If the field types have original types, those are also compared. Any match is

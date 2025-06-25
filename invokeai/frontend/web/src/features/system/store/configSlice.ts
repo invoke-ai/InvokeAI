@@ -2,9 +2,9 @@ import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { AppConfig, NumericalParameterConfig, PartialAppConfig } from 'app/types/invokeai';
+import { merge } from 'es-toolkit/compat';
 import type { TabName } from 'features/ui/store/uiTypes';
 import { ALL_TABS } from 'features/ui/store/uiTypes';
-import { merge } from 'lodash-es';
 
 const baseDimensionConfig: NumericalParameterConfig = {
   initial: 512, // determined by model selection, unused in practice

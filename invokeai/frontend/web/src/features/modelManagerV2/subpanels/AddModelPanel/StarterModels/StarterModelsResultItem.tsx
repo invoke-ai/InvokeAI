@@ -1,9 +1,9 @@
 import { Badge, Box, Flex, IconButton, Text } from '@invoke-ai/ui-library';
+import { negate } from 'es-toolkit/compat';
 import { flattenStarterModel, useBuildModelInstallArg } from 'features/modelManagerV2/hooks/useBuildModelsToInstall';
 import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
 import ModelBaseBadge from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
 import { toast } from 'features/toast/toast';
-import { negate } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';

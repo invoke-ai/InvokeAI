@@ -1,4 +1,4 @@
-import { some } from 'lodash-es';
+import { some } from 'es-toolkit/compat';
 import { useMemo } from 'react';
 
 import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';

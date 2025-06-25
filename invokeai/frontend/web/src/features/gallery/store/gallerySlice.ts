@@ -2,7 +2,7 @@ import { objectEquals } from '@observ33r/object-equals';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { uniq } from 'lodash-es';
+import { uniq } from 'es-toolkit/compat';
 import type { BoardRecordOrderBy } from 'services/api/types';
 
 import type { BoardId, ComparisonMode, GalleryState, GalleryView, OrderDir } from './types';

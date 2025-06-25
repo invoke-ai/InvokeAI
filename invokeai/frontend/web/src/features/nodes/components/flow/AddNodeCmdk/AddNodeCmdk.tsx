@@ -17,6 +17,7 @@ import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { CommandEmpty, CommandItem, CommandList, CommandRoot } from 'cmdk';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
+import { memoize } from 'es-toolkit/compat';
 import { useBuildNode } from 'features/nodes/hooks/useBuildNode';
 import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import {
@@ -38,7 +39,6 @@ import { isInvocationNode } from 'features/nodes/types/invocation';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { toast } from 'features/toast/toast';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import { memoize } from 'lodash-es';
 import { computed } from 'nanostores';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';

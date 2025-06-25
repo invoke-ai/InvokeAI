@@ -1,5 +1,5 @@
 import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
-import { random } from 'lodash-es';
+import { random } from 'es-toolkit/compat';
 
 type GenerateSeedsArg = {
   count: number;

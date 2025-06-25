@@ -1,8 +1,8 @@
+import { get } from 'es-toolkit/compat';
 import { img_resize, main_model_loader } from 'features/nodes/store/util/testUtils';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { getDefaultForm } from 'features/nodes/types/workflow';
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
-import { get } from 'lodash-es';
 import { describe, expect, it } from 'vitest';
 
 //TODO(psyche): Test workflow validation for form builder fields

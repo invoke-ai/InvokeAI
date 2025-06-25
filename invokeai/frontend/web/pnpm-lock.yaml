@@ -56,6 +56,9 @@ dependencies:
   dockview:
     specifier: ^4.3.1
     version: 4.3.1(react@18.3.1)
+  es-toolkit:
+    specifier: ^1.39.5
+    version: 1.39.5
   filesize:
     specifier: ^10.1.6
     version: 10.1.6
@@ -86,9 +89,6 @@ dependencies:
   linkifyjs:
     specifier: ^4.2.0
     version: 4.2.0
-  lodash-es:
-    specifier: ^4.17.21
-    version: 4.17.21
   lru-cache:
     specifier: ^11.1.0
     version: 11.1.0
@@ -232,9 +232,6 @@ devDependencies:
   '@storybook/theming':
     specifier: ^8.6.12
     version: 8.6.12(storybook@8.6.12)
-  '@types/lodash-es':
-    specifier: ^4.17.12
-    version: 4.17.12
   '@types/node':
     specifier: ^22.15.1
     version: 22.15.1
@@ -2805,7 +2802,7 @@ packages:
     peerDependencies:
       storybook: ^8.6.12
     dependencies:
-      es-toolkit: 1.36.0
+      es-toolkit: 1.39.5
       estraverse: 5.3.0
       prettier: 3.5.3
       storybook: 8.6.12(prettier@3.5.3)
@@ -3096,12 +3093,6 @@ packages:
     resolution: {integrity: sha512-dRLjCWHYg4oaA77cxO64oO+7JwCwnIzkZPdrrC71jQmQtlhM556pwKo5bUzqvZndkVbeFLIIi+9TC40JNF5hNQ==}
     dev: true
 
-  /@types/lodash-es@4.17.12:
-    resolution: {integrity: sha512-0NgftHUcV4v34VhXm8QBSftKVXtbkBG3ViCjs6+eJ5a6y6Mi/jiFGPc1sC7QK+9BFhWrURE3EOggmWaSxL9OzQ==}
-    dependencies:
-      '@types/lodash': 4.17.10
-    dev: true
-
   /@types/lodash.mergewith@4.6.7:
     resolution: {integrity: sha512-3m+lkO5CLRRYU0fhGRp7zbsGi6+BZj0uTVSwvcKU+nSlhjA9/QRNfuSGnD2mX6hQA7ZbmcCkzk5h4ZYGOtk14A==}
     dependencies:
@@ -3116,6 +3107,7 @@ packages:
 
   /@types/lodash@4.17.10:
     resolution: {integrity: sha512-YpS0zzoduEhuOWjAotS6A5AVCva7X4lVlYLF0FYHAY9sdraBfnatttHItlWeZdGhuEkf+OzMNg2ZYAx8t+52uQ==}
+    dev: false
 
   /@types/lodash@4.17.18:
     resolution: {integrity: sha512-KJ65INaxqxmU6EoCiJmRPZC9H9RVWCRd349tXM2M3O5NA7cY6YL7c0bHAHQ93NOfTObEQ004kd2QVHs/r0+m4g==}
@@ -4763,9 +4755,8 @@ packages:
       is-symbol: 1.0.4
     dev: true
 
-  /es-toolkit@1.36.0:
-    resolution: {integrity: sha512-5lpkRpDELuTSeAL//Rcg5urg+K/yOD1BobJSiNeCc89snMqgrhckmj8jdljqraDbpREiXTNW311RN518eVHBng==}
-    dev: true
+  /es-toolkit@1.39.5:
+    resolution: {integrity: sha512-z9V0qU4lx1TBXDNFWfAASWk6RNU6c6+TJBKE+FLIg8u0XJ6Yw58Hi0yX8ftEouj6p1QARRlXLFfHbIli93BdQQ==}
 
   /esbuild-register@3.6.0(esbuild@0.25.3):
     resolution: {integrity: sha512-H2/S7Pm8a9CL1uhp9OvjwrBh5Pvx0H8qVOxNu8Wed9Y7qv56MPtq+GGM8RJpq6glYJn9Wspr8uw7l55uyinNeg==}

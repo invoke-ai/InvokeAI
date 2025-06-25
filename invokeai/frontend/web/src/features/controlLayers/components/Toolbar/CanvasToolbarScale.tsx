@@ -14,9 +14,9 @@ import {
   PopoverTrigger,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { round } from 'es-toolkit/compat';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { snapToNearest } from 'features/controlLayers/konva/util';
-import { round } from 'lodash-es';
 import type { KeyboardEvent } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { PiCaretDownBold, PiMagnifyingGlassMinusBold, PiMagnifyingGlassPlusBold } from 'react-icons/pi';

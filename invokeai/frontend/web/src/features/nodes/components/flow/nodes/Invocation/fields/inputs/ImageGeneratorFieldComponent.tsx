@@ -1,6 +1,7 @@
 import { Flex, Select, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
+import { debounce } from 'es-toolkit/compat';
 import { ImageGeneratorImagesFromBoardSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ImageGeneratorImagesFromBoardSettings';
 import type { FieldComponentProps } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/types';
 import { fieldImageGeneratorValueChanged } from 'features/nodes/store/nodesSlice';
@@ -11,7 +12,6 @@ import {
   ImageGeneratorImagesFromBoardType,
   resolveImageGeneratorField,
 } from 'features/nodes/types/field';
-import { debounce } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';

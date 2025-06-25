@@ -1,5 +1,6 @@
 import { createAction } from '@reduxjs/toolkit';
 import { useAppStore } from 'app/store/nanostores/store';
+import { groupBy } from 'es-toolkit/compat';
 import {
   $outputNodeId,
   getPublishInputs,
@@ -11,7 +12,6 @@ import { isBatchNode, isInvocationNode } from 'features/nodes/types/invocation';
 import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
 import { resolveBatchValue } from 'features/nodes/util/node/resolveBatchValue';
 import { buildWorkflowWithValidation } from 'features/nodes/util/workflow/buildWorkflow';
-import { groupBy } from 'lodash-es';
 import { useCallback } from 'react';
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
 import type { Batch, EnqueueBatchArg } from 'services/api/types';
