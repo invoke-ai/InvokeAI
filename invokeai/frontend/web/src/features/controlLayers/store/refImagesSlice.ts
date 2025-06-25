@@ -6,7 +6,7 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasMetadataRecalled } from 'features/controlLayers/store/canvasSlice';
 import type { FLUXReduxImageInfluence, RefImagesState } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import { isEqual } from 'lodash-es';
+import { clamp, isEqual } from 'lodash-es';
 import type { ApiModelConfig, FLUXReduxModelConfig, ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import type { PartialDeep } from 'type-fest';
@@ -188,10 +188,11 @@ export const refImagesSlice = createSlice({
     },
     refImageDeleted: (state, action: PayloadActionWithId) => {
       const { id } = action.payload;
+      const currentIndex = state.entities.findIndex((rg) => rg.id === id);
       state.entities = state.entities.filter((rg) => rg.id !== id);
-      if (state.selectedEntityId === id) {
-        state.selectedEntityId = null;
-      }
+      const nextIndex = clamp(currentIndex, 0, state.entities.length - 1);
+      const nextEntity = state.entities[nextIndex];
+      state.selectedEntityId = nextEntity?.id ?? null;
     },
     refImageSelected: (state, action: PayloadAction<{ id: string }>) => {
       const { id } = action.payload;
@@ -238,7 +239,7 @@ export const refImagesPersistConfig: PersistConfig<RefImagesState> = {
   name: refImagesSlice.name,
   initialState: getInitialRefImagesState(),
   migrate,
-  persistDenylist: ['isPanelOpen'],
+  persistDenylist: ['selectedEntityId', 'isPanelOpen'],
 };
 
 export const selectRefImagesSlice = (state: RootState) => state.refImages;
