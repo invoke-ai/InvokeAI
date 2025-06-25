@@ -1,7 +1,7 @@
 import { Tag, TagCloseButton, TagLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useIsRegionFocused } from 'common/hooks/focus';
-import { useGalleryImageNames } from 'features/gallery/components/NewGallery';
+import { useGalleryImageNames } from 'features/gallery/components/use-gallery-image-names';
 import { selectFirstSelectedImage, selectSelectionCount } from 'features/gallery/store/gallerySelectors';
 import { selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';

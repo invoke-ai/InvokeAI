@@ -1,5 +1,5 @@
 import { IconButton, Input, InputGroup, InputRightElement, Spinner } from '@invoke-ai/ui-library';
-import { useGalleryImageNames } from 'features/gallery/components/NewGallery';
+import { useGalleryImageNames } from 'features/gallery/components/use-gallery-image-names';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
