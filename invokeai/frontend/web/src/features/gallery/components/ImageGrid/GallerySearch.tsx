@@ -1,10 +1,9 @@
 import { IconButton, Input, InputGroup, InputRightElement, Spinner } from '@invoke-ai/ui-library';
-import { useDebouncedImageCollectionQueryArgs } from 'features/gallery/components/NewGallery';
+import { useGalleryImageNames } from 'features/gallery/components/NewGallery';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
-import { useGetImageCollectionCountsQuery } from 'services/api/endpoints/images';
 
 type Props = {
   searchTerm: string;
@@ -14,8 +13,7 @@ type Props = {
 
 export const GallerySearch = memo(({ searchTerm, onChangeSearchTerm, onResetSearchTerm }: Props) => {
   const { t } = useTranslation();
-  const queryArgs = useDebouncedImageCollectionQueryArgs();
-  const { isFetching } = useGetImageCollectionCountsQuery(queryArgs);
+  const { isFetching } = useGalleryImageNames();
 
   const handleChangeInput = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {

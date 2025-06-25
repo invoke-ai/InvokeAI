@@ -4,6 +4,7 @@ import type { NodeProps } from '@xyflow/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { DndImage } from 'features/dnd/DndImage';
+import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
@@ -74,7 +75,7 @@ const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => {
           {props.children}
           {isHovering && (
             <motion.div key="nextPrevButtons" initial={initial} animate={animate} exit={exit} style={styles}>
-              {/* <NextPrevImageButtons inset={2} /> */}
+              <NextPrevImageButtons inset={2} />
             </motion.div>
           )}
         </Flex>

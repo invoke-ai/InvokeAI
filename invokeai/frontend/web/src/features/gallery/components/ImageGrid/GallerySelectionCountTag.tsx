@@ -1,7 +1,7 @@
 import { Tag, TagCloseButton, TagLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useIsRegionFocused } from 'common/hooks/focus';
-import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
+import { useGalleryImageNames } from 'features/gallery/components/NewGallery';
 import {
   selectFirstSelectedImage,
   selectSelection,
@@ -15,12 +15,12 @@ import { useTranslation } from 'react-i18next';
 export const GallerySelectionCountTag = memo(() => {
   const dispatch = useAppDispatch();
   const selection = useAppSelector(selectSelection);
-  const { imageDTOs } = useGalleryImages();
+  const { imageNames } = useGalleryImageNames();
   const isGalleryFocused = useIsRegionFocused('gallery');
 
   const onSelectPage = useCallback(() => {
-    dispatch(selectionChanged([...selection, ...imageDTOs.map(({ image_name }) => image_name)]));
-  }, [dispatch, selection, imageDTOs]);
+    dispatch(selectionChanged([...imageNames]));
+  }, [dispatch, imageNames]);
 
   useRegisteredHotkeys({
     id: 'selectAllOnPage',

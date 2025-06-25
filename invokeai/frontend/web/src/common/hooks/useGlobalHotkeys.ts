@@ -117,4 +117,20 @@ export const useGlobalHotkeys = () => {
     },
     dependencies: [dispatch, isModelManagerEnabled],
   });
+
+  // TODO: implement delete - needs to handle gallery focus, which has changed w/ dockview
+  // useRegisteredHotkeys({
+  //   id: 'deleteSelection',
+  //   category: 'gallery',
+  //   callback: () => {
+  //     if (!selection.length) {
+  //       return;
+  //     }
+  //     deleteImageModal.delete(selection);
+  //   },
+  //   options: {
+  //     enabled: (isGalleryFocused || isImageViewerFocused) && isDeleteEnabledByTab && !isWorkflowsFocused,
+  //   },
+  //   dependencies: [isWorkflowsFocused, isDeleteEnabledByTab, selection, isWorkflowsFocused],
+  // });
 };
