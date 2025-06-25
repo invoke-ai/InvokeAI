@@ -29,6 +29,7 @@ import type { ImageDTO } from 'services/api/types';
 import { useDebounce } from 'use-debounce';
 
 import { GalleryImage } from './ImageGrid/GalleryImage';
+import { GallerySelectionCountTag } from './ImageGrid/GallerySelectionCountTag';
 
 const log = logger('gallery');
 
@@ -494,7 +495,7 @@ export const NewGallery = memo(() => {
   }
 
   return (
-    <Box data-overlayscrollbars-initialize="" ref={rootRef} w="full" h="full">
+    <Box data-overlayscrollbars-initialize="" ref={rootRef} position="relative" w="full" h="full">
       <VirtuosoGrid<string, GridContext>
         ref={virtuosoRef}
         context={context}
@@ -508,6 +509,7 @@ export const NewGallery = memo(() => {
         scrollSeekConfiguration={scrollSeekConfiguration}
         rangeChanged={handleRangeChanged}
       />
+      <GallerySelectionCountTag />
     </Box>
   );
 });
