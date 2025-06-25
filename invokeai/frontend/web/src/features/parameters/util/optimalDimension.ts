@@ -21,6 +21,7 @@ export const getOptimalDimension = (base?: BaseModelType | null): number => {
     case 'imagen3':
     case 'imagen4':
     case 'chatgpt-4o':
+    case 'flux-kontext':
     default:
       return 1024;
   }
@@ -81,6 +82,7 @@ export const getGridSize = (base?: BaseModelType | null): number => {
     case 'sdxl':
     case 'imagen3':
     case 'chatgpt-4o':
+    case 'flux-kontext':
     default:
       return 8;
   }

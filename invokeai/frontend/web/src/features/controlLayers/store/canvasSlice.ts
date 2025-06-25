@@ -69,7 +69,13 @@ import type {
   IPMethodV2,
   T2IAdapterConfig,
 } from './types';
-import { getEntityIdentifier, isChatGPT4oAspectRatioID, isImagenAspectRatioID, isRenderableEntity } from './types';
+import {
+  getEntityIdentifier,
+  isChatGPT4oAspectRatioID,
+  isFluxKontextAspectRatioID,
+  isImagenAspectRatioID,
+  isRenderableEntity,
+} from './types';
 import {
   converters,
   getControlLayerState,
@@ -81,6 +87,7 @@ import {
   initialChatGPT4oReferenceImage,
   initialControlLoRA,
   initialControlNet,
+  initialFluxKontextReferenceImage,
   initialFLUXRedux,
   initialIPAdapter,
   initialT2IAdapter,
@@ -680,6 +687,16 @@ export const canvasSlice = createSlice({
         // Switching to chatgpt-4o ref image
         entity.ipAdapter = {
           ...initialChatGPT4oReferenceImage,
+          image: entity.ipAdapter.image,
+          model: entity.ipAdapter.model,
+        };
+        return;
+      }
+
+      if (entity.ipAdapter.model.base === 'flux-kontext') {
+        // Switching to flux-kontext
+        entity.ipAdapter = {
+          ...initialFluxKontextReferenceImage,
           image: entity.ipAdapter.image,
           model: entity.ipAdapter.model,
         };
@@ -1319,6 +1336,31 @@ export const canvasSlice = createSlice({
         } else if (id === '2:3') {
           state.bbox.rect.width = 1024;
           state.bbox.rect.height = 1536;
+        }
+        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
+        state.bbox.aspectRatio.isLocked = true;
+      } else if (state.bbox.modelBase === 'flux-kontext' && isFluxKontextAspectRatioID(id)) {
+        if (id === '3:4') {
+          state.bbox.rect.width = 880;
+          state.bbox.rect.height = 1184;
+        } else if (id === '4:3') {
+          state.bbox.rect.width = 1184;
+          state.bbox.rect.height = 880;
+        } else if (id === '9:16') {
+          state.bbox.rect.width = 752;
+          state.bbox.rect.height = 1392;
+        } else if (id === '16:9') {
+          state.bbox.rect.width = 1392;
+          state.bbox.rect.height = 752;
+        } else if (id === '21:9') {
+          state.bbox.rect.width = 1568;
+          state.bbox.rect.height = 672;
+        } else if (id === '9:21') {
+          state.bbox.rect.width = 672;
+          state.bbox.rect.height = 1568;
+        } else if (id === '1:1') {
+          state.bbox.rect.width = 880;
+          state.bbox.rect.height = 880;
         }
         state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
         state.bbox.aspectRatio.isLocked = true;

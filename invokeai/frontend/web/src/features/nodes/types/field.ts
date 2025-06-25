@@ -260,6 +260,10 @@ const zChatGPT4oModelFieldType = zFieldTypeBase.extend({
   name: z.literal('ChatGPT4oModelField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zFluxKontextModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('FluxKontextModelField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zSchedulerFieldType = zFieldTypeBase.extend({
   name: z.literal('SchedulerField'),
   originalType: zStatelessFieldType.optional(),
@@ -313,6 +317,7 @@ const zStatefulFieldType = z.union([
   zImagen3ModelFieldType,
   zImagen4ModelFieldType,
   zChatGPT4oModelFieldType,
+  zFluxKontextModelFieldType,
   zColorFieldType,
   zSchedulerFieldType,
   zFloatGeneratorFieldType,
@@ -354,6 +359,7 @@ const modelFieldTypeNames = [
   zImagen3ModelFieldType.shape.name.value,
   zImagen4ModelFieldType.shape.name.value,
   zChatGPT4oModelFieldType.shape.name.value,
+  zFluxKontextModelFieldType.shape.name.value,
   // Stateless model fields
   'UNetField',
   'VAEField',
@@ -1231,6 +1237,24 @@ export const isImagen4ModelFieldInputTemplate =
   buildTemplateTypeGuard<Imagen4ModelFieldInputTemplate>('Imagen4ModelField');
 // #endregion
 
+// #region FluxKontextModelField
+export const zFluxKontextModelFieldValue = zModelIdentifierField.optional();
+const zFluxKontextModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zFluxKontextModelFieldValue,
+});
+const zFluxKontextModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zFluxKontextModelFieldType,
+  originalType: zFieldType.optional(),
+  default: zFluxKontextModelFieldValue,
+});
+export type FluxKontextModelFieldValue = z.infer<typeof zFluxKontextModelFieldValue>;
+export type FluxKontextModelFieldInputInstance = z.infer<typeof zFluxKontextModelFieldInputInstance>;
+export type FluxKontextModelFieldInputTemplate = z.infer<typeof zFluxKontextModelFieldInputTemplate>;
+export const isFluxKontextModelFieldInputInstance = buildInstanceTypeGuard(zFluxKontextModelFieldInputInstance);
+export const isFluxKontextModelFieldInputTemplate =
+  buildTemplateTypeGuard<FluxKontextModelFieldInputTemplate>('FluxKontextModelField');
+// #endregion
+
 // #region ChatGPT4oModelField
 export const zChatGPT4oModelFieldValue = zModelIdentifierField.optional();
 const zChatGPT4oModelFieldInputInstance = zFieldInputInstanceBase.extend({
@@ -1882,6 +1906,7 @@ export const zStatefulFieldValue = z.union([
   zFluxReduxModelFieldValue,
   zImagen3ModelFieldValue,
   zImagen4ModelFieldValue,
+  zFluxKontextModelFieldValue,
   zChatGPT4oModelFieldValue,
   zColorFieldValue,
   zSchedulerFieldValue,
@@ -1976,6 +2001,7 @@ const zStatefulFieldInputTemplate = z.union([
   zImagen3ModelFieldInputTemplate,
   zImagen4ModelFieldInputTemplate,
   zChatGPT4oModelFieldInputTemplate,
+  zFluxKontextModelFieldInputTemplate,
   zColorFieldInputTemplate,
   zSchedulerFieldInputTemplate,
   zStatelessFieldInputTemplate,

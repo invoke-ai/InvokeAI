@@ -516,6 +516,17 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
   });
 
+  const enabledGlobalReferenceLayers = canvas.referenceImages.entities.filter(
+    (referenceImage) => referenceImage.isEnabled
+  );
+
+  // Flux Kontext only supports 1x Reference Image at a time.
+  const referenceImageCount = enabledGlobalReferenceLayers.length;
+
+  if (model?.base === 'flux-kontext' && referenceImageCount > 1) {
+    reasons.push({ content: i18n.t('parameters.invoke.fluxKontextMultipleReferenceImages') });
+  }
+
   canvas.referenceImages.entities
     .filter((entity) => entity.isEnabled)
     .forEach((entity, i) => {
