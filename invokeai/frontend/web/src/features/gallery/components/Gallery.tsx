@@ -111,9 +111,6 @@ export const GalleryPanel = memo(() => {
           </Box>
         </Collapse>
       </Tabs>
-
-      {/* <GalleryImageGrid />
-      <GalleryPagination /> */}
       <NewGallery />
     </Flex>
   );
