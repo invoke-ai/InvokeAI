@@ -48,9 +48,9 @@ def test_flux_aitoolkit_transformer_state_dict_is_in_invoke_format():
     model_keys = set(model.state_dict().keys())
 
     for converted_key_prefix in converted_key_prefixes:
-        assert any(model_key.startswith(converted_key_prefix) for model_key in model_keys), (
-            f"'{converted_key_prefix}' did not match any model keys."
-        )
+        assert any(
+            model_key.startswith(converted_key_prefix) for model_key in model_keys
+        ), f"'{converted_key_prefix}' did not match any model keys."
 
 
 def test_lora_model_from_flux_aitoolkit_state_dict():

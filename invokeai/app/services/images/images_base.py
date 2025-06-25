@@ -1,12 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Literal, Optional
+from typing import Callable, Optional
 
 from PIL.Image import Image as PILImageType
 
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
-    ImageCollectionCounts,
     ImageRecord,
     ImageRecordChanges,
     ResourceOrigin,
@@ -150,36 +149,9 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
-    def get_collection_counts(
-        self,
-        image_origin: Optional[ResourceOrigin] = None,
-        categories: Optional[list[ImageCategory]] = None,
-        is_intermediate: Optional[bool] = None,
-        board_id: Optional[str] = None,
-        search_term: Optional[str] = None,
-    ) -> ImageCollectionCounts:
-        """Gets counts for starred and unstarred image collections."""
-        pass
-
-    @abstractmethod
-    def get_collection_images(
-        self,
-        collection: Literal["starred", "unstarred"],
-        offset: int = 0,
-        limit: int = 10,
-        order_dir: SQLiteDirection = SQLiteDirection.Descending,
-        image_origin: Optional[ResourceOrigin] = None,
-        categories: Optional[list[ImageCategory]] = None,
-        is_intermediate: Optional[bool] = None,
-        board_id: Optional[str] = None,
-        search_term: Optional[str] = None,
-    ) -> OffsetPaginatedResults[ImageDTO]:
-        """Gets images from a specific collection (starred or unstarred)."""
-        pass
-
-    @abstractmethod
     def get_image_names(
         self,
+        starred_first: bool = True,
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,
@@ -187,5 +159,5 @@ class ImageServiceABC(ABC):
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
     ) -> list[str]:
-        """Gets ordered list of all image names (starred first, then unstarred)."""
+        """Gets ordered list of all image names."""
         pass

@@ -379,13 +379,13 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 bytes_ = path.read_bytes()
                 workflow_from_file = WorkflowValidator.validate_json(bytes_)
 
-                assert workflow_from_file.id.startswith("default_"), (
-                    f'Invalid default workflow ID (must start with "default_"): {workflow_from_file.id}'
-                )
+                assert workflow_from_file.id.startswith(
+                    "default_"
+                ), f'Invalid default workflow ID (must start with "default_"): {workflow_from_file.id}'
 
-                assert workflow_from_file.meta.category is WorkflowCategory.Default, (
-                    f"Invalid default workflow category: {workflow_from_file.meta.category}"
-                )
+                assert (
+                    workflow_from_file.meta.category is WorkflowCategory.Default
+                ), f"Invalid default workflow category: {workflow_from_file.meta.category}"
 
                 workflows_from_file.append(workflow_from_file)
 

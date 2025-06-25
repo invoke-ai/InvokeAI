@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Optional
 
 from PIL.Image import Image as PILImageType
 
@@ -10,7 +10,6 @@ from invokeai.app.services.image_files.image_files_common import (
 )
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
-    ImageCollectionCounts,
     ImageRecord,
     ImageRecordChanges,
     ImageRecordDeleteException,
@@ -311,73 +310,9 @@ class ImageService(ImageServiceABC):
             self.__invoker.services.logger.error("Problem getting intermediates count")
             raise e
 
-    def get_collection_counts(
-        self,
-        image_origin: Optional[ResourceOrigin] = None,
-        categories: Optional[list[ImageCategory]] = None,
-        is_intermediate: Optional[bool] = None,
-        board_id: Optional[str] = None,
-        search_term: Optional[str] = None,
-    ) -> ImageCollectionCounts:
-        try:
-            return self.__invoker.services.image_records.get_collection_counts(
-                image_origin=image_origin,
-                categories=categories,
-                is_intermediate=is_intermediate,
-                board_id=board_id,
-                search_term=search_term,
-            )
-        except Exception as e:
-            self.__invoker.services.logger.error("Problem getting collection counts")
-            raise e
-
-    def get_collection_images(
-        self,
-        collection: Literal["starred", "unstarred"],
-        offset: int = 0,
-        limit: int = 10,
-        order_dir: SQLiteDirection = SQLiteDirection.Descending,
-        image_origin: Optional[ResourceOrigin] = None,
-        categories: Optional[list[ImageCategory]] = None,
-        is_intermediate: Optional[bool] = None,
-        board_id: Optional[str] = None,
-        search_term: Optional[str] = None,
-    ) -> OffsetPaginatedResults[ImageDTO]:
-        try:
-            results = self.__invoker.services.image_records.get_collection_images(
-                collection=collection,
-                offset=offset,
-                limit=limit,
-                order_dir=order_dir,
-                image_origin=image_origin,
-                categories=categories,
-                is_intermediate=is_intermediate,
-                board_id=board_id,
-                search_term=search_term,
-            )
-
-            image_dtos = [
-                image_record_to_dto(
-                    image_record=r,
-                    image_url=self.__invoker.services.urls.get_image_url(r.image_name),
-                    thumbnail_url=self.__invoker.services.urls.get_image_url(r.image_name, True),
-                    board_id=self.__invoker.services.board_image_records.get_board_for_image(r.image_name),
-                )
-                for r in results.items
-            ]
-
-            return OffsetPaginatedResults[ImageDTO](
-                items=image_dtos,
-                offset=results.offset,
-                limit=results.limit,
-                total=results.total,
-            )
-        except Exception as e:
-            self.__invoker.services.logger.error("Problem getting collection images")
-            raise e
-
     def get_image_names(
         self,
+        starred_first: bool = True,
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,
@@ -387,6 +322,7 @@ class ImageService(ImageServiceABC):
     ) -> list[str]:
         try:
             return self.__invoker.services.image_records.get_image_names(
+                starred_first=starred_first,
                 order_dir=order_dir,
                 image_origin=image_origin,
                 categories=categories,

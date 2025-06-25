@@ -4,10 +4,11 @@ import { logger } from 'app/logging/logger';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import {
+  LIMIT,
   selectGalleryImageMinimumWidth,
   selectImageToCompare,
   selectLastSelectedImage,
-  selectListImagesQueryArgs,
+  selectListImageNamesQueryArgs,
 } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
@@ -37,31 +38,26 @@ const SCROLL_SEEK_VELOCITY_THRESHOLD = 4096;
 const DEBOUNCE_DELAY = 500;
 const SPINNER_OPACITY = 0.3;
 
-type ListImagesQueryArgs = ReturnType<typeof selectListImagesQueryArgs>;
+type ListImageNamesQueryArgs = ReturnType<typeof selectListImageNamesQueryArgs>;
 
 type GridContext = {
-  queryArgs: ListImagesQueryArgs;
+  queryArgs: ListImageNamesQueryArgs;
   imageNames: string[];
-};
-
-export const useDebouncedListImagesQueryArgs = () => {
-  const _galleryQueryArgs = useAppSelector(selectListImagesQueryArgs);
-  const [queryArgs] = useDebounce(_galleryQueryArgs, DEBOUNCE_DELAY);
-  return queryArgs;
 };
 
 // Hook to get an image DTO from cache or trigger loading
 const useImageDTOFromListQuery = (
   index: number,
   imageName: string,
-  queryArgs: ListImagesQueryArgs
+  queryArgs: ListImageNamesQueryArgs
 ): ImageDTO | null => {
   const { arg, options } = useMemo(() => {
-    const pageOffset = Math.floor(index / queryArgs.limit) * queryArgs.limit;
+    const pageOffset = Math.floor(index / LIMIT) * LIMIT;
     return {
       arg: {
         ...queryArgs,
         offset: pageOffset,
+        limit: LIMIT,
       } satisfies Parameters<typeof useListImagesQuery>[0],
       options: {
         selectFromResult: ({ data }) => {
@@ -82,7 +78,7 @@ const useImageDTOFromListQuery = (
 
 // Individual image component that gets its data from RTK Query cache
 const ImageAtPosition = memo(
-  ({ index, queryArgs, imageName }: { index: number; imageName: string; queryArgs: ListImagesQueryArgs }) => {
+  ({ index, queryArgs, imageName }: { index: number; imageName: string; queryArgs: ListImageNamesQueryArgs }) => {
     const imageDTO = useImageDTOFromListQuery(index, imageName, queryArgs);
 
     if (!imageDTO) {
@@ -408,7 +404,8 @@ const getImageNamesQueryOptions = {
 } satisfies Parameters<typeof useGetImageNamesQuery>[1];
 
 export const useGalleryImageNames = () => {
-  const queryArgs = useDebouncedListImagesQueryArgs();
+  const _queryArgs = useAppSelector(selectListImageNamesQueryArgs);
+  const [queryArgs] = useDebounce(_queryArgs, DEBOUNCE_DELAY);
   const { imageNames, isLoading, isFetching } = useGetImageNamesQuery(queryArgs, getImageNamesQueryOptions);
   return { imageNames, isLoading, isFetching, queryArgs };
 };

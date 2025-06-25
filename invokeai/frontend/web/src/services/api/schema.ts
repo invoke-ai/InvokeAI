@@ -752,7 +752,7 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/images/collections/counts": {
+    "/api/v1/images/names": {
         parameters: {
             query?: never;
             header?: never;
@@ -760,30 +760,10 @@ export type paths = {
             cookie?: never;
         };
         /**
-         * Get Image Collection Counts
-         * @description Gets counts for starred and unstarred image collections
+         * Get Image Names
+         * @description Gets ordered list of all image names (starred first, then unstarred)
          */
-        get: operations["get_image_collection_counts"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/images/collections/{collection}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Image Collection
-         * @description Gets images from a specific collection (starred or unstarred)
-         */
-        get: operations["get_image_collection"];
+        get: operations["get_image_names"];
         put?: never;
         post?: never;
         delete?: never;
@@ -9838,19 +9818,6 @@ export type components = {
              * @constant
              */
             type: "img_channel_offset";
-        };
-        /** ImageCollectionCounts */
-        ImageCollectionCounts: {
-            /**
-             * Starred Count
-             * @description The number of starred images in the collection.
-             */
-            starred_count: number;
-            /**
-             * Unstarred Count
-             * @description The number of unstarred images in the collection.
-             */
-            unstarred_count: number;
         };
         /**
          * Image Collection Primitive
@@ -23723,17 +23690,21 @@ export interface operations {
             };
         };
     };
-    get_image_collection_counts: {
+    get_image_names: {
         parameters: {
             query?: {
-                /** @description The origin of images to count. */
+                /** @description The origin of images to list. */
                 image_origin?: components["schemas"]["ResourceOrigin"] | null;
                 /** @description The categories of image to include. */
                 categories?: components["schemas"]["ImageCategory"][] | null;
-                /** @description Whether to include intermediate images. */
+                /** @description Whether to list intermediate images. */
                 is_intermediate?: boolean | null;
                 /** @description The board id to filter by. Use 'none' to find images without a board. */
                 board_id?: string | null;
+                /** @description The order of sort */
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                /** @description Whether to sort by starred images first */
+                starred_first?: boolean;
                 /** @description The term to search for */
                 search_term?: string | null;
             };
@@ -23749,56 +23720,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ImageCollectionCounts"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_image_collection: {
-        parameters: {
-            query?: {
-                /** @description The origin of images to list. */
-                image_origin?: components["schemas"]["ResourceOrigin"] | null;
-                /** @description The categories of image to include. */
-                categories?: components["schemas"]["ImageCategory"][] | null;
-                /** @description Whether to list intermediate images. */
-                is_intermediate?: boolean | null;
-                /** @description The board id to filter by. Use 'none' to find images without a board. */
-                board_id?: string | null;
-                /** @description The offset within the collection */
-                offset?: number;
-                /** @description The number of images to return */
-                limit?: number;
-                /** @description The order of sort */
-                order_dir?: components["schemas"]["SQLiteDirection"];
-                /** @description The term to search for */
-                search_term?: string | null;
-            };
-            header?: never;
-            path: {
-                /** @description The collection to retrieve from */
-                collection: "starred" | "unstarred";
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OffsetPaginatedResults_ImageDTO_"];
+                    "application/json": string[];
                 };
             };
             /** @description Validation Error */

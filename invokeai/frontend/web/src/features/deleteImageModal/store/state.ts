@@ -10,7 +10,6 @@ import {
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasState, RefImagesState } from 'features/controlLayers/store/types';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
-import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { fieldImageCollectionValueChanged, fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
@@ -81,14 +80,8 @@ const handleDeletions = async (image_names: string[], dispatch: AppDispatch, get
     await dispatch(imagesApi.endpoints.deleteImages.initiate({ image_names }, { track: false })).unwrap();
 
     if (intersection(state.gallery.selection, image_names).length > 0) {
-      // Some selected images were deleted, need to select the next image
-      const queryArgs = selectListImagesQueryArgs(state);
-      const { data } = imagesApi.endpoints.listImages.select(queryArgs)(state);
-      if (data) {
-        // When we delete multiple images, we clear the selection. Then, the the next time we load images, we will
-        // select the first one. This is handled below in the listener for `imagesApi.endpoints.listImages.matchFulfilled`.
-        dispatch(imageSelected(null));
-      }
+      // Some selected images were deleted, clear selection
+      dispatch(imageSelected(null));
     }
 
     // We need to reset the features where the image is in use - none of these work if their image(s) don't exist

@@ -1,7 +1,7 @@
 import io
 import json
 import traceback
-from typing import ClassVar, Literal, Optional
+from typing import ClassVar, Optional
 
 from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
@@ -14,7 +14,6 @@ from invokeai.app.api.extract_metadata_from_image import extract_metadata_from_i
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
-    ImageCollectionCounts,
     ImageRecordChanges,
     ResourceOrigin,
 )
@@ -565,67 +564,6 @@ async def get_bulk_download_item(
         raise HTTPException(status_code=404)
 
 
-@images_router.get(
-    "/collections/counts", operation_id="get_image_collection_counts", response_model=ImageCollectionCounts
-)
-async def get_image_collection_counts(
-    image_origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of images to count."),
-    categories: Optional[list[ImageCategory]] = Query(default=None, description="The categories of image to include."),
-    is_intermediate: Optional[bool] = Query(default=None, description="Whether to include intermediate images."),
-    board_id: Optional[str] = Query(
-        default=None,
-        description="The board id to filter by. Use 'none' to find images without a board.",
-    ),
-    search_term: Optional[str] = Query(default=None, description="The term to search for"),
-) -> ImageCollectionCounts:
-    """Gets counts for starred and unstarred image collections"""
-
-    try:
-        return ApiDependencies.invoker.services.images.get_collection_counts(
-            image_origin=image_origin,
-            categories=categories,
-            is_intermediate=is_intermediate,
-            board_id=board_id,
-            search_term=search_term,
-        )
-    except Exception:
-        raise HTTPException(status_code=500, detail="Failed to get collection counts")
-
-
-@images_router.get("/collections/{collection}", operation_id="get_image_collection")
-async def get_image_collection(
-    collection: Literal["starred", "unstarred"] = Path(..., description="The collection to retrieve from"),
-    image_origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of images to list."),
-    categories: Optional[list[ImageCategory]] = Query(default=None, description="The categories of image to include."),
-    is_intermediate: Optional[bool] = Query(default=None, description="Whether to list intermediate images."),
-    board_id: Optional[str] = Query(
-        default=None,
-        description="The board id to filter by. Use 'none' to find images without a board.",
-    ),
-    offset: int = Query(default=0, description="The offset within the collection"),
-    limit: int = Query(default=50, description="The number of images to return"),
-    order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
-    search_term: Optional[str] = Query(default=None, description="The term to search for"),
-) -> OffsetPaginatedResults[ImageDTO]:
-    """Gets images from a specific collection (starred or unstarred)"""
-
-    try:
-        image_dtos = ApiDependencies.invoker.services.images.get_collection_images(
-            collection=collection,
-            offset=offset,
-            limit=limit,
-            order_dir=order_dir,
-            image_origin=image_origin,
-            categories=categories,
-            is_intermediate=is_intermediate,
-            board_id=board_id,
-            search_term=search_term,
-        )
-        return image_dtos
-    except Exception:
-        raise HTTPException(status_code=500, detail="Failed to get collection images")
-
-
 @images_router.get("/names", operation_id="get_image_names")
 async def get_image_names(
     image_origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of images to list."),
@@ -636,12 +574,14 @@ async def get_image_names(
         description="The board id to filter by. Use 'none' to find images without a board.",
     ),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
+    starred_first: bool = Query(default=True, description="Whether to sort by starred images first"),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
 ) -> list[str]:
     """Gets ordered list of all image names (starred first, then unstarred)"""
 
     try:
         image_names = ApiDependencies.invoker.services.images.get_image_names(
+            starred_first=starred_first,
             order_dir=order_dir,
             image_origin=image_origin,
             categories=categories,

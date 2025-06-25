@@ -5,6 +5,7 @@ import { CanvasAlertsInvocationProgress } from 'features/controlLayers/component
 import { DndImage } from 'features/dnd/DndImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
+import { selectAutoSwitch } from 'features/gallery/store/gallerySelectors';
 import type { ProgressImage as ProgressImageType } from 'features/nodes/types/common';
 import { selectShouldShowImageDetails, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import type { AnimationProps } from 'framer-motion';
@@ -21,6 +22,7 @@ import { ProgressIndicator } from './ProgressIndicator2';
 export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | null }) => {
   const shouldShowImageDetails = useAppSelector(selectShouldShowImageDetails);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
+  const autoSwitch = useAppSelector(selectAutoSwitch);
 
   const socket = useStore($socket);
   const [progressEvent, setProgressEvent] = useState<S['InvocationProgressEvent'] | null>(null);
@@ -57,6 +59,29 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       socket.off('invocation_progress', onInvocationProgress);
     };
   }, [socket]);
+
+  useEffect(() => {
+    if (!socket) {
+      return;
+    }
+
+    if (autoSwitch) {
+      return;
+    }
+    // When auto-switch is enabled, we will get a load event as we switch to the new image. This in turn clears the progress image,
+    // creating the illusion of the progress image turning into the new image.
+    // But when auto-switch is disabled, we won't get that load event, so we need to clear the progress image manually.
+    const onQueueItemStatusChanged = () => {
+      setProgressEvent(null);
+      setProgressImage(null);
+    };
+
+    socket.on('queue_item_status_changed', onQueueItemStatusChanged);
+
+    return () => {
+      socket.off('queue_item_status_changed', onQueueItemStatusChanged);
+    };
+  }, [autoSwitch, socket]);
 
   const onLoadImage = useCallback(() => {
     if (!progressEvent || !imageDTO) {
