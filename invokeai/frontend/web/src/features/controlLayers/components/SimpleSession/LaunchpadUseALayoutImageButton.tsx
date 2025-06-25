@@ -14,14 +14,15 @@ const NEW_CANVAS_OPTIONS = { type: 'control_layer', withResize: true } as const;
 
 const dndTargetData = newCanvasFromImageDndTarget.getData(NEW_CANVAS_OPTIONS);
 
-export const LaunchpadUseALayoutImageButton = memo(() => {
+export const LaunchpadUseALayoutImageButton = memo((props: { extraAction?: () => void }) => {
   const { getState, dispatch } = useAppStore();
 
   const onUpload = useCallback(
     (imageDTO: ImageDTO) => {
       newCanvasFromImage({ imageDTO, getState, dispatch, ...NEW_CANVAS_OPTIONS });
+      props.extraAction?.();
     },
-    [dispatch, getState]
+    [dispatch, getState, props]
   );
   const uploadApi = useImageUploadButton({ allowMultiple: false, onUpload });
 

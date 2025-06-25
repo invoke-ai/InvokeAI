@@ -2,7 +2,7 @@ import type { DockviewApi, GridviewApi } from 'dockview';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import type { WritableAtom } from 'nanostores';
 import { atom } from 'nanostores';
-import type { PropsWithChildren } from 'react';
+import type { PropsWithChildren, RefObject } from 'react';
 import { createContext, memo, useCallback, useContext, useMemo, useState } from 'react';
 
 import { LEFT_PANEL_ID, LEFT_PANEL_MIN_SIZE_PX, RIGHT_PANEL_ID, RIGHT_PANEL_MIN_SIZE_PX } from './shared';
@@ -13,6 +13,7 @@ type AutoLayoutContextValue = {
   toggleBothPanels: () => void;
   resetPanels: () => void;
   focusPanel: (id: string) => void;
+  rootRef: RefObject<HTMLDivElement>;
   _$rootPanelApi: WritableAtom<GridviewApi | null>;
   _$leftPanelApi: WritableAtom<GridviewApi | null>;
   _$centerPanelApi: WritableAtom<DockviewApi | null>;
@@ -55,8 +56,10 @@ const activatePanel = (api: GridviewApi | DockviewApi, panelId: string) => {
   panel.api.setActive();
 };
 
-export const AutoLayoutProvider = (props: PropsWithChildren<{ $rootApi: WritableAtom<GridviewApi | null> }>) => {
-  const { $rootApi, children } = props;
+export const AutoLayoutProvider = (
+  props: PropsWithChildren<{ $rootApi: WritableAtom<GridviewApi | null>; rootRef: RefObject<HTMLDivElement> }>
+) => {
+  const { $rootApi, rootRef, children } = props;
   const $leftApi = useState(() => atom<GridviewApi | null>(null))[0];
   const $centerApi = useState(() => atom<DockviewApi | null>(null))[0];
   const $rightApi = useState(() => atom<GridviewApi | null>(null))[0];
@@ -128,6 +131,7 @@ export const AutoLayoutProvider = (props: PropsWithChildren<{ $rootApi: Writable
       toggleBothPanels,
       resetPanels,
       focusPanel,
+      rootRef,
       _$rootPanelApi: $rootApi,
       _$leftPanelApi: $leftApi,
       _$centerPanelApi: $centerApi,
@@ -140,6 +144,7 @@ export const AutoLayoutProvider = (props: PropsWithChildren<{ $rootApi: Writable
       $rootApi,
       focusPanel,
       resetPanels,
+      rootRef,
       toggleBothPanels,
       toggleLeftPanel,
       toggleRightPanel,

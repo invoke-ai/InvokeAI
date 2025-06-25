@@ -86,7 +86,7 @@ export const ParamPositivePrompt = memo(() => {
     <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
       <Box pos="relative">
         <Textarea
-          id="prompt"
+          className="positive-prompt-textarea"
           name="prompt"
           ref={textareaRef}
           value={prompt}

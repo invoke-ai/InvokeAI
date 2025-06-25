@@ -1,5 +1,7 @@
 import { Button, Flex, Grid, Heading, Text } from '@invoke-ai/ui-library';
-import { memo } from 'react';
+import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
+import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
+import { memo, useCallback } from 'react';
 
 import { InitialStateMainModelPicker } from './InitialStateMainModelPicker';
 import { LaunchpadAddStyleReference } from './LaunchpadAddStyleReference';
@@ -8,6 +10,10 @@ import { LaunchpadGenerateFromTextButton } from './LaunchpadGenerateFromTextButt
 import { LaunchpadUseALayoutImageButton } from './LaunchpadUseALayoutImageButton';
 
 export const CanvasLaunchpadPanel = memo(() => {
+  const ctx = useAutoLayoutContext();
+  const focusCanvas = useCallback(() => {
+    ctx.focusPanel(WORKSPACE_PANEL_ID);
+  }, [ctx]);
   return (
     <Flex flexDir="column" h="full" w="full" alignItems="center" gap={2}>
       <Flex flexDir="column" w="full" gap={4} px={14} maxW={768} pt="20vh">
@@ -24,10 +30,10 @@ export const CanvasLaunchpadPanel = memo(() => {
               </Text>
             </Flex>
           </Grid>
-          <LaunchpadGenerateFromTextButton />
-          <LaunchpadAddStyleReference />
-          <LaunchpadEditImageButton />
-          <LaunchpadUseALayoutImageButton />
+          <LaunchpadGenerateFromTextButton extraAction={focusCanvas} />
+          <LaunchpadAddStyleReference extraAction={focusCanvas} />
+          <LaunchpadEditImageButton extraAction={focusCanvas} />
+          <LaunchpadUseALayoutImageButton extraAction={focusCanvas} />
         </Flex>
       </Flex>
     </Flex>

@@ -38,7 +38,7 @@ export const ParamSDXLPositiveStylePrompt = memo(() => {
     <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
       <Box pos="relative">
         <Textarea
-          id="prompt"
+          className="positive-style-prompt-textarea"
           name="prompt"
           ref={textareaRef}
           value={prompt}
