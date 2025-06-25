@@ -5,8 +5,8 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   selectGalleryImageMinimumWidth,
-  selectImageCollectionQueryArgs,
   selectLastSelectedImage,
+  selectListImagesQueryArgs,
 } from 'features/gallery/store/gallerySelectors';
 import { selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useOverlayScrollbars } from 'overlayscrollbars-react';
@@ -22,7 +22,7 @@ import type {
 } from 'react-virtuoso';
 import { VirtuosoGrid } from 'react-virtuoso';
 import { useGetImageNamesQuery, useListImagesQuery } from 'services/api/endpoints/images';
-import type { ImageDTO, ListImagesArgs } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
 import { useDebounce } from 'use-debounce';
 
 import { GalleryImage } from './ImageGrid/GalleryImage';
@@ -30,32 +30,36 @@ import { GalleryImage } from './ImageGrid/GalleryImage';
 const log = logger('gallery');
 
 // Constants
-const PAGE_SIZE = 100;
 const VIEWPORT_BUFFER = 2048;
 const SCROLL_SEEK_VELOCITY_THRESHOLD = 4096;
 const DEBOUNCE_DELAY = 500;
 const SPINNER_OPACITY = 0.3;
 
+type ListImagesQueryArgs = ReturnType<typeof selectListImagesQueryArgs>;
+
 type GridContext = {
-  queryArgs: ListImagesArgs;
+  queryArgs: ListImagesQueryArgs;
   imageNames: string[];
 };
 
 export const useDebouncedImageCollectionQueryArgs = () => {
-  const _galleryQueryArgs = useAppSelector(selectImageCollectionQueryArgs);
+  const _galleryQueryArgs = useAppSelector(selectListImagesQueryArgs);
   const [queryArgs] = useDebounce(_galleryQueryArgs, DEBOUNCE_DELAY);
   return queryArgs;
 };
 
 // Hook to get an image DTO from cache or trigger loading
-const useImageDTOFromListQuery = (index: number, imageName: string, queryArgs: ListImagesArgs): ImageDTO | null => {
+const useImageDTOFromListQuery = (
+  index: number,
+  imageName: string,
+  queryArgs: ListImagesQueryArgs
+): ImageDTO | null => {
   const { arg, options } = useMemo(() => {
-    const pageOffset = Math.floor(index / PAGE_SIZE) * PAGE_SIZE;
+    const pageOffset = Math.floor(index / queryArgs.limit) * queryArgs.limit;
     return {
       arg: {
         ...queryArgs,
         offset: pageOffset,
-        limit: PAGE_SIZE,
       } satisfies Parameters<typeof useListImagesQuery>[0],
       options: {
         selectFromResult: ({ data }) => {
@@ -76,7 +80,7 @@ const useImageDTOFromListQuery = (index: number, imageName: string, queryArgs: L
 
 // Individual image component that gets its data from RTK Query cache
 const ImageAtPosition = memo(
-  ({ index, queryArgs, imageName }: { index: number; imageName: string; queryArgs: ListImagesArgs }) => {
+  ({ index, queryArgs, imageName }: { index: number; imageName: string; queryArgs: ListImagesQueryArgs }) => {
     const imageDTO = useImageDTOFromListQuery(index, imageName, queryArgs);
 
     if (!imageDTO) {
@@ -198,30 +202,27 @@ const scrollIntoView = (
   return;
 };
 
+const getImageIndex = (imageName: string | undefined, imageNames: string[]) => {
+  if (!imageName || imageNames.length === 0) {
+    return 0;
+  }
+  const index = imageNames.findIndex((n) => n === imageName);
+  return index >= 0 ? index : 0;
+};
+
 // Hook for keyboard navigation using physical DOM measurements
 const useKeyboardNavigation = (
   imageNames: string[],
   virtuosoRef: React.RefObject<VirtuosoGridHandle>,
-  rootRef: React.RefObject<HTMLDivElement>,
-  rangeRef: MutableRefObject<ListRange>
+  rootRef: React.RefObject<HTMLDivElement>
 ) => {
   const dispatch = useAppDispatch();
   const lastSelectedImage = useAppSelector(selectLastSelectedImage);
-
-  // Get current index of selected image
-  const currentIndex = useMemo(() => {
-    if (!lastSelectedImage || imageNames.length === 0) {
-      return 0;
-    }
-    const index = imageNames.findIndex((name) => name === lastSelectedImage);
-    return index >= 0 ? index : 0;
-  }, [lastSelectedImage, imageNames]);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       const rootEl = rootRef.current;
       const virtuosoGridHandle = virtuosoRef.current;
-      const range = rangeRef.current;
       if (!rootEl || !virtuosoGridHandle) {
         return;
       }
@@ -248,23 +249,24 @@ const useKeyboardNavigation = (
 
       event.preventDefault();
 
+      const currentIndex = getImageIndex(lastSelectedImage, imageNames);
       let newIndex = currentIndex;
 
       switch (event.key) {
         case 'ArrowLeft':
           if (currentIndex > 0) {
             newIndex = currentIndex - 1;
-          } else {
-            // Wrap to last image
-            newIndex = imageNames.length - 1;
+            // } else {
+            //   // Wrap to last image
+            //   newIndex = imageNames.length - 1;
           }
           break;
         case 'ArrowRight':
           if (currentIndex < imageNames.length - 1) {
             newIndex = currentIndex + 1;
-          } else {
-            // Wrap to first image
-            newIndex = 0;
+            // } else {
+            //   // Wrap to first image
+            //   newIndex = 0;
           }
           break;
         case 'ArrowUp':
@@ -289,11 +291,10 @@ const useKeyboardNavigation = (
         const newImageName = imageNames[newIndex];
         if (newImageName) {
           dispatch(selectionChanged([newImageName]));
-          scrollIntoView(newIndex, rootEl, virtuosoGridHandle, range);
         }
       }
     },
-    [rootRef, virtuosoRef, rangeRef, imageNames, currentIndex, dispatch]
+    [rootRef, virtuosoRef, imageNames, lastSelectedImage, dispatch]
   );
 
   useEffect(() => {
@@ -302,6 +303,30 @@ const useKeyboardNavigation = (
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [handleKeyDown]);
+};
+
+const useKeepSelectedImageInView = (
+  imageNames: string[],
+  virtuosoRef: React.RefObject<VirtuosoGridHandle>,
+  rootRef: React.RefObject<HTMLDivElement>,
+  rangeRef: MutableRefObject<ListRange>
+) => {
+  const imageName = useAppSelector(selectLastSelectedImage);
+
+  useEffect(() => {
+    const virtuosoGridHandle = virtuosoRef.current;
+    const rootEl = rootRef.current;
+    const range = rangeRef.current;
+
+    if (!virtuosoGridHandle || !rootEl || !imageNames || imageNames.length === 0) {
+      return;
+    }
+    const index = imageName ? imageNames.indexOf(imageName) : 0;
+    if (index === -1) {
+      return;
+    }
+    scrollIntoView(index, rootEl, virtuosoGridHandle, range);
+  }, [imageName, imageNames, rangeRef, rootRef, virtuosoRef]);
 };
 
 const getImageNamesQueryOptions = {
@@ -316,21 +341,15 @@ export const NewGallery = memo(() => {
   const queryArgs = useDebouncedImageCollectionQueryArgs();
   const virtuosoRef = useRef<VirtuosoGridHandle>(null);
   const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
+  const rootRef = useRef<HTMLDivElement>(null);
 
   // Get the ordered list of image names - this is our primary data source for virtualization
   const { imageNames, isLoading } = useGetImageNamesQuery(queryArgs, getImageNamesQueryOptions);
 
-  // Reset scroll position when query parameters change
-  useEffect(() => {
-    if (virtuosoRef.current && imageNames.length > 0) {
-      virtuosoRef.current.scrollToIndex({ index: 0, behavior: 'auto' });
-    }
-  }, [queryArgs, imageNames.length]);
-
-  const rootRef = useRef<HTMLDivElement>(null);
+  useKeepSelectedImageInView(imageNames, virtuosoRef, rootRef, rangeRef);
 
   // Enable keyboard navigation
-  useKeyboardNavigation(imageNames, virtuosoRef, rootRef, rangeRef);
+  useKeyboardNavigation(imageNames, virtuosoRef, rootRef);
 
   const [scroller, setScroller] = useState<HTMLElement | null>(null);
   const [initialize, osInstance] = useOverlayScrollbars({

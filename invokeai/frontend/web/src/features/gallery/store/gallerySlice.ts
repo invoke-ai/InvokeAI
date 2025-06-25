@@ -16,8 +16,6 @@ const initialGalleryState: GalleryState = {
   selectedBoardId: 'none',
   galleryView: 'images',
   boardSearchText: '',
-  limit: 20,
-  offset: 0,
   starredFirst: true,
   orderDir: 'DESC',
   searchTerm: '',
@@ -114,7 +112,6 @@ export const gallerySlice = createSlice({
     boardIdSelected: (state, action: PayloadAction<{ boardId: BoardId; selectedImageName?: string }>) => {
       state.selectedBoardId = action.payload.boardId;
       state.galleryView = 'images';
-      state.offset = 0;
     },
     autoAddBoardIdChanged: (state, action: PayloadAction<BoardId>) => {
       if (!action.payload) {
@@ -125,7 +122,6 @@ export const gallerySlice = createSlice({
     },
     galleryViewChanged: (state, action: PayloadAction<GalleryView>) => {
       state.galleryView = action.payload;
-      state.offset = 0;
     },
     boardSearchTextChanged: (state, action: PayloadAction<string>) => {
       state.boardSearchText = action.payload;
@@ -143,13 +139,6 @@ export const gallerySlice = createSlice({
     comparisonFitChanged: (state, action: PayloadAction<'contain' | 'fill'>) => {
       state.comparisonFit = action.payload;
     },
-    offsetChanged: (state, action: PayloadAction<{ offset: number; withHotkey?: 'arrow' | 'alt+arrow' }>) => {
-      const { offset } = action.payload;
-      state.offset = offset;
-    },
-    limitChanged: (state, action: PayloadAction<number>) => {
-      state.limit = action.payload;
-    },
     shouldShowArchivedBoardsChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldShowArchivedBoards = action.payload;
     },
@@ -161,7 +150,6 @@ export const gallerySlice = createSlice({
     },
     searchTermChanged: (state, action: PayloadAction<string>) => {
       state.searchTerm = action.payload;
-      state.offset = 0;
     },
     boardsListOrderByChanged: (state, action: PayloadAction<BoardRecordOrderBy>) => {
       state.boardsListOrderBy = action.payload;
@@ -188,8 +176,6 @@ export const {
   comparedImagesSwapped,
   comparisonFitChanged,
   comparisonModeCycled,
-  offsetChanged,
-  limitChanged,
   orderDirChanged,
   starredFirstChanged,
   shouldShowArchivedBoardsChanged,
@@ -212,5 +198,5 @@ export const galleryPersistConfig: PersistConfig<GalleryState> = {
   name: gallerySlice.name,
   initialState: initialGalleryState,
   migrate: migrateGalleryState,
-  persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'offset', 'limit', 'imageToCompare'],
+  persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'imageToCompare'],
 };

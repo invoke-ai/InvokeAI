@@ -1,17 +1,24 @@
 import { logger } from 'app/logging/logger';
+import { addAppListener } from 'app/store/middleware/listenerMiddleware';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
-import { boardIdSelected, galleryViewChanged, imageSelected, offsetChanged } from 'features/gallery/store/gallerySlice';
+import {
+  selectAutoSwitch,
+  selectGalleryView,
+  selectListImagesQueryArgs,
+  selectSelectedBoardId,
+} from 'features/gallery/store/gallerySelectors';
+import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { isImageField, isImageFieldCollection } from 'features/nodes/types/common';
 import { zNodeStatus } from 'features/nodes/types/invocation';
-import { isCanvasOutputEvent } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { ApiTagDescription } from 'services/api';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO, S } from 'services/api/types';
-import { getCategories, getListImagesUrl } from 'services/api/util';
+import { getCategories } from 'services/api/util';
 import { $lastProgressEvent } from 'services/events/stores';
+import stableHash from 'stable-hash';
 import type { Param0 } from 'tsafe';
 import { objectEntries } from 'tsafe';
 import type { JsonObject } from 'type-fest';
@@ -37,22 +44,25 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
     const boardTotalAdditions: Record<string, number> = {};
     const boardTagIdsToInvalidate: Set<string> = new Set();
     const imageListTagIdsToInvalidate: Set<string> = new Set();
+    const listImagesArg = selectListImagesQueryArgs(getState());
 
     for (const imageDTO of imageDTOs) {
       if (imageDTO.is_intermediate) {
         return;
       }
 
-      const boardId = imageDTO.board_id ?? 'none';
+      const board_id = imageDTO.board_id ?? 'none';
       // update the total images for the board
-      boardTotalAdditions[boardId] = (boardTotalAdditions[boardId] || 0) + 1;
+      boardTotalAdditions[board_id] = (boardTotalAdditions[board_id] || 0) + 1;
       // invalidate the board tag
-      boardTagIdsToInvalidate.add(boardId);
+      boardTagIdsToInvalidate.add(board_id);
       // invalidate the image list tag
       imageListTagIdsToInvalidate.add(
-        getListImagesUrl({
-          board_id: boardId,
+        stableHash({
+          ...listImagesArg,
           categories: getCategories(imageDTO),
+          board_id,
+          offset: 0,
         })
       );
     }
@@ -86,48 +96,79 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
     }));
     dispatch(imagesApi.util.invalidateTags([...boardTags, ...imageListTags]));
 
-    // Finally, we may need to autoswitch to the new image. We'll only do it for the last image in the list.
+    const autoSwitch = selectAutoSwitch(getState());
 
+    if (!autoSwitch) {
+      return;
+    }
+
+    // Finally, we may need to autoswitch to the new image. We'll only do it for the last image in the list.
     const lastImageDTO = imageDTOs.at(-1);
 
     if (!lastImageDTO) {
       return;
     }
 
-    const { image_name, board_id } = lastImageDTO;
+    const { image_name } = lastImageDTO;
+    const board_id = lastImageDTO.board_id ?? 'none';
 
-    const { shouldAutoSwitch, selectedBoardId, galleryView, offset } = getState().gallery;
+    /**
+     * Auto-switch needs a bit of care to avoid race conditions - we need to invalidate the appropriate image list
+     * query cache, and only after it has loaded, select the new image.
+     */
+    const queryArgs = {
+      ...listImagesArg,
+      categories: getCategories(lastImageDTO),
+      board_id,
+      offset: 0,
+    };
 
-    // If auto-switch is enabled, select the new image
-    if (shouldAutoSwitch) {
-      // If the image is from a different board, switch to that board - this will also select the image
-      if (board_id && board_id !== selectedBoardId) {
-        dispatch(
-          boardIdSelected({
-            boardId: board_id,
-            selectedImageName: image_name,
-          })
-        );
-      } else if (!board_id && selectedBoardId !== 'none') {
-        dispatch(
-          boardIdSelected({
-            boardId: 'none',
-            selectedImageName: image_name,
-          })
-        );
-      } else {
-        // Else just select the image, no need to switch boards
-        dispatch(imageSelected(lastImageDTO.image_name));
+    dispatch(
+      addAppListener({
+        predicate: (action) => {
+          if (!imagesApi.endpoints.listImages.matchFulfilled(action)) {
+            return false;
+          }
 
-        if (galleryView !== 'images') {
-          // We also need to update the gallery view to images. This also updates the offset.
-          dispatch(galleryViewChanged('images'));
-        } else if (offset > 0) {
-          // If we are not at the start of the gallery, reset the offset.
-          dispatch(offsetChanged({ offset: 0 }));
-        }
-      }
-    }
+          if (stableHash(action.meta.arg.originalArgs) !== stableHash(queryArgs)) {
+            return false;
+          }
+
+          return true;
+        },
+        effect: (_action, { getState, dispatch, unsubscribe }) => {
+          // This is a one-time listener - we always unsubscribe after the first match
+          unsubscribe();
+
+          // Auto-switch may have been disabled while we were waiting for the query to resolve - bail if so
+          const autoSwitch = selectAutoSwitch(getState());
+          if (!autoSwitch) {
+            return;
+          }
+
+          const selectedBoardId = selectSelectedBoardId(getState());
+
+          // If the image is from a different board, switch to that board & select the image - otherwise just select the
+          // image. This implicitly changes the view to 'images' if it was not already.
+          if (board_id !== selectedBoardId) {
+            dispatch(
+              boardIdSelected({
+                boardId: board_id,
+                selectedImageName: image_name,
+              })
+            );
+          } else {
+            // Ensure we are on the 'images' gallery view - that's where this image will be displayed
+            const galleryView = selectGalleryView(getState());
+            if (galleryView !== 'images') {
+              dispatch(galleryViewChanged('images'));
+            }
+            // Else just select the image, no need to switch boards
+            dispatch(imageSelected(lastImageDTO.image_name));
+          }
+        },
+      })
+    );
   };
 
   const getResultImageDTOs = async (data: S['InvocationCompleteEvent']): Promise<ImageDTO[]> => {
@@ -151,68 +192,22 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
     return imageDTOs;
   };
 
-  const handleOriginWorkflows = async (data: S['InvocationCompleteEvent']) => {
-    const { result, invocation_source_id } = data;
-
-    const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
-    if (nes) {
-      nes.status = zNodeStatus.enum.COMPLETED;
-      if (nes.progress !== null) {
-        nes.progress = 1;
-      }
-      nes.outputs.push(result);
-      upsertExecutionState(nes.nodeId, nes);
-    }
-
-    await addImagesToGallery(data);
-  };
-
-  const handleOriginCanvas = async (data: S['InvocationCompleteEvent']) => {
-    if (!isCanvasOutputEvent(data)) {
-      return;
-    }
-
-    await addImagesToGallery(data);
-
-    // // We expect only a single image in the canvas output
-    // const imageDTO = (await getResultImageDTOs(data))[0];
-
-    // if (!imageDTO) {
-    //   return;
-    // }
-
-    // flushSync(() => {
-    //   dispatch(
-    //     stagingAreaImageStaged({
-    //       stagingAreaImage: { type: 'staged', sessionId: data.session_id, imageDTO, offsetX: 0, offsetY: 0 },
-    //     })
-    //   );
-    // });
-
-    // const progressData = $progressImages.get()[data.session_id];
-    // if (progressData) {
-    //   $progressImages.setKey(data.session_id, { ...progressData, isFinished: true, resultImage: imageDTO });
-    // } else {
-    //   $progressImages.setKey(data.session_id, { sessionId: data.session_id, isFinished: true, resultImage: imageDTO });
-    // }
-
-    // $lastCanvasProgressImage.set(null);
-  };
-
-  const handleOriginOther = async (data: S['InvocationCompleteEvent']) => {
-    await addImagesToGallery(data);
-  };
-
   return async (data: S['InvocationCompleteEvent']) => {
     log.debug({ data } as JsonObject, `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`);
 
-    if (data.origin === 'workflows') {
-      await handleOriginWorkflows(data);
-    } else if (data.origin === 'canvas') {
-      await handleOriginCanvas(data);
-    } else {
-      await handleOriginOther(data);
+    const nodeExecutionState = $nodeExecutionStates.get()[data.invocation_source_id];
+
+    if (nodeExecutionState) {
+      const _nodeExecutionState = deepClone(nodeExecutionState);
+      _nodeExecutionState.status = zNodeStatus.enum.COMPLETED;
+      if (_nodeExecutionState.progress !== null) {
+        _nodeExecutionState.progress = 1;
+      }
+      _nodeExecutionState.outputs.push(data.result);
+      upsertExecutionState(_nodeExecutionState.nodeId, _nodeExecutionState);
     }
+
+    await addImagesToGallery(data);
 
     $lastProgressEvent.set(null);
   };
