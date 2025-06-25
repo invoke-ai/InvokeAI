@@ -1,7 +1,8 @@
+import { objectEquals } from '@observ33r/object-equals';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { isEqual, uniq } from 'lodash-es';
+import { uniq } from 'lodash-es';
 import type { BoardRecordOrderBy } from 'services/api/types';
 
 import type { BoardId, ComparisonMode, GalleryState, GalleryView, OrderDir } from './types';
@@ -53,7 +54,7 @@ export const gallerySlice = createSlice({
       }
 
       // If the selected image is different from the current selection, clear the selection and select the new image
-      if (!isEqual(state.selection[0], selectedImageName)) {
+      if (state.selection[0] !== selectedImageName) {
         state.selection = [selectedImageName];
         return;
       }
@@ -74,7 +75,7 @@ export const gallerySlice = createSlice({
       }
 
       // If the new selection is different, update the selection
-      if (!isEqual(newSelection, state.selection)) {
+      if (!objectEquals(newSelection, state.selection)) {
         state.selection = newSelection;
         return;
       }

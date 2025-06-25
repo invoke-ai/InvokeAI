@@ -1,3 +1,4 @@
+import { objectEquals } from '@observ33r/object-equals';
 import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
@@ -13,7 +14,6 @@ import type {
   MainModelLoaderNodes,
   VaeSourceNodes,
 } from 'features/nodes/util/graph/types';
-import { isEqual } from 'lodash-es';
 import type { ImageDTO, Invocation } from 'services/api/types';
 
 type AddInpaintArg = {
@@ -93,7 +93,7 @@ export const addInpaint = async ({
     }
   );
 
-  const needsScaleBeforeProcessing = !isEqual(scaledSize, originalSize);
+  const needsScaleBeforeProcessing = !objectEquals(scaledSize, originalSize);
 
   if (needsScaleBeforeProcessing) {
     // Scale before processing requires some resizing

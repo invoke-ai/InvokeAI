@@ -1,8 +1,8 @@
+import { objectEquals } from '@observ33r/object-equals';
 import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
-import { isEqual } from 'lodash-es';
 import { atom } from 'nanostores';
 import { api } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
@@ -64,7 +64,7 @@ export const addSocketConnectedEventListener = (startAppListening: AppStartListe
         const nextQueueStatusData = await queueStatusRequest.unwrap();
 
         // If the queue hasn't changed, we don't need to do anything.
-        if (isEqual(prevQueueStatusData?.queue, nextQueueStatusData.queue)) {
+        if (objectEquals(prevQueueStatusData?.queue, nextQueueStatusData.queue)) {
           return;
         }
 

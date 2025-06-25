@@ -1,3 +1,4 @@
+import { objectEquals } from '@observ33r/object-equals';
 import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
@@ -6,7 +7,6 @@ import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { isEqual } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
 
 type AddFLUXFillArg = {
@@ -52,7 +52,7 @@ export const addFLUXFill = async ({
 
   const fluxFill = g.addNode({ type: 'flux_fill', id: getPrefixedId('flux_fill') });
 
-  const needsScaleBeforeProcessing = !isEqual(scaledSize, originalSize);
+  const needsScaleBeforeProcessing = !objectEquals(scaledSize, originalSize);
 
   if (needsScaleBeforeProcessing) {
     // Scale before processing requires some resizing
