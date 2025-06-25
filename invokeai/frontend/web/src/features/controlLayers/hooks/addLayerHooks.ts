@@ -29,6 +29,7 @@ import type {
 import {
   initialChatGPT4oReferenceImage,
   initialControlNet,
+  initialFluxKontextReferenceImage,
   initialIPAdapter,
   initialT2IAdapter,
 } from 'features/controlLayers/store/util';
@@ -83,6 +84,12 @@ export const selectDefaultRefImageConfig = createSelector(
   (selectedMainModel, query, base): CanvasReferenceImageState['ipAdapter'] => {
     if (selectedMainModel?.base === 'chatgpt-4o') {
       const referenceImage = deepClone(initialChatGPT4oReferenceImage);
+      referenceImage.model = zModelIdentifierField.parse(selectedMainModel);
+      return referenceImage;
+    }
+
+    if (selectedMainModel?.base === 'flux-kontext') {
+      const referenceImage = deepClone(initialFluxKontextReferenceImage);
       referenceImage.model = zModelIdentifierField.parse(selectedMainModel);
       return referenceImage;
     }
