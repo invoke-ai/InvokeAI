@@ -127,7 +127,6 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
     // If the image is from a different board, switch to that board & select the image - otherwise just select the
     // image. This implicitly changes the view to 'images' if it was not already.
     if (board_id !== selectedBoardId) {
-      console.log('boardIdSelected');
       dispatch(
         boardIdSelected({
           boardId: board_id,
@@ -141,7 +140,6 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
         dispatch(galleryViewChanged('images'));
       }
       // Select the image immediately since we've optimistically updated the cache
-      console.log('imageSelected');
       dispatch(imageSelected(lastImageDTO.image_name));
     }
   };
