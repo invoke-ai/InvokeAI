@@ -1,16 +1,12 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import {
-  selectLastSelectedImage,
-  selectListImageNamesQueryArgs,
-  selectSelectedBoardId,
-} from 'features/gallery/store/gallerySelectors';
+import { selectListImageNamesQueryArgs, selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
 import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
 import { imagesApi } from 'services/api/endpoints/images';
 
 export const addBoardIdSelectedListener = (startAppListening: AppStartListening) => {
   startAppListening({
-    matcher: isAnyOf(boardIdSelected, galleryViewChanged, imagesApi.endpoints.getImageNames.matchFulfilled),
+    matcher: isAnyOf(boardIdSelected, galleryViewChanged),
     effect: async (action, { getState, dispatch, condition, cancelActiveListeners }) => {
       // Cancel any in-progress instances of this listener, we don't want to select an image from a previous board
       cancelActiveListeners();
@@ -23,16 +19,6 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
       const state = getState();
 
       const board_id = selectSelectedBoardId(state);
-      const lastSelectedImage = selectLastSelectedImage(state);
-
-      if (
-        imagesApi.endpoints.getImageNames.matchFulfilled(action) &&
-        lastSelectedImage &&
-        action.meta.arg.originalArgs.board_id === board_id
-      ) {
-        // We just loaded image names for the current board, and we have a last selected image
-        return;
-      }
 
       const queryArgs = { ...selectListImageNamesQueryArgs(state), board_id };
 

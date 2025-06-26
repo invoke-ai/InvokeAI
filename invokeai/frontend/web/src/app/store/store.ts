@@ -39,7 +39,6 @@ import { authToastMiddleware } from 'services/api/authToastMiddleware';
 import type { JsonObject } from 'type-fest';
 
 import { STORAGE_PREFIX } from './constants';
-import { getDebugLoggerMiddleware } from './middleware/debugLoggerMiddleware';
 import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
@@ -177,17 +176,7 @@ export const createStore = (uniqueStoreKey?: string, persist = true) =>
         .concat(api.middleware)
         .concat(dynamicMiddlewares)
         .concat(authToastMiddleware)
-        .concat(
-          getDebugLoggerMiddleware({
-            filter: (action) => {
-              try {
-                return (action as UnknownAction).type.startsWith('api');
-              } catch {
-                return false;
-              }
-            },
-          })
-        )
+        // .concat(getDebugLoggerMiddleware())
         .prepend(listenerMiddleware.middleware),
     enhancers: (getDefaultEnhancers) => {
       const _enhancers = getDefaultEnhancers().concat(autoBatchEnhancer());
