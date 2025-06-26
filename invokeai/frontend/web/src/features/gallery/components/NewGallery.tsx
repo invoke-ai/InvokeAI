@@ -411,6 +411,14 @@ const useScrollableGallery = (rootRef: RefObject<HTMLDivElement>) => {
         viewport.style.overflowY = `var(--os-viewport-overflow-y)`;
       },
     },
+    options: {
+      scrollbars: {
+        visibility: 'auto',
+        autoHide: 'scroll',
+        autoHideDelay: 1300,
+        theme: 'os-theme-dark',
+      },
+    },
   });
 
   useEffect(() => {
