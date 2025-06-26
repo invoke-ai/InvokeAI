@@ -1,6 +1,8 @@
-import omi_model_standards.convert.lora.convert_lora_util as lora_util
-from omi_model_standards.convert.lora.convert_flux_lora import convert_flux_lora_key_sets
-from omi_model_standards.convert.lora.convert_sdxl_lora import convert_sdxl_lora_key_sets
+from invokeai.backend.model_manager.omi.vendor.convert.lora import (
+    convert_lora_util as lora_util,
+    convert_flux_lora as omi_flux,
+    convert_sdxl_lora as omi_sdxl,
+)
 
 from invokeai.backend.model_manager.model_on_disk import StateDict
 from invokeai.backend.model_manager.taxonomy import BaseModelType
@@ -8,8 +10,8 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType
 
 def convert_from_omi(weights_sd: StateDict, base: BaseModelType):
     keyset = {
-        BaseModelType.Flux: convert_flux_lora_key_sets(),
-        BaseModelType.StableDiffusionXL: convert_sdxl_lora_key_sets(),
+        BaseModelType.Flux: omi_flux.convert_flux_lora_key_sets(),
+        BaseModelType.StableDiffusionXL: omi_sdxl.convert_sdxl_lora_key_sets(),
     }[base]
     source = "omi"
     target = "legacy_diffusers"
