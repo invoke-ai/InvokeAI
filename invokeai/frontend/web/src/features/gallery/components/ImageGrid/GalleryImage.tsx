@@ -1,7 +1,7 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Flex, Image } from '@invoke-ai/ui-library';
+import { Box, Flex, Icon, Image } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppStore } from 'app/store/nanostores/store';
 import type { AppDispatch, AppGetState } from 'app/store/store';
@@ -22,11 +22,9 @@ import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import type { MouseEvent, MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { PiImageBold } from 'react-icons/pi';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
-
-// This class name is used to calculate the number of images that fit in the gallery
-export const GALLERY_IMAGE_CONTAINER_CLASS_NAME = 'gallery-image-container';
 
 const galleryImageContainerSX = {
   containerType: 'inline-size',
@@ -149,15 +147,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
   );
   const isSelectedForCompare = useAppSelector(selectIsSelectedForCompare);
   const selectIsSelected = useMemo(
-    () =>
-      createSelector(selectGallerySlice, (gallery) => {
-        for (const selectedImage of gallery.selection) {
-          if (selectedImage === imageDTO.image_name) {
-            return true;
-          }
-        }
-        return false;
-      }),
+    () => createSelector(selectGallerySlice, (gallery) => gallery.selection.includes(imageDTO.image_name)),
     [imageDTO.image_name]
   );
   const isSelected = useAppSelector(selectIsSelected);
@@ -256,12 +246,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
 
   return (
     <>
-      <Box
-        className={GALLERY_IMAGE_CONTAINER_CLASS_NAME}
-        sx={galleryImageContainerSX}
-        data-testid={dataTestId}
-        data-is-dragging={isDragging}
-      >
+      <Box sx={galleryImageContainerSX} data-testid={dataTestId} data-is-dragging={isDragging}>
         <Flex
           role="button"
           className="gallery-image"
@@ -293,4 +278,10 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
 
 GalleryImage.displayName = 'GalleryImage';
 
-export const GalleryImagePlaceholder = memo(() => <Box w="full" h="full" bg="base.850" borderRadius="base" />);
+export const GalleryImagePlaceholder = memo(() => (
+  <Flex w="full" h="full" bg="base.850" borderRadius="base" alignItems="center" justifyContent="center">
+    <Icon as={PiImageBold} boxSize={16} color="base.800" />
+  </Flex>
+));
+
+GalleryImagePlaceholder.displayName = 'GalleryImagePlaceholder';
