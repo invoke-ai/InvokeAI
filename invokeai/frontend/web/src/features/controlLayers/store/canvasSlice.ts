@@ -833,6 +833,8 @@ export const canvasSlice = createSlice({
       }
 
       if (isIPAdapterConfig(referenceImage.config)) {
+        referenceImage.config.model = zModelIdentifierField.parse(modelConfig);
+
         // Ensure that the IP Adapter model is compatible with the CLIP Vision model
         if (referenceImage.config.model?.base === 'flux') {
           referenceImage.config.clipVisionModel = 'ViT-L';
