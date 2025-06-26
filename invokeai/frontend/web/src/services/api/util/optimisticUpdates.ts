@@ -1,3 +1,4 @@
+import type { OrderDir } from 'features/gallery/store/types';
 import type { ImageDTO, ImageNamesResult } from 'services/api/types';
 
 /**
@@ -8,21 +9,22 @@ import type { ImageDTO, ImageNamesResult } from 'services/api/types';
 export function calculateImageInsertionPosition(
   imageDTO: ImageDTO,
   starredFirst: boolean,
-  starredCount: number
+  starredCount: number,
+  orderDir: OrderDir = 'DESC'
 ): number {
   if (!starredFirst) {
-    // When starred_first is false, always insert at the beginning (newest first)
-    return 0;
+    // When starred_first is false, insertion depends on order direction
+    return orderDir === 'DESC' ? 0 : Number.MAX_SAFE_INTEGER;
   }
 
   // When starred_first is true
   if (imageDTO.starred) {
-    // Starred images go at the very beginning
-    return 0;
+    // Starred images: beginning for desc, after existing starred for asc
+    return orderDir === 'DESC' ? 0 : starredCount;
   }
 
   // Unstarred images go after all starred images
-  return starredCount;
+  return orderDir === 'DESC' ? starredCount : Number.MAX_SAFE_INTEGER;
 }
 
 /**
@@ -31,17 +33,23 @@ export function calculateImageInsertionPosition(
 export function insertImageIntoNamesResult(
   currentResult: ImageNamesResult,
   imageDTO: ImageDTO,
-  starredFirst: boolean
+  starredFirst: boolean,
+  orderDir: OrderDir = 'DESC'
 ): ImageNamesResult {
   // Don't insert if the image is already in the list
   if (currentResult.image_names.includes(imageDTO.image_name)) {
     return currentResult;
   }
 
-  const insertPosition = calculateImageInsertionPosition(imageDTO, starredFirst, currentResult.starred_count);
+  const insertPosition = calculateImageInsertionPosition(imageDTO, starredFirst, currentResult.starred_count, orderDir);
 
   const newImageNames = [...currentResult.image_names];
-  newImageNames.splice(insertPosition, 0, imageDTO.image_name);
+  // Handle MAX_SAFE_INTEGER by pushing to end
+  if (insertPosition >= newImageNames.length) {
+    newImageNames.push(imageDTO.image_name);
+  } else {
+    newImageNames.splice(insertPosition, 0, imageDTO.image_name);
+  }
 
   return {
     image_names: newImageNames,
@@ -75,7 +83,8 @@ export function updateImagePositionInNamesResult(
   currentResult: ImageNamesResult,
   updatedImageDTO: ImageDTO,
   previouslyStarred: boolean,
-  starredFirst: boolean
+  starredFirst: boolean,
+  orderDir: OrderDir = 'DESC'
 ): ImageNamesResult {
   // First remove the image from its current position
   const withoutImage = removeImageFromNamesResult(
@@ -86,5 +95,5 @@ export function updateImagePositionInNamesResult(
   );
 
   // Then insert it at the new correct position
-  return insertImageIntoNamesResult(withoutImage, updatedImageDTO, starredFirst);
+  return insertImageIntoNamesResult(withoutImage, updatedImageDTO, starredFirst, orderDir);
 }

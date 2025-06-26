@@ -90,7 +90,12 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
         dispatch(
           imagesApi.util.updateQueryData('getImageNames', expectedQueryArgs, (draft) => {
             // Use the utility function to insert at the correct position
-            const updatedResult = insertImageIntoNamesResult(draft, imageDTO, expectedQueryArgs.starred_first ?? true);
+            const updatedResult = insertImageIntoNamesResult(
+              draft,
+              imageDTO,
+              expectedQueryArgs.starred_first ?? true,
+              expectedQueryArgs.order_dir
+            );
 
             // Replace the draft contents
             draft.image_names = updatedResult.image_names;
