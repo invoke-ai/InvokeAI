@@ -10,6 +10,7 @@ import type { ProgressImage as ProgressImageType } from 'features/nodes/types/co
 import { selectShouldShowImageDetails, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
+import { atom } from 'nanostores';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { ImageDTO, S } from 'services/api/types';
 import { $socket } from 'services/events/stores';
@@ -25,8 +26,10 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
   const autoSwitch = useAppSelector(selectAutoSwitch);
 
   const socket = useStore($socket);
-  const [progressEvent, setProgressEvent] = useState<S['InvocationProgressEvent'] | null>(null);
-  const [progressImage, setProgressImage] = useState<ProgressImageType | null>(null);
+  const $progressEvent = useState(() => atom<S['InvocationProgressEvent'] | null>(null))[0];
+  const $progressImage = useState(() => atom<ProgressImageType | null>(null))[0];
+  const progressImage = useStore($progressImage);
+  const progressEvent = useStore($progressEvent);
 
   // Show and hide the next/prev buttons on mouse move
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] = useState<boolean>(false);
@@ -47,9 +50,9 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     }
 
     const onInvocationProgress = (data: S['InvocationProgressEvent']) => {
-      setProgressEvent(data);
+      $progressEvent.set(data);
       if (data.image) {
-        setProgressImage(data.image);
+        $progressImage.set(data.image);
       }
     };
 
@@ -58,7 +61,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     return () => {
       socket.off('invocation_progress', onInvocationProgress);
     };
-  }, [socket]);
+  }, [$progressEvent, $progressImage, socket]);
 
   useEffect(() => {
     if (!socket) {
@@ -72,8 +75,8 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     // creating the illusion of the progress image turning into the new image.
     // But when auto-switch is disabled, we won't get that load event, so we need to clear the progress image manually.
     const onQueueItemStatusChanged = () => {
-      setProgressEvent(null);
-      setProgressImage(null);
+      $progressEvent.set(null);
+      $progressImage.set(null);
     };
 
     socket.on('queue_item_status_changed', onQueueItemStatusChanged);
@@ -81,17 +84,12 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     return () => {
       socket.off('queue_item_status_changed', onQueueItemStatusChanged);
     };
-  }, [autoSwitch, socket]);
+  }, [$progressEvent, $progressImage, autoSwitch, socket]);
 
   const onLoadImage = useCallback(() => {
-    if (!progressEvent || !imageDTO) {
-      return;
-    }
-    if (progressEvent.session_id === imageDTO.session_id) {
-      setProgressEvent(null);
-      setProgressImage(null);
-    }
-  }, [imageDTO, progressEvent]);
+    $progressEvent.set(null);
+    $progressImage.set(null);
+  }, [$progressEvent, $progressImage]);
 
   const withProgress = shouldShowProgressInViewer && progressEvent && progressImage;
 

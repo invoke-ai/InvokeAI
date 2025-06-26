@@ -9,7 +9,6 @@ import { addDeleteBoardAndImagesFulfilledListener } from 'app/store/middleware/l
 import { addBoardIdSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/boardIdSelected';
 import { addBulkDownloadListeners } from 'app/store/middleware/listenerMiddleware/listeners/bulkDownload';
 import { addEnqueueRequestedLinear } from 'app/store/middleware/listenerMiddleware/listeners/enqueueRequestedLinear';
-import { addEnsureImageIsSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/ensureImageIsSelectedListener';
 import { addGetOpenAPISchemaListener } from 'app/store/middleware/listenerMiddleware/listeners/getOpenAPISchema';
 import { addImageAddedToBoardFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/imageAddedToBoard';
 import { addImageRemovedFromBoardFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/imageRemovedFromBoard';
@@ -76,5 +75,3 @@ addAppConfigReceivedListener(startAppListening);
 addAdHocPostProcessingRequestedListener(startAppListening);
 
 addSetDefaultSettingsListener(startAppListening);
-
-addEnsureImageIsSelectedListener(startAppListening);
