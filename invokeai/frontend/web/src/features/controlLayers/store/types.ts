@@ -321,7 +321,7 @@ export const isChatGPT4oReferenceImageConfig = (
   config: RefImageState['config']
 ): config is ChatGPT4oReferenceImageConfig => config.type === 'chatgpt_4o_reference_image';
 export const isFluxKontextReferenceImageConfig = (
-  config: CanvasReferenceImageState['ipAdapter']
+  config: RefImageState['config']
 ): config is FluxKontextReferenceImageConfig => config.type === 'flux_kontext_reference_image';
 
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
