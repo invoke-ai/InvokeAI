@@ -16,15 +16,21 @@ import { firefoxDndFix } from 'features/dnd/util';
 import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { GalleryImageHoverIcons } from 'features/gallery/components/ImageGrid/GalleryImageHoverIcons';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
-import { selectListImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
+import {
+  selectListImageNamesQueryArgs,
+  selectSelectedBoardId,
+  selectSelection,
+} from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectGallerySlice, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import type { MouseEvent, MouseEventHandler } from 'react';
-import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { PiImageBold } from 'react-icons/pi';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
+
+const GALLERY_IMAGE_CLASS = 'gallery-image';
 
 const galleryImageContainerSX = {
   containerType: 'inline-size',
@@ -38,7 +44,7 @@ const galleryImageContainerSX = {
   '&[data-is-dragging=true]': {
     opacity: 0.3,
   },
-  '.gallery-image': {
+  [`.${GALLERY_IMAGE_CLASS}`]: {
     touchAction: 'none',
     userSelect: 'none',
     webkitUserSelect: 'none',
@@ -139,8 +145,8 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
   const [dragPreviewState, setDragPreviewState] = useState<
     DndDragPreviewSingleImageState | DndDragPreviewMultipleImageState | null
   >(null);
-  const ref = useRef<HTMLImageElement>(null);
-  const dndId = useId();
+  // Must use callback ref - else chakra's Image fallback prop will break the ref & dnd
+  const [element, ref] = useState<HTMLImageElement | null>(null);
   const selectIsSelectedForCompare = useMemo(
     () => createSelector(selectGallerySlice, (gallery) => gallery.imageToCompare === imageDTO.image_name),
     [imageDTO.image_name]
@@ -153,7 +159,6 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
   const isSelected = useAppSelector(selectIsSelected);
 
   useEffect(() => {
-    const element = ref.current;
     if (!element) {
       return;
     }
@@ -162,16 +167,14 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
       draggable({
         element,
         getInitialData: () => {
-          const { gallery } = store.getState();
+          const selection = selectSelection(store.getState());
+          const boardId = selectSelectedBoardId(store.getState());
           // When we have multiple images selected, and the dragged image is part of the selection, initiate a
           // multi-image drag.
-          if (
-            gallery.selection.length > 1 &&
-            gallery.selection.find((image_name) => image_name === imageDTO.image_name) !== undefined
-          ) {
+          if (selection.length > 1 && selection.includes(imageDTO.image_name)) {
             return multipleImageDndSource.getData({
-              image_names: gallery.selection,
-              board_id: gallery.selectedBoardId,
+              image_names: selection,
+              board_id: boardId,
             });
           }
 
@@ -221,7 +224,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
         },
       })
     );
-  }, [imageDTO, store, dndId]);
+  }, [element, imageDTO, store]);
 
   const [isHovered, setIsHovered] = useState(false);
 
@@ -242,14 +245,14 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
 
   const dataTestId = useMemo(() => getGalleryImageDataTestId(imageDTO.image_name), [imageDTO.image_name]);
 
-  useImageContextMenu(imageDTO, ref);
+  useImageContextMenu(imageDTO, element);
 
   return (
     <>
       <Box sx={galleryImageContainerSX} data-testid={dataTestId} data-is-dragging={isDragging}>
         <Flex
           role="button"
-          className="gallery-image"
+          className={GALLERY_IMAGE_CLASS}
           onMouseOver={onMouseOver}
           onMouseOut={onMouseOut}
           onClick={onClick}
