@@ -12,6 +12,7 @@ import { createContext, memo, useCallback, useContext, useMemo, useState } from 
 import { LEFT_PANEL_ID, LEFT_PANEL_MIN_SIZE_PX, RIGHT_PANEL_ID, RIGHT_PANEL_MIN_SIZE_PX } from './shared';
 
 type AutoLayoutContextValue = {
+  tab: TabName;
   isActiveTab: boolean;
   toggleLeftPanel: () => void;
   toggleRightPanel: () => void;
@@ -137,6 +138,7 @@ export const AutoLayoutProvider = (
 
   const value = useMemo<AutoLayoutContextValue>(
     () => ({
+      tab,
       isActiveTab,
       toggleLeftPanel,
       toggleRightPanel,
@@ -150,6 +152,7 @@ export const AutoLayoutProvider = (
       _$rightPanelApi: $rightApi,
     }),
     [
+      tab,
       isActiveTab,
       $centerApi,
       $leftApi,

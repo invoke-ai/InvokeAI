@@ -68,15 +68,14 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       return;
     }
 
-    if (autoSwitch) {
-      return;
-    }
-    // When auto-switch is enabled, we will get a load event as we switch to the new image. This in turn clears the progress image,
-    // creating the illusion of the progress image turning into the new image.
-    // But when auto-switch is disabled, we won't get that load event, so we need to clear the progress image manually.
-    const onQueueItemStatusChanged = () => {
-      $progressEvent.set(null);
-      $progressImage.set(null);
+    const onQueueItemStatusChanged = (data: S['QueueItemStatusChangedEvent']) => {
+      // When auto-switch is enabled, we will get a load event as we switch to the new image. This in turn clears the progress image,
+      // creating the illusion of the progress image turning into the new image.
+      // But when auto-switch is disabled, we won't get that load event, so we need to clear the progress image manually.
+      if (data.origin === 'canvas' || !autoSwitch) {
+        $progressEvent.set(null);
+        $progressImage.set(null);
+      }
     };
 
     socket.on('queue_item_status_changed', onQueueItemStatusChanged);
