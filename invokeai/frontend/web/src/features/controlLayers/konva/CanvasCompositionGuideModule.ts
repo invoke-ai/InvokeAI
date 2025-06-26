@@ -138,4 +138,13 @@ export class CanvasCompositionGuideModule extends CanvasModuleBase {
     this.subscriptions.clear();
     this.konva.group.destroy();
   };
+
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      path: this.path,
+      visible: this.konva.group.visible(),
+    };
+  };
 }
