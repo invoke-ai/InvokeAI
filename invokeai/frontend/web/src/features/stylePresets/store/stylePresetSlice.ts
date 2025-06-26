@@ -57,7 +57,8 @@ export const stylePresetSlice = createSlice({
   },
 });
 
-export const { activeStylePresetIdChanged, searchTermChanged, viewModeChanged, showPromptPreviewsChanged } = stylePresetSlice.actions;
+export const { activeStylePresetIdChanged, searchTermChanged, viewModeChanged, showPromptPreviewsChanged } =
+  stylePresetSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateStylePresetState = (state: any): any => {
