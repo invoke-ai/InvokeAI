@@ -35,6 +35,11 @@ export const QueueCountBadge = memo(({ targetRef }: Props) => {
         return;
       }
       const { x, y } = target.getBoundingClientRect();
+      if (x === 0 || y === 0) {
+        // If the target is not visible, do not show the badge
+        setBadgePos(null);
+        return;
+      }
       setBadgePos({ x: `${x - 7}px`, y: `${y - 5}px` });
     };
 

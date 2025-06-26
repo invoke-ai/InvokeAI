@@ -1,3 +1,4 @@
+import { objectEquals } from '@observ33r/object-equals';
 import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
@@ -14,7 +15,6 @@ import type {
   MainModelLoaderNodes,
   VaeSourceNodes,
 } from 'features/nodes/util/graph/types';
-import { isEqual } from 'lodash-es';
 import type { ImageDTO, Invocation } from 'services/api/types';
 
 type AddOutpaintArg = {
@@ -98,7 +98,7 @@ export const addOutpaint = async ({
 
   const infill = getInfill(g, params);
 
-  const needsScaleBeforeProcessing = !isEqual(scaledSize, originalSize);
+  const needsScaleBeforeProcessing = !objectEquals(scaledSize, originalSize);
 
   if (needsScaleBeforeProcessing) {
     // Scale before processing requires some resizing
@@ -207,9 +207,9 @@ export const addOutpaint = async ({
     g.addEdge(l2i, 'image', resizeOutputImageToOriginalSize, 'image');
     g.addEdge(createGradientMask, 'expanded_mask_area', expandMask, 'mask');
     g.addEdge(expandMask, 'image', resizeOutputMaskToOriginalSize, 'image');
-    // Do the paste back if we are sending to gallery (in which case we want to see the full image), or if we are sending
-    // to canvas but not outputting only masked regions
-    if (!canvasSettings.sendToCanvas || !canvasSettings.outputOnlyMaskedRegions) {
+
+    // Do the paste back if we are not outputting only masked regions
+    if (!canvasSettings.outputOnlyMaskedRegions) {
       const imageLayerBlend = g.addNode({
         type: 'invokeai_img_blend',
         id: getPrefixedId('image_layer_blend'),
@@ -295,9 +295,8 @@ export const addOutpaint = async ({
     });
     g.addEdge(createGradientMask, 'expanded_mask_area', expandMask, 'mask');
 
-    // Do the paste back if we are sending to gallery (in which case we want to see the full image), or if we are sending
-    // to canvas but not outputting only masked regions
-    if (!canvasSettings.sendToCanvas || !canvasSettings.outputOnlyMaskedRegions) {
+    // Do the paste back if we are not outputting only masked regions
+    if (!canvasSettings.outputOnlyMaskedRegions) {
       const imageLayerBlend = g.addNode({
         type: 'invokeai_img_blend',
         id: getPrefixedId('image_layer_blend'),

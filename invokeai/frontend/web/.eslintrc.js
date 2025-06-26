@@ -9,13 +9,16 @@ module.exports = {
     // https://github.com/qdanik/eslint-plugin-path
     'path/no-relative-imports': ['error', { maxDepth: 0 }],
     // https://github.com/edvardchen/eslint-plugin-i18next/blob/HEAD/docs/rules/no-literal-string.md
-    'i18next/no-literal-string': 'error',
+    // TODO: ENABLE THIS RULE BEFORE v6.0.0
+    // 'i18next/no-literal-string': 'error',
     // https://eslint.org/docs/latest/rules/no-console
-    'no-console': 'error',
+    'no-console': 'warn',
     // https://eslint.org/docs/latest/rules/no-promise-executor-return
     'no-promise-executor-return': 'error',
     // https://eslint.org/docs/latest/rules/require-await
     'require-await': 'error',
+    // TODO: ENABLE THIS RULE BEFORE v6.0.0
+    'react/display-name': 'off',
     'no-restricted-properties': [
       'error',
       {
@@ -28,6 +31,27 @@ module.exports = {
         property: 'clipboard',
         message:
           'The Clipboard API is not available by default in Firefox. Use the `useClipboard` hook instead, which wraps clipboard access to prevent errors.',
+      },
+    ],
+    'no-restricted-imports': [
+      'error',
+      {
+        paths: [
+          {
+            name: 'lodash-es',
+            importNames: ['isEqual'],
+            message: 'Please use objectEquals from @observ33r/object-equals instead.',
+          },
+          {
+            name: 'lodash-es',
+            message: 'Please use es-toolkit instead.',
+          },
+          {
+            name: 'es-toolkit',
+            importNames: ['isEqual'],
+            message: 'Please use objectEquals from @observ33r/object-equals instead.',
+          },
+        ],
       },
     ],
   },

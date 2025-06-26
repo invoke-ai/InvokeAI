@@ -1,8 +1,8 @@
 import { deepClone } from 'common/util/deepClone';
+import { unset } from 'es-toolkit/compat';
 import { getCollectItemType } from 'features/nodes/store/util/getCollectItemType';
 import { add, buildEdge, buildNode, collect, templates } from 'features/nodes/store/util/testUtils';
 import type { FieldType } from 'features/nodes/types/field';
-import { unset } from 'lodash-es';
 import { describe, expect, it } from 'vitest';
 
 describe(getCollectItemType.name, () => {

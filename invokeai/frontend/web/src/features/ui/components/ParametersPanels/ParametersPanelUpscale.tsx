@@ -17,7 +17,7 @@ const overlayScrollbarsStyles: CSSProperties = {
   width: '100%',
 };
 
-const ParametersPanelUpscale = () => {
+export const ParametersPanelUpscale = memo(() => {
   const isStylePresetsMenuOpen = useStore($isStylePresetsMenuOpen);
 
   return (
@@ -44,6 +44,6 @@ const ParametersPanelUpscale = () => {
       </Flex>
     </Flex>
   );
-};
+});
 
-export default memo(ParametersPanelUpscale);
+ParametersPanelUpscale.displayName = 'ParametersPanelUpscale';

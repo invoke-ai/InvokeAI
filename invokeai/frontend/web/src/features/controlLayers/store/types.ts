@@ -1,16 +1,38 @@
+import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import { fetchModelConfigByIdentifier } from 'features/metadata/util/modelFetchingHelpers';
+import type { ProgressImage } from 'features/nodes/types/common';
 import { zMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
 import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
 import {
+  zParameterCanvasCoherenceMode,
+  zParameterCFGRescaleMultiplier,
+  zParameterCFGScale,
+  zParameterCLIPEmbedModel,
+  zParameterCLIPGEmbedModel,
+  zParameterCLIPLEmbedModel,
+  zParameterControlLoRAModel,
+  zParameterGuidance,
   zParameterImageDimension,
+  zParameterMaskBlurMethod,
+  zParameterModel,
   zParameterNegativePrompt,
+  zParameterNegativeStylePromptSDXL,
   zParameterPositivePrompt,
+  zParameterPositiveStylePromptSDXL,
+  zParameterPrecision,
+  zParameterScheduler,
+  zParameterSDXLRefinerModel,
+  zParameterSeed,
+  zParameterSteps,
+  zParameterStrength,
+  zParameterT5EncoderModel,
+  zParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 const zId = z.string().min(1);
 const zName = z.string().min(1).nullable();
@@ -36,6 +58,12 @@ const zImageWithDims = z
     return imageDTO !== null;
   });
 export type ImageWithDims = z.infer<typeof zImageWithDims>;
+
+const zImageWithDimsDataURL = z.object({
+  dataURL: z.string(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+});
 
 const zBeginEndStepPct = z
   .tuple([z.number().gte(0).lte(1), z.number().gte(0).lte(1)])
@@ -209,7 +237,7 @@ export type CanvasRectState = z.infer<typeof zCanvasRectState>;
 const zCanvasImageState = z.object({
   id: zId,
   type: z.literal('image'),
-  image: zImageWithDims,
+  image: z.union([zImageWithDims, zImageWithDimsDataURL]),
 });
 export type CanvasImageState = z.infer<typeof zCanvasImageState>;
 
@@ -272,28 +300,28 @@ const zCanvasEntityBase = z.object({
   isLocked: z.boolean(),
 });
 
-const zCanvasReferenceImageState = zCanvasEntityBase.extend({
-  type: z.literal('reference_image'),
+const zRefImageState = z.object({
+  id: zId,
   // This should be named `referenceImage` but we need to keep it as `ipAdapter` for backwards compatibility
-  ipAdapter: z.discriminatedUnion('type', [
+  config: z.discriminatedUnion('type', [
     zIPAdapterConfig,
     zFLUXReduxConfig,
     zChatGPT4oReferenceImageConfig,
     zFluxKontextReferenceImageConfig,
   ]),
 });
-export type CanvasReferenceImageState = z.infer<typeof zCanvasReferenceImageState>;
+export type RefImageState = z.infer<typeof zRefImageState>;
 
-export const isIPAdapterConfig = (config: CanvasReferenceImageState['ipAdapter']): config is IPAdapterConfig =>
+export const isIPAdapterConfig = (config: RefImageState['config']): config is IPAdapterConfig =>
   config.type === 'ip_adapter';
 
-export const isFLUXReduxConfig = (config: CanvasReferenceImageState['ipAdapter']): config is FLUXReduxConfig =>
+export const isFLUXReduxConfig = (config: RefImageState['config']): config is FLUXReduxConfig =>
   config.type === 'flux_redux';
 export const isChatGPT4oReferenceImageConfig = (
-  config: CanvasReferenceImageState['ipAdapter']
+  config: RefImageState['config']
 ): config is ChatGPT4oReferenceImageConfig => config.type === 'chatgpt_4o_reference_image';
 export const isFluxKontextReferenceImageConfig = (
-  config: CanvasReferenceImageState['ipAdapter']
+  config: RefImageState['config']
 ): config is FluxKontextReferenceImageConfig => config.type === 'flux_kontext_reference_image';
 
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
@@ -301,11 +329,11 @@ export type FillStyle = z.infer<typeof zFillStyle>;
 export const isFillStyle = (v: unknown): v is FillStyle => zFillStyle.safeParse(v).success;
 const zFill = z.object({ style: zFillStyle, color: zRgbColor });
 
-const zRegionalGuidanceReferenceImageState = z.object({
+const zRegionalGuidanceRefImageState = z.object({
   id: zId,
-  ipAdapter: z.discriminatedUnion('type', [zIPAdapterConfig, zFLUXReduxConfig]),
+  config: z.discriminatedUnion('type', [zIPAdapterConfig, zFLUXReduxConfig]),
 });
-export type RegionalGuidanceReferenceImageState = z.infer<typeof zRegionalGuidanceReferenceImageState>;
+export type RegionalGuidanceRefImageState = z.infer<typeof zRegionalGuidanceRefImageState>;
 
 const zCanvasRegionalGuidanceState = zCanvasEntityBase.extend({
   type: z.literal('regional_guidance'),
@@ -315,7 +343,7 @@ const zCanvasRegionalGuidanceState = zCanvasEntityBase.extend({
   fill: zFill,
   positivePrompt: zParameterPositivePrompt.nullable(),
   negativePrompt: zParameterNegativePrompt.nullable(),
-  referenceImages: z.array(zRegionalGuidanceReferenceImageState),
+  referenceImages: z.array(zRegionalGuidanceRefImageState),
   autoNegative: z.boolean(),
 });
 export type CanvasRegionalGuidanceState = z.infer<typeof zCanvasRegionalGuidanceState>;
@@ -380,25 +408,14 @@ const zCanvasEntityState = z.discriminatedUnion('type', [
   zCanvasControlLayerState,
   zCanvasRegionalGuidanceState,
   zCanvasInpaintMaskState,
-  zCanvasReferenceImageState,
 ]);
 export type CanvasEntityState = z.infer<typeof zCanvasEntityState>;
-
-const zCanvasRenderableEntityState = z.discriminatedUnion('type', [
-  zCanvasRasterLayerState,
-  zCanvasControlLayerState,
-  zCanvasRegionalGuidanceState,
-  zCanvasInpaintMaskState,
-]);
-export type CanvasRenderableEntityState = z.infer<typeof zCanvasRenderableEntityState>;
-export type CanvasRenderableEntityType = CanvasRenderableEntityState['type'];
 
 const zCanvasEntityType = z.union([
   zCanvasRasterLayerState.shape.type,
   zCanvasControlLayerState.shape.type,
   zCanvasRegionalGuidanceState.shape.type,
   zCanvasInpaintMaskState.shape.type,
-  zCanvasReferenceImageState.shape.type,
 ]);
 export type CanvasEntityType = z.infer<typeof zCanvasEntityType>;
 
@@ -407,7 +424,7 @@ export const zCanvasEntityIdentifer = z.object({
   type: zCanvasEntityType,
 });
 export type CanvasEntityIdentifier<T extends CanvasEntityType = CanvasEntityType> = { id: string; type: T };
-export type CanvasRenderableEntityIdentifier = CanvasEntityIdentifier<CanvasRenderableEntityType>;
+
 export type LoRA = {
   id: string;
   isEnabled: boolean;
@@ -416,10 +433,17 @@ export type LoRA = {
 };
 
 export type StagingAreaImage = {
+  type: 'staged';
+  sessionId: string;
   imageDTO: ImageDTO;
   offsetX: number;
   offsetY: number;
 };
+export type StagingAreaProgressImage = {
+  type: 'progress';
+  sessionId: string;
+};
+export type EphemeralProgressImage = { sessionId: string; image: ProgressImage };
 
 export const zAspectRatioID = z.enum(['Free', '21:9', '9:21', '16:9', '3:2', '4:3', '1:1', '3:4', '2:3', '9:16']);
 
@@ -438,57 +462,143 @@ export const isFluxKontextAspectRatioID = (v: unknown): v is z.infer<typeof zFlu
 export type AspectRatioID = z.infer<typeof zAspectRatioID>;
 export const isAspectRatioID = (v: unknown): v is AspectRatioID => zAspectRatioID.safeParse(v).success;
 
+const zAspectRatioConfig = z.object({
+  id: zAspectRatioID,
+  value: z.number().gt(0),
+  isLocked: z.boolean(),
+});
+type AspectRatioConfig = z.infer<typeof zAspectRatioConfig>;
+
+export const DEFAULT_ASPECT_RATIO_CONFIG: AspectRatioConfig = {
+  id: '1:1',
+  value: 1,
+  isLocked: false,
+};
+
+const zBboxState = z.object({
+  rect: z.object({
+    x: z.number().int(),
+    y: z.number().int(),
+    width: zParameterImageDimension,
+    height: zParameterImageDimension,
+  }),
+  aspectRatio: zAspectRatioConfig,
+  scaledSize: z.object({
+    width: zParameterImageDimension,
+    height: zParameterImageDimension,
+  }),
+  scaleMethod: zBoundingBoxScaleMethod,
+  modelBase: zMainModelBase,
+});
+
+const zParamsState = z.object({
+  maskBlur: z.number().default(16),
+  maskBlurMethod: zParameterMaskBlurMethod.default('box'),
+  canvasCoherenceMode: zParameterCanvasCoherenceMode.default('Gaussian Blur'),
+  canvasCoherenceMinDenoise: zParameterStrength.default(0),
+  canvasCoherenceEdgeSize: z.number().default(16),
+  infillMethod: z.string().default('lama'),
+  infillTileSize: z.number().default(32),
+  infillPatchmatchDownscaleSize: z.number().default(1),
+  infillColorValue: zRgbaColor.default({ r: 0, g: 0, b: 0, a: 1 }),
+  cfgScale: zParameterCFGScale.default(7.5),
+  cfgRescaleMultiplier: zParameterCFGRescaleMultiplier.default(0),
+  guidance: zParameterGuidance.default(4),
+  img2imgStrength: zParameterStrength.default(0.75),
+  optimizedDenoisingEnabled: z.boolean().default(true),
+  iterations: z.number().default(1),
+  scheduler: zParameterScheduler.default('dpmpp_3m_k'),
+  upscaleScheduler: zParameterScheduler.default('kdpm_2'),
+  upscaleCfgScale: zParameterCFGScale.default(2),
+  seed: zParameterSeed.default(0),
+  shouldRandomizeSeed: z.boolean().default(true),
+  steps: zParameterSteps.default(30),
+  model: zParameterModel.nullable().default(null),
+  vae: zParameterVAEModel.nullable().default(null),
+  vaePrecision: zParameterPrecision.default('fp32'),
+  fluxVAE: zParameterVAEModel.nullable().default(null),
+  seamlessXAxis: z.boolean().default(false),
+  seamlessYAxis: z.boolean().default(false),
+  clipSkip: z.number().default(0),
+  shouldUseCpuNoise: z.boolean().default(true),
+  positivePrompt: zParameterPositivePrompt.default(''),
+  // Negative prompt may be disabled, in which case it will be null
+  negativePrompt: zParameterNegativePrompt.default(null),
+  positivePrompt2: zParameterPositiveStylePromptSDXL.default(''),
+  negativePrompt2: zParameterNegativeStylePromptSDXL.default(''),
+  shouldConcatPrompts: z.boolean().default(true),
+  refinerModel: zParameterSDXLRefinerModel.nullable().default(null),
+  refinerSteps: z.number().default(20),
+  refinerCFGScale: z.number().default(7.5),
+  refinerScheduler: zParameterScheduler.default('euler'),
+  refinerPositiveAestheticScore: z.number().default(6),
+  refinerNegativeAestheticScore: z.number().default(2.5),
+  refinerStart: z.number().default(0.8),
+  t5EncoderModel: zParameterT5EncoderModel.nullable().default(null),
+  clipEmbedModel: zParameterCLIPEmbedModel.nullable().default(null),
+  clipLEmbedModel: zParameterCLIPLEmbedModel.nullable().default(null),
+  clipGEmbedModel: zParameterCLIPGEmbedModel.nullable().default(null),
+  controlLora: zParameterControlLoRAModel.nullable().default(null),
+});
+export type ParamsState = z.infer<typeof zParamsState>;
+const INITIAL_PARAMS_STATE = zParamsState.parse({});
+export const getInitialParamsState = () => deepClone(INITIAL_PARAMS_STATE);
+
+const zInpaintMasks = z.object({
+  isHidden: z.boolean(),
+  entities: z.array(zCanvasInpaintMaskState),
+});
+const zRasterLayers = z.object({
+  isHidden: z.boolean(),
+  entities: z.array(zCanvasRasterLayerState),
+});
+const zControlLayers = z.object({
+  isHidden: z.boolean(),
+  entities: z.array(zCanvasControlLayerState),
+});
+const zRegionalGuidance = z.object({
+  isHidden: z.boolean(),
+  entities: z.array(zCanvasRegionalGuidanceState),
+});
 const zCanvasState = z.object({
-  _version: z.literal(3),
-  selectedEntityIdentifier: zCanvasEntityIdentifer.nullable(),
-  bookmarkedEntityIdentifier: zCanvasEntityIdentifer.nullable(),
-  inpaintMasks: z.object({
-    isHidden: z.boolean(),
-    entities: z.array(zCanvasInpaintMaskState),
-  }),
-  rasterLayers: z.object({
-    isHidden: z.boolean(),
-    entities: z.array(zCanvasRasterLayerState),
-  }),
-  controlLayers: z.object({
-    isHidden: z.boolean(),
-    entities: z.array(zCanvasControlLayerState),
-  }),
-  regionalGuidance: z.object({
-    isHidden: z.boolean(),
-    entities: z.array(zCanvasRegionalGuidanceState),
-  }),
-  referenceImages: z.object({
-    entities: z.array(zCanvasReferenceImageState),
-  }),
-  bbox: z.object({
-    rect: z.object({
-      x: z.number().int(),
-      y: z.number().int(),
-      width: zParameterImageDimension,
-      height: zParameterImageDimension,
-    }),
-    aspectRatio: z.object({
-      id: zAspectRatioID,
-      value: z.number().gt(0),
-      isLocked: z.boolean(),
-    }),
-    scaledSize: z.object({
-      width: zParameterImageDimension,
-      height: zParameterImageDimension,
-    }),
-    scaleMethod: zBoundingBoxScaleMethod,
-    modelBase: zMainModelBase,
+  _version: z.literal(3).default(3),
+  selectedEntityIdentifier: zCanvasEntityIdentifer.nullable().default(null),
+  bookmarkedEntityIdentifier: zCanvasEntityIdentifer.nullable().default(null),
+  inpaintMasks: zInpaintMasks.default({ isHidden: false, entities: [] }),
+  rasterLayers: zRasterLayers.default({ isHidden: false, entities: [] }),
+  controlLayers: zControlLayers.default({ isHidden: false, entities: [] }),
+  regionalGuidance: zRegionalGuidance.default({ isHidden: false, entities: [] }),
+  bbox: zBboxState.default({
+    rect: { x: 0, y: 0, width: 512, height: 512 },
+    aspectRatio: DEFAULT_ASPECT_RATIO_CONFIG,
+    scaleMethod: 'auto',
+    scaledSize: { width: 512, height: 512 },
+    modelBase: 'sd-1',
   }),
 });
 export type CanvasState = z.infer<typeof zCanvasState>;
+
+const zRefImagesState = z.object({
+  selectedEntityId: z.string().nullable().default(null),
+  isPanelOpen: z.boolean().default(false),
+  entities: z.array(zRefImageState).default(() => []),
+});
+export type RefImagesState = z.infer<typeof zRefImagesState>;
+const INITIAL_REF_IMAGES_STATE = zRefImagesState.parse({});
+export const getInitialRefImagesState = () => deepClone(INITIAL_REF_IMAGES_STATE);
+
+/**
+ * Gets a fresh canvas initial state with no references in memory to existing objects.
+ */
+const CANVAS_INITIAL_STATE = zCanvasState.parse({});
+export const getInitialCanvasState = () => deepClone(CANVAS_INITIAL_STATE);
 
 export const zCanvasMetadata = z.object({
   inpaintMasks: z.array(zCanvasInpaintMaskState),
   rasterLayers: z.array(zCanvasRasterLayerState),
   controlLayers: z.array(zCanvasControlLayerState),
   regionalGuidance: z.array(zCanvasRegionalGuidanceState),
-  referenceImages: z.array(zCanvasReferenceImageState),
+  referenceImages: z.array(zRefImageState),
 });
 export type CanvasMetadata = z.infer<typeof zCanvasMetadata>;
 
@@ -541,17 +651,6 @@ export type EntityRasterizedPayload = EntityIdentifierPayload<{
 export type GenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';
 
 export type CanvasEntityStateFromType<T extends CanvasEntityType> = Extract<CanvasEntityState, { type: T }>;
-
-export function isRenderableEntityType(
-  entityType: CanvasEntityState['type']
-): entityType is CanvasRenderableEntityState['type'] {
-  return (
-    entityType === 'raster_layer' ||
-    entityType === 'control_layer' ||
-    entityType === 'regional_guidance' ||
-    entityType === 'inpaint_mask'
-  );
-}
 
 export function isRasterLayerEntityIdentifier(
   entityIdentifier: CanvasEntityIdentifier
@@ -608,16 +707,6 @@ export function isSaveableEntityIdentifier(
   entityIdentifier: CanvasEntityIdentifier
 ): entityIdentifier is CanvasEntityIdentifier<'raster_layer'> | CanvasEntityIdentifier<'control_layer'> {
   return isRasterLayerEntityIdentifier(entityIdentifier) || isControlLayerEntityIdentifier(entityIdentifier);
-}
-
-export function isRenderableEntity(entity: CanvasEntityState): entity is CanvasRenderableEntityState {
-  return isRenderableEntityType(entity.type);
-}
-
-export function isRenderableEntityIdentifier(
-  entityIdentifier: CanvasEntityIdentifier
-): entityIdentifier is CanvasRenderableEntityIdentifier {
-  return isRenderableEntityType(entityIdentifier.type);
 }
 
 export const getEntityIdentifier = <T extends CanvasEntityType>(

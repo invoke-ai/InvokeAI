@@ -7,6 +7,8 @@ export type S = components['schemas'];
 export type ListImagesArgs = NonNullable<paths['/api/v1/images/']['get']['parameters']['query']>;
 export type ListImagesResponse = paths['/api/v1/images/']['get']['responses']['200']['content']['application/json'];
 
+export type ImageNamesResult = S['ImageNamesResult'];
+
 export type ListBoardsArgs = NonNullable<paths['/api/v1/boards/']['get']['parameters']['query']>;
 
 export type DeleteBoardResult =
@@ -291,7 +293,6 @@ export type ModelInstallStatus = S['InstallStatus'];
 export type Graph = S['Graph'];
 export type NonNullableGraph = SetRequired<Graph, 'nodes' | 'edges'>;
 export type Batch = S['Batch'];
-export type SessionQueueItemDTO = S['SessionQueueItemDTO'];
 export type WorkflowRecordOrderBy = S['WorkflowRecordOrderBy'];
 export type SQLiteDirection = S['SQLiteDirection'];
 export type WorkflowRecordListItemWithThumbnailDTO = S['WorkflowRecordListItemWithThumbnailDTO'];

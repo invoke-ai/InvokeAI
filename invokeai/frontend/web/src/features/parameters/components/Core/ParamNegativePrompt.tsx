@@ -1,7 +1,7 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { usePersistedTextAreaSize } from 'common/hooks/usePersistedTextareaSize';
-import { negativePromptChanged, selectNegativePrompt } from 'features/controlLayers/store/paramsSlice';
+import { negativePromptChanged, selectNegativePromptWithFallback } from 'features/controlLayers/store/paramsSlice';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModePrompt';
@@ -23,7 +23,7 @@ const persistOptions: Parameters<typeof usePersistedTextAreaSize>[2] = {
 
 export const ParamNegativePrompt = memo(() => {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector(selectNegativePrompt);
+  const prompt = useAppSelector(selectNegativePromptWithFallback);
   const viewMode = useAppSelector(selectStylePresetViewMode);
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
 
@@ -57,7 +57,7 @@ export const ParamNegativePrompt = memo(() => {
     <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
       <Box pos="relative" w="full">
         <Textarea
-          id="negativePrompt"
+          className="negative-prompt-textarea"
           name="negativePrompt"
           ref={textareaRef}
           value={prompt}

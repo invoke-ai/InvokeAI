@@ -25,7 +25,7 @@ export const addArchivedOrDeletedBoardListener = (startAppListening: AppStartLis
     matcher: matchAnyBoardDeleted,
     effect: (action, { dispatch, getState }) => {
       const state = getState();
-      const deletedBoardId = action.meta.arg.originalArgs;
+      const deletedBoardId = action.meta.arg.originalArgs.board_id;
       const { autoAddBoardId, selectedBoardId } = state.gallery;
 
       // If the deleted board was currently selected, we should reset the selected board to uncategorized

@@ -1,31 +1,33 @@
-import type { AppDispatch, RootState } from 'app/store/store';
+import type { AppDispatch, AppGetState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
-import { selectDefaultIPAdapter, selectDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
+import {
+  getDefaultRefImageConfig,
+  getDefaultRegionalGuidanceRefImageConfig,
+} from 'features/controlLayers/hooks/addLayerHooks';
 import { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityTransformer';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasReset } from 'features/controlLayers/store/actions';
 import {
   bboxChangedFromCanvas,
+  canvasClearHistory,
   controlLayerAdded,
   entityRasterized,
   inpaintMaskAdded,
   rasterLayerAdded,
-  referenceImageAdded,
-  referenceImageIPAdapterImageChanged,
   rgAdded,
-  rgIPAdapterImageChanged,
+  rgRefImageImageChanged,
 } from 'features/controlLayers/store/canvasSlice';
+import { refImageAdded, refImageImageChanged } from 'features/controlLayers/store/refImagesSlice';
 import { selectBboxModelBase, selectBboxRect } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
   CanvasEntityIdentifier,
+  CanvasEntityState,
   CanvasEntityType,
   CanvasImageState,
   CanvasInpaintMaskState,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
-  CanvasRenderableEntityIdentifier,
-  CanvasRenderableEntityState,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject, imageDTOToImageWithDims, initialControlNet } from 'features/controlLayers/store/util';
 import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
@@ -40,13 +42,9 @@ import type { ImageDTO } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
-export const setGlobalReferenceImage = (arg: {
-  imageDTO: ImageDTO;
-  entityIdentifier: CanvasEntityIdentifier<'reference_image'>;
-  dispatch: AppDispatch;
-}) => {
-  const { imageDTO, entityIdentifier, dispatch } = arg;
-  dispatch(referenceImageIPAdapterImageChanged({ entityIdentifier, imageDTO }));
+export const setGlobalReferenceImage = (arg: { imageDTO: ImageDTO; id: string; dispatch: AppDispatch }) => {
+  const { imageDTO, id, dispatch } = arg;
+  dispatch(refImageImageChanged({ id, imageDTO }));
 };
 
 export const setRegionalGuidanceReferenceImage = (arg: {
@@ -56,7 +54,7 @@ export const setRegionalGuidanceReferenceImage = (arg: {
   dispatch: AppDispatch;
 }) => {
   const { imageDTO, entityIdentifier, referenceImageId, dispatch } = arg;
-  dispatch(rgIPAdapterImageChanged({ entityIdentifier, referenceImageId, imageDTO }));
+  dispatch(rgRefImageImageChanged({ entityIdentifier, referenceImageId, imageDTO }));
 };
 
 export const setUpscaleInitialImage = (arg: { imageDTO: ImageDTO; dispatch: AppDispatch }) => {
@@ -73,17 +71,17 @@ export const setNodeImageFieldImage = (arg: {
   dispatch(fieldImageValueChanged({ ...fieldIdentifier, value: imageDTO }));
 };
 
-export const setComparisonImage = (arg: { imageDTO: ImageDTO; dispatch: AppDispatch }) => {
-  const { imageDTO, dispatch } = arg;
-  dispatch(imageToCompareChanged(imageDTO));
+export const setComparisonImage = (arg: { image_name: string; dispatch: AppDispatch }) => {
+  const { image_name, dispatch } = arg;
+  dispatch(imageToCompareChanged(image_name));
 };
 
 export const createNewCanvasEntityFromImage = (arg: {
   imageDTO: ImageDTO;
   type: CanvasEntityType | 'regional_guidance_with_reference_image';
   dispatch: AppDispatch;
-  getState: () => RootState;
-  overrides?: Partial<Pick<CanvasRenderableEntityState, 'isEnabled' | 'isLocked' | 'name' | 'position'>>;
+  getState: AppGetState;
+  overrides?: Partial<Pick<CanvasEntityState, 'isEnabled' | 'isLocked' | 'name' | 'position'>>;
 }) => {
   const { type, imageDTO, dispatch, getState, overrides: _overrides } = arg;
   const state = getState();
@@ -116,16 +114,10 @@ export const createNewCanvasEntityFromImage = (arg: {
       dispatch(rgAdded({ overrides, isSelected: true }));
       break;
     }
-    case 'reference_image': {
-      const ipAdapter = deepClone(selectDefaultRefImageConfig(getState()));
-      ipAdapter.image = imageDTOToImageWithDims(imageDTO);
-      dispatch(referenceImageAdded({ overrides: { ipAdapter }, isSelected: true }));
-      break;
-    }
     case 'regional_guidance_with_reference_image': {
-      const ipAdapter = deepClone(selectDefaultIPAdapter(getState()));
-      ipAdapter.image = imageDTOToImageWithDims(imageDTO);
-      const referenceImages = [{ id: getPrefixedId('regional_guidance_reference_image'), ipAdapter }];
+      const config = getDefaultRegionalGuidanceRefImageConfig(getState);
+      config.image = imageDTOToImageWithDims(imageDTO);
+      const referenceImages = [{ id: getPrefixedId('regional_guidance_reference_image'), config }];
       dispatch(rgAdded({ overrides: { referenceImages }, isSelected: true }));
       break;
     }
@@ -145,12 +137,13 @@ export const createNewCanvasEntityFromImage = (arg: {
  */
 export const newCanvasFromImage = async (arg: {
   imageDTO: ImageDTO;
-  type: CanvasEntityType | 'regional_guidance_with_reference_image';
+  type: CanvasEntityType | 'regional_guidance_with_reference_image' | 'reference_image';
   withResize?: boolean;
+  withInpaintMask?: boolean;
   dispatch: AppDispatch;
-  getState: () => RootState;
+  getState: AppGetState;
 }) => {
-  const { type, imageDTO, withResize = false, dispatch, getState } = arg;
+  const { type, imageDTO, withResize = false, withInpaintMask = false, dispatch, getState } = arg;
   const state = getState();
 
   const base = selectBboxModelBase(state);
@@ -196,6 +189,10 @@ export const newCanvasFromImage = async (arg: {
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
       dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
       dispatch(rasterLayerAdded({ overrides, isSelected: true }));
+      if (withInpaintMask) {
+        dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
+      }
+      dispatch(canvasClearHistory());
       break;
     }
     case 'control_layer': {
@@ -209,6 +206,10 @@ export const newCanvasFromImage = async (arg: {
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
       dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
       dispatch(controlLayerAdded({ overrides, isSelected: true }));
+      if (withInpaintMask) {
+        dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
+      }
+      dispatch(canvasClearHistory());
       break;
     }
     case 'inpaint_mask': {
@@ -221,6 +222,10 @@ export const newCanvasFromImage = async (arg: {
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
       dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
       dispatch(inpaintMaskAdded({ overrides, isSelected: true }));
+      if (withInpaintMask) {
+        dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
+      }
+      dispatch(canvasClearHistory());
       break;
     }
     case 'regional_guidance': {
@@ -233,21 +238,33 @@ export const newCanvasFromImage = async (arg: {
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
       dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
       dispatch(rgAdded({ overrides, isSelected: true }));
+      if (withInpaintMask) {
+        dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
+      }
+      dispatch(canvasClearHistory());
       break;
     }
     case 'reference_image': {
-      const ipAdapter = deepClone(selectDefaultRefImageConfig(getState()));
-      ipAdapter.image = imageDTOToImageWithDims(imageDTO);
+      const config = deepClone(getDefaultRefImageConfig(getState));
+      config.image = imageDTOToImageWithDims(imageDTO);
       dispatch(canvasReset());
-      dispatch(referenceImageAdded({ overrides: { ipAdapter }, isSelected: true }));
+      dispatch(refImageAdded({ overrides: { config } }));
+      if (withInpaintMask) {
+        dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
+      }
+      dispatch(canvasClearHistory());
       break;
     }
     case 'regional_guidance_with_reference_image': {
-      const ipAdapter = deepClone(selectDefaultIPAdapter(getState()));
-      ipAdapter.image = imageDTOToImageWithDims(imageDTO);
-      const referenceImages = [{ id: getPrefixedId('regional_guidance_reference_image'), ipAdapter }];
+      const config = getDefaultRegionalGuidanceRefImageConfig(getState);
+      config.image = imageDTOToImageWithDims(imageDTO);
+      const referenceImages = [{ id: getPrefixedId('regional_guidance_reference_image'), config }];
       dispatch(canvasReset());
       dispatch(rgAdded({ overrides: { referenceImages }, isSelected: true }));
+      if (withInpaintMask) {
+        dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
+      }
+      dispatch(canvasClearHistory());
       break;
     }
     default:
@@ -257,9 +274,9 @@ export const newCanvasFromImage = async (arg: {
 
 export const replaceCanvasEntityObjectsWithImage = (arg: {
   imageDTO: ImageDTO;
-  entityIdentifier: CanvasRenderableEntityIdentifier;
+  entityIdentifier: CanvasEntityIdentifier;
   dispatch: AppDispatch;
-  getState: () => RootState;
+  getState: AppGetState;
 }) => {
   const { imageDTO, entityIdentifier, dispatch, getState } = arg;
   const imageObject = imageDTOToImageObject(imageDTO);
@@ -275,14 +292,14 @@ export const replaceCanvasEntityObjectsWithImage = (arg: {
   );
 };
 
-export const addImagesToBoard = (arg: { imageDTOs: ImageDTO[]; boardId: BoardId; dispatch: AppDispatch }) => {
-  const { imageDTOs, boardId, dispatch } = arg;
-  dispatch(imagesApi.endpoints.addImagesToBoard.initiate({ imageDTOs, board_id: boardId }, { track: false }));
+export const addImagesToBoard = (arg: { image_names: string[]; boardId: BoardId; dispatch: AppDispatch }) => {
+  const { image_names, boardId, dispatch } = arg;
+  dispatch(imagesApi.endpoints.addImagesToBoard.initiate({ image_names, board_id: boardId }, { track: false }));
   dispatch(selectionChanged([]));
 };
 
-export const removeImagesFromBoard = (arg: { imageDTOs: ImageDTO[]; dispatch: AppDispatch }) => {
-  const { imageDTOs, dispatch } = arg;
-  dispatch(imagesApi.endpoints.removeImagesFromBoard.initiate({ imageDTOs }, { track: false }));
+export const removeImagesFromBoard = (arg: { image_names: string[]; dispatch: AppDispatch }) => {
+  const { image_names, dispatch } = arg;
+  dispatch(imagesApi.endpoints.removeImagesFromBoard.initiate({ image_names }, { track: false }));
   dispatch(selectionChanged([]));
 };

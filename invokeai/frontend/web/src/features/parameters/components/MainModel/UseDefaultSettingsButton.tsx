@@ -1,6 +1,7 @@
 import { Flex, IconButton, ListItem, Text, UnorderedList } from '@invoke-ai/ui-library';
 import { EMPTY_OBJECT } from 'app/store/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { isNil } from 'es-toolkit/compat';
 import {
   selectCFGRescaleMultiplier,
   selectCFGScale,
@@ -13,7 +14,6 @@ import {
 } from 'features/controlLayers/store/paramsSlice';
 import { selectHeight, selectWidth } from 'features/controlLayers/store/selectors';
 import { setDefaultSettings } from 'features/parameters/store/actions';
-import { isNil } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiSparkleFill } from 'react-icons/pi';

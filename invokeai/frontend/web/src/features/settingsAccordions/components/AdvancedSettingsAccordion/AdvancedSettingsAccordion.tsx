@@ -12,12 +12,10 @@ import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
 import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
 import ParamSeamlessYAxis from 'features/parameters/components/Seamless/ParamSeamlessYAxis';
-import { ParamSeed } from 'features/parameters/components/Seed/ParamSeed';
 import ParamFLUXVAEModelSelect from 'features/parameters/components/VAEModel/ParamFLUXVAEModelSelect';
 import ParamVAEModelSelect from 'features/parameters/components/VAEModel/ParamVAEModelSelect';
 import ParamVAEPrecision from 'features/parameters/components/VAEModel/ParamVAEPrecision';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
@@ -33,7 +31,6 @@ const formLabelProps2: FormLabelProps = {
 export const AdvancedSettingsAccordion = memo(() => {
   const vaeKey = useAppSelector(selectVAEKey);
   const { currentData: vaeConfig } = useGetModelConfigQuery(vaeKey ?? skipToken);
-  const activeTabName = useAppSelector(selectActiveTab);
   const isFLUX = useAppSelector(selectIsFLUX);
   const isSD3 = useAppSelector(selectIsSD3);
 
@@ -68,19 +65,16 @@ export const AdvancedSettingsAccordion = memo(() => {
           if (params.seamlessXAxis || params.seamlessYAxis) {
             badges.push('seamless');
           }
-          if (activeTabName === 'upscaling' && !params.shouldRandomizeSeed) {
-            badges.push('Manual Seed');
-          }
         }
 
         return badges;
       }),
-    [vaeConfig, activeTabName]
+    [vaeConfig]
   );
   const badges = useAppSelector(selectBadges);
   const { t } = useTranslation();
   const { isOpen, onToggle } = useStandaloneAccordionToggle({
-    id: `'advanced-settings-${activeTabName}`,
+    id: `'advanced-settings-generate`,
     defaultIsOpen: false,
   });
 
@@ -91,38 +85,32 @@ export const AdvancedSettingsAccordion = memo(() => {
           {isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
           {!isFLUX && !isSD3 && <ParamVAEPrecision />}
         </Flex>
-        {activeTabName === 'upscaling' ? (
-          <ParamSeed />
-        ) : (
+        {!isFLUX && !isSD3 && (
           <>
-            {!isFLUX && !isSD3 && (
-              <>
-                <FormControlGroup formLabelProps={formLabelProps}>
-                  <ParamClipSkip />
-                  <ParamCFGRescaleMultiplier />
-                </FormControlGroup>
-                <Flex gap={4} w="full">
-                  <FormControlGroup formLabelProps={formLabelProps2}>
-                    <ParamSeamlessXAxis />
-                    <ParamSeamlessYAxis />
-                  </FormControlGroup>
-                </Flex>
-              </>
-            )}
-            {isFLUX && (
-              <FormControlGroup>
-                <ParamT5EncoderModelSelect />
-                <ParamCLIPEmbedModelSelect />
+            <FormControlGroup formLabelProps={formLabelProps}>
+              <ParamClipSkip />
+              <ParamCFGRescaleMultiplier />
+            </FormControlGroup>
+            <Flex gap={4} w="full">
+              <FormControlGroup formLabelProps={formLabelProps2}>
+                <ParamSeamlessXAxis />
+                <ParamSeamlessYAxis />
               </FormControlGroup>
-            )}
-            {isSD3 && (
-              <FormControlGroup>
-                <ParamT5EncoderModelSelect />
-                <ParamCLIPLEmbedModelSelect />
-                <ParamCLIPGEmbedModelSelect />
-              </FormControlGroup>
-            )}
+            </Flex>
           </>
+        )}
+        {isFLUX && (
+          <FormControlGroup>
+            <ParamT5EncoderModelSelect />
+            <ParamCLIPEmbedModelSelect />
+          </FormControlGroup>
+        )}
+        {isSD3 && (
+          <FormControlGroup>
+            <ParamT5EncoderModelSelect />
+            <ParamCLIPLEmbedModelSelect />
+            <ParamCLIPGEmbedModelSelect />
+          </FormControlGroup>
         )}
       </Flex>
     </StandaloneAccordion>

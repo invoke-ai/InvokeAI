@@ -1,5 +1,5 @@
 import { useDisclosure } from '@invoke-ai/ui-library';
-import { isNil } from 'lodash-es';
+import { isNil } from 'es-toolkit/compat';
 import type { ChangeEventHandler, KeyboardEventHandler, RefObject } from 'react';
 import { useCallback } from 'react';
 import { flushSync } from 'react-dom';

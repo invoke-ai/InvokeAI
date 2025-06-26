@@ -1,4 +1,4 @@
-import { isNil } from 'lodash-es';
+import { isNil } from 'es-toolkit/compat';
 import { useMemo } from 'react';
 import type { ControlLoRAModelConfig, ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 

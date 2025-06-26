@@ -9,16 +9,15 @@ const [useCancelAllExceptCurrentQueueItemConfirmationAlertDialog] = buildUseBool
 
 export const useCancelAllExceptCurrentQueueItemDialog = () => {
   const dialog = useCancelAllExceptCurrentQueueItemConfirmationAlertDialog();
-  const { cancelAllExceptCurrentQueueItem, isLoading, isDisabled, queueStatus } = useCancelAllExceptCurrentQueueItem();
+  const cancelAllExceptCurrentQueueItem = useCancelAllExceptCurrentQueueItem();
 
   return {
-    cancelAllExceptCurrentQueueItem,
+    trigger: cancelAllExceptCurrentQueueItem.trigger,
     isOpen: dialog.isTrue,
     openDialog: dialog.setTrue,
     closeDialog: dialog.setFalse,
-    isLoading,
-    queueStatus,
-    isDisabled,
+    isLoading: cancelAllExceptCurrentQueueItem.isLoading,
+    isDisabled: cancelAllExceptCurrentQueueItem.isDisabled,
   };
 };
 
@@ -32,7 +31,7 @@ export const CancelAllExceptCurrentQueueItemConfirmationAlertDialog = memo(() =>
       isOpen={cancelAllExceptCurrentQueueItem.isOpen}
       onClose={cancelAllExceptCurrentQueueItem.closeDialog}
       title={t('queue.cancelAllExceptCurrentTooltip')}
-      acceptCallback={cancelAllExceptCurrentQueueItem.cancelAllExceptCurrentQueueItem}
+      acceptCallback={cancelAllExceptCurrentQueueItem.trigger}
       acceptButtonText={t('queue.confirm')}
       useInert={false}
     >

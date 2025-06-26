@@ -1,13 +1,13 @@
 import type { Selector } from '@reduxjs/toolkit';
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
+import { uniqBy } from 'es-toolkit/compat';
 import { getElement } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import type { NodesState } from 'features/nodes/store/types';
 import type { FieldInputInstance } from 'features/nodes/types/field';
 import type { AnyNode, InvocationNode, InvocationNodeData } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { isContainerElement, isNodeFieldElement } from 'features/nodes/types/workflow';
-import { uniqBy } from 'lodash-es';
 import { assert } from 'tsafe';
 
 export const selectNode = (nodesSlice: NodesState, nodeId: string): AnyNode => {

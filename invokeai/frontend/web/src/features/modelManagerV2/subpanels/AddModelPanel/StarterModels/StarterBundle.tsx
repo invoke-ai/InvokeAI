@@ -1,9 +1,9 @@
 import { Button, Flex, ListItem, Text, Tooltip, UnorderedList } from '@invoke-ai/ui-library';
+import { flatMap, negate, uniqWith } from 'es-toolkit/compat';
 import { flattenStarterModel, useBuildModelInstallArg } from 'features/modelManagerV2/hooks/useBuildModelsToInstall';
 import { isMainModelBase } from 'features/nodes/types/common';
 import { MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
 import { toast } from 'features/toast/toast';
-import { flatMap, negate, uniqWith } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useInstallModelMutation } from 'services/api/endpoints/models';

@@ -1,14 +1,13 @@
+import type { ProgressProps } from '@invoke-ai/ui-library';
 import { Progress } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useCurrentDestination } from 'features/queue/hooks/useCurrentDestination';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 import { $isConnected, $lastProgressEvent } from 'services/events/stores';
 
-const ProgressBar = () => {
+const ProgressBar = (props: ProgressProps) => {
   const { t } = useTranslation();
-  const destination = useCurrentDestination();
   const { data: queueStatus } = useGetQueueStatusQuery();
   const isConnected = useStore($isConnected);
   const lastProgressEvent = useStore($lastProgressEvent);
@@ -39,16 +38,6 @@ const ProgressBar = () => {
     return false;
   }, [isConnected, lastProgressEvent, queueStatus?.queue.in_progress]);
 
-  const colorScheme = useMemo(() => {
-    if (destination === 'canvas') {
-      return 'invokeGreen';
-    } else if (destination === 'gallery') {
-      return 'invokeBlue';
-    } else {
-      return 'base';
-    }
-  }, [destination]);
-
   return (
     <Progress
       value={value}
@@ -56,7 +45,8 @@ const ProgressBar = () => {
       isIndeterminate={isIndeterminate}
       h={2}
       w="full"
-      colorScheme={colorScheme}
+      colorScheme="invokeBlue"
+      {...props}
     />
   );
 };

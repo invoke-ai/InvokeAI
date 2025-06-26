@@ -4,8 +4,9 @@ import type { PersistConfig } from 'app/store/store';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
+import { merge } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { canvasReset, newSessionRequested } from 'features/controlLayers/store/actions';
+import { canvasReset } from 'features/controlLayers/store/actions';
 import { modelChanged } from 'features/controlLayers/store/paramsSlice';
 import {
   selectAllEntities,
@@ -22,7 +23,7 @@ import type {
   EntityMovedByPayload,
   FillStyle,
   FLUXReduxImageInfluence,
-  RegionalGuidanceReferenceImageState,
+  RegionalGuidanceRefImageState,
   RgbColor,
 } from 'features/controlLayers/store/types';
 import {
@@ -35,18 +36,17 @@ import { ASPECT_RATIO_MAP } from 'features/parameters/components/Bbox/constants'
 import { API_BASE_MODELS } from 'features/parameters/types/constants';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
-import { isEqual, merge } from 'lodash-es';
 import type { UndoableOptions } from 'redux-undo';
-import type {
-  ApiModelConfig,
-  ControlLoRAModelConfig,
-  ControlNetModelConfig,
-  FLUXReduxModelConfig,
-  ImageDTO,
-  IPAdapterModelConfig,
-  T2IAdapterModelConfig,
+import {
+  type ControlLoRAModelConfig,
+  type ControlNetModelConfig,
+  type FLUXReduxModelConfig,
+  type ImageDTO,
+  type IPAdapterModelConfig,
+  isFluxReduxModelConfig,
+  isIPAdapterModelConfig,
+  type T2IAdapterModelConfig,
 } from 'services/api/types';
-import { assert } from 'tsafe';
 
 import type {
   AspectRatioID,
@@ -54,7 +54,6 @@ import type {
   CanvasControlLayerState,
   CanvasEntityIdentifier,
   CanvasRasterLayerState,
-  CanvasReferenceImageState,
   CanvasRegionalGuidanceState,
   CanvasState,
   CLIPVisionModelV2,
@@ -70,78 +69,32 @@ import type {
   T2IAdapterConfig,
 } from './types';
 import {
+  DEFAULT_ASPECT_RATIO_CONFIG,
   getEntityIdentifier,
+  getInitialCanvasState,
   isChatGPT4oAspectRatioID,
   isFluxKontextAspectRatioID,
+  isFLUXReduxConfig,
   isImagenAspectRatioID,
-  isRenderableEntity,
+  isIPAdapterConfig,
 } from './types';
 import {
   converters,
   getControlLayerState,
   getInpaintMaskState,
   getRasterLayerState,
-  getReferenceImageState,
   getRegionalGuidanceState,
   imageDTOToImageWithDims,
-  initialChatGPT4oReferenceImage,
   initialControlLoRA,
   initialControlNet,
-  initialFluxKontextReferenceImage,
   initialFLUXRedux,
   initialIPAdapter,
   initialT2IAdapter,
 } from './util';
 
-/**
- * Gets a fresh canvas initial state with no references in memory to existing objects.
- */
-const getInitialState = (): CanvasState => {
-  const initialInpaintMaskState = getInpaintMaskState(getPrefixedId('inpaint_mask'));
-  const initialState: CanvasState = {
-    _version: 3,
-    selectedEntityIdentifier: getEntityIdentifier(initialInpaintMaskState),
-    bookmarkedEntityIdentifier: getEntityIdentifier(initialInpaintMaskState),
-    rasterLayers: {
-      isHidden: false,
-      entities: [],
-    },
-    controlLayers: {
-      isHidden: false,
-      entities: [],
-    },
-    inpaintMasks: {
-      isHidden: false,
-      entities: [initialInpaintMaskState],
-    },
-    regionalGuidance: {
-      isHidden: false,
-      entities: [],
-    },
-    referenceImages: { entities: [] },
-    bbox: {
-      rect: { x: 0, y: 0, width: 512, height: 512 },
-      aspectRatio: {
-        id: '1:1',
-        value: 1,
-        isLocked: false,
-      },
-      scaleMethod: 'auto',
-      scaledSize: {
-        width: 512,
-        height: 512,
-      },
-      modelBase: 'sd-1',
-    },
-  };
-  return initialState;
-};
-
-const initialState = getInitialState();
-
 export const canvasSlice = createSlice({
   name: 'canvas',
-  initialState,
+  initialState: getInitialCanvasState(),
   reducers: {
     // undoable canvas state
     //#region Raster layers
@@ -152,10 +105,11 @@ export const canvasSlice = createSlice({
           id: string;
           overrides?: Partial<CanvasRasterLayerState>;
           isSelected?: boolean;
+          isBookmarked?: boolean;
           mergedEntitiesToDelete?: string[];
         }>
       ) => {
-        const { id, overrides, isSelected, mergedEntitiesToDelete = [] } = action.payload;
+        const { id, overrides, isSelected, isBookmarked, mergedEntitiesToDelete = [] } = action.payload;
         const entityState = getRasterLayerState(id, overrides);
 
         state.rasterLayers.entities.push(entityState);
@@ -166,13 +120,20 @@ export const canvasSlice = createSlice({
           );
         }
 
+        const entityIdentifier = getEntityIdentifier(entityState);
+
         if (isSelected || mergedEntitiesToDelete.length > 0) {
-          state.selectedEntityIdentifier = getEntityIdentifier(entityState);
+          state.selectedEntityIdentifier = entityIdentifier;
+        }
+
+        if (isBookmarked) {
+          state.bookmarkedEntityIdentifier = entityIdentifier;
         }
       },
       prepare: (payload: {
         overrides?: Partial<CanvasRasterLayerState>;
         isSelected?: boolean;
+        isBookmarked?: boolean;
         mergedEntitiesToDelete?: string[];
       }) => ({
         payload: { ...payload, id: getPrefixedId('raster_layer') },
@@ -305,10 +266,11 @@ export const canvasSlice = createSlice({
           id: string;
           overrides?: Partial<CanvasControlLayerState>;
           isSelected?: boolean;
+          isBookmarked?: boolean;
           mergedEntitiesToDelete?: string[];
         }>
       ) => {
-        const { id, overrides, isSelected, mergedEntitiesToDelete = [] } = action.payload;
+        const { id, overrides, isSelected, isBookmarked, mergedEntitiesToDelete = [] } = action.payload;
 
         const entityState = getControlLayerState(id, overrides);
 
@@ -319,14 +281,20 @@ export const canvasSlice = createSlice({
             (entity) => !mergedEntitiesToDelete.includes(entity.id)
           );
         }
+        const entityIdentifier = getEntityIdentifier(entityState);
 
         if (isSelected || mergedEntitiesToDelete.length > 0) {
-          state.selectedEntityIdentifier = getEntityIdentifier(entityState);
+          state.selectedEntityIdentifier = entityIdentifier;
+        }
+
+        if (isBookmarked) {
+          state.bookmarkedEntityIdentifier = entityIdentifier;
         }
       },
       prepare: (payload: {
         overrides?: Partial<CanvasControlLayerState>;
         isSelected?: boolean;
+        isBookmarked?: boolean;
         mergedEntitiesToDelete?: string[];
       }) => ({
         payload: { ...payload, id: getPrefixedId('control_layer') },
@@ -588,190 +556,6 @@ export const canvasSlice = createSlice({
       }
       layer.withTransparencyEffect = !layer.withTransparencyEffect;
     },
-    //#region Global Reference Images
-    referenceImageAdded: {
-      reducer: (
-        state,
-        action: PayloadAction<{ id: string; overrides?: Partial<CanvasReferenceImageState>; isSelected?: boolean }>
-      ) => {
-        const { id, overrides, isSelected } = action.payload;
-        const entityState = getReferenceImageState(id, overrides);
-
-        state.referenceImages.entities.push(entityState);
-
-        if (isSelected) {
-          state.selectedEntityIdentifier = getEntityIdentifier(entityState);
-        }
-      },
-      prepare: (payload?: { overrides?: Partial<CanvasReferenceImageState>; isSelected?: boolean }) => ({
-        payload: { ...payload, id: getPrefixedId('reference_image') },
-      }),
-    },
-    referenceImageRecalled: (state, action: PayloadAction<{ data: CanvasReferenceImageState }>) => {
-      const { data } = action.payload;
-      state.referenceImages.entities.push(data);
-      state.selectedEntityIdentifier = { type: 'reference_image', id: data.id };
-    },
-    referenceImageIPAdapterImageChanged: (
-      state,
-      action: PayloadAction<EntityIdentifierPayload<{ imageDTO: ImageDTO | null }, 'reference_image'>>
-    ) => {
-      const { entityIdentifier, imageDTO } = action.payload;
-      const entity = selectEntity(state, entityIdentifier);
-      if (!entity) {
-        return;
-      }
-      entity.ipAdapter.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
-    },
-    referenceImageIPAdapterMethodChanged: (
-      state,
-      action: PayloadAction<EntityIdentifierPayload<{ method: IPMethodV2 }, 'reference_image'>>
-    ) => {
-      const { entityIdentifier, method } = action.payload;
-      const entity = selectEntity(state, entityIdentifier);
-      if (!entity) {
-        return;
-      }
-      if (entity.ipAdapter.type !== 'ip_adapter') {
-        return;
-      }
-      entity.ipAdapter.method = method;
-    },
-    referenceImageIPAdapterFLUXReduxImageInfluenceChanged: (
-      state,
-      action: PayloadAction<EntityIdentifierPayload<{ imageInfluence: FLUXReduxImageInfluence }, 'reference_image'>>
-    ) => {
-      const { entityIdentifier, imageInfluence } = action.payload;
-      const entity = selectEntity(state, entityIdentifier);
-      if (!entity) {
-        return;
-      }
-      if (entity.ipAdapter.type !== 'flux_redux') {
-        return;
-      }
-      entity.ipAdapter.imageInfluence = imageInfluence;
-    },
-    referenceImageIPAdapterModelChanged: (
-      state,
-      action: PayloadAction<
-        EntityIdentifierPayload<
-          { modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | ApiModelConfig | null },
-          'reference_image'
-        >
-      >
-    ) => {
-      const { entityIdentifier, modelConfig } = action.payload;
-      const entity = selectEntity(state, entityIdentifier);
-      if (!entity) {
-        return;
-      }
-
-      const oldModel = entity.ipAdapter.model;
-
-      // First set the new model
-      entity.ipAdapter.model = modelConfig ? zModelIdentifierField.parse(modelConfig) : null;
-
-      if (!entity.ipAdapter.model) {
-        return;
-      }
-
-      if (isEqual(oldModel, entity.ipAdapter.model)) {
-        // Nothing changed, so we don't need to do anything
-        return;
-      }
-
-      // The type of ref image depends on the model. When the user switches the model, we rebuild the ref image.
-      // When we switch the model, we keep the image the same, but change the other parameters.
-
-      if (entity.ipAdapter.model.base === 'chatgpt-4o') {
-        // Switching to chatgpt-4o ref image
-        entity.ipAdapter = {
-          ...initialChatGPT4oReferenceImage,
-          image: entity.ipAdapter.image,
-          model: entity.ipAdapter.model,
-        };
-        return;
-      }
-
-      if (entity.ipAdapter.model.base === 'flux-kontext') {
-        // Switching to flux-kontext
-        entity.ipAdapter = {
-          ...initialFluxKontextReferenceImage,
-          image: entity.ipAdapter.image,
-          model: entity.ipAdapter.model,
-        };
-        return;
-      }
-
-      if (entity.ipAdapter.model.type === 'flux_redux') {
-        // Switching to flux_redux
-        entity.ipAdapter = {
-          ...initialFLUXRedux,
-          image: entity.ipAdapter.image,
-          model: entity.ipAdapter.model,
-        };
-        return;
-      }
-
-      if (entity.ipAdapter.model.type === 'ip_adapter') {
-        // Switching to ip_adapter
-        entity.ipAdapter = {
-          ...initialIPAdapter,
-          image: entity.ipAdapter.image,
-          model: entity.ipAdapter.model,
-        };
-        // Ensure that the IP Adapter model is compatible with the CLIP Vision model
-        if (entity.ipAdapter.model?.base === 'flux') {
-          entity.ipAdapter.clipVisionModel = 'ViT-L';
-        } else if (entity.ipAdapter.clipVisionModel === 'ViT-L') {
-          // Fall back to ViT-H (ViT-G would also work)
-          entity.ipAdapter.clipVisionModel = 'ViT-H';
-        }
-        return;
-      }
-    },
-    referenceImageIPAdapterCLIPVisionModelChanged: (
-      state,
-      action: PayloadAction<EntityIdentifierPayload<{ clipVisionModel: CLIPVisionModelV2 }, 'reference_image'>>
-    ) => {
-      const { entityIdentifier, clipVisionModel } = action.payload;
-      const entity = selectEntity(state, entityIdentifier);
-      if (!entity) {
-        return;
-      }
-      if (entity.ipAdapter.type !== 'ip_adapter') {
-        return;
-      }
-      entity.ipAdapter.clipVisionModel = clipVisionModel;
-    },
-    referenceImageIPAdapterWeightChanged: (
-      state,
-      action: PayloadAction<EntityIdentifierPayload<{ weight: number }, 'reference_image'>>
-    ) => {
-      const { entityIdentifier, weight } = action.payload;
-      const entity = selectEntity(state, entityIdentifier);
-      if (!entity) {
-        return;
-      }
-      if (entity.ipAdapter.type !== 'ip_adapter') {
-        return;
-      }
-      entity.ipAdapter.weight = weight;
-    },
-    referenceImageIPAdapterBeginEndStepPctChanged: (
-      state,
-      action: PayloadAction<EntityIdentifierPayload<{ beginEndStepPct: [number, number] }, 'reference_image'>>
-    ) => {
-      const { entityIdentifier, beginEndStepPct } = action.payload;
-      const entity = selectEntity(state, entityIdentifier);
-      if (!entity) {
-        return;
-      }
-      if (entity.ipAdapter.type !== 'ip_adapter') {
-        return;
-      }
-      entity.ipAdapter.beginEndStepPct = beginEndStepPct;
-    },
     //#region Regional Guidance
     rgAdded: {
       reducer: (
@@ -780,10 +564,11 @@ export const canvasSlice = createSlice({
           id: string;
           overrides?: Partial<CanvasRegionalGuidanceState>;
           isSelected?: boolean;
+          isBookmarked?: boolean;
           mergedEntitiesToDelete?: string[];
         }>
       ) => {
-        const { id, overrides, isSelected, mergedEntitiesToDelete = [] } = action.payload;
+        const { id, overrides, isSelected, isBookmarked, mergedEntitiesToDelete = [] } = action.payload;
 
         const entityState = getRegionalGuidanceState(id, overrides);
 
@@ -794,14 +579,20 @@ export const canvasSlice = createSlice({
             (entity) => !mergedEntitiesToDelete.includes(entity.id)
           );
         }
+        const entityIdentifier = getEntityIdentifier(entityState);
 
         if (isSelected || mergedEntitiesToDelete.length > 0) {
-          state.selectedEntityIdentifier = getEntityIdentifier(entityState);
+          state.selectedEntityIdentifier = entityIdentifier;
+        }
+
+        if (isBookmarked) {
+          state.bookmarkedEntityIdentifier = entityIdentifier;
         }
       },
       prepare: (payload?: {
         overrides?: Partial<CanvasRegionalGuidanceState>;
         isSelected?: boolean;
+        isBookmarked?: boolean;
         mergedEntitiesToDelete?: string[];
       }) => ({
         payload: { ...payload, id: getPrefixedId('regional_guidance') },
@@ -882,12 +673,12 @@ export const canvasSlice = createSlice({
       }
       rg.autoNegative = !rg.autoNegative;
     },
-    rgIPAdapterAdded: {
+    rgRefImageAdded: {
       reducer: (
         state,
         action: PayloadAction<
           EntityIdentifierPayload<
-            { referenceImageId: string; overrides?: Partial<RegionalGuidanceReferenceImageState> },
+            { referenceImageId: string; overrides?: Partial<RegionalGuidanceRefImageState> },
             'regional_guidance'
           >
         >
@@ -897,20 +688,17 @@ export const canvasSlice = createSlice({
         if (!entity) {
           return;
         }
-        const ipAdapter = { id: referenceImageId, ipAdapter: deepClone(initialIPAdapter) };
-        merge(ipAdapter, overrides);
-        entity.referenceImages.push(ipAdapter);
+        const config = { id: referenceImageId, config: deepClone(initialIPAdapter) };
+        merge(config, overrides);
+        entity.referenceImages.push(config);
       },
       prepare: (
-        payload: EntityIdentifierPayload<
-          { overrides?: Partial<RegionalGuidanceReferenceImageState> },
-          'regional_guidance'
-        >
+        payload: EntityIdentifierPayload<{ overrides?: Partial<RegionalGuidanceRefImageState> }, 'regional_guidance'>
       ) => ({
         payload: { ...payload, referenceImageId: getPrefixedId('regional_guidance_ip_adapter') },
       }),
     },
-    rgIPAdapterDeleted: (
+    rgRefImageDeleted: (
       state,
       action: PayloadAction<EntityIdentifierPayload<{ referenceImageId: string }, 'regional_guidance'>>
     ) => {
@@ -919,9 +707,9 @@ export const canvasSlice = createSlice({
       if (!entity) {
         return;
       }
-      entity.referenceImages = entity.referenceImages.filter((ipAdapter) => ipAdapter.id !== referenceImageId);
+      entity.referenceImages = entity.referenceImages.filter((config) => config.id !== referenceImageId);
     },
-    rgIPAdapterImageChanged: (
+    rgRefImageImageChanged: (
       state,
       action: PayloadAction<
         EntityIdentifierPayload<{ referenceImageId: string; imageDTO: ImageDTO | null }, 'regional_guidance'>
@@ -932,9 +720,9 @@ export const canvasSlice = createSlice({
       if (!referenceImage) {
         return;
       }
-      referenceImage.ipAdapter.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
+      referenceImage.config.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
     },
-    rgIPAdapterWeightChanged: (
+    rgRefImageIPAdapterWeightChanged: (
       state,
       action: PayloadAction<EntityIdentifierPayload<{ referenceImageId: string; weight: number }, 'regional_guidance'>>
     ) => {
@@ -943,13 +731,13 @@ export const canvasSlice = createSlice({
       if (!referenceImage) {
         return;
       }
-      if (referenceImage.ipAdapter.type !== 'ip_adapter') {
+      if (!isIPAdapterConfig(referenceImage.config)) {
         return;
       }
 
-      referenceImage.ipAdapter.weight = weight;
+      referenceImage.config.weight = weight;
     },
-    rgIPAdapterBeginEndStepPctChanged: (
+    rgRefImageIPAdapterBeginEndStepPctChanged: (
       state,
       action: PayloadAction<
         EntityIdentifierPayload<{ referenceImageId: string; beginEndStepPct: [number, number] }, 'regional_guidance'>
@@ -960,13 +748,12 @@ export const canvasSlice = createSlice({
       if (!referenceImage) {
         return;
       }
-      if (referenceImage.ipAdapter.type !== 'ip_adapter') {
+      if (!isIPAdapterConfig(referenceImage.config)) {
         return;
       }
-
-      referenceImage.ipAdapter.beginEndStepPct = beginEndStepPct;
+      referenceImage.config.beginEndStepPct = beginEndStepPct;
     },
-    rgIPAdapterMethodChanged: (
+    rgRefImageIPAdapterMethodChanged: (
       state,
       action: PayloadAction<
         EntityIdentifierPayload<{ referenceImageId: string; method: IPMethodV2 }, 'regional_guidance'>
@@ -977,13 +764,12 @@ export const canvasSlice = createSlice({
       if (!referenceImage) {
         return;
       }
-      if (referenceImage.ipAdapter.type !== 'ip_adapter') {
+      if (!isIPAdapterConfig(referenceImage.config)) {
         return;
       }
-
-      referenceImage.ipAdapter.method = method;
+      referenceImage.config.method = method;
     },
-    rgIPAdapterFLUXReduxImageInfluenceChanged: (
+    rgRefImageFLUXReduxImageInfluenceChanged: (
       state,
       action: PayloadAction<
         EntityIdentifierPayload<
@@ -997,13 +783,13 @@ export const canvasSlice = createSlice({
       if (!referenceImage) {
         return;
       }
-      if (referenceImage.ipAdapter.type !== 'flux_redux') {
+      if (!isFLUXReduxConfig(referenceImage.config)) {
         return;
       }
 
-      referenceImage.ipAdapter.imageInfluence = imageInfluence;
+      referenceImage.config.imageInfluence = imageInfluence;
     },
-    rgIPAdapterModelChanged: (
+    rgRefImageModelChanged: (
       state,
       action: PayloadAction<
         EntityIdentifierPayload<
@@ -1020,43 +806,43 @@ export const canvasSlice = createSlice({
       if (!referenceImage) {
         return;
       }
-      referenceImage.ipAdapter.model = modelConfig ? zModelIdentifierField.parse(modelConfig) : null;
 
-      if (!referenceImage.ipAdapter.model) {
+      if (!modelConfig) {
+        referenceImage.config.model = null;
         return;
       }
 
-      if (referenceImage.ipAdapter.type === 'ip_adapter' && referenceImage.ipAdapter.model.type === 'flux_redux') {
+      if (isIPAdapterConfig(referenceImage.config) && isFluxReduxModelConfig(modelConfig)) {
         // Switching from ip_adapter to flux_redux
-        referenceImage.ipAdapter = {
+        referenceImage.config = {
           ...initialFLUXRedux,
-          image: referenceImage.ipAdapter.image,
-          model: referenceImage.ipAdapter.model,
+          image: referenceImage.config.image,
+          model: zModelIdentifierField.parse(modelConfig),
         };
         return;
       }
 
-      if (referenceImage.ipAdapter.type === 'flux_redux' && referenceImage.ipAdapter.model.type === 'ip_adapter') {
+      if (isFLUXReduxConfig(referenceImage.config) && isIPAdapterModelConfig(modelConfig)) {
         // Switching from flux_redux to ip_adapter
-        referenceImage.ipAdapter = {
+        referenceImage.config = {
           ...initialIPAdapter,
-          image: referenceImage.ipAdapter.image,
-          model: referenceImage.ipAdapter.model,
+          image: referenceImage.config.image,
+          model: zModelIdentifierField.parse(modelConfig),
         };
         return;
       }
 
-      if (referenceImage.ipAdapter.type === 'ip_adapter') {
+      if (isIPAdapterConfig(referenceImage.config)) {
         // Ensure that the IP Adapter model is compatible with the CLIP Vision model
-        if (referenceImage.ipAdapter.model?.base === 'flux') {
-          referenceImage.ipAdapter.clipVisionModel = 'ViT-L';
-        } else if (referenceImage.ipAdapter.clipVisionModel === 'ViT-L') {
+        if (referenceImage.config.model?.base === 'flux') {
+          referenceImage.config.clipVisionModel = 'ViT-L';
+        } else if (referenceImage.config.clipVisionModel === 'ViT-L') {
           // Fall back to ViT-H (ViT-G would also work)
-          referenceImage.ipAdapter.clipVisionModel = 'ViT-H';
+          referenceImage.config.clipVisionModel = 'ViT-H';
         }
       }
     },
-    rgIPAdapterCLIPVisionModelChanged: (
+    rgRefImageIPAdapterCLIPVisionModelChanged: (
       state,
       action: PayloadAction<
         EntityIdentifierPayload<{ referenceImageId: string; clipVisionModel: CLIPVisionModelV2 }, 'regional_guidance'>
@@ -1067,11 +853,10 @@ export const canvasSlice = createSlice({
       if (!referenceImage) {
         return;
       }
-      if (referenceImage.ipAdapter.type !== 'ip_adapter') {
+      if (!isIPAdapterConfig(referenceImage.config)) {
         return;
       }
-
-      referenceImage.ipAdapter.clipVisionModel = clipVisionModel;
+      referenceImage.config.clipVisionModel = clipVisionModel;
     },
     //#region Inpaint mask
     inpaintMaskAdded: {
@@ -1081,10 +866,11 @@ export const canvasSlice = createSlice({
           id: string;
           overrides?: Partial<CanvasInpaintMaskState>;
           isSelected?: boolean;
+          isBookmarked?: boolean;
           mergedEntitiesToDelete?: string[];
         }>
       ) => {
-        const { id, overrides, isSelected, mergedEntitiesToDelete = [] } = action.payload;
+        const { id, overrides, isSelected, isBookmarked, mergedEntitiesToDelete = [] } = action.payload;
 
         const entityState = getInpaintMaskState(id, overrides);
 
@@ -1095,14 +881,20 @@ export const canvasSlice = createSlice({
             (entity) => !mergedEntitiesToDelete.includes(entity.id)
           );
         }
+        const entityIdentifier = getEntityIdentifier(entityState);
 
         if (isSelected || mergedEntitiesToDelete.length > 0) {
-          state.selectedEntityIdentifier = getEntityIdentifier(entityState);
+          state.selectedEntityIdentifier = entityIdentifier;
+        }
+
+        if (isBookmarked) {
+          state.bookmarkedEntityIdentifier = entityIdentifier;
         }
       },
       prepare: (payload?: {
         overrides?: Partial<CanvasInpaintMaskState>;
         isSelected?: boolean;
+        isBookmarked?: boolean;
         mergedEntitiesToDelete?: string[];
       }) => ({
         payload: { ...payload, id: getPrefixedId('inpaint_mask') },
@@ -1409,7 +1201,7 @@ export const canvasSlice = createSlice({
         state.bbox.rect.width = width;
         state.bbox.rect.height = height;
       } else {
-        state.bbox.aspectRatio = deepClone(initialState.bbox.aspectRatio);
+        state.bbox.aspectRatio = deepClone(DEFAULT_ASPECT_RATIO_CONFIG);
         state.bbox.rect.width = optimalDimension;
         state.bbox.rect.height = optimalDimension;
       }
@@ -1466,13 +1258,10 @@ export const canvasSlice = createSlice({
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
-      } else if (isRenderableEntity(entity)) {
-        entity.isEnabled = true;
-        entity.objects = [];
-        entity.position = { x: 0, y: 0 };
-      } else {
-        assert(false, 'Not implemented');
       }
+      entity.isEnabled = true;
+      entity.objects = [];
+      entity.position = { x: 0, y: 0 };
     },
     entityDuplicated: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
@@ -1500,10 +1289,6 @@ export const canvasSlice = createSlice({
             refImage.id = getPrefixedId('regional_guidance_ip_adapter');
           }
           state.regionalGuidance.entities.push(newEntity);
-          break;
-        case 'reference_image':
-          newEntity.id = getPrefixedId('reference_image');
-          state.referenceImages.entities.push(newEntity);
           break;
         case 'inpaint_mask':
           newEntity.id = getPrefixedId('inpaint_mask');
@@ -1558,18 +1343,12 @@ export const canvasSlice = createSlice({
         return;
       }
 
-      if (isRenderableEntity(entity)) {
-        entity.position = position;
-      }
+      entity.position = position;
     },
     entityMovedBy: (state, action: PayloadAction<EntityMovedByPayload>) => {
       const { entityIdentifier, offset } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
-        return;
-      }
-
-      if (!isRenderableEntity(entity)) {
         return;
       }
 
@@ -1583,11 +1362,9 @@ export const canvasSlice = createSlice({
         return;
       }
 
-      if (isRenderableEntity(entity)) {
-        if (replaceObjects) {
-          entity.objects = [imageObject];
-          entity.position = position;
-        }
+      if (replaceObjects) {
+        entity.objects = [imageObject];
+        entity.position = position;
       }
 
       if (isSelected) {
@@ -1599,10 +1376,6 @@ export const canvasSlice = createSlice({
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
-      }
-
-      if (!isRenderableEntity(entity)) {
-        assert(false, `Cannot add a brush line to a non-drawable entity of type ${entity.type}`);
       }
 
       // TODO(psyche): If we add the object without splatting, the renderer will see it as the same object and not
@@ -1620,10 +1393,6 @@ export const canvasSlice = createSlice({
         return;
       }
 
-      if (!isRenderableEntity(entity)) {
-        assert(false, `Cannot add a eraser line to a non-drawable entity of type ${entity.type}`);
-      }
-
       // TODO(psyche): If we add the object without splatting, the renderer will see it as the same object and not
       // re-render it (reference equality check). I don't like this behaviour.
       entity.objects.push({
@@ -1637,10 +1406,6 @@ export const canvasSlice = createSlice({
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
-      }
-
-      if (!isRenderableEntity(entity)) {
-        assert(false, `Cannot add a rect to a non-drawable entity of type ${entity.type}`);
       }
 
       // TODO(psyche): If we add the object without splatting, the renderer will see it as the same object and not
@@ -1672,9 +1437,6 @@ export const canvasSlice = createSlice({
           state.regionalGuidance.entities = state.regionalGuidance.entities.filter(
             (rg) => rg.id !== entityIdentifier.id
           );
-          break;
-        case 'reference_image':
-          state.referenceImages.entities = state.referenceImages.entities.filter((rg) => rg.id !== entityIdentifier.id);
           break;
         case 'inpaint_mask':
           state.inpaintMasks.entities = state.inpaintMasks.entities.filter((rg) => rg.id !== entityIdentifier.id);
@@ -1747,21 +1509,12 @@ export const canvasSlice = createSlice({
             entityIdentifiers as CanvasEntityIdentifier<'regional_guidance'>[]
           );
           break;
-        case 'reference_image':
-          state.referenceImages.entities = reorderEntities(
-            state.referenceImages.entities,
-            entityIdentifiers as CanvasEntityIdentifier<'reference_image'>[]
-          );
-          break;
       }
     },
     entityOpacityChanged: (state, action: PayloadAction<EntityIdentifierPayload<{ opacity: number }>>) => {
       const { entityIdentifier, opacity } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
-        return;
-      }
-      if (entity.type === 'reference_image') {
         return;
       }
       entity.opacity = opacity;
@@ -1782,26 +1535,21 @@ export const canvasSlice = createSlice({
         case 'regional_guidance':
           state.regionalGuidance.isHidden = !state.regionalGuidance.isHidden;
           break;
-        case 'reference_image':
-          // no-op
-          break;
       }
     },
     allEntitiesDeleted: (state) => {
       // Deleting all entities is equivalent to resetting the state for each entity type
-      const initialState = getInitialState();
+      const initialState = getInitialCanvasState();
       state.rasterLayers = initialState.rasterLayers;
       state.controlLayers = initialState.controlLayers;
       state.inpaintMasks = initialState.inpaintMasks;
       state.regionalGuidance = initialState.regionalGuidance;
-      state.referenceImages = initialState.referenceImages;
     },
     canvasMetadataRecalled: (state, action: PayloadAction<CanvasMetadata>) => {
-      const { controlLayers, inpaintMasks, rasterLayers, referenceImages, regionalGuidance } = action.payload;
+      const { controlLayers, inpaintMasks, rasterLayers, regionalGuidance } = action.payload;
       state.controlLayers.entities = controlLayers;
       state.inpaintMasks.entities = inpaintMasks;
       state.rasterLayers.entities = rasterLayers;
-      state.referenceImages.entities = referenceImages;
       state.regionalGuidance.entities = regionalGuidance;
       return state;
     },
@@ -1846,14 +1594,11 @@ export const canvasSlice = createSlice({
         syncScaledSize(state);
       }
     });
-    builder.addMatcher(newSessionRequested, (state) => {
-      return resetState(state);
-    });
   },
 });
 
 const resetState = (state: CanvasState) => {
-  const newState = getInitialState();
+  const newState = getInitialCanvasState();
 
   // We need to retain the optimal dimension across resets, as it is changed only when the model changes. Copy it
   // from the old state, then recalculate the bbox size & scaled size.
@@ -1930,16 +1675,6 @@ export const {
   controlLayerWeightChanged,
   controlLayerBeginEndStepPctChanged,
   controlLayerWithTransparencyEffectToggled,
-  // IP Adapters
-  referenceImageAdded,
-  // referenceImageRecalled,
-  referenceImageIPAdapterImageChanged,
-  referenceImageIPAdapterMethodChanged,
-  referenceImageIPAdapterModelChanged,
-  referenceImageIPAdapterCLIPVisionModelChanged,
-  referenceImageIPAdapterWeightChanged,
-  referenceImageIPAdapterBeginEndStepPctChanged,
-  referenceImageIPAdapterFLUXReduxImageInfluenceChanged,
   // Regions
   rgAdded,
   // rgRecalled,
@@ -1947,15 +1682,15 @@ export const {
   rgPositivePromptChanged,
   rgNegativePromptChanged,
   rgAutoNegativeToggled,
-  rgIPAdapterAdded,
-  rgIPAdapterDeleted,
-  rgIPAdapterImageChanged,
-  rgIPAdapterWeightChanged,
-  rgIPAdapterBeginEndStepPctChanged,
-  rgIPAdapterMethodChanged,
-  rgIPAdapterModelChanged,
-  rgIPAdapterCLIPVisionModelChanged,
-  rgIPAdapterFLUXReduxImageInfluenceChanged,
+  rgRefImageAdded,
+  rgRefImageDeleted,
+  rgRefImageImageChanged,
+  rgRefImageIPAdapterWeightChanged,
+  rgRefImageIPAdapterBeginEndStepPctChanged,
+  rgRefImageIPAdapterMethodChanged,
+  rgRefImageModelChanged,
+  rgRefImageIPAdapterCLIPVisionModelChanged,
+  rgRefImageFLUXReduxImageInfluenceChanged,
   // Inpaint mask
   inpaintMaskAdded,
   inpaintMaskConvertedToRegionalGuidance,
@@ -1975,7 +1710,7 @@ const migrate = (state: any): any => {
 
 export const canvasPersistConfig: PersistConfig<CanvasState> = {
   name: canvasSlice.name,
-  initialState,
+  initialState: getInitialCanvasState(),
   migrate,
   persistDenylist: [],
 };

@@ -1,7 +1,9 @@
+import { objectEquals } from '@observ33r/object-equals';
 import type { EdgeChange, NodeChange } from '@xyflow/react';
 import { logger } from 'app/logging/logger';
 import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
+import { uniqWith } from 'es-toolkit/compat';
 import {
   $copiedEdges,
   $copiedNodes,
@@ -16,7 +18,6 @@ import { findUnoccupiedPosition } from 'features/nodes/store/util/findUnoccupied
 import { validateConnection } from 'features/nodes/store/util/validateConnection';
 import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
 import { t } from 'i18next';
-import { isEqual, uniqWith } from 'lodash-es';
 import { v4 as uuidv4 } from 'uuid';
 
 const log = logger('workflows');
@@ -44,7 +45,7 @@ const _pasteSelection = (withEdgesToCopiedNodes?: boolean) => {
 
   if (withEdgesToCopiedNodes) {
     const edgesToCopiedNodes = deepClone($edgesToCopiedNodes.get());
-    copiedEdges = uniqWith([...copiedEdges, ...edgesToCopiedNodes], isEqual);
+    copiedEdges = uniqWith([...copiedEdges, ...edgesToCopiedNodes], objectEquals);
   }
 
   // Calculate an offset to reposition nodes to surround the cursor position, maintaining relative positioning

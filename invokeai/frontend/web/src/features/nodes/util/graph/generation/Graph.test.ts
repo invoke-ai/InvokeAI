@@ -3,7 +3,7 @@ import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { AnyInvocation, Invocation } from 'services/api/types';
 import { assert, AssertionError, is } from 'tsafe';
 import { describe, expect, it } from 'vitest';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 describe('Graph', () => {
   describe('constructor', () => {

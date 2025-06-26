@@ -1,4 +1,5 @@
 import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMultiple';
+import { noop } from 'es-toolkit/compat';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
@@ -10,7 +11,6 @@ import type { Coordinate, Rect, Tool } from 'features/controlLayers/store/types'
 import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { API_BASE_MODELS } from 'features/parameters/types/constants';
 import Konva from 'konva';
-import { noop } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { assert } from 'tsafe';

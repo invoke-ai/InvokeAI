@@ -1,57 +1,51 @@
-import type { ChakraProps } from '@invoke-ai/ui-library';
-import {
-  Box,
-  Collapse,
-  Flex,
-  IconButton,
-  Spacer,
-  Tab,
-  TabList,
-  Tabs,
-  Text,
-  Tooltip,
-  useDisclosure,
-} from '@invoke-ai/ui-library';
+import { Box, Button, ButtonGroup, Collapse, Divider, Flex, IconButton, Spacer } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useDisclosure } from 'common/hooks/useBoolean';
 import { useGallerySearchTerm } from 'features/gallery/components/ImageGrid/useGallerySearchTerm';
 import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
 import { galleryViewChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
+import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
+import {
+  GALLERY_PANEL_DEFAULT_HEIGHT_PX,
+  GALLERY_PANEL_ID,
+  GALLERY_PANEL_MIN_HEIGHT_PX,
+} from 'features/ui/layouts/shared';
+import { useCollapsibleGridviewPanel } from 'features/ui/layouts/use-collapsible-gridview-panel';
 import type { CSSProperties } from 'react';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiMagnifyingGlassBold } from 'react-icons/pi';
+import { PiCaretDownBold, PiCaretUpBold, PiMagnifyingGlassBold } from 'react-icons/pi';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
-import GallerySettingsPopover from './GallerySettingsPopover/GallerySettingsPopover';
+import { GallerySettingsPopover } from './GallerySettingsPopover/GallerySettingsPopover';
 import { GalleryUploadButton } from './GalleryUploadButton';
-import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
-import { GalleryPagination } from './ImageGrid/GalleryPagination';
 import { GallerySearch } from './ImageGrid/GallerySearch';
-
-const BASE_STYLES: ChakraProps['sx'] = {
-  fontWeight: 'semibold',
-  fontSize: 'sm',
-  color: 'base.300',
-};
-
-const SELECTED_STYLES: ChakraProps['sx'] = {
-  borderColor: 'base.800',
-  borderBottomColor: 'base.900',
-  color: 'invokeBlue.300',
-};
+import { NewGallery } from './NewGallery';
 
 const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0, width: '100%' };
 
 const selectGalleryView = createSelector(selectGallerySlice, (gallery) => gallery.galleryView);
 const selectSearchTerm = createSelector(selectGallerySlice, (gallery) => gallery.searchTerm);
 
-export const Gallery = () => {
+export const GalleryPanel = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const { _$rightPanelApi } = useAutoLayoutContext();
+  const gridviewPanelApi = useStore(_$rightPanelApi);
+  const collapsibleApi = useCollapsibleGridviewPanel(
+    gridviewPanelApi,
+    GALLERY_PANEL_ID,
+    'vertical',
+    GALLERY_PANEL_DEFAULT_HEIGHT_PX,
+    GALLERY_PANEL_MIN_HEIGHT_PX
+  );
+  const isCollapsed = useStore(collapsibleApi.$isCollapsed);
+
   const galleryView = useAppSelector(selectGalleryView);
   const initialSearchTerm = useAppSelector(selectSearchTerm);
-  const searchDisclosure = useDisclosure({ defaultIsOpen: initialSearchTerm.length > 0 });
+  const searchDisclosure = useDisclosure(!!initialSearchTerm);
   const [searchTerm, onChangeSearchTerm, onResetSearchTerm] = useGallerySearchTerm();
   const handleClickImages = useCallback(() => {
     dispatch(galleryViewChanged('images'));
@@ -62,47 +56,60 @@ export const Gallery = () => {
   }, [dispatch]);
 
   const handleClickSearch = useCallback(() => {
-    searchDisclosure.onToggle();
     onResetSearchTerm();
-  }, [onResetSearchTerm, searchDisclosure]);
+    if (!searchDisclosure.isOpen && collapsibleApi.$isCollapsed.get()) {
+      collapsibleApi.expand();
+    }
+    searchDisclosure.toggle();
+  }, [collapsibleApi, onResetSearchTerm, searchDisclosure]);
 
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
   const boardName = useBoardName(selectedBoardId);
 
   return (
-    <Flex flexDirection="column" alignItems="center" justifyContent="space-between" h="full" w="full" pt={1} minH={0}>
-      <Tabs index={galleryView === 'images' ? 0 : 1} variant="enclosed" display="flex" flexDir="column" w="full">
-        <TabList gap={2} fontSize="sm" borderColor="base.800" alignItems="center" w="full">
-          <Text fontSize="sm" fontWeight="semibold" noOfLines={1} px="2" wordBreak="break-all">
-            {boardName}
-          </Text>
-          <Spacer />
-          <Tooltip label={t('gallery.imagesTab')}>
-            <Tab sx={BASE_STYLES} _selected={SELECTED_STYLES} onClick={handleClickImages} data-testid="images-tab">
-              {t('parameters.images')}
-            </Tab>
-          </Tooltip>
-          <Tooltip label={t('gallery.assetsTab')}>
-            <Tab sx={BASE_STYLES} _selected={SELECTED_STYLES} onClick={handleClickAssets} data-testid="assets-tab">
-              {t('gallery.assets')}
-            </Tab>
-          </Tooltip>
-          <Flex h="full" justifyContent="flex-end">
-            <GalleryUploadButton />
-            <GallerySettingsPopover />
-            <IconButton
-              size="sm"
-              variant="link"
-              alignSelf="stretch"
-              onClick={handleClickSearch}
-              tooltip={searchDisclosure.isOpen ? `${t('gallery.exitSearch')}` : `${t('gallery.displaySearch')}`}
-              aria-label={t('gallery.displaySearch')}
-              icon={<PiMagnifyingGlassBold />}
-            />
-          </Flex>
-        </TabList>
-      </Tabs>
-
+    <Flex flexDirection="column" alignItems="center" justifyContent="space-between" h="full" w="full" minH={0} p={2}>
+      <Flex gap={2} fontSize="sm" alignItems="center" w="full">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={collapsibleApi.toggle}
+          leftIcon={isCollapsed ? <PiCaretDownBold /> : <PiCaretUpBold />}
+        >
+          {boardName}
+        </Button>
+        <Spacer />
+        <ButtonGroup size="sm" variant="outline">
+          <Button
+            tooltip={t('gallery.imagesTab')}
+            onClick={handleClickImages}
+            data-testid="images-tab"
+            colorScheme={galleryView === 'images' ? 'invokeBlue' : undefined}
+          >
+            {t('parameters.images')}
+          </Button>
+          <Button
+            tooltip={t('gallery.assetsTab')}
+            onClick={handleClickAssets}
+            data-testid="assets-tab"
+            colorScheme={galleryView === 'assets' ? 'invokeBlue' : undefined}
+          >
+            {t('gallery.assets')}
+          </Button>
+        </ButtonGroup>
+        <Flex flexGrow={1} flexBasis={0} justifyContent="flex-end">
+          <GalleryUploadButton />
+          <GallerySettingsPopover />
+          <IconButton
+            size="sm"
+            variant="link"
+            alignSelf="stretch"
+            onClick={handleClickSearch}
+            tooltip={searchDisclosure.isOpen ? `${t('gallery.exitSearch')}` : `${t('gallery.displaySearch')}`}
+            aria-label={t('gallery.displaySearch')}
+            icon={<PiMagnifyingGlassBold />}
+          />
+        </Flex>
+      </Flex>
       <Collapse in={searchDisclosure.isOpen} style={COLLAPSE_STYLES}>
         <Box w="full" pt={2}>
           <GallerySearch
@@ -112,8 +119,11 @@ export const Gallery = () => {
           />
         </Box>
       </Collapse>
-      <GalleryImageGrid />
-      <GalleryPagination />
+      <Divider pt={2} />
+      <Flex w="full" h="full" pt={2}>
+        <NewGallery />
+      </Flex>
     </Flex>
   );
-};
+});
+GalleryPanel.displayName = 'Gallery';

@@ -1,6 +1,5 @@
 import { Divider, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
@@ -10,6 +9,7 @@ import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors
 import { $hasTemplates } from 'features/nodes/store/nodesSlice';
 import { PostProcessingPopover } from 'features/parameters/components/PostProcessing/PostProcessingPopover';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -21,24 +21,19 @@ import {
   PiQuotesBold,
   PiRulerBold,
 } from 'react-icons/pi';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import type { ImageDTO } from 'services/api/types';
+import { useImageDTO } from 'services/api/endpoints/images';
 
-const CurrentImageButtons = () => {
-  const lastSelectedImage = useAppSelector(selectLastSelectedImage);
-  const { currentData: imageDTO } = useGetImageDTOQuery(lastSelectedImage?.image_name ?? skipToken);
+import { useImageViewerContext } from './context';
 
-  if (!imageDTO) {
-    return null;
-  }
-
-  return <CurrentImageButtonsContent imageDTO={imageDTO} />;
-};
-
-export default memo(CurrentImageButtons);
-
-const CurrentImageButtonsContent = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
+export const CurrentImageButtons = memo(() => {
   const { t } = useTranslation();
+  const ctx = useImageViewerContext();
+  const hasProgressImage = useStore(ctx.$hasProgressImage);
+  const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
+  const isDisabledOverride = hasProgressImage && shouldShowProgressInViewer;
+
+  const imageName = useAppSelector(selectLastSelectedImage);
+  const imageDTO = useImageDTO(imageName);
   const hasTemplates = useStore($hasTemplates);
   const imageActions = useImageActions(imageDTO);
   const isStaging = useAppSelector(selectIsStaging);
@@ -51,7 +46,7 @@ const CurrentImageButtonsContent = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
           as={IconButton}
           aria-label={t('parameters.imageActions')}
           tooltip={t('parameters.imageActions')}
-          isDisabled={!imageDTO}
+          isDisabled={isDisabledOverride || !imageDTO}
           variant="link"
           alignSelf="stretch"
           icon={<PiDotsThreeOutlineFill />}
@@ -65,7 +60,7 @@ const CurrentImageButtonsContent = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
         icon={<PiFlowArrowBold />}
         tooltip={`${t('nodes.loadWorkflow')} (W)`}
         aria-label={`${t('nodes.loadWorkflow')} (W)`}
-        isDisabled={!imageActions.hasWorkflow || !hasTemplates}
+        isDisabled={isDisabledOverride || !imageDTO || !imageActions.hasWorkflow || !hasTemplates}
         variant="link"
         alignSelf="stretch"
         onClick={imageActions.loadWorkflow}
@@ -74,7 +69,7 @@ const CurrentImageButtonsContent = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
         icon={<PiArrowsCounterClockwiseBold />}
         tooltip={`${t('parameters.remixImage')} (R)`}
         aria-label={`${t('parameters.remixImage')} (R)`}
-        isDisabled={!imageActions.hasMetadata}
+        isDisabled={isDisabledOverride || !imageDTO || !imageActions.hasMetadata}
         variant="link"
         alignSelf="stretch"
         onClick={imageActions.remix}
@@ -83,7 +78,7 @@ const CurrentImageButtonsContent = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
         icon={<PiQuotesBold />}
         tooltip={`${t('parameters.usePrompt')} (P)`}
         aria-label={`${t('parameters.usePrompt')} (P)`}
-        isDisabled={!imageActions.hasPrompts}
+        isDisabled={isDisabledOverride || !imageDTO || !imageActions.hasPrompts}
         variant="link"
         alignSelf="stretch"
         onClick={imageActions.recallPrompts}
@@ -92,7 +87,7 @@ const CurrentImageButtonsContent = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
         icon={<PiPlantBold />}
         tooltip={`${t('parameters.useSeed')} (S)`}
         aria-label={`${t('parameters.useSeed')} (S)`}
-        isDisabled={!imageActions.hasSeed}
+        isDisabled={isDisabledOverride || !imageDTO || !imageActions.hasSeed}
         variant="link"
         alignSelf="stretch"
         onClick={imageActions.recallSeed}
@@ -104,25 +99,25 @@ const CurrentImageButtonsContent = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
         variant="link"
         alignSelf="stretch"
         onClick={imageActions.recallSize}
-        isDisabled={isStaging}
+        isDisabled={isDisabledOverride || !imageDTO || isStaging}
       />
       <IconButton
         icon={<PiAsteriskBold />}
         tooltip={`${t('parameters.useAll')} (A)`}
         aria-label={`${t('parameters.useAll')} (A)`}
-        isDisabled={!imageActions.hasMetadata}
+        isDisabled={isDisabledOverride || !imageDTO || !imageActions.hasMetadata}
         variant="link"
         alignSelf="stretch"
         onClick={imageActions.recallAll}
       />
 
-      {isUpscalingEnabled && <PostProcessingPopover imageDTO={imageDTO} />}
+      {isUpscalingEnabled && <PostProcessingPopover imageDTO={imageDTO} isDisabled={isDisabledOverride} />}
 
       <Divider orientation="vertical" h={8} mx={2} />
 
-      <DeleteImageButton onClick={imageActions.delete} />
+      <DeleteImageButton onClick={imageActions.delete} isDisabled={isDisabledOverride || !imageDTO} />
     </>
   );
 });
 
-CurrentImageButtonsContent.displayName = 'CurrentImageButtonsContent';
+CurrentImageButtons.displayName = 'CurrentImageButtons';

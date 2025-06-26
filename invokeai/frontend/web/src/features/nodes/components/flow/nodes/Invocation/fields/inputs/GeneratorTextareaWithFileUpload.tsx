@@ -1,7 +1,7 @@
 import { FormControl, FormLabel, IconButton, Spacer, Textarea } from '@invoke-ai/ui-library';
+import { isString } from 'es-toolkit/compat';
 import { NO_DRAG_CLASS, NO_PAN_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import { toast } from 'features/toast/toast';
-import { isString } from 'lodash-es';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';

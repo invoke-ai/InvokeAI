@@ -1,9 +1,9 @@
 import type { Connection } from '@xyflow/react';
+import { map } from 'es-toolkit/compat';
 import type { Templates } from 'features/nodes/store/types';
 import { validateConnection } from 'features/nodes/store/util/validateConnection';
 import type { FieldInputTemplate, FieldOutputTemplate } from 'features/nodes/types/field';
 import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
-import { map } from 'lodash-es';
 
 /**
  *

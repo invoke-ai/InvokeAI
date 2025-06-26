@@ -4,17 +4,14 @@ import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/com
 import { CanvasEntityHeaderWarnings } from 'features/controlLayers/components/common/CanvasEntityHeaderWarnings';
 import { CanvasEntityIsBookmarkedForQuickSwitchToggle } from 'features/controlLayers/components/common/CanvasEntityIsBookmarkedForQuickSwitchToggle';
 import { CanvasEntityIsLockedToggle } from 'features/controlLayers/components/common/CanvasEntityIsLockedToggle';
-import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { memo } from 'react';
 
 export const CanvasEntityHeaderCommonActions = memo(() => {
-  const entityIdentifier = useEntityIdentifierContext();
-
   return (
     <Flex alignSelf="stretch">
       <CanvasEntityHeaderWarnings />
       <CanvasEntityIsBookmarkedForQuickSwitchToggle />
-      {entityIdentifier.type !== 'reference_image' && <CanvasEntityIsLockedToggle />}
+      <CanvasEntityIsLockedToggle />
       <CanvasEntityEnabledToggle />
       <CanvasEntityDeleteButton />
     </Flex>

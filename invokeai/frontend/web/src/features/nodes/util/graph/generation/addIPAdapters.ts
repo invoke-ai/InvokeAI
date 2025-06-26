@@ -1,8 +1,4 @@
-import {
-  type CanvasReferenceImageState,
-  type IPAdapterConfig,
-  isIPAdapterConfig,
-} from 'features/controlLayers/store/types';
+import { type IPAdapterConfig, isIPAdapterConfig, type RefImageState } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { Invocation, MainModelConfig } from 'services/api/types';
@@ -13,7 +9,7 @@ type AddIPAdaptersResult = {
 };
 
 type AddIPAdaptersArg = {
-  entities: CanvasReferenceImageState[];
+  entities: RefImageState[];
   g: Graph;
   collector: Invocation<'collect'>;
   model: MainModelConfig;
@@ -21,19 +17,18 @@ type AddIPAdaptersArg = {
 
 export const addIPAdapters = ({ entities, g, collector, model }: AddIPAdaptersArg): AddIPAdaptersResult => {
   const validIPAdapters = entities
-    .filter((entity) => entity.isEnabled)
-    .filter((entity) => isIPAdapterConfig(entity.ipAdapter))
+    .filter((entity) => isIPAdapterConfig(entity.config))
     .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0);
 
   const result: AddIPAdaptersResult = {
     addedIPAdapters: 0,
   };
 
-  for (const { id, ipAdapter } of validIPAdapters) {
-    assert(isIPAdapterConfig(ipAdapter), 'This should have been filtered out');
+  for (const { id, config } of validIPAdapters) {
+    assert(isIPAdapterConfig(config), 'This should have been filtered out');
     result.addedIPAdapters++;
 
-    addIPAdapter(id, ipAdapter, g, collector);
+    addIPAdapter(id, config, g, collector);
   }
 
   return result;

@@ -1,11 +1,9 @@
 import { IconButton, Input, InputGroup, InputRightElement, Spinner } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
-import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { useGalleryImageNames } from 'features/gallery/components/use-gallery-image-names';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
-import { useListImagesQuery } from 'services/api/endpoints/images';
 
 type Props = {
   searchTerm: string;
@@ -15,10 +13,7 @@ type Props = {
 
 export const GallerySearch = memo(({ searchTerm, onChangeSearchTerm, onResetSearchTerm }: Props) => {
   const { t } = useTranslation();
-  const queryArgs = useAppSelector(selectListImagesQueryArgs);
-  const { isPending } = useListImagesQuery(queryArgs, {
-    selectFromResult: ({ isLoading, isFetching }) => ({ isPending: isLoading || isFetching }),
-  });
+  const { isFetching } = useGalleryImageNames();
 
   const handleChangeInput = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -46,12 +41,12 @@ export const GallerySearch = memo(({ searchTerm, onChangeSearchTerm, onResetSear
         data-testid="image-search-input"
         onKeyDown={handleKeydown}
       />
-      {isPending && (
+      {isFetching && (
         <InputRightElement h="full" pe={2}>
           <Spinner size="sm" opacity={0.5} />
         </InputRightElement>
       )}
-      {!isPending && searchTerm.length && (
+      {!isFetching && searchTerm.length && (
         <InputRightElement h="full" pe={2}>
           <IconButton
             onClick={onResetSearchTerm}

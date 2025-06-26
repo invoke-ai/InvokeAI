@@ -2,8 +2,8 @@ import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
-import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { addControlNets, addT2IAdapters } from 'features/nodes/util/graph/generation/addControlAdapters';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
@@ -16,15 +16,15 @@ import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
 import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
+import { getGenerationMode } from 'features/nodes/util/graph/generation/getGenerationMode';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
-  CANVAS_OUTPUT_PREFIX,
-  getBoardField,
   getSizes,
+  selectCanvasOutputFields,
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
-import { selectMainModelConfig } from 'services/api/endpoints/models';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
@@ -33,13 +33,14 @@ import { addRegions } from './addRegions';
 
 const log = logger('system');
 
-export const buildSD1Graph = async (state: RootState, manager: CanvasManager): Promise<GraphBuilderReturn> => {
-  const generationMode = await manager.compositor.getGenerationMode();
+export const buildSD1Graph = async (state: RootState, manager: CanvasManager | null): Promise<GraphBuilderReturn> => {
+  const tab = selectActiveTab(state);
+  const generationMode = await getGenerationMode(manager, tab);
   log.debug({ generationMode }, 'Building SD1/SD2 graph');
 
   const params = selectParamsSlice(state);
-  const canvasSettings = selectCanvasSettingsSlice(state);
   const canvas = selectCanvasSlice(state);
+  const refImages = selectRefImagesSlice(state);
 
   const { bbox } = canvas;
   const model = selectMainModelConfig(state);
@@ -170,6 +171,7 @@ export const buildSD1Graph = async (state: RootState, manager: CanvasManager): P
     canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
     g.upsertMetadata({ generation_mode: 'txt2img' });
   } else if (generationMode === 'img2img') {
+    assert(manager, 'Need manager to do img2img');
     canvasOutput = await addImageToImage({
       g,
       manager,
@@ -185,6 +187,7 @@ export const buildSD1Graph = async (state: RootState, manager: CanvasManager): P
     });
     g.upsertMetadata({ generation_mode: 'img2img' });
   } else if (generationMode === 'inpaint') {
+    assert(manager, 'Need manager to do inpaint');
     canvasOutput = await addInpaint({
       state,
       g,
@@ -202,6 +205,7 @@ export const buildSD1Graph = async (state: RootState, manager: CanvasManager): P
     });
     g.upsertMetadata({ generation_mode: 'inpaint' });
   } else if (generationMode === 'outpaint') {
+    assert(manager, 'Need manager to do outpaint');
     canvasOutput = await addOutpaint({
       state,
       g,
@@ -222,40 +226,42 @@ export const buildSD1Graph = async (state: RootState, manager: CanvasManager): P
     assert<Equals<typeof generationMode, never>>(false);
   }
 
-  const controlNetCollector = g.addNode({
-    type: 'collect',
-    id: getPrefixedId('control_net_collector'),
-  });
-  const controlNetResult = await addControlNets({
-    manager,
-    entities: canvas.controlLayers.entities,
-    g,
-    rect: canvas.bbox.rect,
-    collector: controlNetCollector,
-    model,
-  });
-  if (controlNetResult.addedControlNets > 0) {
-    g.addEdge(controlNetCollector, 'collection', denoise, 'control');
-  } else {
-    g.deleteNode(controlNetCollector.id);
-  }
+  if (manager) {
+    const controlNetCollector = g.addNode({
+      type: 'collect',
+      id: getPrefixedId('control_net_collector'),
+    });
+    const controlNetResult = await addControlNets({
+      manager,
+      entities: canvas.controlLayers.entities,
+      g,
+      rect: canvas.bbox.rect,
+      collector: controlNetCollector,
+      model,
+    });
+    if (controlNetResult.addedControlNets > 0) {
+      g.addEdge(controlNetCollector, 'collection', denoise, 'control');
+    } else {
+      g.deleteNode(controlNetCollector.id);
+    }
 
-  const t2iAdapterCollector = g.addNode({
-    type: 'collect',
-    id: getPrefixedId('t2i_adapter_collector'),
-  });
-  const t2iAdapterResult = await addT2IAdapters({
-    manager,
-    entities: canvas.controlLayers.entities,
-    g,
-    rect: canvas.bbox.rect,
-    collector: t2iAdapterCollector,
-    model,
-  });
-  if (t2iAdapterResult.addedT2IAdapters > 0) {
-    g.addEdge(t2iAdapterCollector, 'collection', denoise, 't2i_adapter');
-  } else {
-    g.deleteNode(t2iAdapterCollector.id);
+    const t2iAdapterCollector = g.addNode({
+      type: 'collect',
+      id: getPrefixedId('t2i_adapter_collector'),
+    });
+    const t2iAdapterResult = await addT2IAdapters({
+      manager,
+      entities: canvas.controlLayers.entities,
+      g,
+      rect: canvas.bbox.rect,
+      collector: t2iAdapterCollector,
+      model,
+    });
+    if (t2iAdapterResult.addedT2IAdapters > 0) {
+      g.addEdge(t2iAdapterCollector, 'collection', denoise, 't2i_adapter');
+    } else {
+      g.deleteNode(t2iAdapterCollector.id);
+    }
   }
 
   const ipAdapterCollect = g.addNode({
@@ -263,28 +269,31 @@ export const buildSD1Graph = async (state: RootState, manager: CanvasManager): P
     id: getPrefixedId('ip_adapter_collector'),
   });
   const ipAdapterResult = addIPAdapters({
-    entities: canvas.referenceImages.entities,
+    entities: refImages.entities,
     g,
     collector: ipAdapterCollect,
     model,
   });
+  let totalIPAdaptersAdded = ipAdapterResult.addedIPAdapters;
 
-  const regionsResult = await addRegions({
-    manager,
-    regions: canvas.regionalGuidance.entities,
-    g,
-    bbox: canvas.bbox.rect,
-    model,
-    posCond,
-    negCond,
-    posCondCollect,
-    negCondCollect,
-    ipAdapterCollect,
-    fluxReduxCollect: null,
-  });
+  if (manager) {
+    const regionsResult = await addRegions({
+      manager,
+      regions: canvas.regionalGuidance.entities,
+      g,
+      bbox: canvas.bbox.rect,
+      model,
+      posCond,
+      negCond,
+      posCondCollect,
+      negCondCollect,
+      ipAdapterCollect,
+      fluxReduxCollect: null,
+    });
 
-  const totalIPAdaptersAdded =
-    ipAdapterResult.addedIPAdapters + regionsResult.reduce((acc, r) => acc + r.addedIPAdapters, 0);
+    totalIPAdaptersAdded += regionsResult.reduce((acc, r) => acc + r.addedIPAdapters, 0);
+  }
+
   if (totalIPAdaptersAdded > 0) {
     g.addEdge(ipAdapterCollect, 'collection', denoise, 'ip_adapter');
   } else {
@@ -299,20 +308,9 @@ export const buildSD1Graph = async (state: RootState, manager: CanvasManager): P
     canvasOutput = addWatermarker(g, canvasOutput);
   }
 
-  // This image will be staged, should not be saved to the gallery or added to a board.
-  const is_intermediate = canvasSettings.sendToCanvas;
-  const board = canvasSettings.sendToCanvas ? undefined : getBoardField(state);
+  g.upsertMetadata(selectCanvasMetadata(state));
 
-  if (!canvasSettings.sendToCanvas) {
-    g.upsertMetadata(selectCanvasMetadata(state));
-  }
-
-  g.updateNode(canvasOutput, {
-    id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
-    is_intermediate,
-    use_cache: false,
-    board,
-  });
+  g.updateNode(canvasOutput, selectCanvasOutputFields(state));
 
   g.setMetadataReceivingNode(canvasOutput);
   return {

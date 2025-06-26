@@ -1,3 +1,4 @@
+import { objectEquals } from '@observ33r/object-equals';
 import { Mutex } from 'async-mutex';
 import { deepClone } from 'common/util/deepClone';
 import { withResultAsync } from 'common/util/result';
@@ -94,7 +95,7 @@ export class CanvasObjectImage extends CanvasModuleBase {
     this.state = state;
   }
 
-  updateImageSource = async (imageName: string) => {
+  updateImageSourceByImageName = async (imageName: string) => {
     this.log.trace({ imageName }, 'Updating image source');
 
     this.isLoading = true;
@@ -121,7 +122,30 @@ export class CanvasObjectImage extends CanvasModuleBase {
 
     this.imageElement = imageElementResult.value;
 
-    await this.updateImageElement();
+    this.updateImageElement();
+  };
+
+  updateImageSourceByDataURL = async (dataURL: string) => {
+    this.log.trace({ dataURL: `${dataURL.substring(0, 16)}...` }, 'Updating image source');
+
+    this.isLoading = true;
+    this.konva.group.visible(true);
+
+    if (!this.konva.image) {
+      this.konva.placeholder.group.visible(false);
+      this.konva.placeholder.text.text(t('common.loadingImage', 'Loading Image'));
+    }
+
+    const imageElementResult = await withResultAsync(() => loadImage(dataURL, false));
+    if (imageElementResult.isErr()) {
+      // Image loading failed (e.g. the URL to the "physical" image is invalid)
+      this.onFailedToLoadImage(t('controlLayers.unableToLoadImage', 'Unable to load image'));
+      return;
+    }
+
+    this.imageElement = imageElementResult.value;
+
+    this.updateImageElement();
   };
 
   onFailedToLoadImage = (message: string) => {
@@ -133,43 +157,37 @@ export class CanvasObjectImage extends CanvasModuleBase {
     this.konva.placeholder.group.visible(true);
   };
 
-  updateImageElement = async () => {
-    const release = await this.mutex.acquire();
+  updateImageElement = () => {
+    if (this.imageElement) {
+      const { width, height } = this.state.image;
 
-    try {
-      if (this.imageElement) {
-        const { width, height } = this.state.image;
-
-        if (this.konva.image) {
-          this.log.trace('Updating Konva image attrs');
-          this.konva.image.setAttrs({
-            image: this.imageElement,
-            width,
-            height,
-            visible: true,
-          });
-        } else {
-          this.log.trace('Creating new Konva image');
-          this.konva.image = new Konva.Image({
-            name: `${this.type}:image`,
-            listening: false,
-            image: this.imageElement,
-            width,
-            height,
-            perfectDrawEnabled: false,
-          });
-          this.konva.group.add(this.konva.image);
-        }
-
-        this.konva.placeholder.rect.setAttrs({ width, height });
-        this.konva.placeholder.text.setAttrs({ width, height, fontSize: width / 16 });
-
-        this.isLoading = false;
-        this.isError = false;
-        this.konva.placeholder.group.visible(false);
+      if (this.konva.image) {
+        this.log.trace('Updating Konva image attrs');
+        this.konva.image.setAttrs({
+          image: this.imageElement,
+          width,
+          height,
+          visible: true,
+        });
+      } else {
+        this.log.trace('Creating new Konva image');
+        this.konva.image = new Konva.Image({
+          name: `${this.type}:image`,
+          listening: false,
+          image: this.imageElement,
+          width,
+          height,
+          perfectDrawEnabled: false,
+        });
+        this.konva.group.add(this.konva.image);
       }
-    } finally {
-      release();
+
+      this.konva.placeholder.rect.setAttrs({ width, height });
+      this.konva.placeholder.text.setAttrs({ width, height, fontSize: width / 16 });
+
+      this.isLoading = false;
+      this.isError = false;
+      this.konva.placeholder.group.visible(false);
     }
   };
 
@@ -178,10 +196,22 @@ export class CanvasObjectImage extends CanvasModuleBase {
       this.log.trace({ state }, 'Updating image');
 
       const { image } = state;
-      const { width, height, image_name } = image;
-      if (force || (this.state.image.image_name !== image_name && !this.isLoading)) {
-        await this.updateImageSource(image_name);
+      const { width, height } = image;
+
+      if (force || (!objectEquals(this.state, state) && !this.isLoading)) {
+        const release = await this.mutex.acquire();
+
+        try {
+          if ('image_name' in image) {
+            await this.updateImageSourceByImageName(image.image_name);
+          } else {
+            await this.updateImageSourceByDataURL(image.dataURL);
+          }
+        } finally {
+          release();
+        }
       }
+
       this.konva.image?.setAttrs({ width, height });
       this.state = state;
       return true;

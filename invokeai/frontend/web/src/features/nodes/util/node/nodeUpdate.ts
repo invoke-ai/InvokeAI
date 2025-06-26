@@ -1,9 +1,9 @@
 import { deepClone } from 'common/util/deepClone';
 import { satisfies } from 'compare-versions';
+import { defaultsDeep, keys, pick } from 'es-toolkit/compat';
 import { NodeUpdateError } from 'features/nodes/types/error';
 import type { InvocationNode, InvocationNodeData, InvocationTemplate } from 'features/nodes/types/invocation';
 import { zParsedSemver } from 'features/nodes/types/semver';
-import { defaultsDeep, keys, pick } from 'lodash-es';
 
 import { buildInvocationNode } from './buildInvocationNode';
 

@@ -1,6 +1,7 @@
 import type { FlexProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { camelCase } from 'es-toolkit/compat';
 import { InputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldGate';
 import { ContainerElementSettings } from 'features/nodes/components/sidePanel/builder/ContainerElementSettings';
 import { useDepthContext } from 'features/nodes/components/sidePanel/builder/contexts';
@@ -10,7 +11,6 @@ import { useZoomToNode } from 'features/nodes/hooks/useZoomToNode';
 import { formElementRemoved } from 'features/nodes/store/nodesSlice';
 import type { FormElement, NodeFieldElement } from 'features/nodes/types/workflow';
 import { isContainerElement, isNodeFieldElement } from 'features/nodes/types/workflow';
-import { camelCase } from 'lodash-es';
 import type { RefObject } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

@@ -15,6 +15,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { clamp, round } from 'es-toolkit/compat';
 import { snapToNearest } from 'features/controlLayers/konva/util';
 import { entityOpacityChanged } from 'features/controlLayers/store/canvasSlice';
 import {
@@ -22,8 +23,6 @@ import {
   selectEntity,
   selectSelectedEntityIdentifier,
 } from 'features/controlLayers/store/selectors';
-import { isRenderableEntity } from 'features/controlLayers/store/types';
-import { clamp, round } from 'lodash-es';
 import type { KeyboardEvent } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -68,9 +67,6 @@ const selectOpacity = createSelector(selectCanvasSlice, (canvas) => {
   }
   const selectedEntity = selectEntity(canvas, selectedEntityIdentifier);
   if (!selectedEntity) {
-    return 1; // fallback to 100% opacity
-  }
-  if (!isRenderableEntity(selectedEntity)) {
     return 1; // fallback to 100% opacity
   }
   // Opacity is a float from 0-1, but we want to display it as a percentage
@@ -134,11 +130,7 @@ export const EntityListSelectedEntityActionBarOpacity = memo(() => {
 
   return (
     <Popover>
-      <FormControl
-        w="min-content"
-        gap={2}
-        isDisabled={selectedEntityIdentifier === null || selectedEntityIdentifier.type === 'reference_image'}
-      >
+      <FormControl w="min-content" gap={2} isDisabled={selectedEntityIdentifier === null}>
         <FormLabel m={0}>{t('controlLayers.opacity')}</FormLabel>
         <PopoverAnchor>
           <NumberInput
@@ -167,7 +159,7 @@ export const EntityListSelectedEntityActionBarOpacity = memo(() => {
                 position="absolute"
                 insetInlineEnd={0}
                 h="full"
-                isDisabled={selectedEntityIdentifier === null || selectedEntityIdentifier.type === 'reference_image'}
+                isDisabled={selectedEntityIdentifier === null}
               />
             </PopoverTrigger>
           </NumberInput>
@@ -185,7 +177,7 @@ export const EntityListSelectedEntityActionBarOpacity = memo(() => {
             marks={marks}
             formatValue={formatSliderValue}
             alwaysShowMarks
-            isDisabled={selectedEntityIdentifier === null || selectedEntityIdentifier.type === 'reference_image'}
+            isDisabled={selectedEntityIdentifier === null}
           />
         </PopoverBody>
       </PopoverContent>

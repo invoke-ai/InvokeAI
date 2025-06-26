@@ -1,7 +1,7 @@
 import { Flex, IconButton, Progress, Text, Tooltip } from '@invoke-ai/ui-library';
+import { isNil } from 'es-toolkit/compat';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { isNil } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { PiXBold } from 'react-icons/pi';
 import { useCancelModelInstallMutation } from 'services/api/endpoints/models';

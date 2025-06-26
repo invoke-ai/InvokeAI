@@ -1,5 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
+import { omit, reduce } from 'es-toolkit/compat';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { Templates } from 'features/nodes/store/types';
@@ -7,7 +8,6 @@ import type { BoardField } from 'features/nodes/types/common';
 import type { BoardFieldInputInstance } from 'features/nodes/types/field';
 import { isBoardFieldInputInstance, isBoardFieldInputTemplate } from 'features/nodes/types/field';
 import { isExecutableNode, isInvocationNode } from 'features/nodes/types/invocation';
-import { omit, reduce } from 'lodash-es';
 import type { AnyInvocation, Graph } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
 

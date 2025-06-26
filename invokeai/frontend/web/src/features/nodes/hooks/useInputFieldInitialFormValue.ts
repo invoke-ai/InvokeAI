@@ -1,9 +1,9 @@
+import { objectEquals } from '@observ33r/object-equals';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { fieldValueReset } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { isInvocationNode } from 'features/nodes/types/invocation';
-import { isEqual } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 
 const uniqueNonexistentValue = Symbol('uniqueNonexistentValue');
@@ -32,7 +32,7 @@ export const useInputFieldInitialFormValue = (elementId: string, nodeId: string,
           return;
         }
         const value = node.data.inputs[fieldName]?.value;
-        return !isEqual(value, initialValue);
+        return !objectEquals(value, initialValue);
       }),
     [fieldName, initialValue, nodeId]
   );

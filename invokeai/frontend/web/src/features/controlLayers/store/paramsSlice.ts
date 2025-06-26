@@ -1,8 +1,9 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { deepClone } from 'common/util/deepClone';
-import type { RgbaColor } from 'features/controlLayers/store/types';
+import { clamp } from 'es-toolkit/compat';
+import type { ParamsState, RgbaColor } from 'features/controlLayers/store/types';
+import { getInitialParamsState } from 'features/controlLayers/store/types';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import type {
   ParameterCanvasCoherenceMode,
@@ -13,126 +14,21 @@ import type {
   ParameterCLIPLEmbedModel,
   ParameterControlLoRAModel,
   ParameterGuidance,
-  ParameterMaskBlurMethod,
   ParameterModel,
   ParameterNegativePrompt,
-  ParameterNegativeStylePromptSDXL,
   ParameterPositivePrompt,
-  ParameterPositiveStylePromptSDXL,
   ParameterPrecision,
   ParameterScheduler,
   ParameterSDXLRefinerModel,
-  ParameterSeed,
-  ParameterSteps,
-  ParameterStrength,
   ParameterT5EncoderModel,
   ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
-import { clamp } from 'lodash-es';
-
-import { newSessionRequested } from './actions';
-
-export type ParamsState = {
-  maskBlur: number;
-  maskBlurMethod: ParameterMaskBlurMethod;
-  canvasCoherenceMode: ParameterCanvasCoherenceMode;
-  canvasCoherenceMinDenoise: ParameterStrength;
-  canvasCoherenceEdgeSize: number;
-  infillMethod: string;
-  infillTileSize: number;
-  infillPatchmatchDownscaleSize: number;
-  infillColorValue: RgbaColor;
-  cfgScale: ParameterCFGScale;
-  cfgRescaleMultiplier: ParameterCFGRescaleMultiplier;
-  guidance: ParameterGuidance;
-  img2imgStrength: ParameterStrength;
-  optimizedDenoisingEnabled: boolean;
-  iterations: number;
-  scheduler: ParameterScheduler;
-  upscaleScheduler: ParameterScheduler;
-  upscaleCfgScale: ParameterCFGScale;
-  seed: ParameterSeed;
-  shouldRandomizeSeed: boolean;
-  steps: ParameterSteps;
-  model: ParameterModel | null;
-  vae: ParameterVAEModel | null;
-  vaePrecision: ParameterPrecision;
-  fluxVAE: ParameterVAEModel | null;
-  seamlessXAxis: boolean;
-  seamlessYAxis: boolean;
-  clipSkip: number;
-  shouldUseCpuNoise: boolean;
-  positivePrompt: ParameterPositivePrompt;
-  negativePrompt: ParameterNegativePrompt;
-  positivePrompt2: ParameterPositiveStylePromptSDXL;
-  negativePrompt2: ParameterNegativeStylePromptSDXL;
-  shouldConcatPrompts: boolean;
-  refinerModel: ParameterSDXLRefinerModel | null;
-  refinerSteps: number;
-  refinerCFGScale: number;
-  refinerScheduler: ParameterScheduler;
-  refinerPositiveAestheticScore: number;
-  refinerNegativeAestheticScore: number;
-  refinerStart: number;
-  t5EncoderModel: ParameterT5EncoderModel | null;
-  clipEmbedModel: ParameterCLIPEmbedModel | null;
-  clipLEmbedModel: ParameterCLIPLEmbedModel | null;
-  clipGEmbedModel: ParameterCLIPGEmbedModel | null;
-  controlLora: ParameterControlLoRAModel | null;
-};
-
-const initialState: ParamsState = {
-  maskBlur: 16,
-  maskBlurMethod: 'box',
-  canvasCoherenceMode: 'Gaussian Blur',
-  canvasCoherenceMinDenoise: 0,
-  canvasCoherenceEdgeSize: 16,
-  infillMethod: 'lama',
-  infillTileSize: 32,
-  infillPatchmatchDownscaleSize: 1,
-  infillColorValue: { r: 0, g: 0, b: 0, a: 1 },
-  cfgScale: 7.5,
-  cfgRescaleMultiplier: 0,
-  guidance: 4,
-  img2imgStrength: 0.75,
-  optimizedDenoisingEnabled: true,
-  iterations: 1,
-  scheduler: 'dpmpp_3m_k',
-  upscaleScheduler: 'kdpm_2',
-  upscaleCfgScale: 2,
-  seed: 0,
-  shouldRandomizeSeed: true,
-  steps: 30,
-  model: null,
-  vae: null,
-  fluxVAE: null,
-  vaePrecision: 'fp32',
-  seamlessXAxis: false,
-  seamlessYAxis: false,
-  clipSkip: 0,
-  shouldUseCpuNoise: true,
-  positivePrompt: '',
-  negativePrompt: '',
-  positivePrompt2: '',
-  negativePrompt2: '',
-  shouldConcatPrompts: true,
-  refinerModel: null,
-  refinerSteps: 20,
-  refinerCFGScale: 7.5,
-  refinerScheduler: 'euler',
-  refinerPositiveAestheticScore: 6,
-  refinerNegativeAestheticScore: 2.5,
-  refinerStart: 0.8,
-  t5EncoderModel: null,
-  clipEmbedModel: null,
-  clipLEmbedModel: null,
-  clipGEmbedModel: null,
-  controlLora: null,
-};
+import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
+import { isNonRefinerMainModelConfig } from 'services/api/types';
 
 export const paramsSlice = createSlice({
   name: 'params',
-  initialState,
+  initialState: getInitialParamsState(),
   reducers: {
     setIterations: (state, action: PayloadAction<number>) => {
       state.iterations = action.payload;
@@ -230,10 +126,10 @@ export const paramsSlice = createSlice({
     shouldUseCpuNoiseChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldUseCpuNoise = action.payload;
     },
-    positivePromptChanged: (state, action: PayloadAction<string>) => {
+    positivePromptChanged: (state, action: PayloadAction<ParameterPositivePrompt>) => {
       state.positivePrompt = action.payload;
     },
-    negativePromptChanged: (state, action: PayloadAction<string>) => {
+    negativePromptChanged: (state, action: PayloadAction<ParameterNegativePrompt>) => {
       state.negativePrompt = action.payload;
     },
     positivePrompt2Changed: (state, action: PayloadAction<string>) => {
@@ -292,15 +188,12 @@ export const paramsSlice = createSlice({
     },
     paramsReset: (state) => resetState(state),
   },
-  extraReducers(builder) {
-    builder.addMatcher(newSessionRequested, (state) => resetState(state));
-  },
 });
 
 const resetState = (state: ParamsState): ParamsState => {
   // When a new session is requested, we need to keep the current model selections, plus dependent state
   // like VAE precision. Everything else gets reset to default.
-  const newState = deepClone(initialState);
+  const newState = getInitialParamsState();
   newState.model = state.model;
   newState.vae = state.vae;
   newState.fluxVAE = state.fluxVAE;
@@ -366,7 +259,7 @@ const migrate = (state: any): any => {
 
 export const paramsPersistConfig: PersistConfig<ParamsState> = {
   name: paramsSlice.name,
-  initialState,
+  initialState: getInitialParamsState(),
   migrate,
   persistDenylist: [],
 };
@@ -382,8 +275,8 @@ export const selectIsSD3 = createParamsSelector((params) => params.model?.base =
 export const selectIsCogView4 = createParamsSelector((params) => params.model?.base === 'cogview4');
 export const selectIsImagen3 = createParamsSelector((params) => params.model?.base === 'imagen3');
 export const selectIsImagen4 = createParamsSelector((params) => params.model?.base === 'imagen4');
-export const selectIsChatGTP4o = createParamsSelector((params) => params.model?.base === 'chatgpt-4o');
 export const selectIsFluxKontext = createParamsSelector((params) => params.model?.base === 'flux-kontext');
+export const selectIsChatGPT4o = createParamsSelector((params) => params.model?.base === 'chatgpt-4o');
 
 export const selectModel = createParamsSelector((params) => params.model);
 export const selectModelKey = createParamsSelector((params) => params.model?.key);
@@ -415,6 +308,12 @@ export const selectImg2imgStrength = createParamsSelector((params) => params.img
 export const selectOptimizedDenoisingEnabled = createParamsSelector((params) => params.optimizedDenoisingEnabled);
 export const selectPositivePrompt = createParamsSelector((params) => params.positivePrompt);
 export const selectNegativePrompt = createParamsSelector((params) => params.negativePrompt);
+export const selectNegativePromptWithFallback = createParamsSelector((params) => params.negativePrompt ?? '');
+export const selectHasNegativePrompt = createParamsSelector((params) => params.negativePrompt !== null);
+export const selectModelSupportsNegativePrompt = createSelector(
+  [selectIsFLUX, selectIsChatGPT4o],
+  (isFLUX, isChatGPT4o) => !isFLUX && !isChatGPT4o
+);
 export const selectPositivePrompt2 = createParamsSelector((params) => params.positivePrompt2);
 export const selectNegativePrompt2 = createParamsSelector((params) => params.negativePrompt2);
 export const selectShouldConcatPrompts = createParamsSelector((params) => params.shouldConcatPrompts);
@@ -442,3 +341,24 @@ export const selectRefinerNegativeAestheticScore = createParamsSelector(
 export const selectRefinerScheduler = createParamsSelector((params) => params.refinerScheduler);
 export const selectRefinerStart = createParamsSelector((params) => params.refinerStart);
 export const selectRefinerSteps = createParamsSelector((params) => params.refinerSteps);
+
+export const selectMainModelConfig = createSelector(
+  selectModelConfigsQuery,
+  selectParamsSlice,
+  (modelConfigs, { model }) => {
+    if (!modelConfigs.data) {
+      return null;
+    }
+    if (!model) {
+      return null;
+    }
+    const modelConfig = modelConfigsAdapterSelectors.selectById(modelConfigs.data, model.key);
+    if (!modelConfig) {
+      return null;
+    }
+    if (!isNonRefinerMainModelConfig(modelConfig)) {
+      return null;
+    }
+    return modelConfig;
+  }
+);

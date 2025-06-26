@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 import { zFieldInputInstance, zFieldOutputInstance } from './field';
 import { zSemVer } from './semver';
@@ -14,8 +14,8 @@ export const zInvocationNodeData = z.object({
   useCache: z.boolean(),
   version: zSemVer,
   nodePack: z.string().min(1).nullish(),
-  inputs: z.record(zFieldInputInstance),
-  outputs: z.record(zFieldOutputInstance),
+  inputs: z.record(z.string(), zFieldInputInstance),
+  outputs: z.record(z.string(), zFieldOutputInstance),
 });
 
 export const zNotesNodeData = z.object({

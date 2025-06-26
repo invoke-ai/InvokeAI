@@ -127,7 +127,7 @@ import {
 import { atom, computed } from 'nanostores';
 import type { MouseEvent } from 'react';
 import type { UndoableOptions } from 'redux-undo';
-import type { z } from 'zod';
+import type { z } from 'zod/v4';
 
 import type { PendingConnection, Templates } from './types';
 
@@ -193,7 +193,7 @@ const getField = (nodeId: string, fieldName: string, state: NodesState) => {
 const fieldValueReducer = <T extends FieldValue>(
   state: NodesState,
   action: FieldValueAction<T>,
-  schema: z.ZodTypeAny
+  schema: z.ZodType<T>
 ) => {
   const { nodeId, fieldName, value } = action.payload;
   const field = getField(nodeId, fieldName, state);
@@ -213,7 +213,16 @@ export const nodesSlice = createSlice({
   initialState: initialState,
   reducers: {
     nodesChanged: (state, action: PayloadAction<NodeChange<AnyNode>[]>) => {
-      state.nodes = applyNodeChanges<AnyNode>(action.payload, state.nodes);
+      // In v12.7.0, @xyflow/react added a `domAttributes` property to the node data. One DOM attribute is
+      // defaultValue, which may have a value of type `readonly string[]`. This conflicts with the immer-
+      // provided Draft type, used internally by RTK. We don't use `domAttributes`, so we can safely cast
+      // cast this type to `typeof state.nodes`.
+      //
+      // Immer provides a castDraft util that does basically the same thing:
+      // - https://github.com/immerjs/immer/blob/19cbe47ae3db3b4a8940409ab1814ce1a9af3458/src/immer.ts#L95-L103
+      //
+      // But we don't have immer as an explicit dependency so we'll just cast.
+      state.nodes = applyNodeChanges(action.payload, state.nodes) as typeof state.nodes;
       // Remove edges that are no longer valid, due to a removed or otherwise changed node
       const edgeChanges: EdgeChange<AnyEdge>[] = [];
       state.edges.forEach((e) => {

@@ -1,6 +1,6 @@
 import { Flex, Icon, IconButton, Input, InputGroup, InputRightElement, Text, Tooltip } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { map, size } from 'lodash-es';
+import { map, size } from 'es-toolkit/compat';
 import type { ChangeEventHandler } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';

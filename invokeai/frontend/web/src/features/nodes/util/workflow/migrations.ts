@@ -1,4 +1,5 @@
 import { deepClone } from 'common/util/deepClone';
+import { forEach, get } from 'es-toolkit/compat';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { WorkflowMigrationError, WorkflowVersionError } from 'features/nodes/types/error';
 import type { InvocationNodeData } from 'features/nodes/types/invocation';
@@ -12,8 +13,7 @@ import { zWorkflowV2 } from 'features/nodes/types/v2/workflow';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { zWorkflowV3 } from 'features/nodes/types/workflow';
 import { t } from 'i18next';
-import { forEach, get } from 'lodash-es';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 /**
  * Helper schema to extract the version from a workflow.
