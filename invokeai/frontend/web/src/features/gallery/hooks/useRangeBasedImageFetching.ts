@@ -1,5 +1,5 @@
 import { useAppStore } from 'app/store/storeHooks';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import type { ListRange } from 'react-virtuoso';
 import { imagesApi, useGetImageDTOsByNamesMutation } from 'services/api/endpoints/images';
 import { useThrottledCallback } from 'use-debounce';
@@ -52,11 +52,13 @@ export const useRangeBasedImageFetching = ({
   enabled,
 }: UseRangeBasedImageFetchingArgs): UseRangeBasedImageFetchingReturn => {
   const store = useAppStore();
-  const [visibleRange, setVisibleRange] = useState<ListRange>({ startIndex: 0, endIndex: 0 });
   const [getImageDTOsByNames] = useGetImageDTOsByNamesMutation();
 
   const fetchImages = useCallback(
     (visibleRange: ListRange) => {
+      if (!enabled) {
+        return;
+      }
       const cachedImageNames = imagesApi.util.selectCachedArgsForQuery(store.getState(), 'getImageDTO');
       const uncachedNames = getUncachedNames(imageNames, cachedImageNames, visibleRange);
       if (uncachedNames.length === 0) {
@@ -64,21 +66,17 @@ export const useRangeBasedImageFetching = ({
       }
       getImageDTOsByNames({ image_names: uncachedNames });
     },
-    [getImageDTOsByNames, imageNames, store]
+    [enabled, getImageDTOsByNames, imageNames, store]
   );
 
   const throttledFetchImages = useThrottledCallback(fetchImages, 100);
 
-  useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-    throttledFetchImages(visibleRange);
-  }, [enabled, throttledFetchImages, imageNames, visibleRange]);
-
-  const onRangeChanged = useCallback((range: ListRange) => {
-    setVisibleRange(range);
-  }, []);
+  const onRangeChanged = useCallback(
+    (range: ListRange) => {
+      throttledFetchImages(range);
+    },
+    [throttledFetchImages]
+  );
 
   return {
     onRangeChanged,
