@@ -124,7 +124,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
           prepend,
           seedFieldIdentifier,
           positivePromptFieldIdentifier,
-          origin: 'canvas',
+          origin: tab,
           destination,
         })
       );

@@ -33,7 +33,7 @@ export const prepareLinearUIBatch = (arg: {
   prepend: boolean;
   seedFieldIdentifier?: FieldIdentifier;
   positivePromptFieldIdentifier: FieldIdentifier;
-  origin: 'canvas' | 'workflows' | 'upscaling';
+  origin: string;
   destination: string;
 }): EnqueueBatchArg => {
   const { state, g, prepend, seedFieldIdentifier, positivePromptFieldIdentifier, origin, destination } = arg;
