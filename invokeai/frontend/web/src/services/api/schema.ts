@@ -761,11 +761,31 @@ export type paths = {
         };
         /**
          * Get Image Names
-         * @description Gets ordered list of all image names (starred first, then unstarred)
+         * @description Gets ordered list of image names with metadata for optimistic updates
          */
         get: operations["get_image_names"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/images/images_by_names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Images By Names
+         * @description Gets image DTOs for the specified image names. Maintains order of input names.
+         */
+        post: operations["get_images_by_names"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2647,6 +2667,14 @@ export type components = {
             prepend?: boolean;
             /** @description The validation run data to use for this batch. This is only used if this is a validation run. */
             validation_run_data?: components["schemas"]["ValidationRunData"] | null;
+        };
+        /** Body_get_images_by_names */
+        Body_get_images_by_names: {
+            /**
+             * Image Names
+             * @description Object containing list of image names to fetch DTOs for
+             */
+            image_names: string[];
         };
         /** Body_import_style_presets */
         Body_import_style_presets: {
@@ -10473,6 +10501,27 @@ export type components = {
              * @constant
              */
             type: "img_nsfw";
+        };
+        /**
+         * ImageNamesResult
+         * @description Response containing ordered image names with metadata for optimistic updates.
+         */
+        ImageNamesResult: {
+            /**
+             * Image Names
+             * @description Ordered list of image names
+             */
+            image_names: string[];
+            /**
+             * Starred Count
+             * @description Number of starred images (when starred_first=True)
+             */
+            starred_count: number;
+            /**
+             * Total Count
+             * @description Total number of images matching the query
+             */
+            total_count: number;
         };
         /**
          * Add Image Noise
@@ -23720,7 +23769,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": string[];
+                    "application/json": components["schemas"]["ImageNamesResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_images_by_names: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_get_images_by_names"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageDTO"][];
                 };
             };
             /** @description Validation Error */

@@ -6,6 +6,7 @@ from PIL.Image import Image as PILImageType
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
+    ImageNamesResult,
     ImageRecord,
     ImageRecordChanges,
     ResourceOrigin,
@@ -158,6 +159,6 @@ class ImageServiceABC(ABC):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
-    ) -> list[str]:
-        """Gets ordered list of all image names."""
+    ) -> ImageNamesResult:
+        """Gets ordered list of image names with metadata for optimistic updates."""
         pass

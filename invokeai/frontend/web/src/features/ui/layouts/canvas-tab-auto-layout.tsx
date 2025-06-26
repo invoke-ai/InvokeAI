@@ -259,7 +259,7 @@ export const CanvasTabAutoLayout = memo(() => {
   useResizeMainPanelOnFirstVisit($rootPanelApi, rootRef);
 
   return (
-    <AutoLayoutProvider $rootApi={$rootPanelApi} rootRef={rootRef}>
+    <AutoLayoutProvider $rootApi={$rootPanelApi} rootRef={rootRef} tab="canvas">
       <GridviewReact
         ref={rootRef}
         className="dockview-theme-invoke"

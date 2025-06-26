@@ -229,7 +229,7 @@ export const UpscalingTabAutoLayout = memo(() => {
   useResizeMainPanelOnFirstVisit($rootPanelApi, rootRef);
 
   return (
-    <AutoLayoutProvider $rootApi={$rootPanelApi} rootRef={rootRef}>
+    <AutoLayoutProvider $rootApi={$rootPanelApi} rootRef={rootRef} tab="upscaling">
       <GridviewReact
         ref={rootRef}
         className="dockview-theme-invoke"

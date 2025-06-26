@@ -212,3 +212,10 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
 class ImageCollectionCounts(BaseModel):
     starred_count: int = Field(description="The number of starred images in the collection.")
     unstarred_count: int = Field(description="The number of unstarred images in the collection.")
+
+
+class ImageNamesResult(BaseModel):
+    """Response containing ordered image names with metadata for optimistic updates."""
+    image_names: list[str] = Field(description="Ordered list of image names")
+    starred_count: int = Field(description="Number of starred images (when starred_first=True)")
+    total_count: int = Field(description="Total number of images matching the query")
