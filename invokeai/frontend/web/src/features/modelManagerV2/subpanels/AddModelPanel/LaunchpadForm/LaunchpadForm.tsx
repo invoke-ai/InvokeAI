@@ -99,7 +99,14 @@ export const LaunchpadForm = memo(() => {
                     {t('modelManager.urlOrLocalPath')}
                   </Heading>
                 </Flex>
-                <Text fontSize="sm" color="base.400" lineHeight="1.4" flex="1" whiteSpace="normal" wordBreak="break-word">
+                <Text
+                  fontSize="sm"
+                  color="base.400"
+                  lineHeight="1.4"
+                  flex="1"
+                  whiteSpace="normal"
+                  wordBreak="break-word"
+                >
                   {t('modelManager.launchpad.urlDescription')}
                 </Text>
               </Button>
@@ -125,7 +132,14 @@ export const LaunchpadForm = memo(() => {
                     {t('modelManager.huggingFace')}
                   </Heading>
                 </Flex>
-                <Text fontSize="sm" color="base.400" lineHeight="1.4" flex="1" whiteSpace="normal" wordBreak="break-word">
+                <Text
+                  fontSize="sm"
+                  color="base.400"
+                  lineHeight="1.4"
+                  flex="1"
+                  whiteSpace="normal"
+                  wordBreak="break-word"
+                >
                   {t('modelManager.launchpad.huggingFaceDescription')}
                 </Text>
               </Button>
@@ -151,7 +165,14 @@ export const LaunchpadForm = memo(() => {
                     {t('modelManager.scanFolder')}
                   </Heading>
                 </Flex>
-                <Text fontSize="sm" color="base.400" lineHeight="1.4" flex="1" whiteSpace="normal" wordBreak="break-word">
+                <Text
+                  fontSize="sm"
+                  color="base.400"
+                  lineHeight="1.4"
+                  flex="1"
+                  whiteSpace="normal"
+                  wordBreak="break-word"
+                >
                   {t('modelManager.launchpad.scanFolderDescription')}
                 </Text>
               </Button>
