@@ -15,9 +15,12 @@ import { memo, useCallback, useRef, useState } from 'react';
 
 import { GenerateTabLeftPanel } from './GenerateTabLeftPanel';
 import {
+  BOARD_PANEL_DEFAULT_HEIGHT_PX,
+  BOARD_PANEL_MIN_HEIGHT_PX,
   BOARDS_PANEL_ID,
   DEFAULT_TAB_ID,
   GALLERY_PANEL_ID,
+  GALLERY_PANEL_MIN_HEIGHT_PX,
   LAUNCHPAD_PANEL_ID,
   LEFT_PANEL_ID,
   LEFT_PANEL_MIN_SIZE_PX,
@@ -117,18 +120,18 @@ export const initializeRightPanelLayout = (api: GridviewApi) => {
     id: GALLERY_PANEL_ID,
     component: GALLERY_PANEL_ID,
     minimumWidth: RIGHT_PANEL_MIN_SIZE_PX,
-    minimumHeight: 232,
+    minimumHeight: GALLERY_PANEL_MIN_HEIGHT_PX,
   });
   api.addPanel({
     id: BOARDS_PANEL_ID,
     component: BOARDS_PANEL_ID,
-    minimumHeight: 36,
+    minimumHeight: BOARD_PANEL_MIN_HEIGHT_PX,
     position: {
       direction: 'above',
       referencePanel: GALLERY_PANEL_ID,
     },
   });
-  api.getPanel(BOARDS_PANEL_ID)?.api.setSize({ height: 256, width: RIGHT_PANEL_MIN_SIZE_PX });
+  api.getPanel(BOARDS_PANEL_ID)?.api.setSize({ height: BOARD_PANEL_DEFAULT_HEIGHT_PX, width: RIGHT_PANEL_MIN_SIZE_PX });
 };
 
 const RightPanel = memo(() => {

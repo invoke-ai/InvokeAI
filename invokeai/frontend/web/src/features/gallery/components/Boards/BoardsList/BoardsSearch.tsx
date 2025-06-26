@@ -1,14 +1,11 @@
 import { IconButton, Input, InputGroup, InputRightElement } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { buildUseDisclosure } from 'common/hooks/useBoolean';
 import { selectBoardSearchText } from 'features/gallery/store/gallerySelectors';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
-
-export const [useBoardSearchDisclosure, $boardSearchIsOpen] = buildUseDisclosure(false);
 
 export const BoardsSearch = memo(() => {
   const dispatch = useAppDispatch();
