@@ -37,7 +37,7 @@ from invokeai.app.util.misc import uuid_string
 from invokeai.backend.model_hash.hash_validator import validate_hash
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
-from invokeai.backend.model_manager.omi import stable_diffusion_xl_1_lora, flux_dev_1_lora
+from invokeai.backend.model_manager.omi import flux_dev_1_lora, stable_diffusion_xl_1_lora
 from invokeai.backend.model_manager.taxonomy import (
     AnyVariant,
     BaseModelType,

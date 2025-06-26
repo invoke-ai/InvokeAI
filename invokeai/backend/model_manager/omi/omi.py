@@ -1,10 +1,13 @@
+from invokeai.backend.model_manager.model_on_disk import StateDict
+from invokeai.backend.model_manager.omi.vendor.convert.lora import (
+    convert_flux_lora as omi_flux,
+)
 from invokeai.backend.model_manager.omi.vendor.convert.lora import (
     convert_lora_util as lora_util,
-    convert_flux_lora as omi_flux,
+)
+from invokeai.backend.model_manager.omi.vendor.convert.lora import (
     convert_sdxl_lora as omi_sdxl,
 )
-
-from invokeai.backend.model_manager.model_on_disk import StateDict
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 
 

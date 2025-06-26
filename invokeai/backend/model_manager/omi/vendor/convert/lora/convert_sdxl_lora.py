@@ -1,5 +1,8 @@
 from invokeai.backend.model_manager.omi.vendor.convert.lora.convert_clip import map_clip
-from invokeai.backend.model_manager.omi.vendor.convert.lora.convert_lora_util import LoraConversionKeySet, map_prefix_range
+from invokeai.backend.model_manager.omi.vendor.convert.lora.convert_lora_util import (
+    LoraConversionKeySet,
+    map_prefix_range,
+)
 
 
 def __map_unet_resnet_block(key_prefix: LoraConversionKeySet) -> list[LoraConversionKeySet]:
@@ -115,7 +118,7 @@ def convert_sdxl_lora_key_sets() -> list[LoraConversionKeySet]:
     keys = []
 
     keys += [LoraConversionKeySet("bundle_emb", "bundle_emb")]
-    keys += __map_unet(LoraConversionKeySet( "unet", "lora_unet"))
+    keys += __map_unet(LoraConversionKeySet("unet", "lora_unet"))
     keys += map_clip(LoraConversionKeySet("clip_l", "lora_te1"))
     keys += map_clip(LoraConversionKeySet("clip_g", "lora_te2"))
 
