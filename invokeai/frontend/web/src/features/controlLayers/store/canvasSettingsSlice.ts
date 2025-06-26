@@ -80,9 +80,9 @@ type CanvasSettingsState = {
    */
   pressureSensitivity: boolean;
   /**
-   * Whether to show the rule of 4 composition guide overlay on the canvas.
+   * Whether to show the rule of thirds composition guide overlay on the canvas.
    */
-  ruleOfFourGuide: boolean;
+  ruleOfThirds: boolean;
 };
 
 const initialState: CanvasSettingsState = {
@@ -103,7 +103,7 @@ const initialState: CanvasSettingsState = {
   isolatedStagingPreview: true,
   isolatedLayerPreview: true,
   pressureSensitivity: true,
-  ruleOfFourGuide: false,
+  ruleOfThirds: false,
 };
 
 export const canvasSettingsSlice = createSlice({
@@ -161,8 +161,8 @@ export const canvasSettingsSlice = createSlice({
     settingsPressureSensitivityToggled: (state) => {
       state.pressureSensitivity = !state.pressureSensitivity;
     },
-    settingsRuleOfFourGuideToggled: (state) => {
-      state.ruleOfFourGuide = !state.ruleOfFourGuide;
+    settingsRuleOfThirdsToggled: (state) => {
+      state.ruleOfThirds = !state.ruleOfThirds;
     },
   },
   extraReducers(builder) {
@@ -193,7 +193,7 @@ export const {
   settingsIsolatedStagingPreviewToggled,
   settingsIsolatedLayerPreviewToggled,
   settingsPressureSensitivityToggled,
-  settingsRuleOfFourGuideToggled,
+  settingsRuleOfThirdsToggled,
 } = canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -228,4 +228,4 @@ export const selectShowProgressOnCanvas = createCanvasSettingsSelector(
 export const selectIsolatedStagingPreview = createCanvasSettingsSelector((settings) => settings.isolatedStagingPreview);
 export const selectIsolatedLayerPreview = createCanvasSettingsSelector((settings) => settings.isolatedLayerPreview);
 export const selectPressureSensitivity = createCanvasSettingsSelector((settings) => settings.pressureSensitivity);
-export const selectRuleOfFourGuide = createCanvasSettingsSelector((settings) => settings.ruleOfFourGuide);
+export const selectRuleOfThirds = createCanvasSettingsSelector((settings) => settings.ruleOfThirds);

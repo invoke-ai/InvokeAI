@@ -1,25 +1,25 @@
 import { FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectRuleOfFourGuide, settingsRuleOfFourGuideToggled } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectRuleOfThirds, settingsRuleOfThirdsToggled } from 'features/controlLayers/store/canvasSettingsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const CanvasSettingsRuleOfFourGuideSwitch = memo(() => {
+export const CanvasSettingsRuleOfThirdsSwitch = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const ruleOfFourGuide = useAppSelector(selectRuleOfFourGuide);
+  const ruleOfThirds = useAppSelector(selectRuleOfThirds);
   const onChange = useCallback(() => {
-    dispatch(settingsRuleOfFourGuideToggled());
+    dispatch(settingsRuleOfThirdsToggled());
   }, [dispatch]);
 
   return (
     <FormControl>
       <FormLabel m={0} flexGrow={1}>
-        {t('controlLayers.ruleOfFourGuide')}
+        {t('controlLayers.ruleOfThirds')}
       </FormLabel>
-      <Switch size="sm" isChecked={ruleOfFourGuide} onChange={onChange} />
+      <Switch size="sm" isChecked={ruleOfThirds} onChange={onChange} />
     </FormControl>
   );
 });
 
-CanvasSettingsRuleOfFourGuideSwitch.displayName = 'CanvasSettingsRuleOfFourGuideSwitch';
+CanvasSettingsRuleOfThirdsSwitch.displayName = 'CanvasSettingsRuleOfThirdsSwitch';
