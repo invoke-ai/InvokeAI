@@ -1,4 +1,7 @@
-from invokeai.backend.model_manager.omi.vendor.convert.lora.convert_lora_util import LoraConversionKeySet, map_prefix_range
+from invokeai.backend.model_manager.omi.vendor.convert.lora.convert_lora_util import (
+    LoraConversionKeySet,
+    map_prefix_range,
+)
 
 
 def map_t5(key_prefix: LoraConversionKeySet) -> list[LoraConversionKeySet]:

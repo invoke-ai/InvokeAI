@@ -1,5 +1,8 @@
 from invokeai.backend.model_manager.omi.vendor.convert.lora.convert_clip import map_clip
-from invokeai.backend.model_manager.omi.vendor.convert.lora.convert_lora_util import LoraConversionKeySet, map_prefix_range
+from invokeai.backend.model_manager.omi.vendor.convert.lora.convert_lora_util import (
+    LoraConversionKeySet,
+    map_prefix_range,
+)
 from invokeai.backend.model_manager.omi.vendor.convert.lora.convert_t5 import map_t5
 
 
@@ -45,10 +48,16 @@ def __map_transformer(key_prefix: LoraConversionKeySet) -> list[LoraConversionKe
     keys = []
 
     keys += [LoraConversionKeySet("txt_in", "context_embedder", parent=key_prefix)]
-    keys += [LoraConversionKeySet("final_layer.adaLN_modulation.1", "norm_out.linear", parent=key_prefix, swap_chunks=True)]
+    keys += [
+        LoraConversionKeySet("final_layer.adaLN_modulation.1", "norm_out.linear", parent=key_prefix, swap_chunks=True)
+    ]
     keys += [LoraConversionKeySet("final_layer.linear", "proj_out", parent=key_prefix)]
-    keys += [LoraConversionKeySet("guidance_in.in_layer", "time_text_embed.guidance_embedder.linear_1", parent=key_prefix)]
-    keys += [LoraConversionKeySet("guidance_in.out_layer", "time_text_embed.guidance_embedder.linear_2", parent=key_prefix)]
+    keys += [
+        LoraConversionKeySet("guidance_in.in_layer", "time_text_embed.guidance_embedder.linear_1", parent=key_prefix)
+    ]
+    keys += [
+        LoraConversionKeySet("guidance_in.out_layer", "time_text_embed.guidance_embedder.linear_2", parent=key_prefix)
+    ]
     keys += [LoraConversionKeySet("vector_in.in_layer", "time_text_embed.text_embedder.linear_1", parent=key_prefix)]
     keys += [LoraConversionKeySet("vector_in.out_layer", "time_text_embed.text_embedder.linear_2", parent=key_prefix)]
     keys += [LoraConversionKeySet("time_in.in_layer", "time_text_embed.timestep_embedder.linear_1", parent=key_prefix)]
