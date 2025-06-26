@@ -12,6 +12,7 @@ const initialState: StylePresetState = {
   activeStylePresetId: null,
   searchTerm: '',
   viewMode: false,
+  showPromptPreviews: false,
 };
 
 export const stylePresetSlice = createSlice({
@@ -26,6 +27,9 @@ export const stylePresetSlice = createSlice({
     },
     viewModeChanged: (state, action: PayloadAction<boolean>) => {
       state.viewMode = action.payload;
+    },
+    showPromptPreviewsChanged: (state, action: PayloadAction<boolean>) => {
+      state.showPromptPreviews = action.payload;
     },
   },
   extraReducers(builder) {
@@ -53,12 +57,15 @@ export const stylePresetSlice = createSlice({
   },
 });
 
-export const { activeStylePresetIdChanged, searchTermChanged, viewModeChanged } = stylePresetSlice.actions;
+export const { activeStylePresetIdChanged, searchTermChanged, viewModeChanged, showPromptPreviewsChanged } = stylePresetSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateStylePresetState = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
+  }
+  if (!('showPromptPreviews' in state)) {
+    state.showPromptPreviews = false;
   }
   return state;
 };
@@ -79,6 +86,7 @@ export const selectStylePresetActivePresetId = createStylePresetSelector(
 );
 export const selectStylePresetViewMode = createStylePresetSelector((stylePreset) => stylePreset.viewMode);
 export const selectStylePresetSearchTerm = createStylePresetSelector((stylePreset) => stylePreset.searchTerm);
+export const selectShowPromptPreviews = createStylePresetSelector((stylePreset) => stylePreset.showPromptPreviews);
 
 /**
  * Tracks whether or not the style preset menu is open.

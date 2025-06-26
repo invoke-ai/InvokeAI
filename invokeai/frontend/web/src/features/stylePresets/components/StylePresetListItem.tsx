@@ -5,6 +5,7 @@ import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetM
 import {
   $isStylePresetsMenuOpen,
   activeStylePresetIdChanged,
+  selectShowPromptPreviews,
   selectStylePresetActivePresetId,
 } from 'features/stylePresets/store/stylePresetSlice';
 import type { MouseEvent } from 'react';
@@ -18,6 +19,7 @@ import StylePresetImage from './StylePresetImage';
 export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithImage }) => {
   const dispatch = useAppDispatch();
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
+  const showPromptPreviews = useAppSelector(selectShowPromptPreviews);
   const { t } = useTranslation();
   const deleteStylePreset = useDeleteStylePreset();
 
@@ -138,20 +140,22 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
           </Flex>
         </Flex>
 
-        <Flex flexDir="column" gap={1}>
-          <Text fontSize="xs">
-            <Text as="span" fontWeight="semibold">
-              {t('stylePresets.positivePrompt')}:
-            </Text>{' '}
-            {preset.preset_data.positive_prompt}
-          </Text>
-          <Text fontSize="xs">
-            <Text as="span" fontWeight="semibold">
-              {t('stylePresets.negativePrompt')}:
-            </Text>{' '}
-            {preset.preset_data.negative_prompt}
-          </Text>
-        </Flex>
+        {showPromptPreviews && (
+          <Flex flexDir="column" gap={1}>
+            <Text fontSize="xs">
+              <Text as="span" fontWeight="semibold">
+                {t('stylePresets.positivePrompt')}:
+              </Text>{' '}
+              {preset.preset_data.positive_prompt}
+            </Text>
+            <Text fontSize="xs">
+              <Text as="span" fontWeight="semibold">
+                {t('stylePresets.negativePrompt')}:
+              </Text>{' '}
+              {preset.preset_data.negative_prompt}
+            </Text>
+          </Flex>
+        )}
       </Flex>
     </Flex>
   );

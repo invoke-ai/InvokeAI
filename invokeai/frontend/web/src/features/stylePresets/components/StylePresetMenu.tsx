@@ -3,6 +3,7 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
 import { StylePresetExportButton } from 'features/stylePresets/components/StylePresetExportButton';
 import { StylePresetImportButton } from 'features/stylePresets/components/StylePresetImportButton';
+import { StylePresetPromptPreviewToggle } from 'features/stylePresets/components/StylePresetPromptPreviewToggle';
 import { selectStylePresetSearchTerm } from 'features/stylePresets/store/stylePresetSlice';
 import { selectAllowPrivateStylePresets } from 'features/system/store/configSlice';
 import { useTranslation } from 'react-i18next';
@@ -54,9 +55,12 @@ export const StylePresetMenu = () => {
     <Flex flexDir="column" gap={2} padding={3} layerStyle="second" borderRadius="base">
       <Flex alignItems="center" gap={2} w="full" justifyContent="space-between">
         <StylePresetSearch />
-        <StylePresetCreateButton />
-        <StylePresetImportButton />
-        <StylePresetExportButton />
+        <Flex alignItems="center" gap={1}>
+          <StylePresetPromptPreviewToggle />
+          <StylePresetCreateButton />
+          <StylePresetImportButton />
+          <StylePresetExportButton />
+        </Flex>
       </Flex>
 
       <StylePresetList title={t('stylePresets.myTemplates')} data={data.presets} />
