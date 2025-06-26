@@ -36,8 +36,10 @@ Successfully implemented the complete architectural plan for adding "Kontext" re
 #### Integration in FluxDenoiseInvocation:
 - Instantiates KontextExtension when `kontext_conditioning` is provided
 - Requires `controlnet_vae` for image encoding (reuses existing VAE infrastructure)
+- Stores original sequence length before applying extension
 - Applies extension before denoise call to combine image tokens and IDs
 - Passes combined tensors to transformer model
+- **Critical Fix**: Extracts only main image tokens after denoising to avoid unpacking errors
 
 ## Key Technical Details
 
@@ -57,6 +59,15 @@ The implementation uses the same core approach as the original ComfyUI example:
 - Validates that VAE is provided when Kontext conditioning is used
 - Proper device and dtype handling throughout the pipeline
 - Batch size normalization for edge cases
+
+### Sequence Length Management
+**Issue**: When concatenating reference tokens with main image tokens, the sequence length doubles (e.g., 4096 → 8192), but the `unpack` function expects only the original main image sequence length.
+
+**Solution**: 
+1. Store original sequence length before applying KontextExtension
+2. Pass combined sequence (main + reference tokens) to transformer
+3. After denoising, extract only the main image portion: `x[:, :original_seq_len, :]`
+4. Unpack only the main image tokens, avoiding shape mismatch errors
 
 ## Files Modified/Created
 

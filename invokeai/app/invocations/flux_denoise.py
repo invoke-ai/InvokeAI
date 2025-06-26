@@ -402,6 +402,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
             # THE CRITICAL INTEGRATION POINT
             final_img, final_img_ids = x, img_ids
+            original_seq_len = x.shape[1]  # Store the original sequence length
             if kontext_extension is not None:
                 final_img, final_img_ids = kontext_extension.apply(final_img, final_img_ids)
 
@@ -422,6 +423,10 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 neg_ip_adapter_extensions=neg_ip_adapter_extensions,
                 img_cond=img_cond,
             )
+            
+            # Extract only the main image tokens if kontext was applied
+            if kontext_extension is not None:
+                x = x[:, :original_seq_len, :]  # Keep only the first original_seq_len tokens
 
         x = unpack(x.float(), self.height, self.width)
         return x
