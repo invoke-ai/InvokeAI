@@ -2400,7 +2400,9 @@
         "uploadImage": "Upload Image",
         "useForTemplate": "Use For Prompt Template",
         "viewList": "View Template List",
-        "viewModeTooltip": "This is how your prompt will look with your currently selected template. To edit your prompt, click anywhere in the text box."
+        "viewModeTooltip": "This is how your prompt will look with your currently selected template. To edit your prompt, click anywhere in the text box.",
+        "showPromptPreviews": "Show Prompt Previews",
+        "hidePromptPreviews": "Hide Prompt Previews"
     },
     "upsell": {
         "inviteTeammates": "Invite Teammates",
