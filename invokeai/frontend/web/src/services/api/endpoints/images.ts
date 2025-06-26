@@ -7,6 +7,7 @@ import type {
   GraphAndWorkflowResponse,
   ImageCategory,
   ImageDTO,
+  ImageNamesResult,
   ImageUploadEntryRequest,
   ImageUploadEntryResponse,
   ListImagesArgs,
@@ -431,7 +432,7 @@ export const imagesApi = api.injectEndpoints({
      * Get ordered list of image names for selection operations
      */
     getImageNames: build.query<
-      string[],
+      ImageNamesResult,
       {
         categories?: ImageCategory[] | null;
         is_intermediate?: boolean | null;
@@ -449,6 +450,38 @@ export const imagesApi = api.injectEndpoints({
         'FetchOnReconnect',
         { type: 'ImageNameList', id: stableHash(queryArgs) },
       ],
+    }),
+    /**
+     * Get image DTOs for the specified image names. Maintains order of input names.
+     */
+    getImageDTOsByNames: build.mutation<
+      paths['/api/v1/images/images_by_names']['post']['responses']['200']['content']['application/json'],
+      paths['/api/v1/images/images_by_names']['post']['requestBody']['content']['application/json']
+    >({
+      query: (body) => ({
+        url: buildImagesUrl('images_by_names'),
+        method: 'POST',
+        body,
+      }),
+      // Don't provide cache tags - we'll manually upsert into individual getImageDTO caches
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          const { data: imageDTOs } = await queryFulfilled;
+
+          // Upsert each DTO into the individual image cache
+          const updates: Param0<typeof imagesApi.util.upsertQueryEntries> = [];
+          for (const imageDTO of imageDTOs) {
+            updates.push({
+              endpointName: 'getImageDTO',
+              arg: imageDTO.image_name,
+              value: imageDTO,
+            });
+          }
+          dispatch(imagesApi.util.upsertQueryEntries(updates));
+        } catch {
+          // Handle error if needed
+        }
+      },
     }),
   }),
 });
@@ -472,6 +505,7 @@ export const {
   useUnstarImagesMutation,
   useBulkDownloadImagesMutation,
   useGetImageNamesQuery,
+  useGetImageDTOsByNamesMutation,
 } = imagesApi;
 
 /**

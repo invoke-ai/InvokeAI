@@ -5,8 +5,8 @@ import { useGetImageNamesQuery } from 'services/api/endpoints/images';
 import { useDebounce } from 'use-debounce';
 
 const getImageNamesQueryOptions = {
-  selectFromResult: ({ data, isLoading, isFetching }) => ({
-    imageNames: data ?? EMPTY_ARRAY,
+  selectFromResult: ({ currentData, isLoading, isFetching }) => ({
+    imageNames: currentData?.image_names ?? EMPTY_ARRAY,
     isLoading,
     isFetching,
   }),
@@ -14,7 +14,7 @@ const getImageNamesQueryOptions = {
 
 export const useGalleryImageNames = () => {
   const _queryArgs = useAppSelector(selectListImageNamesQueryArgs);
-  const [queryArgs] = useDebounce(_queryArgs, 500);
+  const [queryArgs] = useDebounce(_queryArgs, 300);
   const { imageNames, isLoading, isFetching } = useGetImageNamesQuery(queryArgs, getImageNamesQueryOptions);
   return { imageNames, isLoading, isFetching, queryArgs };
 };

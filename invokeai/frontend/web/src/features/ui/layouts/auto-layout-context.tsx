@@ -1,5 +1,9 @@
+import { createSelector } from '@reduxjs/toolkit';
+import { useAppSelector } from 'app/store/storeHooks';
 import type { DockviewApi, GridviewApi } from 'dockview';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import type { TabName } from 'features/ui/store/uiTypes';
 import type { WritableAtom } from 'nanostores';
 import { atom } from 'nanostores';
 import type { PropsWithChildren, RefObject } from 'react';
@@ -8,6 +12,7 @@ import { createContext, memo, useCallback, useContext, useMemo, useState } from 
 import { LEFT_PANEL_ID, LEFT_PANEL_MIN_SIZE_PX, RIGHT_PANEL_ID, RIGHT_PANEL_MIN_SIZE_PX } from './shared';
 
 type AutoLayoutContextValue = {
+  isActiveTab: boolean;
   toggleLeftPanel: () => void;
   toggleRightPanel: () => void;
   toggleBothPanels: () => void;
@@ -57,9 +62,15 @@ const activatePanel = (api: GridviewApi | DockviewApi, panelId: string) => {
 };
 
 export const AutoLayoutProvider = (
-  props: PropsWithChildren<{ $rootApi: WritableAtom<GridviewApi | null>; rootRef: RefObject<HTMLDivElement> }>
+  props: PropsWithChildren<{
+    $rootApi: WritableAtom<GridviewApi | null>;
+    rootRef: RefObject<HTMLDivElement>;
+    tab: TabName;
+  }>
 ) => {
-  const { $rootApi, rootRef, children } = props;
+  const { $rootApi, rootRef, tab, children } = props;
+  const selectIsActiveTab = useMemo(() => createSelector(selectActiveTab, (activeTab) => activeTab === tab), [tab]);
+  const isActiveTab = useAppSelector(selectIsActiveTab);
   const $leftApi = useState(() => atom<GridviewApi | null>(null))[0];
   const $centerApi = useState(() => atom<DockviewApi | null>(null))[0];
   const $rightApi = useState(() => atom<GridviewApi | null>(null))[0];
@@ -126,6 +137,7 @@ export const AutoLayoutProvider = (
 
   const value = useMemo<AutoLayoutContextValue>(
     () => ({
+      isActiveTab,
       toggleLeftPanel,
       toggleRightPanel,
       toggleBothPanels,
@@ -138,6 +150,7 @@ export const AutoLayoutProvider = (
       _$rightPanelApi: $rightApi,
     }),
     [
+      isActiveTab,
       $centerApi,
       $leftApi,
       $rightApi,

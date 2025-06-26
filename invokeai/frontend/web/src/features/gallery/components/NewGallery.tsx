@@ -2,15 +2,16 @@ import { Box, Flex, forwardRef, Grid, GridItem, Skeleton, Spinner, Text } from '
 import { createSelector } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { useRangeBasedImageFetching } from 'features/gallery/hooks/useRangeBasedImageFetching';
 import type { selectListImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import {
-  LIMIT,
   selectGalleryImageMinimumWidth,
   selectImageToCompare,
   selectLastSelectedImage,
 } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
+import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
 import { useOverlayScrollbars } from 'overlayscrollbars-react';
 import type { MutableRefObject, RefObject } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -23,21 +24,14 @@ import type {
   VirtuosoGridHandle,
 } from 'react-virtuoso';
 import { VirtuosoGrid } from 'react-virtuoso';
-import { useListImagesQuery } from 'services/api/endpoints/images';
-import type { ImageDTO } from 'services/api/types';
+import { imagesApi } from 'services/api/endpoints/images';
 import { useDebounce } from 'use-debounce';
 
-import { GalleryImage } from './ImageGrid/GalleryImage';
+import { GalleryImage, GalleryImagePlaceholder } from './ImageGrid/GalleryImage';
 import { GallerySelectionCountTag } from './ImageGrid/GallerySelectionCountTag';
 import { useGalleryImageNames } from './use-gallery-image-names';
 
 const log = logger('gallery');
-
-// Constants
-const VIEWPORT_BUFFER = 2048;
-const SCROLL_SEEK_VELOCITY_THRESHOLD = 4096;
-const DEBOUNCE_DELAY = 500;
-const SPINNER_OPACITY = 0.3;
 
 type ListImageNamesQueryArgs = ReturnType<typeof selectListImageNamesQueryArgs>;
 
@@ -46,58 +40,41 @@ type GridContext = {
   imageNames: string[];
 };
 
-// Hook to get an image DTO from cache or trigger loading
-const useImageDTOFromListQuery = (
-  index: number,
-  imageName: string,
-  queryArgs: ListImageNamesQueryArgs
-): ImageDTO | null => {
-  const { arg, options } = useMemo(() => {
-    const pageOffset = Math.floor(index / LIMIT) * LIMIT;
-    return {
-      arg: {
-        ...queryArgs,
-        offset: pageOffset,
-        limit: LIMIT,
-      } satisfies Parameters<typeof useListImagesQuery>[0],
-      options: {
-        selectFromResult: ({ data }) => {
-          const imageDTO = data?.items?.[index - pageOffset] || null;
-          if (imageDTO && imageDTO.image_name !== imageName) {
-            log.warn(`Image at index ${index} does not match expected image name ${imageName}`);
-            return { imageDTO: null };
-          }
-          return { imageDTO };
-        },
-      } satisfies Parameters<typeof useListImagesQuery>[1],
-    };
-  }, [index, queryArgs, imageName]);
+const ImageAtPosition = memo(({ imageName }: { index: number; imageName: string }) => {
+  /*
+   * We rely on the useRangeBasedImageFetching to fetch all image DTOs, caching them with RTK Query.
+   *
+   * In this component, we just want to consume that cache. Unforutnately, RTK Query does not provide a way to
+   * subscribe to a query without triggering a new fetch.
+   *
+   * There is a hack, though:
+   * - https://github.com/reduxjs/redux-toolkit/discussions/4213
+   *
+   * This essentially means "subscribe to the query once it has some data".
+   */
 
-  const { imageDTO } = useListImagesQuery(arg, options);
+  // Use `currentData` instead of `data` to prevent a flash of previous image rendered at this index
+  const { currentData: imageDTO, isUninitialized } = imagesApi.endpoints.getImageDTO.useQueryState(imageName);
+  imagesApi.endpoints.getImageDTO.useQuerySubscription(imageName, { skip: isUninitialized });
 
-  return imageDTO;
-};
-
-// Individual image component that gets its data from RTK Query cache
-const ImageAtPosition = memo(
-  ({ index, queryArgs, imageName }: { index: number; imageName: string; queryArgs: ListImageNamesQueryArgs }) => {
-    const imageDTO = useImageDTOFromListQuery(index, imageName, queryArgs);
-
-    if (!imageDTO) {
-      return <Skeleton w="full" h="full" />;
-    }
-
-    return <GalleryImage imageDTO={imageDTO} />;
+  if (!imageDTO) {
+    return <GalleryImagePlaceholder />;
   }
-);
+
+  return <GalleryImage imageDTO={imageDTO} />;
+});
 ImageAtPosition.displayName = 'ImageAtPosition';
 
-// Memoized compute key function using image names
-const computeItemKey: GridComputeItemKey<string, GridContext> = (_index, imageName, { queryArgs }) => {
-  return `${JSON.stringify(queryArgs)}-${imageName}`;
+const computeItemKey: GridComputeItemKey<string, GridContext> = (index, imageName, { queryArgs }) => {
+  return `${JSON.stringify(queryArgs)}-${imageName ?? index}`;
 };
 
-// Physical DOM-based grid calculation using refs (based on working old implementation)
+/**
+ * Calculate how many images fit in a row based on the current grid layout.
+ *
+ * TODO(psyche): We only need to do this when the gallery width changes, or when the galleryImageMinimumWidth value
+ * changes. Cache this calculation.
+ */
 const getImagesPerRow = (rootEl: HTMLDivElement): number => {
   // Start from root and find virtuoso grid elements
   const gridElement = rootEl.querySelector('.virtuoso-grid-list');
@@ -124,7 +101,14 @@ const getImagesPerRow = (rootEl: HTMLDivElement): number => {
     return 0;
   }
 
-  // Use the exact calculation from the working old implementation
+  /**
+   * You might be tempted to just do some simple math like:
+   * const imagesPerRow = Math.floor(containerRect.width / itemRect.width);
+   *
+   * But floating point precision can cause issues with this approach, causing it to be off by 1 in some cases.
+   *
+   * Instead, we use a more robust approach that iteratively calculates how many images fit in the row.
+   */
   let imagesPerRow = 0;
   let spaceUsed = 0;
 
@@ -141,7 +125,9 @@ const getImagesPerRow = (rootEl: HTMLDivElement): number => {
   return Math.max(1, imagesPerRow);
 };
 
-// Check if an item at a given index is visible in the viewport
+/**
+ * Scroll the item at the given index into view if it is not currently visible.
+ */
 const scrollIntoView = (
   index: number,
   rootEl: HTMLDivElement,
@@ -202,6 +188,11 @@ const scrollIntoView = (
   return;
 };
 
+/**
+ * Get the index of the image in the list of image names.
+ * If the image name is not found, return 0.
+ * If no image name is provided, return 0.
+ */
 const getImageIndex = (imageName: string | undefined | null, imageNames: string[]) => {
   if (!imageName || imageNames.length === 0) {
     return 0;
@@ -210,7 +201,9 @@ const getImageIndex = (imageName: string | undefined | null, imageNames: string[
   return index >= 0 ? index : 0;
 };
 
-// Hook for keyboard navigation using physical DOM measurements
+/**
+ * Handles keyboard navigation for the gallery.
+ */
 const useKeyboardNavigation = (
   imageNames: string[],
   virtuosoRef: React.RefObject<VirtuosoGridHandle>,
@@ -249,11 +242,12 @@ const useKeyboardNavigation = (
 
       event.preventDefault();
 
+      const state = getState();
       const imageName = event.altKey
         ? // When the user holds alt, we are changing the image to compare - if no image to compare is currently selected,
           // we start from the last selected image
-          (selectImageToCompare(getState()) ?? selectLastSelectedImage(getState()))
-        : selectLastSelectedImage(getState());
+          (selectImageToCompare(state) ?? selectLastSelectedImage(state))
+        : selectLastSelectedImage(state);
 
       const currentIndex = getImageIndex(imageName, imageNames);
 
@@ -373,6 +367,11 @@ const useKeyboardNavigation = (
   });
 };
 
+/**
+ * Keeps the last selected image in view when the gallery is scrolled.
+ * This is useful for keyboard navigation and ensuring the user can see their selection.
+ * It only tracks the last selected image, not the image to compare.
+ */
 const useKeepSelectedImageInView = (
   imageNames: string[],
   virtuosoRef: React.RefObject<VirtuosoGridHandle>,
@@ -397,6 +396,9 @@ const useKeepSelectedImageInView = (
   }, [imageName, imageNames, rangeRef, rootRef, virtuosoRef]);
 };
 
+/**
+ * Handles the initialization of the overlay scrollbars for the gallery, returning the ref to the scroller element.
+ */
 const useScrollableGallery = (rootRef: RefObject<HTMLDivElement>) => {
   const [scroller, scrollerRef] = useState<HTMLElement | null>(null);
   const [initialize, osInstance] = useOverlayScrollbars({
@@ -431,43 +433,49 @@ const useScrollableGallery = (rootRef: RefObject<HTMLDivElement>) => {
   return scrollerRef;
 };
 
-// Main gallery component
 export const NewGallery = memo(() => {
   const virtuosoRef = useRef<VirtuosoGridHandle>(null);
   const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
   const rootRef = useRef<HTMLDivElement>(null);
+  const { isActiveTab } = useAutoLayoutContext();
 
   // Get the ordered list of image names - this is our primary data source for virtualization
   const { queryArgs, imageNames, isLoading } = useGalleryImageNames();
+
+  // Use range-based fetching for bulk loading image DTOs into cache based on the visible range
+  const { onRangeChanged } = useRangeBasedImageFetching({
+    imageNames,
+    enabled: !isLoading && isActiveTab,
+  });
 
   useKeepSelectedImageInView(imageNames, virtuosoRef, rootRef, rangeRef);
   useKeyboardNavigation(imageNames, virtuosoRef, rootRef);
   const scrollerRef = useScrollableGallery(rootRef);
 
-  // We have to keep track of the visible range for keep-selected-image-in-view functionality
-  const handleRangeChanged = useCallback((range: ListRange) => {
-    rangeRef.current = range;
-  }, []);
-
-  const context = useMemo(
-    () =>
-      ({
-        imageNames,
-        queryArgs,
-      }) satisfies GridContext,
-    [imageNames, queryArgs]
+  /*
+   * We have to keep track of the visible range for keep-selected-image-in-view functionality and push the range to
+   * the range-based image fetching hook.
+   */
+  const handleRangeChanged = useCallback(
+    (range: ListRange) => {
+      rangeRef.current = range;
+      onRangeChanged(range);
+    },
+    [onRangeChanged]
   );
 
+  const context = useMemo<GridContext>(() => ({ imageNames, queryArgs }), [imageNames, queryArgs]);
+
   // Item content function
-  const itemContent: GridItemContent<string, GridContext> = useCallback((index, imageName, ctx) => {
-    return <ImageAtPosition index={index} imageName={imageName} queryArgs={ctx.queryArgs} />;
+  const itemContent: GridItemContent<string, GridContext> = useCallback((index, imageName) => {
+    return <ImageAtPosition index={index} imageName={imageName} />;
   }, []);
 
   if (isLoading) {
     return (
-      <Flex height="100%" alignItems="center" justifyContent="center">
-        <Spinner size="lg" opacity={SPINNER_OPACITY} />
-        <Text ml={4}>Loading gallery...</Text>
+      <Flex height="100%" alignItems="center" justifyContent="center" gap={4}>
+        <Spinner size="lg" opacity={0.3} />
+        <Text color="base.300">Loading gallery...</Text>
       </Flex>
     );
   }
@@ -481,12 +489,13 @@ export const NewGallery = memo(() => {
   }
 
   return (
+    // This wrapper component is necessary to initialize the overlay scrollbars!
     <Box data-overlayscrollbars-initialize="" ref={rootRef} position="relative" w="full" h="full">
       <VirtuosoGrid<string, GridContext>
         ref={virtuosoRef}
         context={context}
         data={imageNames}
-        increaseViewportBy={VIEWPORT_BUFFER}
+        increaseViewportBy={2048}
         itemContent={itemContent}
         computeItemKey={computeItemKey}
         components={components}
@@ -503,7 +512,7 @@ export const NewGallery = memo(() => {
 NewGallery.displayName = 'NewGallery';
 
 const scrollSeekConfiguration: ScrollSeekConfiguration = {
-  enter: (velocity) => velocity > SCROLL_SEEK_VELOCITY_THRESHOLD,
+  enter: (velocity) => velocity > 4096,
   exit: (velocity) => velocity === 0,
 };
 
@@ -518,7 +527,7 @@ const selectGridTemplateColumns = createSelector(
 // Grid components
 const ListComponent: GridComponents<GridContext>['List'] = forwardRef(({ context: _, ...rest }, ref) => {
   const _gridTemplateColumns = useAppSelector(selectGridTemplateColumns);
-  const [gridTemplateColumns] = useDebounce(_gridTemplateColumns, DEBOUNCE_DELAY);
+  const [gridTemplateColumns] = useDebounce(_gridTemplateColumns, 300);
 
   return <Grid ref={ref} gridTemplateColumns={gridTemplateColumns} gap={1} {...rest} />;
 });

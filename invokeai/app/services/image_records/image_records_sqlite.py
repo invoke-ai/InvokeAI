@@ -7,6 +7,7 @@ from invokeai.app.services.image_records.image_records_base import ImageRecordSt
 from invokeai.app.services.image_records.image_records_common import (
     IMAGE_DTO_COLS,
     ImageCategory,
+    ImageNamesResult,
     ImageRecord,
     ImageRecordChanges,
     ImageRecordDeleteException,
@@ -396,17 +397,10 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
-    ) -> list[str]:
+    ) -> ImageNamesResult:
         cursor = self._conn.cursor()
 
-        # Base query to get image names in order (starred first, then unstarred)
-        query = """--sql
-        SELECT images.image_name
-        FROM images
-        LEFT JOIN board_images ON board_images.image_name = images.image_name
-        WHERE 1=1
-        """
-
+        # Build query conditions (reused for both starred count and image names queries)
         query_conditions = ""
         query_params: list[Union[int, str, bool]] = []
 
@@ -451,22 +445,42 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             query_params.append(f"%{search_term.lower()}%")
             query_params.append(f"%{search_term.lower()}%")
 
+        # Get starred count if starred_first is enabled
+        starred_count = 0
         if starred_first:
-            query += (
-                query_conditions
-                + f"""--sql
+            starred_count_query = f"""--sql
+            SELECT COUNT(*)
+            FROM images
+            LEFT JOIN board_images ON board_images.image_name = images.image_name
+            WHERE images.starred = TRUE AND (1=1{query_conditions})
+            """
+            cursor.execute(starred_count_query, query_params)
+            starred_count = cast(int, cursor.fetchone()[0])
+
+        # Get all image names with proper ordering
+        if starred_first:
+            names_query = f"""--sql
+            SELECT images.image_name
+            FROM images
+            LEFT JOIN board_images ON board_images.image_name = images.image_name
+            WHERE 1=1{query_conditions}
             ORDER BY images.starred DESC, images.created_at {order_dir.value}
             """
-            )
         else:
-            query += (
-                query_conditions
-                + f"""--sql
+            names_query = f"""--sql
+            SELECT images.image_name
+            FROM images
+            LEFT JOIN board_images ON board_images.image_name = images.image_name
+            WHERE 1=1{query_conditions}
             ORDER BY images.created_at {order_dir.value}
             """
-            )
 
-        cursor.execute(query, query_params)
+        cursor.execute(names_query, query_params)
         result = cast(list[sqlite3.Row], cursor.fetchall())
+        image_names = [row[0] for row in result]
 
-        return [row[0] for row in result]
+        return ImageNamesResult(
+            image_names=image_names,
+            starred_count=starred_count,
+            total_count=len(image_names)
+        )

@@ -10,6 +10,7 @@ from invokeai.app.services.image_files.image_files_common import (
 )
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
+    ImageNamesResult,
     ImageRecord,
     ImageRecordChanges,
     ImageRecordDeleteException,
@@ -319,7 +320,7 @@ class ImageService(ImageServiceABC):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
-    ) -> list[str]:
+    ) -> ImageNamesResult:
         try:
             return self.__invoker.services.image_records.get_image_names(
                 starred_first=starred_first,

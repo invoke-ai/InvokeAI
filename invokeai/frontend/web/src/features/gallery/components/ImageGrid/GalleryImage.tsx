@@ -3,9 +3,10 @@ import { draggable, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Image } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
-import { galleryImageClicked } from 'app/store/middleware/listenerMiddleware/listeners/galleryImageClicked';
 import { useAppStore } from 'app/store/nanostores/store';
+import type { AppDispatch, AppGetState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
+import { uniq } from 'es-toolkit';
 import { multipleImageDndSource, singleImageDndSource } from 'features/dnd/dnd';
 import type { DndDragPreviewMultipleImageState } from 'features/dnd/DndDragPreviewMultipleImage';
 import { createMultipleImageDragPreview, setMultipleImageDragPreview } from 'features/dnd/DndDragPreviewMultipleImage';
@@ -15,11 +16,13 @@ import { firefoxDndFix } from 'features/dnd/util';
 import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { GalleryImageHoverIcons } from 'features/gallery/components/ImageGrid/GalleryImageHoverIcons';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
-import { imageToCompareChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
+import { selectListImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { imageToCompareChanged, selectGallerySlice, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
-import type { MouseEventHandler } from 'react';
+import type { MouseEvent, MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
 // This class name is used to calculate the number of images that fit in the gallery
@@ -82,6 +85,54 @@ const galleryImageContainerSX = {
 interface Props {
   imageDTO: ImageDTO;
 }
+
+const buildOnClick =
+  (imageName: string, dispatch: AppDispatch, getState: AppGetState) => (e: MouseEvent<HTMLDivElement>) => {
+    const { shiftKey, ctrlKey, metaKey, altKey } = e;
+    const state = getState();
+    const queryArgs = selectListImageNamesQueryArgs(state);
+    const imageNames = imagesApi.endpoints.getImageNames.select(queryArgs)(state).data?.image_names ?? [];
+
+    // If we don't have the image names cached, we can't perform selection operations
+    // This can happen if the user clicks on an image before the names are loaded
+    if (imageNames.length === 0) {
+      // For basic click without modifiers, we can still set selection
+      if (!shiftKey && !ctrlKey && !metaKey && !altKey) {
+        dispatch(selectionChanged([imageName]));
+      }
+      return;
+    }
+
+    const selection = state.gallery.selection;
+
+    if (altKey) {
+      if (state.gallery.imageToCompare === imageName) {
+        dispatch(imageToCompareChanged(null));
+      } else {
+        dispatch(imageToCompareChanged(imageName));
+      }
+    } else if (shiftKey) {
+      const rangeEndImageName = imageName;
+      const lastSelectedImage = selection.at(-1);
+      const lastClickedIndex = imageNames.findIndex((name) => name === lastSelectedImage);
+      const currentClickedIndex = imageNames.findIndex((name) => name === rangeEndImageName);
+      if (lastClickedIndex > -1 && currentClickedIndex > -1) {
+        // We have a valid range!
+        const start = Math.min(lastClickedIndex, currentClickedIndex);
+        const end = Math.max(lastClickedIndex, currentClickedIndex);
+        const imagesToSelect = imageNames.slice(start, end + 1);
+        dispatch(selectionChanged(uniq(selection.concat(imagesToSelect))));
+      }
+    } else if (ctrlKey || metaKey) {
+      if (selection.some((n) => n === imageName) && selection.length > 1) {
+        dispatch(selectionChanged(uniq(selection.filter((n) => n !== imageName))));
+      } else {
+        dispatch(selectionChanged(uniq(selection.concat(imageName))));
+      }
+    } else {
+      dispatch(selectionChanged([imageName]));
+    }
+  };
 
 export const GalleryImage = memo(({ imageDTO }: Props) => {
   const store = useAppStore();
@@ -192,20 +243,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
     setIsHovered(false);
   }, []);
 
-  const onClick = useCallback<MouseEventHandler<HTMLDivElement>>(
-    (e) => {
-      store.dispatch(
-        galleryImageClicked({
-          imageName: imageDTO.image_name,
-          shiftKey: e.shiftKey,
-          ctrlKey: e.ctrlKey,
-          metaKey: e.metaKey,
-          altKey: e.altKey,
-        })
-      );
-    },
-    [imageDTO, store]
-  );
+  const onClick = useMemo(() => buildOnClick(imageDTO.image_name, store.dispatch, store.getState), [imageDTO, store]);
 
   const onDoubleClick = useCallback<MouseEventHandler<HTMLDivElement>>(() => {
     store.dispatch(imageToCompareChanged(null));
@@ -238,6 +276,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
             ref={ref}
             src={imageDTO.thumbnail_url}
             w={imageDTO.width}
+            fallback={<GalleryImagePlaceholder />}
             objectFit="contain"
             maxW="full"
             maxH="full"
@@ -253,3 +292,5 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
 });
 
 GalleryImage.displayName = 'GalleryImage';
+
+export const GalleryImagePlaceholder = memo(() => <Box w="full" h="full" bg="base.850" borderRadius="base" />);

@@ -14,6 +14,7 @@ from invokeai.app.api.extract_metadata_from_image import extract_metadata_from_i
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
+    ImageNamesResult,
     ImageRecordChanges,
     ResourceOrigin,
 )
@@ -576,11 +577,11 @@ async def get_image_names(
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
     starred_first: bool = Query(default=True, description="Whether to sort by starred images first"),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
-) -> list[str]:
-    """Gets ordered list of all image names (starred first, then unstarred)"""
+) -> ImageNamesResult:
+    """Gets ordered list of image names with metadata for optimistic updates"""
 
     try:
-        image_names = ApiDependencies.invoker.services.images.get_image_names(
+        result = ApiDependencies.invoker.services.images.get_image_names(
             starred_first=starred_first,
             order_dir=order_dir,
             image_origin=image_origin,
@@ -589,6 +590,34 @@ async def get_image_names(
             board_id=board_id,
             search_term=search_term,
         )
-        return image_names
+        return result
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to get image names")
+
+
+@images_router.post(
+    "/images_by_names",
+    operation_id="get_images_by_names",
+    responses={200: {"model": list[ImageDTO]}},
+)
+async def get_images_by_names(
+    image_names: list[str] = Body(embed=True, description="Object containing list of image names to fetch DTOs for"),
+) -> list[ImageDTO]:
+    """Gets image DTOs for the specified image names. Maintains order of input names."""
+
+    try:
+        image_service = ApiDependencies.invoker.services.images
+
+        # Fetch DTOs preserving the order of requested names
+        image_dtos: list[ImageDTO] = []
+        for name in image_names:
+            try:
+                dto = image_service.get_dto(name)
+                image_dtos.append(dto)
+            except Exception:
+                # Skip missing images - they may have been deleted between name fetch and DTO fetch
+                continue
+
+        return image_dtos
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to get image DTOs")

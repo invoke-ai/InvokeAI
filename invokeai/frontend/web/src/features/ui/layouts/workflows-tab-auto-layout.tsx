@@ -247,7 +247,7 @@ export const WorkflowsTabAutoLayout = memo(() => {
   useResizeMainPanelOnFirstVisit($rootPanelApi, rootRef);
 
   return (
-    <AutoLayoutProvider $rootApi={$rootPanelApi} rootRef={rootRef}>
+    <AutoLayoutProvider $rootApi={$rootPanelApi} rootRef={rootRef} tab="workflows">
       <GridviewReact
         ref={rootRef}
         className="dockview-theme-invoke"
