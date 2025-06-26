@@ -215,6 +215,7 @@ class FieldDescriptions:
     flux_redux_conditioning = "FLUX Redux conditioning tensor"
     vllm_model = "The VLLM model to use"
     flux_fill_conditioning = "FLUX Fill conditioning tensor"
+    flux_kontext_conditioning = "FLUX Kontext conditioning (reference image)"
 
 
 class ImageField(BaseModel):
@@ -289,6 +290,12 @@ class FluxFillConditioningField(BaseModel):
 
     image: ImageField = Field(description="The FLUX Fill reference image.")
     mask: TensorField = Field(description="The FLUX Fill inpaint mask.")
+
+
+class FluxKontextConditioningField(BaseModel):
+    """A conditioning field for FLUX Kontext (reference image)."""
+
+    image: ImageField = Field(description="The Kontext reference image.")
 
 
 class SD3ConditioningField(BaseModel):
