@@ -29,7 +29,7 @@ import { CanvasSettingsShowHUDSwitch } from 'features/controlLayers/components/S
 import { CanvasSettingsShowProgressOnCanvas } from 'features/controlLayers/components/Settings/CanvasSettingsShowProgressOnCanvasSwitch';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiGearSixFill, PiPencilFill, PiEyeFill, PiSquaresFourFill, PiCodeFill } from 'react-icons/pi';
+import { PiCodeFill,PiEyeFill, PiGearSixFill, PiPencilFill, PiSquaresFourFill } from 'react-icons/pi';
 
 export const CanvasSettingsPopover = memo(() => {
   const { t } = useTranslation();
