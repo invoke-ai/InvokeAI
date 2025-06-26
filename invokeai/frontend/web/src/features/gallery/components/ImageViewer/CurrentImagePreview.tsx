@@ -110,7 +110,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       )}
       {!imageDTO && <NoContentForViewer />}
       {withProgress && (
-        <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center">
+        <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center" bg="base.900">
           <ProgressImage progressImage={progressImage} />
           {progressEvent && (
             <ProgressIndicator progressEvent={progressEvent} position="absolute" top={6} right={6} size={8} />
