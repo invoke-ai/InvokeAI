@@ -46,11 +46,12 @@ export const ProgressImage = memo(() => {
           borderColor="base.700"
           borderWidth={1}
           bg="base.900"
-          opacity={0.8}
+          opacity="0.8"
           fontSize="sm"
           fontWeight="semibold"
-          zIndex={1}
+          zIndex="docked"
           pointerEvents="none"
+          borderRadius="base"
         >
           Waiting for Image
         </Badge>
