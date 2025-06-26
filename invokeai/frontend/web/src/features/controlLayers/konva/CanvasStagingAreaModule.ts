@@ -13,7 +13,7 @@ import type { Logger } from 'roarr';
 
 // Theme-consistent spacing constants (in pixels)
 const SPACING_2 = 8; // Equivalent to theme token 2
-const SPACING_4 = 16; // Equivalent to theme token 4  
+const SPACING_4 = 16; // Equivalent to theme token 4
 const SPACING_8 = 32; // Equivalent to theme token 8
 const BORDER_RADIUS_BASE = 6; // Equivalent to theme borderRadius "base"
 const BORDER_WIDTH = 1; // Standard border width
@@ -86,7 +86,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
           fill: 'hsl(220 12% 10% / 0.8)', // 'base.900' with opacity
           x: SPACING_2 - 2, // Slight offset for visual balance
           y: SPACING_2 - 2,
-          width: Math.min(BADGE_MIN_WIDTH + 4, width - (SPACING_2 * 2) + 4),
+          width: Math.min(BADGE_MIN_WIDTH + 4, width - SPACING_2 * 2 + 4),
           height: BADGE_HEIGHT,
           cornerRadius: BORDER_RADIUS_BASE,
           stroke: 'hsl(220 12% 50% / 1)', // 'base.700'
@@ -151,7 +151,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     const { width, height } = this.manager.stateApi.getBbox().rect;
     this.konva.placeholder.rect.width(width);
     this.konva.placeholder.rect.height(height);
-    this.konva.placeholder.badgeBg.width(Math.min(BADGE_MIN_WIDTH + 4, width - (SPACING_2 * 2) + 4));
+    this.konva.placeholder.badgeBg.width(Math.min(BADGE_MIN_WIDTH + 4, width - SPACING_2 * 2 + 4));
     this.konva.placeholder.text.width(Math.min(BADGE_MIN_WIDTH, width - SPACING_4));
   };
 
