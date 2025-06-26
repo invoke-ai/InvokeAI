@@ -18,8 +18,8 @@ export const StylePresetPromptPreviewToggle = () => {
     <IconButton
       size="sm"
       variant="ghost"
-      aria-label={showPromptPreviews ? t('stylePresets.hidePromptPreviews') : t('stylePresets.showPromptPreviews')}
-      tooltip={showPromptPreviews ? t('stylePresets.hidePromptPreviews') : t('stylePresets.showPromptPreviews')}
+      aria-label={t('stylePresets.togglePromptPreviews')}
+      tooltip={t('stylePresets.togglePromptPreviews')}
       onClick={handleToggle}
       icon={showPromptPreviews ? <PiEyeBold /> : <PiEyeSlashBold />}
       colorScheme={showPromptPreviews ? 'invokeBlue' : 'base'}
