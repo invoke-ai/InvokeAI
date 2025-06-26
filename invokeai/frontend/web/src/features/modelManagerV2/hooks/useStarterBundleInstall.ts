@@ -62,4 +62,4 @@ export const useStarterBundleInstall = () => {
   );
 
   return { installBundle, getModelsToInstall };
-}; 
+};
