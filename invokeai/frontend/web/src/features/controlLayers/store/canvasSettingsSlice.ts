@@ -79,6 +79,10 @@ type CanvasSettingsState = {
    * Whether to use pressure sensitivity for the brush and eraser tool when a pen device is used.
    */
   pressureSensitivity: boolean;
+  /**
+   * Whether to show the rule of 4 composition guide overlay on the canvas.
+   */
+  ruleOfFourGuide: boolean;
 };
 
 const initialState: CanvasSettingsState = {
@@ -99,6 +103,7 @@ const initialState: CanvasSettingsState = {
   isolatedStagingPreview: true,
   isolatedLayerPreview: true,
   pressureSensitivity: true,
+  ruleOfFourGuide: false,
 };
 
 export const canvasSettingsSlice = createSlice({
@@ -156,6 +161,9 @@ export const canvasSettingsSlice = createSlice({
     settingsPressureSensitivityToggled: (state) => {
       state.pressureSensitivity = !state.pressureSensitivity;
     },
+    settingsRuleOfFourGuideToggled: (state) => {
+      state.ruleOfFourGuide = !state.ruleOfFourGuide;
+    },
   },
   extraReducers(builder) {
     builder.addCase(newGallerySessionRequested, (state) => {
@@ -185,6 +193,7 @@ export const {
   settingsIsolatedStagingPreviewToggled,
   settingsIsolatedLayerPreviewToggled,
   settingsPressureSensitivityToggled,
+  settingsRuleOfFourGuideToggled,
 } = canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -219,3 +228,4 @@ export const selectShowProgressOnCanvas = createCanvasSettingsSelector(
 export const selectIsolatedStagingPreview = createCanvasSettingsSelector((settings) => settings.isolatedStagingPreview);
 export const selectIsolatedLayerPreview = createCanvasSettingsSelector((settings) => settings.isolatedLayerPreview);
 export const selectPressureSensitivity = createCanvasSettingsSelector((settings) => settings.pressureSensitivity);
+export const selectRuleOfFourGuide = createCanvasSettingsSelector((settings) => settings.ruleOfFourGuide);

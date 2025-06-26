@@ -37,6 +37,7 @@ import { assert } from 'tsafe';
 import type { JsonObject } from 'type-fest';
 
 import { CanvasBackgroundModule } from './CanvasBackgroundModule';
+import { CanvasCompositionGuideModule } from './CanvasCompositionGuideModule';
 import { CanvasStateApiModule } from './CanvasStateApiModule';
 
 export class CanvasManager extends CanvasModuleBase {
@@ -67,6 +68,7 @@ export class CanvasManager extends CanvasModuleBase {
   tool: CanvasToolModule;
   stagingArea: CanvasStagingAreaModule;
   progressImage: CanvasProgressImageModule;
+  compositionGuide: CanvasCompositionGuideModule;
 
   konva: {
     previewLayer: Konva.Layer;
@@ -132,10 +134,12 @@ export class CanvasManager extends CanvasModuleBase {
 
     this.tool = new CanvasToolModule(this);
     this.progressImage = new CanvasProgressImageModule(this);
+    this.compositionGuide = new CanvasCompositionGuideModule(this);
 
     // Must add in this order for correct z-index
     this.konva.previewLayer.add(this.stagingArea.konva.group);
     this.konva.previewLayer.add(this.progressImage.konva.group);
+    this.konva.previewLayer.add(this.compositionGuide.konva.group);
     this.konva.previewLayer.add(this.tool.konva.group);
   }
 
@@ -239,6 +243,7 @@ export class CanvasManager extends CanvasModuleBase {
       this.stagingArea,
       this.tool,
       this.progressImage,
+      this.compositionGuide,
       this.stateApi,
       this.background,
       this.worker,
@@ -286,6 +291,7 @@ export class CanvasManager extends CanvasModuleBase {
       stagingArea: this.stagingArea.repr(),
       tool: this.tool.repr(),
       progressImage: this.progressImage.repr(),
+      compositionGuide: this.compositionGuide.repr(),
       background: this.background.repr(),
       worker: this.worker.repr(),
       entityRenderer: this.entityRenderer.repr(),

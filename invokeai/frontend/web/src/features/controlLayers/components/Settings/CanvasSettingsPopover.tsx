@@ -23,6 +23,7 @@ import { CanvasSettingsOutputOnlyMaskedRegionsCheckbox } from 'features/controlL
 import { CanvasSettingsPreserveMaskCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsPreserveMaskCheckbox';
 import { CanvasSettingsPressureSensitivityCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsPressureSensitivity';
 import { CanvasSettingsRecalculateRectsButton } from 'features/controlLayers/components/Settings/CanvasSettingsRecalculateRectsButton';
+import { CanvasSettingsRuleOfFourGuideSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsRuleOfFourGuideSwitch';
 import { CanvasSettingsShowHUDSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsShowHUDSwitch';
 import { CanvasSettingsShowProgressOnCanvas } from 'features/controlLayers/components/Settings/CanvasSettingsShowProgressOnCanvasSwitch';
 import { memo } from 'react';
@@ -56,6 +57,7 @@ export const CanvasSettingsPopover = memo(() => {
             <CanvasSettingsIsolatedLayerPreviewSwitch />
             <CanvasSettingsDynamicGridSwitch />
             <CanvasSettingsBboxOverlaySwitch />
+            <CanvasSettingsRuleOfFourGuideSwitch />
             <CanvasSettingsShowHUDSwitch />
             <DebugSettings />
           </Flex>
