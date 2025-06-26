@@ -5,16 +5,13 @@ import { CanvasAlertsInvocationProgress } from 'features/controlLayers/component
 import { DndImage } from 'features/dnd/DndImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
-import { selectAutoSwitch } from 'features/gallery/store/gallerySelectors';
-import type { ProgressImage as ProgressImageType } from 'features/nodes/types/common';
 import { selectShouldShowImageDetails, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
-import { atom } from 'nanostores';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import type { ImageDTO, S } from 'services/api/types';
-import { $socket } from 'services/events/stores';
+import { memo, useCallback, useRef, useState } from 'react';
+import type { ImageDTO } from 'services/api/types';
 
+import { useImageViewerContext } from './context';
 import { ImageMetadataMini } from './ImageMetadataMini';
 import { NoContentForViewer } from './NoContentForViewer';
 import { ProgressImage } from './ProgressImage2';
@@ -23,13 +20,9 @@ import { ProgressIndicator } from './ProgressIndicator2';
 export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | null }) => {
   const shouldShowImageDetails = useAppSelector(selectShouldShowImageDetails);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
-  const autoSwitch = useAppSelector(selectAutoSwitch);
-
-  const socket = useStore($socket);
-  const $progressEvent = useState(() => atom<S['InvocationProgressEvent'] | null>(null))[0];
-  const $progressImage = useState(() => atom<ProgressImageType | null>(null))[0];
-  const progressImage = useStore($progressImage);
+  const { onLoadImage, $progressEvent, $progressImage } = useImageViewerContext();
   const progressEvent = useStore($progressEvent);
+  const progressImage = useStore($progressImage);
 
   // Show and hide the next/prev buttons on mouse move
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] = useState<boolean>(false);
@@ -43,52 +36,6 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       setShouldShowNextPrevButtons(false);
     }, 500);
   }, []);
-
-  useEffect(() => {
-    if (!socket) {
-      return;
-    }
-
-    const onInvocationProgress = (data: S['InvocationProgressEvent']) => {
-      $progressEvent.set(data);
-      if (data.image) {
-        $progressImage.set(data.image);
-      }
-    };
-
-    socket.on('invocation_progress', onInvocationProgress);
-
-    return () => {
-      socket.off('invocation_progress', onInvocationProgress);
-    };
-  }, [$progressEvent, $progressImage, socket]);
-
-  useEffect(() => {
-    if (!socket) {
-      return;
-    }
-
-    const onQueueItemStatusChanged = (data: S['QueueItemStatusChangedEvent']) => {
-      // When auto-switch is enabled, we will get a load event as we switch to the new image. This in turn clears the progress image,
-      // creating the illusion of the progress image turning into the new image.
-      // But when auto-switch is disabled, we won't get that load event, so we need to clear the progress image manually.
-      if (data.origin === 'canvas' || !autoSwitch) {
-        $progressEvent.set(null);
-        $progressImage.set(null);
-      }
-    };
-
-    socket.on('queue_item_status_changed', onQueueItemStatusChanged);
-
-    return () => {
-      socket.off('queue_item_status_changed', onQueueItemStatusChanged);
-    };
-  }, [$progressEvent, $progressImage, autoSwitch, socket]);
-
-  const onLoadImage = useCallback(() => {
-    $progressEvent.set(null);
-    $progressImage.set(null);
-  }, [$progressEvent, $progressImage]);
 
   const withProgress = shouldShowProgressInViewer && progressImage !== null;
 
