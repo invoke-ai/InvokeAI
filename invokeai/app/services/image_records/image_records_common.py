@@ -216,6 +216,7 @@ class ImageCollectionCounts(BaseModel):
 
 class ImageNamesResult(BaseModel):
     """Response containing ordered image names with metadata for optimistic updates."""
+
     image_names: list[str] = Field(description="Ordered list of image names")
     starred_count: int = Field(description="Number of starred images (when starred_first=True)")
     total_count: int = Field(description="Total number of images matching the query")

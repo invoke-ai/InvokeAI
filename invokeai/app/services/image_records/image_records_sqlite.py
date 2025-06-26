@@ -479,8 +479,4 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         result = cast(list[sqlite3.Row], cursor.fetchall())
         image_names = [row[0] for row in result]
 
-        return ImageNamesResult(
-            image_names=image_names,
-            starred_count=starred_count,
-            total_count=len(image_names)
-        )
+        return ImageNamesResult(image_names=image_names, starred_count=starred_count, total_count=len(image_names))
