@@ -11,6 +11,16 @@ import type { Atom } from 'nanostores';
 import { atom, effect } from 'nanostores';
 import type { Logger } from 'roarr';
 
+// Theme-consistent spacing constants (in pixels)
+const SPACING_2 = 8; // Equivalent to theme token 2
+const SPACING_4 = 16; // Equivalent to theme token 4  
+const SPACING_8 = 32; // Equivalent to theme token 8
+const BORDER_RADIUS_BASE = 6; // Equivalent to theme borderRadius "base"
+const BORDER_WIDTH = 1; // Standard border width
+const FONT_SIZE_SM = 14; // Equivalent to theme fontSize "sm"
+const BADGE_MIN_WIDTH = 200;
+const BADGE_HEIGHT = 36;
+
 type ImageNameSrc = { type: 'imageName'; data: string };
 type DataURLSrc = { type: 'dataURL'; data: string };
 
@@ -74,28 +84,28 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
         badgeBg: new Konva.Rect({
           name: `${this.type}:placeholder_badge_bg`,
           fill: 'hsl(220 12% 10% / 0.8)', // 'base.900' with opacity
-          x: 6,
-          y: 6,
-          width: Math.min(204, width - 12),
-          height: 36,
-          cornerRadius: 6,
+          x: SPACING_2 - 2, // Slight offset for visual balance
+          y: SPACING_2 - 2,
+          width: Math.min(BADGE_MIN_WIDTH + 4, width - (SPACING_2 * 2) + 4),
+          height: BADGE_HEIGHT,
+          cornerRadius: BORDER_RADIUS_BASE,
           stroke: 'hsl(220 12% 50% / 1)', // 'base.700'
-          strokeWidth: 1,
+          strokeWidth: BORDER_WIDTH,
           listening: false,
           perfectDrawEnabled: false,
         }),
         text: new Konva.Text({
           name: `${this.type}:placeholder_text`,
           fill: 'hsl(220 12% 80% / 1)', // 'base.300'
-          x: 8,
-          y: 8,
-          width: Math.min(200, width - 16),
-          height: 32,
+          x: SPACING_2,
+          y: SPACING_2,
+          width: Math.min(BADGE_MIN_WIDTH, width - SPACING_4),
+          height: SPACING_8,
           align: 'center',
           verticalAlign: 'middle',
           fontFamily: '"Inter Variable", sans-serif',
-          fontSize: 14,
-          fontStyle: '600',
+          fontSize: FONT_SIZE_SM,
+          fontStyle: '600', // Equivalent to theme fontWeight "semibold"
           text: 'Waiting for Image',
           listening: false,
           perfectDrawEnabled: false,
@@ -141,8 +151,8 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     const { width, height } = this.manager.stateApi.getBbox().rect;
     this.konva.placeholder.rect.width(width);
     this.konva.placeholder.rect.height(height);
-    this.konva.placeholder.badgeBg.width(Math.min(204, width - 12));
-    this.konva.placeholder.text.width(Math.min(200, width - 16));
+    this.konva.placeholder.badgeBg.width(Math.min(BADGE_MIN_WIDTH + 4, width - (SPACING_2 * 2) + 4));
+    this.konva.placeholder.text.width(Math.min(BADGE_MIN_WIDTH, width - SPACING_4));
   };
 
   initialize = () => {
