@@ -6,6 +6,7 @@ import { useRelatedGroupedModelCombobox } from 'common/hooks/useRelatedGroupedMo
 import { loraAdded, selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
 import { selectBase } from 'features/controlLayers/store/paramsSlice';
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
+import { API_BASE_MODELS } from 'features/parameters/types/constants';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLoRAModels } from 'services/api/hooks/modelsByType';
@@ -58,6 +59,19 @@ const LoRASelect = () => {
     return t('models.addLora');
   }, [isLoading, options.length, t]);
 
+  // Calculate initial group states to default to the current base model architecture
+  const initialGroupStates = useMemo(() => {
+    if (!currentBaseModel) {
+      return undefined;
+    }
+
+    // Determine the group ID for the current base model
+    const groupId = API_BASE_MODELS.includes(currentBaseModel) ? 'api' : currentBaseModel;
+
+    // Return a map with only the current base model group enabled
+    return { [groupId]: true };
+  }, [currentBaseModel]);
+
   return (
     <FormControl gap={2}>
       <InformationalPopover feature="lora">
@@ -72,6 +86,7 @@ const LoRASelect = () => {
         placeholder={placeholder}
         getIsOptionDisabled={getIsDisabled}
         noOptionsText={t('models.noLoRAsInstalled')}
+        initialGroupStates={initialGroupStates}
       />
     </FormControl>
   );
