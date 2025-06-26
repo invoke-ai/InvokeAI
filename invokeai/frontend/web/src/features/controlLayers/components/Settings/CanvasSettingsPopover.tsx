@@ -7,6 +7,7 @@ import {
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
+  Text,
   useShiftModifier,
 } from '@invoke-ai/ui-library';
 import { CanvasSettingsBboxOverlaySwitch } from 'features/controlLayers/components/Settings/CanvasSettingsBboxOverlaySwitch';
@@ -28,7 +29,7 @@ import { CanvasSettingsShowHUDSwitch } from 'features/controlLayers/components/S
 import { CanvasSettingsShowProgressOnCanvas } from 'features/controlLayers/components/Settings/CanvasSettingsShowProgressOnCanvasSwitch';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiGearSixFill } from 'react-icons/pi';
+import { PiGearSixFill, PiPencilFill, PiEyeFill, PiSquaresFourFill, PiCodeFill } from 'react-icons/pi';
 
 export const CanvasSettingsPopover = memo(() => {
   const { t } = useTranslation();
@@ -42,23 +43,63 @@ export const CanvasSettingsPopover = memo(() => {
           alignSelf="stretch"
         />
       </PopoverTrigger>
-      <PopoverContent>
+      <PopoverContent maxW="280px">
         <PopoverArrow />
         <PopoverBody>
-          <Flex direction="column" gap={2}>
-            <CanvasSettingsInvertScrollCheckbox />
-            <CanvasSettingsPreserveMaskCheckbox />
-            <CanvasSettingsClipToBboxCheckbox />
-            <CanvasSettingsOutputOnlyMaskedRegionsCheckbox />
-            <CanvasSettingsSnapToGridCheckbox />
-            <CanvasSettingsPressureSensitivityCheckbox />
-            <CanvasSettingsShowProgressOnCanvas />
-            <CanvasSettingsIsolatedStagingPreviewSwitch />
-            <CanvasSettingsIsolatedLayerPreviewSwitch />
-            <CanvasSettingsDynamicGridSwitch />
-            <CanvasSettingsBboxOverlaySwitch />
-            <CanvasSettingsRuleOfThirdsSwitch />
-            <CanvasSettingsShowHUDSwitch />
+          <Flex direction="column" gap={3}>
+            {/* Behavior Settings */}
+            <Flex direction="column" gap={2}>
+              <Flex align="center" gap={2} mb={1}>
+                <PiPencilFill size={16} />
+                <Text fontWeight="bold" fontSize="sm" color="base.200">
+                  {t('hotkeys.canvas.settings.behavior')}
+                </Text>
+              </Flex>
+              <Flex direction="column" gap={2} pl={6}>
+                <CanvasSettingsInvertScrollCheckbox />
+                <CanvasSettingsPressureSensitivityCheckbox />
+                <CanvasSettingsPreserveMaskCheckbox />
+                <CanvasSettingsClipToBboxCheckbox />
+                <CanvasSettingsOutputOnlyMaskedRegionsCheckbox />
+              </Flex>
+            </Flex>
+
+            <Divider />
+
+            {/* Display Settings */}
+            <Flex direction="column" gap={2}>
+              <Flex align="center" gap={2} mb={1}>
+                <PiEyeFill size={16} />
+                <Text fontWeight="bold" fontSize="sm" color="base.200">
+                  {t('hotkeys.canvas.settings.display')}
+                </Text>
+              </Flex>
+              <Flex direction="column" gap={2} pl={6}>
+                <CanvasSettingsShowProgressOnCanvas />
+                <CanvasSettingsIsolatedStagingPreviewSwitch />
+                <CanvasSettingsIsolatedLayerPreviewSwitch />
+                <CanvasSettingsBboxOverlaySwitch />
+                <CanvasSettingsShowHUDSwitch />
+              </Flex>
+            </Flex>
+
+            <Divider />
+
+            {/* Grid Settings */}
+            <Flex direction="column" gap={2}>
+              <Flex align="center" gap={2} mb={1}>
+                <PiSquaresFourFill size={16} />
+                <Text fontWeight="bold" fontSize="sm" color="base.200">
+                  {t('hotkeys.canvas.settings.grid')}
+                </Text>
+              </Flex>
+              <Flex direction="column" gap={2} pl={6}>
+                <CanvasSettingsSnapToGridCheckbox />
+                <CanvasSettingsDynamicGridSwitch />
+                <CanvasSettingsRuleOfThirdsSwitch />
+              </Flex>
+            </Flex>
+
             <DebugSettings />
           </Flex>
         </PopoverBody>
@@ -70,6 +111,7 @@ export const CanvasSettingsPopover = memo(() => {
 CanvasSettingsPopover.displayName = 'CanvasSettingsPopover';
 
 const DebugSettings = () => {
+  const { t } = useTranslation();
   const shift = useShiftModifier();
 
   if (!shift) {
@@ -79,10 +121,20 @@ const DebugSettings = () => {
   return (
     <>
       <Divider />
-      <CanvasSettingsClearCachesButton />
-      <CanvasSettingsRecalculateRectsButton />
-      <CanvasSettingsLogDebugInfoButton />
-      <CanvasSettingsClearHistoryButton />
+      <Flex direction="column" gap={2}>
+        <Flex align="center" gap={2} mb={1}>
+          <PiCodeFill size={16} />
+          <Text fontWeight="bold" fontSize="sm" color="base.200">
+            {t('hotkeys.canvas.settings.debug')}
+          </Text>
+        </Flex>
+        <Flex direction="column" gap={2} pl={6}>
+          <CanvasSettingsClearCachesButton />
+          <CanvasSettingsRecalculateRectsButton />
+          <CanvasSettingsLogDebugInfoButton />
+          <CanvasSettingsClearHistoryButton />
+        </Flex>
+      </Flex>
     </>
   );
 };

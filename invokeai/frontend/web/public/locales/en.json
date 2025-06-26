@@ -335,7 +335,7 @@
         "images": "Images",
         "assets": "Assets",
         "alwaysShowImageSizeBadge": "Always Show Image Size Badge",
-        "assetsTab": "Files you’ve uploaded for use in your projects.",
+        "assetsTab": "Files you've uploaded for use in your projects.",
         "autoAssignBoardOnClick": "Auto-Assign Board on Click",
         "autoSwitchNewImages": "Auto-Switch to New Images",
         "boardsSettings": "Boards Settings",
@@ -357,7 +357,7 @@
         "gallerySettings": "Gallery Settings",
         "go": "Go",
         "image": "image",
-        "imagesTab": "Images you’ve created and saved within Invoke.",
+        "imagesTab": "Images you've created and saved within Invoke.",
         "imagesSettings": "Gallery Images Settings",
         "jump": "Jump",
         "loading": "Loading",
@@ -579,6 +579,12 @@
             "cancelTransform": {
                 "title": "Cancel Transform",
                 "desc": "Cancel the pending transform."
+            },
+            "settings": {
+                "behavior": "Behavior",
+                "display": "Display",
+                "grid": "Grid",
+                "debug": "Debug"
             }
         },
         "workflows": {
