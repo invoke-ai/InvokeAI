@@ -40,6 +40,7 @@ Successfully implemented the complete architectural plan for adding "Kontext" re
 - Applies extension before denoise call to combine image tokens and IDs
 - Passes combined tensors to transformer model
 - **Critical Fix**: Extracts only main image tokens after denoising to avoid unpacking errors
+- **Step Callback Fix**: Modified step callback to handle combined sequences during denoising progress
 
 ## Key Technical Details
 
@@ -66,8 +67,11 @@ The implementation uses the same core approach as the original ComfyUI example:
 **Solution**: 
 1. Store original sequence length before applying KontextExtension
 2. Pass combined sequence (main + reference tokens) to transformer
-3. After denoising, extract only the main image portion: `x[:, :original_seq_len, :]`
-4. Unpack only the main image tokens, avoiding shape mismatch errors
+3. **Step Callback Fix**: Modified `_build_step_callback()` to accept `original_seq_len` parameter and extract main tokens during progress callbacks
+4. After denoising, extract only the main image portion: `x[:, :original_seq_len, :]`
+5. Unpack only the main image tokens, avoiding shape mismatch errors
+
+**Critical Implementation Detail**: The step callback function was also causing EinopsError because it was trying to unpack the combined sequence during each denoising step. The fix ensures both the progress callbacks and final unpacking only process the main image tokens.
 
 ## Files Modified/Created
 
@@ -99,3 +103,7 @@ Users can now:
 - **Efficient**: Pre-processes reference image once, reuses across denoising steps
 
 The implementation is complete and ready for testing with actual FLUX models.
+
+## Version Notes
+
+**v1.1 (Fixed)**: Resolved EinopsError by implementing proper sequence length management in both the main denoising loop and step callback functions. The system now correctly handles the token concatenation approach while maintaining compatibility with the existing unpacking infrastructure.

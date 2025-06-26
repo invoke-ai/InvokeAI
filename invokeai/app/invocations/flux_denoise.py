@@ -414,7 +414,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 pos_regional_prompting_extension=pos_regional_prompting_extension,
                 neg_regional_prompting_extension=neg_regional_prompting_extension,
                 timesteps=timesteps,
-                step_callback=self._build_step_callback(context),
+                step_callback=self._build_step_callback(context, original_seq_len if kontext_extension is not None else None),
                 guidance=self.guidance,
                 cfg_scale=cfg_scale,
                 inpaint_extension=inpaint_extension,
@@ -898,9 +898,13 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             yield (lora_info.model, lora.weight)
             del lora_info
 
-    def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
+    def _build_step_callback(self, context: InvocationContext, original_seq_len: Optional[int] = None) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:
-            state.latents = unpack(state.latents.float(), self.height, self.width).squeeze()
+            # Extract only main image tokens if Kontext conditioning was applied
+            latents = state.latents.float()
+            if original_seq_len is not None:
+                latents = latents[:, :original_seq_len, :]
+            state.latents = unpack(latents, self.height, self.width).squeeze()
             context.util.flux_step_callback(state)
 
         return step_callback
