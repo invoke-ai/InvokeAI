@@ -1,6 +1,6 @@
 import type { GridviewApi, GridviewPanelApi, IGridviewPanel } from 'dockview';
 import { atom } from 'nanostores';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 const getIsCollapsed = (
   panel: IGridviewPanel<GridviewPanelApi>,
@@ -21,6 +21,7 @@ export const useCollapsibleGridviewPanel = (
   collapsedSize?: number
 ) => {
   const $isCollapsed = useState(() => atom(false))[0];
+  const lastExpandedSizeRef = useRef<number>(0);
   const collapse = useCallback(() => {
     if (!api) {
       return;
@@ -29,6 +30,9 @@ export const useCollapsibleGridviewPanel = (
     if (!panel) {
       return;
     }
+
+    lastExpandedSizeRef.current = orientation === 'vertical' ? panel.height : panel.width;
+
     if (orientation === 'vertical') {
       panel.api.setSize({ height: collapsedSize ?? panel.minimumHeight });
     } else {
@@ -45,9 +49,9 @@ export const useCollapsibleGridviewPanel = (
       return;
     }
     if (orientation === 'vertical') {
-      panel.api.setSize({ height: defaultSize });
+      panel.api.setSize({ height: lastExpandedSizeRef.current || defaultSize });
     } else {
-      panel.api.setSize({ width: defaultSize });
+      panel.api.setSize({ width: lastExpandedSizeRef.current || defaultSize });
     }
   }, [api, defaultSize, orientation, panelId]);
 
@@ -75,6 +79,8 @@ export const useCollapsibleGridviewPanel = (
     if (!panel) {
       return;
     }
+
+    lastExpandedSizeRef.current = orientation === 'vertical' ? panel.height : panel.width;
 
     const disposable = panel.api.onDidDimensionsChange(() => {
       const isCollapsed = getIsCollapsed(panel, orientation, collapsedSize);

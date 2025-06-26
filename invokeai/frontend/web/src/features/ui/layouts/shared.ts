@@ -18,3 +18,12 @@ export const TAB_WITH_PROGRESS_INDICATOR_ID = 'tab-with-progress-indicator';
 
 export const LEFT_PANEL_MIN_SIZE_PX = 420;
 export const RIGHT_PANEL_MIN_SIZE_PX = 420;
+
+export const BOARD_PANEL_MIN_HEIGHT_PX = 36;
+export const BOARD_PANEL_DEFAULT_HEIGHT_PX = 232;
+
+export const GALLERY_PANEL_MIN_HEIGHT_PX = 36;
+export const GALLERY_PANEL_DEFAULT_HEIGHT_PX = 232;
+
+export const LAYERS_PANEL_MIN_HEIGHT_PX = 36;
+export const LAYERS_PANEL_DEFAULT_HEIGHT_PX = 232;
