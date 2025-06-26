@@ -1,4 +1,4 @@
-import { Box, Flex, forwardRef, Grid, GridItem, Skeleton, Spinner, Text } from '@invoke-ai/ui-library';
+import { Box, Flex, forwardRef, Grid, GridItem, Spinner, Text } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
@@ -445,6 +445,7 @@ export const NewGallery = memo(() => {
   const virtuosoRef = useRef<VirtuosoGridHandle>(null);
   const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
   const rootRef = useRef<HTMLDivElement>(null);
+
   const { isActiveTab } = useAutoLayoutContext();
 
   // Get the ordered list of image names - this is our primary data source for virtualization
@@ -546,13 +547,12 @@ const ItemComponent: GridComponents<GridContext>['Item'] = forwardRef(({ context
 ));
 ItemComponent.displayName = 'ItemComponent';
 
-const ScrollSeekPlaceholderComponent: GridComponents<GridContext>['ScrollSeekPlaceholder'] = forwardRef(
-  (props, ref) => (
-    <GridItem ref={ref} aspectRatio="1/1" {...props}>
-      <Skeleton w="full" h="full" />
-    </GridItem>
-  )
+const ScrollSeekPlaceholderComponent: GridComponents<GridContext>['ScrollSeekPlaceholder'] = (props) => (
+  <GridItem aspectRatio="1/1" {...props}>
+    <GalleryImagePlaceholder />
+  </GridItem>
 );
+
 ScrollSeekPlaceholderComponent.displayName = 'ScrollSeekPlaceholderComponent';
 
 const components: GridComponents<GridContext> = {
