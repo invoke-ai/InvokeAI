@@ -91,7 +91,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     $progressImage.set(null);
   }, [$progressEvent, $progressImage]);
 
-  const withProgress = shouldShowProgressInViewer && progressEvent && progressImage;
+  const withProgress = shouldShowProgressInViewer && progressImage !== null;
 
   return (
     <Flex
@@ -110,9 +110,11 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       )}
       {!imageDTO && <NoContentForViewer />}
       {withProgress && (
-        <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center" bg="base.900">
+        <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center">
           <ProgressImage progressImage={progressImage} />
-          <ProgressIndicator progressEvent={progressEvent} position="absolute" top={6} right={6} size={8} />
+          {progressEvent && (
+            <ProgressIndicator progressEvent={progressEvent} position="absolute" top={6} right={6} size={8} />
+          )}
         </Flex>
       )}
       <Flex flexDir="column" gap={2} position="absolute" top={0} insetInlineStart={0} alignItems="flex-start">
