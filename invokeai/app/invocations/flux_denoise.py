@@ -16,6 +16,7 @@ from invokeai.app.invocations.fields import (
     FieldDescriptions,
     FluxConditioningField,
     FluxFillConditioningField,
+    FluxKontextConditioningField,
     FluxReduxConditioningField,
     ImageField,
     Input,
@@ -34,6 +35,7 @@ from invokeai.backend.flux.controlnet.instantx_controlnet_flux import InstantXCo
 from invokeai.backend.flux.controlnet.xlabs_controlnet_flux import XLabsControlNetFlux
 from invokeai.backend.flux.denoise import denoise
 from invokeai.backend.flux.extensions.instantx_controlnet_extension import InstantXControlNetExtension
+from invokeai.backend.flux.extensions.kontext_extension import KontextExtension
 from invokeai.backend.flux.extensions.regional_prompting_extension import RegionalPromptingExtension
 from invokeai.backend.flux.extensions.xlabs_controlnet_extension import XLabsControlNetExtension
 from invokeai.backend.flux.extensions.xlabs_ip_adapter_extension import XLabsIPAdapterExtension
@@ -148,6 +150,12 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     ip_adapter: IPAdapterField | list[IPAdapterField] | None = InputField(
         description=FieldDescriptions.ip_adapter, title="IP-Adapter", default=None, input=Input.Connection
+    )
+
+    kontext_conditioning: Optional[FluxKontextConditioningField] = InputField(
+        default=None,
+        description="FLUX Kontext conditioning (reference image).",
+        input=Input.Connection,
     )
 
     @torch.no_grad()
@@ -376,10 +384,32 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 dtype=inference_dtype,
             )
 
+            # Instantiate our new extension if the conditioning is provided
+            kontext_extension = None
+            if self.kontext_conditioning is not None:
+                # We need a VAE to encode the reference image. We can reuse the
+                # controlnet_vae field as it serves a similar purpose (image to latents).
+                if not self.controlnet_vae:
+                    raise ValueError("A VAE (e.g., controlnet_vae) must be provided to use Kontext conditioning.")
+
+                kontext_extension = KontextExtension(
+                    kontext_field=self.kontext_conditioning,
+                    context=context,
+                    vae_field=self.controlnet_vae, # Pass the VAE field
+                    device=TorchDevice.choose_torch_device(),
+                    dtype=inference_dtype,
+                )
+
+            # THE CRITICAL INTEGRATION POINT
+            final_img, final_img_ids = x, img_ids
+            if kontext_extension is not None:
+                final_img, final_img_ids = kontext_extension.apply(final_img, final_img_ids)
+
+            # The denoise function will now use the combined tensors
             x = denoise(
                 model=transformer,
-                img=x,
-                img_ids=img_ids,
+                img=final_img,         # Pass the combined image tokens
+                img_ids=final_img_ids, # Pass the combined image IDs
                 pos_regional_prompting_extension=pos_regional_prompting_extension,
                 neg_regional_prompting_extension=neg_regional_prompting_extension,
                 timesteps=timesteps,
