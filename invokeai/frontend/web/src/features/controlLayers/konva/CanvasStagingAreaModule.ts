@@ -28,6 +28,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     placeholder: {
       group: Konva.Group;
       rect: Konva.Rect;
+      badgeBg: Konva.Rect;
       text: Konva.Text;
     };
   };
@@ -64,21 +65,36 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
         }),
         rect: new Konva.Rect({
           name: `${this.type}:placeholder_rect`,
-          fill: 'hsl(220 12% 10% / 1)', // 'base.900'
+          fill: 'transparent',
           width,
           height,
           listening: false,
           perfectDrawEnabled: false,
         }),
+        badgeBg: new Konva.Rect({
+          name: `${this.type}:placeholder_badge_bg`,
+          fill: 'hsl(220 12% 10% / 0.8)', // 'base.900' with opacity
+          x: 6,
+          y: 6,
+          width: Math.min(204, width - 12),
+          height: 36,
+          cornerRadius: 6,
+          stroke: 'hsl(220 12% 50% / 1)', // 'base.700'
+          strokeWidth: 1,
+          listening: false,
+          perfectDrawEnabled: false,
+        }),
         text: new Konva.Text({
           name: `${this.type}:placeholder_text`,
-          fill: 'hsl(220 12% 80% / 1)', // 'base.900'
-          width,
-          height,
+          fill: 'hsl(220 12% 80% / 1)', // 'base.300'
+          x: 8,
+          y: 8,
+          width: Math.min(200, width - 16),
+          height: 32,
           align: 'center',
           verticalAlign: 'middle',
           fontFamily: '"Inter Variable", sans-serif',
-          fontSize: width / 24,
+          fontSize: 14,
           fontStyle: '600',
           text: 'Waiting for Image',
           listening: false,
@@ -88,6 +104,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     };
 
     this.konva.placeholder.group.add(this.konva.placeholder.rect);
+    this.konva.placeholder.group.add(this.konva.placeholder.badgeBg);
     this.konva.placeholder.group.add(this.konva.placeholder.text);
     this.konva.group.add(this.konva.placeholder.group);
 
@@ -124,9 +141,8 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     const { width, height } = this.manager.stateApi.getBbox().rect;
     this.konva.placeholder.rect.width(width);
     this.konva.placeholder.rect.height(height);
-    this.konva.placeholder.text.width(width);
-    this.konva.placeholder.text.height(height);
-    this.konva.placeholder.text.fontSize(width / 24);
+    this.konva.placeholder.badgeBg.width(Math.min(204, width - 12));
+    this.konva.placeholder.text.width(Math.min(200, width - 16));
   };
 
   initialize = () => {
