@@ -11,13 +11,22 @@ import type { Atom } from 'nanostores';
 import { atom, effect } from 'nanostores';
 import type { Logger } from 'roarr';
 
-// Theme-consistent spacing constants (in pixels)
-const SPACING_2 = 8; // Equivalent to theme token 2
-const SPACING_4 = 16; // Equivalent to theme token 4
-const SPACING_8 = 32; // Equivalent to theme token 8
-const BORDER_RADIUS_BASE = 6; // Equivalent to theme borderRadius "base"
+// To get pixel sizes corresponding to our theme tokens, first find the theme token CSS var in browser dev tools.
+// For example `var(--invoke-space-8)` is equivalent to using `8` as a space prop in a component.
+//
+// If it is already in pixels, you can use it directly. If it is in rems, you need to convert it to pixels.
+//
+// For example:
+// const style = window.getComputedStyle(document.documentElement)
+// parseFloat(style.fontSize) * parseFloat(style.getPropertyValue("--invoke-space-8"))
+//
+// This will give you the pixel value for the theme token in pixels.
+const SPACING_2 = 6; // Equivalent to theme token 2
+const SPACING_4 = 12; // Equivalent to theme token 4
+const SPACING_8 = 24; // Equivalent to theme token 8
+const BORDER_RADIUS_BASE = 4; // Equivalent to theme borderRadius "base"
 const BORDER_WIDTH = 1; // Standard border width
-const FONT_SIZE_SM = 14; // Equivalent to theme fontSize "sm"
+const FONT_SIZE_SM = 12; // Equivalent to theme fontSize "sm"
 const BADGE_MIN_WIDTH = 200;
 const BADGE_HEIGHT = 36;
 
