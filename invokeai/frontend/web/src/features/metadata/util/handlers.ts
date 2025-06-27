@@ -375,7 +375,7 @@ export const parseAndRecallAllMetadata = async (
  * @returns A promise that resolves to an object containing the recalled values.
  */
 const recallKeys = async (keysToRecall: (keyof typeof handlers)[], metadata: unknown): Promise<RecallResults> => {
-  const { dispatch } = getStore();
+  const { dispatch, getState } = getStore();
   const recalled: RecallResults = {};
   // It's possible for some metadata item's recall to clobber the recall of another. For example, the model recall
   // may change the width and height. If we are also recalling the width and height directly, we need to ensure that the
@@ -401,15 +401,21 @@ const recallKeys = async (keysToRecall: (keyof typeof handlers)[], metadata: unk
     }
   }
 
-  if (
-    (recalled['sdxlPositiveStylePrompt'] && recalled['sdxlPositiveStylePrompt'] !== recalled['positivePrompt']) ||
-    (recalled['sdxlNegativeStylePrompt'] && recalled['sdxlNegativeStylePrompt'] !== recalled['negativePrompt'])
-  ) {
-    // If we set the negative style prompt or positive style prompt, we should disable prompt concat
-    dispatch(shouldConcatPromptsChanged(false));
-  } else {
-    // Otherwise, we should enable prompt concat
-    dispatch(shouldConcatPromptsChanged(true));
+  // Check if current model is SDXL - if so, don't change shouldConcatPrompts (always keep it linked)
+  const currentModel = getState().params.model;
+  const isSDXL = currentModel?.base === 'sdxl';
+
+  if (!isSDXL) {
+    if (
+      (recalled['sdxlPositiveStylePrompt'] && recalled['sdxlPositiveStylePrompt'] !== recalled['positivePrompt']) ||
+      (recalled['sdxlNegativeStylePrompt'] && recalled['sdxlNegativeStylePrompt'] !== recalled['negativePrompt'])
+    ) {
+      // If we set the negative style prompt or positive style prompt, we should disable prompt concat
+      dispatch(shouldConcatPromptsChanged(false));
+    } else {
+      // Otherwise, we should enable prompt concat
+      dispatch(shouldConcatPromptsChanged(true));
+    }
   }
 
   return recalled;

@@ -139,7 +139,12 @@ export const paramsSlice = createSlice({
       state.negativePrompt2 = action.payload;
     },
     shouldConcatPromptsChanged: (state, action: PayloadAction<boolean>) => {
-      state.shouldConcatPrompts = action.payload;
+      // For SDXL models, always keep prompts concatenated (linked)
+      if (state.model?.base === 'sdxl') {
+        state.shouldConcatPrompts = true;
+      } else {
+        state.shouldConcatPrompts = action.payload;
+      }
     },
     refinerModelChanged: (state, action: PayloadAction<ParameterSDXLRefinerModel | null>) => {
       state.refinerModel = action.payload;

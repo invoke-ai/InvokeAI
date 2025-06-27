@@ -15,7 +15,6 @@ import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModeP
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
-import { SDXLConcatButton } from 'features/sdxl/components/SDXLPrompts/SDXLConcatButton';
 import {
   selectStylePresetActivePresetId,
   selectStylePresetViewMode,
@@ -103,7 +102,6 @@ export const ParamPositivePrompt = memo(() => {
         />
         <PromptOverlayButtonWrapper>
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
-          {baseModel === 'sdxl' && <SDXLConcatButton />}
           <ShowDynamicPromptsPreviewButton />
           {modelSupportsNegativePrompt && <NegativePromptToggleButton />}
         </PromptOverlayButtonWrapper>
