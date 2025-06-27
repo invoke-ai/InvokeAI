@@ -1,4 +1,4 @@
-import { Box, Button, Flex, Grid, Heading, Text } from '@invoke-ai/ui-library';
+import { Box, Button, Flex, Grid, Heading, Icon, Text } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useStarterBundleInstall } from 'features/modelManagerV2/hooks/useStarterBundleInstall';
 import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
@@ -80,55 +80,34 @@ export const LaunchpadForm = memo(() => {
               <Button
                 onClick={navigateToUrlTab}
                 variant="outline"
-                h="auto"
-                minH={12}
                 p={4}
                 textAlign="left"
-                justifyContent="flex-start"
-                alignItems="flex-start"
                 flexDir="column"
                 gap={2}
-                borderRadius="lg"
-                whiteSpace="normal"
+                h="unset"
               >
-                <Flex alignItems="center" gap={2} w="full">
-                  <Box color="base.300" flexShrink={0}>
-                    <PiLinkBold size={24} />
-                  </Box>
-                  <Heading size="sm" color="base.100" noOfLines={2}>
+                <Flex alignItems="center" gap={4} w="full">
+                  <Icon as={PiLinkBold} boxSize={8} color="base.300" />
+                  <Heading size="sm" color="base.100">
                     {t('modelManager.urlOrLocalPath')}
                   </Heading>
                 </Flex>
-                <Text
-                  fontSize="sm"
-                  color="base.400"
-                  lineHeight="1.4"
-                  flex="1"
-                  whiteSpace="normal"
-                  wordBreak="break-word"
-                >
+                <Text fontSize="sm" lineHeight="1.4" flex="1" whiteSpace="normal" wordBreak="break-word">
                   {t('modelManager.launchpad.urlDescription')}
                 </Text>
               </Button>
               <Button
                 onClick={navigateToHuggingFaceTab}
                 variant="outline"
-                h="auto"
-                minH={12}
                 p={4}
                 textAlign="left"
-                justifyContent="flex-start"
-                alignItems="flex-start"
                 flexDir="column"
                 gap={2}
-                borderRadius="lg"
-                whiteSpace="normal"
+                h="unset"
               >
-                <Flex alignItems="center" gap={2} w="full">
-                  <Box color="base.300" flexShrink={0}>
-                    <SiHuggingface size={24} />
-                  </Box>
-                  <Heading size="sm" color="base.100" noOfLines={2}>
+                <Flex alignItems="center" gap={4} w="full">
+                  <Icon as={SiHuggingface} boxSize={8} color="base.300" />
+                  <Heading size="sm" color="base.100">
                     {t('modelManager.huggingFace')}
                   </Heading>
                 </Flex>
@@ -146,22 +125,15 @@ export const LaunchpadForm = memo(() => {
               <Button
                 onClick={navigateToScanFolderTab}
                 variant="outline"
-                h="auto"
-                minH={12}
                 p={4}
                 textAlign="left"
-                justifyContent="flex-start"
-                alignItems="flex-start"
                 flexDir="column"
                 gap={2}
-                borderRadius="lg"
-                whiteSpace="normal"
+                h="unset"
               >
-                <Flex alignItems="center" gap={2} w="full">
-                  <Box color="base.300" flexShrink={0}>
-                    <PiFolderOpenBold size={24} />
-                  </Box>
-                  <Heading size="sm" color="base.100" noOfLines={2}>
+                <Flex alignItems="center" gap={4} w="full">
+                  <Icon as={PiFolderOpenBold} boxSize={8} color="base.300" />
+                  <Heading size="sm" color="base.100">
                     {t('modelManager.scanFolder')}
                   </Heading>
                 </Flex>
