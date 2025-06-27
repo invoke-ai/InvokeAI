@@ -15,6 +15,7 @@ import type { AnyObjectRenderer, AnyObjectState } from 'features/controlLayers/k
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import { getPatternSVG } from 'features/controlLayers/konva/patterns/getPatternSVG';
 import {
+  areStageAttrsGonnaExplode,
   getKonvaNodeDebugAttrs,
   getPrefixedId,
   konvaNodeToBlob,
@@ -135,6 +136,10 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     this.subscriptions.add(
       this.manager.stage.$stageAttrs.listen((stageAttrs, oldStageAttrs) => {
         if (!this.konva.compositing) {
+          return;
+        }
+
+        if (areStageAttrsGonnaExplode(stageAttrs)) {
           return;
         }
 

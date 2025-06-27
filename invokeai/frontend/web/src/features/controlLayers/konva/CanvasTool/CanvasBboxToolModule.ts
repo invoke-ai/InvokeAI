@@ -3,7 +3,12 @@ import { noop } from 'es-toolkit/compat';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
-import { fitRectToGrid, getKonvaNodeDebugAttrs, getPrefixedId } from 'features/controlLayers/konva/util';
+import {
+  areStageAttrsGonnaExplode,
+  fitRectToGrid,
+  getKonvaNodeDebugAttrs,
+  getPrefixedId,
+} from 'features/controlLayers/konva/util';
 import { selectBboxOverlay } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectModel } from 'features/controlLayers/store/paramsSlice';
 import { selectBbox } from 'features/controlLayers/store/selectors';
@@ -253,6 +258,9 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
     }
 
     const stageAttrs = this.manager.stage.$stageAttrs.get();
+    if (areStageAttrsGonnaExplode(stageAttrs)) {
+      return;
+    }
 
     this.konva.overlayRect.setAttrs({
       x: -stageAttrs.x / stageAttrs.scale,
