@@ -11,7 +11,7 @@ export const EntityListNonRasterLayerToggle = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isHidden = useNonRasterLayersIsHidden();
-  
+
   const onClick = useCallback<MouseEventHandler>(
     (e) => {
       e.stopPropagation();
@@ -33,4 +33,4 @@ export const EntityListNonRasterLayerToggle = memo(() => {
   );
 });
 
-EntityListNonRasterLayerToggle.displayName = 'EntityListNonRasterLayerToggle'; 
+EntityListNonRasterLayerToggle.displayName = 'EntityListNonRasterLayerToggle';

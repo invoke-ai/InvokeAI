@@ -16,4 +16,4 @@ export const useCanvasToggleNonRasterLayersHotkey = () => {
     callback: handleToggleNonRasterLayers,
     dependencies: [handleToggleNonRasterLayers],
   });
-}; 
+};
