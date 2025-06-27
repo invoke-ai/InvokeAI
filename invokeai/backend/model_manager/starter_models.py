@@ -23,7 +23,7 @@ class StarterModel(StarterModelWithoutDependencies):
     dependencies: Optional[list[StarterModelWithoutDependencies]] = None
 
 
-class StarterModelBundles(BaseModel):
+class StarterModelBundle(BaseModel):
     name: str
     models: list[StarterModel]
 
@@ -778,10 +778,10 @@ flux_bundle: list[StarterModel] = [
     flux_fill,
 ]
 
-STARTER_BUNDLES: dict[str, list[StarterModel]] = {
-    BaseModelType.StableDiffusion1: sd1_bundle,
-    BaseModelType.StableDiffusionXL: sdxl_bundle,
-    BaseModelType.Flux: flux_bundle,
+STARTER_BUNDLES: dict[str, StarterModelBundle] = {
+    BaseModelType.StableDiffusion1: StarterModelBundle(name="Stable Diffusion 1.5", models=sd1_bundle),
+    BaseModelType.StableDiffusionXL: StarterModelBundle(name="SDXL", models=sdxl_bundle),
+    BaseModelType.Flux: StarterModelBundle(name="FLUX.1 dev", models=flux_bundle),
 }
 
 assert len(STARTER_MODELS) == len({m.source for m in STARTER_MODELS}), "Duplicate starter models"
