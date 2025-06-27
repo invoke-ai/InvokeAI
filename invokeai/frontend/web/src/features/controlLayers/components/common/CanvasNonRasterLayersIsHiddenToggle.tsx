@@ -1,7 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { useNonRasterLayersIsHidden } from 'features/controlLayers/hooks/useNonRasterLayersIsHidden';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { allNonRasterLayersIsHiddenToggled } from 'features/controlLayers/store/canvasSlice';
+import { selectNonRasterLayersIsHidden } from 'features/controlLayers/store/selectors';
 import type { MouseEventHandler } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,7 +10,7 @@ import { PiEyeBold, PiEyeClosedBold } from 'react-icons/pi';
 export const EntityListNonRasterLayerToggle = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const isHidden = useNonRasterLayersIsHidden();
+  const isHidden = useAppSelector(selectNonRasterLayersIsHidden);
 
   const onClick = useCallback<MouseEventHandler>(
     (e) => {
