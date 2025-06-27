@@ -50,13 +50,7 @@ export type Feature =
   | 'paramWidth'
   | 'patchmatchDownScaleSize'
   | 'rasterLayer'
-  | 'refinerModel'
-  | 'refinerNegativeAestheticScore'
-  | 'refinerPositiveAestheticScore'
-  | 'refinerScheduler'
-  | 'refinerStart'
-  | 'refinerSteps'
-  | 'refinerCfgScale'
+
   | 'regionalGuidance'
   | 'regionalGuidanceAndReferenceImage'
   | 'regionalReferenceImage'
@@ -188,27 +182,7 @@ export const POPOVER_DATA: { [key in Feature]?: PopoverData } = {
   paramUpscaleMethod: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000096700-how-can-i-get-larger-images-what-does-upscaling-do-',
   },
-  refinerModel: {
-    href: 'https://support.invoke.ai/support/solutions/articles/151000178333-using-the-refiner',
-  },
-  refinerNegativeAestheticScore: {
-    href: 'https://support.invoke.ai/support/solutions/articles/151000178333-using-the-refiner',
-  },
-  refinerPositiveAestheticScore: {
-    href: 'https://support.invoke.ai/support/solutions/articles/151000178333-using-the-refiner',
-  },
-  refinerScheduler: {
-    href: 'https://support.invoke.ai/support/solutions/articles/151000178333-using-the-refiner',
-  },
-  refinerStart: {
-    href: 'https://support.invoke.ai/support/solutions/articles/151000178333-using-the-refiner',
-  },
-  refinerSteps: {
-    href: 'https://support.invoke.ai/support/solutions/articles/151000178333-using-the-refiner',
-  },
-  refinerCfgScale: {
-    href: 'https://support.invoke.ai/support/solutions/articles/151000178333-using-the-refiner',
-  },
+
   seamlessTilingXAxis: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000178161-advanced-settings',
   },

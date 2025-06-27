@@ -91,8 +91,7 @@ import {
   isSD3MainModelFieldInputTemplate,
   isSDXLMainModelFieldInputInstance,
   isSDXLMainModelFieldInputTemplate,
-  isSDXLRefinerModelFieldInputInstance,
-  isSDXLRefinerModelFieldInputTemplate,
+
   isSigLipModelFieldInputInstance,
   isSigLipModelFieldInputTemplate,
   isSpandrelImageToImageModelFieldInputInstance,
@@ -133,7 +132,7 @@ import IPAdapterModelFieldInputComponent from './inputs/IPAdapterModelFieldInput
 import LLaVAModelFieldInputComponent from './inputs/LLaVAModelFieldInputComponent';
 import LoRAModelFieldInputComponent from './inputs/LoRAModelFieldInputComponent';
 import MainModelFieldInputComponent from './inputs/MainModelFieldInputComponent';
-import RefinerModelFieldInputComponent from './inputs/RefinerModelFieldInputComponent';
+
 import SchedulerFieldInputComponent from './inputs/SchedulerFieldInputComponent';
 import SD3MainModelFieldInputComponent from './inputs/SD3MainModelFieldInputComponent';
 import SDXLMainModelFieldInputComponent from './inputs/SDXLMainModelFieldInputComponent';
@@ -295,12 +294,7 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
     return <ModelIdentifierFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
   }
 
-  if (isSDXLRefinerModelFieldInputTemplate(template)) {
-    if (!isSDXLRefinerModelFieldInputInstance(field)) {
-      return null;
-    }
-    return <RefinerModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
-  }
+
 
   if (isVAEModelFieldInputTemplate(template)) {
     if (!isVAEModelFieldInputInstance(field)) {

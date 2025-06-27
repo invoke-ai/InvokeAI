@@ -904,7 +904,7 @@
         "lora": "LoRA",
         "selectModel": "Select a Model",
         "noLoRAsInstalled": "No LoRAs installed",
-        "noRefinerModelsInstalled": "No SDXL Refiner models installed",
+    
         "defaultVAE": "Default VAE"
     },
     "nodes": {
@@ -1225,10 +1225,7 @@
         "noModelsAvailable": "No models available",
         "posAestheticScore": "Positive Aesthetic Score",
         "posStylePrompt": "Positive Style Prompt",
-        "refiner": "Refiner",
-        "refinermodel": "Refiner Model",
-        "refinerStart": "Refiner Start",
-        "refinerSteps": "Refiner Steps",
+        
         "scheduler": "Scheduler",
         "steps": "Steps"
     },
@@ -1623,53 +1620,7 @@
                 "Higher downscaling will improve performance and reduce quality."
             ]
         },
-        "refinerModel": {
-            "heading": "Refiner Model",
-            "paragraphs": [
-                "Model used during the refiner portion of the generation process.",
-                "Similar to the Generation Model."
-            ]
-        },
-        "refinerPositiveAestheticScore": {
-            "heading": "Positive Aesthetic Score",
-            "paragraphs": [
-                "Weight generations to be more similar to images with a high aesthetic score, based on the training data."
-            ]
-        },
-        "refinerNegativeAestheticScore": {
-            "heading": "Negative Aesthetic Score",
-            "paragraphs": [
-                "Weight generations to be more similar to images with a low aesthetic score, based on the training data."
-            ]
-        },
-        "refinerScheduler": {
-            "heading": "Scheduler",
-            "paragraphs": [
-                "Scheduler used during the refiner portion of the generation process.",
-                "Similar to the Generation Scheduler."
-            ]
-        },
-        "refinerStart": {
-            "heading": "Refiner Start",
-            "paragraphs": [
-                "Where in the generation process the refiner will start to be used.",
-                "0 means the refiner will be used for the entire generation process, 0.8 means the refiner will be used for the last 20% of the generation process."
-            ]
-        },
-        "refinerSteps": {
-            "heading": "Steps",
-            "paragraphs": [
-                "Number of steps that will be performed during the refiner portion of the generation process.",
-                "Similar to the Generation Steps."
-            ]
-        },
-        "refinerCfgScale": {
-            "heading": "CFG Scale",
-            "paragraphs": [
-                "Controls how much the prompt influences the generation process.",
-                "Similar to the Generation CFG Scale."
-            ]
-        },
+
         "scaleBeforeProcessing": {
             "heading": "Scale Before Processing",
             "paragraphs": [

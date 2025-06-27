@@ -19,7 +19,7 @@ import type {
   ParameterPositivePrompt,
   ParameterPrecision,
   ParameterScheduler,
-  ParameterSDXLRefinerModel,
+
   ParameterT5EncoderModel,
   ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
@@ -141,27 +141,7 @@ export const paramsSlice = createSlice({
     shouldConcatPromptsChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldConcatPrompts = action.payload;
     },
-    refinerModelChanged: (state, action: PayloadAction<ParameterSDXLRefinerModel | null>) => {
-      state.refinerModel = action.payload;
-    },
-    setRefinerSteps: (state, action: PayloadAction<number>) => {
-      state.refinerSteps = action.payload;
-    },
-    setRefinerCFGScale: (state, action: PayloadAction<number>) => {
-      state.refinerCFGScale = action.payload;
-    },
-    setRefinerScheduler: (state, action: PayloadAction<ParameterScheduler>) => {
-      state.refinerScheduler = action.payload;
-    },
-    setRefinerPositiveAestheticScore: (state, action: PayloadAction<number>) => {
-      state.refinerPositiveAestheticScore = action.payload;
-    },
-    setRefinerNegativeAestheticScore: (state, action: PayloadAction<number>) => {
-      state.refinerNegativeAestheticScore = action.payload;
-    },
-    setRefinerStart: (state, action: PayloadAction<number>) => {
-      state.refinerStart = action.payload;
-    },
+
     setInfillMethod: (state, action: PayloadAction<string>) => {
       state.infillMethod = action.payload;
     },
@@ -200,7 +180,7 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.vaePrecision = state.vaePrecision;
   newState.t5EncoderModel = state.t5EncoderModel;
   newState.clipEmbedModel = state.clipEmbedModel;
-  newState.refinerModel = state.refinerModel;
+
   return newState;
 };
 
@@ -241,13 +221,7 @@ export const {
   positivePrompt2Changed,
   negativePrompt2Changed,
   shouldConcatPromptsChanged,
-  refinerModelChanged,
-  setRefinerSteps,
-  setRefinerCFGScale,
-  setRefinerScheduler,
-  setRefinerPositiveAestheticScore,
-  setRefinerNegativeAestheticScore,
-  setRefinerStart,
+
   modelChanged,
   paramsReset,
 } = paramsSlice.actions;
@@ -329,18 +303,7 @@ export const selectShouldUseCPUNoise = createParamsSelector((params) => params.s
 export const selectUpscaleScheduler = createParamsSelector((params) => params.upscaleScheduler);
 export const selectUpscaleCfgScale = createParamsSelector((params) => params.upscaleCfgScale);
 
-export const selectRefinerCFGScale = createParamsSelector((params) => params.refinerCFGScale);
-export const selectRefinerModel = createParamsSelector((params) => params.refinerModel);
-export const selectIsRefinerModelSelected = createParamsSelector((params) => Boolean(params.refinerModel));
-export const selectRefinerPositiveAestheticScore = createParamsSelector(
-  (params) => params.refinerPositiveAestheticScore
-);
-export const selectRefinerNegativeAestheticScore = createParamsSelector(
-  (params) => params.refinerNegativeAestheticScore
-);
-export const selectRefinerScheduler = createParamsSelector((params) => params.refinerScheduler);
-export const selectRefinerStart = createParamsSelector((params) => params.refinerStart);
-export const selectRefinerSteps = createParamsSelector((params) => params.refinerSteps);
+
 
 export const selectMainModelConfig = createSelector(
   selectModelConfigsQuery,
