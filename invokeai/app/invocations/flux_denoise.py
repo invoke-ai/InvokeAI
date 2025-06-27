@@ -384,7 +384,6 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 dtype=inference_dtype,
             )
 
-            # Instantiate our new extension if the conditioning is provided
             kontext_extension = None
             if self.kontext_conditioning is not None:
                 # We need a VAE to encode the reference image. We can reuse the
@@ -400,7 +399,6 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                     dtype=inference_dtype,
                 )
 
-            # THE CRITICAL INTEGRATION POINT
             final_img, final_img_ids = x, img_ids
             original_seq_len = x.shape[1]  # Store the original sequence length
             if kontext_extension is not None:
@@ -426,7 +424,6 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 img_cond=img_cond,
             )
 
-            # Extract only the main image tokens if kontext was applied
             if kontext_extension is not None:
                 x = x[:, :original_seq_len, :]  # Keep only the first original_seq_len tokens
 
