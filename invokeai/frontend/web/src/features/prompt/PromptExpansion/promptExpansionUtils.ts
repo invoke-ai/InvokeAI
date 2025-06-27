@@ -1,8 +1,10 @@
+import type { ImageDTO } from 'services/api/types';
 import { $promptExpansionRequest } from 'services/events/stores';
 
 export interface PromptExpansionRequest {
   startTime: number;
   status: 'pending' | 'completed' | 'error';
+  sourceImage?: ImageDTO;
 }
 
 export const getPromptExpansionRequest = () => {

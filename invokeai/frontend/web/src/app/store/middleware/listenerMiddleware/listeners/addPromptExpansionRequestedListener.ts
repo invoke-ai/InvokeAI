@@ -94,6 +94,7 @@ export const addPromptExpansionRequestedListener = (startAppListening: AppStartL
         $promptExpansionRequest.set({
           startTime: Date.now(),
           status: 'pending' as const,
+          sourceImage: imageDTO,
         });
 
         log.debug({ imageDTO: imageDTO.image_name }, 'Prompt generation from image request initiated');
@@ -167,6 +168,7 @@ export const addPromptExpansionRequestedListener = (startAppListening: AppStartL
         $promptExpansionRequest.set({
           startTime: Date.now(),
           status: 'pending' as const,
+          sourceImage: imageDTO,
         });
 
         log.debug({ imageDTO: imageDTO?.image_name }, 'Prompt generation from uploaded image request initiated');

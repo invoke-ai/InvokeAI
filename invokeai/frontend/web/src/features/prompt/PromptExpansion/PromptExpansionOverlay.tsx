@@ -1,4 +1,4 @@
-import { Box, Flex, Spinner, Text } from '@invoke-ai/ui-library';
+import { Box, Flex, Image, Spinner, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { PromptExpansionResultOverlay } from 'features/prompt/PromptExpansion/PromptExpansionResultOverlay';
 import { usePromptExpansionTracking } from 'features/prompt/PromptExpansion/usePromptExpansionTracking';
@@ -43,7 +43,29 @@ export const PromptExpansionOverlay = memo(() => {
       justifyContent="center"
       animation="pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite"
     >
-      <Flex direction="column" alignItems="center" gap={3} color="invokeYellow.300">
+      {/* Show dimmed source image if available */}
+      {promptExpansionRequest?.sourceImage && (
+        <Box
+          position="absolute"
+          top={2}
+          left={2}
+          right={2}
+          bottom={2}
+          opacity={0.5}
+          borderRadius="base"
+          overflow="hidden"
+        >
+          <Image
+            src={promptExpansionRequest.sourceImage.thumbnail_url}
+            objectFit="contain"
+            w="full"
+            h="full"
+            borderRadius="base"
+          />
+        </Box>
+      )}
+
+      <Flex direction="column" alignItems="center" gap={3} color="invokeYellow.300" position="relative" zIndex={1}>
         <Box position="relative" display="flex" alignItems="center" justifyContent="center">
           <PiMagicWandBold size={24} />
           <Spinner size="sm" position="absolute" color="invokeYellow.400" thickness="2px" />
