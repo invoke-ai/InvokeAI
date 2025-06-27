@@ -17,7 +17,8 @@ export const StylePresetPromptPreviewToggle = () => {
   return (
     <IconButton
       size="sm"
-      variant="ghost"
+      variant="link"
+      alignSelf="stretch"
       aria-label={t('stylePresets.togglePromptPreviews')}
       tooltip={t('stylePresets.togglePromptPreviews')}
       onClick={handleToggle}

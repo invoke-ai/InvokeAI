@@ -17,14 +17,13 @@ export const StylePresetCreateButton = () => {
 
   return (
     <IconButton
+      size="sm"
+      variant="link"
+      alignSelf="stretch"
       icon={<PiPlusBold />}
       tooltip={t('stylePresets.createPromptTemplate')}
       aria-label={t('stylePresets.createPromptTemplate')}
       onClick={handleClickAddNew}
-      size="md"
-      variant="ghost"
-      w={8}
-      h={8}
     />
   );
 };
