@@ -893,9 +893,6 @@
             "fluxDev": "FLUX.1 dev"
         },
         "controlLora": "Control LoRA",
-        "downloadBundle": "Download {bundleName} Bundle",
-        "startDownload": "Start Download",
-        "bundleDownloadConfirmation": "This will download all models associated with the {bundleName} bundle and may take some time. Model downloads can be cancelled at any time. Are you ready to begin?",
         "llavaOnevision": "LLaVA OneVision",
         "syncModels": "Sync Models",
         "textualInversions": "Textual Inversions",
