@@ -28,7 +28,7 @@ const containerSx: SystemStyleObject = {
   cursor: 'grab',
   // The action buttons are hidden by default and shown on hover
   '& .node-selection-overlay': {
-    display: 'none',
+    display: 'block',
     position: 'absolute',
     top: 0,
     insetInlineEnd: 0,
@@ -37,31 +37,28 @@ const containerSx: SystemStyleObject = {
     borderRadius: 'base',
     transitionProperty: 'none',
     pointerEvents: 'none',
-    opacity: 0.5,
+    shadow: '0 0 0 1px var(--invoke-colors-base-500)',
   },
   '&[data-is-mouse-over-node="true"] .node-selection-overlay': {
-    opacity: 1,
     display: 'block',
   },
   '&[data-is-mouse-over-form-field="true"] .node-selection-overlay': {
-    opacity: 1,
     display: 'block',
     bg: 'invokeBlueAlpha.100',
   },
   _hover: {
     '& .node-selection-overlay': {
       display: 'block',
-      shadow: '0 0 0 2px var(--invoke-colors-blue-300)',
+      shadow: '0 0 0 1px var(--invoke-colors-blue-300)',
     },
     '&[data-is-selected="true"] .node-selection-overlay': {
       display: 'block',
-      opacity: 1,
-      shadow: '0 0 0 3px var(--invoke-colors-blue-300)',
+      shadow: '0 0 0 2px var(--invoke-colors-blue-300)',
     },
   },
   '&[data-is-selected="true"] .node-selection-overlay': {
     display: 'block',
-    shadow: '0 0 0 3px var(--invoke-colors-blue-300)',
+    shadow: '0 0 0 2px var(--invoke-colors-blue-300)',
   },
   '&[data-is-editor-locked="true"]': {
     '& *': {
