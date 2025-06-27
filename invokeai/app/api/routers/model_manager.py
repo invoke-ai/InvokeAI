@@ -41,6 +41,7 @@ from invokeai.backend.model_manager.starter_models import (
     STARTER_BUNDLES,
     STARTER_MODELS,
     StarterModel,
+    StarterModelBundle,
     StarterModelWithoutDependencies,
 )
 
@@ -799,7 +800,7 @@ async def convert_model(
 
 class StarterModelResponse(BaseModel):
     starter_models: list[StarterModel]
-    starter_bundles: dict[str, list[StarterModel]]
+    starter_bundles: dict[str, StarterModelBundle]
 
 
 def get_is_installed(
@@ -833,7 +834,7 @@ async def get_starter_models() -> StarterModelResponse:
         model.dependencies = missing_deps
 
     for bundle in starter_bundles.values():
-        for model in bundle:
+        for model in bundle.models:
             model.is_installed = get_is_installed(model, installed_models)
             # Remove already-installed dependencies
             missing_deps: list[StarterModelWithoutDependencies] = []

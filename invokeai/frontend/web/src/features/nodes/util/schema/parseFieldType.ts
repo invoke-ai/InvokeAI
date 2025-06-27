@@ -1,3 +1,4 @@
+import { isArray } from 'es-toolkit/compat';
 import {
   FieldParseError,
   UnableToExtractSchemaNameFromRefError,
@@ -9,7 +10,6 @@ import type { FieldType } from 'features/nodes/types/field';
 import type { OpenAPIV3_1SchemaOrRef } from 'features/nodes/types/openapi';
 import { isArraySchemaObject, isNonArraySchemaObject, isRefObject, isSchemaObject } from 'features/nodes/types/openapi';
 import { t } from 'i18next';
-import { isArray } from 'lodash-es';
 import type { OpenAPIV3_1 } from 'openapi-types';
 
 /**

@@ -1,13 +1,13 @@
+import { objectEquals } from '@observ33r/object-equals';
 import { createDraftSafeSelectorCreator, createSelectorCreator, lruMemoize } from '@reduxjs/toolkit';
-import { isEqual } from 'lodash-es';
 
 /**
- * A memoized selector creator that uses LRU cache and lodash's isEqual for equality check.
+ * A memoized selector creator that uses LRU cache and @observ33r/object-equals's objectEquals for equality check.
  */
 export const createMemoizedSelector = createSelectorCreator({
   memoize: lruMemoize,
   memoizeOptions: {
-    resultEqualityCheck: isEqual,
+    resultEqualityCheck: objectEquals,
   },
   argsMemoize: lruMemoize,
 });

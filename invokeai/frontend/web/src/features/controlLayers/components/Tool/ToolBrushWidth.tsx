@@ -1,7 +1,6 @@
 import {
   CompositeSlider,
   FormControl,
-  FormLabel,
   IconButton,
   NumberInput,
   NumberInputField,
@@ -14,14 +13,12 @@ import {
 } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { clamp } from 'es-toolkit/compat';
 import { useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
 import { selectCanvasSettingsSlice, settingsBrushWidthChanged } from 'features/controlLayers/store/canvasSettingsSlice';
-import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { clamp } from 'lodash-es';
 import type { KeyboardEvent } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
 
 const selectBrushWidth = createSelector(selectCanvasSettingsSlice, (settings) => settings.brushWidth);
@@ -68,8 +65,6 @@ const sliderDefaultValue = mapRawValueToSliderValue(50);
 
 export const ToolBrushWidth = memo(() => {
   const dispatch = useAppDispatch();
-  const { t } = useTranslation();
-  const imageViewer = useImageViewer();
   const isSelected = useToolIsSelected('brush');
   const width = useAppSelector(selectBrushWidth);
   const [localValue, setLocalValue] = useState(width);
@@ -133,21 +128,20 @@ export const ToolBrushWidth = memo(() => {
     id: 'decrementToolWidth',
     category: 'canvas',
     callback: decrement,
-    options: { enabled: isSelected && !imageViewer.isOpen },
-    dependencies: [decrement, isSelected, imageViewer.isOpen],
+    options: { enabled: isSelected },
+    dependencies: [decrement, isSelected],
   });
   useRegisteredHotkeys({
     id: 'incrementToolWidth',
     category: 'canvas',
     callback: increment,
-    options: { enabled: isSelected && !imageViewer.isOpen },
-    dependencies: [increment, isSelected, imageViewer.isOpen],
+    options: { enabled: isSelected },
+    dependencies: [increment, isSelected],
   });
 
   return (
     <Popover>
       <FormControl w="min-content" gap={2}>
-        <FormLabel m={0}>{t('controlLayers.width')}</FormLabel>
         <PopoverAnchor>
           <NumberInput
             variant="outline"

@@ -585,6 +585,10 @@
                 "display": "Display",
                 "grid": "Grid",
                 "debug": "Debug"
+            },
+            "toggleNonRasterLayers": {
+                "title": "Toggle Non-Raster Layers",
+                "desc": "Show or hide all non-raster layer categories (Control Layers, Inpaint Masks, Regional Guidance)."
             }
         },
         "workflows": {
@@ -769,7 +773,7 @@
         "convertToDiffusers": "Convert To Diffusers",
         "convertToDiffusersHelpText1": "This model will be converted to the 🧨 Diffusers format.",
         "convertToDiffusersHelpText2": "This process will replace your Model Manager entry with the Diffusers version of the same model.",
-        "convertToDiffusersHelpText3": "Your checkpoint file on disk WILL be deleted if it is in InvokeAI root folder. If it is in a custom location, then it WILL NOT be deleted.",
+        "convertToDiffusersHelpText3": "Your checkpoint file on disk WILL be deleted if it is in the InvokeAI root folder. If it is in a custom location, then it WILL NOT be deleted.",
         "convertToDiffusersHelpText4": "This is a one time process only. It might take around 30s-60s depending on the specifications of your computer.",
         "convertToDiffusersHelpText5": "Please make sure you have enough disk space. Models generally vary between 2GB-7GB in size.",
         "convertToDiffusersHelpText6": "Do you wish to convert this model?",
@@ -812,7 +816,11 @@
         "urlUnauthorizedErrorMessage": "You may need to configure an API token to access this model.",
         "urlUnauthorizedErrorMessage2": "Learn how here.",
         "imageEncoderModelId": "Image Encoder Model ID",
-        "includesNModels": "Includes {{n}} models and their dependencies",
+        "installedModelsCount": "{{installed}} of {{total}} models installed.",
+        "includesNModels": "Includes {{n}} models and their dependencies.",
+        "allNModelsInstalled": "All {{count}} models installed",
+        "nToInstall": "{{count}} to install",
+        "nAlreadyInstalled": "{{count}} already installed",
         "installQueue": "Install Queue",
         "inplaceInstall": "In-place install",
         "inplaceInstallDesc": "Install models without copying the files. When using the model, it will be loaded from its this location. If disabled, the model file(s) will be copied into the Invoke-managed models directory during installation.",
@@ -875,6 +883,25 @@
         "starterBundleHelpText": "Easily install all models needed to get started with a base model, including a main model, controlnets, IP adapters, and more. Selecting a bundle will skip any models that you already have installed.",
         "starterModels": "Starter Models",
         "starterModelsInModelManager": "Starter Models can be found in Model Manager",
+        "bundleAlreadyInstalled": "Bundle already installed",
+        "bundleAlreadyInstalledDesc": "All models in the {{bundleName}} bundle are already installed.",
+        "launchpadTab": "Launchpad",
+        "launchpad": {
+            "welcome": "Welcome to Model Management",
+            "description": "Invoke requires models to be installed to utilize most features of the platform. Choose from manual installation options or explore curated starter models.",
+            "manualInstall": "Manual Installation",
+            "urlDescription": "Install models from a URL or local file path. Perfect for specific models you want to add.",
+            "huggingFaceDescription": "Browse and install models directly from HuggingFace repositories.",
+            "scanFolderDescription": "Scan a local folder to automatically detect and install models.",
+            "recommendedModels": "Recommended Models",
+            "exploreStarter": "Or browse all available starter models",
+            "quickStart": "Quick Start Bundles",
+            "bundleDescription": "Each bundle includes essential models for each model family and curated base models to get started.",
+            "browseAll": "Or browse all available models:",
+            "stableDiffusion15": "Stable Diffusion 1.5",
+            "sdxl": "SDXL",
+            "fluxDev": "FLUX.1 dev"
+        },
         "controlLora": "Control LoRA",
         "llavaOnevision": "LLaVA OneVision",
         "syncModels": "Sync Models",
@@ -2001,6 +2028,8 @@
         "disableTransparencyEffect": "Disable Transparency Effect",
         "hidingType": "Hiding {{type}}",
         "showingType": "Showing {{type}}",
+        "showNonRasterLayers": "Show Non-Raster Layers (Shift+H)",
+        "hideNonRasterLayers": "Hide Non-Raster Layers (Shift+H)",
         "dynamicGrid": "Dynamic Grid",
         "logDebugInfo": "Log Debug Info",
         "locked": "Locked",
@@ -2024,7 +2053,9 @@
         "resetGenerationSettings": "Reset Generation Settings",
         "replaceCurrent": "Replace Current",
         "controlLayerEmptyState": "<UploadButton>Upload an image</UploadButton>, drag an image from the <GalleryButton>gallery</GalleryButton> onto this layer, <PullBboxButton>pull the bounding box into this layer</PullBboxButton>, or draw on the canvas to get started.",
-        "referenceImageEmptyState": "<UploadButton>Upload an image</UploadButton>, drag an image from the <GalleryButton>gallery</GalleryButton> onto this layer, or <PullBboxButton>pull the bounding box into this layer</PullBboxButton> to get started.",
+        "referenceImageEmptyStateWithCanvasOptions": "<UploadButton>Upload an image</UploadButton>, drag an image from the <GalleryButton>gallery</GalleryButton> onto this Reference Image or <PullBboxButton>pull the bounding box into this Reference Image</PullBboxButton> to get started.",
+        "referenceImageEmptyState": "<UploadButton>Upload an image</UploadButton> or drag an image from the <GalleryButton>gallery</GalleryButton> onto this Reference Image to get started.",
+        "uploadOrDragAnImage": "Drag an image from the gallery or <UploadButton>upload an image</UploadButton>.",
         "imageNoise": "Image Noise",
         "denoiseLimit": "Denoise Limit",
         "warnings": {
@@ -2376,7 +2407,8 @@
         "uploadImage": "Upload Image",
         "useForTemplate": "Use For Prompt Template",
         "viewList": "View Template List",
-        "viewModeTooltip": "This is how your prompt will look with your currently selected template. To edit your prompt, click anywhere in the text box."
+        "viewModeTooltip": "This is how your prompt will look with your currently selected template. To edit your prompt, click anywhere in the text box.",
+        "togglePromptPreviews": "Toggle Prompt Previews"
     },
     "upsell": {
         "inviteTeammates": "Invite Teammates",

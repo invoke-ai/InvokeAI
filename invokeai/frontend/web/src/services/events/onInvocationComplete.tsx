@@ -1,17 +1,21 @@
 import { logger } from 'app/logging/logger';
-import type { AppDispatch, RootState } from 'app/store/store';
+import type { AppDispatch, AppGetState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
-import { stagingAreaImageStaged } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { boardIdSelected, galleryViewChanged, imageSelected, offsetChanged } from 'features/gallery/store/gallerySlice';
+import {
+  selectAutoSwitch,
+  selectGalleryView,
+  selectListImageNamesQueryArgs,
+  selectSelectedBoardId,
+} from 'features/gallery/store/gallerySelectors';
+import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { isImageField, isImageFieldCollection } from 'features/nodes/types/common';
 import { zNodeStatus } from 'features/nodes/types/invocation';
-import { CANVAS_OUTPUT_PREFIX } from 'features/nodes/util/graph/graphBuilderUtils';
-import type { ApiTagDescription } from 'services/api';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO, S } from 'services/api/types';
-import { getCategories, getListImagesUrl } from 'services/api/util';
+import { getCategories } from 'services/api/util';
+import { insertImageIntoNamesResult } from 'services/api/util/optimisticUpdates';
 import { $lastProgressEvent } from 'services/events/stores';
 import type { Param0 } from 'tsafe';
 import { objectEntries } from 'tsafe';
@@ -19,42 +23,33 @@ import type { JsonObject } from 'type-fest';
 
 const log = logger('events');
 
-const isCanvasOutputNode = (data: S['InvocationCompleteEvent']) => {
-  return data.invocation_source_id.split(':')[0] === CANVAS_OUTPUT_PREFIX;
-};
-
 const nodeTypeDenylist = ['load_image', 'image'];
 
-export const buildOnInvocationComplete = (getState: () => RootState, dispatch: AppDispatch) => {
-  const addImagesToGallery = (data: S['InvocationCompleteEvent'], imageDTOs: ImageDTO[]) => {
+export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDispatch) => {
+  const addImagesToGallery = async (data: S['InvocationCompleteEvent']) => {
     if (nodeTypeDenylist.includes(data.invocation.type)) {
       log.trace(`Skipping denylisted node type (${data.invocation.type})`);
+      return;
+    }
+
+    const imageDTOs = await getResultImageDTOs(data);
+    if (imageDTOs.length === 0) {
       return;
     }
 
     // For efficiency's sake, we want to minimize the number of dispatches and invalidations we do.
     // We'll keep track of each change we need to make and do them all at once.
     const boardTotalAdditions: Record<string, number> = {};
-    const boardTagIdsToInvalidate: Set<string> = new Set();
-    const imageListTagIdsToInvalidate: Set<string> = new Set();
+    const listImageNamesArg = selectListImageNamesQueryArgs(getState());
 
     for (const imageDTO of imageDTOs) {
       if (imageDTO.is_intermediate) {
         return;
       }
 
-      const boardId = imageDTO.board_id ?? 'none';
+      const board_id = imageDTO.board_id ?? 'none';
       // update the total images for the board
-      boardTotalAdditions[boardId] = (boardTotalAdditions[boardId] || 0) + 1;
-      // invalidate the board tag
-      boardTagIdsToInvalidate.add(boardId);
-      // invalidate the image list tag
-      imageListTagIdsToInvalidate.add(
-        getListImagesUrl({
-          board_id: boardId,
-          categories: getCategories(imageDTO),
-        })
-      );
+      boardTotalAdditions[board_id] = (boardTotalAdditions[board_id] || 0) + 1;
     }
 
     // Update all the board image totals at once
@@ -75,58 +70,82 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
     }
     dispatch(boardsApi.util.upsertQueryEntries(entries));
 
-    // Invalidate all tags at once
-    const boardTags: ApiTagDescription[] = Array.from(boardTagIdsToInvalidate).map((boardId) => ({
-      type: 'Board' as const,
-      id: boardId,
-    }));
-    const imageListTags: ApiTagDescription[] = Array.from(imageListTagIdsToInvalidate).map((imageListId) => ({
-      type: 'ImageList' as const,
-      id: imageListId,
-    }));
-    dispatch(imagesApi.util.invalidateTags([...boardTags, ...imageListTags]));
+    // Optimistically update image names lists - DTOs are already cached by getResultImageDTOs
+    const state = getState();
+
+    for (const imageDTO of imageDTOs) {
+      // Construct the expected query args for this image's getImageNames query
+      // Use the current gallery query args as base, but override board_id and categories for this specific image
+      const expectedQueryArgs = {
+        ...listImageNamesArg,
+        categories: getCategories(imageDTO),
+        board_id: imageDTO.board_id ?? 'none',
+      };
+
+      // Check if we have cached image names for this query
+      const cachedNamesResult = imagesApi.endpoints.getImageNames.select(expectedQueryArgs)(state);
+
+      if (cachedNamesResult.data) {
+        // We have cached names - optimistically insert the new image
+        dispatch(
+          imagesApi.util.updateQueryData('getImageNames', expectedQueryArgs, (draft) => {
+            // Use the utility function to insert at the correct position
+            const updatedResult = insertImageIntoNamesResult(
+              draft,
+              imageDTO,
+              expectedQueryArgs.starred_first ?? true,
+              expectedQueryArgs.order_dir
+            );
+
+            // Replace the draft contents
+            draft.image_names = updatedResult.image_names;
+            draft.starred_count = updatedResult.starred_count;
+            draft.total_count = updatedResult.total_count;
+          })
+        );
+      }
+      // If no cached data, we don't need to do anything - there's no list to update
+    }
+
+    // No need to invalidate tags since we're doing optimistic updates
+    // Board totals are already updated above via upsertQueryEntries
+
+    const autoSwitch = selectAutoSwitch(getState());
+
+    if (!autoSwitch) {
+      return;
+    }
 
     // Finally, we may need to autoswitch to the new image. We'll only do it for the last image in the list.
-
     const lastImageDTO = imageDTOs.at(-1);
 
     if (!lastImageDTO) {
       return;
     }
 
-    const { image_name, board_id } = lastImageDTO;
+    const { image_name } = lastImageDTO;
+    const board_id = lastImageDTO.board_id ?? 'none';
 
-    const { shouldAutoSwitch, selectedBoardId, galleryView, offset } = getState().gallery;
+    // With optimistic updates, we can immediately switch to the new image
+    const selectedBoardId = selectSelectedBoardId(getState());
 
-    // If auto-switch is enabled, select the new image
-    if (shouldAutoSwitch) {
-      // If the image is from a different board, switch to that board - this will also select the image
-      if (board_id && board_id !== selectedBoardId) {
-        dispatch(
-          boardIdSelected({
-            boardId: board_id,
-            selectedImageName: image_name,
-          })
-        );
-      } else if (!board_id && selectedBoardId !== 'none') {
-        dispatch(
-          boardIdSelected({
-            boardId: 'none',
-            selectedImageName: image_name,
-          })
-        );
-      } else {
-        // Else just select the image, no need to switch boards
-        dispatch(imageSelected(lastImageDTO));
-
-        if (galleryView !== 'images') {
-          // We also need to update the gallery view to images. This also updates the offset.
-          dispatch(galleryViewChanged('images'));
-        } else if (offset > 0) {
-          // If we are not at the start of the gallery, reset the offset.
-          dispatch(offsetChanged({ offset: 0 }));
-        }
+    // If the image is from a different board, switch to that board & select the image - otherwise just select the
+    // image. This implicitly changes the view to 'images' if it was not already.
+    if (board_id !== selectedBoardId) {
+      dispatch(
+        boardIdSelected({
+          boardId: board_id,
+          selectedImageName: image_name,
+        })
+      );
+    } else {
+      // Ensure we are on the 'images' gallery view - that's where this image will be displayed
+      const galleryView = selectGalleryView(getState());
+      if (galleryView !== 'images') {
+        dispatch(galleryViewChanged('images'));
       }
+      // Select the image immediately since we've optimistically updated the cache
+      dispatch(imageSelected(lastImageDTO.image_name));
     }
   };
 
@@ -151,61 +170,22 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
     return imageDTOs;
   };
 
-  const handleOriginWorkflows = async (data: S['InvocationCompleteEvent']) => {
-    const { result, invocation_source_id } = data;
-
-    const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
-    if (nes) {
-      nes.status = zNodeStatus.enum.COMPLETED;
-      if (nes.progress !== null) {
-        nes.progress = 1;
-      }
-      nes.outputs.push(result);
-      upsertExecutionState(nes.nodeId, nes);
-    }
-
-    const imageDTOs = await getResultImageDTOs(data);
-    addImagesToGallery(data, imageDTOs);
-  };
-
-  const handleOriginCanvas = async (data: S['InvocationCompleteEvent']) => {
-    const imageDTOs = await getResultImageDTOs(data);
-
-    // We expect only a single image in the canvas output
-    const imageDTO = imageDTOs[0];
-    if (!imageDTO) {
-      return;
-    }
-
-    if (data.destination === 'canvas') {
-      // TODO(psyche): Can/should we let canvas handle this itself?
-      if (isCanvasOutputNode(data)) {
-        if (data.result.type === 'image_output') {
-          dispatch(stagingAreaImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
-        }
-        addImagesToGallery(data, [imageDTO]);
-      }
-    } else if (!imageDTO.is_intermediate) {
-      // Desintaion is gallery
-      addImagesToGallery(data, [imageDTO]);
-    }
-  };
-
-  const handleOriginOther = async (data: S['InvocationCompleteEvent']) => {
-    const imageDTOs = await getResultImageDTOs(data);
-    addImagesToGallery(data, imageDTOs);
-  };
-
   return async (data: S['InvocationCompleteEvent']) => {
     log.debug({ data } as JsonObject, `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`);
 
-    if (data.origin === 'workflows') {
-      await handleOriginWorkflows(data);
-    } else if (data.origin === 'canvas') {
-      await handleOriginCanvas(data);
-    } else {
-      await handleOriginOther(data);
+    const nodeExecutionState = $nodeExecutionStates.get()[data.invocation_source_id];
+
+    if (nodeExecutionState) {
+      const _nodeExecutionState = deepClone(nodeExecutionState);
+      _nodeExecutionState.status = zNodeStatus.enum.COMPLETED;
+      if (_nodeExecutionState.progress !== null) {
+        _nodeExecutionState.progress = 1;
+      }
+      _nodeExecutionState.outputs.push(data.result);
+      upsertExecutionState(_nodeExecutionState.nodeId, _nodeExecutionState);
     }
+
+    await addImagesToGallery(data);
 
     $lastProgressEvent.set(null);
   };

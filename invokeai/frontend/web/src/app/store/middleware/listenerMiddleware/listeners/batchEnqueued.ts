@@ -1,9 +1,9 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { truncate } from 'es-toolkit/compat';
 import { zPydanticValidationError } from 'features/system/store/zodSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { truncate } from 'lodash-es';
 import { serializeError } from 'serialize-error';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { JsonObject } from 'type-fest';

@@ -1,8 +1,9 @@
+import { objectEquals } from '@observ33r/object-equals';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { isEqual, uniqBy } from 'lodash-es';
-import type { BoardRecordOrderBy, ImageDTO } from 'services/api/types';
+import { uniq } from 'es-toolkit/compat';
+import type { BoardRecordOrderBy } from 'services/api/types';
 
 import type { BoardId, ComparisonMode, GalleryState, GalleryView, OrderDir } from './types';
 
@@ -16,8 +17,6 @@ const initialGalleryState: GalleryState = {
   selectedBoardId: 'none',
   galleryView: 'images',
   boardSearchText: '',
-  limit: 20,
-  offset: 0,
   starredFirst: true,
   orderDir: 'DESC',
   searchTerm: '',
@@ -33,14 +32,14 @@ export const gallerySlice = createSlice({
   name: 'gallery',
   initialState: initialGalleryState,
   reducers: {
-    imageSelected: (state, action: PayloadAction<ImageDTO | null>) => {
+    imageSelected: (state, action: PayloadAction<string | null>) => {
       // Let's be efficient here and not update the selection unless it has actually changed. This helps to prevent
       // unnecessary re-renders of the gallery.
 
-      const selectedImage = action.payload;
+      const selectedImageName = action.payload;
 
       // If we got `null`, clear the selection
-      if (!selectedImage) {
+      if (!selectedImageName) {
         // But only if we have images selected
         if (state.selection.length > 0) {
           state.selection = [];
@@ -50,24 +49,24 @@ export const gallerySlice = createSlice({
 
       // If we have multiple images selected, clear the selection and select the new image
       if (state.selection.length !== 1) {
-        state.selection = [selectedImage];
+        state.selection = [selectedImageName];
         return;
       }
 
       // If the selected image is different from the current selection, clear the selection and select the new image
-      if (!isEqual(state.selection[0], selectedImage)) {
-        state.selection = [selectedImage];
+      if (state.selection[0] !== selectedImageName) {
+        state.selection = [selectedImageName];
         return;
       }
 
       // Else we have the same image selected, do nothing
     },
-    selectionChanged: (state, action: PayloadAction<ImageDTO[]>) => {
+    selectionChanged: (state, action: PayloadAction<string[]>) => {
       // Let's be efficient here and not update the selection unless it has actually changed. This helps to prevent
       // unnecessary re-renders of the gallery.
 
       // Remove duplicates from the selection
-      const newSelection = uniqBy(action.payload, (i) => i.image_name);
+      const newSelection = uniq(action.payload);
 
       // If the new selection has a different length, update the selection
       if (newSelection.length !== state.selection.length) {
@@ -76,14 +75,14 @@ export const gallerySlice = createSlice({
       }
 
       // If the new selection is different, update the selection
-      if (!isEqual(newSelection, state.selection)) {
+      if (!objectEquals(newSelection, state.selection)) {
         state.selection = newSelection;
         return;
       }
 
       // Else we have the same selection, do nothing
     },
-    imageToCompareChanged: (state, action: PayloadAction<ImageDTO | null>) => {
+    imageToCompareChanged: (state, action: PayloadAction<string | null>) => {
       state.imageToCompare = action.payload;
     },
     comparisonModeChanged: (state, action: PayloadAction<ComparisonMode>) => {
@@ -112,9 +111,12 @@ export const gallerySlice = createSlice({
       state.autoAssignBoardOnClick = action.payload;
     },
     boardIdSelected: (state, action: PayloadAction<{ boardId: BoardId; selectedImageName?: string }>) => {
-      state.selectedBoardId = action.payload.boardId;
+      const { boardId, selectedImageName } = action.payload;
+      state.selectedBoardId = boardId;
       state.galleryView = 'images';
-      state.offset = 0;
+      if (selectedImageName) {
+        state.selection = [selectedImageName];
+      }
     },
     autoAddBoardIdChanged: (state, action: PayloadAction<BoardId>) => {
       if (!action.payload) {
@@ -125,7 +127,6 @@ export const gallerySlice = createSlice({
     },
     galleryViewChanged: (state, action: PayloadAction<GalleryView>) => {
       state.galleryView = action.payload;
-      state.offset = 0;
     },
     boardSearchTextChanged: (state, action: PayloadAction<string>) => {
       state.boardSearchText = action.payload;
@@ -143,13 +144,6 @@ export const gallerySlice = createSlice({
     comparisonFitChanged: (state, action: PayloadAction<'contain' | 'fill'>) => {
       state.comparisonFit = action.payload;
     },
-    offsetChanged: (state, action: PayloadAction<{ offset: number; withHotkey?: 'arrow' | 'alt+arrow' }>) => {
-      const { offset } = action.payload;
-      state.offset = offset;
-    },
-    limitChanged: (state, action: PayloadAction<number>) => {
-      state.limit = action.payload;
-    },
     shouldShowArchivedBoardsChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldShowArchivedBoards = action.payload;
     },
@@ -161,7 +155,6 @@ export const gallerySlice = createSlice({
     },
     searchTermChanged: (state, action: PayloadAction<string>) => {
       state.searchTerm = action.payload;
-      state.offset = 0;
     },
     boardsListOrderByChanged: (state, action: PayloadAction<BoardRecordOrderBy>) => {
       state.boardsListOrderBy = action.payload;
@@ -188,8 +181,6 @@ export const {
   comparedImagesSwapped,
   comparisonFitChanged,
   comparisonModeCycled,
-  offsetChanged,
-  limitChanged,
   orderDirChanged,
   starredFirstChanged,
   shouldShowArchivedBoardsChanged,
@@ -212,5 +203,5 @@ export const galleryPersistConfig: PersistConfig<GalleryState> = {
   name: gallerySlice.name,
   initialState: initialGalleryState,
   migrate: migrateGalleryState,
-  persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'offset', 'limit', 'imageToCompare'],
+  persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'imageToCompare'],
 };

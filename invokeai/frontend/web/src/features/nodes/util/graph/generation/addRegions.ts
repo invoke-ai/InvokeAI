@@ -3,7 +3,12 @@ import { deepClone } from 'common/util/deepClone';
 import { withResultAsync } from 'common/util/result';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type { CanvasRegionalGuidanceState, Rect } from 'features/controlLayers/store/types';
+import {
+  type CanvasRegionalGuidanceState,
+  isFLUXReduxConfig,
+  isIPAdapterConfig,
+  type Rect,
+} from 'features/controlLayers/store/types';
 import { getRegionalGuidanceWarnings } from 'features/controlLayers/store/validators';
 import { IMAGE_INFLUENCE_TO_SETTINGS } from 'features/nodes/util/graph/generation/addFLUXRedux';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
@@ -273,12 +278,12 @@ export const addRegions = async ({
       }
     }
 
-    for (const { id, ipAdapter } of region.referenceImages) {
-      if (ipAdapter.type === 'ip_adapter') {
+    for (const { id, config } of region.referenceImages) {
+      if (isIPAdapterConfig(config)) {
         assert(!isFLUX, 'Regional IP adapters are not supported for FLUX.');
 
         result.addedIPAdapters++;
-        const { weight, model, clipVisionModel, method, beginEndStepPct, image } = ipAdapter;
+        const { weight, model, clipVisionModel, method, beginEndStepPct, image } = config;
         assert(model, 'IP Adapter model is required');
         assert(image, 'IP Adapter image is required');
 
@@ -299,11 +304,11 @@ export const addRegions = async ({
         // Connect the mask to the conditioning
         g.addEdge(maskToTensor, 'mask', ipAdapterNode, 'mask');
         g.addEdge(ipAdapterNode, 'ip_adapter', ipAdapterCollect, 'item');
-      } else if (ipAdapter.type === 'flux_redux') {
+      } else if (isFLUXReduxConfig(config)) {
         assert(isFLUX, 'Regional FLUX Redux requires FLUX.');
         assert(fluxReduxCollect !== null, 'FLUX Redux collector is required.');
         result.addedFLUXReduxes++;
-        const { model: fluxReduxModel, image } = ipAdapter;
+        const { model: fluxReduxModel, image } = config;
         assert(fluxReduxModel, 'FLUX Redux model is required');
         assert(image, 'FLUX Redux image is required');
 
@@ -314,7 +319,7 @@ export const addRegions = async ({
           image: {
             image_name: image.image_name,
           },
-          ...IMAGE_INFLUENCE_TO_SETTINGS[ipAdapter.imageInfluence ?? 'highest'],
+          ...IMAGE_INFLUENCE_TO_SETTINGS[config.imageInfluence ?? 'highest'],
         });
 
         // Connect the mask to the conditioning

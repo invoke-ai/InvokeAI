@@ -1,6 +1,5 @@
 import { useShiftModifier } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
+import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
 import { DndImageIcon } from 'features/dnd/DndImageIcon';
 import type { MouseEvent } from 'react';
 import { memo, useCallback } from 'react';
@@ -15,16 +14,17 @@ type Props = {
 export const GalleryImageDeleteIconButton = memo(({ imageDTO }: Props) => {
   const shift = useShiftModifier();
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
+  const deleteImageModal = useDeleteImageModalApi();
+
   const onClick = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
       if (!imageDTO) {
         return;
       }
-      dispatch(imagesToDeleteSelected([imageDTO]));
+      deleteImageModal.delete([imageDTO.image_name]);
     },
-    [dispatch, imageDTO]
+    [deleteImageModal, imageDTO]
   );
 
   if (!shift) {

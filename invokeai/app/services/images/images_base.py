@@ -6,6 +6,7 @@ from PIL.Image import Image as PILImageType
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
+    ImageNamesResult,
     ImageRecord,
     ImageRecordChanges,
     ResourceOrigin,
@@ -125,7 +126,7 @@ class ImageServiceABC(ABC):
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
     ) -> OffsetPaginatedResults[ImageDTO]:
-        """Gets a paginated list of image DTOs."""
+        """Gets a paginated list of image DTOs with starred images first when starred_first=True."""
         pass
 
     @abstractmethod
@@ -146,4 +147,18 @@ class ImageServiceABC(ABC):
     @abstractmethod
     def delete_images_on_board(self, board_id: str):
         """Deletes all images on a board."""
+        pass
+
+    @abstractmethod
+    def get_image_names(
+        self,
+        starred_first: bool = True,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        image_origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+    ) -> ImageNamesResult:
+        """Gets ordered list of image names with metadata for optimistic updates."""
         pass

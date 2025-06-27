@@ -1,10 +1,11 @@
-import { Badge, Flex, IconButton, Text } from '@invoke-ai/ui-library';
+import { Badge, Button, Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useDeleteStylePreset } from 'features/stylePresets/components/DeleteStylePresetDialog';
 import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
 import {
   $isStylePresetsMenuOpen,
   activeStylePresetIdChanged,
+  selectShowPromptPreviews,
   selectStylePresetActivePresetId,
 } from 'features/stylePresets/store/stylePresetSlice';
 import type { MouseEvent } from 'react';
@@ -18,6 +19,7 @@ import StylePresetImage from './StylePresetImage';
 export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithImage }) => {
   const dispatch = useAppDispatch();
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
+  const showPromptPreviews = useAppSelector(selectShowPromptPreviews);
   const { t } = useTranslation();
   const deleteStylePreset = useDeleteStylePreset();
 
@@ -77,82 +79,80 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
   );
 
   return (
-    <Flex
-      gap={4}
+    <Button
+      as={Flex}
+      role="button"
+      gap={3}
       onClick={handleClickApply}
-      cursor="pointer"
-      _hover={{ backgroundColor: 'base.750' }}
-      py={3}
-      px={2}
-      borderRadius="base"
-      alignItems="flex-start"
+      p={3}
+      h="unset"
+      variant="ghost"
       w="full"
+      alignItems="flex-start"
     >
       <StylePresetImage presetImageUrl={preset.image} />
-      <Flex flexDir="column" w="full">
-        <Flex w="full" justifyContent="space-between" alignItems="flex-start">
-          <Flex alignItems="center" gap={2}>
-            <Text fontSize="md" noOfLines={2}>
-              {preset.name}
-            </Text>
-            {activeStylePresetId === preset.id && (
-              <Badge
-                color="invokeBlue.400"
-                borderColor="invokeBlue.700"
-                borderWidth={1}
-                bg="transparent"
-                flexShrink={0}
-              >
-                {t('stylePresets.active')}
-              </Badge>
-            )}
-          </Flex>
-
-          <Flex alignItems="center" gap={1}>
-            <IconButton
-              size="sm"
-              variant="ghost"
-              aria-label={t('stylePresets.copyTemplate')}
-              onClick={handleClickCopy}
-              icon={<PiCopyBold />}
-            />
-            {preset.type !== 'default' && (
-              <>
-                <IconButton
-                  size="sm"
-                  variant="ghost"
-                  aria-label={t('stylePresets.editTemplate')}
-                  onClick={handleClickEdit}
-                  icon={<PiPencilBold />}
-                />
-                <IconButton
-                  size="sm"
-                  variant="ghost"
-                  aria-label={t('stylePresets.deleteTemplate')}
-                  onClick={handleClickDelete}
-                  colorScheme="error"
-                  icon={<PiTrashBold />}
-                />
-              </>
-            )}
-          </Flex>
-        </Flex>
-
-        <Flex flexDir="column" gap={1}>
-          <Text fontSize="xs">
-            <Text as="span" fontWeight="semibold">
-              {t('stylePresets.positivePrompt')}:
-            </Text>{' '}
-            {preset.preset_data.positive_prompt}
+      <Flex flexDir="column" w="full" alignItems="flex-start" flexGrow={1} minW={0} gap={2}>
+        <Flex gap={2} w="full" justifyContent="space-between" alignItems="center" minW={0} minH={8}>
+          <Text fontSize="md" noOfLines={2} fontWeight="semibold" color="base.100">
+            {preset.name}
           </Text>
-          <Text fontSize="xs">
-            <Text as="span" fontWeight="semibold">
-              {t('stylePresets.negativePrompt')}:
-            </Text>{' '}
-            {preset.preset_data.negative_prompt}
-          </Text>
+          {activeStylePresetId === preset.id && (
+            <Badge color="invokeBlue.400" borderColor="invokeBlue.700" borderWidth={1} bg="transparent" flexShrink={0}>
+              {t('stylePresets.active')}
+            </Badge>
+          )}
+          <Spacer />
+          <IconButton
+            size="sm"
+            variant="link"
+            alignSelf="stretch"
+            aria-label={t('stylePresets.copyTemplate')}
+            onClick={handleClickCopy}
+            icon={<PiCopyBold />}
+          />
+          {preset.type !== 'default' && (
+            <>
+              <IconButton
+                size="sm"
+                variant="link"
+                alignSelf="stretch"
+                aria-label={t('stylePresets.editTemplate')}
+                onClick={handleClickEdit}
+                icon={<PiPencilBold />}
+              />
+              <IconButton
+                size="sm"
+                variant="link"
+                alignSelf="stretch"
+                aria-label={t('stylePresets.deleteTemplate')}
+                onClick={handleClickDelete}
+                colorScheme="error"
+                icon={<PiTrashBold />}
+              />
+            </>
+          )}
         </Flex>
+        {showPromptPreviews && (
+          <>
+            <Flex gap={1} minW={0} fontSize="sm" whiteSpace="normal">
+              <Text>
+                {t('stylePresets.positivePrompt')}:{' '}
+                <Text as="span" fontWeight="normal">
+                  {preset.preset_data.positive_prompt}
+                </Text>
+              </Text>
+            </Flex>
+            <Flex gap={1} minW={0} fontSize="sm" whiteSpace="normal">
+              <Text>
+                {t('stylePresets.negativePrompt')}:{' '}
+                <Text as="span" fontWeight="normal">
+                  {preset.preset_data.negative_prompt}
+                </Text>
+              </Text>
+            </Flex>
+          </>
+        )}
       </Flex>
-    </Flex>
+    </Button>
   );
 };

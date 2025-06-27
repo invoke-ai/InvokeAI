@@ -2,7 +2,9 @@ import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { AppConfig, NumericalParameterConfig, PartialAppConfig } from 'app/types/invokeai';
-import { merge } from 'lodash-es';
+import { merge } from 'es-toolkit/compat';
+import type { TabName } from 'features/ui/store/uiTypes';
+import { ALL_TABS } from 'features/ui/store/uiTypes';
 
 const baseDimensionConfig: NumericalParameterConfig = {
   initial: 512, // determined by model selection, unused in practice
@@ -225,3 +227,12 @@ export const selectIsClientSideUploadEnabled = createConfigSelector((config) => 
 export const selectAllowPublishWorkflows = createConfigSelector((config) => config.allowPublishWorkflows);
 export const selectIsLocal = createSelector(selectConfigSlice, (config) => config.isLocal);
 export const selectShouldShowCredits = createConfigSelector((config) => config.shouldShowCredits);
+export const selectEnabledTabs = createConfigSelector((config) => {
+  const enabledTabs: TabName[] = [];
+  for (const tab of ALL_TABS) {
+    if (!config.disabledTabs.includes(tab)) {
+      enabledTabs.push(tab);
+    }
+  }
+  return enabledTabs;
+});

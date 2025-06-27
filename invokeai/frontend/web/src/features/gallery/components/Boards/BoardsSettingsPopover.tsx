@@ -1,12 +1,14 @@
 import {
-  Box,
   Divider,
   Flex,
   IconButton,
   Popover,
+  PopoverArrow,
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
+  Portal,
+  Text,
 } from '@invoke-ai/ui-library';
 import BoardAutoAddSelect from 'features/gallery/components/Boards/BoardAutoAddSelect';
 import AutoAssignBoardCheckbox from 'features/gallery/components/GallerySettingsPopover/AutoAssignBoardCheckbox';
@@ -17,7 +19,7 @@ import { PiGearSixFill } from 'react-icons/pi';
 
 import { BoardsListSortControls } from './BoardsListSortControls';
 
-const BoardsSettingsPopover = () => {
+export const BoardsSettingsPopover = memo(() => {
   const { t } = useTranslation();
 
   return (
@@ -32,22 +34,29 @@ const BoardsSettingsPopover = () => {
           tooltip={t('gallery.boardsSettings')}
         />
       </PopoverTrigger>
-      <PopoverContent>
-        <PopoverBody>
-          <Flex direction="column" gap={2}>
-            <AutoAssignBoardCheckbox />
-            <ShowArchivedBoardsCheckbox />
-            <BoardAutoAddSelect />
-            <Box py={2}>
-              <Divider />
-            </Box>
+      <Portal>
+        <PopoverContent>
+          <PopoverArrow />
+          <PopoverBody>
+            <Flex direction="column" gap={2}>
+              <Text fontWeight="semibold" color="base.300">
+                Boards Settings
+              </Text>
 
-            <BoardsListSortControls />
-          </Flex>
-        </PopoverBody>
-      </PopoverContent>
+              <Divider />
+
+              <AutoAssignBoardCheckbox />
+              <ShowArchivedBoardsCheckbox />
+              <BoardAutoAddSelect />
+
+              <Divider />
+
+              <BoardsListSortControls />
+            </Flex>
+          </PopoverBody>
+        </PopoverContent>
+      </Portal>
     </Popover>
   );
-};
-
-export default memo(BoardsSettingsPopover);
+});
+BoardsSettingsPopover.displayName = 'BoardsSettingsPopover';

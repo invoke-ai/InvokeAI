@@ -78,11 +78,12 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('app', 'invokeFront', ['mod+shift+enter']);
     addHotkey('app', 'cancelQueueItem', ['shift+x']);
     addHotkey('app', 'clearQueue', ['mod+shift+x']);
-    addHotkey('app', 'selectCanvasTab', ['1']);
-    addHotkey('app', 'selectUpscalingTab', ['2']);
-    addHotkey('app', 'selectWorkflowsTab', ['3']);
-    addHotkey('app', 'selectModelsTab', ['4'], isModelManagerEnabled);
-    addHotkey('app', 'selectQueueTab', isModelManagerEnabled ? ['5'] : ['4']);
+    addHotkey('app', 'selectGenerateTab', ['1']);
+    addHotkey('app', 'selectCanvasTab', ['2']);
+    addHotkey('app', 'selectUpscalingTab', ['3']);
+    addHotkey('app', 'selectWorkflowsTab', ['4']);
+    addHotkey('app', 'selectModelsTab', ['5'], isModelManagerEnabled);
+    addHotkey('app', 'selectQueueTab', isModelManagerEnabled ? ['6'] : ['5']);
     addHotkey('app', 'focusPrompt', ['alt+a']);
     addHotkey('app', 'toggleLeftPanel', ['t', 'o']);
     addHotkey('app', 'toggleRightPanel', ['g']);
@@ -121,6 +122,7 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('canvas', 'cancelTransform', ['esc']);
     addHotkey('canvas', 'applySegmentAnything', ['enter']);
     addHotkey('canvas', 'cancelSegmentAnything', ['esc']);
+    addHotkey('canvas', 'toggleNonRasterLayers', ['shift+h']);
 
     // Workflows
     addHotkey('workflows', 'addNode', ['shift+a', 'space']);

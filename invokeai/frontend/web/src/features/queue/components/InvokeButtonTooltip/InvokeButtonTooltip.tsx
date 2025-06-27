@@ -2,7 +2,7 @@ import type { TooltipProps } from '@invoke-ai/ui-library';
 import { Divider, Flex, ListItem, Text, Tooltip, UnorderedList } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectSendToCanvas } from 'features/controlLayers/store/canvasSettingsSlice';
+import { debounce } from 'es-toolkit/compat';
 import { selectIterations } from 'features/controlLayers/store/paramsSlice';
 import { selectDynamicPromptsIsLoading } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
@@ -14,7 +14,6 @@ import { getBatchSize } from 'features/nodes/util/node/resolveBatchValue';
 import type { Reason } from 'features/queue/store/readiness';
 import { $isReadyToEnqueue, $reasonsWhyCannotEnqueue, selectPromptsCount } from 'features/queue/store/readiness';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import { debounce } from 'lodash-es';
 import type { PropsWithChildren } from 'react';
 import { memo, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -36,7 +35,7 @@ export const InvokeButtonTooltip = ({ prepend, children, ...rest }: PropsWithChi
 const TooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
   const activeTab = useAppSelector(selectActiveTab);
 
-  if (activeTab === 'canvas') {
+  if (activeTab === 'canvas' || activeTab === 'generate') {
     return <CanvasTabTooltipContent prepend={prepend} />;
   }
 
@@ -237,32 +236,14 @@ StyledDivider.displayName = 'StyledDivider';
 
 const AddingToText = memo(() => {
   const { t } = useTranslation();
-  const sendToCanvas = useAppSelector(selectSendToCanvas);
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const autoAddBoardName = useBoardName(autoAddBoardId);
 
-  const addingTo = useMemo(() => {
-    if (sendToCanvas) {
-      return t('controlLayers.stagingOnCanvas');
-    }
-    return t('parameters.invoke.addingImagesTo');
-  }, [sendToCanvas, t]);
-
-  const destination = useMemo(() => {
-    if (sendToCanvas) {
-      return t('queue.canvas');
-    }
-    if (autoAddBoardName) {
-      return autoAddBoardName;
-    }
-    return t('boards.uncategorized');
-  }, [autoAddBoardName, sendToCanvas, t]);
-
   return (
     <Text fontStyle="oblique 10deg">
-      {addingTo}{' '}
+      {t('parameters.invoke.addingImagesTo')}{' '}
       <Text as="span" fontWeight="semibold">
-        {destination}
+        {autoAddBoardName || t('boards.uncategorized')}
       </Text>
     </Text>
   );

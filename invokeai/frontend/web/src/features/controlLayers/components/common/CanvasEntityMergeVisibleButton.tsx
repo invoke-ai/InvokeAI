@@ -2,13 +2,13 @@ import { IconButton } from '@invoke-ai/ui-library';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useVisibleEntityCountByType } from 'features/controlLayers/hooks/useVisibleEntityCountByType';
-import type { CanvasRenderableEntityType } from 'features/controlLayers/store/types';
+import type { CanvasEntityType } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiStackBold } from 'react-icons/pi';
 
 type Props = {
-  type: CanvasRenderableEntityType;
+  type: CanvasEntityType;
 };
 
 export const CanvasEntityMergeVisibleButton = memo(({ type }: Props) => {

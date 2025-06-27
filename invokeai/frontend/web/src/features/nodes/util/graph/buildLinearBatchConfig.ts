@@ -2,11 +2,11 @@ import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
 import type { RootState } from 'app/store/store';
 import { generateSeeds } from 'common/util/generateSeeds';
 import randomInt from 'common/util/randomInt';
+import { range } from 'es-toolkit/compat';
 import type { SeedBehaviour } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { range } from 'lodash-es';
 import type { components } from 'services/api/schema';
 import type { Batch, EnqueueBatchArg } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -33,8 +33,8 @@ export const prepareLinearUIBatch = (arg: {
   prepend: boolean;
   seedFieldIdentifier?: FieldIdentifier;
   positivePromptFieldIdentifier: FieldIdentifier;
-  origin: 'canvas' | 'workflows' | 'upscaling';
-  destination: 'canvas' | 'gallery';
+  origin: string;
+  destination: string;
 }): EnqueueBatchArg => {
   const { state, g, prepend, seedFieldIdentifier, positivePromptFieldIdentifier, origin, destination } = arg;
   const { iterations, model, shouldRandomizeSeed, seed, shouldConcatPrompts } = state.params;

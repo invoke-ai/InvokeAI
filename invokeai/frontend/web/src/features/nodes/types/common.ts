@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 import type { ModelIdentifier as ModelIdentifierV2 } from './v2/common';
 import { zModelIdentifier as zModelIdentifierV2 } from './v2/common';
@@ -93,7 +93,7 @@ export const zMainModelBase = z.enum([
   'chatgpt-4o',
   'flux-kontext',
 ]);
-export type MainModelBase = z.infer<typeof zMainModelBase>;
+type MainModelBase = z.infer<typeof zMainModelBase>;
 export const isMainModelBase = (base: unknown): base is MainModelBase => zMainModelBase.safeParse(base).success;
 const zModelType = z.enum([
   'main',

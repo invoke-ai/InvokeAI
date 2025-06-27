@@ -8,6 +8,7 @@ import { $bulkDownloadId } from 'app/store/nanostores/bulkDownloadId';
 import { $queueId } from 'app/store/nanostores/queueId';
 import type { AppStore } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
+import { forEach, isNil, round } from 'es-toolkit/compat';
 import {
   $isInPublishFlow,
   $outputNodeId,
@@ -18,11 +19,10 @@ import { zNodeStatus } from 'features/nodes/types/invocation';
 import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { forEach, isNil, round } from 'lodash-es';
 import type { ApiTagDescription } from 'services/api';
-import { api, LIST_TAG } from 'services/api';
+import { api, LIST_ALL_TAG, LIST_TAG } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
-import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
+import { queueApi } from 'services/api/endpoints/queue';
 import { workflowsApi } from 'services/api/endpoints/workflows';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import { buildOnModelInstallError } from 'services/events/onModelInstallError';
@@ -30,7 +30,13 @@ import type { ClientToServerEvents, ServerToClientEvents } from 'services/events
 import type { Socket } from 'socket.io-client';
 import type { JsonObject } from 'type-fest';
 
-import { $lastProgressEvent } from './stores';
+import {
+  $lastProgressEvent,
+  $lastUpscalingProgressEvent,
+  $lastUpscalingProgressImage,
+  $lastWorkflowsProgressEvent,
+  $lastWorkflowsProgressImage,
+} from './stores';
 
 const log = logger('events');
 
@@ -92,7 +98,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('invocation_progress', (data) => {
-    const { invocation_source_id, invocation, image, origin, percentage, message } = data;
+    const { invocation_source_id, invocation, session_id, image, origin, percentage, message } = data;
 
     let _message = 'Invocation progress';
     if (message) {
@@ -107,7 +113,20 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
     $lastProgressEvent.set(data);
 
+    if (origin === 'upscaling') {
+      $lastUpscalingProgressEvent.set(data);
+      if (image) {
+        $lastUpscalingProgressImage.set({ sessionId: session_id, image });
+      }
+    }
+
     if (origin === 'workflows') {
+      $lastWorkflowsProgressEvent.set(data);
+
+      if (image) {
+        $lastWorkflowsProgressImage.set({ sessionId: session_id, image });
+      }
+
       const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
       if (nes) {
         nes.status = zNodeStatus.enum.IN_PROGRESS;
@@ -324,67 +343,20 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
   socket.on('queue_item_status_changed', (data) => {
     // we've got new status for the queue item, batch and queue
-    const {
-      item_id,
-      session_id,
-      status,
-      started_at,
-      updated_at,
-      completed_at,
-      batch_status,
-      queue_status,
-      error_type,
-      error_message,
-      error_traceback,
-      destination,
-      credits,
-    } = data;
+    const { item_id, session_id, status, batch_status, error_type, error_message, destination } = data;
 
     log.debug({ data }, `Queue item ${item_id} status updated: ${status}`);
 
-    // Update this specific queue item in the list of queue items (this is the queue item DTO, without the session)
-    dispatch(
-      queueApi.util.updateQueryData('listQueueItems', undefined, (draft) => {
-        queueItemsAdapter.updateOne(draft, {
-          id: String(item_id),
-          changes: {
-            status,
-            started_at,
-            updated_at: updated_at ?? undefined,
-            completed_at: completed_at ?? undefined,
-            error_type,
-            error_message,
-            error_traceback,
-            credits,
-          },
-        });
-      })
-    );
-
-    // Optimistic update of the queue status. We prefer to do an optimistic update over tag invalidation due to the
-    // frequency of `queue_item_status_changed` events.
-    dispatch(
-      queueApi.util.updateQueryData('getQueueStatus', undefined, (draft) => {
-        if (!draft) {
-          return;
-        }
-        /**
-         * Update the queue status - though the getQueueStatus query response contains the processor status (i.e. running
-         * or paused), that data is not provided in the event we are handling. So we can only update `draft.queue` here.
-         */
-        Object.assign(draft.queue, queue_status);
-      })
-    );
-
-    // Update the batch status
-    dispatch(queueApi.util.updateQueryData('getBatchStatus', { batch_id: batch_status.batch_id }, () => batch_status));
-
     // Invalidate caches for things we cannot easily update
     const tagsToInvalidate: ApiTagDescription[] = [
+      'SessionQueueStatus',
       'CurrentSessionQueueItem',
       'NextSessionQueueItem',
       'InvocationCacheStatus',
       { type: 'SessionQueueItem', id: item_id },
+      { type: 'SessionQueueItem', id: LIST_TAG },
+      { type: 'SessionQueueItem', id: LIST_ALL_TAG },
+      { type: 'BatchStatus', id: batch_status.batch_id },
     ];
     if (destination) {
       tagsToInvalidate.push({ type: 'QueueCountsByDestination', id: destination });
@@ -404,6 +376,10 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         clone.outputs = [];
         $nodeExecutionStates.setKey(clone.nodeId, clone);
       });
+      if (data.origin === 'canvas') {
+        // store.dispatch(stagingAreaGenerationStarted({ sessionId: session_id }));
+        // $progressImages.setKey(session_id, { sessionId: session_id, isFinished: false });
+      }
     } else if (status === 'completed' || status === 'failed' || status === 'canceled') {
       if (status === 'failed' && error_type) {
         const isLocal = getState().config.isLocal ?? true;
@@ -427,6 +403,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       }
       // If the queue item is completed, failed, or cancelled, we want to clear the last progress event
       $lastProgressEvent.set(null);
+      // $progressImages.setKey(session_id, undefined);
 
       // When a validation run is completed, we want to clear the validation run batch ID & set the workflow as published
       const validationRunData = $validationRunData.get();

@@ -752,6 +752,46 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/images/names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Image Names
+         * @description Gets ordered list of image names with metadata for optimistic updates
+         */
+        get: operations["get_image_names"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/images/images_by_names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Images By Names
+         * @description Gets image DTOs for the specified image names. Maintains order of input names.
+         */
+        post: operations["get_images_by_names"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/boards/": {
         parameters: {
             query?: never;
@@ -1153,9 +1193,29 @@ export type paths = {
         };
         /**
          * List Queue Items
-         * @description Gets all queue items (without graphs)
+         * @description Gets cursor-paginated queue items
          */
         get: operations["list_queue_items"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/{queue_id}/list_all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List All Queue Items
+         * @description Gets all queue items
+         */
+        get: operations["list_all_queue_items"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1217,6 +1277,26 @@ export type paths = {
          * @description Immediately cancels all queue items except in-processing items
          */
         put: operations["cancel_all_except_current"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/{queue_id}/delete_all_except_current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Delete All Except Current
+         * @description Immediately deletes all queue items except in-processing items
+         */
+        put: operations["delete_all_except_current"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1418,7 +1498,11 @@ export type paths = {
         get: operations["get_queue_item"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Queue Item
+         * @description Deletes a queue item
+         */
+        delete: operations["delete_queue_item"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1459,6 +1543,26 @@ export type paths = {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/{queue_id}/d/{destination}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete By Destination
+         * @description Deletes all items with the given destination
+         */
+        delete: operations["delete_by_destination"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1717,15 +1821,15 @@ export type components = {
         /** AddImagesToBoardResult */
         AddImagesToBoardResult: {
             /**
-             * Board Id
-             * @description The id of the board the images were added to
+             * Affected Boards
+             * @description The ids of boards affected by the delete operation
              */
-            board_id: string;
+            affected_boards: string[];
             /**
-             * Added Image Names
+             * Added Images
              * @description The image names that were added to the board
              */
-            added_image_names: string[];
+            added_images: string[];
         };
         /**
          * Add Integers
@@ -2563,6 +2667,14 @@ export type components = {
             prepend?: boolean;
             /** @description The validation run data to use for this batch. This is only used if this is a validation run. */
             validation_run_data?: components["schemas"]["ValidationRunData"] | null;
+        };
+        /** Body_get_images_by_names */
+        Body_get_images_by_names: {
+            /**
+             * Image Names
+             * @description Object containing list of image names to fetch DTOs for
+             */
+            image_names: string[];
         };
         /** Body_import_style_presets */
         Body_import_style_presets: {
@@ -5715,8 +5827,8 @@ export type components = {
              */
             type: "crop_latents";
         };
-        /** CursorPaginatedResults[SessionQueueItemDTO] */
-        CursorPaginatedResults_SessionQueueItemDTO_: {
+        /** CursorPaginatedResults[SessionQueueItem] */
+        CursorPaginatedResults_SessionQueueItem_: {
             /**
              * Limit
              * @description Limit of items to get
@@ -5731,7 +5843,7 @@ export type components = {
              * Items
              * @description Items
              */
-            items: components["schemas"]["SessionQueueItemDTO"][];
+            items: components["schemas"]["SessionQueueItem"][];
         };
         /**
          * OpenCV Inpaint
@@ -5841,6 +5953,17 @@ export type components = {
              */
             type: "dw_openpose_detection";
         };
+        /**
+         * DeleteAllExceptCurrentResult
+         * @description Result of deleting all except current
+         */
+        DeleteAllExceptCurrentResult: {
+            /**
+             * Deleted
+             * @description Number of queue items deleted
+             */
+            deleted: number;
+        };
         /** DeleteBoardResult */
         DeleteBoardResult: {
             /**
@@ -5859,9 +5982,28 @@ export type components = {
              */
             deleted_images: string[];
         };
-        /** DeleteImagesFromListResult */
-        DeleteImagesFromListResult: {
-            /** Deleted Images */
+        /**
+         * DeleteByDestinationResult
+         * @description Result of deleting by a destination
+         */
+        DeleteByDestinationResult: {
+            /**
+             * Deleted
+             * @description Number of queue items deleted
+             */
+            deleted: number;
+        };
+        /** DeleteImagesResult */
+        DeleteImagesResult: {
+            /**
+             * Affected Boards
+             * @description The ids of boards affected by the delete operation
+             */
+            affected_boards: string[];
+            /**
+             * Deleted Images
+             * @description The names of the images that were deleted
+             */
             deleted_images: string[];
         };
         /**
@@ -8742,47 +8884,47 @@ export type components = {
              * Id
              * @description The id of the execution state
              */
-            id?: string;
+            id: string;
             /** @description The graph being executed */
             graph: components["schemas"]["Graph"];
             /** @description The expanded graph of activated and executed nodes */
-            execution_graph?: components["schemas"]["Graph"];
+            execution_graph: components["schemas"]["Graph"];
             /**
              * Executed
              * @description The set of node ids that have been executed
              */
-            executed?: string[];
+            executed: string[];
             /**
              * Executed History
              * @description The list of node ids that have been executed, in order of execution
              */
-            executed_history?: string[];
+            executed_history: string[];
             /**
              * Results
              * @description The results of node executions
              */
-            results?: {
+            results: {
                 [key: string]: components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["BoundingBoxCollectionOutput"] | components["schemas"]["BoundingBoxOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["CogView4ConditioningOutput"] | components["schemas"]["CogView4ModelLoaderOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["FloatGeneratorOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["FluxConditioningOutput"] | components["schemas"]["FluxControlLoRALoaderOutput"] | components["schemas"]["FluxControlNetOutput"] | components["schemas"]["FluxFillOutput"] | components["schemas"]["FluxLoRALoaderOutput"] | components["schemas"]["FluxModelLoaderOutput"] | components["schemas"]["FluxReduxOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ImageGeneratorOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ImagePanelCoordinateOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IntegerGeneratorOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["LatentsMetaOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["MDControlListOutput"] | components["schemas"]["MDIPAdapterListOutput"] | components["schemas"]["MDT2IAdapterListOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["MetadataToLorasCollectionOutput"] | components["schemas"]["MetadataToModelOutput"] | components["schemas"]["MetadataToSDXLModelOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["SD3ConditioningOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["Sd3ModelLoaderOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["String2Output"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringGeneratorOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["VAEOutput"];
             };
             /**
              * Errors
              * @description Errors raised when executing nodes
              */
-            errors?: {
+            errors: {
                 [key: string]: string;
             };
             /**
              * Prepared Source Mapping
              * @description The map of prepared nodes to original graph nodes
              */
-            prepared_source_mapping?: {
+            prepared_source_mapping: {
                 [key: string]: string;
             };
             /**
              * Source Prepared Mapping
              * @description The map of original graph nodes to prepared nodes
              */
-            source_prepared_mapping?: {
+            source_prepared_mapping: {
                 [key: string]: string[];
             };
         };
@@ -10366,6 +10508,27 @@ export type components = {
             type: "img_nsfw";
         };
         /**
+         * ImageNamesResult
+         * @description Response containing ordered image names with metadata for optimistic updates.
+         */
+        ImageNamesResult: {
+            /**
+             * Image Names
+             * @description Ordered list of image names
+             */
+            image_names: string[];
+            /**
+             * Starred Count
+             * @description Number of starred images (when starred_first=True)
+             */
+            starred_count: number;
+            /**
+             * Total Count
+             * @description Total number of images matching the query
+             */
+            total_count: number;
+        };
+        /**
          * Add Image Noise
          * @description Add noise to an image
          */
@@ -10937,14 +11100,6 @@ export type components = {
              * @description The name of the bulk download item for which events will be emitted
              */
             bulk_download_item_name?: string | null;
-        };
-        /** ImagesUpdatedFromListResult */
-        ImagesUpdatedFromListResult: {
-            /**
-             * Updated Image Names
-             * @description The image names that were updated
-             */
-            updated_image_names: string[];
         };
         /**
          * Solid Color Infill
@@ -17798,10 +17953,15 @@ export type components = {
         /** RemoveImagesFromBoardResult */
         RemoveImagesFromBoardResult: {
             /**
-             * Removed Image Names
+             * Affected Boards
+             * @description The ids of boards affected by the delete operation
+             */
+            affected_boards: string[];
+            /**
+             * Removed Images
              * @description The image names that were removed from their board
              */
-            removed_image_names: string[];
+            removed_images: string[];
         };
         /**
          * Resize Latents
@@ -19117,7 +19277,10 @@ export type components = {
              */
             total: number;
         };
-        /** SessionQueueItem */
+        /**
+         * SessionQueueItem
+         * @description Session queue item without the full graph. Used for serialization.
+         */
         SessionQueueItem: {
             /**
              * Item Id
@@ -19219,16 +19382,6 @@ export type components = {
              */
             published_workflow_id?: string | null;
             /**
-             * Api Input Fields
-             * @description The fields that were used as input to the API
-             */
-            api_input_fields?: components["schemas"]["FieldIdentifier"][] | null;
-            /**
-             * Api Output Fields
-             * @description The nodes that were used as output from the API
-             */
-            api_output_fields?: components["schemas"]["FieldIdentifier"][] | null;
-            /**
              * Credits
              * @description The total credits used for this queue item
              */
@@ -19237,123 +19390,6 @@ export type components = {
             session: components["schemas"]["GraphExecutionState"];
             /** @description The workflow associated with this queue item */
             workflow?: components["schemas"]["WorkflowWithoutID"] | null;
-        };
-        /** SessionQueueItemDTO */
-        SessionQueueItemDTO: {
-            /**
-             * Item Id
-             * @description The identifier of the session queue item
-             */
-            item_id: number;
-            /**
-             * Status
-             * @description The status of this queue item
-             * @default pending
-             * @enum {string}
-             */
-            status: "pending" | "in_progress" | "completed" | "failed" | "canceled";
-            /**
-             * Priority
-             * @description The priority of this queue item
-             * @default 0
-             */
-            priority: number;
-            /**
-             * Batch Id
-             * @description The ID of the batch associated with this queue item
-             */
-            batch_id: string;
-            /**
-             * Origin
-             * @description The origin of this queue item. This data is used by the frontend to determine how to handle results.
-             */
-            origin?: string | null;
-            /**
-             * Destination
-             * @description The origin of this queue item. This data is used by the frontend to determine how to handle results
-             */
-            destination?: string | null;
-            /**
-             * Session Id
-             * @description The ID of the session associated with this queue item. The session doesn't exist in graph_executions until the queue item is executed.
-             */
-            session_id: string;
-            /**
-             * Error Type
-             * @description The error type if this queue item errored
-             */
-            error_type?: string | null;
-            /**
-             * Error Message
-             * @description The error message if this queue item errored
-             */
-            error_message?: string | null;
-            /**
-             * Error Traceback
-             * @description The error traceback if this queue item errored
-             */
-            error_traceback?: string | null;
-            /**
-             * Created At
-             * @description When this queue item was created
-             */
-            created_at: string;
-            /**
-             * Updated At
-             * @description When this queue item was updated
-             */
-            updated_at: string;
-            /**
-             * Started At
-             * @description When this queue item was started
-             */
-            started_at?: string | null;
-            /**
-             * Completed At
-             * @description When this queue item was completed
-             */
-            completed_at?: string | null;
-            /**
-             * Queue Id
-             * @description The id of the queue with which this item is associated
-             */
-            queue_id: string;
-            /**
-             * Field Values
-             * @description The field values that were used for this queue item
-             */
-            field_values?: components["schemas"]["NodeFieldValue"][] | null;
-            /**
-             * Retried From Item Id
-             * @description The item_id of the queue item that this item was retried from
-             */
-            retried_from_item_id?: number | null;
-            /**
-             * Is Api Validation Run
-             * @description Whether this queue item is an API validation run.
-             * @default false
-             */
-            is_api_validation_run?: boolean;
-            /**
-             * Published Workflow Id
-             * @description The ID of the published workflow associated with this queue item
-             */
-            published_workflow_id?: string | null;
-            /**
-             * Api Input Fields
-             * @description The fields that were used as input to the API
-             */
-            api_input_fields?: components["schemas"]["FieldIdentifier"][] | null;
-            /**
-             * Api Output Fields
-             * @description The nodes that were used as output from the API
-             */
-            api_output_fields?: components["schemas"]["FieldIdentifier"][] | null;
-            /**
-             * Credits
-             * @description The total credits used for this queue item
-             */
-            credits?: number | null;
         };
         /** SessionQueueStatus */
         SessionQueueStatus: {
@@ -19726,6 +19762,19 @@ export type components = {
              */
             type: "spandrel_image_to_image";
         };
+        /** StarredImagesResult */
+        StarredImagesResult: {
+            /**
+             * Affected Boards
+             * @description The ids of boards affected by the delete operation
+             */
+            affected_boards: string[];
+            /**
+             * Starred Images
+             * @description The names of the images that were starred
+             */
+            starred_images: string[];
+        };
         /** StarterModel */
         StarterModel: {
             /** Description */
@@ -19750,13 +19799,20 @@ export type components = {
             /** Dependencies */
             dependencies?: components["schemas"]["StarterModelWithoutDependencies"][] | null;
         };
+        /** StarterModelBundle */
+        StarterModelBundle: {
+            /** Name */
+            name: string;
+            /** Models */
+            models: components["schemas"]["StarterModel"][];
+        };
         /** StarterModelResponse */
         StarterModelResponse: {
             /** Starter Models */
             starter_models: components["schemas"]["StarterModel"][];
             /** Starter Bundles */
             starter_bundles: {
-                [key: string]: components["schemas"]["StarterModel"][];
+                [key: string]: components["schemas"]["StarterModelBundle"];
             };
         };
         /** StarterModelWithoutDependencies */
@@ -21330,6 +21386,19 @@ export type components = {
              * @constant
              */
             type: "unsharp_mask";
+        };
+        /** UnstarredImagesResult */
+        UnstarredImagesResult: {
+            /**
+             * Affected Boards
+             * @description The ids of boards affected by the delete operation
+             */
+            affected_boards: string[];
+            /**
+             * Unstarred Images
+             * @description The names of the images that were unstarred
+             */
+            unstarred_images: string[];
         };
         /** Upscaler */
         Upscaler: {
@@ -23188,7 +23257,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["DeleteImagesResult"];
                 };
             };
             /** @description Validation Error */
@@ -23510,7 +23579,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeleteImagesFromListResult"];
+                    "application/json": components["schemas"]["DeleteImagesResult"];
                 };
             };
             /** @description Validation Error */
@@ -23539,7 +23608,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeleteImagesFromListResult"];
+                    "application/json": components["schemas"]["DeleteImagesResult"];
                 };
             };
         };
@@ -23563,7 +23632,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ImagesUpdatedFromListResult"];
+                    "application/json": components["schemas"]["StarredImagesResult"];
                 };
             };
             /** @description Validation Error */
@@ -23596,7 +23665,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ImagesUpdatedFromListResult"];
+                    "application/json": components["schemas"]["UnstarredImagesResult"];
                 };
             };
             /** @description Validation Error */
@@ -23670,6 +23739,83 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_image_names: {
+        parameters: {
+            query?: {
+                /** @description The origin of images to list. */
+                image_origin?: components["schemas"]["ResourceOrigin"] | null;
+                /** @description The categories of image to include. */
+                categories?: components["schemas"]["ImageCategory"][] | null;
+                /** @description Whether to list intermediate images. */
+                is_intermediate?: boolean | null;
+                /** @description The board id to filter by. Use 'none' to find images without a board. */
+                board_id?: string | null;
+                /** @description The order of sort */
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                /** @description Whether to sort by starred images first */
+                starred_first?: boolean;
+                /** @description The term to search for */
+                search_term?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageNamesResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_images_by_names: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_get_images_by_names"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageDTO"][];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -23917,7 +24063,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AddImagesToBoardResult"];
                 };
             };
             /** @description Validation Error */
@@ -23950,7 +24096,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["RemoveImagesFromBoardResult"];
                 };
             };
             /** @description Validation Error */
@@ -24476,6 +24622,8 @@ export interface operations {
                 cursor?: number | null;
                 /** @description The pagination cursor priority */
                 priority?: number;
+                /** @description The destination of queue items to fetch */
+                destination?: string | null;
             };
             header?: never;
             path: {
@@ -24492,7 +24640,42 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CursorPaginatedResults_SessionQueueItemDTO_"];
+                    "application/json": components["schemas"]["CursorPaginatedResults_SessionQueueItem_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_all_queue_items: {
+        parameters: {
+            query?: {
+                /** @description The destination of queue items to fetch */
+                destination?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionQueueItem"][];
                 };
             };
             /** @description Validation Error */
@@ -24589,6 +24772,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CancelAllExceptCurrentResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_all_except_current: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteAllExceptCurrentResult"];
                 };
             };
             /** @description Validation Error */
@@ -24937,6 +25152,40 @@ export interface operations {
             };
         };
     };
+    delete_queue_item: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+                /** @description The queue item to delete */
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     cancel_queue_item: {
         parameters: {
             query?: never;
@@ -24993,6 +25242,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionQueueCountsByDestination"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_by_destination: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The queue id to query */
+                queue_id: string;
+                /** @description The destination to query */
+                destination: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteByDestinationResult"];
                 };
             };
             /** @description Validation Error */

@@ -15,9 +15,9 @@ import {
 } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { merge, omit } from 'es-toolkit/compat';
 import { selectSystemSlice, setShouldEnableInformationalPopovers } from 'features/system/store/systemSlice';
 import { toast } from 'features/toast/toast';
-import { merge, omit } from 'lodash-es';
 import type { ReactElement } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

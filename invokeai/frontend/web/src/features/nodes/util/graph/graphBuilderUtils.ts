@@ -1,14 +1,16 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import { type ParamsState, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
-import type { CanvasState } from 'features/controlLayers/store/types';
+import { pick } from 'es-toolkit/compat';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import type { CanvasState, ParamsState } from 'features/controlLayers/store/types';
 import type { BoardField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { buildPresetModifiedPrompt } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
 import { selectStylePresetSlice } from 'features/stylePresets/store/stylePresetSlice';
-import { pick } from 'lodash-es';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { selectListStylePresetsRequestState } from 'services/api/endpoints/stylePresets';
-import type { Invocation } from 'services/api/types';
+import type { Invocation, S } from 'services/api/types';
 import { assert } from 'tsafe';
 
 import type { MainModelLoaderNodes } from './types';
@@ -25,6 +27,28 @@ export const getBoardField = (state: RootState): BoardField | undefined => {
 };
 
 /**
+ * Builds the common fields for canvas output:
+ * - id
+ * - use_cache
+ * - is_intermediate
+ * - board
+ */
+export const selectCanvasOutputFields = (state: RootState) => {
+  // Advanced session means working on canvas - images are not saved to gallery or added to a board.
+  // Simple session means working in YOLO mode - images are saved to gallery & board.
+  const tab = selectActiveTab(state);
+  const is_intermediate = tab === 'canvas';
+  const board = tab === 'canvas' ? undefined : getBoardField(state);
+
+  return {
+    is_intermediate,
+    board,
+    use_cache: false,
+    id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
+  };
+};
+
+/**
  * Gets the prompts, modified for the active style preset.
  */
 export const selectPresetModifiedPrompts = createSelector(
@@ -32,7 +56,8 @@ export const selectPresetModifiedPrompts = createSelector(
   selectStylePresetSlice,
   selectListStylePresetsRequestState,
   (params, stylePresetSlice, listStylePresetsRequestState) => {
-    const { positivePrompt, negativePrompt, positivePrompt2, negativePrompt2, shouldConcatPrompts } = params;
+    const negativePrompt = params.negativePrompt ?? '';
+    const { positivePrompt, positivePrompt2, negativePrompt2, shouldConcatPrompts } = params;
     const { activeStylePresetId } = stylePresetSlice;
 
     if (activeStylePresetId) {
@@ -48,7 +73,7 @@ export const selectPresetModifiedPrompts = createSelector(
 
         const presetModifiedNegativePrompt = buildPresetModifiedPrompt(
           activeStylePreset.preset_data.negative_prompt,
-          negativePrompt
+          negativePrompt ?? ''
         );
 
         return {
@@ -125,7 +150,7 @@ export const getInfill = (
   assert(false, 'Unknown infill method');
 };
 
-export const CANVAS_OUTPUT_PREFIX = 'canvas_output';
+const CANVAS_OUTPUT_PREFIX = 'canvas_output';
 
 export const isMainModelWithoutUnet = (modelLoader: Invocation<MainModelLoaderNodes>) => {
   return (
@@ -133,4 +158,10 @@ export const isMainModelWithoutUnet = (modelLoader: Invocation<MainModelLoaderNo
     modelLoader.type === 'sd3_model_loader' ||
     modelLoader.type === 'cogview4_model_loader'
   );
+};
+
+export const isCanvasOutputNodeId = (nodeId: string) => nodeId.split(':')[0] === CANVAS_OUTPUT_PREFIX;
+
+export const isCanvasOutputEvent = (data: S['InvocationCompleteEvent']) => {
+  return isCanvasOutputNodeId(data.invocation_source_id);
 };

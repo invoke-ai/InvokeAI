@@ -1,6 +1,7 @@
 import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
 import { objectKeys } from 'common/util/objectKeys';
+import { size } from 'es-toolkit/compat';
 import { shouldConcatPromptsChanged } from 'features/controlLayers/store/paramsSlice';
 import type { LoRA } from 'features/controlLayers/store/types';
 import type {
@@ -17,7 +18,6 @@ import { validators } from 'features/metadata/util/validators';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { size } from 'lodash-es';
 
 import { parsers } from './parsers';
 import { recallers } from './recallers';

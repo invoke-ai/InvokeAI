@@ -1,3 +1,4 @@
+import { omit } from 'es-toolkit/compat';
 import { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterBase';
 import { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityBufferObjectRenderer';
 import { CanvasEntityFilterer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityFilterer';
@@ -7,7 +8,6 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasSegmentAnythingModule } from 'features/controlLayers/konva/CanvasSegmentAnythingModule';
 import type { CanvasControlLayerState, CanvasEntityIdentifier, Rect } from 'features/controlLayers/store/types';
 import type { GroupConfig } from 'konva/lib/Group';
-import { omit } from 'lodash-es';
 import type { JsonObject } from 'type-fest';
 
 export class CanvasEntityAdapterControlLayer extends CanvasEntityAdapterBase<

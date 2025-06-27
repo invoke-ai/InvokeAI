@@ -1,6 +1,6 @@
 import { Handle, Position } from '@xyflow/react';
+import { map } from 'es-toolkit/compat';
 import { useNodeTemplateOrThrow } from 'features/nodes/hooks/useNodeTemplateOrThrow';
-import { map } from 'lodash-es';
 import type { CSSProperties } from 'react';
 import { memo } from 'react';
 

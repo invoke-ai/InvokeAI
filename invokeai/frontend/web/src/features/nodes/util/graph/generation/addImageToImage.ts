@@ -1,3 +1,4 @@
+import { objectEquals } from '@observ33r/object-equals';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasState, Dimensions } from 'features/controlLayers/store/types';
@@ -8,7 +9,6 @@ import type {
   MainModelLoaderNodes,
   VaeSourceNodes,
 } from 'features/nodes/util/graph/types';
-import { isEqual } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
 
 type AddImageToImageArg = {
@@ -45,7 +45,7 @@ export const addImageToImage = async ({
     silent: true,
   });
 
-  if (!isEqual(scaledSize, originalSize)) {
+  if (!objectEquals(scaledSize, originalSize)) {
     // Resize the initial image to the scaled size, denoise, then resize back to the original size
     const resizeImageToScaledSize = g.addNode({
       type: 'img_resize',

@@ -1,29 +1,36 @@
 import { logger } from 'app/logging/logger';
-import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { useAppDispatch, useAppStore } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
 import { withResultAsync } from 'common/util/result';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { selectDefaultIPAdapter, selectDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
+import {
+  getDefaultRefImageConfig,
+  getDefaultRegionalGuidanceRefImageConfig,
+} from 'features/controlLayers/hooks/addLayerHooks';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   controlLayerAdded,
   entityRasterized,
   rasterLayerAdded,
-  referenceImageAdded,
-  referenceImageIPAdapterImageChanged,
   rgAdded,
-  rgIPAdapterImageChanged,
+  rgRefImageImageChanged,
 } from 'features/controlLayers/store/canvasSlice';
-import { selectNegativePrompt, selectPositivePrompt, selectSeed } from 'features/controlLayers/store/paramsSlice';
+import {
+  selectMainModelConfig,
+  selectNegativePrompt,
+  selectPositivePrompt,
+  selectSeed,
+} from 'features/controlLayers/store/paramsSlice';
+import { refImageAdded, refImageImageChanged } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
   CanvasEntityIdentifier,
   CanvasRasterLayerState,
-  CanvasReferenceImageState,
   CanvasRegionalGuidanceState,
   Rect,
-  RegionalGuidanceReferenceImageState,
+  RefImageState,
+  RegionalGuidanceRefImageState,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject, imageDTOToImageWithDims, initialControlNet } from 'features/controlLayers/store/util';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
@@ -33,7 +40,6 @@ import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { serializeError } from 'serialize-error';
-import { selectMainModelConfig } from 'services/api/endpoints/models';
 import type { ImageDTO } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
@@ -164,15 +170,14 @@ export const useSaveBboxToGallery = () => {
 
 export const useNewRegionalReferenceImageFromBbox = () => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const defaultIPAdapter = useAppSelector(selectDefaultIPAdapter);
+  const { dispatch, getState } = useAppStore();
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO) => {
-      const ipAdapter: RegionalGuidanceReferenceImageState = {
+      const ipAdapter: RegionalGuidanceRefImageState = {
         id: getPrefixedId('regional_guidance_reference_image'),
-        ipAdapter: {
-          ...deepClone(defaultIPAdapter),
+        config: {
+          ...getDefaultRegionalGuidanceRefImageConfig(getState),
           image: imageDTOToImageWithDims(imageDTO),
         },
       };
@@ -190,25 +195,24 @@ export const useNewRegionalReferenceImageFromBbox = () => {
       toastOk: t('controlLayers.newRegionalReferenceImageOk'),
       toastError: t('controlLayers.newRegionalReferenceImageError'),
     };
-  }, [defaultIPAdapter, dispatch, t]);
+  }, [dispatch, getState, t]);
   const func = useSaveCanvas(arg);
   return func;
 };
 
 export const useNewGlobalReferenceImageFromBbox = () => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const defaultIPAdapter = useAppSelector(selectDefaultRefImageConfig);
+  const { dispatch, getState } = useAppStore();
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO) => {
-      const overrides: Partial<CanvasReferenceImageState> = {
-        ipAdapter: {
-          ...deepClone(defaultIPAdapter),
+      const overrides: Partial<RefImageState> = {
+        config: {
+          ...getDefaultRefImageConfig(getState),
           image: imageDTOToImageWithDims(imageDTO),
         },
       };
-      dispatch(referenceImageAdded({ overrides, isSelected: true }));
+      dispatch(refImageAdded({ overrides }));
     };
 
     return {
@@ -218,7 +222,7 @@ export const useNewGlobalReferenceImageFromBbox = () => {
       toastOk: t('controlLayers.newGlobalReferenceImageOk'),
       toastError: t('controlLayers.newGlobalReferenceImageError'),
     };
-  }, [defaultIPAdapter, dispatch, t]);
+  }, [dispatch, getState, t]);
   const func = useSaveCanvas(arg);
   return func;
 };
@@ -302,13 +306,13 @@ export const usePullBboxIntoLayer = (entityIdentifier: CanvasEntityIdentifier<'c
   return func;
 };
 
-export const usePullBboxIntoGlobalReferenceImage = (entityIdentifier: CanvasEntityIdentifier<'reference_image'>) => {
+export const usePullBboxIntoGlobalReferenceImage = (id: string) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO, _: Rect) => {
-      dispatch(referenceImageIPAdapterImageChanged({ entityIdentifier, imageDTO }));
+      dispatch(refImageImageChanged({ id, imageDTO }));
     };
 
     return {
@@ -318,7 +322,7 @@ export const usePullBboxIntoGlobalReferenceImage = (entityIdentifier: CanvasEnti
       toastOk: t('controlLayers.pullBboxIntoReferenceImageOk'),
       toastError: t('controlLayers.pullBboxIntoReferenceImageError'),
     };
-  }, [dispatch, entityIdentifier, t]);
+  }, [dispatch, id, t]);
 
   const func = useSaveCanvas(arg);
   return func;
@@ -333,7 +337,7 @@ export const usePullBboxIntoRegionalGuidanceReferenceImage = (
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO, _: Rect) => {
-      dispatch(rgIPAdapterImageChanged({ entityIdentifier, referenceImageId, imageDTO }));
+      dispatch(rgRefImageImageChanged({ entityIdentifier, referenceImageId, imageDTO }));
     };
 
     return {

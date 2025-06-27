@@ -1,6 +1,6 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import {
-  selectIsChatGTP4o,
+  selectIsChatGPT4o,
   selectIsFluxKontext,
   selectIsImagen3,
   selectIsImagen4,
@@ -9,8 +9,8 @@ import {
 export const useIsApiModel = () => {
   const isImagen3 = useAppSelector(selectIsImagen3);
   const isImagen4 = useAppSelector(selectIsImagen4);
-  const isChatGPT4o = useAppSelector(selectIsChatGTP4o);
   const isFluxKontext = useAppSelector(selectIsFluxKontext);
+  const isChatGPT4o = useAppSelector(selectIsChatGPT4o);
 
   return isImagen3 || isImagen4 || isChatGPT4o || isFluxKontext;
 };

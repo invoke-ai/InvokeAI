@@ -1,34 +1,36 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  selectImageCount,
-  selectSelectedImage,
-  selectStagedImageIndex,
-  stagingAreaReset,
-  stagingAreaStagedImageDiscarded,
-} from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { useStore } from '@nanostores/react';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
+import { canvasSessionReset, generateSessionReset } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { useDeleteQueueItem } from 'features/queue/hooks/useDeleteQueueItem';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 
-export const StagingAreaToolbarDiscardSelectedButton = memo(() => {
+export const StagingAreaToolbarDiscardSelectedButton = memo(({ isDisabled }: { isDisabled?: boolean }) => {
   const dispatch = useAppDispatch();
-  const index = useAppSelector(selectStagedImageIndex);
-  const selectedImage = useAppSelector(selectSelectedImage);
-  const imageCount = useAppSelector(selectImageCount);
+  const ctx = useCanvasSessionContext();
+  const deleteQueueItem = useDeleteQueueItem();
+  const selectedItemId = useStore(ctx.$selectedItemId);
 
   const { t } = useTranslation();
 
-  const discardSelected = useCallback(() => {
-    if (!selectedImage) {
+  const discardSelected = useCallback(async () => {
+    if (selectedItemId === null) {
       return;
     }
-    if (imageCount === 1) {
-      dispatch(stagingAreaReset());
-    } else {
-      dispatch(stagingAreaStagedImageDiscarded({ index }));
+    await deleteQueueItem.trigger(selectedItemId);
+    const itemCount = ctx.$itemCount.get();
+    if (itemCount <= 1) {
+      if (ctx.session.type === 'advanced') {
+        dispatch(canvasSessionReset());
+      } else {
+        // ctx.session.type === 'simple'
+        dispatch(generateSessionReset());
+      }
     }
-  }, [selectedImage, imageCount, dispatch, index]);
+  }, [selectedItemId, deleteQueueItem, ctx.$itemCount, ctx.session.type, dispatch]);
 
   return (
     <IconButton
@@ -38,7 +40,8 @@ export const StagingAreaToolbarDiscardSelectedButton = memo(() => {
       onClick={discardSelected}
       colorScheme="invokeBlue"
       fontSize={16}
-      isDisabled={!selectedImage}
+      isDisabled={selectedItemId === null || deleteQueueItem.isDisabled || isDisabled}
+      isLoading={deleteQueueItem.isLoading}
     />
   );
 });

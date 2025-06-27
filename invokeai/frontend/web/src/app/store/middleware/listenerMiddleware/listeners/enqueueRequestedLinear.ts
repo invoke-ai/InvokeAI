@@ -5,6 +5,12 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import { extractMessageFromAssertionError } from 'common/util/extractMessageFromAssertionError';
 import { withResult, withResultAsync } from 'common/util/result';
 import { parseify } from 'common/util/serialize';
+import {
+  canvasSessionIdCreated,
+  generateSessionIdCreated,
+  selectCanvasSessionId,
+  selectGenerateSessionId,
+} from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { $canvasManager } from 'features/controlLayers/store/ephemeral';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildChatGPT4oGraph } from 'features/nodes/util/graph/generation/buildChatGPT4oGraph';
@@ -18,6 +24,7 @@ import { buildSD3Graph } from 'features/nodes/util/graph/generation/buildSD3Grap
 import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { toast } from 'features/toast/toast';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { serializeError } from 'serialize-error';
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
 import { assert, AssertionError } from 'tsafe';
@@ -31,11 +38,34 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
     actionCreator: enqueueRequestedCanvas,
     effect: async (action, { getState, dispatch }) => {
       log.debug('Enqueue requested');
+
+      const tab = selectActiveTab(getState());
+      let sessionId = null;
+      if (tab === 'generate') {
+        sessionId = selectGenerateSessionId(getState());
+        if (!sessionId) {
+          dispatch(generateSessionIdCreated());
+          sessionId = selectGenerateSessionId(getState());
+        }
+      } else if (tab === 'canvas') {
+        sessionId = selectCanvasSessionId(getState());
+        if (!sessionId) {
+          dispatch(canvasSessionIdCreated());
+          sessionId = selectCanvasSessionId(getState());
+        }
+      } else {
+        log.warn(`Enqueue requested in unsupported tab ${tab}`);
+        return;
+      }
+
       const state = getState();
+      const destination = sessionId;
+      assert(destination !== null);
+
       const { prepend } = action.payload;
 
       const manager = $canvasManager.get();
-      assert(manager, 'No canvas manager');
+      // assert(manager, 'No canvas manager');
 
       const model = state.params.model;
       assert(model, 'No model found in state');
@@ -90,8 +120,6 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
 
       const { g, seedFieldIdentifier, positivePromptFieldIdentifier } = buildGraphResult.value;
 
-      const destination = state.canvasSettings.sendToCanvas ? 'canvas' : 'gallery';
-
       const prepareBatchResult = withResult(() =>
         prepareLinearUIBatch({
           state,
@@ -99,7 +127,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
           prepend,
           seedFieldIdentifier,
           positivePromptFieldIdentifier,
-          origin: 'canvas',
+          origin: tab,
           destination,
         })
       );

@@ -1,3 +1,4 @@
+import { omit } from 'es-toolkit/compat';
 import { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterBase';
 import { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityBufferObjectRenderer';
 import { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityObjectRenderer';
@@ -5,7 +6,6 @@ import { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEnti
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasEntityIdentifier, CanvasInpaintMaskState, Rect } from 'features/controlLayers/store/types';
 import type { GroupConfig } from 'konva/lib/Group';
-import { omit } from 'lodash-es';
 import type { JsonObject } from 'type-fest';
 
 export class CanvasEntityAdapterInpaintMask extends CanvasEntityAdapterBase<

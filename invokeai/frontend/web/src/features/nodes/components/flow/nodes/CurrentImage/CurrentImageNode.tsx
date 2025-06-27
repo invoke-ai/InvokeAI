@@ -13,11 +13,13 @@ import { motion } from 'framer-motion';
 import type { CSSProperties, PropsWithChildren } from 'react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useImageDTO } from 'services/api/endpoints/images';
 import { $lastProgressEvent } from 'services/events/stores';
 
 const CurrentImageNode = (props: NodeProps) => {
-  const imageDTO = useAppSelector(selectLastSelectedImage);
+  const image_name = useAppSelector(selectLastSelectedImage);
   const lastProgressEvent = useStore($lastProgressEvent);
+  const imageDTO = useImageDTO(image_name);
 
   if (lastProgressEvent?.image) {
     return (

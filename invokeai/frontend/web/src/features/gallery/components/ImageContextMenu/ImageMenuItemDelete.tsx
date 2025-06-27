@@ -1,6 +1,5 @@
-import { useAppDispatch } from 'app/store/storeHooks';
 import { IconMenuItem } from 'common/components/IconMenuItem';
-import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
+import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,12 +7,16 @@ import { PiTrashSimpleBold } from 'react-icons/pi';
 
 export const ImageMenuItemDelete = memo(() => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
+  const deleteImageModal = useDeleteImageModalApi();
   const imageDTO = useImageDTOContext();
 
-  const onClick = useCallback(() => {
-    dispatch(imagesToDeleteSelected([imageDTO]));
-  }, [dispatch, imageDTO]);
+  const onClick = useCallback(async () => {
+    try {
+      await deleteImageModal.delete([imageDTO.image_name]);
+    } catch {
+      // noop;
+    }
+  }, [deleteImageModal, imageDTO]);
 
   return (
     <IconMenuItem

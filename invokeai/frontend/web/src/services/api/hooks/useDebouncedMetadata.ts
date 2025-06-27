@@ -8,8 +8,7 @@ export const useDebouncedMetadata = (imageName?: string | null) => {
   const metadataFetchDebounce = useAppSelector(selectMetadataFetchDebounce);
 
   const [debouncedImageName] = useDebounce(imageName, metadataFetchDebounce);
+  const { data, isFetching } = useGetImageMetadataQuery(debouncedImageName ?? skipToken);
 
-  const { data: metadata, isLoading } = useGetImageMetadataQuery(debouncedImageName ?? skipToken);
-
-  return { metadata, isLoading };
+  return { metadata: data, isLoading: isFetching || imageName !== debouncedImageName };
 };

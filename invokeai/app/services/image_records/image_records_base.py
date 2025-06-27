@@ -5,6 +5,7 @@ from typing import Optional
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
+    ImageNamesResult,
     ImageRecord,
     ImageRecordChanges,
     ResourceOrigin,
@@ -96,4 +97,18 @@ class ImageRecordStorageBase(ABC):
     @abstractmethod
     def get_most_recent_image_for_board(self, board_id: str) -> Optional[ImageRecord]:
         """Gets the most recent image for a board."""
+        pass
+
+    @abstractmethod
+    def get_image_names(
+        self,
+        starred_first: bool = True,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        image_origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+    ) -> ImageNamesResult:
+        """Gets ordered list of image names with metadata for optimistic updates."""
         pass

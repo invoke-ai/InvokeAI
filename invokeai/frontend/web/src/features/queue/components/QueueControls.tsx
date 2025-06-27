@@ -1,30 +1,20 @@
-import { Flex, Spacer } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
-import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { ClearQueueIconButton } from 'features/queue/components/ClearQueueIconButton';
+import { Flex, Spacer, useShiftModifier } from '@invoke-ai/ui-library';
+import { DeleteAllExceptCurrentIconButton } from 'features/queue/components/DeleteAllExceptCurrentIconButton';
+import { DeleteCurrentQueueItemIconButton } from 'features/queue/components/DeleteCurrentQueueItemIconButton';
 import { QueueActionsMenuButton } from 'features/queue/components/QueueActionsMenuButton';
-import { SendToToggle } from 'features/queue/components/SendToToggle';
 import ProgressBar from 'features/system/components/ProgressBar';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 
 import { InvokeButton } from './InvokeQueueBackButton';
 
 const QueueControls = () => {
-  const tab = useAppSelector(selectActiveTab);
-
   return (
     <Flex w="full" position="relative" borderRadius="base" gap={2} flexDir="column">
       <Flex gap={2}>
         <InvokeButton />
         <Spacer />
-        {tab === 'canvas' && (
-          <CanvasManagerProviderGate>
-            <SendToToggle />
-          </CanvasManagerProviderGate>
-        )}
         <QueueActionsMenuButton />
-        <ClearQueueIconButton />
+        <DeleteIconButton />
       </Flex>
       <ProgressBar />
     </Flex>
@@ -32,3 +22,15 @@ const QueueControls = () => {
 };
 
 export default memo(QueueControls);
+
+export const DeleteIconButton = memo(() => {
+  const shift = useShiftModifier();
+
+  if (!shift) {
+    return <DeleteCurrentQueueItemIconButton />;
+  }
+
+  return <DeleteAllExceptCurrentIconButton />;
+});
+
+DeleteIconButton.displayName = 'DeleteIconButton';

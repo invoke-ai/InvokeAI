@@ -1,9 +1,9 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
+import { size } from 'es-toolkit/compat';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { parseSchema } from 'features/nodes/util/schema/parseSchema';
-import { size } from 'lodash-es';
 import { serializeError } from 'serialize-error';
 import { appInfoApi } from 'services/api/endpoints/appInfo';
 import type { JsonObject } from 'type-fest';

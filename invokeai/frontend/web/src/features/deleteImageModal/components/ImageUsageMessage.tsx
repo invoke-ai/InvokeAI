@@ -1,6 +1,6 @@
 import { ListItem, Text, UnorderedList } from '@invoke-ai/ui-library';
+import { some } from 'es-toolkit/compat';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
-import { some } from 'lodash-es';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 

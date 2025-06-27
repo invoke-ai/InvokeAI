@@ -37,6 +37,7 @@ from invokeai.app.util.misc import uuid_string
 from invokeai.backend.model_hash.hash_validator import validate_hash
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
+from invokeai.backend.model_manager.omi import flux_dev_1_lora, stable_diffusion_xl_1_lora
 from invokeai.backend.model_manager.taxonomy import (
     AnyVariant,
     BaseModelType,
@@ -352,15 +353,14 @@ class LoRAOmiConfig(LoRAConfigBase, ModelConfigBase):
     @classmethod
     def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
         metadata = mod.metadata()
-        base_str, _ = metadata["modelspec.architecture"].split("/")
-        base_str = base_str.lower()
+        architecture = metadata["modelspec.architecture"]
 
-        if "stable-diffusion-xl-v1-base" in base_str:
+        if architecture == stable_diffusion_xl_1_lora:
             base = BaseModelType.StableDiffusionXL
-        elif "flux" in base_str:
+        elif architecture == flux_dev_1_lora:
             base = BaseModelType.Flux
         else:
-            raise InvalidModelConfigException(f"Unrecognised/unsupported base architecture for OMI LoRA: {base_str}")
+            raise InvalidModelConfigException(f"Unrecognised/unsupported architecture for OMI LoRA: {architecture}")
 
         return {"base": base}
 
@@ -381,7 +381,7 @@ class LoRALyCORISConfig(LoRAConfigBase, ModelConfigBase):
 
         state_dict = mod.load_state_dict()
         for key in state_dict.keys():
-            if type(key) is int:
+            if isinstance(key, int):
                 continue
 
             if key.startswith(("lora_te_", "lora_unet_", "lora_te1_", "lora_te2_", "lora_transformer_")):
