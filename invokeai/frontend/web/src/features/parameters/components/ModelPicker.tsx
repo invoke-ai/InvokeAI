@@ -18,7 +18,7 @@ import type { Group, PickerContextState } from 'common/components/Picker/Picker'
 import { buildGroup, getRegex, Picker, usePickerContext } from 'common/components/Picker/Picker';
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { typedMemo } from 'common/util/typedMemo';
-import { $installModelsTab } from 'features/modelManagerV2/store/installModelsStore';
+import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
 import { BASE_COLOR_MAP } from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
 import ModelImage from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelImage';
 import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
@@ -38,7 +38,7 @@ const ModelManagerLink = memo((props: ButtonProps) => {
   const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
     dispatch(setActiveTab('models'));
-    $installModelsTab.set(3);
+    setInstallModelsTabByName('launchpad');
   }, [dispatch]);
 
   return (

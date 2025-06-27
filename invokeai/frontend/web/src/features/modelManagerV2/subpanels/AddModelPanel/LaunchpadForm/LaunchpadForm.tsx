@@ -1,7 +1,7 @@
 import { Box, Button, Flex, Grid, Heading, Text } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useStarterBundleInstall } from 'features/modelManagerV2/hooks/useStarterBundleInstall';
-import { $installModelsTab } from 'features/modelManagerV2/store/installModelsStore';
+import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFolderOpenBold, PiLinkBold, PiStarBold } from 'react-icons/pi';
@@ -31,19 +31,19 @@ export const LaunchpadForm = memo(() => {
   );
 
   const navigateToUrlTab = useCallback(() => {
-    $installModelsTab.set(1); // URL/Local Path tab (now index 1)
+    setInstallModelsTabByName('urlOrLocal');
   }, []);
 
   const navigateToHuggingFaceTab = useCallback(() => {
-    $installModelsTab.set(2); // HuggingFace tab (now index 2)
+    setInstallModelsTabByName('huggingface');
   }, []);
 
   const navigateToScanFolderTab = useCallback(() => {
-    $installModelsTab.set(3); // Scan Folder tab (now index 3)
+    setInstallModelsTabByName('scanFolder');
   }, []);
 
   const navigateToStarterModelsTab = useCallback(() => {
-    $installModelsTab.set(4); // Starter Models tab (now index 4)
+    setInstallModelsTabByName('starterModels');
   }, []);
 
   const handleSD15BundleClick = useCallback(() => {
