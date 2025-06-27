@@ -19799,13 +19799,20 @@ export type components = {
             /** Dependencies */
             dependencies?: components["schemas"]["StarterModelWithoutDependencies"][] | null;
         };
+        /** StarterModelBundle */
+        StarterModelBundle: {
+            /** Name */
+            name: string;
+            /** Models */
+            models: components["schemas"]["StarterModel"][];
+        };
         /** StarterModelResponse */
         StarterModelResponse: {
             /** Starter Models */
             starter_models: components["schemas"]["StarterModel"][];
             /** Starter Bundles */
             starter_bundles: {
-                [key: string]: components["schemas"]["StarterModel"][];
+                [key: string]: components["schemas"]["StarterModelBundle"];
             };
         };
         /** StarterModelWithoutDependencies */
