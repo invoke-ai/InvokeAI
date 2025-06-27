@@ -1,6 +1,7 @@
 import { Flex, Spacer } from '@invoke-ai/ui-library';
 import { EntityListGlobalActionBarAddLayerMenu } from 'features/controlLayers/components/CanvasEntityList/EntityListGlobalActionBarAddLayerMenu';
 import { EntityListSelectedEntityActionBarDuplicateButton } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarDuplicateButton';
+import { EntityListSelectedEntityActionBarExportPSDButton } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarExportPSDButton';
 import { EntityListSelectedEntityActionBarFill } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarFill';
 import { EntityListSelectedEntityActionBarFilterButton } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarFilterButton';
 import { EntityListSelectedEntityActionBarOpacity } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarOpacity';
@@ -22,6 +23,7 @@ export const EntityListSelectedEntityActionBar = memo(() => {
         <EntityListSelectedEntityActionBarFilterButton />
         <EntityListSelectedEntityActionBarTransformButton />
         <EntityListSelectedEntityActionBarSaveToAssetsButton />
+        <EntityListSelectedEntityActionBarExportPSDButton />
         <EntityListSelectedEntityActionBarDuplicateButton />
         <EntityListNonRasterLayerToggle />
         <EntityListGlobalActionBarAddLayerMenu />
