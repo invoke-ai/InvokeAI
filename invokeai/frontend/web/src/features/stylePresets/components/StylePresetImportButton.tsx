@@ -50,13 +50,12 @@ export const StylePresetImportButton = () => {
   return (
     <>
       <IconButton
+        size="sm"
+        variant="link"
+        alignSelf="stretch"
         icon={!isLoading ? <PiUploadSimpleBold /> : <PiSpinner />}
         tooltip={<TooltipContent />}
         aria-label={t('stylePresets.importTemplates')}
-        size="md"
-        variant="link"
-        w={8}
-        h={8}
         sx={isLoading ? loadingStyles : undefined}
         isDisabled={isLoading}
         {...getRootProps()}
