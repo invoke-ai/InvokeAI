@@ -6,6 +6,7 @@ import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEnt
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import {
+  areStageAttrsGonnaExplode,
   canvasToImageData,
   getEmptyRect,
   getKonvaNodeDebugAttrs,
@@ -266,6 +267,9 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     // the bbox outline should always be 1 screen pixel wide, so we need to update its stroke width.
     this.subscriptions.add(
       this.manager.stage.$stageAttrs.listen((newVal, oldVal) => {
+        if (areStageAttrsGonnaExplode(newVal)) {
+          return;
+        }
         if (newVal.scale !== oldVal.scale) {
           this.syncScale();
         }
