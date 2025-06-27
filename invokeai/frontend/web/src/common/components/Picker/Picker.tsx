@@ -201,7 +201,7 @@ type PickerProps<T extends object> = {
   /**
    * Initial state for group toggles. If provided, groups will start with these states instead of all being disabled.
    */
-  initialGroupStates?: Record<string, boolean>;
+  initialGroupStates?: GroupStatusMap;
 };
 
 export type PickerContextState<T extends object> = {
@@ -314,12 +314,9 @@ const flattenOptions = <T extends object>(options: OptionOrGroup<T>[]): T[] => {
   return flattened;
 };
 
-type GroupStatusMap = Record<string, boolean>;
+export type GroupStatusMap = Record<string, boolean>;
 
-const useTogglableGroups = <T extends object>(
-  options: OptionOrGroup<T>[],
-  initialGroupStates?: Record<string, boolean>
-) => {
+const useTogglableGroups = <T extends object>(options: OptionOrGroup<T>[], initialGroupStates?: GroupStatusMap) => {
   const groupsWithOptions = useMemo(() => {
     const ids: string[] = [];
     for (const optionOrGroup of options) {
