@@ -1,4 +1,4 @@
-import { Box, Button, Flex, Grid, Heading, Icon, Text } from '@invoke-ai/ui-library';
+import { Button, Flex, Grid, Heading, Icon, Text } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useStarterBundleInstall } from 'features/modelManagerV2/hooks/useStarterBundleInstall';
 import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
@@ -63,20 +63,14 @@ export const LaunchpadForm = memo(() => {
       <ScrollableContent>
         <Flex flexDir="column" gap={6} p={3}>
           {/* Welcome Section */}
-          <Box>
-            <Heading size="md" mb={1}>
-              {t('modelManager.launchpad.welcome')}
-            </Heading>
-            <Text color="base.300" fontSize="sm">
-              {t('modelManager.launchpad.description')}
-            </Text>
-          </Box>
+          <Flex flexDir="column" gap={2} alignItems="flex-start">
+            <Heading size="md">{t('modelManager.launchpad.welcome')}</Heading>
+            <Text color="base.300">{t('modelManager.launchpad.description')}</Text>
+          </Flex>
           {/* Manual Installation Options */}
-          <Box>
-            <Heading size="sm" mb={2}>
-              {t('modelManager.launchpad.manualInstall')}
-            </Heading>
-            <Grid templateColumns="repeat(auto-fit, minmax(280px, 1fr))" gap={3}>
+          <Flex flexDir="column" gap={2} alignItems="flex-start">
+            <Heading size="sm">{t('modelManager.launchpad.manualInstall')}</Heading>
+            <Grid templateColumns="repeat(auto-fit, minmax(280px, 1fr))" gap={3} w="full">
               <Button
                 onClick={navigateToUrlTab}
                 variant="outline"
@@ -92,7 +86,7 @@ export const LaunchpadForm = memo(() => {
                     {t('modelManager.urlOrLocalPath')}
                   </Heading>
                 </Flex>
-                <Text fontSize="sm" lineHeight="1.4" flex="1" whiteSpace="normal" wordBreak="break-word">
+                <Text lineHeight="1.4" flex="1" whiteSpace="normal" wordBreak="break-word">
                   {t('modelManager.launchpad.urlDescription')}
                 </Text>
               </Button>
@@ -149,53 +143,34 @@ export const LaunchpadForm = memo(() => {
                 </Text>
               </Button>
             </Grid>
-          </Box>
+          </Flex>
           {/* Recommended Section */}
-          <Box>
-            <Heading size="sm" mb={2}>
-              {t('modelManager.launchpad.recommendedModels')}
-            </Heading>
-            <Flex flexDir="column" gap={2}>
-              {/* Starter Model Bundles - More Prominent */}
-              <Box>
-                <Heading size="xs" color="base.100" mb={1}>
-                  {t('modelManager.launchpad.quickStart')}
-                </Heading>
-                <Text fontSize="xs" color="base.300" mb={2}>
-                  {t('modelManager.launchpad.bundleDescription')}
-                </Text>
-                <Grid templateColumns="repeat(auto-fit, minmax(180px, 1fr))" gap={2}>
-                  <Button onClick={handleSD15BundleClick} variant="outline" p={6}>
-                    {t('modelManager.launchpad.stableDiffusion15')}
-                  </Button>
-                  <Button onClick={handleSDXLBundleClick} variant="outline" p={6}>
-                    {t('modelManager.launchpad.sdxl')}
-                  </Button>
-                  <Button onClick={handleFluxBundleClick} variant="outline" p={6}>
-                    {t('modelManager.launchpad.fluxDev')}
-                  </Button>
-                </Grid>
-              </Box>
-              {/* Browse All - Simple Link */}
-              <Box pt={1} borderTop="1px solid" borderColor="base.700">
-                <Text fontSize="xs" color="base.400" mb={1}>
-                  {t('modelManager.launchpad.browseAll')}
-                </Text>
-                <Button
-                  onClick={navigateToStarterModelsTab}
-                  variant="link"
-                  color="invokeBlue.300"
-                  fontSize="sm"
-                  fontWeight="medium"
-                  p={0}
-                  h="auto"
-                  leftIcon={<PiStarBold size={16} />}
-                >
-                  {t('modelManager.launchpad.exploreStarter')}
-                </Button>
-              </Box>
-            </Flex>
-          </Box>
+          <Flex flexDir="column" gap={2} alignItems="flex-start">
+            <Heading size="sm">{t('modelManager.launchpad.recommendedModels')}</Heading>
+            {/* Starter Model Bundles - More Prominent */}
+            <Text color="base.300">{t('modelManager.launchpad.bundleDescription')}</Text>
+            <Grid templateColumns="repeat(auto-fit, minmax(180px, 1fr))" gap={2} w="full">
+              <Button onClick={handleSD15BundleClick} variant="outline" p={6}>
+                {t('modelManager.launchpad.stableDiffusion15')}
+              </Button>
+              <Button onClick={handleSDXLBundleClick} variant="outline" p={6}>
+                {t('modelManager.launchpad.sdxl')}
+              </Button>
+              <Button onClick={handleFluxBundleClick} variant="outline" p={6}>
+                {t('modelManager.launchpad.fluxDev')}
+              </Button>
+            </Grid>
+            {/* Browse All - Simple Link */}
+            <Button
+              onClick={navigateToStarterModelsTab}
+              variant="link"
+              size="sm"
+              leftIcon={<PiStarBold />}
+              colorScheme="invokeBlue"
+            >
+              {t('modelManager.launchpad.exploreStarter')}
+            </Button>
+          </Flex>
         </Flex>
       </ScrollableContent>
     </Flex>
