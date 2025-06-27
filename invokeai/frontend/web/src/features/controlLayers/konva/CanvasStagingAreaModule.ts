@@ -21,13 +21,15 @@ import type { Logger } from 'roarr';
 // parseFloat(style.fontSize) * parseFloat(style.getPropertyValue("--invoke-space-8"))
 //
 // This will give you the pixel value for the theme token in pixels.
-const SPACING_2 = 6; // Equivalent to theme token 2
-const SPACING_4 = 12; // Equivalent to theme token 4
-const SPACING_8 = 24; // Equivalent to theme token 8
-const BORDER_RADIUS_BASE = 4; // Equivalent to theme borderRadius "base"
-const BORDER_WIDTH = 1; // Standard border width
-const FONT_SIZE_SM = 12; // Equivalent to theme fontSize "sm"
-const BADGE_MIN_WIDTH = 200;
+//
+// You cannot do this dynamically in this file, because it depends on the styles being applied to the document, which
+// will not have happened yet when this module is loaded.
+
+const SPACING_4 = 12; // --invoke-space-4 in pixels
+const BORDER_RADIUS_BASE = 4; // --invoke-radii-base in pixels
+const BORDER_WIDTH = 1;
+const FONT_SIZE_MD = 14.4; // --invoke-fontSizes-md
+const BADGE_WIDTH = 192;
 const BADGE_HEIGHT = 36;
 
 type ImageNameSrc = { type: 'imageName'; data: string };
@@ -93,9 +95,9 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
         badgeBg: new Konva.Rect({
           name: `${this.type}:placeholder_badge_bg`,
           fill: 'hsl(220 12% 10% / 0.8)', // 'base.900' with opacity
-          x: SPACING_2 - 2, // Slight offset for visual balance
-          y: SPACING_2 - 2,
-          width: Math.min(BADGE_MIN_WIDTH + 4, width - SPACING_2 * 2 + 4),
+          x: SPACING_4,
+          y: SPACING_4,
+          width: BADGE_WIDTH,
           height: BADGE_HEIGHT,
           cornerRadius: BORDER_RADIUS_BASE,
           stroke: 'hsl(220 12% 50% / 1)', // 'base.700'
@@ -106,14 +108,14 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
         text: new Konva.Text({
           name: `${this.type}:placeholder_text`,
           fill: 'hsl(220 12% 80% / 1)', // 'base.300'
-          x: SPACING_2,
-          y: SPACING_2,
-          width: Math.min(BADGE_MIN_WIDTH, width - SPACING_4),
-          height: SPACING_8,
+          x: SPACING_4,
+          y: SPACING_4,
+          width: BADGE_WIDTH,
+          height: BADGE_HEIGHT,
           align: 'center',
           verticalAlign: 'middle',
           fontFamily: '"Inter Variable", sans-serif',
-          fontSize: FONT_SIZE_SM,
+          fontSize: FONT_SIZE_MD,
           fontStyle: '600', // Equivalent to theme fontWeight "semibold"
           text: 'Waiting for Image',
           listening: false,
