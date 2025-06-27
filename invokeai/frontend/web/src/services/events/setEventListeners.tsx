@@ -24,18 +24,19 @@ import { api, LIST_ALL_TAG, LIST_TAG } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi } from 'services/api/endpoints/queue';
 import { workflowsApi } from 'services/api/endpoints/workflows';
-import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
-import { buildOnModelInstallError } from 'services/events/onModelInstallError';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import type { Socket } from 'socket.io-client';
 import type { JsonObject } from 'type-fest';
 
+import { buildOnInvocationComplete } from './onInvocationComplete';
+import { buildOnModelInstallError } from './onModelInstallError';
 import {
   $lastProgressEvent,
   $lastUpscalingProgressEvent,
   $lastUpscalingProgressImage,
   $lastWorkflowsProgressEvent,
   $lastWorkflowsProgressImage,
+  $promptExpansionRequest,
 } from './stores';
 
 const log = logger('events');
@@ -140,6 +141,20 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   socket.on('invocation_error', (data) => {
     const { invocation_source_id, invocation, error_type, error_message, error_traceback } = data;
     log.error({ data } as JsonObject, `Invocation error (${invocation.type}, ${invocation_source_id})`);
+
+    // Handle prompt expansion errors
+    // @ts-expect-error: These nodes are not available in the OSS application
+    if (invocation.type === 'claude_expand_prompt' || invocation.type === 'claude_analyze_image') {
+      const currentRequest = $promptExpansionRequest.get();
+      if (currentRequest && currentRequest.status === 'pending') {
+        $promptExpansionRequest.set({
+          ...currentRequest,
+          status: 'error' as const,
+        });
+        log.debug({ error_message }, 'Prompt expansion failed');
+      }
+    }
+
     const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
     if (nes) {
       nes.status = zNodeStatus.enum.FAILED;

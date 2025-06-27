@@ -10,7 +10,8 @@ export const PromptOverlayButtonWrapper = memo((props: PropsWithChildren) => (
     p={2}
     gap={2}
     alignItems="center"
-    justifyContent="center"
+    justifyContent="space-between"
+    h="full"
   >
     {props.children}
   </Flex>

@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
+import { positivePromptChanged } from 'features/controlLayers/store/paramsSlice';
 import {
   selectAutoSwitch,
   selectGalleryView,
@@ -16,7 +17,7 @@ import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO, S } from 'services/api/types';
 import { getCategories } from 'services/api/util';
 import { insertImageIntoNamesResult } from 'services/api/util/optimisticUpdates';
-import { $lastProgressEvent } from 'services/events/stores';
+import { $lastProgressEvent, $promptExpansionRequest } from 'services/events/stores';
 import type { Param0 } from 'tsafe';
 import { objectEntries } from 'tsafe';
 import type { JsonObject } from 'type-fest';
@@ -170,6 +171,33 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
     return imageDTOs;
   };
 
+  const handleStringOutputs = (data: S['InvocationCompleteEvent']) => {
+    const { result, invocation } = data;
+
+    // If this is a prompt expansion or generation invocation, look for string output
+    // @ts-expect-error: These nodes are not available in the OSS application
+    if (
+      (invocation.type === 'claude_expand_prompt' || invocation.type === 'claude_analyze_image') &&
+      result.type === 'string_output'
+    ) {
+      const stringValue = result.value;
+
+      const currentRequest = $promptExpansionRequest.get();
+
+      if (currentRequest && currentRequest.status === 'pending') {
+        // Update the status to completed
+        $promptExpansionRequest.set({
+          ...currentRequest,
+          status: 'completed' as const,
+        });
+
+        dispatch(positivePromptChanged(stringValue));
+
+        log.debug({ stringValue }, 'Prompt expansion/generation completed');
+      }
+    }
+  };
+
   return async (data: S['InvocationCompleteEvent']) => {
     log.debug({ data } as JsonObject, `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`);
 
@@ -186,6 +214,7 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
     }
 
     await addImagesToGallery(data);
+    handleStringOutputs(data);
 
     $lastProgressEvent.set(null);
   };

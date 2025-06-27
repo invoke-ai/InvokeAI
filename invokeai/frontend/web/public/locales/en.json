@@ -225,7 +225,10 @@
     "prompt": {
         "addPromptTrigger": "Add Prompt Trigger",
         "compatibleEmbeddings": "Compatible Embeddings",
-        "noMatchingTriggers": "No matching triggers"
+        "noMatchingTriggers": "No matching triggers",
+        "generateFromImage": "Generate prompt from image",
+        "expandCurrentPrompt": "Expand Current Prompt",
+        "uploadImageForPromptGeneration": "Upload Image for Prompt Generation"
     },
     "queue": {
         "queue": "Queue",
@@ -335,14 +338,14 @@
         "images": "Images",
         "assets": "Assets",
         "alwaysShowImageSizeBadge": "Always Show Image Size Badge",
-        "assetsTab": "Files you’ve uploaded for use in your projects.",
+        "assetsTab": "Files you've uploaded for use in your projects.",
         "autoAssignBoardOnClick": "Auto-Assign Board on Click",
         "autoSwitchNewImages": "Auto-Switch to New Images",
         "boardsSettings": "Boards Settings",
         "copy": "Copy",
         "currentlyInUse": "This image is currently in use in the following features:",
         "drop": "Drop",
-        "dropOrUpload": "$t(gallery.drop) or Upload",
+        "dropOrUpload": "Drop or Upload",
         "dropToUpload": "$t(gallery.drop) to Upload",
         "deleteImage_one": "Delete Image",
         "deleteImage_other": "Delete {{count}} Images",
@@ -357,7 +360,7 @@
         "gallerySettings": "Gallery Settings",
         "go": "Go",
         "image": "image",
-        "imagesTab": "Images you’ve created and saved within Invoke.",
+        "imagesTab": "Images you've created and saved within Invoke.",
         "imagesSettings": "Gallery Images Settings",
         "jump": "Jump",
         "loading": "Loading",
@@ -396,7 +399,8 @@
         "compareHelp4": "Press <Kbd>Z</Kbd> or <Kbd>Esc</Kbd> to exit.",
         "openViewer": "Open Viewer",
         "closeViewer": "Close Viewer",
-        "move": "Move"
+        "move": "Move",
+        "useForPromptGeneration": "Use for Prompt Generation"
     },
     "hotkeys": {
         "hotkeys": "Hotkeys",
@@ -1341,7 +1345,11 @@
         "fluxKontextIncompatibleGenerationMode": "Flux Kontext supports Text to Image only. Use other models for Image to Image, Inpainting and Outpainting tasks.",
         "problemUnpublishingWorkflow": "Problem Unpublishing Workflow",
         "problemUnpublishingWorkflowDescription": "There was a problem unpublishing the workflow. Please try again.",
-        "workflowUnpublished": "Workflow Unpublished"
+        "workflowUnpublished": "Workflow Unpublished",
+        "sentToCanvas": "Sent to Canvas",
+        "sentToUpscale": "Sent to Upscale",
+        "promptGenerationStarted": "Prompt generation started",
+        "uploadAndPromptGenerationFailed": "Failed to upload image and generate prompt"
     },
     "popovers": {
         "clipSkip": {

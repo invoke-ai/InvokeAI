@@ -1,4 +1,4 @@
-import { Box, Textarea } from '@invoke-ai/ui-library';
+import { Box, Flex, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { usePersistedTextAreaSize } from 'common/hooks/usePersistedTextareaSize';
 import {
@@ -7,12 +7,15 @@ import {
   selectModelSupportsNegativePrompt,
   selectPositivePrompt,
 } from 'features/controlLayers/store/paramsSlice';
+import { promptGenerationFromImageDndTarget } from 'features/dnd/dnd';
+import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { ShowDynamicPromptsPreviewButton } from 'features/dynamicPrompts/components/ShowDynamicPromptsPreviewButton';
 import { NegativePromptToggleButton } from 'features/parameters/components/Core/NegativePromptToggleButton';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModePrompt';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
+import { PromptExpansionMenu } from 'features/prompt/PromptExpansion/PromptExpansionMenu';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
 import { SDXLConcatButton } from 'features/sdxl/components/SDXLPrompts/SDXLConcatButton';
@@ -21,7 +24,7 @@ import {
   selectStylePresetViewMode,
 } from 'features/stylePresets/store/stylePresetSlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { memo, useCallback, useRef } from 'react';
+import { memo, useCallback, useMemo, useRef } from 'react';
 import type { HotkeyCallback } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
@@ -82,41 +85,54 @@ export const ParamPositivePrompt = memo(() => {
     dependencies: [focus],
   });
 
+  const dndTargetData = useMemo(() => promptGenerationFromImageDndTarget.getData(), []);
+
   return (
-    <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
-      <Box pos="relative">
-        <Textarea
-          className="positive-prompt-textarea"
-          name="prompt"
-          ref={textareaRef}
-          value={prompt}
-          onChange={onChange}
-          onKeyDown={onKeyDown}
-          variant="darkFilled"
-          borderTopWidth={24} // This prevents the prompt from being hidden behind the header
-          paddingInlineEnd={10}
-          paddingInlineStart={3}
-          paddingTop={0}
-          paddingBottom={3}
-          resize="vertical"
-          minH={32}
-        />
-        <PromptOverlayButtonWrapper>
-          <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
-          {baseModel === 'sdxl' && <SDXLConcatButton />}
-          <ShowDynamicPromptsPreviewButton />
-          {modelSupportsNegativePrompt && <NegativePromptToggleButton />}
-        </PromptOverlayButtonWrapper>
-        <PromptLabel label="Prompt" />
-        {viewMode && (
-          <ViewModePrompt
-            prompt={prompt}
-            presetPrompt={activeStylePreset?.preset_data.positive_prompt || ''}
-            label={`${t('parameters.positivePromptPlaceholder')} (${t('stylePresets.preview')})`}
+    <Box pos="relative">
+      <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
+        <Box pos="relative">
+          <Textarea
+            className="positive-prompt-textarea"
+            name="prompt"
+            ref={textareaRef}
+            value={prompt}
+            onChange={onChange}
+            onKeyDown={onKeyDown}
+            variant="darkFilled"
+            borderTopWidth={24} // This prevents the prompt from being hidden behind the header
+            paddingInlineEnd={10}
+            paddingInlineStart={3}
+            paddingTop={0}
+            paddingBottom={3}
+            resize="vertical"
+            minH={32}
           />
-        )}
-      </Box>
-    </PromptPopover>
+          <PromptOverlayButtonWrapper>
+            <Flex flexDir="column" gap={2} justifyContent="flex-start" alignItems="center">
+              <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
+              {baseModel === 'sdxl' && <SDXLConcatButton />}
+              <ShowDynamicPromptsPreviewButton />
+              {modelSupportsNegativePrompt && <NegativePromptToggleButton />}
+            </Flex>
+            <PromptExpansionMenu />
+          </PromptOverlayButtonWrapper>
+          <PromptLabel label="Prompt" />
+          {viewMode && (
+            <ViewModePrompt
+              prompt={prompt}
+              presetPrompt={activeStylePreset?.preset_data.positive_prompt || ''}
+              label={`${t('parameters.positivePromptPlaceholder')} (${t('stylePresets.preview')})`}
+            />
+          )}
+          <DndDropTarget
+            dndTarget={promptGenerationFromImageDndTarget}
+            dndTargetData={dndTargetData}
+            label={t('prompt.generateFromImage')}
+            isDisabled={false}
+          />
+        </Box>
+      </PromptPopover>
+    </Box>
   );
 });
 
