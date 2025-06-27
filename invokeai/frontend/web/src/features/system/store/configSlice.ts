@@ -24,6 +24,7 @@ const initialConfigState: AppConfig = {
   allowPrivateStylePresets: false,
   allowClientSideUpload: false,
   allowPublishWorkflows: false,
+  allowPromptExpansion: false,
   shouldShowCredits: false,
   disabledTabs: [],
   disabledFeatures: ['lightbox', 'faceRestore', 'batches'],
