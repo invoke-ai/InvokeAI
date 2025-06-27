@@ -37,6 +37,7 @@ import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
 import { getGridSize } from 'features/parameters/util/optimalDimension';
+import type { PromptExpansionRequest } from 'features/prompt/PromptExpansion';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
@@ -91,10 +92,7 @@ const debouncedUpdateReasons = debounce(
     store: AppStore,
     isInPublishFlow: boolean,
     isChatGPT4oHighModelDisabled: (model: ParameterModel) => boolean,
-    promptExpansionRequest: {
-      startTime: number;
-      status: 'pending' | 'completed' | 'error';
-    } | null
+    promptExpansionRequest: PromptExpansionRequest | null
   ) => {
     if (tab === 'canvas') {
       const model = selectMainModelConfig(store.getState());
@@ -303,10 +301,7 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
   upscale: UpscaleState;
   config: AppConfig;
   params: ParamsState;
-  promptExpansionRequest: {
-    startTime: number;
-    status: 'pending' | 'completed' | 'error';
-  } | null;
+  promptExpansionRequest: PromptExpansionRequest | null;
 }) => {
   const { isConnected, upscale, config, params, promptExpansionRequest } = arg;
   const reasons: Reason[] = [];
@@ -368,10 +363,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   canvasIsCompositing: boolean;
   canvasIsSelectingObject: boolean;
   isChatGPT4oHighModelDisabled: (model: ParameterModel) => boolean;
-  promptExpansionRequest: {
-    startTime: number;
-    status: 'pending' | 'completed' | 'error';
-  } | null;
+  promptExpansionRequest: PromptExpansionRequest | null;
 }) => {
   const {
     isConnected,

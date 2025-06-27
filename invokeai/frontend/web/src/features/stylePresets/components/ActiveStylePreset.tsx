@@ -1,7 +1,6 @@
 import { Badge, Flex, IconButton, Spacer, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { negativePromptChanged, positivePromptChanged } from 'features/controlLayers/store/paramsSlice';
-import { usePromptExpansionTracking } from 'features/prompt/PromptExpansion/usePromptExpansionTracking';
 import { usePresetModifiedPrompts } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
 import {
   activeStylePresetIdChanged,
@@ -20,7 +19,6 @@ import StylePresetImage from './StylePresetImage';
 export const ActiveStylePreset = () => {
   const viewMode = useAppSelector(selectStylePresetViewMode);
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
-  const { isPending: isPromptExpansionPending } = usePromptExpansionTracking();
 
   const { activeStylePreset } = useListStylePresetsQuery(undefined, {
     selectFromResult: ({ data }) => {
@@ -98,7 +96,6 @@ export const ActiveStylePreset = () => {
           size="sm"
           aria-label={t('stylePresets.flatten')}
           icon={<PiStackSimpleBold />}
-          isDisabled={isPromptExpansionPending}
         />
       </Tooltip>
       <Tooltip label={t('stylePresets.clearTemplateSelection')}>

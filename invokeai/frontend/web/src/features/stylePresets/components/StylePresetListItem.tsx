@@ -1,6 +1,5 @@
 import { Badge, Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { usePromptExpansionTracking } from 'features/prompt/PromptExpansion/usePromptExpansionTracking';
 import { useDeleteStylePreset } from 'features/stylePresets/components/DeleteStylePresetDialog';
 import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
 import {
@@ -19,7 +18,6 @@ import StylePresetImage from './StylePresetImage';
 export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithImage }) => {
   const dispatch = useAppDispatch();
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
-  const { isPending: isPromptExpansionPending } = usePromptExpansionTracking();
   const { t } = useTranslation();
   const deleteStylePreset = useDeleteStylePreset();
 
@@ -45,12 +43,9 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
   );
 
   const handleClickApply = useCallback(() => {
-    if (isPromptExpansionPending) {
-      return;
-    }
     dispatch(activeStylePresetIdChanged(preset.id));
     $isStylePresetsMenuOpen.set(false);
-  }, [dispatch, preset.id, isPromptExpansionPending]);
+  }, [dispatch, preset.id]);
 
   const handleClickDelete = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
@@ -85,14 +80,12 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
     <Flex
       gap={4}
       onClick={handleClickApply}
-      cursor={isPromptExpansionPending ? 'not-allowed' : 'pointer'}
-      _hover={isPromptExpansionPending ? undefined : { backgroundColor: 'base.750' }}
+      cursor="pointer"
       py={3}
       px={2}
       borderRadius="base"
       alignItems="flex-start"
       w="full"
-      opacity={isPromptExpansionPending ? 0.7 : 1}
     >
       <StylePresetImage presetImageUrl={preset.image} />
       <Flex flexDir="column" w="full">

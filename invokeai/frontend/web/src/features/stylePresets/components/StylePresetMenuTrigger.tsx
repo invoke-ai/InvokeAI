@@ -1,7 +1,6 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { usePromptExpansionTracking } from 'features/prompt/PromptExpansion/usePromptExpansionTracking';
 import { $isStylePresetsMenuOpen } from 'features/stylePresets/store/stylePresetSlice';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,15 +14,11 @@ const _hover: SystemStyleObject = {
 
 export const StylePresetMenuTrigger = () => {
   const isMenuOpen = useStore($isStylePresetsMenuOpen);
-  const { isPending: isPromptExpansionPending } = usePromptExpansionTracking();
   const { t } = useTranslation();
 
   const handleToggle = useCallback(() => {
-    if (isPromptExpansionPending) {
-      return;
-    }
     $isStylePresetsMenuOpen.set(!isMenuOpen);
-  }, [isMenuOpen, isPromptExpansionPending]);
+  }, [isMenuOpen]);
 
   return (
     <Flex
@@ -36,12 +31,11 @@ export const StylePresetMenuTrigger = () => {
       borderRadius="base"
       gap={2}
       role="button"
-      _hover={isPromptExpansionPending ? undefined : _hover}
+      _hover={_hover}
       transitionProperty="background-color"
       transitionDuration="normal"
       w="full"
-      opacity={isPromptExpansionPending ? 0.5 : 1}
-      cursor={isPromptExpansionPending ? 'not-allowed' : 'pointer'}
+      cursor="pointer"
     >
       <ActiveStylePreset />
       <IconButton
@@ -49,7 +43,6 @@ export const StylePresetMenuTrigger = () => {
         variant="ghost"
         icon={<PiCaretDownBold />}
         size="sm"
-        isDisabled={isPromptExpansionPending}
       />
     </Flex>
   );
