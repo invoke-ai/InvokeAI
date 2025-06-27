@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import { promptGenerationFromImageRequested } from 'app/store/middleware/listenerMiddleware/listeners/addPromptExpansionRequestedListener';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
@@ -515,23 +516,47 @@ export const removeImageFromBoardDndTarget: DndTarget<
 
 //#endregion
 
+//#region Prompt Generation From Image
+const _promptGenerationFromImage = buildTypeAndKey('prompt-generation-from-image');
+export type PromptGenerationFromImageDndTargetData = DndData<
+  typeof _promptGenerationFromImage.type,
+  typeof _promptGenerationFromImage.key,
+  void
+>;
+export const promptGenerationFromImageDndTarget: DndTarget<
+  PromptGenerationFromImageDndTargetData,
+  SingleImageDndSourceData
+> = {
+  ..._promptGenerationFromImage,
+  typeGuard: buildTypeGuard(_promptGenerationFromImage.key),
+  getData: buildGetData(_promptGenerationFromImage.key, _promptGenerationFromImage.type),
+  isValid: ({ sourceData }) => {
+    if (singleImageDndSource.typeGuard(sourceData)) {
+      return true;
+    }
+    return false;
+  },
+  handler: ({ sourceData, dispatch }) => {
+    const { imageDTO } = sourceData.payload;
+    dispatch(promptGenerationFromImageRequested({ imageDTO }));
+  },
+};
+//#endregion
+
 export const dndTargets = [
-  // Single Image
   setGlobalReferenceImageDndTarget,
+  addGlobalReferenceImageDndTarget,
   setRegionalGuidanceReferenceImageDndTarget,
   setUpscaleInitialImageDndTarget,
   setNodeImageFieldImageDndTarget,
+  addImagesToNodeImageFieldCollectionDndTarget,
   setComparisonImageDndTarget,
   newCanvasEntityFromImageDndTarget,
+  newCanvasFromImageDndTarget,
   replaceCanvasEntityObjectsWithImageDndTarget,
   addImageToBoardDndTarget,
   removeImageFromBoardDndTarget,
-  newCanvasFromImageDndTarget,
-  addGlobalReferenceImageDndTarget,
-  // Single or Multiple Image
-  addImageToBoardDndTarget,
-  removeImageFromBoardDndTarget,
-  addImagesToNodeImageFieldCollectionDndTarget,
+  promptGenerationFromImageDndTarget,
 ] as const;
 
 export type AnyDndTarget = (typeof dndTargets)[number];

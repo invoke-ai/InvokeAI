@@ -24,6 +24,7 @@ const initialConfigState: AppConfig = {
   allowPrivateStylePresets: false,
   allowClientSideUpload: false,
   allowPublishWorkflows: false,
+  allowPromptExpansion: false,
   shouldShowCredits: false,
   disabledTabs: [],
   disabledFeatures: ['lightbox', 'faceRestore', 'batches'],
@@ -225,6 +226,7 @@ export const selectMetadataFetchDebounce = createConfigSelector((config) => conf
 export const selectIsModelsTabDisabled = createConfigSelector((config) => config.disabledTabs.includes('models'));
 export const selectIsClientSideUploadEnabled = createConfigSelector((config) => config.allowClientSideUpload);
 export const selectAllowPublishWorkflows = createConfigSelector((config) => config.allowPublishWorkflows);
+export const selectAllowPromptExpansion = createConfigSelector((config) => config.allowPromptExpansion);
 export const selectIsLocal = createSelector(selectConfigSlice, (config) => config.isLocal);
 export const selectShouldShowCredits = createConfigSelector((config) => config.shouldShowCredits);
 export const selectEnabledTabs = createConfigSelector((config) => {

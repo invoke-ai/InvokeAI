@@ -2,7 +2,7 @@ import type { CircularProgressProps, SystemStyleObject } from '@invoke-ai/ui-lib
 import { CircularProgress, Tooltip } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { memo } from 'react';
-import { useIsGenerationInProgress } from 'services/api/endpoints/queue';
+import { useIsNonPromptExpansionGenerationInProgress } from 'services/api/endpoints/queue';
 import { $lastProgressEvent, formatProgressMessage } from 'services/events/stores';
 
 const circleStyles: SystemStyleObject = {
@@ -13,9 +13,9 @@ const circleStyles: SystemStyleObject = {
 };
 
 export const ProgressIndicator = memo((props: CircularProgressProps) => {
-  const isGenerationInProgress = useIsGenerationInProgress();
+  const isNonPromptExpansionGenerationInProgress = useIsNonPromptExpansionGenerationInProgress();
   const lastProgressEvent = useStore($lastProgressEvent);
-  if (!isGenerationInProgress) {
+  if (!isNonPromptExpansionGenerationInProgress) {
     return null;
   }
   if (!lastProgressEvent) {

@@ -11,6 +11,7 @@ type Props = {
 export const AddPromptTriggerButton = memo((props: Props) => {
   const { onOpen, isOpen } = props;
   const { t } = useTranslation();
+
   return (
     <Tooltip label={t('prompt.addPromptTrigger')}>
       <IconButton
