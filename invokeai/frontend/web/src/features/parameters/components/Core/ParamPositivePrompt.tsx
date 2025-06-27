@@ -26,6 +26,7 @@ import {
   selectStylePresetViewMode,
 } from 'features/stylePresets/store/stylePresetSlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
+import { selectAllowPromptExpansion } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import type { HotkeyCallback } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -45,6 +46,7 @@ export const ParamPositivePrompt = memo(() => {
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
   const modelSupportsNegativePrompt = useAppSelector(selectModelSupportsNegativePrompt);
   const { isPending: isPromptExpansionPending } = usePromptExpansionTracking();
+  const isPromptExpansionEnabled = useAppSelector(selectAllowPromptExpansion);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   usePersistedTextAreaSize('positive_prompt', textareaRef, persistOptions);
@@ -109,7 +111,7 @@ export const ParamPositivePrompt = memo(() => {
             paddingTop={0}
             paddingBottom={3}
             resize="vertical"
-            minH={44}
+            minH={isPromptExpansionEnabled ? 44 : 32}
             isDisabled={isPromptExpansionPending}
           />
           <PromptOverlayButtonWrapper>
@@ -119,7 +121,7 @@ export const ParamPositivePrompt = memo(() => {
               <ShowDynamicPromptsPreviewButton />
               {modelSupportsNegativePrompt && <NegativePromptToggleButton />}
             </Flex>
-            <PromptExpansionMenu />
+            {isPromptExpansionEnabled && <PromptExpansionMenu />}
           </PromptOverlayButtonWrapper>
           <PromptLabel label="Prompt" />
           {viewMode && (

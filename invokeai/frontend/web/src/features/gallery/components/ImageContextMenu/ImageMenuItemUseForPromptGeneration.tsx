@@ -1,8 +1,9 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { promptGenerationFromImageRequested } from 'app/store/middleware/listenerMiddleware/listeners/addPromptExpansionRequestedListener';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { usePromptExpansionTracking } from 'features/prompt/PromptExpansion/usePromptExpansionTracking';
+import { selectAllowPromptExpansion } from 'features/system/store/configSlice';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +14,7 @@ export const ImageMenuItemUseForPromptGeneration = memo(() => {
   const dispatch = useAppDispatch();
   const imageDTO = useImageDTOContext();
   const { isPending } = usePromptExpansionTracking();
+  const isPromptExpansionEnabled = useAppSelector(selectAllowPromptExpansion);
 
   const handleUseForPromptGeneration = useCallback(() => {
     dispatch(promptGenerationFromImageRequested({ imageDTO }));
@@ -22,6 +24,10 @@ export const ImageMenuItemUseForPromptGeneration = memo(() => {
       status: 'info',
     });
   }, [dispatch, imageDTO, t]);
+
+  if (!isPromptExpansionEnabled) {
+    return null;
+  }
 
   return (
     <MenuItem
