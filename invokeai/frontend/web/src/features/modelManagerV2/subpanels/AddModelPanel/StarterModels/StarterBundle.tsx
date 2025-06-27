@@ -4,25 +4,25 @@ import { isMainModelBase } from 'features/nodes/types/common';
 import { MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { StarterModel } from 'services/api/types';
+import type { S } from 'services/api/types';
 
-export const StarterBundle = ({ bundleName, bundle }: { bundleName: string; bundle: StarterModel[] }) => {
+export const StarterBundle = ({ bundle }: { bundle: S['StarterModelBundle'] }) => {
   const { installBundle, getModelsToInstall } = useStarterBundleInstall();
   const { t } = useTranslation();
 
-  const modelsToInstall = useMemo(() => getModelsToInstall(bundle), [getModelsToInstall, bundle]);
+  const modelsToInstall = useMemo(() => getModelsToInstall(bundle), [bundle, getModelsToInstall]);
 
   const handleClickBundle = useCallback(() => {
-    installBundle(bundle, bundleName);
-  }, [installBundle, bundle, bundleName]);
+    installBundle(bundle);
+  }, [installBundle, bundle]);
 
   return (
     <Tooltip
       label={
         <Flex flexDir="column" p={1}>
-          <Text>{t('modelManager.includesNModels', { n: bundle.length })}:</Text>
+          <Text>{t('modelManager.includesNModels', { n: bundle.models.length })}:</Text>
           <UnorderedList>
-            {bundle.map((model, index) => (
+            {bundle.models.map((model, index) => (
               <ListItem key={index} wordBreak="break-all">
                 {model.name}
               </ListItem>
@@ -33,10 +33,10 @@ export const StarterBundle = ({ bundleName, bundle }: { bundleName: string; bund
     >
       <Button size="sm" onClick={handleClickBundle} py={6} isDisabled={modelsToInstall.install.length === 0}>
         <Flex flexDir="column">
-          <Text>{isMainModelBase(bundleName) ? MODEL_TYPE_SHORT_MAP[bundleName] : bundleName}</Text>
+          <Text>{isMainModelBase(bundle.name) ? MODEL_TYPE_SHORT_MAP[bundle.name] : bundle.name}</Text>
           {modelsToInstall.install.length > 0 && (
             <Text fontSize="xs">
-              ({bundle.length} {t('settings.models')})
+              ({bundle.models.length} {t('settings.models')})
             </Text>
           )}
           {modelsToInstall.install.length === 0 && <Text fontSize="xs">{t('common.installed')}</Text>}

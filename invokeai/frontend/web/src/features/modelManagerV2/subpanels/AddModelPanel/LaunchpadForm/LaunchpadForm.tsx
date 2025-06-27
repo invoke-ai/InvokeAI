@@ -25,7 +25,7 @@ export const LaunchpadForm = memo(() => {
         return;
       }
 
-      installBundle(bundle, bundleName);
+      installBundle(bundle);
     },
     [starterModelsData, installBundle]
   );
