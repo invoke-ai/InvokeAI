@@ -229,7 +229,12 @@
         "generateFromImage": "Generate prompt from image",
         "expandCurrentPrompt": "Expand Current Prompt",
         "uploadImageForPromptGeneration": "Upload Image for Prompt Generation",
-        "expandingPrompt": "Expanding prompt..."
+        "expandingPrompt": "Expanding prompt...",
+        "resultTitle": "Prompt Expansion Complete",
+        "resultSubtitle": "Choose how to handle the expanded prompt:",
+        "replace": "Replace",
+        "insert": "Insert",
+        "discard": "Discard"
     },
     "queue": {
         "queue": "Queue",

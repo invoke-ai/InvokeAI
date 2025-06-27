@@ -8,6 +8,7 @@ import {
   selectStylePresetViewMode,
   viewModeChanged,
 } from 'features/stylePresets/store/stylePresetSlice';
+import { usePromptExpansionTracking } from 'features/prompt/PromptExpansion/usePromptExpansionTracking';
 import type { MouseEventHandler } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,6 +20,7 @@ import StylePresetImage from './StylePresetImage';
 export const ActiveStylePreset = () => {
   const viewMode = useAppSelector(selectStylePresetViewMode);
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
+  const { isPending: isPromptExpansionPending } = usePromptExpansionTracking();
 
   const { activeStylePreset } = useListStylePresetsQuery(undefined, {
     selectFromResult: ({ data }) => {
@@ -96,6 +98,7 @@ export const ActiveStylePreset = () => {
           size="sm"
           aria-label={t('stylePresets.flatten')}
           icon={<PiStackSimpleBold />}
+          isDisabled={isPromptExpansionPending}
         />
       </Tooltip>
       <Tooltip label={t('stylePresets.clearTemplateSelection')}>

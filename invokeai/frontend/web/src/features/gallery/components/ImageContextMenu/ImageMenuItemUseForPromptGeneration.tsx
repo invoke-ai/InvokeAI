@@ -24,9 +24,9 @@ export const ImageMenuItemUseForPromptGeneration = memo(() => {
   }, [dispatch, imageDTO, t]);
 
   return (
-    <MenuItem 
-      icon={<PiTextTBold />} 
-      onClickCapture={handleUseForPromptGeneration} 
+    <MenuItem
+      icon={<PiTextTBold />}
+      onClickCapture={handleUseForPromptGeneration}
       id="use-for-prompt-generation"
       isDisabled={isPending}
     >

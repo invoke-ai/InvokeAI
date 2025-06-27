@@ -16,9 +16,13 @@ export const $lastUpscalingProgressEvent = atom<S['InvocationProgressEvent'] | n
 export const $lastUpscalingProgressImage = atom<EphemeralProgressImage | null>(null);
 
 // Prompt expansion tracking - single request since only one at a time
-export const $promptExpansionRequest = atom<{ startTime: number; status: 'pending' | 'completed' | 'error' } | null>(
-  null
-);
+export const $promptExpansionRequest = atom<{
+  startTime: number;
+  status: 'pending' | 'completed' | 'error';
+} | null>(null);
+
+// Expanded text from prompt expansion - set when invocation completes
+export const $promptExpansionResult = atom<string | null>(null);
 
 export const $lastProgressImage = computed($lastProgressEvent, (val) => val?.image ?? null);
 export const $hasLastProgressImage = computed($lastProgressEvent, (val) => Boolean(val?.image));

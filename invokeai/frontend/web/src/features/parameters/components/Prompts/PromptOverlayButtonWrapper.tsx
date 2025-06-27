@@ -11,7 +11,8 @@ export const PromptOverlayButtonWrapper = memo((props: PropsWithChildren) => (
     gap={2}
     alignItems="center"
     justifyContent="space-between"
-    h="full"
+    bottom={4} // make sure textarea resize is accessible
+    pb={0}
   >
     {props.children}
   </Flex>

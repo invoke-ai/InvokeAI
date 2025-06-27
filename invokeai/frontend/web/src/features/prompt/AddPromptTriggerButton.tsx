@@ -12,13 +12,13 @@ type Props = {
 export const AddPromptTriggerButton = memo((props: Props) => {
   const { onOpen, isOpen, isDisabled = false } = props;
   const { t } = useTranslation();
-  
+
   const handleClick = useCallback(() => {
     if (!isDisabled) {
       onOpen();
     }
   }, [onOpen, isDisabled]);
-  
+
   return (
     <Tooltip label={t('prompt.addPromptTrigger')}>
       <IconButton

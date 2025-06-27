@@ -1,7 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
-import { positivePromptChanged } from 'features/controlLayers/store/paramsSlice';
 import {
   selectAutoSwitch,
   selectGalleryView,
@@ -12,12 +11,13 @@ import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gal
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { isImageField, isImageFieldCollection } from 'features/nodes/types/common';
 import { zNodeStatus } from 'features/nodes/types/invocation';
+import { isPromptExpansionNode } from 'features/nodes/util/graph/buildPromptExpansionGraph';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO, S } from 'services/api/types';
 import { getCategories } from 'services/api/util';
 import { insertImageIntoNamesResult } from 'services/api/util/optimisticUpdates';
-import { $lastProgressEvent, $promptExpansionRequest } from 'services/events/stores';
+import { $lastProgressEvent, $promptExpansionRequest, $promptExpansionResult } from 'services/events/stores';
 import type { Param0 } from 'tsafe';
 import { objectEntries } from 'tsafe';
 import type { JsonObject } from 'type-fest';
@@ -175,10 +175,7 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
     const { result, invocation } = data;
 
     // If this is a prompt expansion or generation invocation, look for string output
-    if (
-      (invocation.type as string === 'claude_expand_prompt' || invocation.type as string === 'claude_analyze_image') &&
-      result.type === 'string_output'
-    ) {
+    if (isPromptExpansionNode(invocation.type) && result.type === 'string_output') {
       const stringValue = result.value;
 
       const currentRequest = $promptExpansionRequest.get();
@@ -190,7 +187,8 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
           status: 'completed' as const,
         });
 
-        dispatch(positivePromptChanged(stringValue));
+        // Set the expanded text in the separate nanostore
+        $promptExpansionResult.set(stringValue);
 
         log.debug({ stringValue }, 'Prompt expansion/generation completed');
       }

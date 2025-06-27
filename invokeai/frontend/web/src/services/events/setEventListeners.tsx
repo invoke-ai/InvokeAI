@@ -16,6 +16,7 @@ import {
 } from 'features/nodes/components/sidePanel/workflow/publish';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
+import { isPromptExpansionNode } from 'features/nodes/util/graph/buildPromptExpansionGraph';
 import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
@@ -143,8 +144,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.error({ data } as JsonObject, `Invocation error (${invocation.type}, ${invocation_source_id})`);
 
     // Handle prompt expansion errors
-    // @ts-expect-error: These nodes are not available in the OSS application
-    if (invocation.type === 'claude_expand_prompt' || invocation.type === 'claude_analyze_image') {
+    if (isPromptExpansionNode(invocation.type)) {
       const currentRequest = $promptExpansionRequest.get();
       if (currentRequest && currentRequest.status === 'pending') {
         $promptExpansionRequest.set({

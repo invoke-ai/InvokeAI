@@ -4,7 +4,7 @@ import { $promptExpansionRequest } from 'services/events/stores';
 export const usePromptExpansionTracking = () => {
   const request = useStore($promptExpansionRequest);
 
-  const isPending = request?.status === 'pending';
+  const isPending = request?.status === 'pending' || request?.status === 'completed';
   const isCompleted = request?.status === 'completed';
   const isFailed = request?.status === 'error';
   const hasRequest = request !== null;

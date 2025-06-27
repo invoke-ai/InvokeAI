@@ -55,8 +55,8 @@ export const addPromptExpansionRequestedListener = (startAppListening: AppStartL
       } catch (error) {
         // Clear the prompt expansion request status on error
         $promptExpansionRequest.set(null);
-        
-        log.error({ enqueueBatchArg } as JsonObject, t('queue.graphFailedToQueue'));
+
+        log.error({ enqueueBatchArg, error } as JsonObject, t('queue.graphFailedToQueue'));
 
         if (error instanceof Object && 'status' in error && error.status === 403) {
           return;
@@ -109,7 +109,7 @@ export const addPromptExpansionRequestedListener = (startAppListening: AppStartL
       } catch (error) {
         // Clear the prompt expansion request status on error
         $promptExpansionRequest.set(null);
-        
+
         log.error({ enqueueBatchArg } as JsonObject, t('queue.graphFailedToQueue'));
 
         if (error instanceof Object && 'status' in error && error.status === 403) {
@@ -169,7 +169,7 @@ export const addPromptExpansionRequestedListener = (startAppListening: AppStartL
           status: 'pending' as const,
         });
 
-        log.debug({ imageDTO: imageDTO.image_name }, 'Prompt generation from uploaded image request initiated');
+        log.debug({ imageDTO: imageDTO?.image_name }, 'Prompt generation from uploaded image request initiated');
 
         const req = dispatch(
           queueApi.endpoints.enqueueBatch.initiate(enqueueBatchArg, enqueueMutationFixedCacheKeyOptions)
@@ -182,7 +182,7 @@ export const addPromptExpansionRequestedListener = (startAppListening: AppStartL
       } catch (error) {
         // Clear the prompt expansion request status on error
         $promptExpansionRequest.set(null);
-        
+
         log.error({ error } as JsonObject, 'Failed to upload image and generate prompt');
 
         if (error instanceof Object && 'status' in error && error.status === 403) {

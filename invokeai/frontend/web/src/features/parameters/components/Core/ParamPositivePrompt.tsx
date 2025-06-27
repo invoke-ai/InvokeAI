@@ -93,10 +93,10 @@ export const ParamPositivePrompt = memo(() => {
 
   return (
     <Box pos="relative">
-      <PromptPopover 
-        isOpen={isOpen && !isPromptExpansionPending} 
-        onClose={onClose} 
-        onSelect={onSelect} 
+      <PromptPopover
+        isOpen={isOpen && !isPromptExpansionPending}
+        onClose={onClose}
+        onSelect={onSelect}
         width={textareaRef.current?.clientWidth}
       >
         <Box pos="relative">
@@ -114,7 +114,7 @@ export const ParamPositivePrompt = memo(() => {
             paddingTop={0}
             paddingBottom={3}
             resize="vertical"
-            minH={32}
+            minH={44}
             isDisabled={isPromptExpansionPending}
           />
           <PromptOverlayButtonWrapper>

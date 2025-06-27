@@ -5,6 +5,12 @@ import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 
+const PROMPT_EXPANSION_NODES = ['claude_expand_prompt', 'claude_analyze_image'];
+
+export const isPromptExpansionNode = (node: string) => {
+  return PROMPT_EXPANSION_NODES.includes(node);
+};
+
 type Arg = {
   state: RootState;
   imageDTO?: ImageDTO;
