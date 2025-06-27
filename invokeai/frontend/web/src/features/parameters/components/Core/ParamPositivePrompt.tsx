@@ -93,12 +93,7 @@ export const ParamPositivePrompt = memo(() => {
 
   return (
     <Box pos="relative">
-      <PromptPopover
-        isOpen={isOpen}
-        onClose={onClose}
-        onSelect={onSelect}
-        width={textareaRef.current?.clientWidth}
-      >
+      <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
         <Box pos="relative">
           <Textarea
             className="positive-prompt-textarea"
@@ -120,7 +115,7 @@ export const ParamPositivePrompt = memo(() => {
           <PromptOverlayButtonWrapper>
             <Flex flexDir="column" gap={2} justifyContent="flex-start" alignItems="center">
               <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
-              {baseModel === 'sdxl' && <SDXLConcatButton isDisabled={isPromptExpansionPending} />}
+              {baseModel === 'sdxl' && <SDXLConcatButton />}
               <ShowDynamicPromptsPreviewButton />
               {modelSupportsNegativePrompt && <NegativePromptToggleButton />}
             </Flex>

@@ -38,12 +38,7 @@ export const StylePresetMenuTrigger = () => {
       cursor="pointer"
     >
       <ActiveStylePreset />
-      <IconButton
-        aria-label={t('stylePresets.viewList')}
-        variant="ghost"
-        icon={<PiCaretDownBold />}
-        size="sm"
-      />
+      <IconButton aria-label={t('stylePresets.viewList')} variant="ghost" icon={<PiCaretDownBold />} size="sm" />
     </Flex>
   );
 };
