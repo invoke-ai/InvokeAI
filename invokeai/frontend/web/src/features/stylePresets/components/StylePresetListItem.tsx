@@ -1,7 +1,7 @@
 import { Badge, Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useDeleteStylePreset } from 'features/stylePresets/components/DeleteStylePresetDialog';
 import { usePromptExpansionTracking } from 'features/prompt/PromptExpansion/usePromptExpansionTracking';
+import { useDeleteStylePreset } from 'features/stylePresets/components/DeleteStylePresetDialog';
 import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
 import {
   $isStylePresetsMenuOpen,
@@ -45,7 +45,9 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
   );
 
   const handleClickApply = useCallback(() => {
-    if (isPromptExpansionPending) return;
+    if (isPromptExpansionPending) {
+      return;
+    }
     dispatch(activeStylePresetIdChanged(preset.id));
     $isStylePresetsMenuOpen.set(false);
   }, [dispatch, preset.id, isPromptExpansionPending]);

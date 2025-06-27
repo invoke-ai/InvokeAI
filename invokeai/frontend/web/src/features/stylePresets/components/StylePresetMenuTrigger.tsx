@@ -19,7 +19,9 @@ export const StylePresetMenuTrigger = () => {
   const { t } = useTranslation();
 
   const handleToggle = useCallback(() => {
-    if (isPromptExpansionPending) return;
+    if (isPromptExpansionPending) {
+      return;
+    }
     $isStylePresetsMenuOpen.set(!isMenuOpen);
   }, [isMenuOpen, isPromptExpansionPending]);
 
@@ -42,10 +44,10 @@ export const StylePresetMenuTrigger = () => {
       cursor={isPromptExpansionPending ? 'not-allowed' : 'pointer'}
     >
       <ActiveStylePreset />
-      <IconButton 
-        aria-label={t('stylePresets.viewList')} 
-        variant="ghost" 
-        icon={<PiCaretDownBold />} 
+      <IconButton
+        aria-label={t('stylePresets.viewList')}
+        variant="ghost"
+        icon={<PiCaretDownBold />}
         size="sm"
         isDisabled={isPromptExpansionPending}
       />

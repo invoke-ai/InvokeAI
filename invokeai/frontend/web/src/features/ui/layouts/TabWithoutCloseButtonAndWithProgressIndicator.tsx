@@ -3,10 +3,10 @@ import { useCallbackOnDragEnter } from 'common/hooks/useCallbackOnDragEnter';
 import type { IDockviewPanelHeaderProps } from 'dockview';
 import ProgressBar from 'features/system/components/ProgressBar';
 import { memo, useCallback, useRef } from 'react';
-import { useIsGenerationInProgress } from 'services/api/endpoints/queue';
+import { useIsNonPromptExpansionGenerationInProgress } from 'services/api/endpoints/queue';
 
 export const TabWithoutCloseButtonAndWithProgressIndicator = memo((props: IDockviewPanelHeaderProps) => {
-  const isGenerationInProgress = useIsGenerationInProgress();
+  const isGenerationInProgress = useIsNonPromptExpansionGenerationInProgress();
 
   const ref = useRef<HTMLDivElement>(null);
   const setActive = useCallback(() => {

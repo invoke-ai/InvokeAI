@@ -7,7 +7,7 @@ import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { memo, useMemo } from 'react';
 import { PiPulseBold } from 'react-icons/pi';
-import { useIsGenerationInProgress } from 'services/api/endpoints/queue';
+import { useIsNonPromptExpansionGenerationInProgress } from 'services/api/endpoints/queue';
 import { $lastProgressImage } from 'services/events/stores';
 
 const selectShouldAntialiasProgressImage = createSelector(
@@ -16,7 +16,7 @@ const selectShouldAntialiasProgressImage = createSelector(
 );
 
 export const ProgressImage = memo(() => {
-  const isGenerationInProgress = useIsGenerationInProgress();
+  const isGenerationInProgress = useIsNonPromptExpansionGenerationInProgress();
   const progressImage = useStore($lastProgressImage);
   const shouldAntialiasProgressImage = useAppSelector(selectShouldAntialiasProgressImage);
 

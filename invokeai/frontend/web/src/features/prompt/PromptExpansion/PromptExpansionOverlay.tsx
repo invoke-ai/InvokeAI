@@ -14,12 +14,12 @@ export const PromptExpansionOverlay = memo(() => {
   const { t } = useTranslation();
 
   const showOverlay = useMemo(() => {
-    return promptExpansionRequest?.status === 'completed' && expandedText
+    return promptExpansionRequest?.status === 'completed' && expandedText;
   }, [promptExpansionRequest, expandedText]);
 
   // Show result overlay when completed
   if (showOverlay) {
-    return <PromptExpansionResultOverlay expandedText={expandedText || ""} />;
+    return <PromptExpansionResultOverlay expandedText={expandedText || ''} />;
   }
 
   // Show pending overlay when pending
