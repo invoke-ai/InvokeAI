@@ -125,6 +125,7 @@ export const ModelPicker = typedMemo(
     isInvalid,
     className,
     noOptionsText,
+    initialGroupStates,
   }: {
     modelConfigs: T[];
     selectedModelConfig: T | undefined;
@@ -137,6 +138,7 @@ export const ModelPicker = typedMemo(
     isInvalid?: boolean;
     className?: string;
     noOptionsText?: string;
+    initialGroupStates?: Record<string, boolean>;
   }) => {
     const { t } = useTranslation();
     const options = useMemo<T[] | Group<T>[]>(() => {
@@ -244,6 +246,7 @@ export const ModelPicker = typedMemo(
                 NextToSearchBar={<NavigateToModelManagerButton />}
                 getIsOptionDisabled={getIsOptionDisabled}
                 searchable
+                initialGroupStates={initialGroupStates}
               />
             </PopoverBody>
           </PopoverContent>

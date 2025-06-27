@@ -198,6 +198,10 @@ type PickerProps<T extends object> = {
    * Whether the picker should be searchable. If true, renders a search input.
    */
   searchable?: boolean;
+  /**
+   * Initial state for group toggles. If provided, groups will start with these states instead of all being disabled.
+   */
+  initialGroupStates?: GroupStatusMap;
 };
 
 export type PickerContextState<T extends object> = {
@@ -310,9 +314,9 @@ const flattenOptions = <T extends object>(options: OptionOrGroup<T>[]): T[] => {
   return flattened;
 };
 
-type GroupStatusMap = Record<string, boolean>;
+export type GroupStatusMap = Record<string, boolean>;
 
-const useTogglableGroups = <T extends object>(options: OptionOrGroup<T>[]) => {
+const useTogglableGroups = <T extends object>(options: OptionOrGroup<T>[], initialGroupStates?: GroupStatusMap) => {
   const groupsWithOptions = useMemo(() => {
     const ids: string[] = [];
     for (const optionOrGroup of options) {
@@ -332,14 +336,16 @@ const useTogglableGroups = <T extends object>(options: OptionOrGroup<T>[]) => {
     const groupStatusMap = $groupStatusMap.get();
     const newMap: GroupStatusMap = {};
     for (const id of groupsWithOptions) {
-      if (newMap[id] === undefined) {
-        newMap[id] = false;
+      if (initialGroupStates && initialGroupStates[id] !== undefined) {
+        newMap[id] = initialGroupStates[id];
       } else if (groupStatusMap[id] !== undefined) {
         newMap[id] = groupStatusMap[id];
+      } else {
+        newMap[id] = false;
       }
     }
     $groupStatusMap.set(newMap);
-  }, [groupsWithOptions, $groupStatusMap]);
+  }, [groupsWithOptions, $groupStatusMap, initialGroupStates]);
 
   const toggleGroup = useCallback(
     (idToToggle: string) => {
@@ -511,10 +517,14 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
     OptionComponent = DefaultOptionComponent,
     NextToSearchBar,
     searchable,
+    initialGroupStates,
   } = props;
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { $groupStatusMap, $areAllGroupsDisabled, toggleGroup } = useTogglableGroups(optionsOrGroups);
+  const { $groupStatusMap, $areAllGroupsDisabled, toggleGroup } = useTogglableGroups(
+    optionsOrGroups,
+    initialGroupStates
+  );
   const $activeOptionId = useAtom(getFirstOptionId(optionsOrGroups, getOptionId));
   const $compactView = useAtom(true);
   const $optionsOrGroups = useAtom(optionsOrGroups);
