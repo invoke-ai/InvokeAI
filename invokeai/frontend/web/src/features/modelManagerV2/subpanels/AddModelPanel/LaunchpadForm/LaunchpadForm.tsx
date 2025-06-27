@@ -1,7 +1,9 @@
 import { Button, Flex, Grid, Heading, Icon, Text } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { useStarterBundleInstall } from 'features/modelManagerV2/hooks/useStarterBundleInstall';
+import { map } from 'es-toolkit/compat';
 import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
+import { StarterBundleButton } from 'features/modelManagerV2/subpanels/AddModelPanel/StarterModels/StarterBundle';
+import { StarterBundleTooltipContentCompact } from 'features/modelManagerV2/subpanels/AddModelPanel/StarterModels/StarterBundleTooltipContentCompact';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFolderOpenBold, PiLinkBold, PiStarBold } from 'react-icons/pi';
@@ -10,25 +12,7 @@ import { useGetStarterModelsQuery } from 'services/api/endpoints/models';
 
 export const LaunchpadForm = memo(() => {
   const { t } = useTranslation();
-  const { installBundle } = useStarterBundleInstall();
   const { data: starterModelsData } = useGetStarterModelsQuery();
-
-  // Function to install models from a bundle
-  const handleBundleInstall = useCallback(
-    (bundleName: string) => {
-      if (!starterModelsData?.starter_bundles) {
-        return;
-      }
-
-      const bundle = starterModelsData.starter_bundles[bundleName];
-      if (!bundle) {
-        return;
-      }
-
-      installBundle(bundle);
-    },
-    [starterModelsData, installBundle]
-  );
 
   const navigateToUrlTab = useCallback(() => {
     setInstallModelsTabByName('urlOrLocal');
@@ -45,18 +29,6 @@ export const LaunchpadForm = memo(() => {
   const navigateToStarterModelsTab = useCallback(() => {
     setInstallModelsTabByName('starterModels');
   }, []);
-
-  const handleSD15BundleClick = useCallback(() => {
-    handleBundleInstall('sd-1');
-  }, [handleBundleInstall]);
-
-  const handleSDXLBundleClick = useCallback(() => {
-    handleBundleInstall('sdxl');
-  }, [handleBundleInstall]);
-
-  const handleFluxBundleClick = useCallback(() => {
-    handleBundleInstall('flux');
-  }, [handleBundleInstall]);
 
   return (
     <Flex flexDir="column" height="100%" gap={3}>
@@ -145,32 +117,36 @@ export const LaunchpadForm = memo(() => {
             </Grid>
           </Flex>
           {/* Recommended Section */}
-          <Flex flexDir="column" gap={2} alignItems="flex-start">
-            <Heading size="sm">{t('modelManager.launchpad.recommendedModels')}</Heading>
-            {/* Starter Model Bundles - More Prominent */}
-            <Text color="base.300">{t('modelManager.launchpad.bundleDescription')}</Text>
-            <Grid templateColumns="repeat(auto-fit, minmax(180px, 1fr))" gap={2} w="full">
-              <Button onClick={handleSD15BundleClick} variant="outline" p={6}>
-                {t('modelManager.launchpad.stableDiffusion15')}
+          {starterModelsData && (
+            <Flex flexDir="column" gap={2} alignItems="flex-start">
+              <Heading size="sm">{t('modelManager.launchpad.recommendedModels')}</Heading>
+              {/* Starter Model Bundles - More Prominent */}
+              <Text color="base.300">{t('modelManager.launchpad.bundleDescription')}</Text>
+              <Grid templateColumns="repeat(auto-fit, minmax(180px, 1fr))" gap={2} w="full">
+                {map(starterModelsData.starter_bundles, (bundle) => (
+                  <StarterBundleButton
+                    size="md"
+                    tooltip={<StarterBundleTooltipContentCompact bundle={bundle} />}
+                    key={bundle.name}
+                    bundle={bundle}
+                    variant="outline"
+                    p={4}
+                    h="unset"
+                  />
+                ))}
+              </Grid>
+              {/* Browse All - Simple Link */}
+              <Button
+                onClick={navigateToStarterModelsTab}
+                variant="link"
+                size="sm"
+                leftIcon={<PiStarBold />}
+                colorScheme="invokeBlue"
+              >
+                {t('modelManager.launchpad.exploreStarter')}
               </Button>
-              <Button onClick={handleSDXLBundleClick} variant="outline" p={6}>
-                {t('modelManager.launchpad.sdxl')}
-              </Button>
-              <Button onClick={handleFluxBundleClick} variant="outline" p={6}>
-                {t('modelManager.launchpad.fluxDev')}
-              </Button>
-            </Grid>
-            {/* Browse All - Simple Link */}
-            <Button
-              onClick={navigateToStarterModelsTab}
-              variant="link"
-              size="sm"
-              leftIcon={<PiStarBold />}
-              colorScheme="invokeBlue"
-            >
-              {t('modelManager.launchpad.exploreStarter')}
-            </Button>
-          </Flex>
+            </Flex>
+          )}
         </Flex>
       </ScrollableContent>
     </Flex>
