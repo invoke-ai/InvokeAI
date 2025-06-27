@@ -118,6 +118,7 @@ export const ModelPicker = typedMemo(
     selectedModelConfig,
     onChange,
     grouped,
+    relatedModelKeys = [],
     getIsOptionDisabled,
     placeholder,
     allowEmpty,
@@ -131,6 +132,7 @@ export const ModelPicker = typedMemo(
     selectedModelConfig: T | undefined;
     onChange: (modelConfig: T) => void;
     grouped?: boolean;
+    relatedModelKeys?: string[];
     getIsOptionDisabled?: (model: T) => boolean;
     placeholder?: string;
     allowEmpty?: boolean;
@@ -143,13 +145,35 @@ export const ModelPicker = typedMemo(
     const { t } = useTranslation();
     const options = useMemo<T[] | Group<T>[]>(() => {
       if (!grouped) {
+        // Handle related models for non-grouped view
+        if (relatedModelKeys.length > 0) {
+          const relatedModels: T[] = [];
+          const otherModels: T[] = [];
+          
+          for (const modelConfig of modelConfigs) {
+            if (relatedModelKeys.includes(modelConfig.key)) {
+              relatedModels.push(modelConfig);
+            } else {
+              otherModels.push(modelConfig);
+            }
+          }
+          
+          return [...relatedModels, ...otherModels];
+        }
         return modelConfigs;
       }
 
       // When all groups are disabled, we show all models
       const groups: Record<string, Group<T>> = {};
+      const relatedModels: T[] = [];
 
       for (const modelConfig of modelConfigs) {
+        // Check if this model is related and separate it
+        if (relatedModelKeys.length > 0 && relatedModelKeys.includes(modelConfig.key)) {
+          relatedModels.push(modelConfig);
+          continue;
+        }
+
         const groupId = getGroupIDFromModelConfig(modelConfig);
         let group = groups[groupId];
         if (!group) {
@@ -170,6 +194,20 @@ export const ModelPicker = typedMemo(
 
       const _options: Group<T>[] = [];
 
+      // Add related models group first if there are any
+      if (relatedModels.length > 0) {
+        const relatedGroup = buildGroup<T>({
+          id: 'related',
+          color: 'accent.300',
+          shortName: t('modelManager.showOnlyRelatedModels'),
+          name: t('modelManager.relatedModels'),
+          getOptionCountString: (count) => t('common.model_withCount', { count }),
+          options: relatedModels,
+        });
+        _options.push(relatedGroup);
+      }
+
+      // Add other groups in the original order
       for (const groupId of ['api', 'flux', 'cogview4', 'sdxl', 'sd-3', 'sd-2', 'sd-1']) {
         const group = groups[groupId];
         if (group) {
@@ -180,7 +218,7 @@ export const ModelPicker = typedMemo(
       _options.push(...Object.values(groups));
 
       return _options;
-    }, [grouped, modelConfigs, t]);
+    }, [grouped, modelConfigs, relatedModelKeys, t]);
     const popover = useDisclosure(false);
     const pickerRef = useRef<PickerContextState<T>>(null);
 
@@ -206,6 +244,18 @@ export const ModelPicker = typedMemo(
       }
       return undefined;
     }, [allowEmpty, isInvalid, selectedModelConfig]);
+
+    // Create a component wrapper that includes related model styling
+    const RelatedModelPickerOptionComponent = useCallback(
+      ({ option, ...rest }: { option: T } & BoxProps) => (
+        <PickerOptionComponent 
+          option={option} 
+          isRelated={relatedModelKeys.includes(option.key)}
+          {...rest} 
+        />
+      ),
+      [relatedModelKeys]
+    );
 
     return (
       <Popover
@@ -240,7 +290,7 @@ export const ModelPicker = typedMemo(
                 onSelect={onSelect}
                 selectedOption={selectedModelConfig}
                 isMatch={isMatch}
-                OptionComponent={PickerOptionComponent}
+                OptionComponent={RelatedModelPickerOptionComponent}
                 noOptionsFallback={<NoOptionsFallback noOptionsText={noOptionsText} />}
                 noMatchesFallback={t('modelManager.noMatchingModels')}
                 NextToSearchBar={<NavigateToModelManagerButton />}
@@ -291,9 +341,11 @@ const optionNameSx: SystemStyleObject = {
   },
 };
 
-const PickerOptionComponent = typedMemo(({ option, ...rest }: { option: AnyModelConfig } & BoxProps) => {
+const PickerOptionComponent = typedMemo(({ option, isRelated = false, ...rest }: { option: AnyModelConfig; isRelated?: boolean } & BoxProps) => {
   const { $compactView } = usePickerContext<AnyModelConfig>();
   const compactView = useStore($compactView);
+
+  const displayName = isRelated ? `* ${option.name}` : option.name;
 
   return (
     <Flex {...rest} sx={optionSx} data-is-compact={compactView}>
@@ -301,7 +353,7 @@ const PickerOptionComponent = typedMemo(({ option, ...rest }: { option: AnyModel
       <Flex flexDir="column" gap={1} flex={1}>
         <Flex gap={2} alignItems="center">
           <Text sx={optionNameSx} data-is-compact={compactView}>
-            {option.name}
+            {displayName}
           </Text>
           <Spacer />
           {option.file_size > 0 && (

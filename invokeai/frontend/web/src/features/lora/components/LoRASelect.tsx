@@ -1,26 +1,65 @@
 import { FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
+import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import type { GroupStatusMap } from 'common/components/Picker/Picker';
-import { useRelatedGroupedModelCombobox } from 'common/hooks/useRelatedGroupedModelCombobox';
+import { uniq } from 'es-toolkit/compat';
 import { loraAdded, selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
-import { selectBase } from 'features/controlLayers/store/paramsSlice';
+import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
 import { API_BASE_MODELS } from 'features/parameters/types/constants';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useGetRelatedModelIdsBatchQuery } from 'services/api/endpoints/modelRelationships';
 import { useLoRAModels } from 'services/api/hooks/modelsByType';
 import type { LoRAModelConfig } from 'services/api/types';
 
 const selectLoRAs = createSelector(selectLoRAsSlice, (loras) => loras.loras);
+
+const selectSelectedModelKeys = createSelector(selectParamsSlice, selectLoRAsSlice, (params, loras) => {
+  const keys: string[] = [];
+  const main = params.model;
+  const vae = params.vae;
+  const refiner = params.refinerModel;
+  const controlnet = params.controlLora;
+
+  if (main) {
+    keys.push(main.key);
+  }
+  if (vae) {
+    keys.push(vae.key);
+  }
+  if (refiner) {
+    keys.push(refiner.key);
+  }
+  if (controlnet) {
+    keys.push(controlnet.key);
+  }
+  for (const { model } of loras.loras) {
+    keys.push(model.key);
+  }
+
+  return uniq(keys);
+});
 
 const LoRASelect = () => {
   const dispatch = useAppDispatch();
   const [modelConfigs, { isLoading }] = useLoRAModels();
   const { t } = useTranslation();
   const addedLoRAs = useAppSelector(selectLoRAs);
-  const currentBaseModel = useAppSelector(selectBase);
+  const selectedKeys = useAppSelector(selectSelectedModelKeys);
+
+  const { relatedKeys } = useGetRelatedModelIdsBatchQuery(selectedKeys, {
+    selectFromResult: ({ data }) => {
+      if (!data) {
+        return { relatedKeys: EMPTY_ARRAY };
+      }
+      return { relatedKeys: data };
+    },
+  });
+
+  const currentBaseModel = useAppSelector((state) => state.controlLayers.present.params.model?.base);
 
   const getIsDisabled = useCallback(
     (model: LoRAModelConfig): boolean => {
@@ -42,23 +81,17 @@ const LoRASelect = () => {
     [dispatch]
   );
 
-  const { options } = useRelatedGroupedModelCombobox({
-    modelConfigs,
-    getIsDisabled,
-    onChange,
-  });
-
   const placeholder = useMemo(() => {
     if (isLoading) {
       return t('common.loading');
     }
 
-    if (options.length === 0) {
+    if (modelConfigs.length === 0) {
       return t('models.noLoRAsInstalled');
     }
 
     return t('models.addLora');
-  }, [isLoading, options.length, t]);
+  }, [isLoading, modelConfigs.length, t]);
 
   // Calculate initial group states to default to the current base model architecture
   const initialGroupStates = useMemo(() => {
@@ -82,6 +115,7 @@ const LoRASelect = () => {
         modelConfigs={modelConfigs}
         onChange={onChange}
         grouped
+        relatedModelKeys={relatedKeys}
         selectedModelConfig={undefined}
         allowEmpty
         placeholder={placeholder}
