@@ -1,6 +1,7 @@
 import {
   Divider,
   Flex,
+  Icon,
   IconButton,
   Popover,
   PopoverArrow,
@@ -46,58 +47,52 @@ export const CanvasSettingsPopover = memo(() => {
       <PopoverContent maxW="280px">
         <PopoverArrow />
         <PopoverBody>
-          <Flex direction="column" gap={3}>
+          <Flex direction="column" gap={2}>
             {/* Behavior Settings */}
-            <Flex direction="column" gap={2}>
-              <Flex align="center" gap={2} mb={1}>
-                <PiPencilFill size={16} />
-                <Text fontWeight="bold" fontSize="sm" color="base.200">
+            <Flex direction="column" gap={1}>
+              <Flex align="center" gap={2}>
+                <Icon as={PiPencilFill} boxSize={4} />
+                <Text fontWeight="bold" fontSize="sm" color="base.100">
                   {t('hotkeys.canvas.settings.behavior')}
                 </Text>
               </Flex>
-              <Flex direction="column" gap={2} pl={6}>
-                <CanvasSettingsInvertScrollCheckbox />
-                <CanvasSettingsPressureSensitivityCheckbox />
-                <CanvasSettingsPreserveMaskCheckbox />
-                <CanvasSettingsClipToBboxCheckbox />
-                <CanvasSettingsOutputOnlyMaskedRegionsCheckbox />
-              </Flex>
+              <CanvasSettingsInvertScrollCheckbox />
+              <CanvasSettingsPressureSensitivityCheckbox />
+              <CanvasSettingsPreserveMaskCheckbox />
+              <CanvasSettingsClipToBboxCheckbox />
+              <CanvasSettingsOutputOnlyMaskedRegionsCheckbox />
             </Flex>
 
             <Divider />
 
             {/* Display Settings */}
-            <Flex direction="column" gap={2}>
-              <Flex align="center" gap={2} mb={1}>
-                <PiEyeFill size={16} />
-                <Text fontWeight="bold" fontSize="sm" color="base.200">
+            <Flex direction="column" gap={1}>
+              <Flex align="center" gap={2} color="base.200">
+                <Icon as={PiEyeFill} boxSize={4} />
+                <Text fontWeight="bold" fontSize="sm">
                   {t('hotkeys.canvas.settings.display')}
                 </Text>
               </Flex>
-              <Flex direction="column" gap={2} pl={6}>
-                <CanvasSettingsShowProgressOnCanvas />
-                <CanvasSettingsIsolatedStagingPreviewSwitch />
-                <CanvasSettingsIsolatedLayerPreviewSwitch />
-                <CanvasSettingsBboxOverlaySwitch />
-                <CanvasSettingsShowHUDSwitch />
-              </Flex>
+              <CanvasSettingsShowProgressOnCanvas />
+              <CanvasSettingsIsolatedStagingPreviewSwitch />
+              <CanvasSettingsIsolatedLayerPreviewSwitch />
+              <CanvasSettingsBboxOverlaySwitch />
+              <CanvasSettingsShowHUDSwitch />
             </Flex>
 
             <Divider />
 
             {/* Grid Settings */}
-            <Flex direction="column" gap={2}>
-              <Flex align="center" gap={2} mb={1}>
-                <PiSquaresFourFill size={16} />
-                <Text fontWeight="bold" fontSize="sm" color="base.200">
+            <Flex direction="column" gap={1}>
+              <Flex align="center" gap={2} color="base.200">
+                <Icon as={PiSquaresFourFill} boxSize={4} />
+                <Text fontWeight="bold" fontSize="sm">
                   {t('hotkeys.canvas.settings.grid')}
                 </Text>
               </Flex>
-              <Flex direction="column" gap={2} pl={6}>
-                <CanvasSettingsSnapToGridCheckbox />
-                <CanvasSettingsDynamicGridSwitch />
-                <CanvasSettingsRuleOfThirdsSwitch />
-              </Flex>
+              <CanvasSettingsSnapToGridCheckbox />
+              <CanvasSettingsDynamicGridSwitch />
+              <CanvasSettingsRuleOfThirdsSwitch />
             </Flex>
 
             <DebugSettings />
@@ -121,19 +116,17 @@ const DebugSettings = () => {
   return (
     <>
       <Divider />
-      <Flex direction="column" gap={2}>
-        <Flex align="center" gap={2} mb={1}>
-          <PiCodeFill size={16} />
-          <Text fontWeight="bold" fontSize="sm" color="base.200">
+      <Flex direction="column" gap={1}>
+        <Flex align="center" gap={2} color="base.200">
+          <Icon as={PiCodeFill} boxSize={4} />
+          <Text fontWeight="bold" fontSize="sm">
             {t('hotkeys.canvas.settings.debug')}
           </Text>
         </Flex>
-        <Flex direction="column" gap={2} pl={6}>
-          <CanvasSettingsClearCachesButton />
-          <CanvasSettingsRecalculateRectsButton />
-          <CanvasSettingsLogDebugInfoButton />
-          <CanvasSettingsClearHistoryButton />
-        </Flex>
+        <CanvasSettingsClearCachesButton />
+        <CanvasSettingsRecalculateRectsButton />
+        <CanvasSettingsLogDebugInfoButton />
+        <CanvasSettingsClearHistoryButton />
       </Flex>
     </>
   );
