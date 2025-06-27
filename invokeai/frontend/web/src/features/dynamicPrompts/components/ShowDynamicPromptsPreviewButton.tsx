@@ -14,7 +14,12 @@ const loadingStyles: SystemStyleObject = {
   svg: { animation: spinAnimation },
 };
 
-export const ShowDynamicPromptsPreviewButton = memo(() => {
+type Props = {
+  isDisabled?: boolean;
+};
+
+export const ShowDynamicPromptsPreviewButton = memo((props: Props) => {
+  const { isDisabled = false } = props;
   const { t } = useTranslation();
   const isLoading = useAppSelector(selectDynamicPromptsIsLoading);
   const isError = useAppSelector(selectDynamicPromptsIsError);
@@ -25,7 +30,7 @@ export const ShowDynamicPromptsPreviewButton = memo(() => {
       <IconButton
         size="sm"
         variant="promptOverlay"
-        isDisabled={isOpen}
+        isDisabled={isOpen || isDisabled}
         aria-label={t('dynamicPrompts.showDynamicPrompts')}
         icon={<PiBracketsCurlyBold />}
         onClick={onOpen}

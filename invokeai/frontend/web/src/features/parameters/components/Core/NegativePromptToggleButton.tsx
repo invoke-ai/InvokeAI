@@ -4,7 +4,12 @@ import { negativePromptChanged, selectHasNegativePrompt } from 'features/control
 import { memo, useCallback, useMemo } from 'react';
 import { PiPlusMinusBold } from 'react-icons/pi';
 
-export const NegativePromptToggleButton = memo(() => {
+type Props = {
+  isDisabled?: boolean;
+};
+
+export const NegativePromptToggleButton = memo((props: Props) => {
+  const { isDisabled = false } = props;
   const hasNegativePrompt = useAppSelector(selectHasNegativePrompt);
 
   const dispatch = useAppDispatch();
@@ -32,6 +37,7 @@ export const NegativePromptToggleButton = memo(() => {
         fontSize={12}
         px={0.5}
         colorScheme={hasNegativePrompt ? 'invokeBlue' : 'base'}
+        isDisabled={isDisabled}
       />
     </Tooltip>
   );

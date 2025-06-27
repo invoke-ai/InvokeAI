@@ -53,6 +53,9 @@ export const addPromptExpansionRequestedListener = (startAppListening: AppStartL
         req.reset();
         log.debug({ enqueueResult } as JsonObject, t('queue.graphQueued'));
       } catch (error) {
+        // Clear the prompt expansion request status on error
+        $promptExpansionRequest.set(null);
+        
         log.error({ enqueueBatchArg } as JsonObject, t('queue.graphFailedToQueue'));
 
         if (error instanceof Object && 'status' in error && error.status === 403) {
@@ -104,6 +107,9 @@ export const addPromptExpansionRequestedListener = (startAppListening: AppStartL
         req.reset();
         log.debug({ enqueueResult } as JsonObject, t('queue.graphQueued'));
       } catch (error) {
+        // Clear the prompt expansion request status on error
+        $promptExpansionRequest.set(null);
+        
         log.error({ enqueueBatchArg } as JsonObject, t('queue.graphFailedToQueue'));
 
         if (error instanceof Object && 'status' in error && error.status === 403) {
@@ -174,6 +180,9 @@ export const addPromptExpansionRequestedListener = (startAppListening: AppStartL
         req.reset();
         log.debug({ enqueueResult } as JsonObject, t('queue.graphQueued'));
       } catch (error) {
+        // Clear the prompt expansion request status on error
+        $promptExpansionRequest.set(null);
+        
         log.error({ error } as JsonObject, 'Failed to upload image and generate prompt');
 
         if (error instanceof Object && 'status' in error && error.status === 403) {

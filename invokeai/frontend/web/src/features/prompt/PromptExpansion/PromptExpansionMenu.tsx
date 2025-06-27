@@ -4,6 +4,7 @@ import {
   promptGenerationFromUploadRequested,
 } from 'app/store/middleware/listenerMiddleware/listeners/addPromptExpansionRequestedListener';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { usePromptExpansionTracking } from 'features/prompt/PromptExpansion/usePromptExpansionTracking';
 import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiMagicWandBold } from 'react-icons/pi';
@@ -11,6 +12,7 @@ import { PiMagicWandBold } from 'react-icons/pi';
 export const PromptExpansionMenu = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const { isPending } = usePromptExpansionTracking();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const onClickExpandPrompt = useCallback(() => {
@@ -42,12 +44,13 @@ export const PromptExpansionMenu = () => {
           size="sm"
           borderRadius="100%"
           colorScheme="invokeYellow"
+          isDisabled={isPending}
         />
         <MenuList>
-          <MenuItem onClick={onClickExpandPrompt}>
+          <MenuItem onClick={onClickExpandPrompt} isDisabled={isPending}>
             <Text>{t('prompt.expandCurrentPrompt')}</Text>
           </MenuItem>
-          <MenuItem onClick={onClickUploadImage}>
+          <MenuItem onClick={onClickUploadImage} isDisabled={isPending}>
             <Text>{t('prompt.uploadImageForPromptGeneration')}</Text>
           </MenuItem>
         </MenuList>

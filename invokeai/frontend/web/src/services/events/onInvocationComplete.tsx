@@ -175,9 +175,8 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
     const { result, invocation } = data;
 
     // If this is a prompt expansion or generation invocation, look for string output
-    // @ts-expect-error: These nodes are not available in the OSS application
     if (
-      (invocation.type === 'claude_expand_prompt' || invocation.type === 'claude_analyze_image') &&
+      (invocation.type as string === 'claude_expand_prompt' || invocation.type as string === 'claude_analyze_image') &&
       result.type === 'string_output'
     ) {
       const stringValue = result.value;

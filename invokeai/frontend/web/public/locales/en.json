@@ -228,7 +228,8 @@
         "noMatchingTriggers": "No matching triggers",
         "generateFromImage": "Generate prompt from image",
         "expandCurrentPrompt": "Expand Current Prompt",
-        "uploadImageForPromptGeneration": "Upload Image for Prompt Generation"
+        "uploadImageForPromptGeneration": "Upload Image for Prompt Generation",
+        "expandingPrompt": "Expanding prompt..."
     },
     "queue": {
         "queue": "Queue",
@@ -1159,7 +1160,8 @@
             "canvasIsSelectingObject": "Canvas is busy (selecting object)",
             "noPrompts": "No prompts generated",
             "noNodesInGraph": "No nodes in graph",
-            "systemDisconnected": "System disconnected"
+            "systemDisconnected": "System disconnected",
+            "promptExpansionPending": "Prompt expansion in progress"
         },
         "maskBlur": "Mask Blur",
         "negativePromptPlaceholder": "Negative Prompt",

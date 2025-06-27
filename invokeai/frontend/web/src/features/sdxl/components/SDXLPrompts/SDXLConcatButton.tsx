@@ -5,7 +5,12 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiLinkSimpleBold, PiLinkSimpleBreakBold } from 'react-icons/pi';
 
-export const SDXLConcatButton = memo(() => {
+type Props = {
+  isDisabled?: boolean;
+};
+
+export const SDXLConcatButton = memo((props: Props) => {
+  const { isDisabled = false } = props;
   const shouldConcatPrompts = useAppSelector(selectShouldConcatPrompts);
 
   const dispatch = useAppDispatch();
@@ -29,6 +34,7 @@ export const SDXLConcatButton = memo(() => {
         variant="promptOverlay"
         fontSize={12}
         px={0.5}
+        isDisabled={isDisabled}
       />
     </Tooltip>
   );

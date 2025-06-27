@@ -16,6 +16,8 @@ import { PromptOverlayButtonWrapper } from 'features/parameters/components/Promp
 import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModePrompt';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptExpansionMenu } from 'features/prompt/PromptExpansion/PromptExpansionMenu';
+import { PromptExpansionOverlay } from 'features/prompt/PromptExpansion/PromptExpansionOverlay';
+import { usePromptExpansionTracking } from 'features/prompt/PromptExpansion/usePromptExpansionTracking';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
 import { SDXLConcatButton } from 'features/sdxl/components/SDXLPrompts/SDXLConcatButton';
@@ -42,6 +44,7 @@ export const ParamPositivePrompt = memo(() => {
   const viewMode = useAppSelector(selectStylePresetViewMode);
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
   const modelSupportsNegativePrompt = useAppSelector(selectModelSupportsNegativePrompt);
+  const { isPending: isPromptExpansionPending } = usePromptExpansionTracking();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   usePersistedTextAreaSize('positive_prompt', textareaRef, persistOptions);
@@ -67,6 +70,7 @@ export const ParamPositivePrompt = memo(() => {
     prompt,
     textareaRef: textareaRef,
     onChange: handleChange,
+    isDisabled: isPromptExpansionPending,
   });
 
   const focus: HotkeyCallback = useCallback(
@@ -89,7 +93,12 @@ export const ParamPositivePrompt = memo(() => {
 
   return (
     <Box pos="relative">
-      <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
+      <PromptPopover 
+        isOpen={isOpen && !isPromptExpansionPending} 
+        onClose={onClose} 
+        onSelect={onSelect} 
+        width={textareaRef.current?.clientWidth}
+      >
         <Box pos="relative">
           <Textarea
             className="positive-prompt-textarea"
@@ -106,13 +115,14 @@ export const ParamPositivePrompt = memo(() => {
             paddingBottom={3}
             resize="vertical"
             minH={32}
+            isDisabled={isPromptExpansionPending}
           />
           <PromptOverlayButtonWrapper>
             <Flex flexDir="column" gap={2} justifyContent="flex-start" alignItems="center">
-              <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
-              {baseModel === 'sdxl' && <SDXLConcatButton />}
-              <ShowDynamicPromptsPreviewButton />
-              {modelSupportsNegativePrompt && <NegativePromptToggleButton />}
+              <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} isDisabled={isPromptExpansionPending} />
+              {baseModel === 'sdxl' && <SDXLConcatButton isDisabled={isPromptExpansionPending} />}
+              <ShowDynamicPromptsPreviewButton isDisabled={isPromptExpansionPending} />
+              {modelSupportsNegativePrompt && <NegativePromptToggleButton isDisabled={isPromptExpansionPending} />}
             </Flex>
             <PromptExpansionMenu />
           </PromptOverlayButtonWrapper>
@@ -128,8 +138,9 @@ export const ParamPositivePrompt = memo(() => {
             dndTarget={promptGenerationFromImageDndTarget}
             dndTargetData={dndTargetData}
             label={t('prompt.generateFromImage')}
-            isDisabled={false}
+            isDisabled={isPromptExpansionPending}
           />
+          <PromptExpansionOverlay />
         </Box>
       </PromptPopover>
     </Box>

@@ -37,6 +37,7 @@ import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
 import { getGridSize } from 'features/parameters/util/optimalDimension';
+import type { PromptExpansionRequest } from 'features/prompt/PromptExpansion/promptExpansionUtils';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
@@ -44,7 +45,7 @@ import i18n from 'i18next';
 import { atom, computed } from 'nanostores';
 import { useEffect } from 'react';
 import type { MainModelConfig } from 'services/api/types';
-import { $isConnected } from 'services/events/stores';
+import { $isConnected,$promptExpansionRequest  } from 'services/events/stores';
 
 /**
  * This file contains selectors and utilities for determining the app is ready to enqueue generations. The handling
@@ -90,7 +91,8 @@ const debouncedUpdateReasons = debounce(
     config: AppConfig,
     store: AppStore,
     isInPublishFlow: boolean,
-    isChatGPT4oHighModelDisabled: (model: ParameterModel) => boolean
+    isChatGPT4oHighModelDisabled: (model: ParameterModel) => boolean,
+    promptExpansionRequest: PromptExpansionRequest | null
   ) => {
     if (tab === 'canvas') {
       const model = selectMainModelConfig(store.getState());
@@ -107,6 +109,7 @@ const debouncedUpdateReasons = debounce(
         canvasIsCompositing,
         canvasIsSelectingObject,
         isChatGPT4oHighModelDisabled,
+        promptExpansionRequest,
       });
       $reasonsWhyCannotEnqueue.set(reasons);
     } else if (tab === 'workflows') {
@@ -125,6 +128,7 @@ const debouncedUpdateReasons = debounce(
         upscale,
         config,
         params,
+        promptExpansionRequest,
       });
       $reasonsWhyCannotEnqueue.set(reasons);
     } else {
@@ -156,6 +160,7 @@ export const useReadinessWatcher = () => {
   const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $false);
   const isInPublishFlow = useStore($isInPublishFlow);
   const { isChatGPT4oHighModelDisabled } = useIsModelDisabled();
+  const promptExpansionRequest = useStore($promptExpansionRequest);
 
   useEffect(() => {
     debouncedUpdateReasons(
@@ -177,7 +182,8 @@ export const useReadinessWatcher = () => {
       config,
       store,
       isInPublishFlow,
-      isChatGPT4oHighModelDisabled
+      isChatGPT4oHighModelDisabled,
+      promptExpansionRequest
     );
   }, [
     store,
@@ -199,6 +205,7 @@ export const useReadinessWatcher = () => {
     workflowSettings,
     isInPublishFlow,
     isChatGPT4oHighModelDisabled,
+    promptExpansionRequest,
   ]);
 };
 
@@ -294,8 +301,9 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
   upscale: UpscaleState;
   config: AppConfig;
   params: ParamsState;
+  promptExpansionRequest: PromptExpansionRequest | null;
 }) => {
-  const { isConnected, upscale, config, params } = arg;
+  const { isConnected, upscale, config, params, promptExpansionRequest } = arg;
   const reasons: Reason[] = [];
 
   if (!isConnected) {
@@ -332,6 +340,10 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
     }
   }
 
+  if (promptExpansionRequest && promptExpansionRequest.status === 'pending') {
+    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionPending') });
+  }
+
   return reasons;
 };
 
@@ -348,6 +360,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   canvasIsCompositing: boolean;
   canvasIsSelectingObject: boolean;
   isChatGPT4oHighModelDisabled: (model: ParameterModel) => boolean;
+  promptExpansionRequest: PromptExpansionRequest | null;
 }) => {
   const {
     isConnected,
@@ -362,6 +375,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     canvasIsCompositing,
     canvasIsSelectingObject,
     isChatGPT4oHighModelDisabled,
+    promptExpansionRequest,
   } = arg;
   const { positivePrompt } = params;
   const reasons: Reason[] = [];
@@ -496,6 +510,10 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
 
   if (model && isChatGPT4oHighModelDisabled(model)) {
     reasons.push({ content: i18n.t('parameters.invoke.modelDisabledForTrial', { modelName: model.name }) });
+  }
+
+  if (promptExpansionRequest && promptExpansionRequest.status === 'pending') {
+    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionPending') });
   }
 
   const enabledControlLayers = canvas.controlLayers.entities.filter((controlLayer) => controlLayer.isEnabled);
