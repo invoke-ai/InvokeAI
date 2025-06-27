@@ -65,9 +65,6 @@ const migrateStylePresetState = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
   }
-  if (!('showPromptPreviews' in state)) {
-    state.showPromptPreviews = false;
-  }
   return state;
 };
 
