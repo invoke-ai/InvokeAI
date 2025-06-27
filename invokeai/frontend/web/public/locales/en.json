@@ -580,6 +580,12 @@
                 "title": "Cancel Transform",
                 "desc": "Cancel the pending transform."
             },
+            "settings": {
+                "behavior": "Behavior",
+                "display": "Display",
+                "grid": "Grid",
+                "debug": "Debug"
+            },
             "toggleNonRasterLayers": {
                 "title": "Toggle Non-Raster Layers",
                 "desc": "Show or hide all non-raster layer categories (Control Layers, Inpaint Masks, Regional Guidance)."
@@ -1916,6 +1922,7 @@
         "mergingLayers": "Merging layers",
         "clearHistory": "Clear History",
         "bboxOverlay": "Show Bbox Overlay",
+        "ruleOfThirds": "Show Rule of Thirds",
         "newSession": "New Session",
         "clearCaches": "Clear Caches",
         "recalculateRects": "Recalculate Rects",

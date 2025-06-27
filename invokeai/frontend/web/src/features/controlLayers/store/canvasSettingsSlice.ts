@@ -73,6 +73,10 @@ type CanvasSettingsState = {
    * Whether to use pressure sensitivity for the brush and eraser tool when a pen device is used.
    */
   pressureSensitivity: boolean;
+  /**
+   * Whether to show the rule of thirds composition guide overlay on the canvas.
+   */
+  ruleOfThirds: boolean;
 };
 
 const initialState: CanvasSettingsState = {
@@ -92,6 +96,7 @@ const initialState: CanvasSettingsState = {
   isolatedStagingPreview: true,
   isolatedLayerPreview: true,
   pressureSensitivity: true,
+  ruleOfThirds: false,
 };
 
 export const canvasSettingsSlice = createSlice({
@@ -146,6 +151,9 @@ export const canvasSettingsSlice = createSlice({
     settingsPressureSensitivityToggled: (state) => {
       state.pressureSensitivity = !state.pressureSensitivity;
     },
+    settingsRuleOfThirdsToggled: (state) => {
+      state.ruleOfThirds = !state.ruleOfThirds;
+    },
   },
 });
 
@@ -166,6 +174,7 @@ export const {
   settingsIsolatedStagingPreviewToggled,
   settingsIsolatedLayerPreviewToggled,
   settingsPressureSensitivityToggled,
+  settingsRuleOfThirdsToggled,
 } = canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -199,3 +208,4 @@ export const selectShowProgressOnCanvas = createCanvasSettingsSelector(
 export const selectIsolatedStagingPreview = createCanvasSettingsSelector((settings) => settings.isolatedStagingPreview);
 export const selectIsolatedLayerPreview = createCanvasSettingsSelector((settings) => settings.isolatedLayerPreview);
 export const selectPressureSensitivity = createCanvasSettingsSelector((settings) => settings.pressureSensitivity);
+export const selectRuleOfThirds = createCanvasSettingsSelector((settings) => settings.ruleOfThirds);
