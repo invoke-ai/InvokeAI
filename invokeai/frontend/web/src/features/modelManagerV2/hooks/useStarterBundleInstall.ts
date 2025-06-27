@@ -36,8 +36,8 @@ export const useStarterBundleInstall = () => {
       if (modelsToInstall.install.length === 0) {
         toast({
           status: 'info',
-          title: t('modelManager.bundleAlreadyInstalled', { bundleName: bundle.name }),
-          description: t('modelManager.allModelsAlreadyInstalled'),
+          title: t('modelManager.bundleAlreadyInstalled'),
+          description: t('modelManager.bundleAlreadyInstalledDesc', { bundleName: bundle.name }),
         });
         return;
       }

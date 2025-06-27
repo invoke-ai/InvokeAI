@@ -873,7 +873,8 @@
         "starterBundleHelpText": "Easily install all models needed to get started with a base model, including a main model, controlnets, IP adapters, and more. Selecting a bundle will skip any models that you already have installed.",
         "starterModels": "Starter Models",
         "starterModelsInModelManager": "Starter Models can be found in Model Manager",
-        "bundleAlreadyInstalled": "Bundle {{bundleName}} already installed",
+        "bundleAlreadyInstalled": "Bundle already installed",
+        "bundleAlreadyInstalledDesc": "All models in the {{bundleName}} bundle are already installed.",
         "launchpadTab": "Launchpad",
         "launchpad": {
             "welcome": "Welcome to Model Management",
