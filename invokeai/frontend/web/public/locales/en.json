@@ -1166,7 +1166,8 @@
             "noPrompts": "No prompts generated",
             "noNodesInGraph": "No nodes in graph",
             "systemDisconnected": "System disconnected",
-            "promptExpansionPending": "Prompt expansion in progress"
+            "promptExpansionPending": "Prompt expansion in progress",
+            "promptExpansionResultPending": "Please accept or discard your prompt expansion result"
         },
         "maskBlur": "Mask Blur",
         "negativePromptPlaceholder": "Negative Prompt",
