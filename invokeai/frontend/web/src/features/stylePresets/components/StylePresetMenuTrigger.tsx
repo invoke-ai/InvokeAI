@@ -35,7 +35,6 @@ export const StylePresetMenuTrigger = () => {
       transitionProperty="background-color"
       transitionDuration="normal"
       w="full"
-      cursor="pointer"
     >
       <ActiveStylePreset />
       <IconButton aria-label={t('stylePresets.viewList')} variant="ghost" icon={<PiCaretDownBold />} size="sm" />

@@ -81,6 +81,7 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
       gap={4}
       onClick={handleClickApply}
       cursor="pointer"
+      _hover={{ backgroundColor: 'base.750' }}
       py={3}
       px={2}
       borderRadius="base"
