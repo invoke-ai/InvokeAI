@@ -3,7 +3,7 @@ import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useInstallModelMutation } from 'services/api/endpoints/models';
-import type { StarterModel } from 'services/api/types';
+import type { S } from 'services/api/types';
 
 import { flattenStarterModel, useBuildModelInstallArg } from './useBuildModelsToInstall';
 
@@ -13,9 +13,9 @@ export const useStarterBundleInstall = () => {
   const { t } = useTranslation();
 
   const getModelsToInstall = useCallback(
-    (bundle: StarterModel[]) => {
+    (bundle: S['StarterModelBundle']) => {
       // Flatten the models and remove duplicates, which is expected as models can have the same dependencies
-      const flattenedModels = flatMap(bundle, flattenStarterModel);
+      const flattenedModels = flatMap(bundle.models, flattenStarterModel);
       const uniqueModels = uniqWith(
         flattenedModels,
         (m1, m2) => m1.source === m2.source || (m1.name === m2.name && m1.base === m2.base && m1.type === m2.type)
@@ -30,17 +30,15 @@ export const useStarterBundleInstall = () => {
   );
 
   const installBundle = useCallback(
-    (bundle: StarterModel[], bundleName?: string) => {
+    (bundle: S['StarterModelBundle']) => {
       const modelsToInstall = getModelsToInstall(bundle);
 
       if (modelsToInstall.install.length === 0) {
-        if (bundleName) {
-          toast({
-            status: 'info',
-            title: t('modelManager.bundleAlreadyInstalled', { bundleName }),
-            description: t('modelManager.allModelsAlreadyInstalled'),
-          });
-        }
+        toast({
+          status: 'info',
+          title: t('modelManager.bundleAlreadyInstalled', { bundleName: bundle.name }),
+          description: t('modelManager.allModelsAlreadyInstalled'),
+        });
         return;
       }
 

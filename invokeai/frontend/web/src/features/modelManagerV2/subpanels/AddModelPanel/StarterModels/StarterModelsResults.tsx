@@ -61,8 +61,8 @@ export const StarterModelsResults = memo(({ results }: StarterModelsResultsProps
               </Tooltip>
             </Flex>
             <Flex gap={2}>
-              {map(results.starter_bundles, (bundle, bundleName) => (
-                <StarterBundle key={bundleName} bundleName={bundleName} bundle={bundle} />
+              {map(results.starter_bundles, (bundle) => (
+                <StarterBundle key={bundle.name} bundle={bundle} />
               ))}
             </Flex>
           </Flex>
