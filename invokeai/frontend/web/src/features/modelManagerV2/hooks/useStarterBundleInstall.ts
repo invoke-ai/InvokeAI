@@ -1,5 +1,5 @@
+import { flatMap, negate, uniqWith } from 'es-toolkit/compat';
 import { toast } from 'features/toast/toast';
-import { flatMap, negate, uniqWith } from 'lodash-es';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useInstallModelMutation } from 'services/api/endpoints/models';
