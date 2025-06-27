@@ -1,7 +1,11 @@
-import { IconButton, Popover, PopoverBody, PopoverContent, PopoverTrigger, Text, VStack } from '@invoke-ai/ui-library';
+import { IconButton, Popover, PopoverBody, PopoverContent, PopoverTrigger, Text, VStack, Divider, Grid } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
-import { memo, useCallback } from 'react';
+import { MetadataItem } from 'features/metadata/components/MetadataItem';
+import { MetadataLoRAs } from 'features/metadata/components/MetadataLoRAs';
+import { useMetadataExtraction } from 'features/metadata/hooks/useMetadataExtraction';
+import { handlers } from 'features/metadata/util/handlers';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiInfoBold } from 'react-icons/pi';
 
@@ -10,20 +14,8 @@ export const StagingAreaToolbarInfoButton = memo(({ isDisabled }: { isDisabled?:
   const selectedItem = useStore(ctx.$selectedItem);
   const { t } = useTranslation();
 
-  const formatTimestamp = useCallback((timestamp: string | null | undefined) => {
-    if (!timestamp) {
-      return 'N/A';
-    }
-    return new Date(timestamp).toLocaleString();
-  }, []);
-
-  const formatDuration = useCallback((start: string | null | undefined, end: string | null | undefined) => {
-    if (!start || !end) {
-      return 'N/A';
-    }
-    const duration = new Date(end).getTime() - new Date(start).getTime();
-    return `${(duration / 1000).toFixed(2)}s`;
-  }, []);
+  // Extract metadata using the unified hook
+  const metadata = useMetadataExtraction(selectedItem);
 
   if (!selectedItem) {
     return (
@@ -48,101 +40,126 @@ export const StagingAreaToolbarInfoButton = memo(({ isDisabled }: { isDisabled?:
           isDisabled={isDisabled}
         />
       </PopoverTrigger>
-      <PopoverContent maxW="300px">
-        <PopoverBody>
-          <VStack align="start" spacing={2} fontSize="sm">
-            <Text fontWeight="bold">Generation Info</Text>
-
-            <VStack align="start" spacing={1} w="full">
-              <Text>
-                <Text as="span" fontWeight="semibold">
-                  Status:
-                </Text>{' '}
-                {selectedItem.status}
-              </Text>
-              <Text>
-                <Text as="span" fontWeight="semibold">
-                  Item ID:
-                </Text>{' '}
-                {selectedItem.item_id}
-              </Text>
-              <Text>
-                <Text as="span" fontWeight="semibold">
-                  Priority:
-                </Text>{' '}
-                {selectedItem.priority}
-              </Text>
-
-              {selectedItem.origin && (
-                <Text>
-                  <Text as="span" fontWeight="semibold">
-                    Origin:
-                  </Text>{' '}
-                  {selectedItem.origin}
-                </Text>
-              )}
-
-              {selectedItem.destination && (
-                <Text>
-                  <Text as="span" fontWeight="semibold">
-                    Destination:
-                  </Text>{' '}
-                  {selectedItem.destination}
-                </Text>
-              )}
-
-              <Text>
-                <Text as="span" fontWeight="semibold">
-                  Created:
-                </Text>{' '}
-                {formatTimestamp(selectedItem.created_at)}
-              </Text>
-
-              {selectedItem.started_at && (
-                <Text>
-                  <Text as="span" fontWeight="semibold">
-                    Started:
-                  </Text>{' '}
-                  {formatTimestamp(selectedItem.started_at)}
-                </Text>
-              )}
-
-              {selectedItem.completed_at && (
-                <Text>
-                  <Text as="span" fontWeight="semibold">
-                    Completed:
-                  </Text>{' '}
-                  {formatTimestamp(selectedItem.completed_at)}
-                </Text>
-              )}
-
-              {selectedItem.started_at && selectedItem.completed_at && (
-                <Text>
-                  <Text as="span" fontWeight="semibold">
-                    Duration:
-                  </Text>{' '}
-                  {formatDuration(selectedItem.started_at, selectedItem.completed_at)}
-                </Text>
-              )}
-
-              {selectedItem.credits && (
-                <Text>
-                  <Text as="span" fontWeight="semibold">
-                    Credits:
-                  </Text>{' '}
-                  {selectedItem.credits}
-                </Text>
-              )}
-
-              {selectedItem.error_message && (
-                <Text color="error.300">
-                  <Text as="span" fontWeight="semibold">
-                    Error:
-                  </Text>{' '}
-                  {selectedItem.error_message}
-                </Text>
+      <PopoverContent maxW="500px" bg="base.900" borderColor="base.700">
+        <PopoverBody p={4}>
+          <VStack align="start" spacing={4} fontSize="sm">
+            {/* Prompts Section */}
+            <VStack align="start" spacing={3} w="full">
+              <Text fontWeight="semibold" fontSize="md" color="base.100">Prompts</Text>
+              
+              {metadata !== null && (
+                <>
+                  <MetadataItem 
+                    metadata={metadata} 
+                    handlers={handlers.positivePrompt} 
+                    displayMode="card"
+                    showCopy={true}
+                  />
+                  <MetadataItem 
+                    metadata={metadata} 
+                    handlers={handlers.negativePrompt} 
+                    displayMode="card"
+                    showCopy={true}
+                  />
+                </>
               )}
             </VStack>
+
+            <Divider borderColor="base.700" />
+
+            {/* Models and LoRAs Section - Left Column */}
+            <Grid templateColumns="1fr 1fr" gap={6} w="full">
+              <VStack align="start" spacing={4} w="full">
+                {/* Model Section */}
+                <VStack align="start" spacing={3} w="full">
+                  <Text fontWeight="semibold" fontSize="md" color="base.100">Model</Text>
+                  
+                  {metadata !== null && (
+                    <VStack align="start" spacing={2} w="full">
+                      <MetadataItem 
+                        metadata={metadata} 
+                        handlers={handlers.model} 
+                        displayMode="badge"
+                        colorScheme="invokeBlue"
+                        showCopy={true}
+                      />
+                      <MetadataItem 
+                        metadata={metadata} 
+                        handlers={handlers.vae} 
+                        displayMode="badge"
+                        colorScheme="base"
+                        showCopy={true}
+                      />
+                    </VStack>
+                  )}
+                </VStack>
+
+                {/* LoRA Section */}
+                {metadata !== null && (
+                  <MetadataLoRAs 
+                    metadata={metadata} 
+                    displayMode="badge"
+                    showCopy={true}
+                  />
+                )}
+              </VStack>
+
+              {/* Other Settings Section - Right Column */}
+              <VStack align="start" spacing={3} w="full">
+                <Text fontWeight="semibold" fontSize="md" color="base.100">Other Settings</Text>
+                
+                {metadata !== null && (
+                  <VStack align="start" spacing={3} w="full">
+                    <MetadataItem 
+                      metadata={metadata} 
+                      handlers={handlers.seed} 
+                      displayMode="simple"
+                      showCopy={true}
+                    />
+                    <MetadataItem 
+                      metadata={metadata} 
+                      handlers={handlers.steps} 
+                      displayMode="simple"
+                      showCopy={true}
+                    />
+                    <MetadataItem 
+                      metadata={metadata} 
+                      handlers={handlers.cfgScale} 
+                      displayMode="simple"
+                      showCopy={true}
+                    />
+                    <MetadataItem 
+                      metadata={metadata} 
+                      handlers={handlers.scheduler} 
+                      displayMode="simple"
+                      showCopy={true}
+                    />
+                  </VStack>
+                )}
+              </VStack>
+            </Grid>
+
+            {/* Error Section */}
+            {selectedItem.error_message && (
+              <>
+                <Divider borderColor="base.700" />
+                <VStack align="start" spacing={2} w="full">
+                  <Text fontWeight="semibold" fontSize="md" color="error.300">Error</Text>
+                  <Text 
+                    fontSize="sm" 
+                    color="error.200" 
+                    bg="error.900" 
+                    p={3} 
+                    borderRadius="lg" 
+                    w="full"
+                    border="1px solid"
+                    borderColor="error.700"
+                  >
+                    {selectedItem.error_message}
+                  </Text>
+                </VStack>
+              </>
+            )}
           </VStack>
         </PopoverBody>
       </PopoverContent>

@@ -9,10 +9,26 @@ type MetadataItemProps<T> = {
   metadata: unknown;
   handlers: MetadataHandlers<T>;
   direction?: 'row' | 'column';
+  /** Display mode for the metadata item */
+  displayMode?: 'default' | 'badge' | 'simple' | 'card';
+  /** Color scheme for badge display mode */
+  colorScheme?: string;
+  /** Whether to show copy functionality */
+  showCopy?: boolean;
+  /** Whether to show recall functionality */
+  showRecall?: boolean;
 };
 
-const _MetadataItem = typedMemo(<T,>({ metadata, handlers, direction = 'row' }: MetadataItemProps<T>) => {
-  const { label, isDisabled, value, renderedValue, onRecall } = useMetadataItem(metadata, handlers);
+const _MetadataItem = typedMemo(<T,>({ 
+  metadata, 
+  handlers, 
+  direction = 'row',
+  displayMode = 'default',
+  colorScheme = 'invokeBlue',
+  showCopy = false,
+  showRecall = true
+}: MetadataItemProps<T>) => {
+  const { label, isDisabled, value, renderedValue, onRecall, valueOrNull } = useMetadataItem(metadata, handlers);
 
   if (value === MetadataParseFailedToken) {
     return null;
@@ -22,13 +38,24 @@ const _MetadataItem = typedMemo(<T,>({ metadata, handlers, direction = 'row' }: 
     return null;
   }
 
+  // For display modes other than default, we need the raw value for copy functionality
+  if (displayMode !== 'default') {
+    if (!valueOrNull) {
+      return null;
+    }
+  }
+
   return (
     <MetadataItemView
       label={label}
-      onRecall={onRecall}
+      onRecall={showRecall ? onRecall : undefined}
       isDisabled={isDisabled}
       renderedValue={renderedValue}
       direction={direction}
+      displayMode={displayMode}
+      colorScheme={colorScheme}
+      showCopy={showCopy}
+      valueOrNull={valueOrNull}
     />
   );
 });
