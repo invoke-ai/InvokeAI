@@ -41,6 +41,9 @@ dependencies:
   '@xyflow/react':
     specifier: ^12.7.1
     version: 12.7.1(@types/react@18.3.11)(react-dom@18.3.1)(react@18.3.1)
+  ag-psd:
+    specifier: ^28.2.1
+    version: 28.2.1
   async-mutex:
     specifier: ^0.5.0
     version: 0.5.0
@@ -3655,6 +3658,13 @@ packages:
     hasBin: true
     dev: true
 
+  /ag-psd@28.2.1:
+    resolution: {integrity: sha512-dso+nogIiERMsukqwxDE6AXezYK7+t5CKhc4JG5S9neB8JhKMIIie5RdJwW0aaoNf03/wKD2kdk43TBDJskhxQ==}
+    dependencies:
+      base64-js: 1.5.1
+      pako: 2.1.0
+    dev: false
+
   /agent-base@7.1.3:
     resolution: {integrity: sha512-jRR5wdylq8CkOe6hei19GGZnxM6rBGwFl3Bg0YItGDimvjGtAvdZk4Pu6Cl4u4Igsws4a1fd1Vq3ezrhn4KmFw==}
     engines: {node: '>= 14'}
@@ -3919,7 +3929,6 @@ packages:
 
   /base64-js@1.5.1:
     resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
-    dev: true
 
   /better-opn@3.0.2:
     resolution: {integrity: sha512-aVNobHnJqLiUelTaHat9DZ1qM2w0C0Eym4LPI/3JxOnSokGVdsl1T1kN7TFvsEAD8G47A6VKQ0TVHqbBnYMJlQ==}
@@ -6665,6 +6674,10 @@ packages:
   /package-json-from-dist@1.0.1:
     resolution: {integrity: sha512-UEZIS3/by4OC8vL3P2dTXRETpebLI2NiI5vIrjaD/5UtrkFX/tNbwjTSRAGC/+7CAo2pIcBaRgWmcBBHcsaCIw==}
     dev: true
+
+  /pako@2.1.0:
+    resolution: {integrity: sha512-w+eufiZ1WuJYgPXbV/PO3NCMEc3xqylkKHzp8bxp1uW4qaSNQUkwmLLEc3kKsfz8lpV1F8Ht3U1Cm+9Srog2ug==}
+    dev: false
 
   /parent-module@1.0.1:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==}
