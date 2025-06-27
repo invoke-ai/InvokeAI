@@ -165,53 +165,14 @@ export const LaunchpadForm = memo(() => {
                   {t('modelManager.launchpad.bundleDescription')}
                 </Text>
                 <Grid templateColumns="repeat(auto-fit, minmax(180px, 1fr))" gap={2}>
-                  <Button
-                    onClick={handleSD15BundleClick}
-                    variant="outline"
-                    h="auto"
-                    minH={10}
-                    p={3}
-                    textAlign="center"
-                    justifyContent="center"
-                    alignItems="center"
-                    borderRadius="lg"
-                    whiteSpace="normal"
-                  >
-                    <Text fontSize="sm" fontWeight="bold" noOfLines={1}>
-                      {t('modelManager.launchpad.stableDiffusion15')}
-                    </Text>
+                  <Button onClick={handleSD15BundleClick} variant="outline" p={6}>
+                    {t('modelManager.launchpad.stableDiffusion15')}
                   </Button>
-                  <Button
-                    onClick={handleSDXLBundleClick}
-                    variant="outline"
-                    h="auto"
-                    minH={10}
-                    p={3}
-                    textAlign="center"
-                    justifyContent="center"
-                    alignItems="center"
-                    borderRadius="lg"
-                    whiteSpace="normal"
-                  >
-                    <Text fontSize="sm" fontWeight="bold" noOfLines={1}>
-                      {t('modelManager.launchpad.sdxl')}
-                    </Text>
+                  <Button onClick={handleSDXLBundleClick} variant="outline" p={6}>
+                    {t('modelManager.launchpad.sdxl')}
                   </Button>
-                  <Button
-                    onClick={handleFluxBundleClick}
-                    variant="outline"
-                    h="auto"
-                    minH={10}
-                    p={3}
-                    textAlign="center"
-                    justifyContent="center"
-                    alignItems="center"
-                    borderRadius="lg"
-                    whiteSpace="normal"
-                  >
-                    <Text fontSize="sm" fontWeight="bold" noOfLines={1}>
-                      {t('modelManager.launchpad.fluxDev')}
-                    </Text>
+                  <Button onClick={handleFluxBundleClick} variant="outline" p={6}>
+                    {t('modelManager.launchpad.fluxDev')}
                   </Button>
                 </Grid>
               </Box>
