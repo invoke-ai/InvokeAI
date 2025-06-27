@@ -1540,13 +1540,11 @@ export const canvasSlice = createSlice({
       }
     },
     allNonRasterLayersIsHiddenToggled: (state) => {
-      const hasVisibleNonRasterLayers = 
-        !state.controlLayers.isHidden ||
-        !state.inpaintMasks.isHidden ||
-        !state.regionalGuidance.isHidden;
-      
+      const hasVisibleNonRasterLayers =
+        !state.controlLayers.isHidden || !state.inpaintMasks.isHidden || !state.regionalGuidance.isHidden;
+
       const shouldHide = hasVisibleNonRasterLayers;
-      
+
       state.controlLayers.isHidden = shouldHide;
       state.inpaintMasks.isHidden = shouldHide;
       state.regionalGuidance.isHidden = shouldHide;
