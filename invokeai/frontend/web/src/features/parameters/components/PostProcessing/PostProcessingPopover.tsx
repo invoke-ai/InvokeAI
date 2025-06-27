@@ -11,7 +11,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { adHocPostProcessingRequested } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { $installModelsTab } from 'features/modelManagerV2/store/installModelsStore';
+import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
 import ParamPostProcessingModel from 'features/parameters/components/PostProcessing/ParamPostProcessingModel';
 import { selectPostProcessingModel } from 'features/parameters/store/upscaleSlice';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
@@ -78,7 +78,7 @@ const MissingModelWarning = () => {
 
   const handleGoToModelManager = useCallback(() => {
     dispatch(setActiveTab('models'));
-    $installModelsTab.set(3);
+    setInstallModelsTabByName('launchpad');
   }, [dispatch]);
 
   return (
