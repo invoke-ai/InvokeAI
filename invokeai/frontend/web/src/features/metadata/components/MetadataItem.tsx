@@ -19,46 +19,48 @@ type MetadataItemProps<T> = {
   showRecall?: boolean;
 };
 
-const _MetadataItem = typedMemo(<T,>({ 
-  metadata, 
-  handlers, 
-  direction = 'row',
-  displayMode = 'default',
-  colorScheme = 'invokeBlue',
-  showCopy = false,
-  showRecall = true
-}: MetadataItemProps<T>) => {
-  const { label, isDisabled, value, renderedValue, onRecall, valueOrNull } = useMetadataItem(metadata, handlers);
+const _MetadataItem = typedMemo(
+  <T,>({
+    metadata,
+    handlers,
+    direction = 'row',
+    displayMode = 'default',
+    colorScheme = 'invokeBlue',
+    showCopy = false,
+    showRecall = true,
+  }: MetadataItemProps<T>) => {
+    const { label, isDisabled, value, renderedValue, onRecall, valueOrNull } = useMetadataItem(metadata, handlers);
 
-  if (value === MetadataParseFailedToken) {
-    return null;
-  }
-
-  if (handlers.getIsVisible && !isSymbol(value) && !handlers.getIsVisible(value)) {
-    return null;
-  }
-
-  // For display modes other than default, we need the raw value for copy functionality
-  if (displayMode !== 'default') {
-    if (!valueOrNull) {
+    if (value === MetadataParseFailedToken) {
       return null;
     }
-  }
 
-  return (
-    <MetadataItemView
-      label={label}
-      onRecall={showRecall ? onRecall : undefined}
-      isDisabled={isDisabled}
-      renderedValue={renderedValue}
-      direction={direction}
-      displayMode={displayMode}
-      colorScheme={colorScheme}
-      showCopy={showCopy}
-      valueOrNull={valueOrNull}
-    />
-  );
-});
+    if (handlers.getIsVisible && !isSymbol(value) && !handlers.getIsVisible(value)) {
+      return null;
+    }
+
+    // For display modes other than default, we need the raw value for copy functionality
+    if (displayMode !== 'default') {
+      if (!valueOrNull) {
+        return null;
+      }
+    }
+
+    return (
+      <MetadataItemView
+        label={label}
+        onRecall={showRecall ? onRecall : undefined}
+        isDisabled={isDisabled}
+        renderedValue={renderedValue}
+        direction={direction}
+        displayMode={displayMode}
+        colorScheme={colorScheme}
+        showCopy={showCopy}
+        valueOrNull={valueOrNull}
+      />
+    );
+  }
+);
 
 export const MetadataItem = typedMemo(_MetadataItem);
 

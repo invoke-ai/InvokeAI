@@ -1,6 +1,6 @@
-import { Flex, Text, VStack, HStack, Badge, IconButton, Tooltip } from '@invoke-ai/ui-library';
-import { RecallButton } from 'features/metadata/components/RecallButton';
+import { Badge, Flex, HStack, IconButton, Text, Tooltip,VStack } from '@invoke-ai/ui-library';
 import { useClipboard } from 'common/hooks/useClipboard';
+import { RecallButton } from 'features/metadata/components/RecallButton';
 import { memo, useCallback } from 'react';
 import { PiCopyBold } from 'react-icons/pi';
 
@@ -21,21 +21,21 @@ type MetadataItemViewProps = {
 };
 
 export const MetadataItemView = memo(
-  ({ 
-    label, 
-    onRecall, 
-    isDisabled, 
-    renderedValue, 
+  ({
+    label,
+    onRecall,
+    isDisabled,
+    renderedValue,
     direction = 'row',
     displayMode = 'default',
     colorScheme = 'invokeBlue',
     showCopy = false,
-    valueOrNull
+    valueOrNull,
   }: MetadataItemViewProps) => {
     const clipboard = useClipboard();
 
     const handleCopy = useCallback(() => {
-      if (valueOrNull != null) {
+      if (valueOrNull !== null) {
         clipboard.writeText(String(valueOrNull));
       }
     }, [clipboard, valueOrNull]);
@@ -62,21 +62,21 @@ export const MetadataItemView = memo(
           <Text fontSize="xs" fontWeight="medium" color="base.300" textTransform="uppercase" letterSpacing="wide">
             {label}
           </Text>
-          <VStack 
-            position="relative" 
+          <VStack
+            position="relative"
             w="full"
             _hover={{
               '& .hover-actions': {
                 opacity: 1,
-              }
+              },
             }}
           >
-            <Text 
-              fontSize="sm" 
-              bg="base.800" 
-              p={3} 
-              borderRadius="lg" 
-              w="full" 
+            <Text
+              fontSize="sm"
+              bg="base.800"
+              p={3}
+              borderRadius="lg"
+              w="full"
               wordBreak="break-word"
               border="1px solid"
               borderColor="base.700"
@@ -85,7 +85,7 @@ export const MetadataItemView = memo(
             >
               {renderedValue}
             </Text>
-            <HStack 
+            <HStack
               className="hover-actions"
               position="absolute"
               top={2}
@@ -106,13 +106,7 @@ export const MetadataItemView = memo(
                   />
                 </Tooltip>
               )}
-              {onRecall && (
-                <RecallButton
-                  label={label}
-                  onClick={onRecall}
-                  isDisabled={isDisabled}
-                />
-              )}
+              {onRecall && <RecallButton label={label} onClick={onRecall} isDisabled={isDisabled} />}
             </HStack>
           </VStack>
         </VStack>
@@ -126,19 +120,29 @@ export const MetadataItemView = memo(
           <Text fontSize="xs" fontWeight="medium" color="base.300" textTransform="uppercase" letterSpacing="wide">
             {label}
           </Text>
-          <VStack 
-            position="relative" 
+          <VStack
+            position="relative"
             w="full"
             _hover={{
               '& .hover-actions': {
                 opacity: 1,
-              }
+              },
             }}
           >
-            <Text fontSize="sm" color="base.100" fontFamily="mono" bg="base.800" px={3} py={2} borderRadius="md" w="full" textAlign="center">
+            <Text
+              fontSize="sm"
+              color="base.100"
+              fontFamily="mono"
+              bg="base.800"
+              px={3}
+              py={2}
+              borderRadius="md"
+              w="full"
+              textAlign="center"
+            >
               {renderedValue}
             </Text>
-            <HStack 
+            <HStack
               className="hover-actions"
               position="absolute"
               top={1}
@@ -159,13 +163,7 @@ export const MetadataItemView = memo(
                   />
                 </Tooltip>
               )}
-              {onRecall && (
-                <RecallButton
-                  label={label}
-                  onClick={onRecall}
-                  isDisabled={isDisabled}
-                />
-              )}
+              {onRecall && <RecallButton label={label} onClick={onRecall} isDisabled={isDisabled} />}
             </HStack>
           </VStack>
         </VStack>
@@ -179,26 +177,19 @@ export const MetadataItemView = memo(
           <Text fontSize="xs" fontWeight="medium" color="base.300" textTransform="uppercase" letterSpacing="wide">
             {label}
           </Text>
-          <VStack 
-            position="relative" 
+          <VStack
+            position="relative"
             w="fit-content"
             _hover={{
               '& .hover-actions': {
                 opacity: 1,
-              }
+              },
             }}
           >
-            <Badge 
-              colorScheme={colorScheme} 
-              variant="subtle" 
-              fontSize="sm" 
-              px={3} 
-              py={2}
-              borderRadius="md"
-            >
+            <Badge colorScheme={colorScheme} variant="subtle" fontSize="sm" px={3} py={2} borderRadius="md">
               {renderedValue}
             </Badge>
-            <HStack 
+            <HStack
               className="hover-actions"
               position="absolute"
               top={-2}
@@ -225,13 +216,7 @@ export const MetadataItemView = memo(
                   />
                 </Tooltip>
               )}
-              {onRecall && (
-                <RecallButton
-                  label={label}
-                  onClick={onRecall}
-                  isDisabled={isDisabled}
-                />
-              )}
+              {onRecall && <RecallButton label={label} onClick={onRecall} isDisabled={isDisabled} />}
             </HStack>
           </VStack>
         </VStack>

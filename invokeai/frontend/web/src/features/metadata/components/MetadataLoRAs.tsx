@@ -1,11 +1,11 @@
+import { Badge, HStack, IconButton, Text, Tooltip,VStack } from '@invoke-ai/ui-library';
+import { useClipboard } from 'common/hooks/useClipboard';
 import type { LoRA } from 'features/controlLayers/store/types';
 import { MetadataItemView } from 'features/metadata/components/MetadataItemView';
 import { RecallButton } from 'features/metadata/components/RecallButton';
 import type { MetadataHandlers } from 'features/metadata/types';
 import { handlers } from 'features/metadata/util/handlers';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { VStack, Text, Badge, HStack, IconButton, Tooltip } from '@invoke-ai/ui-library';
-import { useClipboard } from 'common/hooks/useClipboard';
 import { PiCopyBold } from 'react-icons/pi';
 
 type Props = {
@@ -18,14 +18,8 @@ type Props = {
   showRecall?: boolean;
 };
 
-export const MetadataLoRAs = ({ 
-  metadata, 
-  displayMode = 'default',
-  showCopy = false,
-  showRecall = true
-}: Props) => {
+export const MetadataLoRAs = ({ metadata, displayMode = 'default', showCopy = false, showRecall = true }: Props) => {
   const [loras, setLoRAs] = useState<LoRA[]>([]);
-  const clipboard = useClipboard();
 
   useEffect(() => {
     const parse = async () => {
@@ -46,10 +40,10 @@ export const MetadataLoRAs = ({
     return (
       <>
         {loras.map((lora) => (
-          <MetadataViewLoRA 
-            key={lora.model.key} 
-            label={label} 
-            lora={lora} 
+          <MetadataViewLoRA
+            key={lora.model.key}
+            label={label}
+            lora={lora}
             handlers={handlers.loras}
             showRecall={showRecall}
           />
@@ -66,10 +60,12 @@ export const MetadataLoRAs = ({
 
     return (
       <VStack align="start" spacing={3} w="full">
-        <Text fontWeight="semibold" fontSize="md" color="base.100">LoRAs</Text>
+        <Text fontWeight="semibold" fontSize="md" color="base.100">
+          LoRAs
+        </Text>
         <VStack align="start" spacing={2} w="full">
           {loras.map((lora: LoRA, index: number) => (
-            <BadgeLoRA 
+            <BadgeLoRA
               key={lora.id || index}
               lora={lora}
               index={index}
@@ -121,11 +117,11 @@ const MetadataViewLoRA = ({
   }, [handlers, lora]);
 
   return (
-    <MetadataItemView 
-      label={label} 
-      isDisabled={false} 
-      onRecall={showRecall ? onRecall : undefined} 
-      renderedValue={renderedValue} 
+    <MetadataItemView
+      label={label}
+      isDisabled={false}
+      onRecall={showRecall ? onRecall : undefined}
+      renderedValue={renderedValue}
     />
   );
 };
@@ -144,7 +140,7 @@ const BadgeLoRA = ({
   showRecall?: boolean;
 }) => {
   const [renderedValue, setRenderedValue] = useState<React.ReactNode>(null);
-  const clipboard = useClipboard();
+  const _clipboard = useClipboard();
 
   useEffect(() => {
     const _renderValue = async () => {
@@ -164,8 +160,8 @@ const BadgeLoRA = ({
   }, [handlers, lora]);
 
   const handleCopy = useCallback(() => {
-    clipboard.writeText(`${lora.model.key} - ${lora.weight}`);
-  }, [clipboard, lora]);
+    _clipboard.writeText(`${lora.model.key} - ${lora.weight}`);
+  }, [_clipboard, lora]);
 
   const onRecall = useCallback(() => {
     if (!handlers.recallItem || !showRecall) {
@@ -181,20 +177,20 @@ const BadgeLoRA = ({
       <Text fontSize="xs" fontWeight="medium" color="base.300" textTransform="uppercase" letterSpacing="wide">
         LoRA {index + 1}
       </Text>
-      <VStack 
-        position="relative" 
+      <VStack
+        position="relative"
         w="full"
         _hover={{
           '& .hover-actions': {
             opacity: 1,
-          }
+          },
         }}
       >
-        <Badge 
-          colorScheme="purple" 
-          variant="subtle" 
-          fontSize="sm" 
-          px={3} 
+        <Badge
+          colorScheme="purple"
+          variant="subtle"
+          fontSize="sm"
+          px={3}
           py={2}
           borderRadius="md"
           w="full"
@@ -202,7 +198,7 @@ const BadgeLoRA = ({
         >
           {renderedValue}
         </Badge>
-        <HStack 
+        <HStack
           className="hover-actions"
           position="absolute"
           top={-2}
@@ -230,11 +226,7 @@ const BadgeLoRA = ({
             </Tooltip>
           )}
           {showRecall && handlers.recallItem && (
-            <RecallButton
-              label={handlers.getLabel()}
-              onClick={onRecall}
-              isDisabled={false}
-            />
+            <RecallButton label={handlers.getLabel()} onClick={onRecall} isDisabled={false} />
           )}
         </HStack>
       </VStack>

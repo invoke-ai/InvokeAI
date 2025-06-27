@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
 import { extractMetadata } from 'features/metadata/util/metadataExtraction';
+import { useMemo } from 'react';
 
 /**
  * Hook for extracting metadata from different data structures
@@ -10,4 +10,4 @@ export const useMetadataExtraction = (data: unknown): unknown => {
   return useMemo(() => {
     return extractMetadata(data);
   }, [data]);
-}; 
+};

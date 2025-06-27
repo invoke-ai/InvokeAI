@@ -1,4 +1,14 @@
-import { IconButton, Popover, PopoverBody, PopoverContent, PopoverTrigger, Text, VStack, Divider, Grid } from '@invoke-ai/ui-library';
+import {
+  Divider,
+  Grid,
+  IconButton,
+  Popover,
+  PopoverBody,
+  PopoverContent,
+  PopoverTrigger,
+  Text,
+  VStack,
+} from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
 import { MetadataItem } from 'features/metadata/components/MetadataItem';
@@ -45,19 +55,21 @@ export const StagingAreaToolbarInfoButton = memo(({ isDisabled }: { isDisabled?:
           <VStack align="start" spacing={4} fontSize="sm">
             {/* Prompts Section */}
             <VStack align="start" spacing={3} w="full">
-              <Text fontWeight="semibold" fontSize="md" color="base.100">Prompts</Text>
-              
+              <Text fontWeight="semibold" fontSize="md" color="base.100">
+                Prompts
+              </Text>
+
               {metadata !== null && (
                 <>
-                  <MetadataItem 
-                    metadata={metadata} 
-                    handlers={handlers.positivePrompt} 
+                  <MetadataItem
+                    metadata={metadata}
+                    handlers={handlers.positivePrompt}
                     displayMode="card"
                     showCopy={true}
                   />
-                  <MetadataItem 
-                    metadata={metadata} 
-                    handlers={handlers.negativePrompt} 
+                  <MetadataItem
+                    metadata={metadata}
+                    handlers={handlers.negativePrompt}
                     displayMode="card"
                     showCopy={true}
                   />
@@ -72,20 +84,22 @@ export const StagingAreaToolbarInfoButton = memo(({ isDisabled }: { isDisabled?:
               <VStack align="start" spacing={4} w="full">
                 {/* Model Section */}
                 <VStack align="start" spacing={3} w="full">
-                  <Text fontWeight="semibold" fontSize="md" color="base.100">Model</Text>
-                  
+                  <Text fontWeight="semibold" fontSize="md" color="base.100">
+                    Model
+                  </Text>
+
                   {metadata !== null && (
                     <VStack align="start" spacing={2} w="full">
-                      <MetadataItem 
-                        metadata={metadata} 
-                        handlers={handlers.model} 
+                      <MetadataItem
+                        metadata={metadata}
+                        handlers={handlers.model}
                         displayMode="badge"
                         colorScheme="invokeBlue"
                         showCopy={true}
                       />
-                      <MetadataItem 
-                        metadata={metadata} 
-                        handlers={handlers.vae} 
+                      <MetadataItem
+                        metadata={metadata}
+                        handlers={handlers.vae}
                         displayMode="badge"
                         colorScheme="base"
                         showCopy={true}
@@ -95,42 +109,28 @@ export const StagingAreaToolbarInfoButton = memo(({ isDisabled }: { isDisabled?:
                 </VStack>
 
                 {/* LoRA Section */}
-                {metadata !== null && (
-                  <MetadataLoRAs 
-                    metadata={metadata} 
-                    displayMode="badge"
-                    showCopy={true}
-                  />
-                )}
+                {metadata !== null && <MetadataLoRAs metadata={metadata} displayMode="badge" showCopy={true} />}
               </VStack>
 
               {/* Other Settings Section - Right Column */}
               <VStack align="start" spacing={3} w="full">
-                <Text fontWeight="semibold" fontSize="md" color="base.100">Other Settings</Text>
-                
+                <Text fontWeight="semibold" fontSize="md" color="base.100">
+                  Other Settings
+                </Text>
+
                 {metadata !== null && (
                   <VStack align="start" spacing={3} w="full">
-                    <MetadataItem 
-                      metadata={metadata} 
-                      handlers={handlers.seed} 
+                    <MetadataItem metadata={metadata} handlers={handlers.seed} displayMode="simple" showCopy={true} />
+                    <MetadataItem metadata={metadata} handlers={handlers.steps} displayMode="simple" showCopy={true} />
+                    <MetadataItem
+                      metadata={metadata}
+                      handlers={handlers.cfgScale}
                       displayMode="simple"
                       showCopy={true}
                     />
-                    <MetadataItem 
-                      metadata={metadata} 
-                      handlers={handlers.steps} 
-                      displayMode="simple"
-                      showCopy={true}
-                    />
-                    <MetadataItem 
-                      metadata={metadata} 
-                      handlers={handlers.cfgScale} 
-                      displayMode="simple"
-                      showCopy={true}
-                    />
-                    <MetadataItem 
-                      metadata={metadata} 
-                      handlers={handlers.scheduler} 
+                    <MetadataItem
+                      metadata={metadata}
+                      handlers={handlers.scheduler}
                       displayMode="simple"
                       showCopy={true}
                     />
@@ -144,13 +144,15 @@ export const StagingAreaToolbarInfoButton = memo(({ isDisabled }: { isDisabled?:
               <>
                 <Divider borderColor="base.700" />
                 <VStack align="start" spacing={2} w="full">
-                  <Text fontWeight="semibold" fontSize="md" color="error.300">Error</Text>
-                  <Text 
-                    fontSize="sm" 
-                    color="error.200" 
-                    bg="error.900" 
-                    p={3} 
-                    borderRadius="lg" 
+                  <Text fontWeight="semibold" fontSize="md" color="error.300">
+                    Error
+                  </Text>
+                  <Text
+                    fontSize="sm"
+                    color="error.200"
+                    bg="error.900"
+                    p={3}
+                    borderRadius="lg"
                     w="full"
                     border="1px solid"
                     borderColor="error.700"

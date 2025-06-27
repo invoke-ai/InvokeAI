@@ -3,23 +3,45 @@
  */
 
 /**
+ * Type guard to check if an object has a session property
+ */
+const hasSession = (data: unknown): data is { session: { graph?: { nodes?: Record<string, unknown> } } } => {
+  return (
+    data !== null &&
+    typeof data === 'object' &&
+    'session' in data &&
+    typeof (data as Record<string, unknown>).session === 'object' &&
+    (data as Record<string, unknown>).session !== null
+  );
+};
+
+/**
+ * Type guard to check if an object has a metadata property
+ */
+const hasMetadata = (data: unknown): data is { metadata: unknown } => {
+  return data !== null && typeof data === 'object' && 'metadata' in data;
+};
+
+/**
  * Extracts metadata from a session graph
  * @param session The session object containing the graph
  * @returns The extracted metadata or null if not found
  */
-export const extractMetadataFromSession = (session: { graph?: { nodes?: Record<string, unknown> } } | null): unknown => {
+export const extractMetadataFromSession = (
+  session: { graph?: { nodes?: Record<string, unknown> } } | null
+): unknown => {
   if (!session?.graph?.nodes) {
     return null;
   }
-  
+
   // Find the metadata node (core_metadata with unique suffix)
   const nodeKeys = Object.keys(session.graph.nodes);
-  const metadataNodeKey = nodeKeys.find(key => key.startsWith('core_metadata:'));
-  
+  const metadataNodeKey = nodeKeys.find((key) => key.startsWith('core_metadata:'));
+
   if (!metadataNodeKey) {
     return null;
   }
-  
+
   return session.graph.nodes[metadataNodeKey];
 };
 
@@ -43,16 +65,16 @@ export const extractMetadata = (data: unknown): unknown => {
   }
 
   // Try to extract from session graph
-  if ('session' in data && data.session && typeof data.session === 'object') {
-    const sessionMetadata = extractMetadataFromSession(data.session as any);
+  if (hasSession(data)) {
+    const sessionMetadata = extractMetadataFromSession(data.session);
     if (sessionMetadata) {
       return sessionMetadata;
     }
   }
 
   // Try to extract from image DTO
-  if ('metadata' in data) {
-    const imageMetadata = extractMetadataFromImage(data as any);
+  if (hasMetadata(data)) {
+    const imageMetadata = extractMetadataFromImage(data);
     if (imageMetadata) {
       return imageMetadata;
     }
@@ -64,4 +86,4 @@ export const extractMetadata = (data: unknown): unknown => {
   }
 
   return null;
-}; 
+};
