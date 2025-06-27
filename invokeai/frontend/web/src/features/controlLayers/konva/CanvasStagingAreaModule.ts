@@ -48,7 +48,6 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     group: Konva.Group;
     placeholder: {
       group: Konva.Group;
-      rect: Konva.Rect;
       badgeBg: Konva.Rect;
       text: Konva.Text;
     };
@@ -71,8 +70,6 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
 
     this.log.debug('Creating module');
 
-    const { width, height } = this.manager.stateApi.getBbox().rect;
-
     this.konva = {
       group: new Konva.Group({
         name: `${this.type}:group`,
@@ -83,14 +80,6 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
           name: `${this.type}:placeholder_group`,
           listening: false,
           visible: false,
-        }),
-        rect: new Konva.Rect({
-          name: `${this.type}:placeholder_rect`,
-          fill: 'transparent',
-          width,
-          height,
-          listening: false,
-          perfectDrawEnabled: false,
         }),
         badgeBg: new Konva.Rect({
           name: `${this.type}:placeholder_badge_bg`,
@@ -124,7 +113,6 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
       },
     };
 
-    this.konva.placeholder.group.add(this.konva.placeholder.rect);
     this.konva.placeholder.group.add(this.konva.placeholder.badgeBg);
     this.konva.placeholder.group.add(this.konva.placeholder.text);
     this.konva.group.add(this.konva.placeholder.group);
