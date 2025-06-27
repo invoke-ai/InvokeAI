@@ -158,14 +158,6 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     );
   }
 
-  syncPlaceholderSize = () => {
-    const { width, height } = this.manager.stateApi.getBbox().rect;
-    this.konva.placeholder.rect.width(width);
-    this.konva.placeholder.rect.height(height);
-    this.konva.placeholder.badgeBg.width(Math.min(BADGE_MIN_WIDTH + 4, width - SPACING_2 * 2 + 4));
-    this.konva.placeholder.text.width(Math.min(BADGE_MIN_WIDTH, width - SPACING_4));
-  };
-
   initialize = () => {
     this.log.debug('Initializing module');
     this.render();
@@ -246,7 +238,6 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
       } else {
         this.image?.destroy();
         this.image = null;
-        this.syncPlaceholderSize();
         this.konva.placeholder.group.visible(true);
       }
 
