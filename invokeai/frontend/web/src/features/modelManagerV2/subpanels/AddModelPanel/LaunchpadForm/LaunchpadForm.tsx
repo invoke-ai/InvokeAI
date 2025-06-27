@@ -1,4 +1,4 @@
-import { Button, Flex, Grid, Heading, Icon, Text } from '@invoke-ai/ui-library';
+import { Button, Flex, Grid, Heading, Text } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { map } from 'es-toolkit/compat';
 import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
@@ -9,6 +9,8 @@ import { useTranslation } from 'react-i18next';
 import { PiFolderOpenBold, PiLinkBold, PiStarBold } from 'react-icons/pi';
 import { SiHuggingface } from 'react-icons/si';
 import { useGetStarterModelsQuery } from 'services/api/endpoints/models';
+
+import { LaunchpadButton } from './LaunchpadButton';
 
 export const LaunchpadForm = memo(() => {
   const { t } = useTranslation();
@@ -43,77 +45,24 @@ export const LaunchpadForm = memo(() => {
           <Flex flexDir="column" gap={2} alignItems="flex-start">
             <Heading size="sm">{t('modelManager.launchpad.manualInstall')}</Heading>
             <Grid templateColumns="repeat(auto-fit, minmax(280px, 1fr))" gap={3} w="full">
-              <Button
+              <LaunchpadButton
                 onClick={navigateToUrlTab}
-                variant="outline"
-                p={4}
-                textAlign="left"
-                flexDir="column"
-                gap={2}
-                h="unset"
-              >
-                <Flex alignItems="center" gap={4} w="full">
-                  <Icon as={PiLinkBold} boxSize={8} color="base.300" />
-                  <Heading size="sm" color="base.100">
-                    {t('modelManager.urlOrLocalPath')}
-                  </Heading>
-                </Flex>
-                <Text lineHeight="1.4" flex="1" whiteSpace="normal" wordBreak="break-word">
-                  {t('modelManager.launchpad.urlDescription')}
-                </Text>
-              </Button>
-              <Button
+                icon={PiLinkBold}
+                title={t('modelManager.urlOrLocalPath')}
+                description={t('modelManager.launchpad.urlDescription')}
+              />
+              <LaunchpadButton
                 onClick={navigateToHuggingFaceTab}
-                variant="outline"
-                p={4}
-                textAlign="left"
-                flexDir="column"
-                gap={2}
-                h="unset"
-              >
-                <Flex alignItems="center" gap={4} w="full">
-                  <Icon as={SiHuggingface} boxSize={8} color="base.300" />
-                  <Heading size="sm" color="base.100">
-                    {t('modelManager.huggingFace')}
-                  </Heading>
-                </Flex>
-                <Text
-                  fontSize="sm"
-                  color="base.400"
-                  lineHeight="1.4"
-                  flex="1"
-                  whiteSpace="normal"
-                  wordBreak="break-word"
-                >
-                  {t('modelManager.launchpad.huggingFaceDescription')}
-                </Text>
-              </Button>
-              <Button
+                icon={SiHuggingface}
+                title={t('modelManager.huggingFace')}
+                description={t('modelManager.launchpad.huggingFaceDescription')}
+              />
+              <LaunchpadButton
                 onClick={navigateToScanFolderTab}
-                variant="outline"
-                p={4}
-                textAlign="left"
-                flexDir="column"
-                gap={2}
-                h="unset"
-              >
-                <Flex alignItems="center" gap={4} w="full">
-                  <Icon as={PiFolderOpenBold} boxSize={8} color="base.300" />
-                  <Heading size="sm" color="base.100">
-                    {t('modelManager.scanFolder')}
-                  </Heading>
-                </Flex>
-                <Text
-                  fontSize="sm"
-                  color="base.400"
-                  lineHeight="1.4"
-                  flex="1"
-                  whiteSpace="normal"
-                  wordBreak="break-word"
-                >
-                  {t('modelManager.launchpad.scanFolderDescription')}
-                </Text>
-              </Button>
+                icon={PiFolderOpenBold}
+                title={t('modelManager.scanFolder')}
+                description={t('modelManager.launchpad.scanFolderDescription')}
+              />
             </Grid>
           </Flex>
           {/* Recommended Section */}
