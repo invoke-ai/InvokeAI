@@ -52,7 +52,7 @@ export class CanvasCompositionGuideModule extends CanvasModuleBase {
       verticalLine1: new Konva.Line({
         name: `${this.type}:vertical_line_1`,
         listening: false,
-        stroke: 'rgba(255, 255, 255, 0.45)',
+        stroke: 'hsl(220 12% 90% / 0.9)',
         strokeWidth: 1,
         strokeScaleEnabled: false,
         perfectDrawEnabled: false,
@@ -61,7 +61,7 @@ export class CanvasCompositionGuideModule extends CanvasModuleBase {
       verticalLine2: new Konva.Line({
         name: `${this.type}:vertical_line_2`,
         listening: false,
-        stroke: 'rgba(255, 255, 255, 0.45)',
+        stroke: 'hsl(220 12% 90% / 0.9)',
         strokeWidth: 1,
         strokeScaleEnabled: false,
         perfectDrawEnabled: false,
@@ -70,7 +70,7 @@ export class CanvasCompositionGuideModule extends CanvasModuleBase {
       horizontalLine1: new Konva.Line({
         name: `${this.type}:horizontal_line_1`,
         listening: false,
-        stroke: 'rgba(255, 255, 255, 0.45)',
+        stroke: 'hsl(220 12% 90% / 0.9)',
         strokeWidth: 1,
         strokeScaleEnabled: false,
         perfectDrawEnabled: false,
@@ -79,7 +79,7 @@ export class CanvasCompositionGuideModule extends CanvasModuleBase {
       horizontalLine2: new Konva.Line({
         name: `${this.type}:horizontal_line_2`,
         listening: false,
-        stroke: 'rgba(255, 255, 255, 0.45)',
+        stroke: 'hsl(220 12% 90% / 0.9)',
         strokeWidth: 1,
         strokeScaleEnabled: false,
         perfectDrawEnabled: false,
