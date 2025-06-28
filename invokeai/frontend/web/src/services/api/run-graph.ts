@@ -47,7 +47,7 @@ type RunGraphReturn = {
 /**
  * Creates production dependencies for runGraph using Redux store and socket.
  */
-export const createProductionDependencies = (
+export const buildRunGraphDependencies = (
   store: AppStore,
   socket: {
     on: (event: 'queue_item_status_changed', handler: (event: S['QueueItemStatusChangedEvent']) => void) => void;
@@ -95,7 +95,7 @@ export const createProductionDependencies = (
  * @example
  *
  * ```ts
- * const dependencies = createProductionDependencies(store, socket);
+ * const dependencies = buildRunGraphDependencies(store, socket);
  * const graph = new Graph();
  * const outputNode = graph.addNode({ id: 'my-resize-node', type: 'img_resize', image: { image_name: 'my-image.png' } });
  * const controller = new AbortController();
