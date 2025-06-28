@@ -148,10 +148,10 @@ export const runGraph = (arg: RunGraphArg): Promise<RunGraphReturn> => {
     };
 
     /**
-     * Flag to indicate whether the promise is settled (resolved or rejected). This is used to prevent multiple
-     * resolutions. This flag must be set to true before the promise is resolved or rejected.
+     * Flag to indicate whether we have finished with the business logic of executing the graph. This is used to
+     * prevent multiple promise resolutions. This flag must be set to true before the promise is resolved or rejected.
      */
-    let isSettled = false;
+    let isFinished = false;
 
     /**
      * The queue item id is set to null initially, but will be updated once the graph is enqueued. It will be used to
@@ -176,10 +176,10 @@ export const runGraph = (arg: RunGraphArg): Promise<RunGraphReturn> => {
     // If a timeout value is provided, we create a timer to reject the promise.
     if (timeout !== undefined) {
       const timeoutId = setTimeout(() => {
-        if (isSettled) {
+        if (isFinished) {
           return;
         }
-        isSettled = true;
+        isFinished = true;
         log.trace('Graph canceled by timeout');
         cleanup();
         if (queueItemId !== null) {
@@ -200,10 +200,10 @@ export const runGraph = (arg: RunGraphArg): Promise<RunGraphReturn> => {
     // If a signal is provided, we add an abort handler to reject the promise if the signal is aborted.
     if (signal !== undefined) {
       const abortHandler = () => {
-        if (isSettled) {
+        if (isFinished) {
           return;
         }
-        isSettled = true;
+        isFinished = true;
         log.trace('Graph canceled by signal');
         cleanup();
         if (queueItemId !== null) {
@@ -224,7 +224,7 @@ export const runGraph = (arg: RunGraphArg): Promise<RunGraphReturn> => {
 
     // Handle the queue item status change events.
     const onQueueItemStatusChanged = async (event: S['QueueItemStatusChangedEvent']) => {
-      if (isSettled) {
+      if (isFinished) {
         return;
       }
 
@@ -239,7 +239,7 @@ export const runGraph = (arg: RunGraphArg): Promise<RunGraphReturn> => {
       }
 
       // The queue item is finished - retrieve it, extract results and resolve or reject the promise
-      isSettled = true;
+      isFinished = true;
       cleanup();
 
       // We need to handle any errors, including retrieving the queue item
@@ -291,12 +291,12 @@ export const runGraph = (arg: RunGraphArg): Promise<RunGraphReturn> => {
         queueItemId = data.item_ids[0];
       })
       .catch((error) => {
-        if (isSettled) {
+        if (isFinished) {
           // Not sure how it could happen that we are settled at this point, but if it does, we don't want to
           // reject the promise again.
           return;
         }
-        isSettled = true;
+        isFinished = true;
         cleanup();
         reject(error);
       });
