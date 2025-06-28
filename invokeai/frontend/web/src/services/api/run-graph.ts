@@ -24,7 +24,7 @@ type Deferred<T> = {
 /**
  * Create a promise and expose its resolve and reject callbacks.
  */
-const createDeferred = <T>(): Deferred<T> => {
+const createDeferredPromise = <T>(): Deferred<T> => {
   let resolve!: (value: T) => void;
   let reject!: (error: Error) => void;
 
@@ -36,21 +36,21 @@ const createDeferred = <T>(): Deferred<T> => {
   return { promise, resolve, reject };
 };
 
-interface QueueStatusEventHandler {
+type QueueStatusEventHandler = {
   subscribe: (handler: (event: S['QueueItemStatusChangedEvent']) => void) => void;
   unsubscribe: (handler: (event: S['QueueItemStatusChangedEvent']) => void) => void;
-}
+};
 
-interface GraphExecutor {
+type GraphExecutor = {
   enqueueBatch: (batch: EnqueueBatchArg) => Promise<{ item_ids: number[] }>;
   getQueueItem: (id: number) => Promise<S['SessionQueueItem']>;
   cancelQueueItem: (id: number) => Promise<S['SessionQueueItem']>;
-}
+};
 
-interface GraphRunnerDependencies {
+type GraphRunnerDependencies = {
   executor: GraphExecutor;
   eventHandler: QueueStatusEventHandler;
-}
+};
 
 type RunGraphArg = {
   graph: Graph;
@@ -105,7 +105,7 @@ type RunGraphReturn = {
  */
 export const runGraph = (arg: RunGraphArg): Promise<RunGraphReturn> => {
   // A deferred promise works around the antipattern of async promise executors.
-  const { promise, resolve, reject } = createDeferred<RunGraphReturn>();
+  const { promise, resolve, reject } = createDeferredPromise<RunGraphReturn>();
   _runGraph(arg, resolve, reject);
   return promise;
 };
