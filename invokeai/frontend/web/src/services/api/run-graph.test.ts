@@ -6,7 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   IterateNodeFoundError,
+  NodeNotFoundError,
   OutputNodeNotFoundError,
+  ResultNotFoundError,
   runGraph,
   SessionAbortedError,
   SessionCancelationError,
@@ -576,7 +578,7 @@ describe('runGraph', () => {
   });
 
   describe('output extraction', () => {
-    it('should throw NodeNotFoundError if output node not in session mapping', async () => {
+    it('should reject with NodeNotFoundError if output node not in session mapping', async () => {
       const mockQueueItem = createMockQueueItem('completed', {
         session: {
           source_prepared_mapping: {
@@ -607,10 +609,10 @@ describe('runGraph', () => {
         origin: TEST_ORIGIN,
       } as S['QueueItemStatusChangedEvent']);
 
-      await expect(promise).rejects.toThrow("Node 'output-node' not found in session");
+      await expect(promise).rejects.toThrow(NodeNotFoundError);
     });
 
-    it('should throw ResultNotFoundError if result not found for prepared node', async () => {
+    it('should reject with ResultNotFoundError if result not found for prepared node', async () => {
       const mockQueueItem = createMockQueueItem('completed', {
         session: {
           source_prepared_mapping: {
@@ -641,7 +643,7 @@ describe('runGraph', () => {
         origin: TEST_ORIGIN,
       } as S['QueueItemStatusChangedEvent']);
 
-      await expect(promise).rejects.toThrow("Result for node 'output-node' not found in session");
+      await expect(promise).rejects.toThrow(ResultNotFoundError);
     });
   });
 
