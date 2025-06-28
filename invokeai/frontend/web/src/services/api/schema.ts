@@ -6732,6 +6732,11 @@ export type components = {
              * @description The priority of the enqueued batch
              */
             priority: number;
+            /**
+             * Item Ids
+             * @description The IDs of the queue items that were enqueued
+             */
+            item_ids: number[];
         };
         /**
          * Expand Mask with Fade
