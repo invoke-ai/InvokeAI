@@ -159,7 +159,11 @@ export const runGraph = (arg: RunGraphArg): Promise<RunGraphReturn> => {
     const cleanupFunctions: Set<() => void> = new Set();
     const cleanup = () => {
       for (const func of cleanupFunctions) {
-        func();
+        try {
+          func();
+        } catch (error) {
+          log.warn({ error: parseify(error) }, 'Error during cleanup');
+        }
       }
     };
 
