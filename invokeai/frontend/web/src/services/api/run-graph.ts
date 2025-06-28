@@ -136,7 +136,7 @@ export const runGraph = (arg: RunGraphArg): Promise<RunGraphReturn> => {
     }
 
     if (signal !== undefined) {
-      signal.addEventListener('abort', () => {
+      const abortHandler = () => {
         if (isResolved) {
           return;
         }
@@ -146,8 +146,12 @@ export const runGraph = (arg: RunGraphArg): Promise<RunGraphReturn> => {
           cancelQueueItem(queueItemId, store);
         }
         reject(new Error('Graph canceled'));
+      };
+
+      signal.addEventListener('abort', abortHandler);
+      cleanupFunctions.add(() => {
+        signal.removeEventListener('abort', abortHandler);
       });
-      // TODO(psyche): Do we need to somehow clean up the signal? Not sure what is required here.
     }
 
     const onQueueItemStatusChanged = async (event: S['QueueItemStatusChangedEvent']) => {
