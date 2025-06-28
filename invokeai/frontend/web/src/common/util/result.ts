@@ -109,11 +109,11 @@ export async function withResultAsync<T>(fn: () => Promise<T>): Promise<Result<T
 }
 
 export class WrappedError extends Error {
-  data: unknown;
+  error: unknown;
 
-  constructor(data: unknown) {
+  constructor(error: unknown) {
     super('Wrapped Error');
     this.name = this.constructor.name;
-    this.data = data;
+    this.error = error;
   }
 }
