@@ -658,4 +658,111 @@ describe('runGraph', () => {
       await expect(promise).rejects.toThrow("Result for node 'output-node' not found in session");
     });
   });
+
+  describe('race conditions and timing', () => {
+    it('should handle events arriving before enqueue completes', async () => {
+      let enqueueResolve: (value: { item_ids: number[] }) => void;
+      const enqueuePromise = new Promise<{ item_ids: number[] }>((resolve) => {
+        enqueueResolve = resolve;
+      });
+      mockExecutor.enqueueBatch.mockReturnValue(enqueuePromise);
+
+      const mockQueueItem = createMockQueueItem();
+      mockExecutor.getQueueItem.mockResolvedValue(mockQueueItem);
+
+      const promise = runGraph({
+        graph: mockGraph,
+        outputNodeId: 'output-node',
+        dependencies: { executor: mockExecutor, eventHandler: mockEventHandler },
+      });
+
+      // Trigger completion event before enqueue resolves
+      mockEventHandler._triggerEvent({
+        item_id: 1,
+        status: 'completed',
+        origin: 'test-graph:mock-id-123',
+      } as S['QueueItemStatusChangedEvent']);
+
+      // Now resolve the enqueue
+      enqueueResolve!({ item_ids: [1] });
+
+      const result = await promise;
+      expect(result.session).toBe(mockQueueItem.session);
+      expect(result.output).toEqual(mockQueueItem.session.results['prepared-output-node']);
+    });
+
+    it('should handle multiple rapid status changes', async () => {
+      const mockQueueItem = createMockQueueItem();
+      mockExecutor.enqueueBatch.mockResolvedValue({ item_ids: [1] });
+      mockExecutor.getQueueItem.mockResolvedValue(mockQueueItem);
+
+      const promise = runGraph({
+        graph: mockGraph,
+        outputNodeId: 'output-node',
+        dependencies: { executor: mockExecutor, eventHandler: mockEventHandler },
+      });
+
+      // Trigger rapid sequence of events
+      mockEventHandler._triggerEvent({
+        item_id: 1,
+        status: 'pending',
+        origin: 'test-graph:mock-id-123',
+      } as S['QueueItemStatusChangedEvent']);
+
+      mockEventHandler._triggerEvent({
+        item_id: 1,
+        status: 'in_progress',
+        origin: 'test-graph:mock-id-123',
+      } as S['QueueItemStatusChangedEvent']);
+
+      mockEventHandler._triggerEvent({
+        item_id: 1,
+        status: 'completed',
+        origin: 'test-graph:mock-id-123',
+      } as S['QueueItemStatusChangedEvent']);
+
+      // Trigger another completed event (should be ignored since already resolved)
+      mockEventHandler._triggerEvent({
+        item_id: 1,
+        status: 'completed',
+        origin: 'test-graph:mock-id-123',
+      } as S['QueueItemStatusChangedEvent']);
+
+      const result = await promise;
+      expect(result.session).toBe(mockQueueItem.session);
+      expect(result.output).toEqual(mockQueueItem.session.results['prepared-output-node']);
+
+      // Should only call getQueueItem once despite multiple completion events
+      expect(mockExecutor.getQueueItem).toHaveBeenCalledTimes(1);
+    });
+
+    it('should cleanup properly when promise is never resolved', async () => {
+      // Mock enqueueBatch to never resolve
+      const neverResolvingPromise = new Promise(() => {
+        // This promise never resolves
+      });
+      mockExecutor.enqueueBatch.mockReturnValue(neverResolvingPromise);
+
+      const controller = new AbortController();
+
+      const promise = runGraph({
+        graph: mockGraph,
+        outputNodeId: 'output-node',
+        dependencies: { executor: mockExecutor, eventHandler: mockEventHandler },
+        signal: controller.signal,
+      });
+
+      // Abort the operation while enqueueBatch is still pending
+      controller.abort();
+
+      await expect(promise).rejects.toThrow('Graph canceled');
+
+      // Verify cleanup happened - event handler should be unsubscribed
+      expect(mockEventHandler.unsubscribe).toHaveBeenCalled();
+      expect(mockEventHandler._getHandlerCount()).toBe(0);
+
+      // cancelQueueItem should not be called since we don't have a queue item ID yet
+      expect(mockExecutor.cancelQueueItem).not.toHaveBeenCalled();
+    });
+  });
 });
