@@ -164,7 +164,7 @@ export const runGraph = (arg: RunGraphArg): Promise<RunGraphReturn> => {
     };
 
     if (timeout !== undefined) {
-      const timeoutId = window.setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         if (isResolved) {
           return;
         }
@@ -177,7 +177,7 @@ export const runGraph = (arg: RunGraphArg): Promise<RunGraphReturn> => {
       }, timeout);
 
       cleanupFunctions.add(() => {
-        window.clearTimeout(timeoutId);
+        clearTimeout(timeoutId);
       });
     }
 
