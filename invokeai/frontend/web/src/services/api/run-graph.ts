@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
 import { withResult, withResultAsync } from 'common/util/result';
+import { parseify } from 'common/util/serialize';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { S } from 'services/api/types';
@@ -175,7 +176,9 @@ export const runGraph = (arg: RunGraphArg): Promise<RunGraphReturn> => {
         log.trace('Graph canceled by timeout');
         cleanup();
         if (queueItemId !== null) {
-          dependencies.executor.cancelQueueItem(queueItemId);
+          dependencies.executor.cancelQueueItem(queueItemId).catch((error) => {
+            log.warn({ error: parseify(error) }, 'Failed to cancel queue item during timeout');
+          });
         }
         reject(new Error('Graph timed out'));
       }, timeout);
@@ -193,7 +196,9 @@ export const runGraph = (arg: RunGraphArg): Promise<RunGraphReturn> => {
         log.trace('Graph canceled by signal');
         cleanup();
         if (queueItemId !== null) {
-          dependencies.executor.cancelQueueItem(queueItemId);
+          dependencies.executor.cancelQueueItem(queueItemId).catch((error) => {
+            log.warn({ error: parseify(error) }, 'Failed to cancel queue item during abort');
+          });
         }
         reject(new Error('Graph canceled'));
       };
