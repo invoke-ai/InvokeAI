@@ -22,8 +22,6 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
-    WithBoard,
-    WithMetadata,
 )
 from invokeai.app.invocations.flux_controlnet import FluxControlNetField
 from invokeai.app.invocations.flux_vae_encode import FluxVaeEncodeInvocation
@@ -65,9 +63,9 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX Denoise",
     tags=["image", "flux"],
     category="image",
-    version="3.3.0",
+    version="3.3.1",
 )
-class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
+class FluxDenoiseInvocation(BaseInvocation):
     """Run denoising process with a FLUX transformer model."""
 
     # If latents is provided, this means we are doing image-to-image.
