@@ -202,6 +202,7 @@ const _runGraph = async (
         log.warn({ error: parseify(error) }, 'Error during cleanup');
       }
     }
+    cleanupFunctions.clear();
   };
 
   /**
