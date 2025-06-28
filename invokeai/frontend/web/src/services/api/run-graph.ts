@@ -5,7 +5,6 @@ import { parseify } from 'common/util/serialize';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { S } from 'services/api/types';
-import { QueueError } from 'services/events/errors';
 import { assert } from 'tsafe';
 
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from './endpoints/queue';
@@ -115,14 +114,14 @@ export const runGraph = (arg: RunGraphArg): Promise<RunGraphReturn> => {
     const { graph, outputNodeId, dependencies, destination, prepend, timeout, signal } = arg;
 
     if (!graph.hasNode(outputNodeId)) {
-      reject(new Error(`Graph does not contain output node ${outputNodeId}.`));
+      reject(new OutputNodeNotFoundError(outputNodeId, graph));
       return;
     }
 
     const g = graph.getGraph();
 
     if (Object.values(g.nodes).some((node) => node.type === 'iterate')) {
-      reject(new Error('Iterate nodes are not supported by this utility.'));
+      reject(new IterateNodeFoundError(graph));
       return;
     }
 
@@ -190,7 +189,7 @@ export const runGraph = (arg: RunGraphArg): Promise<RunGraphReturn> => {
             log.warn({ error: parseify(error) }, 'Failed to cancel queue item during timeout');
           });
         }
-        reject(new Error('Graph timed out'));
+        reject(new SessionTimeoutError(queueItemId));
       }, timeout);
 
       cleanupFunctions.add(() => {
@@ -214,7 +213,7 @@ export const runGraph = (arg: RunGraphArg): Promise<RunGraphReturn> => {
             log.warn({ error: parseify(error) }, 'Failed to cancel queue item during abort');
           });
         }
-        reject(new Error('Graph canceled'));
+        reject(new SessionAbortedError(queueItemId));
       };
 
       signal.addEventListener('abort', abortHandler);
@@ -255,7 +254,7 @@ export const runGraph = (arg: RunGraphArg): Promise<RunGraphReturn> => {
       const { status, session, error_type, error_message, error_traceback } = queueItem;
 
       if (status === 'completed') {
-        const getOutputResult = withResult(() => getOutputFromSession(session, outputNodeId));
+        const getOutputResult = withResult(() => getOutputFromSession(queueItemId, session, outputNodeId));
         if (getOutputResult.isErr()) {
           reject(getOutputResult.error);
           return;
@@ -267,19 +266,12 @@ export const runGraph = (arg: RunGraphArg): Promise<RunGraphReturn> => {
       }
 
       if (status === 'failed') {
-        // We expect the event to have error details, but technically it's possible that it doesn't
-        if (error_type && error_message && error_traceback) {
-          reject(new QueueError(error_type, error_message, error_traceback));
-          return;
-        }
-
-        // If we don't have error details, we can't provide a useful error message
-        reject(new Error('Queue item failed, but no error details were provided'));
+        reject(new SessionExecutionError(queueItemId, session, error_type, error_message, error_traceback));
         return;
       }
 
       if (status === 'canceled') {
-        reject(new Error('Graph canceled'));
+        reject(new SessionCancelationError(queueItemId, session));
         return;
       }
     };
@@ -314,41 +306,121 @@ export const runGraph = (arg: RunGraphArg): Promise<RunGraphReturn> => {
 };
 
 const getOutputFromSession = (
+  queueItemId: number | null,
   session: S['SessionQueueItem']['session'],
   nodeId: string
 ): S['SessionQueueItem']['session']['results'][string] => {
   const { results, source_prepared_mapping } = session;
   const preparedNodeId = source_prepared_mapping[nodeId]?.[0];
   if (!preparedNodeId) {
-    throw new NodeNotFoundError(nodeId, session);
+    throw new NodeNotFoundError(queueItemId, session, nodeId);
   }
   const result = results[preparedNodeId];
   if (!result) {
-    throw new ResultNotFoundError(nodeId, session);
+    throw new ResultNotFoundError(queueItemId, session, nodeId);
   }
   return result;
 };
 
-class NodeNotFoundError extends Error {
-  session: S['SessionQueueItem']['session'];
-  nodeId: string;
+export class OutputNodeNotFoundError extends Error {
+  outputNodeId: string;
+  graph: Graph;
 
-  constructor(nodeId: string, session: S['SessionQueueItem']['session']) {
-    super(`Node '${nodeId}' not found in session.`);
+  constructor(outputNodeId: string, graph: Graph) {
+    super(`Output node '${outputNodeId}' not found in the graph.`);
+    this.name = this.constructor.name;
+    this.outputNodeId = outputNodeId;
+    this.graph = graph;
+  }
+}
+
+export class IterateNodeFoundError extends Error {
+  graph: Graph;
+
+  constructor(graph: Graph) {
+    super('Iterate node(s) found in the graph.');
+    this.name = this.constructor.name;
+    this.graph = graph;
+  }
+}
+
+export class QueueItemError extends Error {
+  queueItemId: number | null;
+
+  constructor(queueItemId: number | null, message?: string) {
+    super(message ?? 'Queue item error occurred');
+    this.name = this.constructor.name;
+    this.queueItemId = queueItemId;
+  }
+}
+
+export class SessionError extends QueueItemError {
+  session: S['SessionQueueItem']['session'];
+
+  constructor(queueItemId: number | null, session: S['SessionQueueItem']['session'], message?: string) {
+    super(queueItemId, message ?? 'Session error occurred');
     this.name = this.constructor.name;
     this.session = session;
+  }
+}
+
+export class NodeNotFoundError extends SessionError {
+  nodeId: string;
+
+  constructor(queueItemId: number | null, session: S['SessionQueueItem']['session'], nodeId: string) {
+    super(queueItemId, session, `Node '${nodeId}' not found in session.`);
+    this.name = this.constructor.name;
     this.nodeId = nodeId;
   }
 }
 
-class ResultNotFoundError extends Error {
-  session: S['SessionQueueItem']['session'];
+export class ResultNotFoundError extends SessionError {
   nodeId: string;
 
-  constructor(nodeId: string, session: S['SessionQueueItem']['session']) {
-    super(`Result for node '${nodeId}' not found in session.`);
+  constructor(queueItemId: number | null, session: S['SessionQueueItem']['session'], nodeId: string) {
+    super(queueItemId, session, `Result for node '${nodeId}' not found in session.`);
     this.name = this.constructor.name;
-    this.session = session;
     this.nodeId = nodeId;
+  }
+}
+
+export class SessionExecutionError extends SessionError {
+  error_type?: string | null;
+  error_message?: string | null;
+  error_traceback?: string | null;
+
+  constructor(
+    queueItemId: number | null,
+    session: S['SessionQueueItem']['session'],
+    error_type?: string | null,
+    error_message?: string | null,
+    error_traceback?: string | null
+  ) {
+    super(queueItemId, session, 'Session execution failed');
+    this.name = this.constructor.name;
+    this.error_type = error_type;
+    this.error_traceback = error_traceback;
+    this.error_message = error_message;
+  }
+}
+
+export class SessionCancelationError extends SessionError {
+  constructor(queueItemId: number | null, session: S['SessionQueueItem']['session']) {
+    super(queueItemId, session, 'Session execution was canceled');
+    this.name = this.constructor.name;
+  }
+}
+
+export class SessionAbortedError extends QueueItemError {
+  constructor(queueItemId: number | null) {
+    super(queueItemId, 'Session execution was aborted via signal');
+    this.name = this.constructor.name;
+  }
+}
+
+export class SessionTimeoutError extends QueueItemError {
+  constructor(queueItemId: number | null) {
+    super(queueItemId, 'Session execution timed out');
+    this.name = this.constructor.name;
   }
 }
