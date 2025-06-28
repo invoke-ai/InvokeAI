@@ -5,14 +5,14 @@ import type { PartialDeep } from 'type-fest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  IterateNodeFoundError,
-  NodeNotFoundError,
-  OutputNodeNotFoundError,
-  ResultNotFoundError,
+  IterateNodeFoundInGraphError,
+  OutputNodeNotFoundInCompletedSessionError,
+  OutputNodeNotFoundInGraphError,
+  ResultNotFoundInCompletedSessionError,
   runGraph,
   SessionAbortedError,
-  SessionCancelationError,
-  SessionExecutionError,
+  SessionCanceledError,
+  SessionFailedError,
   SessionTimeoutError,
 } from './run-graph';
 
@@ -135,7 +135,7 @@ describe('runGraph', () => {
         dependencies: { executor: mockExecutor, eventHandler: mockEventHandler },
       });
 
-      await expect(promise).rejects.toThrow(OutputNodeNotFoundError);
+      await expect(promise).rejects.toThrow(OutputNodeNotFoundInGraphError);
     });
 
     it('should reject with IterateNodeFoundError if graph contains iterate nodes', async () => {
@@ -147,7 +147,7 @@ describe('runGraph', () => {
         dependencies: { executor: mockExecutor, eventHandler: mockEventHandler },
       });
 
-      await expect(promise).rejects.toThrow(IterateNodeFoundError);
+      await expect(promise).rejects.toThrow(IterateNodeFoundInGraphError);
     });
   });
 
@@ -248,7 +248,7 @@ describe('runGraph', () => {
         } as S['QueueItemStatusChangedEvent']);
       });
 
-      await expect(promise).rejects.toThrow(SessionExecutionError);
+      await expect(promise).rejects.toThrow(SessionFailedError);
     });
 
     it('should reject with SessionCancelationError on canceled status', async () => {
@@ -270,7 +270,7 @@ describe('runGraph', () => {
         } as S['QueueItemStatusChangedEvent']);
       });
 
-      await expect(promise).rejects.toThrow(SessionCancelationError);
+      await expect(promise).rejects.toThrow(SessionCanceledError);
     });
 
     it('should reject if enqueueBatch fails', async () => {
@@ -609,7 +609,7 @@ describe('runGraph', () => {
         origin: TEST_ORIGIN,
       } as S['QueueItemStatusChangedEvent']);
 
-      await expect(promise).rejects.toThrow(NodeNotFoundError);
+      await expect(promise).rejects.toThrow(OutputNodeNotFoundInCompletedSessionError);
     });
 
     it('should reject with ResultNotFoundError if result not found for prepared node', async () => {
@@ -643,7 +643,7 @@ describe('runGraph', () => {
         origin: TEST_ORIGIN,
       } as S['QueueItemStatusChangedEvent']);
 
-      await expect(promise).rejects.toThrow(ResultNotFoundError);
+      await expect(promise).rejects.toThrow(ResultNotFoundInCompletedSessionError);
     });
   });
 
