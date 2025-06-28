@@ -379,6 +379,9 @@
             "applyTransform": {
                 "title": "Applica trasformazione",
                 "desc": "Applica la trasformazione in sospeso al livello selezionato."
+            },
+            "toggleNonRasterLayers": {
+                "desc": "Mostra o nascondi tutte le categorie di livelli non raster (Livelli di controllo, Maschere di Inpaint, Guida regionale)."
             }
         },
         "workflows": {
@@ -623,7 +626,7 @@
         "installingXModels_one": "Installazione di {{count}} modello",
         "installingXModels_many": "Installazione di {{count}} modelli",
         "installingXModels_other": "Installazione di {{count}} modelli",
-        "includesNModels": "Include {{n}} modelli e le loro dipendenze",
+        "includesNModels": "Include {{n}} modelli e le loro dipendenze.",
         "starterBundleHelpText": "Installa facilmente tutti i modelli necessari per iniziare con un modello base, tra cui un modello principale, controlnet, adattatori IP e altro. Selezionando un pacchetto salterai tutti i modelli che hai già installato.",
         "noDefaultSettings": "Nessuna impostazione predefinita configurata per questo modello. Visita Gestione Modelli per aggiungere impostazioni predefinite.",
         "defaultSettingsOutOfSync": "Alcune impostazioni non corrispondono a quelle predefinite del modello:",
@@ -656,7 +659,22 @@
         "manageModels": "Gestione modelli",
         "hfTokenReset": "Ripristino del gettone HF",
         "relatedModels": "Modelli correlati",
-        "showOnlyRelatedModels": "Correlati"
+        "showOnlyRelatedModels": "Correlati",
+        "installedModelsCount": "{{installed}} di {{total}} modelli installati.",
+        "allNModelsInstalled": "Tutti i {{count}} modelli installati",
+        "nToInstall": "{{count}} da installare",
+        "nAlreadyInstalled": "{{count}} già installati",
+        "bundleAlreadyInstalled": "Pacchetto già installato",
+        "bundleAlreadyInstalledDesc": "Tutti i modelli nel pacchetto {{bundleName}} sono già installati.",
+        "launchpad": {
+            "description": "Per utilizzare la maggior parte delle funzionalità della piattaforma, Invoke richiede l'installazione di modelli. Scegli tra le opzioni di installazione manuale o esplora i modelli di avvio selezionati.",
+            "manualInstall": "Installazione manuale",
+            "urlDescription": "Installa i modelli da un URL o da un percorso file locale. Perfetto per modelli specifici che desideri aggiungere.",
+            "huggingFaceDescription": "Esplora e installa i modelli direttamente dai repository di HuggingFace.",
+            "scanFolderDescription": "Esegui la scansione di una cartella locale per rilevare e installare automaticamente i modelli.",
+            "recommendedModels": "Modelli consigliati",
+            "exploreStarter": "Oppure sfoglia tutti i modelli iniziali disponibili"
+        }
     },
     "parameters": {
         "images": "Immagini",
@@ -2302,7 +2320,7 @@
         "controlLayerEmptyState": "<UploadButton>Carica un'immagine</UploadButton>, trascina un'immagine dalla <GalleryButton>galleria</GalleryButton> su questo livello, <PullBboxButton>trascina il riquadro di delimitazione in questo livello</PullBboxButton> oppure disegna sulla tela per iniziare.",
         "useImage": "Usa immagine",
         "resetGenerationSettings": "Ripristina impostazioni di generazione",
-        "referenceImageEmptyState": "Per iniziare, <UploadButton>carica un'immagine</UploadButton>, trascina un'immagine dalla <GalleryButton>galleria</GalleryButton>, oppure <PullBboxButton>trascina il riquadro di delimitazione in questo livello</PullBboxButton> su questo livello.",
+        "referenceImageEmptyState": "Per iniziare, <UploadButton>carica un'immagine</UploadButton> oppure trascina un'immagine dalla <GalleryButton>galleria</GalleryButton> su questa Immagine di riferimento.",
         "asRasterLayer": "Come $t(controlLayers.rasterLayer)",
         "asRasterLayerResize": "Come $t(controlLayers.rasterLayer) (Ridimensiona)",
         "asControlLayer": "Come $t(controlLayers.controlLayer)",
