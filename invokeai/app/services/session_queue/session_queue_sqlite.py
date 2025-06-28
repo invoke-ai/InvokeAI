@@ -133,6 +133,18 @@ class SqliteSessionQueue(SessionQueueBase):
                     """,
                     values_to_insert,
                 )
+            with self._conn:
+                cursor = self._conn.cursor()
+                cursor.execute(
+                    """--sql
+                    SELECT item_id
+                    FROM session_queue
+                    WHERE batch_id = ?
+                    ORDER BY item_id DESC;
+                    """,
+                    (batch.batch_id,)  # batch_id is the 4th element in the tuple
+                )
+                item_ids = [row[0] for row in cursor.fetchall()]
         except Exception:
             raise
         enqueue_result = EnqueueBatchResult(
@@ -141,6 +153,7 @@ class SqliteSessionQueue(SessionQueueBase):
             enqueued=enqueued_count,
             batch=batch,
             priority=priority,
+            item_ids=item_ids,
         )
         self.__invoker.services.events.emit_batch_enqueued(enqueue_result)
         return enqueue_result
