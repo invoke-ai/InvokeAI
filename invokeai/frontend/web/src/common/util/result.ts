@@ -57,7 +57,7 @@ export class Err<E> {
  * @template T The type of the value in the `Ok` case.
  * @template E The type of the error in the `Err` case.
  */
-type Result<T, E> = Ok<T> | Err<E>;
+export type Result<T, E = Error> = Ok<T> | Err<E>;
 
 /**
  * Creates a successful result.
@@ -85,12 +85,11 @@ export function ErrResult<E>(error: E): Err<E> {
  * @param {() => T} fn The function to execute.
  * @returns {Result<T>} An `Ok` result if the function succeeds, or an `Err` result if it throws an error.
  */
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-export function withResult<T>(fn: () => T): Result<T, any> {
+export function withResult<T>(fn: () => T): Result<T> {
   try {
     return new Ok(fn());
   } catch (error) {
-    return new Err(error);
+    return new Err(error instanceof Error ? error : new WrappedError(error));
   }
 }
 
@@ -100,12 +99,21 @@ export function withResult<T>(fn: () => T): Result<T, any> {
  * @param {() => Promise<T>} fn The asynchronous function to execute.
  * @returns {Promise<Result<T>>} A `Promise` resolving to an `Ok` result if the function succeeds, or an `Err` result if it throws an error.
  */
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-export async function withResultAsync<T>(fn: () => Promise<T>): Promise<Result<T, any>> {
+export async function withResultAsync<T>(fn: () => Promise<T>): Promise<Result<T>> {
   try {
     const result = await fn();
     return new Ok(result);
   } catch (error) {
-    return new Err(error);
+    return new Err(error instanceof Error ? error : new WrappedError(error));
+  }
+}
+
+export class WrappedError extends Error {
+  data: unknown;
+
+  constructor(data: unknown) {
+    super('Wrapped Error');
+    this.name = this.constructor.name;
+    this.data = data;
   }
 }
