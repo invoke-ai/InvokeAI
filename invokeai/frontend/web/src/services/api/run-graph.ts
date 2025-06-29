@@ -264,17 +264,22 @@ const _runGraph = async (
     const timeoutId = setTimeout(async () => {
       await settle(async () => {
         log.trace('Graph canceled by timeout');
+        let cancellationFailed = false;
+        let cancellationError: Error | undefined;
+
         const cancelResult = await withResultAsync(async () => {
           if (queueItemId !== null) {
             await dependencies.executor.cancelQueueItem(queueItemId);
           }
         });
+
         if (cancelResult.isErr()) {
-          // It's possible the cancelation will fail, but we have no way to handle that gracefully. Log a warning
-          // and move on to reject.
+          cancellationFailed = true;
+          cancellationError = cancelResult.error;
           log.warn({ error: parseify(cancelResult.error) }, 'Failed to cancel queue item during timeout');
         }
-        return ErrResult(new SessionTimeoutError(queueItemId));
+
+        return ErrResult(new SessionTimeoutError(queueItemId, cancellationFailed, cancellationError));
       });
     }, timeout);
 
@@ -288,17 +293,22 @@ const _runGraph = async (
     const abortHandler = async () => {
       await settle(async () => {
         log.trace('Graph canceled by signal');
+        let cancellationFailed = false;
+        let cancellationError: Error | undefined;
+
         const cancelResult = await withResultAsync(async () => {
           if (queueItemId !== null) {
             await dependencies.executor.cancelQueueItem(queueItemId);
           }
         });
+
         if (cancelResult.isErr()) {
-          // It's possible the cancelation will fail, but we have no way to handle that gracefully. Log a warning
-          // and move on to reject.
+          cancellationFailed = true;
+          cancellationError = cancelResult.error;
           log.warn({ error: parseify(cancelResult.error) }, 'Failed to cancel queue item during abort');
         }
-        return ErrResult(new SessionAbortedError(queueItemId));
+
+        return ErrResult(new SessionAbortedError(queueItemId, cancellationFailed, cancellationError));
       });
     };
 
@@ -507,15 +517,31 @@ export class SessionCanceledError extends BaseSessionError {
 }
 
 export class SessionAbortedError extends BaseQueueItemError {
-  constructor(queueItemId: number | null) {
-    super(queueItemId, 'Session execution was aborted via signal');
+  public readonly cancellationFailed: boolean;
+  public readonly cancellationError?: Error;
+
+  constructor(queueItemId: number | null, cancellationFailed = false, cancellationError?: Error) {
+    const message = cancellationFailed
+      ? 'Session execution was aborted via signal and cancellation failed'
+      : 'Session execution was aborted via signal';
+    super(queueItemId, message);
     this.name = this.constructor.name;
+    this.cancellationFailed = cancellationFailed;
+    this.cancellationError = cancellationError;
   }
 }
 
 export class SessionTimeoutError extends BaseQueueItemError {
-  constructor(queueItemId: number | null) {
-    super(queueItemId, 'Session execution timed out');
+  public readonly cancellationFailed: boolean;
+  public readonly cancellationError?: Error;
+
+  constructor(queueItemId: number | null, cancellationFailed = false, cancellationError?: Error) {
+    const message = cancellationFailed
+      ? 'Session execution timed out and cancellation failed'
+      : 'Session execution timed out';
+    super(queueItemId, message);
     this.name = this.constructor.name;
+    this.cancellationFailed = cancellationFailed;
+    this.cancellationError = cancellationError;
   }
 }
