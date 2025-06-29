@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
 import { Mutex } from 'async-mutex';
-import { withResult, withResultAsync } from 'common/util/result';
+import { withResultAsync, WrappedError } from 'common/util/result';
 import { parseify } from 'common/util/serialize';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
@@ -255,8 +255,10 @@ const _runGraph = async (
       const result = await withResultAsync(() => Promise.resolve(settlement()));
 
       if (result.isOk()) {
+        log.debug({ queueItemId, output: parseify(result.value) }, 'Run completed successfully');
         _resolve(result.value);
       } else {
+        log.debug({ queueItemId, error: parseify(result.error) }, 'Run failed');
         _reject(result.error);
       }
     });
@@ -283,20 +285,15 @@ const _runGraph = async (
         let cancellationFailed = false;
         let cancellationError: Error | null = null;
 
-        const cancelResult = await withResultAsync(async () => {
-          if (queueItemId !== null) {
+        if (queueItemId !== null) {
+          try {
             await dependencies.executor.cancelQueueItem(queueItemId);
+          } catch (error) {
+            cancellationFailed = true;
+            cancellationError = WrappedError.wrap(error);
           }
-        });
-
-        if (cancelResult.isErr()) {
-          cancellationFailed = true;
-          cancellationError = cancelResult.error;
         }
-        log.debug(
-          { ...loggingCtx, queueItemId, cancellationFailed, cancellationError: parseify(cancellationError) },
-          'Run timed out'
-        );
+
         throw new SessionTimeoutError(queueItemId, cancellationFailed, cancellationError);
       });
     }, timeout);
@@ -313,20 +310,15 @@ const _runGraph = async (
         let cancellationFailed = false;
         let cancellationError: Error | null = null;
 
-        const cancelResult = await withResultAsync(async () => {
-          if (queueItemId !== null) {
+        if (queueItemId !== null) {
+          try {
             await dependencies.executor.cancelQueueItem(queueItemId);
+          } catch (error) {
+            cancellationFailed = true;
+            cancellationError = WrappedError.wrap(error);
           }
-        });
-
-        if (cancelResult.isErr()) {
-          cancellationFailed = true;
-          cancellationError = cancelResult.error;
         }
-        log.debug(
-          { ...loggingCtx, queueItemId, cancellationFailed, cancellationError: parseify(cancellationError) },
-          'Run aborted by signal'
-        );
+
         throw new SessionAbortedError(queueItemId, cancellationFailed, cancellationError);
       });
     };
@@ -351,43 +343,22 @@ const _runGraph = async (
 
     await settle(async () => {
       // We need to handle any errors, including retrieving the queue item
-      const queueItemResult = await withResultAsync(() => dependencies.executor.getQueueItem(event.item_id));
-      if (queueItemResult.isErr()) {
-        log.debug(
-          { ...loggingCtx, queueItemId, error: parseify(queueItemResult.error) },
-          'Failed to retrieve queue item'
-        );
-        throw queueItemResult.error;
-      }
-
-      const queueItem = queueItemResult.value;
-
+      const queueItem = await dependencies.executor.getQueueItem(event.item_id);
       const { status, session, error_type, error_message, error_traceback } = queueItem;
 
       // We are confident that the queue item is not pending or in progress, at this time.
       assert(status !== 'pending' && status !== 'in_progress');
 
       if (status === 'completed') {
-        const getOutputResult = withResult(() => getOutputFromSession(queueItemId, session, outputNodeId));
-        if (getOutputResult.isErr()) {
-          log.debug(
-            { ...loggingCtx, queueItemId, status, error: parseify(getOutputResult.error) },
-            'Failed to retrieve output result'
-          );
-          throw getOutputResult.error;
-        }
-        const output = getOutputResult.value;
-        log.debug({ ...loggingCtx, queueItemId, status, output: parseify(output) }, 'Run completed successfully');
+        const output = getOutputFromSession(queueItemId, session, outputNodeId);
         return { session, output };
       }
 
       if (status === 'failed') {
-        log.debug({ ...loggingCtx, queueItemId, status, error_type, error_message, error_traceback }, 'Session failed');
         throw new SessionFailedError(queueItemId, session, error_type, error_message, error_traceback);
       }
 
       if (status === 'canceled') {
-        log.debug({ ...loggingCtx, queueItemId, status }, 'Session canceled');
         throw new SessionCanceledError(queueItemId, session);
       }
 
@@ -400,7 +371,7 @@ const _runGraph = async (
     dependencies.eventHandler.unsubscribe(onQueueItemStatusChanged);
   });
 
-  const enqueueResult = await withResultAsync(() => {
+  try {
     const batch: EnqueueBatchArg = {
       prepend,
       batch: {
@@ -410,23 +381,16 @@ const _runGraph = async (
         runs: 1,
       },
     };
-    return dependencies.executor.enqueueBatch(batch);
-  });
-  if (enqueueResult.isErr()) {
-    // The enqueue operation itself failed - we cannot proceed.
-    log.debug({ ...loggingCtx }, 'Enqueue failed');
-    await settle(() => {
-      throw enqueueResult.error;
+    const { item_ids } = await dependencies.executor.enqueueBatch(batch);
+    // We expect exactly one item id to be returned. We control the batch config, so we can safely assert this.
+    assert(item_ids.length === 1);
+    assert(item_ids[0] !== undefined);
+    queueItemId = item_ids[0];
+  } catch (error) {
+    settle(() => {
+      throw WrappedError.wrap(error);
     });
-    return;
   }
-
-  // Retrieve the queue item id from the enqueue result.
-  const { item_ids } = enqueueResult.value;
-  // We expect exactly one item id to be returned. We control the batch config, so we can safely assert this.
-  assert(item_ids.length === 1);
-  assert(item_ids[0] !== undefined);
-  queueItemId = item_ids[0];
 };
 
 const getOutputFromSession = (
