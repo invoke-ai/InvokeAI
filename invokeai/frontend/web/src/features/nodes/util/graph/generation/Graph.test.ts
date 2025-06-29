@@ -138,6 +138,21 @@ describe('Graph', () => {
     });
   });
 
+  describe('getNodes', () => {
+    it('should return all nodes in the graph', () => {
+      const g = new Graph();
+      const n1 = g.addNode({
+        id: 'n1',
+        type: 'add',
+      });
+      const n2 = g.addNode({
+        id: 'n2',
+        type: 'sub',
+      });
+      expect(g.getNodes()).toEqual([n1, n2]);
+    });
+  });
+
   describe('addEdge', () => {
     const add: Invocation<'add'> = {
       id: 'from-node',
