@@ -97,8 +97,10 @@ type RunGraphReturn = {
  * - `ResultNotFoundInCompletedSessionError` if the result for the output node is not found in the completed session.
  * - `SessionFailedError` if the session execution fails, including error type, message, and traceback.
  * - `SessionCanceledError` if the session execution is canceled via the queue.
- * - `SessionAbortedError` if the session execution is aborted via signal.
- * - `SessionTimeoutError` if the session execution times out.
+ * - `SessionAbortedError` if the session execution is aborted via signal. Includes information on whether cancellation
+ *    failed and the cancellation error, if any.
+ * - `SessionTimeoutError` if the session execution times out. Includes information on whether cancellation failed and
+ *    the cancellation error, if any.
  *
  * @example
  *
