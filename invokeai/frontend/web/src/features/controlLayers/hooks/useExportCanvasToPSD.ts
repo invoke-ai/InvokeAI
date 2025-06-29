@@ -1,13 +1,12 @@
+import { writePsd } from 'ag-psd';
 import { logger } from 'app/logging/logger';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { canvasToBlob } from 'features/controlLayers/konva/util';
 import { selectRasterLayerEntities } from 'features/controlLayers/store/selectors';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { serializeError } from 'serialize-error';
-import { writePsd } from 'ag-psd';
 
 const log = logger('canvas');
 
@@ -64,7 +63,9 @@ export const useExportCanvasToPSD = () => {
       try {
         await Promise.race([
           Promise.all(rectCalculationPromises),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Rect calculation timeout')), 5000))
+          new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Rect calculation timeout')), 5000);
+          })
         ]);
       } catch (error) {
         log.warn({ error: serializeError(error as Error) }, 'Rect calculation timeout or error, proceeding anyway');
@@ -158,9 +159,9 @@ export const useExportCanvasToPSD = () => {
 
       // Create PSD layers from active raster layers
       const psdLayers = await Promise.all(
-        layerAdapters.map(async (layerData, index) => {
+        layerAdapters.map((layerData, index) => {
           try {
-            const { adapter, canvas, rect, layer } = layerData;
+            const { adapter: _adapter, canvas, rect, layer } = layerData;
             
             const layerDataPSD = {
               name: layer.name || `Layer ${index + 1}`,
