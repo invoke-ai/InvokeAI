@@ -414,8 +414,8 @@ const getOutputFromSession = (
 };
 
 export class OutputNodeNotFoundInGraphError extends Error {
-  outputNodeId: string;
-  graph: Graph;
+  public readonly outputNodeId: string;
+  public readonly graph: Graph;
 
   constructor(outputNodeId: string, graph: Graph) {
     super(`Output node '${outputNodeId}' not found in the graph.`);
@@ -426,7 +426,7 @@ export class OutputNodeNotFoundInGraphError extends Error {
 }
 
 export class IterateNodeFoundInGraphError extends Error {
-  graph: Graph;
+  public readonly graph: Graph;
 
   constructor(graph: Graph) {
     super('Iterate node(s) found in the graph.');
@@ -436,7 +436,7 @@ export class IterateNodeFoundInGraphError extends Error {
 }
 
 class BaseQueueItemError extends Error {
-  queueItemId: number | null;
+  public readonly queueItemId: number | null;
 
   constructor(queueItemId: number | null, message?: string) {
     super(message ?? 'Queue item error occurred');
@@ -446,7 +446,7 @@ class BaseQueueItemError extends Error {
 }
 
 class BaseSessionError extends BaseQueueItemError {
-  session: S['SessionQueueItem']['session'];
+  public readonly session: S['SessionQueueItem']['session'];
 
   constructor(queueItemId: number | null, session: S['SessionQueueItem']['session'], message?: string) {
     super(queueItemId, message ?? 'Session error occurred');
@@ -456,7 +456,7 @@ class BaseSessionError extends BaseQueueItemError {
 }
 
 export class UnexpectedStatusError extends BaseSessionError {
-  status: S['SessionQueueItem']['status'];
+  public readonly status: S['SessionQueueItem']['status'];
 
   constructor(
     queueItemId: number | null,
@@ -470,7 +470,7 @@ export class UnexpectedStatusError extends BaseSessionError {
 }
 
 export class OutputNodeNotFoundInCompletedSessionError extends BaseSessionError {
-  nodeId: string;
+  public readonly nodeId: string;
 
   constructor(queueItemId: number | null, session: S['SessionQueueItem']['session'], nodeId: string) {
     super(queueItemId, session, `Node '${nodeId}' not found in session.`);
@@ -480,7 +480,7 @@ export class OutputNodeNotFoundInCompletedSessionError extends BaseSessionError 
 }
 
 export class ResultNotFoundInCompletedSessionError extends BaseSessionError {
-  nodeId: string;
+  public readonly nodeId: string;
 
   constructor(queueItemId: number | null, session: S['SessionQueueItem']['session'], nodeId: string) {
     super(queueItemId, session, `Result for node '${nodeId}' not found in session.`);
@@ -490,9 +490,9 @@ export class ResultNotFoundInCompletedSessionError extends BaseSessionError {
 }
 
 export class SessionFailedError extends BaseSessionError {
-  error_type?: string | null;
-  error_message?: string | null;
-  error_traceback?: string | null;
+  public readonly error_type?: string | null;
+  public readonly error_message?: string | null;
+  public readonly error_traceback?: string | null;
 
   constructor(
     queueItemId: number | null,
