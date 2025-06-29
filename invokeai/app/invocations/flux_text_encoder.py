@@ -200,7 +200,7 @@ class FluxTextEncoderInvocation(BaseInvocation):
 
         # The T5 tokenizer uses a space-like character ' ' (U+2581) to denote spaces.
         # We'll replace it with a regular space for readability.
-        tokens = [t.replace(" ", " ") for t in tokens]
+        tokens = [t.replace("\u2581", " ") for t in tokens]
 
         tokenized_str = ""
         used_tokens = 0
