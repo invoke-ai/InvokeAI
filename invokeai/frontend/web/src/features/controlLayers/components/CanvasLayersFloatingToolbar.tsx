@@ -12,7 +12,6 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiEraserBold,
-  PiImageBold,
   PiPaintBrushBold,
   PiRectangleBold,
   PiShapesFill,
@@ -23,7 +22,7 @@ export const CanvasLayersFloatingToolbar = memo(() => {
   const isBusy = useCanvasIsBusy();
   const addInpaintMask = useAddInpaintMask();
   const addRegionalGuidance = useAddRegionalGuidance();
-  const addRegionalReferenceImage = useAddNewRegionalGuidanceWithARefImage();
+  const _addRegionalReferenceImage = useAddNewRegionalGuidanceWithARefImage();
   const addRasterLayer = useAddRasterLayer();
   const addControlLayer = useAddControlLayer();
   const isRegionalGuidanceEnabled = useIsEntityTypeEnabled('regional_guidance');
