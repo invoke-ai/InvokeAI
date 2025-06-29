@@ -75,22 +75,41 @@ export const useCollapsibleGridviewPanel = (
     if (!api) {
       return;
     }
-    const panel = api.getPanel(panelId);
-    if (!panel) {
-      return;
-    }
+    
+    const initializePanel = () => {
+      const panel = api.getPanel(panelId);
+      if (!panel) {
+        // Panel not available yet, retry after a short delay
+        setTimeout(initializePanel, 10);
+        return;
+      }
 
-    lastExpandedSizeRef.current = orientation === 'vertical' ? panel.height : panel.width;
+      // Set initial state immediately
+      const initialIsCollapsed = getIsCollapsed(panel, orientation, collapsedSize);
+      $isCollapsed.set(initialIsCollapsed);
+      
+      // Initialize lastExpandedSizeRef properly
+      if (initialIsCollapsed) {
+        // If starting collapsed, use default size as the target expansion size
+        lastExpandedSizeRef.current = defaultSize;
+      } else {
+        // If starting expanded, use current size as the target expansion size
+        lastExpandedSizeRef.current = orientation === 'vertical' ? panel.height : panel.width;
+      }
 
-    const disposable = panel.api.onDidDimensionsChange(() => {
-      const isCollapsed = getIsCollapsed(panel, orientation, collapsedSize);
-      $isCollapsed.set(isCollapsed);
-    });
+      const disposable = panel.api.onDidDimensionsChange(() => {
+        const isCollapsed = getIsCollapsed(panel, orientation, collapsedSize);
+        $isCollapsed.set(isCollapsed);
+      });
 
-    return () => {
-      disposable.dispose();
+      return () => {
+        disposable.dispose();
+      };
     };
-  }, [$isCollapsed, api, collapsedSize, orientation, panelId]);
+
+    const cleanup = initializePanel();
+    return cleanup;
+  }, [api, collapsedSize, orientation, panelId, defaultSize]);
 
   return useMemo(
     () => ({
