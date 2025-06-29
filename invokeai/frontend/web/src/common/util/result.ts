@@ -116,4 +116,11 @@ export class WrappedError extends Error {
     this.name = this.constructor.name;
     this.error = error;
   }
+
+  static wrap(error: unknown): Error | WrappedError {
+    if (error instanceof Error) {
+      return error;
+    }
+    return new WrappedError(error);
+  }
 }
