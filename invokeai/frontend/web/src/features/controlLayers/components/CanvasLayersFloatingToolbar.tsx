@@ -60,14 +60,6 @@ export const CanvasLayersFloatingToolbar = memo(() => {
             isDisabled={!isRegionalGuidanceEnabled || isBusy}
           />
         </Tooltip>
-        <Tooltip label={t('controlLayers.regionalReferenceImage')} placement="top">
-          <IconButton
-            aria-label={t('controlLayers.regionalReferenceImage')}
-            icon={<PiImageBold />}
-            onClick={addRegionalReferenceImage}
-            isDisabled={!isRegionalGuidanceEnabled || isBusy}
-          />
-        </Tooltip>
         <Tooltip label={t('controlLayers.controlLayer')} placement="top">
           <IconButton
             aria-label={t('controlLayers.controlLayer')}
