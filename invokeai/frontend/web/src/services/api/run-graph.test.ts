@@ -343,7 +343,51 @@ describe('runGraph', () => {
       // Fast-forward time to trigger timeout
       vi.advanceTimersByTime(1001);
 
-      await expect(promise).rejects.toThrow(SessionTimeoutError);
+      try {
+        await promise;
+        expect.fail('Promise should have rejected');
+      } catch (error) {
+        expect(error).toBeInstanceOf(SessionTimeoutError);
+        expect((error as SessionTimeoutError).cancellationFailed).toBe(false);
+        expect((error as SessionTimeoutError).cancellationError).toBeUndefined();
+        expect((error as SessionTimeoutError).message).toBe('Session execution timed out');
+      }
+      expect(mockExecutor.cancelQueueItem).toHaveBeenCalledWith(1);
+    });
+
+    it('should timeout and reject with SessionTimeoutError indicating cancellation failure when cancel fails', async () => {
+      let resolveEnqueue: (value: { item_ids: number[] }) => void = () => {};
+      const enqueuePromise = new Promise<{ item_ids: number[] }>((resolve) => {
+        resolveEnqueue = resolve;
+      });
+
+      const cancellationError = new Error('Network error during cancellation');
+      mockExecutor.enqueueBatch.mockReturnValue(enqueuePromise);
+      mockExecutor.cancelQueueItem.mockRejectedValue(cancellationError);
+
+      const promise = runGraph({
+        graph: mockGraph,
+        outputNodeId: 'output-node',
+        dependencies: { executor: mockExecutor, eventHandler: mockEventHandler },
+        timeout: 1000,
+      });
+
+      // Resolve enqueue to set queue item ID
+      resolveEnqueue({ item_ids: [1] });
+      await Promise.resolve(); // Let the promise resolution be processed
+
+      // Fast-forward time to trigger timeout
+      vi.advanceTimersByTime(1001);
+
+      try {
+        await promise;
+        expect.fail('Promise should have rejected');
+      } catch (error) {
+        expect(error).toBeInstanceOf(SessionTimeoutError);
+        expect((error as SessionTimeoutError).cancellationFailed).toBe(true);
+        expect((error as SessionTimeoutError).cancellationError).toBe(cancellationError);
+        expect((error as SessionTimeoutError).message).toBe('Session execution timed out and cancellation failed');
+      }
       expect(mockExecutor.cancelQueueItem).toHaveBeenCalledWith(1);
     });
 
@@ -388,7 +432,15 @@ describe('runGraph', () => {
       // Fast-forward time to trigger timeout before enqueue completes
       vi.advanceTimersByTime(1001);
 
-      await expect(promise).rejects.toThrow(SessionTimeoutError);
+      try {
+        await promise;
+        expect.fail('Promise should have rejected');
+      } catch (error) {
+        expect(error).toBeInstanceOf(SessionTimeoutError);
+        expect((error as SessionTimeoutError).cancellationFailed).toBe(false);
+        expect((error as SessionTimeoutError).cancellationError).toBeUndefined();
+        expect((error as SessionTimeoutError).message).toBe('Session execution timed out');
+      }
       // Should not attempt to cancel since queue item ID is not available
       expect(mockExecutor.cancelQueueItem).not.toHaveBeenCalled();
     });
@@ -411,7 +463,46 @@ describe('runGraph', () => {
         controller.abort();
       });
 
-      await expect(promise).rejects.toThrow(SessionAbortedError);
+      try {
+        await promise;
+        expect.fail('Promise should have rejected');
+      } catch (error) {
+        expect(error).toBeInstanceOf(SessionAbortedError);
+        expect((error as SessionAbortedError).cancellationFailed).toBe(false);
+        expect((error as SessionAbortedError).cancellationError).toBeUndefined();
+        expect((error as SessionAbortedError).message).toBe('Session execution was aborted via signal');
+      }
+      expect(mockExecutor.cancelQueueItem).toHaveBeenCalledWith(1);
+    });
+
+    it('should reject with SessionAbortedError indicating cancellation failure when cancel fails', async () => {
+      const controller = new AbortController();
+      const cancellationError = new Error('Network error during cancellation');
+      mockExecutor.enqueueBatch.mockResolvedValue({ item_ids: [1] });
+      mockExecutor.cancelQueueItem.mockRejectedValue(cancellationError);
+
+      const promise = runGraph({
+        graph: mockGraph,
+        outputNodeId: 'output-node',
+        dependencies: { executor: mockExecutor, eventHandler: mockEventHandler },
+        signal: controller.signal,
+      });
+
+      setImmediate(() => {
+        controller.abort();
+      });
+
+      try {
+        await promise;
+        expect.fail('Promise should have rejected');
+      } catch (error) {
+        expect(error).toBeInstanceOf(SessionAbortedError);
+        expect((error as SessionAbortedError).cancellationFailed).toBe(true);
+        expect((error as SessionAbortedError).cancellationError).toBe(cancellationError);
+        expect((error as SessionAbortedError).message).toBe(
+          'Session execution was aborted via signal and cancellation failed'
+        );
+      }
       expect(mockExecutor.cancelQueueItem).toHaveBeenCalledWith(1);
     });
 
@@ -460,7 +551,15 @@ describe('runGraph', () => {
         controller.abort();
       });
 
-      await expect(promise).rejects.toThrow(SessionAbortedError);
+      try {
+        await promise;
+        expect.fail('Promise should have rejected');
+      } catch (error) {
+        expect(error).toBeInstanceOf(SessionAbortedError);
+        expect((error as SessionAbortedError).cancellationFailed).toBe(false);
+        expect((error as SessionAbortedError).cancellationError).toBeUndefined();
+        expect((error as SessionAbortedError).message).toBe('Session execution was aborted via signal');
+      }
       // Should not attempt to cancel since queue item ID is not available
       expect(mockExecutor.cancelQueueItem).not.toHaveBeenCalled();
     });
