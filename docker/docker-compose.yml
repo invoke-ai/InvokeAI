@@ -47,6 +47,9 @@ services:
 
   invokeai-rocm:
     <<: *invokeai
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile-rocm
     devices:
       - /dev/kfd:/dev/kfd
       - /dev/dri:/dev/dri

@@ -13,7 +13,7 @@ run() {
 
   # parse .env file for build args
   build_args=$(awk '$1 ~ /=[^$]/ && $0 !~ /^#/ {print "--build-arg " $0 " "}' .env) &&
-  profile="$(awk -F '=' '/GPU_DRIVER/ {print $2}' .env)"
+  profile="$(awk -F '=' '/GPU_DRIVER=/ {print $2}' .env)"
 
   # default to 'cuda' profile
   [[ -z "$profile" ]] && profile="cuda"
@@ -30,7 +30,7 @@ run() {
 
   printf "%s\n" "starting service $service_name"
   docker compose --profile "$profile" up -d "$service_name"
-  docker compose logs -f
+  docker compose --profile "$profile" logs -f
 }
 
 run
