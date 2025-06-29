@@ -10,12 +10,7 @@ import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useIsEntityTypeEnabled } from 'features/controlLayers/hooks/useIsEntityTypeEnabled';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  PiEraserBold,
-  PiPaintBrushBold,
-  PiRectangleBold,
-  PiShapesFill,
-} from 'react-icons/pi';
+import { PiEraserBold, PiPaintBrushBold, PiRectangleBold, PiShapesFill } from 'react-icons/pi';
 
 export const CanvasLayersFloatingToolbar = memo(() => {
   const { t } = useTranslation();
