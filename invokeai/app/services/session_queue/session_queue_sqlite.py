@@ -142,7 +142,7 @@ class SqliteSessionQueue(SessionQueueBase):
                     WHERE batch_id = ?
                     ORDER BY item_id DESC;
                     """,
-                    (batch.batch_id,)  # batch_id is the 4th element in the tuple
+                    (batch.batch_id,)
                 )
                 item_ids = [row[0] for row in cursor.fetchall()]
         except Exception:
