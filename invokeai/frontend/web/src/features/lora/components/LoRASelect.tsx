@@ -59,16 +59,22 @@ const LoRASelect = () => {
     },
   });
 
-  const currentBaseModel = useAppSelector((state) => state.controlLayers.present.params.model?.base);
+  const currentBaseModel = useAppSelector((state) => state.params.model?.base);
+
+  // Filter to only show compatible LoRAs
+  const compatibleLoRAs = useMemo(() => {
+    if (!currentBaseModel) {
+      return [];
+    }
+    return modelConfigs.filter((model) => model.base === currentBaseModel);
+  }, [modelConfigs, currentBaseModel]);
 
   const getIsDisabled = useCallback(
     (model: LoRAModelConfig): boolean => {
-      const isCompatible = currentBaseModel === model.base;
       const isAdded = Boolean(addedLoRAs.find((lora) => lora.model.key === model.key));
-      const hasMainModel = Boolean(currentBaseModel);
-      return !hasMainModel || !isCompatible || isAdded;
+      return isAdded;
     },
-    [addedLoRAs, currentBaseModel]
+    [addedLoRAs]
   );
 
   const onChange = useCallback(
@@ -86,12 +92,12 @@ const LoRASelect = () => {
       return t('common.loading');
     }
 
-    if (modelConfigs.length === 0) {
-      return t('models.noLoRAsInstalled');
+    if (compatibleLoRAs.length === 0) {
+      return currentBaseModel ? t('models.noCompatibleLoRAs') : t('models.selectModelFirst');
     }
 
     return t('models.addLora');
-  }, [isLoading, modelConfigs.length, t]);
+  }, [isLoading, compatibleLoRAs.length, currentBaseModel, t]);
 
   // Calculate initial group states to default to the current base model architecture
   const initialGroupStates = useMemo(() => {
@@ -112,16 +118,16 @@ const LoRASelect = () => {
         <FormLabel>{t('models.concepts')} </FormLabel>
       </InformationalPopover>
       <ModelPicker
-        modelConfigs={modelConfigs}
+        modelConfigs={compatibleLoRAs}
         onChange={onChange}
-        grouped
+        grouped={false}
         relatedModelKeys={relatedKeys}
         selectedModelConfig={undefined}
         allowEmpty
         placeholder={placeholder}
         getIsOptionDisabled={getIsDisabled}
-        noOptionsText={t('models.noLoRAsInstalled')}
         initialGroupStates={initialGroupStates}
+        noOptionsText={currentBaseModel ? t('models.noCompatibleLoRAs') : t('models.selectModelFirst')}
       />
     </FormControl>
   );
