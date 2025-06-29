@@ -349,7 +349,7 @@ describe('runGraph', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(SessionTimeoutError);
         expect((error as SessionTimeoutError).cancellationFailed).toBe(false);
-        expect((error as SessionTimeoutError).cancellationError).toBeUndefined();
+        expect((error as SessionTimeoutError).cancellationError).toBeNull();
         expect((error as SessionTimeoutError).message).toBe('Session execution timed out');
       }
       expect(mockExecutor.cancelQueueItem).toHaveBeenCalledWith(1);
@@ -438,7 +438,7 @@ describe('runGraph', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(SessionTimeoutError);
         expect((error as SessionTimeoutError).cancellationFailed).toBe(false);
-        expect((error as SessionTimeoutError).cancellationError).toBeUndefined();
+        expect((error as SessionTimeoutError).cancellationError).toBeNull();
         expect((error as SessionTimeoutError).message).toBe('Session execution timed out');
       }
       // Should not attempt to cancel since queue item ID is not available
@@ -469,7 +469,7 @@ describe('runGraph', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(SessionAbortedError);
         expect((error as SessionAbortedError).cancellationFailed).toBe(false);
-        expect((error as SessionAbortedError).cancellationError).toBeUndefined();
+        expect((error as SessionAbortedError).cancellationError).toBeNull();
         expect((error as SessionAbortedError).message).toBe('Session execution was aborted via signal');
       }
       expect(mockExecutor.cancelQueueItem).toHaveBeenCalledWith(1);
@@ -557,7 +557,7 @@ describe('runGraph', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(SessionAbortedError);
         expect((error as SessionAbortedError).cancellationFailed).toBe(false);
-        expect((error as SessionAbortedError).cancellationError).toBeUndefined();
+        expect((error as SessionAbortedError).cancellationError).toBeNull();
         expect((error as SessionAbortedError).message).toBe('Session execution was aborted via signal');
       }
       // Should not attempt to cancel since queue item ID is not available
