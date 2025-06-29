@@ -199,8 +199,7 @@ describe('runGraph', () => {
         graph: mockGraph,
         outputNodeId: 'output-node',
         dependencies: { executor: mockExecutor, eventHandler: mockEventHandler },
-        destination: 'test-destination',
-        prepend: true,
+        options: { destination: 'test-destination', prepend: true },
       });
 
       setImmediate(() => {
@@ -333,7 +332,7 @@ describe('runGraph', () => {
         graph: mockGraph,
         outputNodeId: 'output-node',
         dependencies: { executor: mockExecutor, eventHandler: mockEventHandler },
-        timeout: 1000,
+        options: { timeout: 1000 },
       });
 
       // Resolve enqueue to set queue item ID
@@ -369,7 +368,7 @@ describe('runGraph', () => {
         graph: mockGraph,
         outputNodeId: 'output-node',
         dependencies: { executor: mockExecutor, eventHandler: mockEventHandler },
-        timeout: 1000,
+        options: { timeout: 1000 },
       });
 
       // Resolve enqueue to set queue item ID
@@ -400,7 +399,7 @@ describe('runGraph', () => {
         graph: mockGraph,
         outputNodeId: 'output-node',
         dependencies: { executor: mockExecutor, eventHandler: mockEventHandler },
-        timeout: 1000,
+        options: { timeout: 1000 },
       });
 
       // Complete before timeout
@@ -426,7 +425,7 @@ describe('runGraph', () => {
         graph: mockGraph,
         outputNodeId: 'output-node',
         dependencies: { executor: mockExecutor, eventHandler: mockEventHandler },
-        timeout: 1000,
+        options: { timeout: 1000 },
       });
 
       // Fast-forward time to trigger timeout before enqueue completes
@@ -456,7 +455,7 @@ describe('runGraph', () => {
         graph: mockGraph,
         outputNodeId: 'output-node',
         dependencies: { executor: mockExecutor, eventHandler: mockEventHandler },
-        signal: controller.signal,
+        options: { signal: controller.signal },
       });
 
       setImmediate(() => {
@@ -485,7 +484,7 @@ describe('runGraph', () => {
         graph: mockGraph,
         outputNodeId: 'output-node',
         dependencies: { executor: mockExecutor, eventHandler: mockEventHandler },
-        signal: controller.signal,
+        options: { signal: controller.signal },
       });
 
       setImmediate(() => {
@@ -516,7 +515,7 @@ describe('runGraph', () => {
         graph: mockGraph,
         outputNodeId: 'output-node',
         dependencies: { executor: mockExecutor, eventHandler: mockEventHandler },
-        signal: controller.signal,
+        options: { signal: controller.signal },
       });
 
       // Complete before abort
@@ -544,7 +543,7 @@ describe('runGraph', () => {
         graph: mockGraph,
         outputNodeId: 'output-node',
         dependencies: { executor: mockExecutor, eventHandler: mockEventHandler },
-        signal: controller.signal,
+        options: { signal: controller.signal },
       });
 
       setImmediate(() => {
@@ -837,7 +836,7 @@ describe('runGraph', () => {
         graph: mockGraph,
         outputNodeId: 'output-node',
         dependencies: { executor: mockExecutor, eventHandler: mockEventHandler },
-        signal: controller.signal,
+        options: { signal: controller.signal },
       });
 
       // Abort the operation while enqueueBatch is still pending
