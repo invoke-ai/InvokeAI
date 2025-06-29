@@ -65,7 +65,7 @@ export const useExportCanvasToPSD = () => {
           Promise.all(rectCalculationPromises),
           new Promise((_, reject) => {
             setTimeout(() => reject(new Error('Rect calculation timeout')), 5000);
-          })
+          }),
         ]);
       } catch (error) {
         log.warn({ error: serializeError(error as Error) }, 'Rect calculation timeout or error, proceeding anyway');
@@ -78,47 +78,53 @@ export const useExportCanvasToPSD = () => {
       let minTop = Infinity;
 
       // Get layer adapters and calculate bounds
-      const layerAdapters = activeLayers.map((layer) => {
-        const adapter = canvasManager.getAdapter({ id: layer.id, type: 'raster_layer' });
-        log.debug(`Layer "${layer.name}": adapter found = ${!!adapter}, type = ${adapter?.type}`);
-        
-        if (adapter && adapter.type === 'raster_layer_adapter') {
-          // Get the actual pixel bounds of the layer content from the transformer
-          const pixelRect = adapter.transformer.$pixelRect.get();
-          const layerPosition = adapter.state.position;
-          
-          log.debug(`Layer "${layer.name}": pixelRect=${JSON.stringify(pixelRect)}, position=${JSON.stringify(layerPosition)}`);
-          
-          // Alternative approach: use full canvas and adjust positioning
-          const canvas = adapter.getCanvas();
-          const left = layerPosition.x;
-          const top = layerPosition.y;
-          const right = left + canvas.width;
-          const bottom = top + canvas.height;
+      const layerAdapters = activeLayers
+        .map((layer) => {
+          const adapter = canvasManager.getAdapter({ id: layer.id, type: 'raster_layer' });
+          log.debug(`Layer "${layer.name}": adapter found = ${!!adapter}, type = ${adapter?.type}`);
 
-          log.debug(`Layer "${layer.name}": canvas size = ${canvas.width}x${canvas.height}, position = ${left},${top}`);
+          if (adapter && adapter.type === 'raster_layer_adapter') {
+            // Get the actual pixel bounds of the layer content from the transformer
+            const pixelRect = adapter.transformer.$pixelRect.get();
+            const layerPosition = adapter.state.position;
 
-          // Skip layers with invalid canvas dimensions
-          if (canvas.width === 0 || canvas.height === 0) {
-            log.debug(`Layer "${layer.name}": skipping due to invalid canvas dimensions`);
-            return null;
+            log.debug(
+              `Layer "${layer.name}": pixelRect=${JSON.stringify(pixelRect)}, position=${JSON.stringify(layerPosition)}`
+            );
+
+            // Alternative approach: use full canvas and adjust positioning
+            const canvas = adapter.getCanvas();
+            const left = layerPosition.x;
+            const top = layerPosition.y;
+            const right = left + canvas.width;
+            const bottom = top + canvas.height;
+
+            log.debug(
+              `Layer "${layer.name}": canvas size = ${canvas.width}x${canvas.height}, position = ${left},${top}`
+            );
+
+            // Skip layers with invalid canvas dimensions
+            if (canvas.width === 0 || canvas.height === 0) {
+              log.debug(`Layer "${layer.name}": skipping due to invalid canvas dimensions`);
+              return null;
+            }
+
+            minLeft = Math.min(minLeft, left);
+            minTop = Math.min(minTop, top);
+            maxRight = Math.max(maxRight, right);
+            maxBottom = Math.max(maxBottom, bottom);
+
+            // Temporarily remove the empty bounds filter to see what's happening
+            // if (pixelRect.width === 0 || pixelRect.height === 0) {
+            //   log.debug(`Layer "${layer.name}": skipping due to empty bounds`);
+            //   return null;
+            // }
+
+            return { adapter, canvas, rect: { x: left, y: top, width: canvas.width, height: canvas.height }, layer };
           }
-
-          minLeft = Math.min(minLeft, left);
-          minTop = Math.min(minTop, top);
-          maxRight = Math.max(maxRight, right);
-          maxBottom = Math.max(maxBottom, bottom);
-
-          // Temporarily remove the empty bounds filter to see what's happening
-          // if (pixelRect.width === 0 || pixelRect.height === 0) {
-          //   log.debug(`Layer "${layer.name}": skipping due to empty bounds`);
-          //   return null;
-          // }
-
-          return { adapter, canvas, rect: { x: left, y: top, width: canvas.width, height: canvas.height }, layer };
-        }
-        return null;
-      }).filter((item): item is NonNullable<typeof item> => item !== null);
+          return null;
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null);
 
       log.debug(`Found ${layerAdapters.length} valid layer adapters out of ${activeLayers.length} active layers`);
 
@@ -162,7 +168,7 @@ export const useExportCanvasToPSD = () => {
         layerAdapters.map((layerData, index) => {
           try {
             const { adapter: _adapter, canvas, rect, layer } = layerData;
-            
+
             const layerDataPSD = {
               name: layer.name || `Layer ${index + 1}`,
               left: Math.floor(rect.x - minLeft),
@@ -175,7 +181,9 @@ export const useExportCanvasToPSD = () => {
               canvas: canvas,
             };
 
-            log.debug(`Layer "${layerDataPSD.name}": ${layerDataPSD.left},${layerDataPSD.top} to ${layerDataPSD.right},${layerDataPSD.bottom}`);
+            log.debug(
+              `Layer "${layerDataPSD.name}": ${layerDataPSD.left},${layerDataPSD.top} to ${layerDataPSD.right},${layerDataPSD.bottom}`
+            );
 
             return layerDataPSD;
           } catch (error) {
@@ -207,15 +215,21 @@ export const useExportCanvasToPSD = () => {
         children: validLayers,
       };
 
-      log.debug({ 
-        layerCount: validLayers.length, 
-        canvasDimensions: { width: canvasWidth, height: canvasHeight },
-        layers: validLayers.map(l => ({ name: l.name, bounds: { left: l.left, top: l.top, right: l.right, bottom: l.bottom } }))
-      }, 'Creating PSD with layers');
+      log.debug(
+        {
+          layerCount: validLayers.length,
+          canvasDimensions: { width: canvasWidth, height: canvasHeight },
+          layers: validLayers.map((l) => ({
+            name: l.name,
+            bounds: { left: l.left, top: l.top, right: l.right, bottom: l.bottom },
+          })),
+        },
+        'Creating PSD with layers'
+      );
 
       // Generate PSD file
       const buffer = writePsd(psd);
-      
+
       // Create blob and download
       const blob = new Blob([buffer], { type: 'application/octet-stream' });
       const url = URL.createObjectURL(blob);
