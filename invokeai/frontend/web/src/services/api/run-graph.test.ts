@@ -48,6 +48,7 @@ const createMockGraph = (id = TEST_ID, hasIterateNodes = false): Graph => {
       nodes: mockNodes,
       edges: {},
     }),
+    getNodes: vi.fn().mockReturnValue(Object.values(mockNodes)),
   } as unknown as Graph;
 };
 
