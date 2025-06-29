@@ -7,7 +7,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFileArrowDownBold } from 'react-icons/pi';
 
-export const EntityListSelectedEntityActionBarExportPSDButton = memo(() => {
+export const RasterLayerExportPSDButton = memo(() => {
   const { t } = useTranslation();
   const isBusy = useCanvasIsBusy();
   const rasterLayers = useAppSelector(selectRasterLayerEntities);
@@ -27,8 +27,9 @@ export const EntityListSelectedEntityActionBarExportPSDButton = memo(() => {
     <IconButton
       onClick={onClick}
       isDisabled={isBusy}
-      minW={8}
+      size="sm"
       variant="link"
+      colorScheme="invokeBlue"
       alignSelf="stretch"
       aria-label={t('controlLayers.exportCanvasToPSD')}
       tooltip={t('controlLayers.exportCanvasToPSD')}
@@ -37,4 +38,4 @@ export const EntityListSelectedEntityActionBarExportPSDButton = memo(() => {
   );
 });
 
-EntityListSelectedEntityActionBarExportPSDButton.displayName = 'EntityListSelectedEntityActionBarExportPSDButton';
+RasterLayerExportPSDButton.displayName = 'RasterLayerExportPSDButton'; 

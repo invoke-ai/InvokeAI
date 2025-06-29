@@ -10,6 +10,7 @@ import { fixTooltipCloseOnScrollStyles } from 'common/util/fixTooltipCloseOnScro
 import { CanvasEntityAddOfTypeButton } from 'features/controlLayers/components/common/CanvasEntityAddOfTypeButton';
 import { CanvasEntityMergeVisibleButton } from 'features/controlLayers/components/common/CanvasEntityMergeVisibleButton';
 import { CanvasEntityTypeIsHiddenToggle } from 'features/controlLayers/components/common/CanvasEntityTypeIsHiddenToggle';
+import { RasterLayerExportPSDButton } from 'features/controlLayers/components/RasterLayer/RasterLayerExportPSDButton';
 import { useEntityTypeInformationalPopover } from 'features/controlLayers/hooks/useEntityTypeInformationalPopover';
 import { useEntityTypeTitle } from 'features/controlLayers/hooks/useEntityTypeTitle';
 import { entitiesReordered } from 'features/controlLayers/store/canvasSlice';
@@ -166,6 +167,7 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children, entityI
         </Flex>
         <CanvasEntityMergeVisibleButton type={type} />
         <CanvasEntityTypeIsHiddenToggle type={type} />
+        {type === 'raster_layer' && <RasterLayerExportPSDButton />}
         <CanvasEntityAddOfTypeButton type={type} />
       </Flex>
       <Collapse in={collapse.isTrue} style={fixTooltipCloseOnScrollStyles}>
