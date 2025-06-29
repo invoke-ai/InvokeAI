@@ -149,7 +149,7 @@ export const ModelPicker = typedMemo(
         if (relatedModelKeys.length > 0) {
           const relatedModels: T[] = [];
           const otherModels: T[] = [];
-          
+
           for (const modelConfig of modelConfigs) {
             if (relatedModelKeys.includes(modelConfig.key)) {
               relatedModels.push(modelConfig);
@@ -157,7 +157,7 @@ export const ModelPicker = typedMemo(
               otherModels.push(modelConfig);
             }
           }
-          
+
           return [...relatedModels, ...otherModels];
         }
         return modelConfigs;
@@ -248,11 +248,7 @@ export const ModelPicker = typedMemo(
     // Create a component wrapper that includes related model styling
     const RelatedModelPickerOptionComponent = useCallback(
       ({ option, ...rest }: { option: T } & BoxProps) => (
-        <PickerOptionComponent 
-          option={option} 
-          isRelated={relatedModelKeys.includes(option.key)}
-          {...rest} 
-        />
+        <PickerOptionComponent option={option} isRelated={relatedModelKeys.includes(option.key)} {...rest} />
       ),
       [relatedModelKeys]
     );
@@ -341,37 +337,39 @@ const optionNameSx: SystemStyleObject = {
   },
 };
 
-const PickerOptionComponent = typedMemo(({ option, isRelated = false, ...rest }: { option: AnyModelConfig; isRelated?: boolean } & BoxProps) => {
-  const { $compactView } = usePickerContext<AnyModelConfig>();
-  const compactView = useStore($compactView);
+const PickerOptionComponent = typedMemo(
+  ({ option, isRelated = false, ...rest }: { option: AnyModelConfig; isRelated?: boolean } & BoxProps) => {
+    const { $compactView } = usePickerContext<AnyModelConfig>();
+    const compactView = useStore($compactView);
 
-  const displayName = isRelated ? `* ${option.name}` : option.name;
+    const displayName = isRelated ? `* ${option.name}` : option.name;
 
-  return (
-    <Flex {...rest} sx={optionSx} data-is-compact={compactView}>
-      {!compactView && option.cover_image && <ModelImage image_url={option.cover_image} />}
-      <Flex flexDir="column" gap={1} flex={1}>
-        <Flex gap={2} alignItems="center">
-          <Text sx={optionNameSx} data-is-compact={compactView}>
-            {displayName}
-          </Text>
-          <Spacer />
-          {option.file_size > 0 && (
-            <Text variant="subtext" fontStyle="italic" noOfLines={1} flexShrink={0} overflow="visible">
-              {filesize(option.file_size)}
+    return (
+      <Flex {...rest} sx={optionSx} data-is-compact={compactView}>
+        {!compactView && option.cover_image && <ModelImage image_url={option.cover_image} />}
+        <Flex flexDir="column" gap={1} flex={1}>
+          <Flex gap={2} alignItems="center">
+            <Text sx={optionNameSx} data-is-compact={compactView}>
+              {displayName}
             </Text>
-          )}
-          {option.usage_info && (
-            <Text variant="subtext" fontStyle="italic" noOfLines={1} flexShrink={0} overflow="visible">
-              {option.usage_info}
-            </Text>
-          )}
+            <Spacer />
+            {option.file_size > 0 && (
+              <Text variant="subtext" fontStyle="italic" noOfLines={1} flexShrink={0} overflow="visible">
+                {filesize(option.file_size)}
+              </Text>
+            )}
+            {option.usage_info && (
+              <Text variant="subtext" fontStyle="italic" noOfLines={1} flexShrink={0} overflow="visible">
+                {option.usage_info}
+              </Text>
+            )}
+          </Flex>
+          {option.description && !compactView && <Text color="base.200">{option.description}</Text>}
         </Flex>
-        {option.description && !compactView && <Text color="base.200">{option.description}</Text>}
       </Flex>
-    </Flex>
-  );
-});
+    );
+  }
+);
 PickerOptionComponent.displayName = 'PickerItemComponent';
 
 const BASE_KEYWORDS: { [key in BaseModelType]?: string[] } = {
