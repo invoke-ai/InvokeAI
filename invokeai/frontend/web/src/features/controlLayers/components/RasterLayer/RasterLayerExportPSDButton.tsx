@@ -12,7 +12,7 @@ export const RasterLayerExportPSDButton = memo(() => {
   const isBusy = useCanvasIsBusy();
   const rasterLayers = useAppSelector(selectRasterLayerEntities);
   const { exportCanvasToPSD } = useExportCanvasToPSD();
-  
+
   const onClick = useCallback(() => {
     exportCanvasToPSD();
   }, [exportCanvasToPSD]);
@@ -38,4 +38,4 @@ export const RasterLayerExportPSDButton = memo(() => {
   );
 });
 
-RasterLayerExportPSDButton.displayName = 'RasterLayerExportPSDButton'; 
+RasterLayerExportPSDButton.displayName = 'RasterLayerExportPSDButton';
