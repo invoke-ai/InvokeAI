@@ -14,7 +14,7 @@ import type { JsonObject } from 'type-fest';
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from './endpoints/queue';
 import type { EnqueueBatchArg } from './types';
 
-const log = logger('queue');
+const log = logger('system');
 
 type Deferred<T> = {
   promise: Promise<T>;
