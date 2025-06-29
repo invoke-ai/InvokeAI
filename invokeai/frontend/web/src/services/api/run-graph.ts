@@ -53,14 +53,18 @@ type GraphRunnerDependencies = {
   eventHandler: QueueStatusEventHandler;
 };
 
-type RunGraphArg = {
-  graph: Graph;
-  outputNodeId: string;
-  dependencies: GraphRunnerDependencies;
+export type RunGraphOptions = {
   destination?: string;
   prepend?: boolean;
   timeout?: number;
   signal?: AbortSignal;
+};
+
+type RunGraphArg = {
+  graph: Graph;
+  outputNodeId: string;
+  dependencies: GraphRunnerDependencies;
+  options?: RunGraphOptions;
 };
 
 type RunGraphReturn = {
@@ -79,13 +83,14 @@ type RunGraphReturn = {
  * @param arg.graph The graph to execute as an instance of the Graph class.
  * @param arg.outputNodeId The id of the node whose output will be retrieved.
  * @param arg.dependencies The dependencies for queue operations and event handling.
- * @param arg.destination The destination to assign to the batch. If omitted, the destination is not set.
- * @param arg.prepend Whether to prepend the graph to the front of the queue. If omitted, the graph is appended to the
+ * @param arg.options Optional parameters for the run:
+ * @param arg.options.destination The destination to assign to the batch. If omitted, the destination is not set.
+ * @param arg.options.prepend Whether to prepend the graph to the front of the queue. If omitted, the graph is appended to the
  *    end of the queue.
- * @param arg.timeout The timeout for the run in milliseconds. The promise rejects with a SessionTimeoutError when
+ * @param arg.options.timeout The timeout for the run in milliseconds. The promise rejects with a SessionTimeoutError when
  *    the run times out. If the queue item was enqueued, a best effort is made to cancel it. **If omitted, there is
  *    no timeout and the run will wait indefinitely for completion.**
- * @param arg.signal An optional signal to cancel the operation. The promise rejects with a SessionAbortedError when
+ * @param arg.options.signal An optional signal to cancel the operation. The promise rejects with a SessionAbortedError when
  *    the run is canceled via signal. If the queue item was enqueued, a best effort is made to cancel it. **If omitted,
  *    the run cannot easily be canceled.**
  *
@@ -168,10 +173,11 @@ export const buildRunGraphDependencies = (
  */
 const _runGraph = async (
   arg: RunGraphArg,
-  _resolve: (value: RunGraphReturn) => void,
-  _reject: (error: Error) => void
+  _resolve: Deferred<RunGraphReturn>['resolve'],
+  _reject: Deferred<RunGraphReturn>['reject']
 ): Promise<void> => {
-  const { graph, outputNodeId, dependencies, destination, prepend, timeout, signal } = arg;
+  const { graph, outputNodeId, dependencies, options } = arg;
+  const { destination, prepend, timeout, signal } = options ?? {};
 
   const loggingCtx: JsonObject = {
     graphId: graph.id,

@@ -594,8 +594,10 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       this.manager.stateApi.runGraphAndReturnImageOutput({
         graph,
         outputNodeId,
-        prepend: true,
-        signal: controller.signal,
+        options: {
+          prepend: true,
+          signal: controller.signal,
+        },
       })
     );
 

@@ -53,6 +53,7 @@ import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import { getImageDTO } from 'services/api/endpoints/images';
+import type { RunGraphOptions } from 'services/api/run-graph';
 import { buildRunGraphDependencies, runGraph } from 'services/api/run-graph';
 import type { ImageDTO, S } from 'services/api/types';
 import type { Param0 } from 'tsafe';
@@ -267,23 +268,13 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   runGraphAndReturnImageOutput = async (arg: {
     graph: Graph;
     outputNodeId: string;
-    destination?: string;
-    prepend?: boolean;
-    timeout?: number;
-    signal?: AbortSignal;
+    options?: RunGraphOptions;
   }): Promise<ImageDTO> => {
-    const { graph, outputNodeId, destination, prepend, timeout, signal } = arg;
-
     const dependencies = buildRunGraphDependencies(this.store, this.manager.socket);
 
     const { output } = await runGraph({
-      graph,
-      outputNodeId,
       dependencies,
-      destination,
-      prepend,
-      timeout,
-      signal,
+      ...arg,
     });
 
     // Extract the image from the result - we expect a single image
