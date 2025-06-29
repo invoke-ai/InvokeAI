@@ -52,6 +52,24 @@ export const useExportCanvasToPSD = () => {
 
       log.debug(`Exporting ${activeLayers.length} active raster layers to PSD`);
 
+      // Ensure all rect calculations are up to date before proceeding
+      const rectCalculationPromises = activeLayers.map(async (layer) => {
+        const adapter = canvasManager.getAdapter({ id: layer.id, type: 'raster_layer' });
+        if (adapter && adapter.type === 'raster_layer_adapter') {
+          await adapter.transformer.requestRectCalculation();
+        }
+      });
+
+      // Wait for all rect calculations to complete with a timeout
+      try {
+        await Promise.race([
+          Promise.all(rectCalculationPromises),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Rect calculation timeout')), 5000))
+        ]);
+      } catch (error) {
+        log.warn({ error: serializeError(error as Error) }, 'Rect calculation timeout or error, proceeding anyway');
+      }
+
       // Find canvas dimensions by getting the maximum bounds of all layers
       let maxRight = 0;
       let maxBottom = 0;
@@ -61,24 +79,47 @@ export const useExportCanvasToPSD = () => {
       // Get layer adapters and calculate bounds
       const layerAdapters = activeLayers.map((layer) => {
         const adapter = canvasManager.getAdapter({ id: layer.id, type: 'raster_layer' });
+        log.debug(`Layer "${layer.name}": adapter found = ${!!adapter}, type = ${adapter?.type}`);
+        
         if (adapter && adapter.type === 'raster_layer_adapter') {
-          const canvas = adapter.getCanvas();
-          const rect = adapter.transformer.$pixelRect.get();
+          // Get the actual pixel bounds of the layer content from the transformer
+          const pixelRect = adapter.transformer.$pixelRect.get();
+          const layerPosition = adapter.state.position;
           
-          const left = layer.position.x + rect.x;
-          const top = layer.position.y + rect.y;
-          const right = left + rect.width;
-          const bottom = top + rect.height;
+          log.debug(`Layer "${layer.name}": pixelRect=${JSON.stringify(pixelRect)}, position=${JSON.stringify(layerPosition)}`);
+          
+          // Alternative approach: use full canvas and adjust positioning
+          const canvas = adapter.getCanvas();
+          const left = layerPosition.x;
+          const top = layerPosition.y;
+          const right = left + canvas.width;
+          const bottom = top + canvas.height;
+
+          log.debug(`Layer "${layer.name}": canvas size = ${canvas.width}x${canvas.height}, position = ${left},${top}`);
+
+          // Skip layers with invalid canvas dimensions
+          if (canvas.width === 0 || canvas.height === 0) {
+            log.debug(`Layer "${layer.name}": skipping due to invalid canvas dimensions`);
+            return null;
+          }
 
           minLeft = Math.min(minLeft, left);
           minTop = Math.min(minTop, top);
           maxRight = Math.max(maxRight, right);
           maxBottom = Math.max(maxBottom, bottom);
 
-          return { adapter, canvas, rect: { x: left, y: top, width: rect.width, height: rect.height }, layer };
+          // Temporarily remove the empty bounds filter to see what's happening
+          // if (pixelRect.width === 0 || pixelRect.height === 0) {
+          //   log.debug(`Layer "${layer.name}": skipping due to empty bounds`);
+          //   return null;
+          // }
+
+          return { adapter, canvas, rect: { x: left, y: top, width: canvas.width, height: canvas.height }, layer };
         }
         return null;
       }).filter((item): item is NonNullable<typeof item> => item !== null);
+
+      log.debug(`Found ${layerAdapters.length} valid layer adapters out of ${activeLayers.length} active layers`);
 
       if (layerAdapters.length === 0) {
         toast({
@@ -92,6 +133,26 @@ export const useExportCanvasToPSD = () => {
       // Default canvas size if no valid bounds found
       const canvasWidth = maxRight > minLeft ? Math.ceil(maxRight - minLeft) : 1024;
       const canvasHeight = maxBottom > minTop ? Math.ceil(maxBottom - minTop) : 1024;
+
+      // Validate canvas dimensions
+      if (canvasWidth <= 0 || canvasHeight <= 0) {
+        toast({
+          id: 'INVALID_CANVAS_DIMENSIONS',
+          title: t('toast.invalidCanvasDimensions'),
+          status: 'error',
+        });
+        return;
+      }
+
+      if (canvasWidth > 30000 || canvasHeight > 30000) {
+        toast({
+          id: 'CANVAS_TOO_LARGE',
+          title: t('toast.canvasTooLarge'),
+          description: t('toast.canvasTooLargeDesc'),
+          status: 'error',
+        });
+        return;
+      }
 
       log.debug(`PSD canvas dimensions: ${canvasWidth}x${canvasHeight}`);
 
@@ -145,7 +206,11 @@ export const useExportCanvasToPSD = () => {
         children: validLayers,
       };
 
-      log.debug({ layerCount: validLayers.length }, 'Creating PSD with layers');
+      log.debug({ 
+        layerCount: validLayers.length, 
+        canvasDimensions: { width: canvasWidth, height: canvasHeight },
+        layers: validLayers.map(l => ({ name: l.name, bounds: { left: l.left, top: l.top, right: l.right, bottom: l.bottom } }))
+      }, 'Creating PSD with layers');
 
       // Generate PSD file
       const buffer = writePsd(psd);
