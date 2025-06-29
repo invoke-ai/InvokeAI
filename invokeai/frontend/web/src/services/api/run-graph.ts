@@ -178,15 +178,6 @@ const _runGraph = async (
   const { graph, outputNodeId, dependencies, options } = arg;
   const { destination, prepend, timeout, signal } = options ?? {};
 
-  const loggingCtx: JsonObject = {
-    graphId: graph.id,
-    outputNodeId,
-    destination: destination ?? 'not provided',
-    prepend: prepend ?? false,
-    timeout: timeout ?? 'not provided',
-    signal: signal !== undefined ? 'provided' : 'not provided',
-  };
-
   /**
    * We will use the origin to filter out socket events unrelated to this graph.
    *
@@ -217,7 +208,7 @@ const _runGraph = async (
       try {
         func();
       } catch (error) {
-        log.warn({ ...loggingCtx, error: parseify(error) }, 'Error during cleanup');
+        log.warn({ error: parseify(error) }, 'Error during runGraph cleanup');
       }
     }
     cleanupFunctions.clear();
@@ -229,15 +220,18 @@ const _runGraph = async (
    *
    * A flag allows pending locks to bail if the promise has already been settled.
    */
-  let isSettling = false;
   const settlementMutex = new Mutex();
+  let isSettling = false;
 
   /**
-   * Wraps all logic that settles the promise. Return a Result to indicate success or failure. This function will
-   * handle the cleanup of listeners, timeouts, etc. and resolve or reject the promise based on the result.
+   * Wraps all logic that settles the promise. This function will handle the cleanup of listeners, timeouts, etc. and
+   * resolve or reject the promise.
    *
    * Once the graph execution is finished, all remaining logic should be wrapped in this function to avoid race
    * conditions or multiple resolutions/rejections of the promise.
+   *
+   * @param settlement A function that returns a `RunGraphReturn` object or a promise that resolves to a
+   *    `RunGraphReturn` object. The function should throw an error if the run was not successful.
    */
   const settle = async (settlement: () => Promise<RunGraphReturn> | RunGraphReturn) => {
     await settlementMutex.runExclusive(async () => {
@@ -251,14 +245,24 @@ const _runGraph = async (
       // Clean up listeners, timeouts, etc. ASAP.
       cleanup();
 
-      // Normalize the settlement function to always return a promise.
+      // Normalize the settlement function to always return a promise and wrap in a result to handle errors.
       const result = await withResultAsync(() => Promise.resolve(settlement()));
 
+      const ctx: JsonObject = {
+        queueItemId,
+        graphId: graph.id,
+        outputNodeId,
+        destination: destination ?? 'not provided',
+        prepend: prepend ?? false,
+        timeout: timeout ?? 'not provided',
+        signal: signal !== undefined ? 'provided' : 'not provided',
+      };
+
       if (result.isOk()) {
-        log.debug({ queueItemId, output: parseify(result.value) }, 'Run completed successfully');
+        log.debug({ ...ctx, output: parseify(result.value) }, 'Run completed successfully');
         _resolve(result.value);
       } else {
-        log.debug({ queueItemId, error: parseify(result.error) }, 'Run failed');
+        log.debug({ ...ctx, error: parseify(result.error) }, 'Run failed');
         _reject(result.error);
       }
     });
