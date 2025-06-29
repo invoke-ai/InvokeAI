@@ -109,7 +109,7 @@ export const useCollapsibleGridviewPanel = (
 
     const cleanup = initializePanel();
     return cleanup;
-  }, [api, collapsedSize, orientation, panelId, defaultSize]);
+  }, [api, collapsedSize, orientation, panelId, defaultSize, $isCollapsed]);
 
   return useMemo(
     () => ({
