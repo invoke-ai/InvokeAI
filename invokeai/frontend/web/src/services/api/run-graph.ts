@@ -262,14 +262,17 @@ const _runGraph = async (
   // If a timeout value is provided, we create a timer to reject the promise.
   if (timeout !== undefined) {
     const timeoutId = setTimeout(async () => {
-      await settle(() => {
+      await settle(async () => {
         log.trace('Graph canceled by timeout');
-        if (queueItemId !== null) {
+        const cancelResult = await withResultAsync(async () => {
+          if (queueItemId !== null) {
+            await dependencies.executor.cancelQueueItem(queueItemId);
+          }
+        });
+        if (cancelResult.isErr()) {
           // It's possible the cancelation will fail, but we have no way to handle that gracefully. Log a warning
           // and move on to reject.
-          dependencies.executor.cancelQueueItem(queueItemId).catch((error) => {
-            log.warn({ error: parseify(error) }, 'Failed to cancel queue item during timeout');
-          });
+          log.warn({ error: parseify(cancelResult.error) }, 'Failed to cancel queue item during timeout');
         }
         return ErrResult(new SessionTimeoutError(queueItemId));
       });
@@ -282,15 +285,18 @@ const _runGraph = async (
 
   // If a signal is provided, we add an abort handler to reject the promise if the signal is aborted.
   if (signal !== undefined) {
-    const abortHandler = () => {
-      settle(() => {
+    const abortHandler = async () => {
+      await settle(async () => {
         log.trace('Graph canceled by signal');
-        if (queueItemId !== null) {
+        const cancelResult = await withResultAsync(async () => {
+          if (queueItemId !== null) {
+            await dependencies.executor.cancelQueueItem(queueItemId);
+          }
+        });
+        if (cancelResult.isErr()) {
           // It's possible the cancelation will fail, but we have no way to handle that gracefully. Log a warning
           // and move on to reject.
-          dependencies.executor.cancelQueueItem(queueItemId).catch((error) => {
-            log.warn({ error: parseify(error) }, 'Failed to cancel queue item during abort');
-          });
+          log.warn({ error: parseify(cancelResult.error) }, 'Failed to cancel queue item during abort');
         }
         return ErrResult(new SessionAbortedError(queueItemId));
       });
