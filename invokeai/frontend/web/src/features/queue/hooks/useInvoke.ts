@@ -28,7 +28,10 @@ export const useInvoke = () => {
   const enqueueGenerate = useEnqueueGenerate();
   const enqueueUpscaling = useEnqueueUpscaling();
 
-  const [_, { isLoading }] = useEnqueueBatchMutation(enqueueMutationFixedCacheKeyOptions);
+  const [_, { isLoading }] = useEnqueueBatchMutation({
+    ...enqueueMutationFixedCacheKeyOptions,
+    selectFromResult: ({ isLoading }) => ({ isLoading }),
+  });
 
   const enqueue = useCallback(
     async (prepend: boolean, isApiValidationRun: boolean) => {
