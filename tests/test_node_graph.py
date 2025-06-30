@@ -20,9 +20,11 @@ from invokeai.app.invocations.primitives import (
 from invokeai.app.invocations.upscale import ESRGANInvocation
 from invokeai.app.services.shared.graph import (
     CollectInvocation,
+    CollectInvocationOutput,
     Edge,
     EdgeConnection,
     Graph,
+    GraphExecutionState,
     InvalidEdgeError,
     IterateInvocation,
     NodeAlreadyInGraphError,
@@ -35,9 +37,12 @@ from tests.test_nodes import (
     ListPassThroughInvocation,
     PolymorphicStringTestInvocation,
     PromptCollectionTestInvocation,
+    PromptCollectionTestInvocationOutput,
     PromptTestInvocation,
     PromptTestInvocationOutput,
     TextToImageTestInvocation,
+    get_single_output_from_session,
+    run_session_with_mock_context,
 )
 
 
@@ -758,3 +763,26 @@ def test_nodes_must_return_invocation_output():
         class NoOutputInvocation(BaseInvocation):
             def invoke(self) -> str:
                 return "foo"
+
+def test_collector_different_incomers():
+    """Tests an edge case where a collector has incoming edges from invocations with differently-named output fields."""
+    g = Graph()
+    # This node has a str type output field named "prompt"
+    n1 = PromptTestInvocation(id="1", prompt="Banana")
+    # This node has a str type output field named "value"
+    n2 = StringInvocation(id="2", value="Sushi")
+    n3 = CollectInvocation(id="3")
+    g.add_node(n1)
+    g.add_node(n2)
+    g.add_node(n3)
+    e1 = create_edge(n1.id, "prompt", n3.id, "item")
+    e2 = create_edge(n2.id, "value", n3.id, "item")
+    g.add_edge(e1)
+    g.add_edge(e2)
+    session = GraphExecutionState(graph=g)
+    # The bug resulted in an error like this when calling session.next():
+    #   Field types are incompatible (a0f9797b-1179-4200-81ae-6ef981660163.prompt -> ccc6af96-2a65-4bbe-a02f-4189bb4770ac.item)
+    run_session_with_mock_context(session)
+    output= get_single_output_from_session(session, n3.id)
+    assert isinstance(output, CollectInvocationOutput)
+    assert output.collection == ["Banana", "Sushi"]  # Both inputs should be collected
