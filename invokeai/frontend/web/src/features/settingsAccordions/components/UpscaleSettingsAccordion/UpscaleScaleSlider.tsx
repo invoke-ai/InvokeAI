@@ -41,8 +41,9 @@ export const UpscaleScaleSlider = memo(() => {
           value={scale}
           onChange={onChange}
           defaultValue={4}
-          min={2}
+          min={1}
           max={16}
+          step={0.5}
           format={formatValue}
         />
       </Flex>
