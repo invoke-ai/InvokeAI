@@ -1,4 +1,4 @@
-import { writePsd, type Layer, type Psd } from 'ag-psd';
+import { type Layer, type Psd, writePsd } from 'ag-psd';
 import { logger } from 'app/logging/logger';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { downloadBlob } from 'features/controlLayers/konva/util';
@@ -8,6 +8,12 @@ import { useTranslation } from 'react-i18next';
 import { serializeError } from 'serialize-error';
 
 const log = logger('canvas');
+
+// Canvas size limits for PSD export
+// These are conservative limits to prevent memory issues with large canvases
+// The actual limit may be lower depending on available memory
+const MAX_CANVAS_DIMENSION = 8192; // 8K resolution
+const MAX_CANVAS_AREA = MAX_CANVAS_DIMENSION * MAX_CANVAS_DIMENSION; // ~64MP max
 
 export const useExportCanvasToPSD = () => {
   const { t } = useTranslation();
@@ -52,7 +58,9 @@ export const useExportCanvasToPSD = () => {
         return;
       }
 
-      if (visibleRect.width > 30000 || visibleRect.height > 30000) {
+      // Check size constraints using area only
+      const canvasArea = visibleRect.width * visibleRect.height;
+      if (canvasArea > MAX_CANVAS_AREA) {
         toast({
           id: 'CANVAS_TOO_LARGE',
           title: t('toast.canvasTooLarge'),
@@ -91,7 +99,7 @@ export const useExportCanvasToPSD = () => {
         })
       );
 
-      // Create PSD document
+      // Create PSD document using proper types
       const psd: Psd = {
         width: visibleRect.width,
         height: visibleRect.height,
@@ -103,12 +111,13 @@ export const useExportCanvasToPSD = () => {
 
       log.debug(
         {
-          layerCount: psdLayers.length,
+          layerCount: psd.children?.length ?? 0,
           canvasDimensions: { width: psd.width, height: psd.height },
-          layers: psdLayers.map((l) => ({
-            name: l.name,
-            bounds: { left: l.left, top: l.top, right: l.right, bottom: l.bottom },
-          })),
+          layers:
+            psd.children?.map((l) => ({
+              name: l.name,
+              bounds: { left: l.left, top: l.top, right: l.right, bottom: l.bottom },
+            })) ?? [],
         },
         'Creating PSD with layers'
       );
@@ -124,7 +133,7 @@ export const useExportCanvasToPSD = () => {
       toast({
         id: 'PSD_EXPORT_SUCCESS',
         title: t('toast.psdExportSuccess'),
-        description: t('toast.psdExportSuccessDesc', { count: psdLayers.length }),
+        description: t('toast.psdExportSuccessDesc', { count: psd.children?.length ?? 0 }),
         status: 'success',
       });
 
