@@ -1,4 +1,4 @@
-import { Box, Flex, FormControl, FormLabel, Grid, Heading, Icon, Text } from '@invoke-ai/ui-library';
+import { Box, Flex, Grid, Heading, Icon, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { setUpscaleInitialImageDndTarget } from 'features/dnd/dnd';
@@ -47,8 +47,8 @@ export const UpscalingLaunchpadPanel = memo(() => {
             <>
               <Icon as={PiImageBold} boxSize={8} color="base.500" />
               <Flex flexDir="column" alignItems="flex-start" gap={2}>
-                <Heading size="sm">Upload Image to Upscale</Heading>
-                <Text color="base.300">Click or drag an image to upscale (JPG, PNG, WebP up to 100MB)</Text>
+                <Heading size="sm">{t('ui.launchpad.upscaling.uploadImage.title')}</Heading>
+                <Text color="base.300">{t('ui.launchpad.upscaling.uploadImage.description')}</Text>
               </Flex>
               <Flex position="absolute" right={3} bottom={3}>
                 <PiUploadBold />
@@ -83,8 +83,8 @@ export const UpscalingLaunchpadPanel = memo(() => {
                 >{`${upscaleInitialImage.width}x${upscaleInitialImage.height}`}</Text>
               </Flex>
               <Flex flexDir="column" alignItems="flex-start" gap={2}>
-                <Heading size="sm">Image Ready</Heading>
-                <Text color="base.300">Press Invoke to begin upscaling</Text>
+                <Heading size="sm">{t('ui.launchpad.upscaling.imageReady.title')}</Heading>
+                <Text color="base.300">{t('ui.launchpad.upscaling.imageReady.description')}</Text>
               </Flex>
             </>
           )}
@@ -97,16 +97,9 @@ export const UpscalingLaunchpadPanel = memo(() => {
 
         {/* Guidance text */}
         {upscaleInitialImage && (
-          <Flex 
-            bg="base.800" 
-            p={4} 
-            borderRadius="base" 
-            border="1px solid" 
-            borderColor="base.700"
-            mt={6}
-          >
+          <Flex bg="base.800" p={4} borderRadius="base" border="1px solid" borderColor="base.700" mt={6}>
             <Text variant="subtext" fontSize="sm" lineHeight="1.6">
-              <strong>Ready to upscale!</strong> Configure your settings below, then click the <strong>Invoke</strong> button to begin upscaling your image.
+              <strong>{t('ui.launchpad.upscaling.readyToUpscale.title')}</strong> {t('ui.launchpad.upscaling.readyToUpscale.description')}
             </Text>
           </Flex>
         )}
@@ -117,19 +110,25 @@ export const UpscalingLaunchpadPanel = memo(() => {
           {/* Left Column: All parameters stacked */}
           <Flex flexDir="column" gap={6} alignItems="flex-start">
             <Box w="full">
-              <Text fontWeight="semibold" fontSize="sm" mb={1}>Upscale Model</Text>
+              <Text fontWeight="semibold" fontSize="sm" mb={1}>
+                {t('ui.launchpad.upscaling.upscaleModel')}
+              </Text>
               <Box className="launchpad-hide-label">
                 <ParamSpandrelModel />
               </Box>
             </Box>
             <Box w="full">
-              <Text fontWeight="semibold" fontSize="sm" mb={1}>Model</Text>
+              <Text fontWeight="semibold" fontSize="sm" mb={1}>
+                {t('ui.launchpad.upscaling.model')}
+              </Text>
               <Box className="launchpad-hide-label">
                 <MainModelPicker />
               </Box>
             </Box>
             <Box w="full">
-              <Text fontWeight="semibold" fontSize="sm" mb={1}>Scale</Text>
+              <Text fontWeight="semibold" fontSize="sm" mb={1}>
+                {t('ui.launchpad.upscaling.scale')}
+              </Text>
               <Box className="launchpad-hide-label">
                 <UpscaleScaleSlider />
               </Box>
@@ -138,10 +137,10 @@ export const UpscalingLaunchpadPanel = memo(() => {
           {/* Right Column: Description/help text */}
           <Box>
             <Text variant="subtext" fontSize="sm" lineHeight="1.6">
-              When upscaling, use a prompt that describes the medium and style. Avoid describing specific content details in the image.
+              {t('ui.launchpad.upscaling.helpText.promptAdvice')}
             </Text>
             <Text variant="subtext" fontSize="sm" lineHeight="1.6" mt={3}>
-              Upscaling works best with the general style of your image.
+              {t('ui.launchpad.upscaling.helpText.styleAdvice')}
             </Text>
           </Box>
         </Grid>
