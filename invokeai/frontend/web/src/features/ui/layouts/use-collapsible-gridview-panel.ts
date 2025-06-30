@@ -13,6 +13,10 @@ const getIsCollapsed = (
   return panel.width <= (collapsedSize ?? panel.minimumWidth);
 };
 
+// More realistic limits based on typical browser memory constraints
+const MAX_CANVAS_DIMENSION = 8192; // 8K resolution
+const MAX_CANVAS_AREA = 8192 * 8192; // ~64MP max
+
 export const useCollapsibleGridviewPanel = (
   api: GridviewApi | null,
   panelId: string,
