@@ -1,6 +1,4 @@
 import { logger } from 'app/logging/logger';
-import type { RootState } from 'app/store/store';
-import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
@@ -8,23 +6,18 @@ import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { isChatGPT4oAspectRatioID, isChatGPT4oReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { type ImageField, zModelIdentifierField } from 'features/nodes/types/common';
-import { getGenerationMode } from 'features/nodes/util/graph/generation/getGenerationMode';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
-import { type GraphBuilderReturn, UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import type { GraphBuilderArg, GraphBuilderReturn } from 'features/nodes/util/graph/types';
+import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { t } from 'i18next';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 const log = logger('system');
 
-export const buildChatGPT4oGraph = async (
-  state: RootState,
-  manager: CanvasManager | null
-): Promise<GraphBuilderReturn> => {
-  const tab = selectActiveTab(state);
-  const generationMode = await getGenerationMode(manager, tab);
+export const buildChatGPT4oGraph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
+  const { generationMode, state } = arg;
 
   if (generationMode !== 'txt2img' && generationMode !== 'img2img') {
     throw new UnsupportedGenerationModeError(t('toast.chatGPT4oIncompatibleGenerationMode'));
@@ -86,9 +79,8 @@ export const buildChatGPT4oGraph = async (
   }
 
   if (generationMode === 'img2img') {
-    assert(manager, 'Need manager to do img2img');
-    const adapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
-    const { image_name } = await manager.compositor.getCompositeImageDTO(adapters, bbox.rect, {
+    const adapters = arg.canvasManager.compositor.getVisibleAdaptersOfType('raster_layer');
+    const { image_name } = await arg.canvasManager.compositor.getCompositeImageDTO(adapters, bbox.rect, {
       is_intermediate: true,
       silent: true,
     });

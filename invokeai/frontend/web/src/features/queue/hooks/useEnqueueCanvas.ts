@@ -7,7 +7,8 @@ import { extractMessageFromAssertionError } from 'common/util/extractMessageFrom
 import { withResult, withResultAsync } from 'common/util/result';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { canvasSessionIdCreated, selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { canvasSessionIdChanged, selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildChatGPT4oGraph } from 'features/nodes/util/graph/generation/buildChatGPT4oGraph';
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
@@ -18,6 +19,7 @@ import { buildImagen4Graph } from 'features/nodes/util/graph/generation/buildIma
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSD3Graph } from 'features/nodes/util/graph/generation/buildSD3Graph';
 import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
+import type { GraphBuilderArg } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
@@ -33,40 +35,42 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
 
   dispatch(enqueueRequestedCanvas());
 
-  let destination = selectCanvasSessionId(getState());
-  if (!destination) {
-    dispatch(canvasSessionIdCreated());
-    destination = selectCanvasSessionId(getState());
-  }
-  assert(destination !== null);
-
   const state = getState();
 
-  const model = state.params.model;
-  assert(model, 'No model found in state');
-  const base = model.base;
+  let destination = selectCanvasSessionId(state);
+  if (destination === null) {
+    destination = getPrefixedId('canvas');
+    dispatch(canvasSessionIdChanged({ id: destination }));
+  }
 
   const buildGraphResult = await withResultAsync(async () => {
+    const model = state.params.model;
+    assert(model, 'No model found in state');
+    const base = model.base;
+
+    const generationMode = await canvasManager.compositor.getGenerationMode();
+    const graphBuilderArg: GraphBuilderArg = { generationMode, state, canvasManager };
+
     switch (base) {
       case 'sdxl':
-        return await buildSDXLGraph(state, canvasManager);
+        return await buildSDXLGraph(graphBuilderArg);
       case 'sd-1':
       case `sd-2`:
-        return await buildSD1Graph(state, canvasManager);
+        return await buildSD1Graph(graphBuilderArg);
       case `sd-3`:
-        return await buildSD3Graph(state, canvasManager);
+        return await buildSD3Graph(graphBuilderArg);
       case `flux`:
-        return await buildFLUXGraph(state, canvasManager);
+        return await buildFLUXGraph(graphBuilderArg);
       case 'cogview4':
-        return await buildCogView4Graph(state, canvasManager);
+        return await buildCogView4Graph(graphBuilderArg);
       case 'imagen3':
-        return await buildImagen3Graph(state, canvasManager);
+        return buildImagen3Graph(graphBuilderArg);
       case 'imagen4':
-        return await buildImagen4Graph(state, canvasManager);
+        return buildImagen4Graph(graphBuilderArg);
       case 'chatgpt-4o':
-        return await buildChatGPT4oGraph(state, canvasManager);
+        return await buildChatGPT4oGraph(graphBuilderArg);
       case 'flux-kontext':
-        return await buildFluxKontextGraph(state, canvasManager);
+        return buildFluxKontextGraph(graphBuilderArg);
       default:
         assert(false, `No graph builders for base ${base}`);
     }

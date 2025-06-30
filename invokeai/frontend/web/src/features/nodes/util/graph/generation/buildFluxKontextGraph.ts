@@ -1,6 +1,4 @@
 import { logger } from 'app/logging/logger';
-import type { RootState } from 'app/store/store';
-import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
@@ -11,22 +9,15 @@ import type { ImageField } from 'features/nodes/types/common';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
-import { type GraphBuilderReturn, UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import type { GraphBuilderArg, GraphBuilderReturn } from 'features/nodes/util/graph/types';
+import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { t } from 'i18next';
-import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
-
-import { getGenerationMode } from './getGenerationMode';
 
 const log = logger('system');
 
-export const buildFluxKontextGraph = async (
-  state: RootState,
-  manager: CanvasManager | null
-): Promise<GraphBuilderReturn> => {
-  const tab = selectActiveTab(state);
-  const generationMode = await getGenerationMode(manager, tab);
+export const buildFluxKontextGraph = (arg: GraphBuilderArg): GraphBuilderReturn => {
+  const { generationMode, state } = arg;
 
   if (generationMode !== 'txt2img') {
     throw new UnsupportedGenerationModeError(t('toast.imagenIncompatibleGenerationMode', { model: 'FLUX Kontext' }));
@@ -61,29 +52,25 @@ export const buildFluxKontextGraph = async (
     };
   }
 
-  if (generationMode === 'txt2img') {
-    const g = new Graph(getPrefixedId('flux_kontext_txt2img_graph'));
-    const fluxKontextImage = g.addNode({
-      // @ts-expect-error: These nodes are not available in the OSS application
-      type: input_image ? 'flux_kontext_edit_image' : 'flux_kontext_generate_image',
-      model: zModelIdentifierField.parse(model),
-      positive_prompt: positivePrompt,
-      aspect_ratio: bbox.aspectRatio.id,
-      input_image,
-      prompt_upsampling: true,
-      ...selectCanvasOutputFields(state),
-    });
-    g.upsertMetadata({
-      positive_prompt: positivePrompt,
-      model: Graph.getModelMetadataField(model),
-      width: bbox.rect.width,
-      height: bbox.rect.height,
-    });
-    return {
-      g,
-      positivePromptFieldIdentifier: { nodeId: fluxKontextImage.id, fieldName: 'positive_prompt' },
-    };
-  }
-
-  assert<Equals<typeof generationMode, never>>(false, 'Invalid generation mode for Flux Kontext');
+  const g = new Graph(getPrefixedId('flux_kontext_txt2img_graph'));
+  const fluxKontextImage = g.addNode({
+    // @ts-expect-error: These nodes are not available in the OSS application
+    type: input_image ? 'flux_kontext_edit_image' : 'flux_kontext_generate_image',
+    model: zModelIdentifierField.parse(model),
+    positive_prompt: positivePrompt,
+    aspect_ratio: bbox.aspectRatio.id,
+    input_image,
+    prompt_upsampling: true,
+    ...selectCanvasOutputFields(state),
+  });
+  g.upsertMetadata({
+    positive_prompt: positivePrompt,
+    model: Graph.getModelMetadataField(model),
+    width: bbox.rect.width,
+    height: bbox.rect.height,
+  });
+  return {
+    g,
+    positivePromptFieldIdentifier: { nodeId: fluxKontextImage.id, fieldName: 'positive_prompt' },
+  };
 };

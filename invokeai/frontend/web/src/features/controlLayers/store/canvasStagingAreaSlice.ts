@@ -1,7 +1,6 @@
 import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasReset } from 'features/controlLayers/store/actions';
 
 type CanvasStagingAreaState = {
@@ -20,26 +19,16 @@ export const canvasSessionSlice = createSlice({
   name: 'canvasSession',
   initialState: getInitialState(),
   reducers: {
-    generateSessionIdCreated: {
-      reducer: (state, action: PayloadAction<{ id: string }>) => {
-        const { id } = action.payload;
-        state.generateSessionId = id;
-      },
-      prepare: () => ({
-        payload: { id: getPrefixedId('generate') },
-      }),
+    generateSessionIdChanged: (state, action: PayloadAction<{ id: string }>) => {
+      const { id } = action.payload;
+      state.generateSessionId = id;
     },
     generateSessionReset: (state) => {
       state.generateSessionId = null;
     },
-    canvasSessionIdCreated: {
-      reducer: (state, action: PayloadAction<{ id: string }>) => {
-        const { id } = action.payload;
-        state.canvasSessionId = id;
-      },
-      prepare: () => ({
-        payload: { id: getPrefixedId('canvas') },
-      }),
+    canvasSessionIdChanged: (state, action: PayloadAction<{ id: string }>) => {
+      const { id } = action.payload;
+      state.canvasSessionId = id;
     },
     canvasSessionReset: (state) => {
       state.canvasSessionId = null;
@@ -52,7 +41,7 @@ export const canvasSessionSlice = createSlice({
   },
 });
 
-export const { generateSessionIdCreated, generateSessionReset, canvasSessionIdCreated, canvasSessionReset } =
+export const { generateSessionIdChanged, generateSessionReset, canvasSessionIdChanged, canvasSessionReset } =
   canvasSessionSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
