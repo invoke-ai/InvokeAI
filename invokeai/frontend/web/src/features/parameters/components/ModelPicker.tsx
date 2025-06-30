@@ -28,7 +28,7 @@ import { setActiveTab } from 'features/ui/store/uiSlice';
 import { filesize } from 'filesize';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { PiCaretDownBold, PiStarFill } from 'react-icons/pi';
+import { PiCaretDownBold, PiLinkSimple  } from 'react-icons/pi';
 import type { AnyModelConfig, BaseModelType } from 'services/api/types';
 
 // Type for models with starred field
@@ -332,7 +332,7 @@ const PickerOptionComponent = typedMemo(
         <Flex flexDir="column" gap={1} flex={1}>
           <Flex gap={2} alignItems="center">
             {option.starred && (
-              <PiStarFill color="yellow" size={16} />
+              <PiLinkSimple color="yellow" size={16} />
             )}
             <Text sx={optionNameSx} data-is-compact={compactView}>
               {option.name}
