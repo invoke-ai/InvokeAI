@@ -24,8 +24,13 @@ export const CanvasLaunchpadPanel = memo(() => {
             <Flex flexDir="column" gap={2} justifyContent="center">
               <Text>
                 Want to learn what prompts work best for each model?{' '}
-                <Button as="a" variant="link" href="#" size="sm">
-                  Check our our Model Guide.
+                <Button
+                  as="a"
+                  variant="link"
+                  href="https://support.invoke.ai/support/solutions/articles/151000216086-model-guide"
+                  size="sm"
+                >
+                  Check out our Model Guide.
                 </Button>
               </Text>
             </Flex>
