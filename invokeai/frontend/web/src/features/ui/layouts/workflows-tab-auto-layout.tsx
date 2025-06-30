@@ -30,16 +30,19 @@ import {
   RIGHT_PANEL_ID,
   RIGHT_PANEL_MIN_SIZE_PX,
   SETTINGS_PANEL_ID,
+  TAB_WITH_LAUNCHPAD_ICON_ID,
   TAB_WITH_PROGRESS_INDICATOR_ID,
   VIEWER_PANEL_ID,
   WORKSPACE_PANEL_ID,
 } from './shared';
+import { TabWithLaunchpadIcon } from './TabWithLaunchpadIcon';
 import { TabWithoutCloseButtonAndWithProgressIndicator } from './TabWithoutCloseButtonAndWithProgressIndicator';
 import { useResizeMainPanelOnFirstVisit } from './use-on-first-visible';
 
 const tabComponents = {
   [DEFAULT_TAB_ID]: TabWithoutCloseButton,
   [TAB_WITH_PROGRESS_INDICATOR_ID]: TabWithoutCloseButtonAndWithProgressIndicator,
+  [TAB_WITH_LAUNCHPAD_ICON_ID]: TabWithLaunchpadIcon,
 };
 
 const centerPanelComponents: IDockviewReactProps['components'] = {
@@ -54,7 +57,7 @@ const initializeCenterPanelLayout = (api: DockviewApi) => {
     id: LAUNCHPAD_PANEL_ID,
     component: LAUNCHPAD_PANEL_ID,
     title: 'Launchpad',
-    tabComponent: DEFAULT_TAB_ID,
+    tabComponent: TAB_WITH_LAUNCHPAD_ICON_ID,
   });
   api.addPanel({
     id: WORKSPACE_PANEL_ID,
