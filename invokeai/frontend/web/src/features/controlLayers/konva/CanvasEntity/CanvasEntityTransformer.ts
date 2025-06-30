@@ -1,10 +1,12 @@
 import { Mutex } from 'async-mutex';
 import { withResult, withResultAsync } from 'common/util/result';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
+import { clamp, debounce, get } from 'es-toolkit/compat';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import {
+  areStageAttrsGonnaExplode,
   canvasToImageData,
   getEmptyRect,
   getKonvaNodeDebugAttrs,
@@ -13,11 +15,10 @@ import {
   roundRect,
 } from 'features/controlLayers/konva/util';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
-import type { Coordinate, Rect, RectWithRotation } from 'features/controlLayers/store/types';
+import type { Coordinate, LifecycleCallback, Rect, RectWithRotation } from 'features/controlLayers/store/types';
 import { toast } from 'features/toast/toast';
 import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
-import { clamp, debounce, get } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { serializeError } from 'serialize-error';
@@ -123,7 +124,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   /**
    * Whether the transformer is currently calculating the rect of the parent.
    */
-  $isPendingRectCalculation = atom<boolean>(true);
+  $isPendingRectCalculation = atom<boolean>(false);
 
   /**
    * A set of subscriptions that should be cleaned up when the transformer is destroyed.
@@ -176,6 +177,11 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    * The mutex is locked during transformation and during rect calculations which are handled in a web worker.
    */
   transformMutex = new Mutex();
+
+  /**
+   * Callbacks that are executed when the bbox is updated.
+   */
+  private static bboxUpdatedCallbacks = new Set<LifecycleCallback>();
 
   konva: {
     transformer: Konva.Transformer;
@@ -261,6 +267,9 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     // the bbox outline should always be 1 screen pixel wide, so we need to update its stroke width.
     this.subscriptions.add(
       this.manager.stage.$stageAttrs.listen((newVal, oldVal) => {
+        if (areStageAttrsGonnaExplode(newVal)) {
+          return;
+        }
         if (newVal.scale !== oldVal.scale) {
           this.syncScale();
         }
@@ -908,6 +917,8 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       this.parent.renderer.konva.objectGroup.setAttrs(groupAttrs);
       this.parent.bufferRenderer.konva.group.setAttrs(groupAttrs);
     }
+
+    CanvasEntityTransformer.runBboxUpdatedCallbacks(this.parent);
   };
 
   calculateRect = debounce(() => {
@@ -1024,6 +1035,23 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
   _hideBboxOutline = () => {
     this.konva.outlineRect.visible(false);
+  };
+
+  static registerBboxUpdatedCallback = (callback: LifecycleCallback) => {
+    const wrapped = async (adapter: CanvasEntityAdapter) => {
+      const result = await callback(adapter);
+      if (result) {
+        this.bboxUpdatedCallbacks.delete(wrapped);
+      }
+      return result;
+    };
+    this.bboxUpdatedCallbacks.add(wrapped);
+  };
+
+  private static runBboxUpdatedCallbacks = (adapter: CanvasEntityAdapter) => {
+    for (const callback of this.bboxUpdatedCallbacks) {
+      callback(adapter);
+    }
   };
 
   repr = () => {

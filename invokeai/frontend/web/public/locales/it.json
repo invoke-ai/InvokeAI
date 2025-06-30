@@ -1086,11 +1086,11 @@
         "menuItemAutoAdd": "Aggiungi automaticamente a questa bacheca",
         "cancel": "Annulla",
         "addBoard": "Aggiungi Bacheca",
-        "bottomMessage": "L'eliminazione di questa bacheca e delle sue immagini ripristinerà tutte le funzionalità che le stanno attualmente utilizzando.",
+        "bottomMessage": "L'eliminazione delle immagini reimposterà tutte le funzionalità che le stanno utilizzando.",
         "changeBoard": "Cambia Bacheca",
         "loading": "Caricamento in corso ...",
         "clearSearch": "Cancella Ricerca",
-        "topMessage": "Questa bacheca contiene immagini utilizzate nelle seguenti funzionalità:",
+        "topMessage": "Questa selezione contiene immagini utilizzate nelle seguenti funzionalità:",
         "move": "Sposta",
         "myBoard": "Bacheca",
         "searchBoard": "Cerca bacheche ...",
@@ -1101,7 +1101,7 @@
         "deleteBoardOnly": "solo la Bacheca",
         "deleteBoard": "Elimina Bacheca",
         "deleteBoardAndImages": "Bacheca e Immagini",
-        "deletedBoardsCannotbeRestored": "Le bacheche eliminate non possono essere ripristinate. Selezionando \"Elimina solo bacheca\" le immagini verranno spostate nella bacheca \"Non categorizzato\".",
+        "deletedBoardsCannotbeRestored": "Le bacheche e le immagini eliminate non possono essere ripristinate. Selezionando \"Elimina solo bacheca\" le immagini verranno spostate in uno stato non categorizzato.",
         "movingImagesToBoard_one": "Spostare {{count}} immagine nella bacheca:",
         "movingImagesToBoard_many": "Spostare {{count}} immagini nella bacheca:",
         "movingImagesToBoard_other": "Spostare {{count}} immagini nella bacheca:",
@@ -1123,8 +1123,11 @@
         "noBoards": "Nessuna bacheca {{boardType}}",
         "hideBoards": "Nascondi bacheche",
         "viewBoards": "Visualizza bacheche",
-        "deletedPrivateBoardsCannotbeRestored": "Le bacheche cancellate non possono essere ripristinate. Selezionando 'Cancella solo bacheca', le immagini verranno spostate nella bacheca \"Non categorizzato\" privata dell'autore dell'immagine.",
-        "updateBoardError": "Errore durante l'aggiornamento della bacheca"
+        "deletedPrivateBoardsCannotbeRestored": "Le bacheche e le immagini eliminate non possono essere ripristinate. Selezionando \"Elimina solo bacheca\", le immagini verranno spostate in uno stato privato e non categorizzato per l'autore dell'immagine.",
+        "updateBoardError": "Errore durante l'aggiornamento della bacheca",
+        "uncategorizedImages": "Immagini non categorizzate",
+        "deleteAllUncategorizedImages": "Elimina tutte le immagini non categorizzate",
+        "deletedImagesCannotBeRestored": "Le immagini eliminate non possono essere ripristinate."
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
@@ -2449,9 +2452,8 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "GPU Nvidia 50xx: Invoke utilizza PyTorch 2.7.0, necessario per queste GPU.",
-            "Relazioni tra modelli: collega i LoRA ai modelli principali e i LoRA verranno visualizzati per primi nell'elenco.",
-            "Adattatore IP: nuovi metodi Style (Strong) e Style (Precise) per i modelli SDXL e SD1.5."
+            "Inpainting: livelli di rumore per maschera e limiti di denoise.",
+            "Canvas: proporzioni più intelligenti per SDXL e scorrimento e zoom migliorati."
         ]
     },
     "system": {

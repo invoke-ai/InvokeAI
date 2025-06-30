@@ -24,12 +24,13 @@ import {
   selectCanvasSlice,
   selectEntity,
 } from 'features/controlLayers/store/selectors';
-import {
-  type CanvasEntityIdentifier,
-  type CanvasRenderableEntityState,
-  isRasterLayerEntityIdentifier,
-  type Rect,
+import type {
+  CanvasEntityIdentifier,
+  CanvasEntityState,
+  LifecycleCallback,
+  Rect,
 } from 'features/controlLayers/store/types';
+import { isRasterLayerEntityIdentifier } from 'features/controlLayers/store/types';
 import { toast } from 'features/toast/toast';
 import Konva from 'konva';
 import { atom } from 'nanostores';
@@ -40,15 +41,7 @@ import stableHash from 'stable-hash';
 import { assert } from 'tsafe';
 import type { Jsonifiable, JsonObject } from 'type-fest';
 
-// Ideally, we'd type `adapter` as `CanvasEntityAdapterBase`, but the generics make this tricky. `CanvasEntityAdapter`
-// is a union of all entity adapters and is functionally identical to `CanvasEntityAdapterBase`. We'll need to do a
-// type assertion below in the `onInit` method, which calls these callbacks.
-type InitCallback = (adapter: CanvasEntityAdapter) => Promise<boolean>;
-
-export abstract class CanvasEntityAdapterBase<
-  T extends CanvasRenderableEntityState,
-  U extends string,
-> extends CanvasModuleBase {
+export abstract class CanvasEntityAdapterBase<T extends CanvasEntityState, U extends string> extends CanvasModuleBase {
   readonly type: U;
   readonly id: string;
   readonly path: string[];
@@ -118,7 +111,7 @@ export abstract class CanvasEntityAdapterBase<
   /**
    * Callbacks that are executed when the module is initialized.
    */
-  private static initCallbacks = new Set<InitCallback>();
+  private static initCallbacks = new Set<LifecycleCallback>();
 
   /**
    * Register a callback to be run when an entity adapter is initialized.
@@ -165,7 +158,7 @@ export abstract class CanvasEntityAdapterBase<
    *   return false;
    * });
    */
-  static registerInitCallback = (callback: InitCallback) => {
+  static registerInitCallback = (callback: LifecycleCallback) => {
     const wrapped = async (adapter: CanvasEntityAdapter) => {
       const result = await callback(adapter);
       if (result) {

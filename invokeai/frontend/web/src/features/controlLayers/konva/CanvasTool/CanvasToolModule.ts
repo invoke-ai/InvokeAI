@@ -22,7 +22,6 @@ import type {
   Coordinate,
   Tool,
 } from 'features/controlLayers/store/types';
-import { isRenderableEntityType } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { atom } from 'nanostores';
@@ -70,7 +69,7 @@ export class CanvasToolModule extends CanvasModuleBase {
   /**
    * The currently selected tool.
    */
-  $tool = atom<Tool>('brush');
+  $tool = atom<Tool>('move');
   /**
    * A buffer for the currently selected tool. This is used to temporarily store the tool while the user is using any
    * hold-to-activate tools, like the view or color picker tools.
@@ -180,7 +179,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       this.tools.bbox.syncCursorStyle();
     } else if (tool === 'colorPicker') {
       this.tools.colorPicker.syncCursorStyle();
-    } else if (selectedEntityAdapter && isRenderableEntityType(selectedEntityAdapter.entityIdentifier.type)) {
+    } else if (selectedEntityAdapter) {
       if (selectedEntityAdapter.$isDisabled.get()) {
         stage.setCursor('not-allowed');
       } else if (selectedEntityAdapter.$isEntityTypeHidden.get()) {
@@ -641,6 +640,9 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.log.debug('Destroying module');
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.subscriptions.clear();
+    for (const tool of Object.values(this.tools)) {
+      tool.destroy();
+    }
     this.konva.group.destroy();
   };
 }

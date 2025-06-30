@@ -1,62 +1,53 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Box, IconButton } from '@invoke-ai/ui-library';
-import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
-import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
-import { useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { clamp } from 'es-toolkit/compat';
+import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
+import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
 
+import { useGalleryImageNames } from './use-gallery-image-names';
+
 const NextPrevImageButtons = ({ inset = 8 }: { inset?: ChakraProps['insetInlineStart' | 'insetInlineEnd'] }) => {
   const { t } = useTranslation();
-  const { prevImage, nextImage, isOnFirstImageOfView, isOnLastImageOfView } = useGalleryNavigation();
+  const dispatch = useAppDispatch();
+  const lastSelectedImage = useAppSelector(selectLastSelectedImage);
+  const { imageNames, isFetching } = useGalleryImageNames();
 
-  const { isFetching } = useGalleryImages().queryResult;
-  const { isNextEnabled, goNext, isPrevEnabled, goPrev } = useGalleryPagination();
-
-  const shouldShowLeftArrow = useMemo(() => {
-    if (!isOnFirstImageOfView) {
-      return true;
-    }
-    if (isPrevEnabled) {
-      return true;
-    }
-    return false;
-  }, [isOnFirstImageOfView, isPrevEnabled]);
+  const isOnFirstImage = useMemo(
+    () => (lastSelectedImage ? imageNames.at(0) === lastSelectedImage : false),
+    [imageNames, lastSelectedImage]
+  );
+  const isOnLastImage = useMemo(
+    () => (lastSelectedImage ? imageNames.at(-1) === lastSelectedImage : false),
+    [imageNames, lastSelectedImage]
+  );
 
   const onClickLeftArrow = useCallback(() => {
-    if (isOnFirstImageOfView) {
-      if (isPrevEnabled && !isFetching) {
-        goPrev('arrow');
-      }
-    } else {
-      prevImage();
+    const targetIndex = lastSelectedImage ? imageNames.findIndex((n) => n === lastSelectedImage) - 1 : 0;
+    const clampedIndex = clamp(targetIndex, 0, imageNames.length - 1);
+    const n = imageNames.at(clampedIndex);
+    if (!n) {
+      return;
     }
-  }, [goPrev, isFetching, isOnFirstImageOfView, isPrevEnabled, prevImage]);
-
-  const shouldShowRightArrow = useMemo(() => {
-    if (!isOnLastImageOfView) {
-      return true;
-    }
-    if (isNextEnabled) {
-      return true;
-    }
-    return false;
-  }, [isNextEnabled, isOnLastImageOfView]);
+    dispatch(imageSelected(n));
+  }, [dispatch, imageNames, lastSelectedImage]);
 
   const onClickRightArrow = useCallback(() => {
-    if (isOnLastImageOfView) {
-      if (isNextEnabled && !isFetching) {
-        goNext('arrow');
-      }
-    } else {
-      nextImage();
+    const targetIndex = lastSelectedImage ? imageNames.findIndex((n) => n === lastSelectedImage) + 1 : 0;
+    const clampedIndex = clamp(targetIndex, 0, imageNames.length - 1);
+    const n = imageNames.at(clampedIndex);
+    if (!n) {
+      return;
     }
-  }, [goNext, isFetching, isNextEnabled, isOnLastImageOfView, nextImage]);
+    dispatch(imageSelected(n));
+  }, [dispatch, imageNames, lastSelectedImage]);
 
   return (
     <Box pos="relative" h="full" w="full">
-      {shouldShowLeftArrow && (
+      {!isOnFirstImage && (
         <IconButton
           position="absolute"
           top="50%"
@@ -71,7 +62,7 @@ const NextPrevImageButtons = ({ inset = 8 }: { inset?: ChakraProps['insetInlineS
           insetInlineStart={inset}
         />
       )}
-      {shouldShowRightArrow && (
+      {!isOnLastImage && (
         <IconButton
           position="absolute"
           top="50%"

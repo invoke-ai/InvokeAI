@@ -29,6 +29,7 @@ class BaseModelType(str, Enum):
     Imagen3 = "imagen3"
     Imagen4 = "imagen4"
     ChatGPT4o = "chatgpt-4o"
+    FluxKontext = "flux-kontext"
 
 
 class ModelType(str, Enum):
@@ -88,6 +89,7 @@ class ModelVariantType(str, Enum):
 class ModelFormat(str, Enum):
     """Storage format of model."""
 
+    OMI = "omi"
     Diffusers = "diffusers"
     Checkpoint = "checkpoint"
     LyCORIS = "lycoris"
@@ -137,6 +139,7 @@ class FluxLoRAFormat(str, Enum):
     Kohya = "flux.kohya"
     OneTrainer = "flux.onetrainer"
     Control = "flux.control"
+    AIToolkit = "flux.aitoolkit"
 
 
 AnyVariant: TypeAlias = Union[ModelVariantType, ClipVariantType, None]

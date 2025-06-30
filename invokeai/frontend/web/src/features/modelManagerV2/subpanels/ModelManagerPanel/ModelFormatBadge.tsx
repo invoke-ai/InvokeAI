@@ -18,10 +18,12 @@ const FORMAT_NAME_MAP: Record<AnyModelConfig['format'], string> = {
   bnb_quantized_nf4b: 'quantized',
   gguf_quantized: 'gguf',
   api: 'api',
+  omi: 'omi',
 };
 
 const FORMAT_COLOR_MAP: Record<AnyModelConfig['format'], string> = {
   diffusers: 'base',
+  omi: 'base',
   lycoris: 'base',
   checkpoint: 'orange',
   invokeai: 'base',

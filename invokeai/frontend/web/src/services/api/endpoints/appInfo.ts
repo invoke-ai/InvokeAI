@@ -1,7 +1,7 @@
 import { $openAPISchemaUrl } from 'app/store/nanostores/openAPISchemaUrl';
 import type { OpenAPIV3_1 } from 'openapi-types';
 import type { paths } from 'services/api/schema';
-import type { AppConfig, AppDependencyVersions, AppVersion } from 'services/api/types';
+import type { AppConfig, AppVersion } from 'services/api/types';
 
 import { api, buildV1Url } from '..';
 
@@ -22,7 +22,10 @@ export const appInfoApi = api.injectEndpoints({
       }),
       providesTags: ['FetchOnReconnect'],
     }),
-    getAppDeps: build.query<AppDependencyVersions, void>({
+    getAppDeps: build.query<
+      paths['/api/v1/app/app_deps']['get']['responses']['200']['content']['application/json'],
+      void
+    >({
       query: () => ({
         url: buildAppInfoUrl('app_deps'),
         method: 'GET',

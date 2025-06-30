@@ -10,6 +10,8 @@ import { buildCreateApi, coreModule, fetchBaseQuery, reactHooksModule } from '@r
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $projectId } from 'app/store/nanostores/projectId';
+import queryString from 'query-string';
+import stableHash from 'stable-hash';
 
 const tagTypes = [
   'AppVersion',
@@ -23,6 +25,8 @@ const tagTypes = [
   'ImageList',
   'ImageMetadata',
   'ImageWorkflow',
+  'ImageCollectionCounts',
+  'ImageCollection',
   'ImageMetadataFromFile',
   'IntermediatesCount',
   'SessionQueueItem',
@@ -56,6 +60,7 @@ const tagTypes = [
 ] as const;
 export type ApiTagDescription = TagDescription<(typeof tagTypes)[number]>;
 export const LIST_TAG = 'LIST';
+export const LIST_ALL_TAG = 'LIST_ALL';
 
 const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = (args, api, extraOptions) => {
   const baseUrl = $baseUrl.get();
@@ -106,6 +111,7 @@ export const api = customCreateApi({
   tagTypes,
   endpoints: () => ({}),
   invalidationBehavior: 'immediately',
+  serializeQueryArgs: stableHash,
 });
 
 function getCircularReplacer() {
@@ -130,5 +136,10 @@ function getCircularReplacer() {
   };
 }
 
-export const buildV1Url = (path: string): string => `api/v1/${path}`;
+export const buildV1Url = (path: string, query?: Parameters<typeof queryString.stringify>[0]): string => {
+  if (!query) {
+    return `api/v1/${path}`;
+  }
+  return `api/v1/${path}?${queryString.stringify(query)}`;
+};
 export const buildV2Url = (path: string): string => `api/v2/${path}`;

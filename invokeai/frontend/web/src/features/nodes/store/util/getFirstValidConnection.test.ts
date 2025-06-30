@@ -1,11 +1,11 @@
 import { deepClone } from 'common/util/deepClone';
+import { unset } from 'es-toolkit/compat';
 import {
   getFirstValidConnection,
   getSourceCandidateFields,
   getTargetCandidateFields,
 } from 'features/nodes/store/util/getFirstValidConnection';
 import { add, buildEdge, buildNode, img_resize, templates } from 'features/nodes/store/util/testUtils';
-import { unset } from 'lodash-es';
 import { describe, expect, it } from 'vitest';
 
 describe('getFirstValidConnection', () => {

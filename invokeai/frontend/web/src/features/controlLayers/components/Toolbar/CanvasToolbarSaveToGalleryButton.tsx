@@ -19,6 +19,7 @@ export const CanvasToolbarSaveToGalleryButton = memo(() => {
       onClick={shift ? saveBboxToGallery : saveCanvasToGallery}
       icon={<PiFloppyDiskBold />}
       aria-label={shift ? t('controlLayers.saveBboxToGallery') : t('controlLayers.saveCanvasToGallery')}
+      colorScheme="invokeBlue"
       tooltip={shift ? t('controlLayers.saveBboxToGallery') : t('controlLayers.saveCanvasToGallery')}
       isDisabled={isBusy}
     />

@@ -2,8 +2,8 @@ import { Flex, FormControl, FormLabel, Tag, TagCloseButton, Text } from '@invoke
 import type { LogNamespace } from 'app/logging/logger';
 import { zLogNamespace } from 'app/logging/logger';
 import { useAppSelector } from 'app/store/storeHooks';
+import { difference } from 'es-toolkit/compat';
 import { logNamespaceToggled, selectSystemLogNamespaces } from 'features/system/store/systemSlice';
-import { difference } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDispatch } from 'react-redux';

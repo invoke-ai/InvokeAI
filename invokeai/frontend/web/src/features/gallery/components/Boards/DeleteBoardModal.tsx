@@ -15,13 +15,14 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
+import { some } from 'es-toolkit/compat';
+import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import ImageUsageMessage from 'features/deleteImageModal/components/ImageUsageMessage';
-import { getImageUsage } from 'features/deleteImageModal/store/selectors';
+import { getImageUsage } from 'features/deleteImageModal/store/state';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
-import { some } from 'lodash-es';
 import { atom } from 'nanostores';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -54,23 +55,26 @@ const DeleteBoardModal = () => {
 
   const selectImageUsageSummary = useMemo(
     () =>
-      createMemoizedSelector([selectNodesSlice, selectCanvasSlice, selectUpscaleSlice], (nodes, canvas, upscale) => {
-        const allImageUsage = (boardImageNames ?? []).map((imageName) =>
-          getImageUsage(nodes, canvas, upscale, imageName)
-        );
+      createMemoizedSelector(
+        [selectNodesSlice, selectCanvasSlice, selectUpscaleSlice, selectRefImagesSlice],
+        (nodes, canvas, upscale, refImages) => {
+          const allImageUsage = (boardImageNames ?? []).map((imageName) =>
+            getImageUsage(nodes, canvas, upscale, refImages, imageName)
+          );
 
-        const imageUsageSummary: ImageUsage = {
-          isUpscaleImage: some(allImageUsage, (i) => i.isUpscaleImage),
-          isRasterLayerImage: some(allImageUsage, (i) => i.isRasterLayerImage),
-          isInpaintMaskImage: some(allImageUsage, (i) => i.isInpaintMaskImage),
-          isRegionalGuidanceImage: some(allImageUsage, (i) => i.isRegionalGuidanceImage),
-          isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
-          isControlLayerImage: some(allImageUsage, (i) => i.isControlLayerImage),
-          isReferenceImage: some(allImageUsage, (i) => i.isReferenceImage),
-        };
+          const imageUsageSummary: ImageUsage = {
+            isUpscaleImage: some(allImageUsage, (i) => i.isUpscaleImage),
+            isRasterLayerImage: some(allImageUsage, (i) => i.isRasterLayerImage),
+            isInpaintMaskImage: some(allImageUsage, (i) => i.isInpaintMaskImage),
+            isRegionalGuidanceImage: some(allImageUsage, (i) => i.isRegionalGuidanceImage),
+            isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
+            isControlLayerImage: some(allImageUsage, (i) => i.isControlLayerImage),
+            isReferenceImage: some(allImageUsage, (i) => i.isReferenceImage),
+          };
 
-        return imageUsageSummary;
-      }),
+          return imageUsageSummary;
+        }
+      ),
     [boardImageNames]
   );
 
@@ -87,7 +91,7 @@ const DeleteBoardModal = () => {
     if (!boardToDelete || boardToDelete === 'none') {
       return;
     }
-    deleteBoardOnly(boardToDelete.board_id);
+    deleteBoardOnly({ board_id: boardToDelete.board_id });
     $boardToDelete.set(null);
   }, [boardToDelete, deleteBoardOnly]);
 
@@ -95,7 +99,7 @@ const DeleteBoardModal = () => {
     if (!boardToDelete || boardToDelete === 'none') {
       return;
     }
-    deleteBoardAndImages(boardToDelete.board_id);
+    deleteBoardAndImages({ board_id: boardToDelete.board_id });
     $boardToDelete.set(null);
   }, [boardToDelete, deleteBoardAndImages]);
 

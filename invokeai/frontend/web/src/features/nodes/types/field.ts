@@ -1,12 +1,12 @@
 import { EMPTY_ARRAY } from 'app/store/constants';
 import type { AppDispatch } from 'app/store/store';
+import { isNil, random, trim } from 'es-toolkit/compat';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
-import { isNil, random, trim } from 'lodash-es';
 import MersenneTwister from 'mtwist';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { utilitiesApi } from 'services/api/endpoints/utilities';
 import { assert } from 'tsafe';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 import type { ImageField } from './common';
 import { zBoardField, zColorField, zImageField, zModelIdentifierField, zSchedulerField } from './common';
@@ -57,8 +57,9 @@ const zFieldInputTemplateBase = zFieldTemplateBase.extend({
   fieldKind: z.literal('input'),
   input: zFieldInput,
   required: z.boolean(),
+  default: z.undefined(),
   ui_component: zFieldUIComponent.nullish(),
-  ui_choice_labels: z.record(z.string()).nullish(),
+  ui_choice_labels: z.record(z.string(), z.string()).nullish(),
 });
 const zFieldOutputTemplateBase = zFieldTemplateBase.extend({
   fieldKind: z.literal('output'),
@@ -260,6 +261,10 @@ const zChatGPT4oModelFieldType = zFieldTypeBase.extend({
   name: z.literal('ChatGPT4oModelField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zFluxKontextModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('FluxKontextModelField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zSchedulerFieldType = zFieldTypeBase.extend({
   name: z.literal('SchedulerField'),
   originalType: zStatelessFieldType.optional(),
@@ -313,6 +318,7 @@ const zStatefulFieldType = z.union([
   zImagen3ModelFieldType,
   zImagen4ModelFieldType,
   zChatGPT4oModelFieldType,
+  zFluxKontextModelFieldType,
   zColorFieldType,
   zSchedulerFieldType,
   zFloatGeneratorFieldType,
@@ -354,6 +360,7 @@ const modelFieldTypeNames = [
   zImagen3ModelFieldType.shape.name.value,
   zImagen4ModelFieldType.shape.name.value,
   zChatGPT4oModelFieldType.shape.name.value,
+  zFluxKontextModelFieldType.shape.name.value,
   // Stateless model fields
   'UNetField',
   'VAEField',
@@ -649,7 +656,7 @@ const zEnumFieldInputTemplate = zFieldInputTemplateBase.extend({
   originalType: zFieldType.optional(),
   default: zEnumFieldValue,
   options: z.array(z.string()),
-  labels: z.record(z.string()).optional(),
+  labels: z.record(z.string(), z.string()).optional(),
 });
 const zEnumFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zEnumFieldType,
@@ -1229,6 +1236,24 @@ export type Imagen4ModelFieldInputTemplate = z.infer<typeof zImagen4ModelFieldIn
 export const isImagen4ModelFieldInputInstance = buildInstanceTypeGuard(zImagen4ModelFieldInputInstance);
 export const isImagen4ModelFieldInputTemplate =
   buildTemplateTypeGuard<Imagen4ModelFieldInputTemplate>('Imagen4ModelField');
+// #endregion
+
+// #region FluxKontextModelField
+export const zFluxKontextModelFieldValue = zModelIdentifierField.optional();
+const zFluxKontextModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zFluxKontextModelFieldValue,
+});
+const zFluxKontextModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zFluxKontextModelFieldType,
+  originalType: zFieldType.optional(),
+  default: zFluxKontextModelFieldValue,
+});
+export type FluxKontextModelFieldValue = z.infer<typeof zFluxKontextModelFieldValue>;
+export type FluxKontextModelFieldInputInstance = z.infer<typeof zFluxKontextModelFieldInputInstance>;
+export type FluxKontextModelFieldInputTemplate = z.infer<typeof zFluxKontextModelFieldInputTemplate>;
+export const isFluxKontextModelFieldInputInstance = buildInstanceTypeGuard(zFluxKontextModelFieldInputInstance);
+export const isFluxKontextModelFieldInputTemplate =
+  buildTemplateTypeGuard<FluxKontextModelFieldInputTemplate>('FluxKontextModelField');
 // #endregion
 
 // #region ChatGPT4oModelField
@@ -1882,6 +1907,7 @@ export const zStatefulFieldValue = z.union([
   zFluxReduxModelFieldValue,
   zImagen3ModelFieldValue,
   zImagen4ModelFieldValue,
+  zFluxKontextModelFieldValue,
   zChatGPT4oModelFieldValue,
   zColorFieldValue,
   zSchedulerFieldValue,
@@ -1976,6 +2002,7 @@ const zStatefulFieldInputTemplate = z.union([
   zImagen3ModelFieldInputTemplate,
   zImagen4ModelFieldInputTemplate,
   zChatGPT4oModelFieldInputTemplate,
+  zFluxKontextModelFieldInputTemplate,
   zColorFieldInputTemplate,
   zSchedulerFieldInputTemplate,
   zStatelessFieldInputTemplate,

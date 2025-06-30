@@ -14,7 +14,6 @@ import RgbaColorPicker from 'common/components/ColorPicker/RgbaColorPicker';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { selectCanvasSettingsSlice, settingsColorChanged } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { RgbaColor } from 'features/controlLayers/store/types';
-import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,14 +30,13 @@ export const ToolColorPicker = memo(() => {
     },
     [dispatch]
   );
-  const imageViewer = useImageViewer();
 
   useRegisteredHotkeys({
     id: 'setFillToWhite',
     category: 'canvas',
     callback: () => dispatch(settingsColorChanged({ r: 255, g: 255, b: 255, a: 1 })),
-    options: { preventDefault: true, enabled: !imageViewer.isOpen },
-    dependencies: [dispatch, imageViewer.isOpen],
+    options: { preventDefault: true },
+    dependencies: [dispatch],
   });
 
   return (

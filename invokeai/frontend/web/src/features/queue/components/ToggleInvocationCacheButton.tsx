@@ -9,28 +9,28 @@ const ToggleInvocationCacheButton = () => {
   const { t } = useTranslation();
   const { data: cacheStatus } = useGetInvocationCacheStatusQuery();
 
-  const {
-    enableInvocationCache,
-    isDisabled: isEnableDisabled,
-    isLoading: isEnableLoading,
-  } = useEnableInvocationCache();
+  const enableInvocationCache = useEnableInvocationCache();
 
-  const {
-    disableInvocationCache,
-    isDisabled: isDisableDisabled,
-    isLoading: isDisableLoading,
-  } = useDisableInvocationCache();
+  const disableInvocationCache = useDisableInvocationCache();
 
   if (cacheStatus?.enabled) {
     return (
-      <Button isDisabled={isDisableDisabled} isLoading={isDisableLoading} onClick={disableInvocationCache}>
+      <Button
+        onClick={disableInvocationCache.trigger}
+        isDisabled={disableInvocationCache.isDisabled}
+        isLoading={disableInvocationCache.isLoading}
+      >
         {t('invocationCache.disable')}
       </Button>
     );
   }
 
   return (
-    <Button isDisabled={isEnableDisabled} isLoading={isEnableLoading} onClick={enableInvocationCache}>
+    <Button
+      onClick={enableInvocationCache.trigger}
+      isDisabled={enableInvocationCache.isDisabled}
+      isLoading={enableInvocationCache.isLoading}
+    >
       {t('invocationCache.enable')}
     </Button>
   );

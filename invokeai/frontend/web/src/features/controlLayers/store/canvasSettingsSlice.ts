@@ -1,7 +1,6 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { newCanvasSessionRequested, newGallerySessionRequested } from 'features/controlLayers/store/actions';
 import type { RgbaColor } from 'features/controlLayers/store/types';
 
 type CanvasSettingsState = {
@@ -34,11 +33,6 @@ type CanvasSettingsState = {
    * The color to use when drawing lines or filling shapes.
    */
   color: RgbaColor;
-  /**
-   * Whether to send generated images to canvas staging area. When disabled, generated images will be sent directly to
-   * the gallery.
-   */
-  sendToCanvas: boolean;
   /**
    * Whether to composite inpainted/outpainted regions back onto the source image when saving canvas generations.
    *
@@ -79,6 +73,10 @@ type CanvasSettingsState = {
    * Whether to use pressure sensitivity for the brush and eraser tool when a pen device is used.
    */
   pressureSensitivity: boolean;
+  /**
+   * Whether to show the rule of thirds composition guide overlay on the canvas.
+   */
+  ruleOfThirds: boolean;
 };
 
 const initialState: CanvasSettingsState = {
@@ -89,7 +87,6 @@ const initialState: CanvasSettingsState = {
   eraserWidth: 50,
   invertScrollForToolWidth: false,
   color: { r: 31, g: 160, b: 224, a: 1 }, // invokeBlue.500
-  sendToCanvas: false,
   outputOnlyMaskedRegions: true,
   autoProcess: true,
   snapToGrid: true,
@@ -99,6 +96,7 @@ const initialState: CanvasSettingsState = {
   isolatedStagingPreview: true,
   isolatedLayerPreview: true,
   pressureSensitivity: true,
+  ruleOfThirds: false,
 };
 
 export const canvasSettingsSlice = createSlice({
@@ -125,9 +123,6 @@ export const canvasSettingsSlice = createSlice({
     },
     settingsInvertScrollForToolWidthChanged: (state, action: PayloadAction<boolean>) => {
       state.invertScrollForToolWidth = action.payload;
-    },
-    settingsSendToCanvasChanged: (state, action: PayloadAction<boolean>) => {
-      state.sendToCanvas = action.payload;
     },
     settingsOutputOnlyMaskedRegionsToggled: (state) => {
       state.outputOnlyMaskedRegions = !state.outputOnlyMaskedRegions;
@@ -156,14 +151,9 @@ export const canvasSettingsSlice = createSlice({
     settingsPressureSensitivityToggled: (state) => {
       state.pressureSensitivity = !state.pressureSensitivity;
     },
-  },
-  extraReducers(builder) {
-    builder.addCase(newGallerySessionRequested, (state) => {
-      state.sendToCanvas = false;
-    });
-    builder.addCase(newCanvasSessionRequested, (state) => {
-      state.sendToCanvas = true;
-    });
+    settingsRuleOfThirdsToggled: (state) => {
+      state.ruleOfThirds = !state.ruleOfThirds;
+    },
   },
 });
 
@@ -175,7 +165,6 @@ export const {
   settingsEraserWidthChanged,
   settingsColorChanged,
   settingsInvertScrollForToolWidthChanged,
-  settingsSendToCanvasChanged,
   settingsOutputOnlyMaskedRegionsToggled,
   settingsAutoProcessToggled,
   settingsSnapToGridToggled,
@@ -185,6 +174,7 @@ export const {
   settingsIsolatedStagingPreviewToggled,
   settingsIsolatedLayerPreviewToggled,
   settingsPressureSensitivityToggled,
+  settingsRuleOfThirdsToggled,
 } = canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -212,10 +202,10 @@ export const selectBboxOverlay = createCanvasSettingsSelector((settings) => sett
 export const selectShowHUD = createCanvasSettingsSelector((settings) => settings.showHUD);
 export const selectAutoProcess = createCanvasSettingsSelector((settings) => settings.autoProcess);
 export const selectSnapToGrid = createCanvasSettingsSelector((settings) => settings.snapToGrid);
-export const selectSendToCanvas = createCanvasSettingsSelector((canvasSettings) => canvasSettings.sendToCanvas);
 export const selectShowProgressOnCanvas = createCanvasSettingsSelector(
   (canvasSettings) => canvasSettings.showProgressOnCanvas
 );
 export const selectIsolatedStagingPreview = createCanvasSettingsSelector((settings) => settings.isolatedStagingPreview);
 export const selectIsolatedLayerPreview = createCanvasSettingsSelector((settings) => settings.isolatedLayerPreview);
 export const selectPressureSensitivity = createCanvasSettingsSelector((settings) => settings.pressureSensitivity);
+export const selectRuleOfThirds = createCanvasSettingsSelector((settings) => settings.ruleOfThirds);

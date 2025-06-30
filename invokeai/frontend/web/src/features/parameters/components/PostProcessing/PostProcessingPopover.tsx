@@ -11,7 +11,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { adHocPostProcessingRequested } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { $installModelsTab } from 'features/modelManagerV2/subpanels/InstallModels';
+import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
 import ParamPostProcessingModel from 'features/parameters/components/PostProcessing/ParamPostProcessingModel';
 import { selectPostProcessingModel } from 'features/parameters/store/upscaleSlice';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
@@ -21,10 +21,10 @@ import { Trans, useTranslation } from 'react-i18next';
 import { PiFrameCornersBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
-type Props = { imageDTO?: ImageDTO };
+type Props = { imageDTO: ImageDTO | null; isDisabled: boolean };
 
 export const PostProcessingPopover = memo((props: Props) => {
-  const { imageDTO } = props;
+  const { imageDTO, isDisabled } = props;
   const dispatch = useAppDispatch();
   const postProcessingModel = useAppSelector(selectPostProcessingModel);
   const inProgress = useIsQueueMutationInProgress();
@@ -49,6 +49,7 @@ export const PostProcessingPopover = memo((props: Props) => {
           aria-label={t('parameters.postProcessing')}
           variant="link"
           alignSelf="stretch"
+          isDisabled={isDisabled}
         />
       </PopoverTrigger>
       <PopoverContent>
@@ -56,7 +57,11 @@ export const PostProcessingPopover = memo((props: Props) => {
           <Flex flexDirection="column" gap={4}>
             <ParamPostProcessingModel />
             {!postProcessingModel && <MissingModelWarning />}
-            <Button size="sm" isDisabled={!imageDTO || inProgress || !postProcessingModel} onClick={handleClickUpscale}>
+            <Button
+              size="sm"
+              isDisabled={isDisabled || !imageDTO || inProgress || !postProcessingModel}
+              onClick={handleClickUpscale}
+            >
               {t('parameters.processImage')}
             </Button>
           </Flex>
@@ -73,7 +78,7 @@ const MissingModelWarning = () => {
 
   const handleGoToModelManager = useCallback(() => {
     dispatch(setActiveTab('models'));
-    $installModelsTab.set(3);
+    setInstallModelsTabByName('launchpad');
   }, [dispatch]);
 
   return (

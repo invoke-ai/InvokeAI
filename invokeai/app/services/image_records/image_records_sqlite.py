@@ -7,6 +7,7 @@ from invokeai.app.services.image_records.image_records_base import ImageRecordSt
 from invokeai.app.services.image_records.image_records_common import (
     IMAGE_DTO_COLS,
     ImageCategory,
+    ImageNamesResult,
     ImageRecord,
     ImageRecordChanges,
     ImageRecordDeleteException,
@@ -196,8 +197,12 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         # Search term condition
         if search_term:
             query_conditions += """--sql
-            AND images.metadata LIKE ?
+            AND (
+                images.metadata LIKE ?
+                OR images.created_at LIKE ?
+            )
             """
+            query_params.append(f"%{search_term.lower()}%")
             query_params.append(f"%{search_term.lower()}%")
 
         if starred_first:
@@ -382,3 +387,96 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             return None
 
         return deserialize_image_record(dict(result))
+
+    def get_image_names(
+        self,
+        starred_first: bool = True,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        image_origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+    ) -> ImageNamesResult:
+        cursor = self._conn.cursor()
+
+        # Build query conditions (reused for both starred count and image names queries)
+        query_conditions = ""
+        query_params: list[Union[int, str, bool]] = []
+
+        if image_origin is not None:
+            query_conditions += """--sql
+            AND images.image_origin = ?
+            """
+            query_params.append(image_origin.value)
+
+        if categories is not None:
+            category_strings = [c.value for c in set(categories)]
+            placeholders = ",".join("?" * len(category_strings))
+            query_conditions += f"""--sql
+            AND images.image_category IN ( {placeholders} )
+            """
+            for c in category_strings:
+                query_params.append(c)
+
+        if is_intermediate is not None:
+            query_conditions += """--sql
+            AND images.is_intermediate = ?
+            """
+            query_params.append(is_intermediate)
+
+        if board_id == "none":
+            query_conditions += """--sql
+            AND board_images.board_id IS NULL
+            """
+        elif board_id is not None:
+            query_conditions += """--sql
+            AND board_images.board_id = ?
+            """
+            query_params.append(board_id)
+
+        if search_term:
+            query_conditions += """--sql
+            AND (
+                images.metadata LIKE ?
+                OR images.created_at LIKE ?
+            )
+            """
+            query_params.append(f"%{search_term.lower()}%")
+            query_params.append(f"%{search_term.lower()}%")
+
+        # Get starred count if starred_first is enabled
+        starred_count = 0
+        if starred_first:
+            starred_count_query = f"""--sql
+            SELECT COUNT(*)
+            FROM images
+            LEFT JOIN board_images ON board_images.image_name = images.image_name
+            WHERE images.starred = TRUE AND (1=1{query_conditions})
+            """
+            cursor.execute(starred_count_query, query_params)
+            starred_count = cast(int, cursor.fetchone()[0])
+
+        # Get all image names with proper ordering
+        if starred_first:
+            names_query = f"""--sql
+            SELECT images.image_name
+            FROM images
+            LEFT JOIN board_images ON board_images.image_name = images.image_name
+            WHERE 1=1{query_conditions}
+            ORDER BY images.starred DESC, images.created_at {order_dir.value}
+            """
+        else:
+            names_query = f"""--sql
+            SELECT images.image_name
+            FROM images
+            LEFT JOIN board_images ON board_images.image_name = images.image_name
+            WHERE 1=1{query_conditions}
+            ORDER BY images.created_at {order_dir.value}
+            """
+
+        cursor.execute(names_query, query_params)
+        result = cast(list[sqlite3.Row], cursor.fetchall())
+        image_names = [row[0] for row in result]
+
+        return ImageNamesResult(image_names=image_names, starred_count=starred_count, total_count=len(image_names))

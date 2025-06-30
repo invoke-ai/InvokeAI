@@ -37,6 +37,7 @@ from invokeai.app.util.misc import uuid_string
 from invokeai.backend.model_hash.hash_validator import validate_hash
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
+from invokeai.backend.model_manager.omi import flux_dev_1_lora, stable_diffusion_xl_1_lora
 from invokeai.backend.model_manager.taxonomy import (
     AnyVariant,
     BaseModelType,
@@ -296,7 +297,7 @@ class LoRAConfigBase(ABC, BaseModel):
         from invokeai.backend.patches.lora_conversions.formats import flux_format_from_state_dict
 
         sd = mod.load_state_dict(mod.path)
-        value = flux_format_from_state_dict(sd)
+        value = flux_format_from_state_dict(sd, mod.metadata())
         mod.cache[key] = value
         return value
 
@@ -334,6 +335,36 @@ class T5EncoderBnbQuantizedLlmInt8bConfig(T5EncoderConfigBase, LegacyProbeMixin,
     format: Literal[ModelFormat.BnbQuantizedLlmInt8b] = ModelFormat.BnbQuantizedLlmInt8b
 
 
+class LoRAOmiConfig(LoRAConfigBase, ModelConfigBase):
+    format: Literal[ModelFormat.OMI] = ModelFormat.OMI
+
+    @classmethod
+    def matches(cls, mod: ModelOnDisk) -> bool:
+        if mod.path.is_dir():
+            return False
+
+        metadata = mod.metadata()
+        return (
+            metadata.get("modelspec.sai_model_spec")
+            and metadata.get("ot_branch") == "omi_format"
+            and metadata["modelspec.architecture"].split("/")[1].lower() == "lora"
+        )
+
+    @classmethod
+    def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
+        metadata = mod.metadata()
+        architecture = metadata["modelspec.architecture"]
+
+        if architecture == stable_diffusion_xl_1_lora:
+            base = BaseModelType.StableDiffusionXL
+        elif architecture == flux_dev_1_lora:
+            base = BaseModelType.Flux
+        else:
+            raise InvalidModelConfigException(f"Unrecognised/unsupported architecture for OMI LoRA: {architecture}")
+
+        return {"base": base}
+
+
 class LoRALyCORISConfig(LoRAConfigBase, ModelConfigBase):
     """Model config for LoRA/Lycoris models."""
 
@@ -350,7 +381,7 @@ class LoRALyCORISConfig(LoRAConfigBase, ModelConfigBase):
 
         state_dict = mod.load_state_dict()
         for key in state_dict.keys():
-            if type(key) is int:
+            if isinstance(key, int):
                 continue
 
             if key.startswith(("lora_te_", "lora_unet_", "lora_te1_", "lora_te2_", "lora_transformer_")):
@@ -668,6 +699,7 @@ AnyModelConfig = Annotated[
         Annotated[ControlNetDiffusersConfig, ControlNetDiffusersConfig.get_tag()],
         Annotated[ControlNetCheckpointConfig, ControlNetCheckpointConfig.get_tag()],
         Annotated[LoRALyCORISConfig, LoRALyCORISConfig.get_tag()],
+        Annotated[LoRAOmiConfig, LoRAOmiConfig.get_tag()],
         Annotated[ControlLoRALyCORISConfig, ControlLoRALyCORISConfig.get_tag()],
         Annotated[ControlLoRADiffusersConfig, ControlLoRADiffusersConfig.get_tag()],
         Annotated[LoRADiffusersConfig, LoRADiffusersConfig.get_tag()],

@@ -1,5 +1,5 @@
+import { get } from 'es-toolkit/compat';
 import type { FieldInputInstance, FieldInputTemplate, FieldValue, StatefulFieldType } from 'features/nodes/types/field';
-import { get } from 'lodash-es';
 
 const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = {
   EnumField: '',
@@ -36,6 +36,7 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   Imagen3ModelField: undefined,
   Imagen4ModelField: undefined,
   ChatGPT4oModelField: undefined,
+  FluxKontextModelField: undefined,
   FloatGeneratorField: undefined,
   IntegerGeneratorField: undefined,
   StringGeneratorField: undefined,

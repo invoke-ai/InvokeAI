@@ -2,15 +2,15 @@ import { logger } from 'app/logging/logger';
 import { useAppStore } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
 import { parseify } from 'common/util/serialize';
+import { pick } from 'es-toolkit/compat';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState } from 'features/nodes/store/types';
 import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { zWorkflowV3 } from 'features/nodes/types/workflow';
 import i18n from 'i18n';
-import { pick } from 'lodash-es';
 import { useCallback } from 'react';
-import { fromZodError } from 'zod-validation-error';
+import { fromZodError } from 'zod-validation-error/v4';
 
 const log = logger('workflows');
 

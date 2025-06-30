@@ -1,12 +1,12 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { map } from 'es-toolkit/compat';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectLanguage } from 'features/system/store/systemSelectors';
 import { languageChanged } from 'features/system/store/systemSlice';
 import type { Language } from 'features/system/store/types';
 import { isLanguage } from 'features/system/store/types';
-import { map } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 

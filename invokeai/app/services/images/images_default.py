@@ -10,6 +10,7 @@ from invokeai.app.services.image_files.image_files_common import (
 )
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
+    ImageNamesResult,
     ImageRecord,
     ImageRecordChanges,
     ImageRecordDeleteException,
@@ -78,7 +79,7 @@ class ImageService(ImageServiceABC):
                         board_id=board_id, image_name=image_name
                     )
                 except Exception as e:
-                    self.__invoker.services.logger.warn(f"Failed to add image to board {board_id}: {str(e)}")
+                    self.__invoker.services.logger.warning(f"Failed to add image to board {board_id}: {str(e)}")
             self.__invoker.services.image_files.save(
                 image_name=image_name, image=image, metadata=metadata, workflow=workflow, graph=graph
             )
@@ -308,4 +309,28 @@ class ImageService(ImageServiceABC):
             return self.__invoker.services.image_records.get_intermediates_count()
         except Exception as e:
             self.__invoker.services.logger.error("Problem getting intermediates count")
+            raise e
+
+    def get_image_names(
+        self,
+        starred_first: bool = True,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        image_origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+    ) -> ImageNamesResult:
+        try:
+            return self.__invoker.services.image_records.get_image_names(
+                starred_first=starred_first,
+                order_dir=order_dir,
+                image_origin=image_origin,
+                categories=categories,
+                is_intermediate=is_intermediate,
+                board_id=board_id,
+                search_term=search_term,
+            )
+        except Exception as e:
+            self.__invoker.services.logger.error("Problem getting image names")
             raise e

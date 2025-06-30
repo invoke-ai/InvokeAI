@@ -1,7 +1,7 @@
 import type { GetOffsetFn } from '@atlaskit/pragmatic-drag-and-drop/dist/types/public-utils/element/custom-native-drag-preview/types';
 import type { Input } from '@atlaskit/pragmatic-drag-and-drop/types';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { noop } from 'lodash-es';
+import { noop } from 'es-toolkit/compat';
 import type { CSSProperties } from 'react';
 
 /**

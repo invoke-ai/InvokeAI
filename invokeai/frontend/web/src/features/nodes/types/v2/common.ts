@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 // #region Field data schemas
 export const zImageField = z.object({

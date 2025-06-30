@@ -1,5 +1,5 @@
+import { map } from 'es-toolkit/compat';
 import { getSortedFilteredFieldNames } from 'features/nodes/util/node/getSortedFilteredFieldNames';
-import { map } from 'lodash-es';
 import { useMemo } from 'react';
 
 import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';

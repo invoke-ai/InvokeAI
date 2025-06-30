@@ -3,7 +3,7 @@ import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { AnyInvocation, Invocation } from 'services/api/types';
 import { assert, AssertionError, is } from 'tsafe';
 import { describe, expect, it } from 'vitest';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 describe('Graph', () => {
   describe('constructor', () => {
@@ -135,6 +135,21 @@ describe('Graph', () => {
       const updates = {};
       const updatedNode = g.updateNode(n, updates);
       expect(updatedNode).toEqual(n);
+    });
+  });
+
+  describe('getNodes', () => {
+    it('should return all nodes in the graph', () => {
+      const g = new Graph();
+      const n1 = g.addNode({
+        id: 'n1',
+        type: 'add',
+      });
+      const n2 = g.addNode({
+        id: 'n2',
+        type: 'sub',
+      });
+      expect(g.getNodes()).toEqual([n1, n2]);
     });
   });
 

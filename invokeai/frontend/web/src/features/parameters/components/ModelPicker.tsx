@@ -18,7 +18,7 @@ import type { Group, PickerContextState } from 'common/components/Picker/Picker'
 import { buildGroup, getRegex, Picker, usePickerContext } from 'common/components/Picker/Picker';
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { typedMemo } from 'common/util/typedMemo';
-import { $installModelsTab } from 'features/modelManagerV2/subpanels/InstallModels';
+import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
 import { BASE_COLOR_MAP } from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
 import ModelImage from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelImage';
 import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
@@ -38,7 +38,7 @@ const ModelManagerLink = memo((props: ButtonProps) => {
   const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
     dispatch(setActiveTab('models'));
-    $installModelsTab.set(3);
+    setInstallModelsTabByName('launchpad');
   }, [dispatch]);
 
   return (
@@ -58,14 +58,14 @@ const components = {
   LinkComponent: <ModelManagerLink />,
 };
 
-const NoOptionsFallback = memo(() => {
+const NoOptionsFallback = memo(({ noOptionsText }: { noOptionsText?: string }) => {
   const { t } = useTranslation();
   const isModelsTabDisabled = useAppSelector(selectIsModelsTabDisabled);
   const onClickGoToModelManager = useStore($onClickGoToModelManager);
 
   return (
     <Flex flexDir="column" gap={4} alignItems="center">
-      <Text color="base.200">{t('modelManager.modelPickerFallbackNoModelsInstalled')}</Text>
+      <Text color="base.200">{noOptionsText ?? t('modelManager.modelPickerFallbackNoModelsInstalled')}</Text>
       {(!isModelsTabDisabled || onClickGoToModelManager) && (
         <Text color="base.200">
           <Trans i18nKey="modelManager.modelPickerFallbackNoModelsInstalled2" components={components} />
@@ -124,6 +124,8 @@ export const ModelPicker = typedMemo(
     isDisabled,
     isInvalid,
     className,
+    noOptionsText,
+    initialGroupStates,
   }: {
     modelConfigs: T[];
     selectedModelConfig: T | undefined;
@@ -135,6 +137,8 @@ export const ModelPicker = typedMemo(
     isDisabled?: boolean;
     isInvalid?: boolean;
     className?: string;
+    noOptionsText?: string;
+    initialGroupStates?: Record<string, boolean>;
   }) => {
     const { t } = useTranslation();
     const options = useMemo<T[] | Group<T>[]>(() => {
@@ -237,11 +241,12 @@ export const ModelPicker = typedMemo(
                 selectedOption={selectedModelConfig}
                 isMatch={isMatch}
                 OptionComponent={PickerOptionComponent}
-                noOptionsFallback={<NoOptionsFallback />}
+                noOptionsFallback={<NoOptionsFallback noOptionsText={noOptionsText} />}
                 noMatchesFallback={t('modelManager.noMatchingModels')}
                 NextToSearchBar={<NavigateToModelManagerButton />}
                 getIsOptionDisabled={getIsOptionDisabled}
                 searchable
+                initialGroupStates={initialGroupStates}
               />
             </PopoverBody>
           </PopoverContent>

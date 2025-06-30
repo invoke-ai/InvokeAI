@@ -1,5 +1,5 @@
 import { deepClone } from 'common/util/deepClone';
-import { set } from 'lodash-es';
+import { set } from 'es-toolkit/compat';
 import { describe, expect, it } from 'vitest';
 
 import { add, buildEdge, buildNode, collect, img_resize, main_model_loader, sub, templates } from './testUtils';

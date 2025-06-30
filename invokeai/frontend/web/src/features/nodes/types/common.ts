@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 import type { ModelIdentifier as ModelIdentifierV2 } from './v2/common';
 import { zModelIdentifier as zModelIdentifierV2 } from './v2/common';
@@ -78,6 +78,7 @@ const zBaseModel = z.enum([
   'imagen3',
   'imagen4',
   'chatgpt-4o',
+  'flux-kontext',
 ]);
 export type BaseModelType = z.infer<typeof zBaseModel>;
 export const zMainModelBase = z.enum([
@@ -90,8 +91,9 @@ export const zMainModelBase = z.enum([
   'imagen3',
   'imagen4',
   'chatgpt-4o',
+  'flux-kontext',
 ]);
-export type MainModelBase = z.infer<typeof zMainModelBase>;
+type MainModelBase = z.infer<typeof zMainModelBase>;
 export const isMainModelBase = (base: unknown): base is MainModelBase => zMainModelBase.safeParse(base).success;
 const zModelType = z.enum([
   'main',
@@ -185,7 +187,7 @@ export type ProgressImage = z.infer<typeof zProgressImage>;
 // #endregion
 
 // #region ImageOutput
-const zImageOutput = z.object({
+export const zImageOutput = z.object({
   image: zImageField,
   width: z.number().int().gt(0),
   height: z.number().int().gt(0),

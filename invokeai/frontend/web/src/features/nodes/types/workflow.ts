@@ -1,5 +1,5 @@
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 import type { FieldType } from './field';
 import { zFieldIdentifier } from './field';
@@ -64,7 +64,7 @@ export type ElementId = z.infer<typeof zElementId>;
 const zElementBase = z.object({
   id: zElementId,
   parentId: zElementId.optional(),
-  data: z.undefined(),
+  data: z.undefined().optional(),
 });
 
 export const zNumberComponent = z.enum(['number-input', 'slider', 'number-input-and-slider']);
@@ -271,7 +271,7 @@ export const getDefaultForm = (): BuilderForm => {
 };
 
 const zBuilderForm = z.object({
-  elements: z.record(zFormElement),
+  elements: z.record(z.string(), zFormElement),
   rootElementId: zElementId,
 });
 

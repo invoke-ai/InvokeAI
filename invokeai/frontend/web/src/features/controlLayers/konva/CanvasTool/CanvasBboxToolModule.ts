@@ -1,8 +1,14 @@
 import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMultiple';
+import { noop } from 'es-toolkit/compat';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
-import { fitRectToGrid, getKonvaNodeDebugAttrs, getPrefixedId } from 'features/controlLayers/konva/util';
+import {
+  areStageAttrsGonnaExplode,
+  fitRectToGrid,
+  getKonvaNodeDebugAttrs,
+  getPrefixedId,
+} from 'features/controlLayers/konva/util';
 import { selectBboxOverlay } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectModel } from 'features/controlLayers/store/paramsSlice';
 import { selectBbox } from 'features/controlLayers/store/selectors';
@@ -10,7 +16,6 @@ import type { Coordinate, Rect, Tool } from 'features/controlLayers/store/types'
 import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { API_BASE_MODELS } from 'features/parameters/types/constants';
 import Konva from 'konva';
-import { noop } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { assert } from 'tsafe';
@@ -253,6 +258,9 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
     }
 
     const stageAttrs = this.manager.stage.$stageAttrs.get();
+    if (areStageAttrsGonnaExplode(stageAttrs)) {
+      return;
+    }
 
     this.konva.overlayRect.setAttrs({
       x: -stageAttrs.x / stageAttrs.scale,

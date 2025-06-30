@@ -3,9 +3,9 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import {
   buildSelectValidRegionalGuidanceActions,
-  useAddRegionalGuidanceIPAdapter,
-  useAddRegionalGuidanceNegativePrompt,
-  useAddRegionalGuidancePositivePrompt,
+  useAddNegativePromptToExistingRegionalGuidance,
+  useAddPositivePromptToExistingRegionalGuidance,
+  useAddRefImageToExistingRegionalGuidance,
 } from 'features/controlLayers/hooks/addLayerHooks';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,9 +14,9 @@ import { PiPlusBold } from 'react-icons/pi';
 export const RegionalGuidanceAddPromptsIPAdapterButtons = () => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
   const { t } = useTranslation();
-  const addRegionalGuidanceIPAdapter = useAddRegionalGuidanceIPAdapter(entityIdentifier);
-  const addRegionalGuidancePositivePrompt = useAddRegionalGuidancePositivePrompt(entityIdentifier);
-  const addRegionalGuidanceNegativePrompt = useAddRegionalGuidanceNegativePrompt(entityIdentifier);
+  const addRegionalGuidanceIPAdapter = useAddRefImageToExistingRegionalGuidance(entityIdentifier);
+  const addRegionalGuidancePositivePrompt = useAddPositivePromptToExistingRegionalGuidance(entityIdentifier);
+  const addRegionalGuidanceNegativePrompt = useAddNegativePromptToExistingRegionalGuidance(entityIdentifier);
 
   const selectValidActions = useMemo(
     () => buildSelectValidRegionalGuidanceActions(entityIdentifier),

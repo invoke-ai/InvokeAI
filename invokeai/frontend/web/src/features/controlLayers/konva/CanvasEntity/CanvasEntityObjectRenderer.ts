@@ -1,6 +1,7 @@
 import { $authToken } from 'app/store/nanostores/authToken';
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { SyncableMap } from 'common/util/SyncableMap/SyncableMap';
+import { throttle } from 'es-toolkit/compat';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
@@ -14,6 +15,7 @@ import type { AnyObjectRenderer, AnyObjectState } from 'features/controlLayers/k
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import { getPatternSVG } from 'features/controlLayers/konva/patterns/getPatternSVG';
 import {
+  areStageAttrsGonnaExplode,
   getKonvaNodeDebugAttrs,
   getPrefixedId,
   konvaNodeToBlob,
@@ -25,7 +27,6 @@ import type { Rect } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
-import { throttle } from 'lodash-es';
 import type { Logger } from 'roarr';
 import { serializeError } from 'serialize-error';
 import { getImageDTOSafe, uploadImage } from 'services/api/endpoints/images';
@@ -135,6 +136,10 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     this.subscriptions.add(
       this.manager.stage.$stageAttrs.listen((stageAttrs, oldStageAttrs) => {
         if (!this.konva.compositing) {
+          return;
+        }
+
+        if (areStageAttrsGonnaExplode(stageAttrs)) {
           return;
         }
 

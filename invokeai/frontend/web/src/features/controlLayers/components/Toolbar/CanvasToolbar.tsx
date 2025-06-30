@@ -1,5 +1,4 @@
-/* eslint-disable i18next/no-literal-string */
-import { Divider, Flex, Spacer } from '@invoke-ai/ui-library';
+import { Divider, Flex } from '@invoke-ai/ui-library';
 import { CanvasSettingsPopover } from 'features/controlLayers/components/Settings/CanvasSettingsPopover';
 import { ToolColorPicker } from 'features/controlLayers/components/Tool/ToolFillColorPicker';
 import { ToolSettings } from 'features/controlLayers/components/Tool/ToolSettings';
@@ -14,6 +13,7 @@ import { useCanvasDeleteLayerHotkey } from 'features/controlLayers/hooks/useCanv
 import { useCanvasEntityQuickSwitchHotkey } from 'features/controlLayers/hooks/useCanvasEntityQuickSwitchHotkey';
 import { useCanvasFilterHotkey } from 'features/controlLayers/hooks/useCanvasFilterHotkey';
 import { useCanvasResetLayerHotkey } from 'features/controlLayers/hooks/useCanvasResetLayerHotkey';
+import { useCanvasToggleNonRasterLayersHotkey } from 'features/controlLayers/hooks/useCanvasToggleNonRasterLayersHotkey';
 import { useCanvasTransformHotkey } from 'features/controlLayers/hooks/useCanvasTransformHotkey';
 import { useCanvasUndoRedoHotkeys } from 'features/controlLayers/hooks/useCanvasUndoRedoHotkeys';
 import { useNextPrevEntityHotkeys } from 'features/controlLayers/hooks/useNextPrevEntity';
@@ -27,13 +27,13 @@ export const CanvasToolbar = memo(() => {
   useNextPrevEntityHotkeys();
   useCanvasTransformHotkey();
   useCanvasFilterHotkey();
+  useCanvasToggleNonRasterLayersHotkey();
 
   return (
-    <Flex w="full" gap={2} alignItems="center">
+    <Flex w="full" gap={2} alignItems="center" px={2}>
       <ToolColorPicker />
       <ToolSettings />
-      <Spacer />
-      <Flex alignItems="center" h="full">
+      <Flex alignItems="center" h="full" flexGrow={1} justifyContent="flex-end">
         <CanvasToolbarScale />
         <CanvasToolbarResetViewButton />
         <CanvasToolbarFitBboxToLayersButton />

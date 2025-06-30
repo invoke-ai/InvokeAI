@@ -5,7 +5,7 @@ import type { CanvasEntityAdapterInpaintMask } from 'features/controlLayers/konv
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
 import type { CanvasEntityAdapterRegionalGuidance } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRegionalGuidance';
 import type { CanvasEntityAdapterFromType } from 'features/controlLayers/konva/CanvasEntity/types';
-import type { CanvasEntityIdentifier, CanvasRenderableEntityType } from 'features/controlLayers/store/types';
+import type { CanvasEntityIdentifier, CanvasEntityType } from 'features/controlLayers/store/types';
 import type { PropsWithChildren } from 'react';
 import { createContext, memo, useContext, useMemo, useSyncExternalStore } from 'react';
 import { assert } from 'tsafe';
@@ -96,15 +96,15 @@ export const RegionalGuidanceAdapterGate = memo(({ children }: PropsWithChildren
   return <EntityAdapterContext.Provider value={adapter}>{children}</EntityAdapterContext.Provider>;
 });
 
-export const useEntityAdapterContext = <T extends CanvasRenderableEntityType | undefined = CanvasRenderableEntityType>(
+export const useEntityAdapterContext = <T extends CanvasEntityType | undefined = CanvasEntityType>(
   type?: T
-): CanvasEntityAdapterFromType<T extends undefined ? CanvasRenderableEntityType : T> => {
+): CanvasEntityAdapterFromType<T extends undefined ? CanvasEntityType : T> => {
   const adapter = useContext(EntityAdapterContext);
   assert(adapter, 'useEntityIdentifier must be used within a EntityIdentifierProvider');
   if (type) {
     assert(adapter.entityIdentifier.type === type, 'useEntityIdentifier must be used with the correct type');
   }
-  return adapter as CanvasEntityAdapterFromType<T extends undefined ? CanvasRenderableEntityType : T>;
+  return adapter as CanvasEntityAdapterFromType<T extends undefined ? CanvasEntityType : T>;
 };
 
 RegionalGuidanceAdapterGate.displayName = 'RegionalGuidanceAdapterGate';
@@ -167,4 +167,34 @@ export const useEntityAdapter = (
   const adapter = useEntityAdapterSafe(entityIdentifier);
   assert(adapter, 'useEntityAdapter must be used within a EntityAdapterContext');
   return adapter;
+};
+
+export const useAllEntityAdapters = () => {
+  const canvasManager = useCanvasManager();
+  const regionalGuidanceAdapters = useSyncExternalStore(
+    canvasManager.adapters.regionMasks.subscribe,
+    canvasManager.adapters.regionMasks.getSnapshot
+  );
+  const rasterLayerAdapters = useSyncExternalStore(
+    canvasManager.adapters.rasterLayers.subscribe,
+    canvasManager.adapters.rasterLayers.getSnapshot
+  );
+  const controlLayerAdapters = useSyncExternalStore(
+    canvasManager.adapters.controlLayers.subscribe,
+    canvasManager.adapters.controlLayers.getSnapshot
+  );
+  const inpaintMaskAdapters = useSyncExternalStore(
+    canvasManager.adapters.inpaintMasks.subscribe,
+    canvasManager.adapters.inpaintMasks.getSnapshot
+  );
+  const allEntityAdapters = useMemo(() => {
+    return [
+      ...Array.from(rasterLayerAdapters.values()),
+      ...Array.from(controlLayerAdapters.values()),
+      ...Array.from(inpaintMaskAdapters.values()),
+      ...Array.from(regionalGuidanceAdapters.values()),
+    ];
+  }, [controlLayerAdapters, inpaintMaskAdapters, rasterLayerAdapters, regionalGuidanceAdapters]);
+
+  return allEntityAdapters;
 };

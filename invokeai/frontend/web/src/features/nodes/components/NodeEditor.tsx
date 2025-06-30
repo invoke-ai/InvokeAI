@@ -1,4 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { ReactFlowProvider } from '@xyflow/react';
 import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { AddNodeCmdk } from 'features/nodes/components/flow/AddNodeCmdk/AddNodeCmdk';
@@ -16,6 +17,7 @@ import BottomLeftPanel from './flow/panels/BottomLeftPanel/BottomLeftPanel';
 import MinimapPanel from './flow/panels/MinimapPanel/MinimapPanel';
 
 const FOCUS_REGION_STYLES: SystemStyleObject = {
+  bg: 'base.900',
   display: 'flex',
   position: 'relative',
   width: 'full',
@@ -29,21 +31,23 @@ const NodeEditor = () => {
   const { t } = useTranslation();
 
   return (
-    <FocusRegionWrapper region="workflows" layerStyle="first" sx={FOCUS_REGION_STYLES}>
-      {data && (
-        <>
-          <Flow />
-          <AddNodeCmdk />
-          <TopLeftPanel />
-          <TopCenterPanel />
-          <TopRightPanel />
-          <BottomLeftPanel />
-          <MinimapPanel />
-        </>
-      )}
-      <WorkflowEditorSettings />
-      {isLoading && <IAINoContentFallback label={t('nodes.loadingNodes')} icon={PiFlowArrowBold} />}
-    </FocusRegionWrapper>
+    <ReactFlowProvider>
+      <FocusRegionWrapper region="workflows" layerStyle="first" sx={FOCUS_REGION_STYLES}>
+        {data && (
+          <>
+            <Flow />
+            <AddNodeCmdk />
+            <TopLeftPanel />
+            <TopCenterPanel />
+            <TopRightPanel />
+            <BottomLeftPanel />
+            <MinimapPanel />
+          </>
+        )}
+        <WorkflowEditorSettings />
+        {isLoading && <IAINoContentFallback label={t('nodes.loadingNodes')} icon={PiFlowArrowBold} />}
+      </FocusRegionWrapper>
+    </ReactFlowProvider>
   );
 };
 

@@ -16,13 +16,12 @@ from invokeai.app.invocations.fields import (
     FieldDescriptions,
     FluxConditioningField,
     FluxFillConditioningField,
+    FluxKontextConditioningField,
     FluxReduxConditioningField,
     ImageField,
     Input,
     InputField,
     LatentsField,
-    WithBoard,
-    WithMetadata,
 )
 from invokeai.app.invocations.flux_controlnet import FluxControlNetField
 from invokeai.app.invocations.flux_vae_encode import FluxVaeEncodeInvocation
@@ -34,6 +33,7 @@ from invokeai.backend.flux.controlnet.instantx_controlnet_flux import InstantXCo
 from invokeai.backend.flux.controlnet.xlabs_controlnet_flux import XLabsControlNetFlux
 from invokeai.backend.flux.denoise import denoise
 from invokeai.backend.flux.extensions.instantx_controlnet_extension import InstantXControlNetExtension
+from invokeai.backend.flux.extensions.kontext_extension import KontextExtension
 from invokeai.backend.flux.extensions.regional_prompting_extension import RegionalPromptingExtension
 from invokeai.backend.flux.extensions.xlabs_controlnet_extension import XLabsControlNetExtension
 from invokeai.backend.flux.extensions.xlabs_ip_adapter_extension import XLabsIPAdapterExtension
@@ -63,9 +63,9 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX Denoise",
     tags=["image", "flux"],
     category="image",
-    version="3.3.0",
+    version="4.0.0",
 )
-class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
+class FluxDenoiseInvocation(BaseInvocation):
     """Run denoising process with a FLUX transformer model."""
 
     # If latents is provided, this means we are doing image-to-image.
@@ -145,9 +145,18 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         description=FieldDescriptions.vae,
         input=Input.Connection,
     )
+    # This node accepts a images for features like FLUX Fill, ControlNet, and Kontext, but needs to operate on them in
+    # latent space. We'll run the VAE to encode them in this node instead of requiring the user to run the VAE in
+    # upstream nodes.
 
     ip_adapter: IPAdapterField | list[IPAdapterField] | None = InputField(
         description=FieldDescriptions.ip_adapter, title="IP-Adapter", default=None, input=Input.Connection
+    )
+
+    kontext_conditioning: Optional[FluxKontextConditioningField] = InputField(
+        default=None,
+        description="FLUX Kontext conditioning (reference image).",
+        input=Input.Connection,
     )
 
     @torch.no_grad()
@@ -376,14 +385,34 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 dtype=inference_dtype,
             )
 
+            kontext_extension = None
+            if self.kontext_conditioning is not None:
+                if not self.controlnet_vae:
+                    raise ValueError("A VAE (e.g., controlnet_vae) must be provided to use Kontext conditioning.")
+
+                kontext_extension = KontextExtension(
+                    kontext_field=self.kontext_conditioning,
+                    context=context,
+                    vae_field=self.controlnet_vae,
+                    device=TorchDevice.choose_torch_device(),
+                    dtype=inference_dtype,
+                )
+
+            final_img, final_img_ids = x, img_ids
+            original_seq_len = x.shape[1]
+            if kontext_extension is not None:
+                final_img, final_img_ids = kontext_extension.apply(final_img, final_img_ids)
+
             x = denoise(
                 model=transformer,
-                img=x,
-                img_ids=img_ids,
+                img=final_img,
+                img_ids=final_img_ids,
                 pos_regional_prompting_extension=pos_regional_prompting_extension,
                 neg_regional_prompting_extension=neg_regional_prompting_extension,
                 timesteps=timesteps,
-                step_callback=self._build_step_callback(context),
+                step_callback=self._build_step_callback(
+                    context, original_seq_len if kontext_extension is not None else None
+                ),
                 guidance=self.guidance,
                 cfg_scale=cfg_scale,
                 inpaint_extension=inpaint_extension,
@@ -392,6 +421,9 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 neg_ip_adapter_extensions=neg_ip_adapter_extensions,
                 img_cond=img_cond,
             )
+
+            if kontext_extension is not None:
+                x = x[:, :original_seq_len, :]  # Keep only the first original_seq_len tokens
 
         x = unpack(x.float(), self.height, self.width)
         return x
@@ -863,9 +895,15 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             yield (lora_info.model, lora.weight)
             del lora_info
 
-    def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
+    def _build_step_callback(
+        self, context: InvocationContext, original_seq_len: Optional[int] = None
+    ) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:
-            state.latents = unpack(state.latents.float(), self.height, self.width).squeeze()
+            # Extract only main image tokens if Kontext conditioning was applied
+            latents = state.latents.float()
+            if original_seq_len is not None:
+                latents = latents[:, :original_seq_len, :]
+            state.latents = unpack(latents, self.height, self.width).squeeze()
             context.util.flux_step_callback(state)
 
         return step_callback

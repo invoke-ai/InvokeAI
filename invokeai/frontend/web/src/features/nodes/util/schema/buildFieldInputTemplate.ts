@@ -1,3 +1,4 @@
+import { isNumber, startCase } from 'es-toolkit/compat';
 import { FieldParseError } from 'features/nodes/types/error';
 import type {
   BoardFieldInputTemplate,
@@ -16,6 +17,7 @@ import type {
   FloatFieldCollectionInputTemplate,
   FloatFieldInputTemplate,
   FloatGeneratorFieldInputTemplate,
+  FluxKontextModelFieldInputTemplate,
   FluxMainModelFieldInputTemplate,
   FluxReduxModelFieldInputTemplate,
   FluxVAEModelFieldInputTemplate,
@@ -61,7 +63,6 @@ import {
 import type { InvocationFieldSchema } from 'features/nodes/types/openapi';
 import { isSchemaObject } from 'features/nodes/types/openapi';
 import { t } from 'i18next';
-import { isNumber, startCase } from 'lodash-es';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FieldInputTemplateBuilder<T extends FieldInputTemplate = any> = // valid `any`!
@@ -613,6 +614,20 @@ const buildImagen4ModelFieldInputTemplate: FieldInputTemplateBuilder<Imagen4Mode
   };
   return template;
 };
+
+const buildFluxKontextModelFieldInputTemplate: FieldInputTemplateBuilder<FluxKontextModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: FluxKontextModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+  return template;
+};
+
 const buildChatGPT4oModelFieldInputTemplate: FieldInputTemplateBuilder<ChatGPT4oModelFieldInputTemplate> = ({
   schemaObject,
   baseField,
@@ -835,6 +850,7 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   Imagen3ModelField: buildImagen3ModelFieldInputTemplate,
   Imagen4ModelField: buildImagen4ModelFieldInputTemplate,
   ChatGPT4oModelField: buildChatGPT4oModelFieldInputTemplate,
+  FluxKontextModelField: buildFluxKontextModelFieldInputTemplate,
   FloatGeneratorField: buildFloatGeneratorFieldInputTemplate,
   IntegerGeneratorField: buildIntegerGeneratorFieldInputTemplate,
   StringGeneratorField: buildStringGeneratorFieldInputTemplate,

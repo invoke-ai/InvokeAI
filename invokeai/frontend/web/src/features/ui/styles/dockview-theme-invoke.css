@@ -1,0 +1,68 @@
+.dockview-theme-invoke {
+  --dv-paneview-active-outline-color: var(--invoke-colors-invokeBlue-300);
+  --dv-tabs-and-actions-container-font-size: var(--invoke-fontSizes-sm);
+  --dv-tabs-and-actions-container-height: var(--invoke-sizes-10);
+  --dv-drag-over-background-color: var(--invoke-colors-baseAlpha-400);
+  --dv-drag-over-border-color: var(--invoke-colors-base-300);
+  --dv-tabs-container-scrollbar-color: #888;
+  --dv-icon-hover-background-color: rgba(90, 93, 94, 0.31);
+  --dv-floating-box-shadow: none;
+  --dv-overlay-z-index: 999;
+
+  --dv-tab-font-size: inherit;
+  --dv-border-radius: 0;
+  --dv-tab-margin: 0;
+  --dv-sash-color: transparent;
+  --dv-active-sash-color: var(--invoke-colors-base-700);
+  --dv-active-sash-transition-duration: 0.15s;
+  --dv-active-sash-transition-delay: 0.1s;
+
+  --dv-group-view-background-color: var(--invoke-colors-base-900);
+
+  --dv-tabs-and-actions-container-background-color: var(--invoke-colors-base-850);
+
+  --dv-activegroup-visiblepanel-tab-color: var(--invoke-colors-base-50);
+  --dv-activegroup-visiblepanel-tab-background-color: var(--invoke-colors-base-700);
+
+  --dv-activegroup-hiddenpanel-tab-color: var(--invoke-colors-base-300);
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--invoke-colors-base-850);
+
+  --dv-inactivegroup-visiblepanel-tab-color: var(--invoke-colors-base-500);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--invoke-colors-base-800);
+
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--invoke-colors-base-600);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--invoke-colors-base-850);
+
+  --dv-tab-divider-color: var(--invoke-colors-base-700);
+  --dv-inactivegroup-tab-divider-color: var(--invoke-colors-base-800);
+
+  --dv-separator-border: var(--invoke-colors-base-750);
+  --dv-paneview-header-border-color: rgba(204, 204, 204, 0.2);
+}
+
+.dv-default-tab-content {
+  margin-right: 0px !important;
+}
+
+.dv-groupview-floating {
+  border-radius: var(--invoke-space-2);
+  border-width: 1px;
+  border-color: var(--invoke-colors-base-800);
+  filter: drop-shadow(0px 0px 3px rgba(0, 0, 0, 0.4)) drop-shadow(5px 5px 10px rgba(0, 0, 0, 0.6));
+}
+
+.dv-resize-container {
+  border: none;
+}
+
+.dv-tab {
+  /* margin-right: 2px; */
+  /* padding-inline-start: var(--invoke-sizes-4);
+  padding-inline-end: var(--invoke-sizes-4); */
+  padding: 0px;
+}
+
+.dv-inactive-group .dv-tabs-container.dv-horizontal .dv-tab:not(:first-child)::before {
+  /* this is the tab divider */
+  background-color: var(--dv-inactivegroup-tab-divider-color);
+}

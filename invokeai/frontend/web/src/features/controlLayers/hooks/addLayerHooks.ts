@@ -1,6 +1,8 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppStore } from 'app/store/nanostores/store';
+import type { AppGetState } from 'app/store/store';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
@@ -9,43 +11,37 @@ import {
   inpaintMaskDenoiseLimitAdded,
   inpaintMaskNoiseAdded,
   rasterLayerAdded,
-  referenceImageAdded,
   rgAdded,
-  rgIPAdapterAdded,
   rgNegativePromptChanged,
   rgPositivePromptChanged,
+  rgRefImageAdded,
 } from 'features/controlLayers/store/canvasSlice';
-import { selectBase } from 'features/controlLayers/store/paramsSlice';
+import { selectBase, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
+import { refImageAdded } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityIdentifier,
-  CanvasReferenceImageState,
   CanvasRegionalGuidanceState,
+  ChatGPT4oReferenceImageConfig,
   ControlLoRAConfig,
   ControlNetConfig,
+  FluxKontextReferenceImageConfig,
   IPAdapterConfig,
   T2IAdapterConfig,
 } from 'features/controlLayers/store/types';
 import {
   initialChatGPT4oReferenceImage,
   initialControlNet,
+  initialFluxKontextReferenceImage,
   initialIPAdapter,
   initialT2IAdapter,
 } from 'features/controlLayers/store/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { useCallback } from 'react';
-import {
-  modelConfigsAdapterSelectors,
-  selectMainModelConfig,
-  selectModelConfigsQuery,
-} from 'services/api/endpoints/models';
-import type {
-  ControlLoRAModelConfig,
-  ControlNetModelConfig,
-  IPAdapterModelConfig,
-  T2IAdapterModelConfig,
-} from 'services/api/types';
-import { isControlLayerModelConfig, isIPAdapterModelConfig } from 'services/api/types';
+import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
+import { selectIPAdapterModels } from 'services/api/hooks/modelsByType';
+import type { ControlLoRAModelConfig, ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
+import { isControlLayerModelConfig } from 'services/api/types';
 
 /**
  * Selects the default control adapter configuration based on the model configurations and the base.
@@ -76,61 +72,69 @@ export const selectDefaultControlAdapter = createSelector(
   }
 );
 
-export const selectDefaultRefImageConfig = createSelector(
-  selectMainModelConfig,
-  selectModelConfigsQuery,
-  selectBase,
-  (selectedMainModel, query, base): CanvasReferenceImageState['ipAdapter'] => {
-    if (selectedMainModel?.base === 'chatgpt-4o') {
-      const referenceImage = deepClone(initialChatGPT4oReferenceImage);
-      referenceImage.model = zModelIdentifierField.parse(selectedMainModel);
-      return referenceImage;
-    }
+export const getDefaultRefImageConfig = (
+  getState: AppGetState
+): IPAdapterConfig | ChatGPT4oReferenceImageConfig | FluxKontextReferenceImageConfig => {
+  const state = getState();
 
-    const { data } = query;
-    let model: IPAdapterModelConfig | null = null;
-    if (data) {
-      const modelConfigs = modelConfigsAdapterSelectors.selectAll(data).filter(isIPAdapterModelConfig);
-      const compatibleModels = modelConfigs.filter((m) => (base ? m.base === base : true));
-      model = compatibleModels[0] ?? modelConfigs[0] ?? null;
-    }
-    const ipAdapter = deepClone(initialIPAdapter);
-    if (model) {
-      ipAdapter.model = zModelIdentifierField.parse(model);
-      if (model.base === 'flux') {
-        ipAdapter.clipVisionModel = 'ViT-L';
-      }
-    }
-    return ipAdapter;
-  }
-);
+  const mainModelConfig = selectMainModelConfig(state);
+  const ipAdapterModelConfigs = selectIPAdapterModels(state);
 
-/**
- * Selects the default IP adapter configuration based on the model configurations and the base.
- *
- * Be sure to clone the output of this selector before modifying it!
- */
-export const selectDefaultIPAdapter = createSelector(
-  selectModelConfigsQuery,
-  selectBase,
-  (query, base): IPAdapterConfig => {
-    const { data } = query;
-    let model: IPAdapterModelConfig | null = null;
-    if (data) {
-      const modelConfigs = modelConfigsAdapterSelectors.selectAll(data).filter(isIPAdapterModelConfig);
-      const compatibleModels = modelConfigs.filter((m) => (base ? m.base === base : true));
-      model = compatibleModels[0] ?? modelConfigs[0] ?? null;
-    }
-    const ipAdapter = deepClone(initialIPAdapter);
-    if (model) {
-      ipAdapter.model = zModelIdentifierField.parse(model);
-      if (model.base === 'flux') {
-        ipAdapter.clipVisionModel = 'ViT-L';
-      }
-    }
-    return ipAdapter;
+  const base = mainModelConfig?.base;
+
+  // For ChatGPT-4o, the ref image model is the model itself.
+  if (base === 'chatgpt-4o') {
+    const config = deepClone(initialChatGPT4oReferenceImage);
+    config.model = zModelIdentifierField.parse(mainModelConfig);
+    return config;
   }
-);
+
+  if (base === 'flux-kontext') {
+    const config = deepClone(initialFluxKontextReferenceImage);
+    config.model = zModelIdentifierField.parse(mainModelConfig);
+    return config;
+  }
+
+  // Otherwise, find the first compatible IP Adapter model.
+  const modelConfig = ipAdapterModelConfigs.find((m) => m.base === base);
+
+  // Clone the initial IP Adapter config and set the model if available.
+  const config = deepClone(initialIPAdapter);
+
+  if (modelConfig) {
+    config.model = zModelIdentifierField.parse(modelConfig);
+    // FLUX models use a different vision model.
+    if (modelConfig.base === 'flux') {
+      config.clipVisionModel = 'ViT-L';
+    }
+  }
+  return config;
+};
+
+export const getDefaultRegionalGuidanceRefImageConfig = (getState: AppGetState): IPAdapterConfig => {
+  // Regional guidance ref images do not support ChatGPT-4o, so we always return the IP Adapter config.
+  const state = getState();
+
+  const mainModelConfig = selectMainModelConfig(state);
+  const ipAdapterModelConfigs = selectIPAdapterModels(state);
+
+  const base = mainModelConfig?.base;
+
+  // Find the first compatible IP Adapter model.
+  const modelConfig = ipAdapterModelConfigs.find((m) => m.base === base);
+
+  // Clone the initial IP Adapter config and set the model if available.
+  const config = deepClone(initialIPAdapter);
+
+  if (modelConfig) {
+    config.model = zModelIdentifierField.parse(modelConfig);
+    // FLUX models use a different vision model.
+    if (modelConfig.base === 'flux') {
+      config.clipVisionModel = 'ViT-L';
+    }
+  }
+  return config;
+};
 
 export const useAddControlLayer = () => {
   const dispatch = useAppDispatch();
@@ -169,44 +173,46 @@ export const useAddRegionalGuidance = () => {
   return func;
 };
 
-export const useAddRegionalReferenceImage = () => {
-  const dispatch = useAppDispatch();
-  const defaultIPAdapter = useAppSelector(selectDefaultIPAdapter);
+export const useAddNewRegionalGuidanceWithARefImage = () => {
+  const { dispatch, getState } = useAppStore();
 
   const func = useCallback(() => {
+    const config = getDefaultRegionalGuidanceRefImageConfig(getState);
     const overrides: Partial<CanvasRegionalGuidanceState> = {
-      referenceImages: [
-        { id: getPrefixedId('regional_guidance_reference_image'), ipAdapter: deepClone(defaultIPAdapter) },
-      ],
+      referenceImages: [{ id: getPrefixedId('regional_guidance_reference_image'), config }],
     };
     dispatch(rgAdded({ isSelected: true, overrides }));
-  }, [defaultIPAdapter, dispatch]);
+  }, [dispatch, getState]);
 
   return func;
 };
 
 export const useAddGlobalReferenceImage = () => {
-  const dispatch = useAppDispatch();
-  const defaultRefImage = useAppSelector(selectDefaultRefImageConfig);
+  const { dispatch, getState } = useAppStore();
   const func = useCallback(() => {
-    const overrides = { ipAdapter: deepClone(defaultRefImage) };
-    dispatch(referenceImageAdded({ isSelected: true, overrides }));
-  }, [defaultRefImage, dispatch]);
+    const config = getDefaultRefImageConfig(getState);
+    const overrides = { config };
+    dispatch(refImageAdded({ overrides }));
+  }, [dispatch, getState]);
 
   return func;
 };
 
-export const useAddRegionalGuidanceIPAdapter = (entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>) => {
-  const dispatch = useAppDispatch();
-  const defaultIPAdapter = useAppSelector(selectDefaultIPAdapter);
+export const useAddRefImageToExistingRegionalGuidance = (
+  entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>
+) => {
+  const { dispatch, getState } = useAppStore();
   const func = useCallback(() => {
-    dispatch(rgIPAdapterAdded({ entityIdentifier, overrides: { ipAdapter: deepClone(defaultIPAdapter) } }));
-  }, [defaultIPAdapter, dispatch, entityIdentifier]);
+    const config = getDefaultRegionalGuidanceRefImageConfig(getState);
+    dispatch(rgRefImageAdded({ entityIdentifier, overrides: { config } }));
+  }, [dispatch, entityIdentifier, getState]);
 
   return func;
 };
 
-export const useAddRegionalGuidancePositivePrompt = (entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>) => {
+export const useAddPositivePromptToExistingRegionalGuidance = (
+  entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>
+) => {
   const dispatch = useAppDispatch();
   const func = useCallback(() => {
     dispatch(rgPositivePromptChanged({ entityIdentifier, prompt: '' }));
@@ -215,7 +221,9 @@ export const useAddRegionalGuidancePositivePrompt = (entityIdentifier: CanvasEnt
   return func;
 };
 
-export const useAddRegionalGuidanceNegativePrompt = (entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>) => {
+export const useAddNegativePromptToExistingRegionalGuidance = (
+  entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>
+) => {
   const dispatch = useAppDispatch();
   const runc = useCallback(() => {
     dispatch(rgNegativePromptChanged({ entityIdentifier, prompt: '' }));

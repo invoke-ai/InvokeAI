@@ -10,18 +10,13 @@ import { CanvasEntityAdapterRegionalGuidance } from 'features/controlLayers/konv
 import type { CanvasEntityAdapter, CanvasEntityAdapterFromType } from 'features/controlLayers/konva/CanvasEntity/types';
 import { CanvasEntityRendererModule } from 'features/controlLayers/konva/CanvasEntityRendererModule';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { CanvasProgressImageModule } from 'features/controlLayers/konva/CanvasProgressImageModule';
 import { CanvasStageModule } from 'features/controlLayers/konva/CanvasStageModule';
 import { CanvasStagingAreaModule } from 'features/controlLayers/konva/CanvasStagingAreaModule';
 import { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
 import { CanvasWorkerModule } from 'features/controlLayers/konva/CanvasWorkerModule.js';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { $canvasManager } from 'features/controlLayers/store/ephemeral';
-import type {
-  CanvasEntityIdentifier,
-  CanvasRenderableEntityIdentifier,
-  CanvasRenderableEntityType,
-} from 'features/controlLayers/store/types';
+import type { CanvasEntityIdentifier, CanvasEntityType } from 'features/controlLayers/store/types';
 import {
   isControlLayerEntityIdentifier,
   isInpaintMaskEntityIdentifier,
@@ -37,6 +32,7 @@ import { assert } from 'tsafe';
 import type { JsonObject } from 'type-fest';
 
 import { CanvasBackgroundModule } from './CanvasBackgroundModule';
+import { CanvasCompositionGuideModule } from './CanvasCompositionGuideModule';
 import { CanvasStateApiModule } from './CanvasStateApiModule';
 
 export class CanvasManager extends CanvasModuleBase {
@@ -66,7 +62,7 @@ export class CanvasManager extends CanvasModuleBase {
   compositor: CanvasCompositorModule;
   tool: CanvasToolModule;
   stagingArea: CanvasStagingAreaModule;
-  progressImage: CanvasProgressImageModule;
+  compositionGuide: CanvasCompositionGuideModule;
 
   konva: {
     previewLayer: Konva.Layer;
@@ -107,6 +103,7 @@ export class CanvasManager extends CanvasModuleBase {
 
     this.compositor = new CanvasCompositorModule(this);
     this.stagingArea = new CanvasStagingAreaModule(this);
+    this.compositionGuide = new CanvasCompositionGuideModule(this);
 
     this.$isBusy = computed(
       [
@@ -131,15 +128,14 @@ export class CanvasManager extends CanvasModuleBase {
     this.stage.addLayer(this.konva.previewLayer);
 
     this.tool = new CanvasToolModule(this);
-    this.progressImage = new CanvasProgressImageModule(this);
 
     // Must add in this order for correct z-index
     this.konva.previewLayer.add(this.stagingArea.konva.group);
-    this.konva.previewLayer.add(this.progressImage.konva.group);
     this.konva.previewLayer.add(this.tool.konva.group);
+    this.konva.previewLayer.add(this.compositionGuide.konva.group);
   }
 
-  getAdapter = <T extends CanvasRenderableEntityType = CanvasRenderableEntityType>(
+  getAdapter = <T extends CanvasEntityType = CanvasEntityType>(
     entityIdentifier: CanvasEntityIdentifier<T>
   ): CanvasEntityAdapterFromType<T> | null => {
     let adapter: CanvasEntityAdapter | undefined;
@@ -167,7 +163,7 @@ export class CanvasManager extends CanvasModuleBase {
     return adapter as CanvasEntityAdapterFromType<T>;
   };
 
-  deleteAdapter = (entityIdentifier: CanvasRenderableEntityIdentifier): boolean => {
+  deleteAdapter = (entityIdentifier: CanvasEntityIdentifier): boolean => {
     switch (entityIdentifier.type) {
       case 'raster_layer':
         return this.adapters.rasterLayers.delete(entityIdentifier.id);
@@ -182,7 +178,7 @@ export class CanvasManager extends CanvasModuleBase {
     }
   };
 
-  getAdapters = (entityIdentifiers: CanvasRenderableEntityIdentifier[]): CanvasEntityAdapter[] => {
+  getAdapters = (entityIdentifiers: CanvasEntityIdentifier[]): CanvasEntityAdapter[] => {
     const adapters: CanvasEntityAdapter[] = [];
     for (const entityIdentifier of entityIdentifiers) {
       const adapter = this.getAdapter(entityIdentifier);
@@ -203,7 +199,7 @@ export class CanvasManager extends CanvasModuleBase {
     ];
   };
 
-  createAdapter = (entityIdentifier: CanvasRenderableEntityIdentifier): CanvasEntityAdapter => {
+  createAdapter = (entityIdentifier: CanvasEntityIdentifier): CanvasEntityAdapter => {
     if (isRasterLayerEntityIdentifier(entityIdentifier)) {
       const adapter = new CanvasEntityAdapterRasterLayer(entityIdentifier, this);
       this.adapters.rasterLayers.set(adapter.id, adapter);
@@ -238,13 +234,13 @@ export class CanvasManager extends CanvasModuleBase {
     return [
       this.stagingArea,
       this.tool,
-      this.progressImage,
       this.stateApi,
       this.background,
       this.worker,
       this.entityRenderer,
       this.compositor,
       this.stage,
+      this.compositionGuide,
     ];
   };
 
@@ -285,12 +281,12 @@ export class CanvasManager extends CanvasModuleBase {
       stateApi: this.stateApi.repr(),
       stagingArea: this.stagingArea.repr(),
       tool: this.tool.repr(),
-      progressImage: this.progressImage.repr(),
       background: this.background.repr(),
       worker: this.worker.repr(),
       entityRenderer: this.entityRenderer.repr(),
       compositor: this.compositor.repr(),
       stage: this.stage.repr(),
+      compositionGuide: this.compositionGuide.repr(),
     };
   };
 

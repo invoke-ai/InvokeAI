@@ -6,7 +6,7 @@ import {
   NewGallerySessionDialog,
 } from 'features/controlLayers/components/NewSessionConfirmationAlertDialog';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
+import { DeleteImageModal } from 'features/deleteImageModal/components/DeleteImageModal';
 import { FullscreenDropzone } from 'features/dnd/FullscreenDropzone';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
@@ -15,6 +15,7 @@ import { ShareWorkflowModal } from 'features/nodes/components/sidePanel/workflow
 import { WorkflowLibraryModal } from 'features/nodes/components/sidePanel/workflow/WorkflowLibrary/WorkflowLibraryModal';
 import { CancelAllExceptCurrentQueueItemConfirmationAlertDialog } from 'features/queue/components/CancelAllExceptCurrentQueueItemConfirmationAlertDialog';
 import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
+import { DeleteAllExceptCurrentQueueItemConfirmationAlertDialog } from 'features/queue/components/DeleteAllExceptCurrentQueueItemConfirmationAlertDialog';
 import { DeleteStylePresetDialog } from 'features/stylePresets/components/DeleteStylePresetDialog';
 import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
 import RefreshAfterResetModal from 'features/system/components/SettingsModal/RefreshAfterResetModal';
@@ -39,6 +40,7 @@ export const GlobalModalIsolator = memo(() => {
       <StylePresetModal />
       <WorkflowLibraryModal />
       <CancelAllExceptCurrentQueueItemConfirmationAlertDialog />
+      <DeleteAllExceptCurrentQueueItemConfirmationAlertDialog />
       <ClearQueueConfirmationsAlertDialog />
       <NewWorkflowConfirmationAlertDialog />
       <LoadWorkflowConfirmationAlertDialog />

@@ -1,10 +1,10 @@
 import { NUMPY_RAND_MAX } from 'app/constants';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { roundDownToMultiple, roundUpToMultiple } from 'common/util/roundDownToMultiple';
+import { isNil } from 'es-toolkit/compat';
 import { fieldIntegerValueChanged } from 'features/nodes/store/nodesSlice';
 import type { IntegerFieldInputTemplate } from 'features/nodes/types/field';
 import { constrainNumber } from 'features/nodes/util/constrainNumber';
-import { isNil } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 
 export const useIntegerField = (

@@ -38,7 +38,7 @@ export const ParamSDXLNegativeStylePrompt = memo(() => {
     <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
       <Box pos="relative">
         <Textarea
-          id="prompt"
+          className="negative-style-prompt-textarea"
           name="prompt"
           ref={textareaRef}
           value={prompt}

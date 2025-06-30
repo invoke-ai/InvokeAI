@@ -392,7 +392,7 @@
                 "title": "全選択"
             },
             "addNode": {
-                "desc": "ノード追加メニューを開く．",
+                "desc": "ノード追加メニューを開く。",
                 "title": "ノードを追加"
             },
             "pasteSelectionWithEdges": {
@@ -1156,11 +1156,11 @@
         "unknownField": "不明なフィールド",
         "unexpectedField_withName": "予期しないフィールド\"{{name}}\"",
         "loadingTemplates": "読み込み中 {{name}}",
-        "validateConnectionsHelp": "無効な接続が行われたり,無効なグラフが呼び出されたりしないようにします.",
+        "validateConnectionsHelp": "無効な接続が行われたり,無効なグラフが呼び出されたりしないようにします",
         "validateConnections": "接続とグラフを確認する",
         "saveToGallery": "ギャラリーに保存",
         "newWorkflowDesc": "新しいワークフローを作りますか？",
-        "unknownFieldType": "$t(nodes.unknownField)型:{type}}",
+        "unknownFieldType": "$t(nodes.unknownField)型: {{type}}",
         "unsupportedArrayItemType": "サポートされていない配列項目型です \"{{type}}\"",
         "unableToLoadWorkflow": "ワークフローが読み込めません",
         "unableToValidateWorkflow": "ワークフローを確認できません",
@@ -1203,13 +1203,13 @@
         "downloadBoard": "ボードをダウンロード",
         "changeBoard": "ボードを変更",
         "loading": "ロード中...",
-        "topMessage": "このボードには、以下の機能で使用されている画像が含まれています：",
-        "bottomMessage": "このボードおよび画像を削除すると、現在これらを利用している機能はリセットされます。",
+        "topMessage": "この選択には、次の機能で使用される画像が含まれています:",
+        "bottomMessage": "この画像を削除すると、現在利用している機能はリセットされます。",
         "clearSearch": "検索をクリア",
         "deleteBoard": "ボードの削除",
         "deleteBoardAndImages": "ボードと画像の削除",
         "deleteBoardOnly": "ボードのみ削除",
-        "deletedBoardsCannotbeRestored": "削除されたボードは復元できません。\"ボードのみ削除\"を選択すると画像は未分類に移動されます。",
+        "deletedBoardsCannotbeRestored": "削除したボードと画像は復元できません。「ボードのみ削除」を選択すると、画像は未分類の状態になります。",
         "movingImagesToBoard_other": "{{count}} の画像をボードに移動:",
         "hideBoards": "ボードを隠す",
         "assetsWithCount_other": "{{count}} のアセット",
@@ -1224,9 +1224,12 @@
         "imagesWithCount_other": "{{count}} の画像",
         "updateBoardError": "ボード更新エラー",
         "selectedForAutoAdd": "自動追加に選択済み",
-        "deletedPrivateBoardsCannotbeRestored": "削除されたボードは復元できません。\"ボードのみ削除\"を選択すると画像はその作成者のプライベートな未分類に移動されます。",
+        "deletedPrivateBoardsCannotbeRestored": "削除されたボードと画像は復元できません。「ボードのみ削除」を選択すると、画像は作成者に対して非公開の未分類状態になります。",
         "noBoards": "{{boardType}} ボードがありません",
-        "viewBoards": "ボードを表示"
+        "viewBoards": "ボードを表示",
+        "uncategorizedImages": "分類されていない画像",
+        "deleteAllUncategorizedImages": "分類されていないすべての画像を削除",
+        "deletedImagesCannotBeRestored": "削除した画像は復元できません."
     },
     "invocationCache": {
         "invocationCache": "呼び出しキャッシュ",
@@ -1292,25 +1295,49 @@
             ]
         },
         "paramUpscaleMethod": {
-            "heading": "アップスケール手法"
+            "heading": "アップスケール手法",
+            "paragraphs": [
+                "高解像度修正のために画像を拡大するために使用される方法。"
+            ]
         },
         "upscaleModel": {
-            "heading": "アップスケールモデル"
+            "heading": "アップスケールモデル",
+            "paragraphs": [
+                "アップスケールモデルは、ディテールを追加する前に画像を出力サイズに合わせて拡大縮小します。サポートされているアップスケールモデルであればどれでも使用できますが、写真や線画など、特定の種類の画像に特化したモデルもあります。"
+            ]
         },
         "paramAspect": {
-            "heading": "縦横比"
+            "heading": "縦横比",
+            "paragraphs": [
+                "生成される画像のアスペクト比。比率を変更すると、幅と高さもそれに応じて更新されます。",
+                "「最適化」は、選択したモデルの幅と高さを最適な寸法に設定します。"
+            ]
         },
         "refinerSteps": {
-            "heading": "ステップ"
+            "heading": "ステップ",
+            "paragraphs": [
+                "生成プロセスのリファイナー部分で実行されるステップの数。",
+                "生成ステップと似ています。"
+            ]
         },
         "paramVAE": {
-            "heading": "VAE"
+            "heading": "VAE",
+            "paragraphs": [
+                "AI 出力を最終画像に変換するために使用されるモデル。"
+            ]
         },
         "scale": {
-            "heading": "スケール"
+            "heading": "スケール",
+            "paragraphs": [
+                "スケールは出力画像のサイズを制御し、入力画像の解像度の倍数に基づいて決定されます。例えば、1024x1024の画像を2倍に拡大すると、2048x2048の出力が生成されます。"
+            ]
         },
         "refinerScheduler": {
-            "heading": "スケジューラー"
+            "heading": "スケジューラー",
+            "paragraphs": [
+                "生成プロセスのリファイナー部分で使用されるスケジューラ。",
+                "生成スケジューラに似ています。"
+            ]
         },
         "compositingCoherenceMode": {
             "heading": "モード",
@@ -1319,10 +1346,16 @@
             ]
         },
         "paramModel": {
-            "heading": "モデル"
+            "heading": "モデル",
+            "paragraphs": [
+                "生成に使用されるモデル。異なるモデルは、異なる美的結果とコンテンツを生成するように特化するようにトレーニングされています。"
+            ]
         },
         "paramHeight": {
-            "heading": "高さ"
+            "heading": "高さ",
+            "paragraphs": [
+                "生成される画像の高さ。8の倍数にする必要があります。"
+            ]
         },
         "paramSteps": {
             "heading": "ステップ",
@@ -1345,7 +1378,11 @@
             ]
         },
         "paramIterations": {
-            "heading": "生成回数"
+            "heading": "生成回数",
+            "paragraphs": [
+                "生成する画像の数。",
+                "動的プロンプトが有効になっている場合、各プロンプトはこの回数生成されます。"
+            ]
         },
         "controlNet": {
             "heading": "ControlNet",
@@ -1354,7 +1391,10 @@
             ]
         },
         "paramWidth": {
-            "heading": "幅"
+            "heading": "幅",
+            "paragraphs": [
+                "生成される画像の幅。8の倍数にする必要があります。"
+            ]
         },
         "lora": {
             "heading": "LoRA",
@@ -1369,7 +1409,11 @@
             ]
         },
         "patchmatchDownScaleSize": {
-            "heading": "Downscale"
+            "heading": "Downscale",
+            "paragraphs": [
+                "埋め込む前にどの程度のダウンスケーリングが行われるか。",
+                "ダウンスケーリングを大きくするとパフォーマンスは向上しますが、品質は低下します。"
+            ]
         },
         "controlNetWeight": {
             "heading": "重み",
@@ -1510,6 +1554,124 @@
             "heading": "充填方法",
             "paragraphs": [
                 "アウトペインティングまたはインペインティングのプロセス中に埋め込む方法."
+            ]
+        },
+        "paramGuidance": {
+            "paragraphs": [
+                "プロンプトが生成プロセスにどの程度影響するかを制御します。",
+                "ガイダンス値が高すぎると過飽和状態になる可能性があり、ガイダンス値が高すぎるか低すぎると生成結果に歪みが生じる可能性があります。ガイダンスはFLUX DEVモデルにのみ適用されます。"
+            ],
+            "heading": "ガイダンス"
+        },
+        "paramDenoisingStrength": {
+            "paragraphs": [
+                "生成されたイメージがラスター レイヤーとどの程度異なるかを制御します。",
+                "強度が低いほど、結合された表示ラスターレイヤーに近くなります。強度が高いほど、グローバルプロンプトに大きく依存します。",
+                "表示されるコンテンツを持つラスター レイヤーがない場合、この設定は無視されます。"
+            ],
+            "heading": "ディノイジングストレングス"
+        },
+        "refinerStart": {
+            "heading": "リファイナースタート",
+            "paragraphs": [
+                "生成プロセスのどの時点でリファイナーが使用され始めるか。",
+                "0 はリファイナーが生成プロセス全体で使用されることを意味し、0.8 は、リファイナーが生成プロセスの最後の 20% で使用されることを意味します。"
+            ]
+        },
+        "optimizedDenoising": {
+            "heading": "イメージtoイメージの最適化",
+            "paragraphs": [
+                "「イメージtoイメージを最適化」を有効にすると、Fluxモデルを用いた画像間変換およびインペインティング変換において、より段階的なノイズ除去強度スケールが適用されます。この設定により、画像に適用される変化量を制御する能力が向上しますが、標準のノイズ除去強度スケールを使用したい場合はオフにすることができます。この設定は現在調整中で、ベータ版です。"
+            ]
+        },
+        "refinerPositiveAestheticScore": {
+            "heading": "ポジティブ美的スコア",
+            "paragraphs": [
+                "トレーニング データに基づいて、美的スコアの高い画像に類似するように生成を重み付けします。"
+            ]
+        },
+        "paramCFGScale": {
+            "paragraphs": [
+                "プロンプトが生成プロセスにどの程度影響するかを制御します。",
+                "CFG スケールの値が高すぎると、飽和しすぎて生成結果が歪む可能性があります。 "
+            ],
+            "heading": "CFGスケール"
+        },
+        "paramVAEPrecision": {
+            "paragraphs": [
+                "VAE エンコードおよびデコード時に使用される精度。",
+                "Fp16/Half 精度は、画像のわずかな変化を犠牲にして、より効率的です。"
+            ],
+            "heading": "VAE精度"
+        },
+        "refinerModel": {
+            "heading": "リファイナーモデル",
+            "paragraphs": [
+                "生成プロセスの精製部分で使用されるモデル。",
+                "世代モデルに似ています。"
+            ]
+        },
+        "refinerCfgScale": {
+            "heading": "CFGスケール",
+            "paragraphs": [
+                "プロンプトが生成プロセスに与える影響を制御する。",
+                "生成CFG スケールに似ています。"
+            ]
+        },
+        "seamlessTilingYAxis": {
+            "heading": "シームレスタイリングY軸",
+            "paragraphs": [
+                "画像を垂直軸に沿ってシームレスに並べます。"
+            ]
+        },
+        "scaleBeforeProcessing": {
+            "heading": "プロセス前のスケール値",
+            "paragraphs": [
+                "「自動」は、画像生成プロセスの前に、選択した領域をモデルに最適なサイズに拡大縮小します。",
+                "「手動」では、画像生成プロセスの前に、選択した領域を拡大縮小する幅と高さを選択できます。"
+            ]
+        },
+        "creativity": {
+            "heading": "クリエイティビティ",
+            "paragraphs": [
+                "クリエイティビティは、ディテールを追加する際のモデルに与えられる自由度を制御します。クリエイティビティが低いと元のイメージに近いままになり、クリエイティビティが高いとより多くの変化を加えることができます。プロンプトを使用する場合、クリエイティビティが高いとプロンプトの影響が増します。"
+            ]
+        },
+        "paramHrf": {
+            "heading": "高解像度修正を有効にする",
+            "paragraphs": [
+                "モデルに最適な解像度よりも高い解像度で、高品質な画像を生成します。通常、生成された画像内の重複を防ぐために使用されます。"
+            ]
+        },
+        "seamlessTilingXAxis": {
+            "heading": "シームレスタイリングX軸",
+            "paragraphs": [
+                "画像を水平軸に沿ってシームレスに並べます。"
+            ]
+        },
+        "paramCFGRescaleMultiplier": {
+            "paragraphs": [
+                "ゼロ端末 SNR (ztsnr) を使用してトレーニングされたモデルに使用される、CFG ガイダンスのリスケールマルチプライヤー。",
+                "これらのモデルの場合、推奨値は 0.7 です。"
+            ],
+            "heading": "CFG リスケールマルチプライヤー"
+        },
+        "structure": {
+            "heading": "ストラクチャ",
+            "paragraphs": [
+                "ストラクチャは、出力画像が元のレイアウトにどれだけ忠実に従うかを制御します。低いストラクチャでは大幅な変更が可能ですが、高いストラクチャでは元の構成とレイアウトが厳密に維持されます。"
+            ]
+        },
+        "refinerNegativeAestheticScore": {
+            "paragraphs": [
+                "トレーニング データに基づいて、美観スコアが低い画像に類似するように生成に重み付けします。"
+            ],
+            "heading": "ネガティブ美的スコア"
+        },
+        "fluxDevLicense": {
+            "heading": "非商用ライセンス",
+            "paragraphs": [
+                "FLUX.1 [dev]モデルは、FLUX [dev]非商用ライセンスに基づいてライセンスされています。Invokeでこのモデルタイプを商用目的で使用する場合は、当社のウェブサイトをご覧ください。"
             ]
         }
     },
@@ -1683,7 +1845,106 @@
         "workflows": "ワークフロー",
         "ascending": "昇順",
         "name": "名前",
-        "descending": "降順"
+        "descending": "降順",
+        "searchPlaceholder": "名前、説明、タグで検索",
+        "projectWorkflows": "プロジェクトワークフロー",
+        "searchWorkflows": "ワークフローを検索",
+        "updated": "アップデート",
+        "published": "公表",
+        "builder": {
+            "label": "ラベル",
+            "containerPlaceholder": "空のコンテナ",
+            "showDescription": "説明を表示",
+            "emptyRootPlaceholderEditMode": "開始するには、フォーム要素またはノード フィールドをここにドラッグします。",
+            "divider": "仕切り",
+            "deleteAllElements": "すべてのフォーム要素を削除",
+            "heading": "見出し",
+            "nodeField": "ノードフィールド",
+            "zoomToNode": "ノードにズーム",
+            "dropdown": "ドロップダウン",
+            "resetOptions": "オプションをリセット",
+            "both": "両方",
+            "builder": "フォームビルダー",
+            "text": "テキスト",
+            "row": "行",
+            "multiLine": "マルチライン",
+            "resetAllNodeFields": "すべてのノードフィールドをリセット",
+            "slider": "スライダー",
+            "layout": "レイアウト",
+            "addToForm": "フォームに追加",
+            "headingPlaceholder": "空の見出し",
+            "nodeFieldTooltip": "ノード フィールドを追加するには、ワークフロー エディターのフィールドにある小さなプラス記号ボタンをクリックするか、フィールド名をフォームにドラッグします。",
+            "workflowBuilderAlphaWarning": "ワークフロービルダーは現在アルファ版です。安定版リリースまでに互換性に影響する変更が発生する可能性があります。",
+            "component": "コンポーネント",
+            "textPlaceholder": "空のテキスト",
+            "emptyRootPlaceholderViewMode": "このワークフローのフォームの作成を開始するには、[編集] をクリックします。",
+            "addOption": "オプションを追加",
+            "singleLine": "単線",
+            "numberInput": "数値入力",
+            "column": "列",
+            "container": "コンテナ",
+            "containerRowLayout": "コンテナ（行レイアウト）",
+            "containerColumnLayout": "コンテナ（列レイアウト）",
+            "maximum": "最大",
+            "published": "公開済み",
+            "publishedWorkflowOutputs": "アウトプット",
+            "minimum": "最小",
+            "publish": "公開",
+            "unpublish": "非公開",
+            "publishedWorkflowInputs": "インプット"
+        },
+        "chooseWorkflowFromLibrary": "ライブラリからワークフローを選択",
+        "unnamedWorkflow": "名前のないワークフロー",
+        "download": "ダウンロード",
+        "savingWorkflow": "ワークフローを保存しています...",
+        "problemSavingWorkflow": "ワークフローの保存に関する問題",
+        "convertGraph": "グラフを変換",
+        "downloadWorkflow": "ファイルに保存",
+        "saveWorkflow": "ワークフローを保存",
+        "userWorkflows": "ユーザーワークフロー",
+        "yourWorkflows": "あなたのワークフロー",
+        "edit": "編集",
+        "workflowLibrary": "ワークフローライブラリ",
+        "workflowSaved": "ワークフローが保存されました",
+        "clearWorkflowSearchFilter": "ワークフロー検索フィルタをクリア",
+        "workflowCleared": "ワークフローが作成されました",
+        "autoLayout": "オートレイアウト",
+        "view": "ビュー",
+        "saveChanges": "変更を保存",
+        "noDescription": "説明なし",
+        "recommended": "あなたへのおすすめ",
+        "noRecentWorkflows": "最近のワークフローがありません",
+        "problemLoading": "ワークフローのローディングに関する問題",
+        "newWorkflowCreated": "新しいワークフローが作成されました",
+        "noWorkflows": "ワークフローがありません",
+        "copyShareLink": "共有リンクをコピー",
+        "copyShareLinkForWorkflow": "ワークフローの共有リンクをコピー",
+        "workflowThumbnail": "ワークフローサムネイル",
+        "loadWorkflow": "$t(common.load) ワークフロー",
+        "shared": "共有",
+        "openWorkflow": "ワークフローを開く",
+        "emptyStringPlaceholder": "<空の文字列>",
+        "browseWorkflows": "ワークフローを閲覧する",
+        "saveWorkflowAs": "ワークフローとして保存",
+        "private": "プライベート",
+        "deselectAll": "すべて選択解除",
+        "delete": "削除",
+        "openLibrary": "ライブラリを開く",
+        "loadMore": "もっと読み込む",
+        "saveWorkflowToProject": "ワークフローをプロジェクトに保存",
+        "created": "作成されました",
+        "workflowEditorMenu": "ワークフローエディターメニュー",
+        "defaultWorkflows": "デフォルトワークフロー",
+        "allLoaded": "すべてのワークフローが読み込まれました",
+        "filterByTags": "タグでフィルター",
+        "recentlyOpened": "最近開いた",
+        "opened": "オープン",
+        "deleteWorkflow": "ワークフローを削除",
+        "deleteWorkflow2": "このワークフローを削除してもよろしいですか? 元に戻すことはできません。",
+        "loadFromGraph": "グラフからワークフローをロード",
+        "workflowName": "ワークフロー名",
+        "loading": "ワークフローをロードしています",
+        "uploadWorkflow": "ファイルからロードする"
     },
     "system": {
         "logNamespaces": {

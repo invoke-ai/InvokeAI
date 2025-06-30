@@ -11,7 +11,7 @@ import {
 import type { ChangeEvent } from 'react';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 const zOrderBy = z.enum(['opened_at', 'created_at', 'updated_at', 'name']);
 type OrderBy = z.infer<typeof zOrderBy>;

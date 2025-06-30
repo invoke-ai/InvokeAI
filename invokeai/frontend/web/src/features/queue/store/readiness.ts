@@ -2,16 +2,17 @@ import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppStore } from 'app/store/nanostores/store';
-import { $true } from 'app/store/nanostores/util';
+import { $false } from 'app/store/nanostores/util';
 import type { AppDispatch, AppStore } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { AppConfig } from 'app/types/invokeai';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
+import { debounce, groupBy, upperFirst } from 'es-toolkit/compat';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import type { ParamsState } from 'features/controlLayers/store/paramsSlice';
-import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import type { CanvasState } from 'features/controlLayers/store/types';
+import type { CanvasState, ParamsState, RefImagesState } from 'features/controlLayers/store/types';
 import {
   getControlLayerWarnings,
   getGlobalReferenceImageWarnings,
@@ -40,10 +41,8 @@ import { selectConfigSlice } from 'features/system/store/configSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
 import i18n from 'i18next';
-import { debounce, groupBy, upperFirst } from 'lodash-es';
 import { atom, computed } from 'nanostores';
 import { useEffect } from 'react';
-import { selectMainModelConfig } from 'services/api/endpoints/models';
 import type { MainModelConfig } from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
 
@@ -77,6 +76,7 @@ const debouncedUpdateReasons = debounce(
     isConnected: boolean,
     canvas: CanvasState,
     params: ParamsState,
+    refImages: RefImagesState,
     dynamicPrompts: DynamicPromptsState,
     canvasIsFiltering: boolean,
     canvasIsTransforming: boolean,
@@ -99,6 +99,7 @@ const debouncedUpdateReasons = debounce(
         model,
         canvas,
         params,
+        refImages,
         dynamicPrompts,
         canvasIsFiltering,
         canvasIsTransforming,
@@ -140,6 +141,7 @@ export const useReadinessWatcher = () => {
   const tab = useAppSelector(selectActiveTab);
   const canvas = useAppSelector(selectCanvasSlice);
   const params = useAppSelector(selectParamsSlice);
+  const refImages = useAppSelector(selectRefImagesSlice);
   const dynamicPrompts = useAppSelector(selectDynamicPromptsSlice);
   const nodes = useAppSelector(selectNodesSlice);
   const workflowSettings = useAppSelector(selectWorkflowSettingsSlice);
@@ -147,11 +149,11 @@ export const useReadinessWatcher = () => {
   const config = useAppSelector(selectConfigSlice);
   const templates = useStore($templates);
   const isConnected = useStore($isConnected);
-  const canvasIsFiltering = useStore(canvasManager?.stateApi.$isFiltering ?? $true);
-  const canvasIsTransforming = useStore(canvasManager?.stateApi.$isTransforming ?? $true);
-  const canvasIsRasterizing = useStore(canvasManager?.stateApi.$isRasterizing ?? $true);
-  const canvasIsSelectingObject = useStore(canvasManager?.stateApi.$isSegmenting ?? $true);
-  const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $true);
+  const canvasIsFiltering = useStore(canvasManager?.stateApi.$isFiltering ?? $false);
+  const canvasIsTransforming = useStore(canvasManager?.stateApi.$isTransforming ?? $false);
+  const canvasIsRasterizing = useStore(canvasManager?.stateApi.$isRasterizing ?? $false);
+  const canvasIsSelectingObject = useStore(canvasManager?.stateApi.$isSegmenting ?? $false);
+  const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $false);
   const isInPublishFlow = useStore($isInPublishFlow);
   const { isChatGPT4oHighModelDisabled } = useIsModelDisabled();
 
@@ -161,6 +163,7 @@ export const useReadinessWatcher = () => {
       isConnected,
       canvas,
       params,
+      refImages,
       dynamicPrompts,
       canvasIsFiltering,
       canvasIsTransforming,
@@ -179,6 +182,7 @@ export const useReadinessWatcher = () => {
   }, [
     store,
     canvas,
+    refImages,
     canvasIsCompositing,
     canvasIsFiltering,
     canvasIsRasterizing,
@@ -336,6 +340,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   model: MainModelConfig | null | undefined;
   canvas: CanvasState;
   params: ParamsState;
+  refImages: RefImagesState;
   dynamicPrompts: DynamicPromptsState;
   canvasIsFiltering: boolean;
   canvasIsTransforming: boolean;
@@ -349,6 +354,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     model,
     canvas,
     params,
+    refImages,
     dynamicPrompts,
     canvasIsFiltering,
     canvasIsTransforming,
@@ -516,20 +522,24 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
   });
 
-  canvas.referenceImages.entities
-    .filter((entity) => entity.isEnabled)
-    .forEach((entity, i) => {
-      const layerLiteral = i18n.t('controlLayers.layer_one');
-      const layerNumber = i + 1;
-      const layerType = i18n.t(LAYER_TYPE_TO_TKEY[entity.type]);
-      const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
-      const problems = getGlobalReferenceImageWarnings(entity, model);
+  // Flux Kontext only supports 1x Reference Image at a time.
+  const referenceImageCount = refImages.entities.length;
 
-      if (problems.length) {
-        const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
-        reasons.push({ prefix, content });
-      }
-    });
+  if (model?.base === 'flux-kontext' && referenceImageCount > 1) {
+    reasons.push({ content: i18n.t('parameters.invoke.fluxKontextMultipleReferenceImages') });
+  }
+
+  refImages.entities.forEach((entity, i) => {
+    const layerNumber = i + 1;
+    const refImageLiteral = i18n.t(LAYER_TYPE_TO_TKEY['reference_image']);
+    const prefix = `${refImageLiteral} #${layerNumber}`;
+    const problems = getGlobalReferenceImageWarnings(entity, model);
+
+    if (problems.length) {
+      const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
+      reasons.push({ prefix, content });
+    }
+  });
 
   canvas.regionalGuidance.entities
     .filter((entity) => entity.isEnabled)

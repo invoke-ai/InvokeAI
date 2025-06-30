@@ -1,5 +1,5 @@
 import { deepClone } from 'common/util/deepClone';
-import { merge } from 'lodash-es';
+import { merge } from 'es-toolkit/compat';
 import { ClickScrollPlugin, OverlayScrollbars } from 'overlayscrollbars';
 import type { UseOverlayScrollbarsParams } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';

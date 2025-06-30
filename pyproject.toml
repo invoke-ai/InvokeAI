@@ -73,7 +73,7 @@ dependencies = [
   "pypatchmatch",
   "python-multipart",
   "requests",
-  "semver~=3.0.1",
+  "semver~=3.0.1"
 ]
 
 [project.optional-dependencies]
@@ -108,6 +108,12 @@ dependencies = [
   "polyfactory==2.19.0",
   "humanize==4.12.1",
 ]
+
+[tool.uv]
+# Prevent opencv-python from ever being chosen during dependency resolution.
+# This prevents conflicts with opencv-contrib-python, which Invoke requires.
+override-dependencies = ["opencv-python; sys_platform=='never'"]
+
 
 [project.scripts]
 "invokeai-web" = "invokeai.app.run_app:run_app"

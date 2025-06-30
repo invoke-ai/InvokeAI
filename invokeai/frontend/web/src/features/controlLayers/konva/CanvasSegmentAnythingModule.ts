@@ -1,6 +1,7 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
 import { withResultAsync } from 'common/util/result';
+import { debounce } from 'es-toolkit/compat';
 import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterControlLayer';
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
@@ -8,6 +9,7 @@ import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase'
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
 import {
   addCoords,
+  areStageAttrsGonnaExplode,
   getKonvaNodeDebugAttrs,
   getPrefixedId,
   offsetCoord,
@@ -15,8 +17,8 @@ import {
 } from 'features/controlLayers/konva/util';
 import { selectAutoProcess } from 'features/controlLayers/store/canvasSettingsSlice';
 import type {
+  CanvasEntityType,
   CanvasImageState,
-  CanvasRenderableEntityType,
   Coordinate,
   RgbaColor,
   SAMPointLabel,
@@ -29,7 +31,6 @@ import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { toast } from 'features/toast/toast';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
-import { debounce } from 'lodash-es';
 import type { Atom } from 'nanostores';
 import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
@@ -443,6 +444,9 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     // Scale the SAM points when the stage scale changes
     this.subscriptions.add(
       this.manager.stage.$stageAttrs.listen((stageAttrs, oldStageAttrs) => {
+        if (areStageAttrsGonnaExplode(stageAttrs)) {
+          return;
+        }
         if (stageAttrs.scale !== oldStageAttrs.scale) {
           this.syncPointScales();
         }
@@ -590,8 +594,10 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       this.manager.stateApi.runGraphAndReturnImageOutput({
         graph,
         outputNodeId,
-        prepend: true,
-        signal: controller.signal,
+        options: {
+          prepend: true,
+          signal: controller.signal,
+        },
       })
     );
 
@@ -703,7 +709,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
    * Saves the segmented image as a new entity of the given type.
    * @param type The type of entity to save the segmented image as.
    */
-  saveAs = (type: CanvasRenderableEntityType) => {
+  saveAs = (type: CanvasEntityType) => {
     const imageState = this.$imageState.get();
     if (!imageState) {
       this.log.error('No image state to save as');

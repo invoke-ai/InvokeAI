@@ -7,6 +7,8 @@ export type S = components['schemas'];
 export type ListImagesArgs = NonNullable<paths['/api/v1/images/']['get']['parameters']['query']>;
 export type ListImagesResponse = paths['/api/v1/images/']['get']['responses']['200']['content']['application/json'];
 
+export type ImageNamesResult = S['ImageNamesResult'];
+
 export type ListBoardsArgs = NonNullable<paths['/api/v1/boards/']['get']['parameters']['query']>;
 
 export type DeleteBoardResult =
@@ -31,7 +33,6 @@ export type InvocationJSONSchemaExtra = S['UIConfigBase'];
 // App Info
 export type AppVersion = S['AppVersion'];
 export type AppConfig = S['AppConfig'];
-export type AppDependencyVersions = S['AppDependencyVersions'];
 
 // Images
 export type ImageDTO = S['ImageDTO'];
@@ -47,7 +48,7 @@ export type BaseModelType = S['BaseModelType'];
 
 export type ControlLoRAModelConfig = S['ControlLoRALyCORISConfig'] | S['ControlLoRADiffusersConfig'];
 // TODO(MM2): Can we make key required in the pydantic model?
-export type LoRAModelConfig = S['LoRADiffusersConfig'] | S['LoRALyCORISConfig'];
+export type LoRAModelConfig = S['LoRADiffusersConfig'] | S['LoRALyCORISConfig'] | S['LoRAOmiConfig'];
 // TODO(MM2): Can we rename this from Vae -> VAE
 export type VAEModelConfig = S['VAECheckpointConfig'] | S['VAEDiffusersConfig'];
 export type ControlNetModelConfig = S['ControlNetDiffusersConfig'] | S['ControlNetCheckpointConfig'];
@@ -241,6 +242,10 @@ export const isImagen4ModelConfig = (config: AnyModelConfig): config is ApiModel
   return config.type === 'main' && config.base === 'imagen4';
 };
 
+export const isFluxKontextModelConfig = (config: AnyModelConfig): config is ApiModelConfig => {
+  return config.type === 'main' && config.base === 'flux-kontext';
+};
+
 export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base !== 'sdxl-refiner';
 };
@@ -288,7 +293,6 @@ export type ModelInstallStatus = S['InstallStatus'];
 export type Graph = S['Graph'];
 export type NonNullableGraph = SetRequired<Graph, 'nodes' | 'edges'>;
 export type Batch = S['Batch'];
-export type SessionQueueItemDTO = S['SessionQueueItemDTO'];
 export type WorkflowRecordOrderBy = S['WorkflowRecordOrderBy'];
 export type SQLiteDirection = S['SQLiteDirection'];
 export type WorkflowRecordListItemWithThumbnailDTO = S['WorkflowRecordListItemWithThumbnailDTO'];

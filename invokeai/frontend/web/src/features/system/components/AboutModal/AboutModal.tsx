@@ -58,7 +58,7 @@ const AboutModal = ({ children }: AboutModalProps) => {
       {cloneElement(children, {
         onClick: onOpen,
       })}
-      <Modal isOpen={isOpen} onClose={onClose} isCentered size="2xl" useInert={false}>
+      <Modal isOpen={isOpen} onClose={onClose} isCentered size="5xl" useInert={false}>
         <ModalOverlay />
         <ModalContent maxH="80vh" h="34rem">
           <ModalHeader>{t('accessibility.about')}</ModalHeader>
@@ -66,7 +66,7 @@ const AboutModal = ({ children }: AboutModalProps) => {
           <ModalBody display="flex" flexDir="column" gap={4}>
             <Grid templateColumns="repeat(2, 1fr)" h="full">
               <GridItem backgroundColor="base.750" borderRadius="base" p="4" h="full">
-                <DataViewer label={t('common.systemInformation')} data={localData} />
+                <DataViewer label={t('common.systemInformation')} data={localData} wrapData={false} />
               </GridItem>
               <GridItem>
                 <Flex flexDir="column" gap={3} justifyContent="center" alignItems="center" h="full">

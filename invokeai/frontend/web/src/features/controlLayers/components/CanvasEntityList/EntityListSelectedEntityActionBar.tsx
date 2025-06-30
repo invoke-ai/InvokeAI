@@ -6,6 +6,7 @@ import { EntityListSelectedEntityActionBarFilterButton } from 'features/controlL
 import { EntityListSelectedEntityActionBarOpacity } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarOpacity';
 import { EntityListSelectedEntityActionBarSelectObjectButton } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarSelectObjectButton';
 import { EntityListSelectedEntityActionBarTransformButton } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarTransformButton';
+import { EntityListNonRasterLayerToggle } from 'features/controlLayers/components/common/CanvasNonRasterLayersIsHiddenToggle';
 import { memo } from 'react';
 
 import { EntityListSelectedEntityActionBarSaveToAssetsButton } from './EntityListSelectedEntityActionBarSaveToAssetsButton';
@@ -22,6 +23,7 @@ export const EntityListSelectedEntityActionBar = memo(() => {
         <EntityListSelectedEntityActionBarTransformButton />
         <EntityListSelectedEntityActionBarSaveToAssetsButton />
         <EntityListSelectedEntityActionBarDuplicateButton />
+        <EntityListNonRasterLayerToggle />
         <EntityListGlobalActionBarAddLayerMenu />
       </Flex>
     </Flex>

@@ -23,7 +23,7 @@ class StarterModel(StarterModelWithoutDependencies):
     dependencies: Optional[list[StarterModelWithoutDependencies]] = None
 
 
-class StarterModelBundles(BaseModel):
+class StarterModelBundle(BaseModel):
     name: str
     models: list[StarterModel]
 
@@ -109,7 +109,7 @@ flux_vae = StarterModel(
 
 # region: Main
 flux_schnell_quantized = StarterModel(
-    name="FLUX Schnell (Quantized)",
+    name="FLUX.1 schnell (quantized)",
     base=BaseModelType.Flux,
     source="InvokeAI/flux_schnell::transformer/bnb_nf4/flux1-schnell-bnb_nf4.safetensors",
     description="FLUX schnell transformer quantized to bitsandbytes NF4 format. Total size with dependencies: ~12GB",
@@ -117,7 +117,7 @@ flux_schnell_quantized = StarterModel(
     dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
 )
 flux_dev_quantized = StarterModel(
-    name="FLUX Dev (Quantized)",
+    name="FLUX.1 dev (quantized)",
     base=BaseModelType.Flux,
     source="InvokeAI/flux_dev::transformer/bnb_nf4/flux1-dev-bnb_nf4.safetensors",
     description="FLUX dev transformer quantized to bitsandbytes NF4 format. Total size with dependencies: ~12GB",
@@ -125,7 +125,7 @@ flux_dev_quantized = StarterModel(
     dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
 )
 flux_schnell = StarterModel(
-    name="FLUX Schnell",
+    name="FLUX.1 schnell",
     base=BaseModelType.Flux,
     source="InvokeAI/flux_schnell::transformer/base/flux1-schnell.safetensors",
     description="FLUX schnell transformer in bfloat16. Total size with dependencies: ~33GB",
@@ -133,10 +133,18 @@ flux_schnell = StarterModel(
     dependencies=[t5_base_encoder, flux_vae, clip_l_encoder],
 )
 flux_dev = StarterModel(
-    name="FLUX Dev",
+    name="FLUX.1 dev",
     base=BaseModelType.Flux,
     source="InvokeAI/flux_dev::transformer/base/flux1-dev.safetensors",
     description="FLUX dev transformer in bfloat16. Total size with dependencies: ~33GB",
+    type=ModelType.Main,
+    dependencies=[t5_base_encoder, flux_vae, clip_l_encoder],
+)
+flux_kontext = StarterModel(
+    name="FLUX.1 Kontext dev",
+    base=BaseModelType.Flux,
+    source="black-forest-labs/FLUX.1-Kontext-dev::flux1-kontext-dev.safetensors",
+    description="FLUX.1 Kontext dev transformer in bfloat16. Total size with dependencies: ~33GB",
     type=ModelType.Main,
     dependencies=[t5_base_encoder, flux_vae, clip_l_encoder],
 )
@@ -296,6 +304,15 @@ ip_adapter_sdxl = StarterModel(
     type=ModelType.IPAdapter,
     dependencies=[ip_adapter_sdxl_image_encoder],
     previous_names=["IP Adapter SDXL"],
+)
+ip_adapter_plus_sdxl = StarterModel(
+    name="Precise Reference (IP Adapter Plus ViT-H)",
+    base=BaseModelType.StableDiffusionXL,
+    source="https://huggingface.co/InvokeAI/ip-adapter-plus_sdxl_vit-h/resolve/main/ip-adapter-plus_sdxl_vit-h.safetensors",
+    description="References images with a higher degree of precision.",
+    type=ModelType.IPAdapter,
+    dependencies=[ip_adapter_sdxl_image_encoder],
+    previous_names=["IP Adapter Plus SDXL"],
 )
 ip_adapter_flux = StarterModel(
     name="Standard Reference (XLabs FLUX IP-Adapter v2)",
@@ -647,6 +664,7 @@ flux_fill = StarterModel(
 # List of starter models, displayed on the frontend.
 # The order/sort of this list is not changed by the frontend - set it how you want it here.
 STARTER_MODELS: list[StarterModel] = [
+    flux_kontext,
     flux_schnell_quantized,
     flux_dev_quantized,
     flux_schnell,
@@ -672,6 +690,7 @@ STARTER_MODELS: list[StarterModel] = [
     ip_adapter_plus_sd1,
     ip_adapter_plus_face_sd1,
     ip_adapter_sdxl,
+    ip_adapter_plus_sdxl,
     ip_adapter_flux,
     qr_code_cnet_sd1,
     qr_code_cnet_sdxl,
@@ -744,6 +763,7 @@ sdxl_bundle: list[StarterModel] = [
     juggernaut_sdxl,
     sdxl_fp16_vae_fix,
     ip_adapter_sdxl,
+    ip_adapter_plus_sdxl,
     canny_sdxl,
     depth_sdxl,
     softedge_sdxl,
@@ -765,12 +785,13 @@ flux_bundle: list[StarterModel] = [
     flux_depth_control_lora,
     flux_redux,
     flux_fill,
+    flux_kontext,
 ]
 
-STARTER_BUNDLES: dict[str, list[StarterModel]] = {
-    BaseModelType.StableDiffusion1: sd1_bundle,
-    BaseModelType.StableDiffusionXL: sdxl_bundle,
-    BaseModelType.Flux: flux_bundle,
+STARTER_BUNDLES: dict[str, StarterModelBundle] = {
+    BaseModelType.StableDiffusion1: StarterModelBundle(name="Stable Diffusion 1.5", models=sd1_bundle),
+    BaseModelType.StableDiffusionXL: StarterModelBundle(name="SDXL", models=sdxl_bundle),
+    BaseModelType.Flux: StarterModelBundle(name="FLUX.1 dev", models=flux_bundle),
 }
 
 assert len(STARTER_MODELS) == len({m.source for m in STARTER_MODELS}), "Duplicate starter models"

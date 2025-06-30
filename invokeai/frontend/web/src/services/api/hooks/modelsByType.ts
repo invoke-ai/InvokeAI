@@ -16,6 +16,7 @@ import {
   isControlLayerModelConfig,
   isControlLoRAModelConfig,
   isControlNetModelConfig,
+  isFluxKontextModelConfig,
   isFluxMainModelModelConfig,
   isFluxReduxModelConfig,
   isFluxVAEModelConfig,
@@ -85,7 +86,11 @@ export const useCLIPVisionModels = buildModelsHook(isCLIPVisionModelConfig);
 export const useSigLipModels = buildModelsHook(isSigLipModelConfig);
 export const useFluxReduxModels = buildModelsHook(isFluxReduxModelConfig);
 export const useGlobalReferenceImageModels = buildModelsHook(
-  (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config) || isChatGPT4oModelConfig(config)
+  (config) =>
+    isIPAdapterModelConfig(config) ||
+    isFluxReduxModelConfig(config) ||
+    isChatGPT4oModelConfig(config) ||
+    isFluxKontextModelConfig(config)
 );
 export const useRegionalReferenceImageModels = buildModelsHook(
   (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config)
@@ -94,16 +99,17 @@ export const useLLaVAModels = buildModelsHook(isLLaVAModelConfig);
 export const useImagen3Models = buildModelsHook(isImagen3ModelConfig);
 export const useImagen4Models = buildModelsHook(isImagen4ModelConfig);
 export const useChatGPT4oModels = buildModelsHook(isChatGPT4oModelConfig);
+export const useFluxKontextModels = buildModelsHook(isFluxKontextModelConfig);
 
-// const buildModelsSelector =
-//   <T extends AnyModelConfig>(typeGuard: (config: AnyModelConfig) => config is T): Selector<RootState, T[]> =>
-//   (state) => {
-//     const result = selectModelConfigsQuery(state);
-//     if (!result.data) {
-//       return EMPTY_ARRAY;
-//     }
-//     return modelConfigsAdapterSelectors.selectAll(result.data).filter(typeGuard);
-//   };
+const buildModelsSelector =
+  <T extends AnyModelConfig>(typeGuard: (config: AnyModelConfig) => config is T): Selector<RootState, T[]> =>
+  (state) => {
+    const result = selectModelConfigsQuery(state);
+    if (!result.data) {
+      return EMPTY_ARRAY;
+    }
+    return modelConfigsAdapterSelectors.selectAll(result.data).filter(typeGuard);
+  };
 // export const selectSDMainModels = buildModelsSelector(isNonRefinerNonFluxMainModelConfig);
 // export const selectMainModels = buildModelsSelector(isNonRefinerMainModelConfig);
 // export const selectNonSDXLMainModels = buildModelsSelector(isNonSDXLMainModelConfig);
@@ -117,7 +123,7 @@ export const useChatGPT4oModels = buildModelsHook(isChatGPT4oModelConfig);
 // export const selectT5EncoderModels = buildModelsSelector(isT5EncoderModelConfig);
 // export const selectClipEmbedModels = buildModelsSelector(isClipEmbedModelConfig);
 // export const selectSpandrelImageToImageModels = buildModelsSelector(isSpandrelImageToImageModelConfig);
-// export const selectIPAdapterModels = buildModelsSelector(isIPAdapterModelConfig);
+export const selectIPAdapterModels = buildModelsSelector(isIPAdapterModelConfig);
 // export const selectEmbeddingModels = buildModelsSelector(isTIModelConfig);
 // export const selectVAEModels = buildModelsSelector(isVAEModelConfig);
 // export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);

@@ -1,5 +1,6 @@
 import { createAction } from '@reduxjs/toolkit';
 import { useAppStore } from 'app/store/nanostores/store';
+import { groupBy } from 'es-toolkit/compat';
 import {
   $outputNodeId,
   getPublishInputs,
@@ -11,10 +12,9 @@ import { isBatchNode, isInvocationNode } from 'features/nodes/types/invocation';
 import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
 import { resolveBatchValue } from 'features/nodes/util/node/resolveBatchValue';
 import { buildWorkflowWithValidation } from 'features/nodes/util/workflow/buildWorkflow';
-import { groupBy } from 'lodash-es';
 import { useCallback } from 'react';
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
-import type { Batch, EnqueueBatchArg } from 'services/api/types';
+import type { Batch, EnqueueBatchArg, S } from 'services/api/types';
 import { assert } from 'tsafe';
 
 const enqueueRequestedWorkflows = createAction('app/enqueueRequestedWorkflows');
@@ -106,12 +106,13 @@ export const useEnqueueWorkflows = () => {
         // Derive the input fields from the builder's selected node field elements
         const fieldIdentifiers = selectFieldIdentifiersWithInvocationTypes(state);
         const inputs = getPublishInputs(fieldIdentifiers, templates);
-        const api_input_fields = inputs.publishable.map(({ nodeId, fieldName }) => {
+        const api_input_fields = inputs.publishable.map(({ nodeId, fieldName, label }) => {
           return {
             kind: 'input',
             node_id: nodeId,
             field_name: fieldName,
-          } as const;
+            user_label: label,
+          } satisfies S['FieldIdentifier'];
         });
 
         // Derive the output fields from the builder's selected output node
@@ -126,7 +127,8 @@ export const useEnqueueWorkflows = () => {
             kind: 'output',
             node_id: outputNodeId,
             field_name: fieldName,
-          } as const;
+            user_label: null,
+          } satisfies S['FieldIdentifier'];
         });
 
         assert(nodesState.id, 'Workflow without ID cannot be used for API validation run');

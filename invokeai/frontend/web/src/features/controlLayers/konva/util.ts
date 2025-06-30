@@ -1,6 +1,7 @@
 import type { Selector, Store } from '@reduxjs/toolkit';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { roundDownToMultiple, roundUpToMultiple } from 'common/util/roundDownToMultiple';
+import { clamp } from 'es-toolkit/compat';
 import type {
   CanvasEntityIdentifier,
   CanvasObjectState,
@@ -8,11 +9,11 @@ import type {
   CoordinateWithPressure,
   Rect,
   RgbaColor,
+  StageAttrs,
 } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
-import { clamp } from 'lodash-es';
 import { customAlphabet } from 'nanoid';
 import type { StrokeOptions } from 'perfect-freehand';
 import getStroke from 'perfect-freehand';
@@ -768,4 +769,8 @@ export const roundRect = (rect: Rect): Rect => {
     width: Math.round(rect.width),
     height: Math.round(rect.height),
   };
+};
+
+export const areStageAttrsGonnaExplode = (stageAttrs: StageAttrs): boolean => {
+  return stageAttrs.height === 0 || stageAttrs.width === 0 || stageAttrs.scale === 0;
 };

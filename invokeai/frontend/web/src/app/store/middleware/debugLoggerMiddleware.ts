@@ -8,10 +8,13 @@ import { diff } from 'jsondiffpatch';
  * Super simple logger middleware. Useful for debugging when the redux devtools are awkward.
  */
 export const getDebugLoggerMiddleware =
-  (options?: { withDiff?: boolean; withNextState?: boolean }): Middleware =>
+  (options?: { filter?: (action: unknown) => boolean; withDiff?: boolean; withNextState?: boolean }): Middleware =>
   (api: MiddlewareAPI) =>
   (next) =>
   (action) => {
+    if (options?.filter?.(action)) {
+      return next(action);
+    }
     const originalState = api.getState();
     console.log('REDUX: dispatching', action);
     const result = next(action);
