@@ -1,5 +1,5 @@
 import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
-import { useAppStore } from 'app/store/nanostores/store';
+import { useAppStore } from 'app/store/storeHooks';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
 import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';

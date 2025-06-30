@@ -2,7 +2,7 @@ import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { ImageProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Image } from '@invoke-ai/ui-library';
-import { useAppStore } from 'app/store/nanostores/store';
+import { useAppStore } from 'app/store/storeHooks';
 import { singleImageDndSource } from 'features/dnd/dnd';
 import type { DndDragPreviewSingleImageState } from 'features/dnd/DndDragPreviewSingleImage';
 import { createSingleImageDragPreview, setSingleImageDragPreview } from 'features/dnd/DndDragPreviewSingleImage';

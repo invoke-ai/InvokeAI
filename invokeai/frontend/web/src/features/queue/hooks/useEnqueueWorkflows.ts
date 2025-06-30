@@ -1,5 +1,5 @@
 import { createAction } from '@reduxjs/toolkit';
-import { useAppStore } from 'app/store/nanostores/store';
+import { useAppStore } from 'app/store/storeHooks';
 import { groupBy } from 'es-toolkit/compat';
 import {
   $outputNodeId,

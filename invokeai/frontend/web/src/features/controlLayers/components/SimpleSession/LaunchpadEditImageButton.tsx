@@ -1,5 +1,5 @@
 import { Flex, Heading, Icon, Text } from '@invoke-ai/ui-library';
-import { useAppStore } from 'app/store/nanostores/store';
+import { useAppStore } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { LaunchpadButton } from 'features/controlLayers/components/SimpleSession/LaunchpadButton';
 import { newCanvasFromImageDndTarget } from 'features/dnd/dnd';

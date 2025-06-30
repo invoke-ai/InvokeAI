@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { useAppStore } from 'app/store/nanostores/store';
+import { useAppStore } from 'app/store/storeHooks';
 import type { AppGetState } from 'app/store/store';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';

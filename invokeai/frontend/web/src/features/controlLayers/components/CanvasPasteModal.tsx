@@ -10,7 +10,7 @@ import {
   ModalOverlay,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppStore } from 'app/store/nanostores/store';
+import { useAppStore } from 'app/store/storeHooks';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';

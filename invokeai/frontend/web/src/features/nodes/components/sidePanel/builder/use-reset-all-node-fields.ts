@@ -1,4 +1,4 @@
-import { useAppStore } from 'app/store/nanostores/store';
+import { useAppStore } from 'app/store/storeHooks';
 import { fieldValueReset } from 'features/nodes/store/nodesSlice';
 import { selectFormInitialValues, selectNodeFieldElements } from 'features/nodes/store/selectors';
 import { useCallback } from 'react';
