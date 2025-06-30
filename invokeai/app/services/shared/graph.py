@@ -1007,10 +1007,11 @@ class GraphExecutionState(BaseModel):
         new_node_ids = []
         if isinstance(next_node, CollectInvocation):
             # Collapse all iterator input mappings and create a single execution node for the collect invocation
-            all_iteration_mappings = list(
-                itertools.chain(*(((s, p) for p in self.source_prepared_mapping[s]) for s in next_node_parents))
-            )
-            # all_iteration_mappings = list(set(itertools.chain(*prepared_parent_mappings)))
+            all_iteration_mappings = []
+            for source_node_id in next_node_parents:
+                prepared_nodes = self.source_prepared_mapping[source_node_id]
+                all_iteration_mappings.extend([(source_node_id, p) for p in prepared_nodes])
+
             create_results = self._create_execution_node(next_node_id, all_iteration_mappings)
             if create_results is not None:
                 new_node_ids.extend(create_results)
