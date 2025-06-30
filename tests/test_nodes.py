@@ -1,4 +1,5 @@
 from typing import Any, Callable, Union
+from unittest.mock import MagicMock
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -108,7 +109,7 @@ class PolymorphicStringTestInvocation(BaseInvocation):
 
 # Importing these must happen after test invocations are defined or they won't register
 from invokeai.app.services.events.events_base import EventServiceBase  # noqa: E402
-from invokeai.app.services.shared.graph import Edge, EdgeConnection  # noqa: E402
+from invokeai.app.services.shared.graph import Edge, EdgeConnection, GraphExecutionState  # noqa: E402
 
 
 def create_edge(from_id: str, from_field: str, to_id: str, to_field: str) -> Edge:
@@ -155,3 +156,27 @@ def wait_until(condition: Callable[[], bool], timeout: int = 10, interval: float
             return
         time.sleep(interval)
     raise TimeoutError("Condition not met")
+
+
+def run_session_with_mock_context(session: GraphExecutionState):
+    """Run the session with a mock context to simulate invocation execution.
+
+    The graph may only contain invocations that operate on primitive types. Images, models, or any other types that
+    require a real context cannot be used in this mock execution.
+    """
+    mock_context = MagicMock(spec=InvocationContext)
+    invocation = session.next()
+    while invocation is not None:
+        output = invocation.invoke(mock_context)
+        session.complete(invocation.id, output)
+        invocation = session.next()
+
+
+def get_single_output_from_session(session: GraphExecutionState, node_id: str) -> BaseInvocationOutput:
+    assert len(session.source_prepared_mapping[node_id]) == 1, (
+        "Expected exactly one prepared node for the given node_id"
+    )
+    prepared_node_id = session.source_prepared_mapping[node_id].pop()
+    output = session.results[prepared_node_id]
+    assert isinstance(output, BaseInvocationOutput), "Expected output to be of type BaseInvocationOutput"
+    return output
