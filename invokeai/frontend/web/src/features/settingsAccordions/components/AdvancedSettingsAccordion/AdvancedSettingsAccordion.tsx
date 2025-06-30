@@ -15,7 +15,9 @@ import ParamSeamlessYAxis from 'features/parameters/components/Seamless/ParamSea
 import ParamFLUXVAEModelSelect from 'features/parameters/components/VAEModel/ParamFLUXVAEModelSelect';
 import ParamVAEModelSelect from 'features/parameters/components/VAEModel/ParamVAEModelSelect';
 import ParamVAEPrecision from 'features/parameters/components/VAEModel/ParamVAEPrecision';
+import ParamTileControlNetModel from 'features/parameters/components/Upscale/ParamTileControlNetModel';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
@@ -33,6 +35,7 @@ export const AdvancedSettingsAccordion = memo(() => {
   const { currentData: vaeConfig } = useGetModelConfigQuery(vaeKey ?? skipToken);
   const isFLUX = useAppSelector(selectIsFLUX);
   const isSD3 = useAppSelector(selectIsSD3);
+  const activeTab = useAppSelector(selectActiveTab);
 
   const selectBadges = useMemo(
     () =>
@@ -112,6 +115,7 @@ export const AdvancedSettingsAccordion = memo(() => {
             <ParamCLIPGEmbedModelSelect />
           </FormControlGroup>
         )}
+        {activeTab === 'upscaling' && <ParamTileControlNetModel />}
       </Flex>
     </StandaloneAccordion>
   );
