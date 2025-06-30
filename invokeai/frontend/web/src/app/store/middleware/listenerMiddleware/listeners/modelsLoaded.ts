@@ -15,7 +15,11 @@ import { refImageModelChanged, selectRefImagesSlice } from 'features/controlLaye
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier, isFLUXReduxConfig, isIPAdapterConfig } from 'features/controlLayers/store/types';
 import { modelSelected } from 'features/parameters/store/actions';
-import { postProcessingModelChanged, tileControlnetModelChanged, upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
+import {
+  postProcessingModelChanged,
+  tileControlnetModelChanged,
+  upscaleModelChanged,
+} from 'features/parameters/store/upscaleSlice';
 import {
   zParameterCLIPEmbedModel,
   zParameterSpandrelImageToImageModel,
@@ -358,7 +362,7 @@ const handleTileControlNetModel: ModelHandler = (models, state, dispatch, log) =
 
   // Find a model with "Tile" in the name, case-insensitive
   const tileModel = controlNetModels.find((m) => m.name.toLowerCase().includes('tile'));
-  
+
   // If we have a tile model, select it
   if (tileModel) {
     log.debug(
