@@ -161,8 +161,12 @@ export const initializeRightPanelLayout = (api: GridviewApi) => {
       referencePanel: GALLERY_PANEL_ID,
     },
   });
-  api.getPanel(BOARDS_PANEL_ID)?.api.setSize({ height: CANVAS_BOARD_PANEL_DEFAULT_HEIGHT_PX, width: RIGHT_PANEL_MIN_SIZE_PX });
-  api.getPanel(GALLERY_PANEL_ID)?.api.setSize({ height: CANVAS_GALLERY_PANEL_DEFAULT_HEIGHT_PX, width: RIGHT_PANEL_MIN_SIZE_PX });
+  api
+    .getPanel(BOARDS_PANEL_ID)
+    ?.api.setSize({ height: CANVAS_BOARD_PANEL_DEFAULT_HEIGHT_PX, width: RIGHT_PANEL_MIN_SIZE_PX });
+  api
+    .getPanel(GALLERY_PANEL_ID)
+    ?.api.setSize({ height: CANVAS_GALLERY_PANEL_DEFAULT_HEIGHT_PX, width: RIGHT_PANEL_MIN_SIZE_PX });
 };
 
 const RightPanel = memo(() => {
