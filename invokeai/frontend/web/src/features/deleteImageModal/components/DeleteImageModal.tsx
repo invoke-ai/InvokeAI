@@ -1,6 +1,5 @@
 import { ConfirmationAlertDialog, Divider, Flex, FormControl, FormLabel, Switch, Text } from '@invoke-ai/ui-library';
-import { useAppStore } from 'app/store/storeHooks';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import ImageUsageMessage from 'features/deleteImageModal/components/ImageUsageMessage';
 import { useDeleteImageModalApi, useDeleteImageModalState } from 'features/deleteImageModal/store/state';
 import { selectSystemShouldConfirmOnDelete, setShouldConfirmOnDelete } from 'features/system/store/systemSlice';

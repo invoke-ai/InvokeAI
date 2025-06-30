@@ -1,6 +1,5 @@
 import { Button, Collapse, Divider, Flex } from '@invoke-ai/ui-library';
-import { useAppStore } from 'app/store/storeHooks';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { RefImagePreview } from 'features/controlLayers/components/RefImage/RefImagePreview';
 import { RefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';

@@ -1,6 +1,6 @@
 import type { Selector } from '@reduxjs/toolkit';
-import { useAppStore } from 'app/store/storeHooks';
 import type { RootState } from 'app/store/store';
+import { useAppStore } from 'app/store/storeHooks';
 import { useEffect, useState } from 'react';
 
 /**

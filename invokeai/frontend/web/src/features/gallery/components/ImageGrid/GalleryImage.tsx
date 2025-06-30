@@ -3,9 +3,8 @@ import { draggable, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Icon, Image } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppStore } from 'app/store/storeHooks';
 import type { AppDispatch, AppGetState } from 'app/store/store';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { uniq } from 'es-toolkit';
 import { multipleImageDndSource, singleImageDndSource } from 'features/dnd/dnd';
 import type { DndDragPreviewMultipleImageState } from 'features/dnd/DndDragPreviewMultipleImage';
