@@ -1,4 +1,4 @@
-import { writePsd } from 'ag-psd';
+import { writePsd, type Layer, type Psd } from 'ag-psd';
 import { logger } from 'app/logging/logger';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { downloadBlob } from 'features/controlLayers/konva/util';
@@ -65,13 +65,13 @@ export const useExportCanvasToPSD = () => {
       log.debug(`PSD canvas dimensions: ${visibleRect.width}x${visibleRect.height}`);
 
       // Create PSD layers from visible raster layer adapters
-      const psdLayers = await Promise.all(
+      const psdLayers: Layer[] = await Promise.all(
         adapters.map((adapter, index) => {
           const layer = adapter.state;
           const canvas = adapter.getCanvas();
           const layerPosition = adapter.state.position;
 
-          const layerDataPSD = {
+          const layerDataPSD: Layer = {
             name: layer.name || `Layer ${index + 1}`,
             left: Math.floor(layerPosition.x - visibleRect.x),
             top: Math.floor(layerPosition.y - visibleRect.y),
@@ -79,7 +79,7 @@ export const useExportCanvasToPSD = () => {
             bottom: Math.floor(layerPosition.y - visibleRect.y + canvas.height),
             opacity: Math.floor(layer.opacity * 255),
             hidden: false,
-            blendMode: 'normal' as const,
+            blendMode: 'normal',
             canvas: canvas,
           };
 
@@ -92,7 +92,7 @@ export const useExportCanvasToPSD = () => {
       );
 
       // Create PSD document
-      const psd = {
+      const psd: Psd = {
         width: visibleRect.width,
         height: visibleRect.height,
         channels: 3, // RGB
@@ -104,7 +104,7 @@ export const useExportCanvasToPSD = () => {
       log.debug(
         {
           layerCount: psdLayers.length,
-          canvasDimensions: { width: visibleRect.width, height: visibleRect.height },
+          canvasDimensions: { width: psd.width, height: psd.height },
           layers: psdLayers.map((l) => ({
             name: l.name,
             bounds: { left: l.left, top: l.top, right: l.right, bottom: l.bottom },
