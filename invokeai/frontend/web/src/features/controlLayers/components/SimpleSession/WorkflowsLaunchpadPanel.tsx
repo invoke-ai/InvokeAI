@@ -1,4 +1,4 @@
-import { Button, Flex, Heading, Link, Text } from '@invoke-ai/ui-library';
+import { Button, Flex, Heading, Icon, Link, Text } from '@invoke-ai/ui-library';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
 import { useNewWorkflow } from 'features/workflowLibrary/components/NewWorkflowConfirmationAlertDialog';
@@ -53,11 +53,11 @@ export const WorkflowsLaunchpadPanel = memo(() => {
 
   return (
     <Flex flexDir="column" h="full" w="full" alignItems="center" gap={2}>
-      <Flex flexDir="column" w="full" gap={6} px={14} maxW={768} pt="20vh">
-        <Heading mb={4}>Go deep with Workflows.</Heading>
+      <Flex flexDir="column" w="full" gap={4} px={14} maxW={768} pt="20vh">
+        <Heading mb={4}>{t('ui.launchpad.workflowsTitle')}</Heading>
 
         {/* Description */}
-        <Text variant="subtext" fontSize="md" lineHeight="1.6" mb={2}>
+        <Text variant="subtext" fontSize="md" lineHeight="1.6">
           Workflows are reusable templates that automate image generation tasks, 
           allowing you to quickly perform complex operations and get consistent results.
         </Text>
@@ -67,43 +67,36 @@ export const WorkflowsLaunchpadPanel = memo(() => {
           isExternal 
           color="invokeBlue.400"
           fontSize="sm"
-          mb={4}
         >
-          {t('nodes.learnMore')} about creating workflows
+          {t('learnMore')} about creating workflows
         </Link>
 
         {/* Action Buttons */}
-        <Flex flexDir="column" gap={4}>
-          {/* Browse Workflow Templates - Updated copy per Devon's feedback */}
-          <LaunchpadButton onClick={handleBrowseTemplates} gap={4}>
-            <PiFolderOpenBold size={24} />
-            <Flex flexDir="column" alignItems="flex-start" flex={1}>
-              <Text fontWeight="semibold">Browse Workflow Templates</Text>
-              <Text variant="subtext" fontSize="sm">
-                Choose from pre-built workflows for common tasks
-              </Text>
+        <Flex flexDir="column" gap={8}>
+          {/* Browse Workflow Templates */}
+          <LaunchpadButton onClick={handleBrowseTemplates} position="relative" gap={8}>
+            <Icon as={PiFolderOpenBold} boxSize={8} color="base.500" />
+            <Flex flexDir="column" alignItems="flex-start" gap={2}>
+              <Heading size="sm">Browse Workflow Templates</Heading>
+              <Text color="base.300">Choose from pre-built workflows for common tasks</Text>
             </Flex>
           </LaunchpadButton>
 
           {/* Create a new Workflow */}
-          <LaunchpadButton onClick={handleCreateNew} gap={4}>
-            <PiFilePlusBold size={24} />
-            <Flex flexDir="column" alignItems="flex-start" flex={1}>
-              <Text fontWeight="semibold">Create a new Workflow</Text>
-              <Text variant="subtext" fontSize="sm">
-                Start a new workflow from scratch
-              </Text>
+          <LaunchpadButton onClick={handleCreateNew} position="relative" gap={8}>
+            <Icon as={PiFilePlusBold} boxSize={8} color="base.500" />
+            <Flex flexDir="column" alignItems="flex-start" gap={2}>
+              <Heading size="sm">Create a new Workflow</Heading>
+              <Text color="base.300">Start a new workflow from scratch</Text>
             </Flex>
           </LaunchpadButton>
 
-          {/* Load workflow from existing image or file - Updated copy per Devon's feedback */}
-          <LaunchpadButton onClick={handleLoadFromFile} gap={4}>
-            <PiUploadBold size={24} />
-            <Flex flexDir="column" alignItems="flex-start" flex={1}>
-              <Text fontWeight="semibold">Load workflow from existing image or file</Text>
-              <Text variant="subtext" fontSize="sm">
-                Drag or upload a workflow to start with an existing setup
-              </Text>
+          {/* Load workflow from existing image or file */}
+          <LaunchpadButton onClick={handleLoadFromFile} position="relative" gap={8}>
+            <Icon as={PiUploadBold} boxSize={8} color="base.500" />
+            <Flex flexDir="column" alignItems="flex-start" gap={2}>
+              <Heading size="sm">Load workflow from existing image or file</Heading>
+              <Text color="base.300">Drag or upload a workflow to start with an existing setup</Text>
             </Flex>
           </LaunchpadButton>
         </Flex>

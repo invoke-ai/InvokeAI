@@ -2444,6 +2444,12 @@
             "upscaling": "Upscaling",
             "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)",
             "gallery": "Gallery"
+        },
+        "launchpad": {
+            "workflowsTitle": "Go deep with Workflows.",
+            "upscalingTitle": "Upscale and add detail.",
+            "canvasTitle": "Edit and refine on Canvas.",
+            "generateTitle": "Generate images from text prompts."
         }
     },
     "system": {
