@@ -1,6 +1,6 @@
 import { MenuGroup, MenuItem } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppStore } from 'app/store/nanostores/store';
+import { useAppStore } from 'app/store/storeHooks';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';

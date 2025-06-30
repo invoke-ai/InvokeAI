@@ -1,5 +1,5 @@
 import { MenuItem } from '@invoke-ai/ui-library';
-import { useAppStore } from 'app/store/nanostores/store';
+import { useAppStore } from 'app/store/storeHooks';
 import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { refImageAdded } from 'features/controlLayers/store/refImagesSlice';
 import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';

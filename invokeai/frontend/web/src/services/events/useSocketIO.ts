@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $isDebugging } from 'app/store/nanostores/isDebugging';
-import { useAppStore } from 'app/store/nanostores/store';
+import { useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import type { MapStore } from 'nanostores';
 import { useEffect, useMemo } from 'react';

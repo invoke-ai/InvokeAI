@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
-import { useAppStore } from 'app/store/nanostores/store';
+import { useAppStore } from 'app/store/storeHooks';
 import { $false } from 'app/store/nanostores/util';
 import type { AppDispatch, AppStore } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';

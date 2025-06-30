@@ -1,6 +1,6 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Grid, GridItem } from '@invoke-ai/ui-library';
-import { useAppStore } from 'app/store/nanostores/store';
+import { useAppStore } from 'app/store/storeHooks';
 import { IAINoContentFallback, IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
 import { UploadMultipleImageButton } from 'common/hooks/useImageUploadButton';

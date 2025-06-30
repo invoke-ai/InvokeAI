@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
-import { useAppStore } from 'app/store/nanostores/store';
+import { useAppStore } from 'app/store/storeHooks';
 import { buildZodTypeGuard } from 'common/util/zodUtils';
 import { getOutputImageName } from 'features/controlLayers/components/SimpleSession/shared';
 import type { ProgressImage } from 'features/nodes/types/common';

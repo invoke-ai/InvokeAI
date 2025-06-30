@@ -1,4 +1,3 @@
-import { useStore } from '@nanostores/react';
 import type { AppStore } from 'app/store/store';
 import { atom } from 'nanostores';
 
@@ -27,14 +26,6 @@ export const $store = atom<Readonly<AppStore | undefined>>();
 
 export const getStore = () => {
   const store = $store.get();
-  if (!store) {
-    throw new ReduxStoreNotInitialized();
-  }
-  return store;
-};
-
-export const useAppStore = () => {
-  const store = useStore($store);
   if (!store) {
     throw new ReduxStoreNotInitialized();
   }
