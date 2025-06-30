@@ -29,7 +29,7 @@ const ParamTileControlNetModel = () => {
 
   return (
     <FormControl isDisabled={!options.length} isInvalid={!options.length} minW={0} flexGrow={1} gap={2}>
-      <FormLabel m={0}>{t('controlLayers.controlNet')}</FormLabel>
+      <FormLabel m={0}>{t('controlNet')}</FormLabel>
       <Combobox value={value} options={options} onChange={onChange} noOptionsMessage={noOptionsMessage} />
     </FormControl>
   );

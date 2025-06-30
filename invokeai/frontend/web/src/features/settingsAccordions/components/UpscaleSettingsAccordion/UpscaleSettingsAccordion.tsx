@@ -5,7 +5,6 @@ import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import ParamCreativity from 'features/parameters/components/Upscale/ParamCreativity';
 import ParamSpandrelModel from 'features/parameters/components/Upscale/ParamSpandrelModel';
 import ParamStructure from 'features/parameters/components/Upscale/ParamStructure';
-import ParamTileControlNetModel from 'features/parameters/components/Upscale/ParamTileControlNetModel';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { getGridSize } from 'features/parameters/util/optimalDimension';
 import { UpscaleScaleSlider } from 'features/settingsAccordions/components/UpscaleSettingsAccordion/UpscaleScaleSlider';
@@ -71,7 +70,6 @@ export const UpscaleSettingsAccordion = memo(() => {
         </Flex>
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} pb={4} flexDir="column">
-            <ParamTileControlNetModel />
             <ParamCreativity />
             <ParamStructure />
           </Flex>
