@@ -123,7 +123,11 @@ def calc_percentage(intermediate_state: PipelineIntermediateState) -> float:
     if total_steps == 0:
         return 0.0
     if order == 2:
-        return floor(step / 2) / floor(total_steps / 2)
+        # Prevent division by zero when total_steps is 1 or 2
+        denominator = floor(total_steps / 2)
+        if denominator == 0:
+            return 0.0
+        return floor(step / 2) / denominator
     # order == 1
     return step / total_steps
 
