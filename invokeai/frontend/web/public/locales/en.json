@@ -1350,6 +1350,8 @@
         "noRasterLayersDesc": "Create at least one raster layer to export to PSD",
         "noActiveRasterLayers": "No Active Raster Layers",
         "noActiveRasterLayersDesc": "Enable at least one raster layer to export to PSD",
+        "noVisibleRasterLayers": "No Visible Raster Layers",
+        "noVisibleRasterLayersDesc": "Enable at least one raster layer to export to PSD",
         "failedToProcessLayers": "Failed to Process Layers",
         "psdExportSuccess": "PSD Export Complete",
         "psdExportSuccessDesc": "Successfully exported {{count}} layers to PSD file",
