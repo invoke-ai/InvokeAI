@@ -99,7 +99,8 @@ export const UpscalingLaunchpadPanel = memo(() => {
         {upscaleInitialImage && (
           <Flex bg="base.800" p={4} borderRadius="base" border="1px solid" borderColor="base.700" mt={6}>
             <Text variant="subtext" fontSize="sm" lineHeight="1.6">
-              <strong>{t('ui.launchpad.upscaling.readyToUpscale.title')}</strong> {t('ui.launchpad.upscaling.readyToUpscale.description')}
+              <strong>{t('ui.launchpad.upscaling.readyToUpscale.title')}</strong>{' '}
+              {t('ui.launchpad.upscaling.readyToUpscale.description')}
             </Text>
           </Flex>
         )}
