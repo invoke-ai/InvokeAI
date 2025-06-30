@@ -2340,7 +2340,8 @@
             "next": "Next",
             "saveToGallery": "Save To Gallery",
             "showResultsOn": "Showing Results",
-            "showResultsOff": "Hiding Results"
+            "showResultsOff": "Hiding Results",
+            "info": "Info"
         }
     },
     "upscaling": {
