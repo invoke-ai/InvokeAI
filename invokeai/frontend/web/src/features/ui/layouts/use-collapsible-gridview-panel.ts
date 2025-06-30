@@ -22,6 +22,9 @@ export const useCollapsibleGridviewPanel = (
 ) => {
   const $isCollapsed = useState(() => atom(false))[0];
   const lastExpandedSizeRef = useRef<number>(0);
+  const retryCountRef = useRef<number>(0);
+  const maxRetries = 10; 
+
   const collapse = useCallback(() => {
     if (!api) {
       return;
@@ -79,10 +82,18 @@ export const useCollapsibleGridviewPanel = (
     const initializePanel = () => {
       const panel = api.getPanel(panelId);
       if (!panel) {
+        retryCountRef.current++;
+        if (retryCountRef.current >= maxRetries) {
+          console.warn(`Panel ${panelId} not available after ${maxRetries} retries`);
+          return;
+        }
         // Panel not available yet, retry after a short delay
-        setTimeout(initializePanel, 10);
+        setTimeout(initializePanel, 50);
         return;
       }
+
+      // Reset retry count on success
+      retryCountRef.current = 0;
 
       // Set initial state immediately
       const initialIsCollapsed = getIsCollapsed(panel, orientation, collapsedSize);

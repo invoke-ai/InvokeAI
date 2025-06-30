@@ -21,10 +21,14 @@ export const LEFT_PANEL_MIN_SIZE_PX = 420;
 export const RIGHT_PANEL_MIN_SIZE_PX = 420;
 
 export const BOARD_PANEL_MIN_HEIGHT_PX = 36;
-export const BOARD_PANEL_DEFAULT_HEIGHT_PX = 300;
+export const BOARD_PANEL_DEFAULT_HEIGHT_PX = 232;
 
 export const GALLERY_PANEL_MIN_HEIGHT_PX = 36;
 export const GALLERY_PANEL_DEFAULT_HEIGHT_PX = 200;
 
 export const LAYERS_PANEL_MIN_HEIGHT_PX = 36;
 export const LAYERS_PANEL_DEFAULT_HEIGHT_PX = 232;
+
+// Canvas-specific panel constants
+export const CANVAS_BOARD_PANEL_DEFAULT_HEIGHT_PX = 36; // Collapsed by default
+export const CANVAS_GALLERY_PANEL_DEFAULT_HEIGHT_PX = 200; // Smaller default size
