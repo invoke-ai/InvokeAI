@@ -1,4 +1,4 @@
-import { Badge, Flex, HStack, IconButton, Text, Tooltip,VStack } from '@invoke-ai/ui-library';
+import { Badge, Flex, HStack, IconButton, Text, Tooltip, VStack } from '@invoke-ai/ui-library';
 import { useClipboard } from 'common/hooks/useClipboard';
 import { RecallButton } from 'features/metadata/components/RecallButton';
 import { memo, useCallback } from 'react';

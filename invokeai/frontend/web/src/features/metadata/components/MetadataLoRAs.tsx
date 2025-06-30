@@ -1,4 +1,4 @@
-import { Badge, HStack, IconButton, Text, Tooltip,VStack } from '@invoke-ai/ui-library';
+import { Badge, HStack, IconButton, Text, Tooltip, VStack } from '@invoke-ai/ui-library';
 import { useClipboard } from 'common/hooks/useClipboard';
 import type { LoRA } from 'features/controlLayers/store/types';
 import { MetadataItemView } from 'features/metadata/components/MetadataItemView';
