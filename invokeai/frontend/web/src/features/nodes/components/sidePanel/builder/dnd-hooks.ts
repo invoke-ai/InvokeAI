@@ -9,8 +9,7 @@ import {
 import { getReorderDestinationIndex } from '@atlaskit/pragmatic-drag-and-drop-hitbox/util/get-reorder-destination-index';
 import { reorderWithEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/util/reorder-with-edge';
 import { logger } from 'app/logging/logger';
-import { useAppStore } from 'app/store/storeHooks';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { parseify } from 'common/util/serialize';
