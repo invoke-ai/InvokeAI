@@ -29,7 +29,8 @@ const ParamTileControlNetModel = () => {
     }
     return modelConfigs.filter((model) => {
       const isCompatible = model.base === currentBaseModel;
-      const isTileOrMultiModel = model.name.toLowerCase().includes('tile') || model.name.toLowerCase().includes('union');
+      const isTileOrMultiModel =
+        model.name.toLowerCase().includes('tile') || model.name.toLowerCase().includes('union');
       return isCompatible && isTileOrMultiModel;
     });
   }, [modelConfigs, currentBaseModel]);
@@ -44,7 +45,13 @@ const ParamTileControlNetModel = () => {
   );
 
   return (
-    <FormControl isDisabled={!filteredModelConfigs.length} isInvalid={!filteredModelConfigs.length} minW={0} flexGrow={1} gap={2}>
+    <FormControl
+      isDisabled={!filteredModelConfigs.length}
+      isInvalid={!filteredModelConfigs.length}
+      minW={0}
+      flexGrow={1}
+      gap={2}
+    >
       <InformationalPopover feature="controlNet">
         <FormLabel m={0}>{t('upscaling.tileControl')}</FormLabel>
       </InformationalPopover>
