@@ -1,5 +1,4 @@
-import { Button, Flex, Heading, Icon, Link, Text } from '@invoke-ai/ui-library';
-import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
+import { Flex, Heading, Icon, Link, Text } from '@invoke-ai/ui-library';
 import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
 import { useNewWorkflow } from 'features/workflowLibrary/components/NewWorkflowConfirmationAlertDialog';
 import { useLoadWorkflowFromFile } from 'features/workflowLibrary/hooks/useLoadWorkflowFromFile';
@@ -21,13 +20,6 @@ export const WorkflowsLaunchpadPanel = memo(() => {
     },
     [loadWorkflowFromFile]
   );
-
-  const uploadApi = useImageUploadButton({ 
-    allowMultiple: false, 
-    onUpload: (imageDTOs) => {
-      // Handle workflow file upload - this would need to be adapted for workflow files
-    } 
-  });
 
   const handleBrowseTemplates = useCallback(() => {
     workflowLibraryModal.open();
@@ -58,17 +50,16 @@ export const WorkflowsLaunchpadPanel = memo(() => {
 
         {/* Description */}
         <Text variant="subtext" fontSize="md" lineHeight="1.6">
-          Workflows are reusable templates that automate image generation tasks, 
-          allowing you to quickly perform complex operations and get consistent results.
+          {t('ui.launchpad.workflows.description')}
         </Text>
 
-        <Link 
-          href="https://invoke-ai.github.io/InvokeAI/features/WORKFLOWS/" 
-          isExternal 
+        <Link
+          href="https://support.invoke.ai/support/solutions/articles/151000189610-getting-started-with-workflows-denoise-latents"
+          isExternal
           color="invokeBlue.400"
           fontSize="sm"
         >
-          {t('learnMore')} about creating workflows
+          {t('ui.launchpad.workflows.learnMoreLink')}
         </Link>
 
         {/* Action Buttons */}
@@ -77,8 +68,8 @@ export const WorkflowsLaunchpadPanel = memo(() => {
           <LaunchpadButton onClick={handleBrowseTemplates} position="relative" gap={8}>
             <Icon as={PiFolderOpenBold} boxSize={8} color="base.500" />
             <Flex flexDir="column" alignItems="flex-start" gap={2}>
-              <Heading size="sm">Browse Workflow Templates</Heading>
-              <Text color="base.300">Choose from pre-built workflows for common tasks</Text>
+              <Heading size="sm">{t('ui.launchpad.workflows.browseTemplates.title')}</Heading>
+              <Text color="base.300">{t('ui.launchpad.workflows.browseTemplates.description')}</Text>
             </Flex>
           </LaunchpadButton>
 
@@ -86,8 +77,8 @@ export const WorkflowsLaunchpadPanel = memo(() => {
           <LaunchpadButton onClick={handleCreateNew} position="relative" gap={8}>
             <Icon as={PiFilePlusBold} boxSize={8} color="base.500" />
             <Flex flexDir="column" alignItems="flex-start" gap={2}>
-              <Heading size="sm">Create a new Workflow</Heading>
-              <Text color="base.300">Start a new workflow from scratch</Text>
+              <Heading size="sm">{t('ui.launchpad.workflows.createNew.title')}</Heading>
+              <Text color="base.300">{t('ui.launchpad.workflows.createNew.description')}</Text>
             </Flex>
           </LaunchpadButton>
 
@@ -95,8 +86,8 @@ export const WorkflowsLaunchpadPanel = memo(() => {
           <LaunchpadButton onClick={handleLoadFromFile} position="relative" gap={8}>
             <Icon as={PiUploadBold} boxSize={8} color="base.500" />
             <Flex flexDir="column" alignItems="flex-start" gap={2}>
-              <Heading size="sm">Load workflow from existing image or file</Heading>
-              <Text color="base.300">Drag or upload a workflow to start with an existing setup</Text>
+              <Heading size="sm">{t('ui.launchpad.workflows.loadFromFile.title')}</Heading>
+              <Text color="base.300">{t('ui.launchpad.workflows.loadFromFile.description')}</Text>
             </Flex>
           </LaunchpadButton>
         </Flex>

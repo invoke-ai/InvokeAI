@@ -2449,7 +2449,44 @@
             "workflowsTitle": "Go deep with Workflows.",
             "upscalingTitle": "Upscale and add detail.",
             "canvasTitle": "Edit and refine on Canvas.",
-            "generateTitle": "Generate images from text prompts."
+            "generateTitle": "Generate images from text prompts.",
+            "workflows": {
+                "description": "Workflows are reusable templates that automate image generation tasks, allowing you to quickly perform complex operations and get consistent results.",
+                "learnMoreLink": "Learn more about creating workflows",
+                "browseTemplates": {
+                    "title": "Browse Workflow Templates",
+                    "description": "Choose from pre-built workflows for common tasks"
+                },
+                "createNew": {
+                    "title": "Create a new Workflow",
+                    "description": "Start a new workflow from scratch"
+                },
+                "loadFromFile": {
+                    "title": "Load workflow from existing image or file",
+                    "description": "Drag or upload a workflow to start with an existing setup"
+                }
+            },
+            "upscaling": {
+                "uploadImage": {
+                    "title": "Upload Image to Upscale",
+                    "description": "Click or drag an image to upscale (JPG, PNG, WebP up to 100MB)"
+                },
+                "imageReady": {
+                    "title": "Image Ready",
+                    "description": "Press Invoke to begin upscaling"
+                },
+                "readyToUpscale": {
+                    "title": "Ready to upscale!",
+                    "description": "Configure your settings below, then click the Invoke button to begin upscaling your image."
+                },
+                "upscaleModel": "Upscale Model",
+                "model": "Model",
+                "scale": "Scale",
+                "helpText": {
+                    "promptAdvice": "When upscaling, use a prompt that describes the medium and style. Avoid describing specific content details in the image.",
+                    "styleAdvice": "Upscaling works best with the general style of your image."
+                }
+            }
         }
     },
     "system": {
