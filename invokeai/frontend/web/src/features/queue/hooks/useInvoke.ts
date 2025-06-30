@@ -1,10 +1,7 @@
 import { useStore } from '@nanostores/react';
 import { logger } from 'app/logging/logger';
-import { enqueueRequestedCanvas } from 'app/store/middleware/listenerMiddleware/listeners/enqueueRequestedLinear';
-import { enqueueRequestedUpscaling } from 'app/store/middleware/listenerMiddleware/listeners/enqueueRequestedUpscale';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { withResultAsync } from 'common/util/result';
-import { parseify } from 'common/util/serialize';
 import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { useEnqueueWorkflows } from 'features/queue/hooks/useEnqueueWorkflows';
 import { $isReadyToEnqueue } from 'features/queue/store/readiness';
@@ -15,15 +12,21 @@ import { useCallback } from 'react';
 import { serializeError } from 'serialize-error';
 import { enqueueMutationFixedCacheKeyOptions, useEnqueueBatchMutation } from 'services/api/endpoints/queue';
 
+import { useEnqueueCanvas } from './useEnqueueCanvas';
+import { useEnqueueGenerate } from './useEnqueueGenerate';
+import { useEnqueueUpscaling } from './useEnqueueUpscaling';
+
 const log = logger('generation');
 
 export const useInvoke = () => {
-  const dispatch = useAppDispatch();
   const ctx = useAutoLayoutContextSafe();
   const tabName = useAppSelector(selectActiveTab);
   const isReady = useStore($isReadyToEnqueue);
   const isLocked = useIsWorkflowEditorLocked();
   const enqueueWorkflows = useEnqueueWorkflows();
+  const enqueueCanvas = useEnqueueCanvas();
+  const enqueueGenerate = useEnqueueGenerate();
+  const enqueueUpscaling = useEnqueueUpscaling();
 
   const [_, { isLoading }] = useEnqueueBatchMutation(enqueueMutationFixedCacheKeyOptions);
 
@@ -33,28 +36,26 @@ export const useInvoke = () => {
         return;
       }
 
-      if (tabName === 'workflows') {
-        const result = await withResultAsync(() => enqueueWorkflows(prepend, isApiValidationRun));
-        if (result.isErr()) {
-          log.error({ error: serializeError(result.error) }, 'Failed to enqueue batch');
-        } else {
-          log.debug(parseify(result.value), 'Enqueued batch');
+      const result = await withResultAsync(async () => {
+        switch (tabName) {
+          case 'workflows':
+            return await enqueueWorkflows(prepend, isApiValidationRun);
+          case 'canvas':
+            return await enqueueCanvas(prepend);
+          case 'generate':
+            return await enqueueGenerate(prepend);
+          case 'upscaling':
+            return await enqueueUpscaling(prepend);
+          default:
+            throw new Error(`No enqueue handler for tab: ${tabName}`);
         }
-      }
+      });
 
-      if (tabName === 'upscaling') {
-        dispatch(enqueueRequestedUpscaling({ prepend }));
-        return;
+      if (result.isErr()) {
+        log.error({ error: serializeError(result.error) }, 'Failed to enqueue batch');
       }
-
-      if (tabName === 'canvas' || tabName === 'generate') {
-        dispatch(enqueueRequestedCanvas({ prepend }));
-        return;
-      }
-
-      // Else we are not on a generation tab and should not queue
     },
-    [dispatch, enqueueWorkflows, isReady, tabName]
+    [enqueueCanvas, enqueueGenerate, enqueueUpscaling, enqueueWorkflows, isReady, tabName]
   );
 
   const enqueueBack = useCallback(() => {

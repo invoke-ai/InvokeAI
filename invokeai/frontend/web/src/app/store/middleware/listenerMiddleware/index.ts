@@ -8,7 +8,6 @@ import { addBatchEnqueuedListener } from 'app/store/middleware/listenerMiddlewar
 import { addDeleteBoardAndImagesFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/boardAndImagesDeleted';
 import { addBoardIdSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/boardIdSelected';
 import { addBulkDownloadListeners } from 'app/store/middleware/listenerMiddleware/listeners/bulkDownload';
-import { addEnqueueRequestedLinear } from 'app/store/middleware/listenerMiddleware/listeners/enqueueRequestedLinear';
 import { addGetOpenAPISchemaListener } from 'app/store/middleware/listenerMiddleware/listeners/getOpenAPISchema';
 import { addImageAddedToBoardFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/imageAddedToBoard';
 import { addImageRemovedFromBoardFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/imageRemovedFromBoard';
@@ -20,7 +19,6 @@ import { addSocketConnectedEventListener } from 'app/store/middleware/listenerMi
 import type { AppDispatch, RootState } from 'app/store/store';
 
 import { addArchivedOrDeletedBoardListener } from './listeners/addArchivedOrDeletedBoardListener';
-import { addEnqueueRequestedUpscale } from './listeners/enqueueRequestedUpscale';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -43,8 +41,6 @@ addImageUploadedFulfilledListener(startAppListening);
 addDeleteBoardAndImagesFulfilledListener(startAppListening);
 
 // User Invoked
-addEnqueueRequestedLinear(startAppListening);
-addEnqueueRequestedUpscale(startAppListening);
 addAnyEnqueuedListener(startAppListening);
 addBatchEnqueuedListener(startAppListening);
 
