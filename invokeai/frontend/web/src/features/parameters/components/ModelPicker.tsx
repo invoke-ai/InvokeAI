@@ -28,12 +28,10 @@ import { setActiveTab } from 'features/ui/store/uiSlice';
 import { filesize } from 'filesize';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { PiCaretDownBold, PiLinkSimple  } from 'react-icons/pi';
+import { PiCaretDownBold, PiLinkSimple } from 'react-icons/pi';
 import type { AnyModelConfig, BaseModelType } from 'services/api/types';
 
 // Type for models with starred field
-type StarredModelConfig = AnyModelConfig & { starred?: boolean };
-
 const getOptionId = <T extends AnyModelConfig>(modelConfig: T & { starred?: boolean }) => modelConfig.key;
 
 const ModelManagerLink = memo((props: ButtonProps) => {
@@ -149,15 +147,19 @@ export const ModelPicker = typedMemo(
     const options = useMemo<(T & { starred?: boolean })[] | Group<T & { starred?: boolean }>[]>(() => {
       if (!grouped) {
         // Add starred field to model options and sort them
-        const modelsWithStarred = modelConfigs.map(model => ({
+        const modelsWithStarred = modelConfigs.map((model) => ({
           ...model,
-          starred: relatedModelKeys.includes(model.key)
+          starred: relatedModelKeys.includes(model.key),
         }));
-        
+
         // Sort so starred models come first
         return modelsWithStarred.sort((a, b) => {
-          if (a.starred && !b.starred) return -1;
-          if (!a.starred && b.starred) return 1;
+          if (a.starred && !b.starred) {
+            return -1;
+          }
+          if (!a.starred && b.starred) {
+            return 1;
+          }
           return 0;
         });
       }
@@ -183,7 +185,7 @@ export const ModelPicker = typedMemo(
           // Add starred field to the model
           const modelWithStarred = {
             ...modelConfig,
-            starred: relatedModelKeys.includes(modelConfig.key)
+            starred: relatedModelKeys.includes(modelConfig.key),
           };
           group.options.push(modelWithStarred);
         }
@@ -197,8 +199,12 @@ export const ModelPicker = typedMemo(
         if (group) {
           // Sort options within each group so starred ones come first
           group.options.sort((a, b) => {
-            if (a.starred && !b.starred) return -1;
-            if (!a.starred && b.starred) return 1;
+            if (a.starred && !b.starred) {
+              return -1;
+            }
+            if (!a.starred && b.starred) {
+              return 1;
+            }
             return 0;
           });
           _options.push(group);
@@ -221,7 +227,7 @@ export const ModelPicker = typedMemo(
       (model: T & { starred?: boolean }) => {
         onClose();
         // Remove the starred field before passing to onChange
-        const { starred, ...modelWithoutStarred } = model;
+        const { starred: _, ...modelWithoutStarred } = model;
         onChange(modelWithoutStarred as T);
       },
       [onChange, onClose]
@@ -268,7 +274,11 @@ export const ModelPicker = typedMemo(
                 optionsOrGroups={options}
                 getOptionId={getOptionId<T>}
                 onSelect={onSelect}
-                selectedOption={selectedModelConfig ? { ...selectedModelConfig, starred: relatedModelKeys.includes(selectedModelConfig.key) } : undefined}
+                selectedOption={
+                  selectedModelConfig
+                    ? { ...selectedModelConfig, starred: relatedModelKeys.includes(selectedModelConfig.key) }
+                    : undefined
+                }
                 isMatch={isMatch<T>}
                 OptionComponent={PickerOptionComponent<T>}
                 noOptionsFallback={<NoOptionsFallback noOptionsText={noOptionsText} />}
@@ -331,9 +341,7 @@ const PickerOptionComponent = typedMemo(
         {!compactView && option.cover_image && <ModelImage image_url={option.cover_image} />}
         <Flex flexDir="column" gap={1} flex={1}>
           <Flex gap={2} alignItems="center">
-            {option.starred && (
-              <PiLinkSimple color="yellow" size={16} />
-            )}
+            {option.starred && <PiLinkSimple color="yellow" size={16} />}
             <Text sx={optionNameSx} data-is-compact={compactView}>
               {option.name}
             </Text>
