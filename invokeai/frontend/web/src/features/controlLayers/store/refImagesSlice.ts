@@ -121,6 +121,16 @@ export const refImagesSlice = createSlice({
         return;
       }
 
+      if (entity.config.model.base === 'flux-kontext') {
+        // Switching to flux-kontext ref image
+        entity.config = {
+          ...initialFluxKontextReferenceImage,
+          image: entity.config.image,
+          model: entity.config.model,
+        };
+        return;
+      }
+
       if (entity.config.model.type === 'flux_redux') {
         // Switching to flux_redux
         entity.config = {
