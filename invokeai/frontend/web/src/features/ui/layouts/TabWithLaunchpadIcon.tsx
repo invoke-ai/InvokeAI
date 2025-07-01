@@ -1,10 +1,11 @@
-import { Flex, Text } from '@invoke-ai/ui-library';
+import { Flex, Icon, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useCallbackOnDragEnter } from 'common/hooks/useCallbackOnDragEnter';
 import type { IDockviewPanelHeaderProps } from 'dockview';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
 import { memo, useCallback, useRef } from 'react';
+import type { IconType } from 'react-icons';
 import {
   PiBoundingBoxBold,
   PiCubeBold,
@@ -14,13 +15,13 @@ import {
   PiTextAaBold,
 } from 'react-icons/pi';
 
-const TAB_ICONS: Record<TabName, React.ReactElement> = {
-  generate: <PiTextAaBold />,
-  canvas: <PiBoundingBoxBold />,
-  upscaling: <PiFrameCornersBold />,
-  workflows: <PiFlowArrowBold />,
-  models: <PiCubeBold />,
-  queue: <PiQueueBold />,
+const TAB_ICONS: Record<TabName, IconType> = {
+  generate: PiTextAaBold,
+  canvas: PiBoundingBoxBold,
+  upscaling: PiFrameCornersBold,
+  workflows: PiFlowArrowBold,
+  models: PiCubeBold,
+  queue: PiQueueBold,
 };
 
 export const TabWithLaunchpadIcon = memo((props: IDockviewPanelHeaderProps) => {
@@ -35,20 +36,10 @@ export const TabWithLaunchpadIcon = memo((props: IDockviewPanelHeaderProps) => {
 
   useCallbackOnDragEnter(setActive, ref, 300);
 
-  // Show icon only for Launchpad panel
-  const isLaunchpadPanel = props.api.id === 'launchpad';
-  const currentTabIcon = TAB_ICONS[activeTab];
-
   return (
-    <Flex ref={ref} alignItems="center" h="full">
-      {isLaunchpadPanel && currentTabIcon && (
-        <Flex alignItems="center" pl={5} pr={2}>
-          {currentTabIcon}
-        </Flex>
-      )}
-      <Text userSelect="none" px={isLaunchpadPanel ? 3 : 4}>
-        {props.api.title ?? props.api.id}
-      </Text>
+    <Flex ref={ref} alignItems="center" h="full" px={4} gap={3}>
+      <Icon as={TAB_ICONS[activeTab]} color="invokeYellow.300" boxSize={5} />
+      <Text userSelect="none">{props.api.title ?? props.api.id}</Text>
     </Flex>
   );
 });
