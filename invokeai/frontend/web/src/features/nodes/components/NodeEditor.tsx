@@ -1,6 +1,5 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { ReactFlowProvider } from '@xyflow/react';
-import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { AddNodeCmdk } from 'features/nodes/components/flow/AddNodeCmdk/AddNodeCmdk';
 import { TopCenterPanel } from 'features/nodes/components/flow/panels/TopPanel/TopCenterPanel';
@@ -22,9 +21,7 @@ const NodeEditor = () => {
 
   return (
     <ReactFlowProvider>
-      <FocusRegionWrapper
-        region="workflows"
-        as={Flex}
+      <Flex
         bg="base.900"
         display="flex"
         position="relative"
@@ -46,7 +43,7 @@ const NodeEditor = () => {
         )}
         <WorkflowEditorSettings />
         {isLoading && <IAINoContentFallback label={t('nodes.loadingNodes')} icon={PiFlowArrowBold} />}
-      </FocusRegionWrapper>
+      </Flex>
     </ReactFlowProvider>
   );
 };

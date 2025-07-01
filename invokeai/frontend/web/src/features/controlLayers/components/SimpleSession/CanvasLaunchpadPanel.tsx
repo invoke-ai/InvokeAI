@@ -1,5 +1,4 @@
 import { Button, Flex, Grid, Heading, Text } from '@invoke-ai/ui-library';
-import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
 import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
 import { memo, useCallback } from 'react';
@@ -18,7 +17,7 @@ export const CanvasLaunchpadPanel = memo(() => {
     ctx.focusPanel(WORKSPACE_PANEL_ID);
   }, [ctx]);
   return (
-    <FocusRegionWrapper region="launchpad" as={Flex} flexDir="column" h="full" w="full" alignItems="center" gap={2}>
+    <Flex flexDir="column" h="full" w="full" alignItems="center" gap={2}>
       <Flex flexDir="column" w="full" gap={4} px={14} maxW={768} pt="20vh">
         <Heading mb={4}>{t('ui.launchpad.canvasTitle')}</Heading>
         <Flex flexDir="column" gap={8}>
@@ -44,7 +43,7 @@ export const CanvasLaunchpadPanel = memo(() => {
           <LaunchpadUseALayoutImageButton extraAction={focusCanvas} />
         </Flex>
       </Flex>
-    </FocusRegionWrapper>
+    </Flex>
   );
 });
 CanvasLaunchpadPanel.displayName = 'CanvasLaunchpadPanel';

@@ -1,9 +1,12 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
+import { setFocusedRegion } from 'common/hooks/focus';
 import { useCallbackOnDragEnter } from 'common/hooks/useCallbackOnDragEnter';
 import type { IDockviewPanelHeaderProps } from 'dockview';
 import { memo, useCallback, useRef } from 'react';
 
-export const TabWithoutCloseButton = memo((props: IDockviewPanelHeaderProps) => {
+import type { PanelParameters } from './auto-layout-context';
+
+export const TabWithoutCloseButton = memo((props: IDockviewPanelHeaderProps<PanelParameters>) => {
   const ref = useRef<HTMLDivElement>(null);
   const setActive = useCallback(() => {
     if (!props.api.isActive) {
@@ -13,8 +16,12 @@ export const TabWithoutCloseButton = memo((props: IDockviewPanelHeaderProps) => 
 
   useCallbackOnDragEnter(setActive, ref, 300);
 
+  const onPointerDown = useCallback(() => {
+    setFocusedRegion(props.params.focusRegion);
+  }, [props.params.focusRegion]);
+
   return (
-    <Flex ref={ref} alignItems="center" h="full">
+    <Flex ref={ref} alignItems="center" h="full" onPointerDown={onPointerDown}>
       <Text userSelect="none" px={4}>
         {props.api.title ?? props.api.id}
       </Text>
