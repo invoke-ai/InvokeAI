@@ -123,16 +123,18 @@ export class PanelRegistry {
    * Focus a specific panel in a specific tab
    * Automatically switches to the target tab if specified
    */
-  focusPanelInTab(tabName: TabName, panelId: string): boolean {
+  focusPanelInTab(tabName: TabName, panelId: string, switchTab = true): boolean {
     const apis = this.getTabPanelApis(tabName);
     if (!apis) {
       log.warn(`Tab "${tabName}" not registered`);
       return false;
     }
 
-    // Switch to target tab first
-    if (!this.switchToTab(tabName)) {
-      return false;
+    if (switchTab) {
+      // Switch to target tab first
+      if (!this.switchToTab(tabName)) {
+        return false;
+      }
     }
 
     // Try to focus in main panel (dockview) first
