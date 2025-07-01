@@ -91,6 +91,10 @@ const isGroup = <T extends object>(optionOrGroup: OptionOrGroup<T>): optionOrGro
   return uniqueGroupKey in optionOrGroup && optionOrGroup[uniqueGroupKey] === true;
 };
 
+export const isOption = <T extends object>(optionOrGroup: OptionOrGroup<T>): optionOrGroup is T => {
+  return !(uniqueGroupKey in optionOrGroup);
+};
+
 const DefaultOptionComponent = typedMemo(<T extends object>({ option }: { option: T }) => {
   const { getOptionId } = usePickerContext();
   return <Text fontWeight="bold">{getOptionId(option)}</Text>;
