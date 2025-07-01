@@ -32,7 +32,6 @@ import { atom } from 'nanostores';
 import { memo, useCallback, useRef, useState } from 'react';
 
 import { GenerateTabLeftPanel } from './GenerateTabLeftPanel';
-import { registerFocusListener } from './layout-focus-bridge';
 import {
   BOARD_PANEL_DEFAULT_HEIGHT_PX,
   BOARD_PANEL_MIN_HEIGHT_PX,
@@ -78,7 +77,6 @@ const initializeCenterPanelLayout = (api: DockviewApi) => {
       focusRegion: 'launchpad',
     },
   });
-  registerFocusListener(launchpadPanel, 'launchpad');
 
   const viewerPanel = api.addPanel<PanelParameters>({
     id: VIEWER_PANEL_ID,
@@ -93,7 +91,6 @@ const initializeCenterPanelLayout = (api: DockviewApi) => {
       referencePanel: launchpadPanel.id,
     },
   });
-  registerFocusListener(viewerPanel, 'viewer');
 
   return { launchpadPanel, viewerPanel } satisfies Record<string, IDockviewPanel>;
 };
@@ -159,7 +156,6 @@ export const initializeRightPanelLayout = (api: GridviewApi) => {
       focusRegion: 'gallery',
     },
   });
-  registerFocusListener(galleryPanel, 'gallery');
 
   const boardsPanel = api.addPanel<PanelParameters>({
     id: BOARDS_PANEL_ID,
@@ -173,7 +169,6 @@ export const initializeRightPanelLayout = (api: GridviewApi) => {
       referencePanel: galleryPanel.id,
     },
   });
-  registerFocusListener(boardsPanel, 'boards');
 
   boardsPanel.api.setSize({ height: BOARD_PANEL_DEFAULT_HEIGHT_PX, width: RIGHT_PANEL_MIN_SIZE_PX });
 
@@ -190,14 +185,12 @@ const RightPanel = memo(() => {
     [ctx._$rightPanelApi]
   );
   return (
-    <>
-      <GridviewReact
-        className="dockview-theme-invoke"
-        orientation={Orientation.VERTICAL}
-        components={rightPanelComponents}
-        onReady={onReady}
-      />
-    </>
+    <GridviewReact
+      className="dockview-theme-invoke"
+      orientation={Orientation.VERTICAL}
+      components={rightPanelComponents}
+      onReady={onReady}
+    />
   );
 });
 RightPanel.displayName = 'RightPanel';
@@ -214,7 +207,6 @@ export const initializeLeftPanelLayout = (api: GridviewApi) => {
       focusRegion: 'settings',
     },
   });
-  registerFocusListener(settingsPanel, 'settings');
 
   return { settingsPanel } satisfies Record<string, IGridviewPanel>;
 };
@@ -229,14 +221,12 @@ const LeftPanel = memo(() => {
     [ctx._$leftPanelApi]
   );
   return (
-    <>
-      <GridviewReact
-        className="dockview-theme-invoke"
-        orientation={Orientation.VERTICAL}
-        components={leftPanelComponents}
-        onReady={onReady}
-      />
-    </>
+    <GridviewReact
+      className="dockview-theme-invoke"
+      orientation={Orientation.VERTICAL}
+      components={leftPanelComponents}
+      onReady={onReady}
+    />
   );
 });
 LeftPanel.displayName = 'LeftPanel';
