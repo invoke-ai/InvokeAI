@@ -2450,6 +2450,8 @@
             "upscalingTitle": "Upscale and add detail.",
             "canvasTitle": "Edit and refine on Canvas.",
             "generateTitle": "Generate images from text prompts.",
+            "modelGuideText": "Want to learn what prompts work best for each model?",
+            "modelGuideLink": "Check out our Model Guide.",
             "workflows": {
                 "description": "Workflows are reusable templates that automate image generation tasks, allowing you to quickly perform complex operations and get consistent results.",
                 "learnMoreLink": "Learn more about creating workflows",
