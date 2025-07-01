@@ -226,7 +226,7 @@ export function maskObjectsToBitmap(
         if ('image_name' in obj.image) {
           // This would need proper image loading from the server
           // For now, we'll skip image objects in the mask conversion
-          console.warn('Image objects with image_name are not supported in mask conversion');
+          // Image objects are not supported in this simple mask conversion
         } else {
           // Data URL image
           img.src = obj.image.dataURL;
