@@ -9,15 +9,15 @@ import { CanvasToolbarResetViewButton } from 'features/controlLayers/components/
 import { CanvasToolbarSaveToGalleryButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarSaveToGalleryButton';
 import { CanvasToolbarScale } from 'features/controlLayers/components/Toolbar/CanvasToolbarScale';
 import { CanvasToolbarUndoButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarUndoButton';
-import { useCanvasAdjustBboxHotkey } from 'features/controlLayers/hooks/useCanvasAdjustBboxHotkey';
 import { useCanvasDeleteLayerHotkey } from 'features/controlLayers/hooks/useCanvasDeleteLayerHotkey';
 import { useCanvasEntityQuickSwitchHotkey } from 'features/controlLayers/hooks/useCanvasEntityQuickSwitchHotkey';
 import { useCanvasFilterHotkey } from 'features/controlLayers/hooks/useCanvasFilterHotkey';
-import { useCanvasInvertMaskHotkey } from 'features/controlLayers/hooks/useCanvasInvertMaskHotkey';
 import { useCanvasResetLayerHotkey } from 'features/controlLayers/hooks/useCanvasResetLayerHotkey';
 import { useCanvasToggleNonRasterLayersHotkey } from 'features/controlLayers/hooks/useCanvasToggleNonRasterLayersHotkey';
 import { useCanvasTransformHotkey } from 'features/controlLayers/hooks/useCanvasTransformHotkey';
 import { useCanvasUndoRedoHotkeys } from 'features/controlLayers/hooks/useCanvasUndoRedoHotkeys';
+import { useCanvasInvertMaskHotkey } from 'features/controlLayers/hooks/useCanvasInvertMaskHotkey';
+import { useCanvasAdjustBboxHotkey } from 'features/controlLayers/hooks/useCanvasAdjustBboxHotkey';
 import { useNextPrevEntityHotkeys } from 'features/controlLayers/hooks/useNextPrevEntity';
 import { memo } from 'react';
 
