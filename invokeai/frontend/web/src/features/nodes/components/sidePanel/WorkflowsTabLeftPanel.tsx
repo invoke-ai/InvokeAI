@@ -1,7 +1,6 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { EditModeLeftPanelContent } from 'features/nodes/components/sidePanel/EditModeLeftPanelContent';
 import { PublishedWorkflowPanelContent } from 'features/nodes/components/sidePanel/PublishedWorkflowPanelContent';
 import { $isInPublishFlow, useIsWorkflowPublished } from 'features/nodes/components/sidePanel/workflow/publish';
@@ -20,7 +19,7 @@ const WorkflowsTabLeftPanel = () => {
   const isInPublishFlow = useStore($isInPublishFlow);
 
   return (
-    <FocusRegionWrapper region="settings" as={Flex} flexDir="column" w="full" h="full" gap={2} p={2}>
+    <Flex flexDir="column" w="full" h="full" gap={2}>
       <QueueControls />
       <Flex w="full" h="full" gap={2} flexDir="column">
         {isInPublishFlow && <PublishWorkflowPanelContent />}
@@ -30,7 +29,7 @@ const WorkflowsTabLeftPanel = () => {
         {!isInPublishFlow && !isPublished && mode === 'edit' && <EditModeLeftPanelContent />}
         {isPublished && <PublishedWorkflowPanelContent />}
       </Flex>
-    </FocusRegionWrapper>
+    </Flex>
   );
 };
 

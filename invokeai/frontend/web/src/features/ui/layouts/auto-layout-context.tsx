@@ -1,12 +1,14 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import type { DockviewApi, GridviewApi } from 'dockview';
+import { AutoLayoutPanelContainer } from 'common/components/FocusRegionWrapper';
+import type { FocusRegionName } from 'common/hooks/focus';
+import type { DockviewApi, GridviewApi, IDockviewPanelProps, IGridviewPanelProps } from 'dockview';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
 import type { WritableAtom } from 'nanostores';
 import { atom } from 'nanostores';
-import type { PropsWithChildren, RefObject } from 'react';
+import type { FunctionComponent, PropsWithChildren, RefObject } from 'react';
 import { createContext, memo, useCallback, useContext, useMemo, useState } from 'react';
 
 import { LEFT_PANEL_ID, LEFT_PANEL_MIN_SIZE_PX, RIGHT_PANEL_ID, RIGHT_PANEL_MIN_SIZE_PX } from './shared';
@@ -208,3 +210,21 @@ export const PanelHotkeysLogical = memo(() => {
   return null;
 });
 PanelHotkeysLogical.displayName = 'PanelHotkeysLogical';
+
+export type PanelParameters = {
+  focusRegion: FocusRegionName;
+};
+
+export type AutoLayoutGridviewComponents = Record<string, FunctionComponent<IGridviewPanelProps<PanelParameters>>>;
+export type AutoLayoutDockviewComponents = Record<string, FunctionComponent<IDockviewPanelProps<PanelParameters>>>;
+export type RootLayoutGridviewComponents = Record<string, FunctionComponent<IGridviewPanelProps<PanelParameters>>>;
+export type PanelProps = IDockviewPanelProps<PanelParameters> | IGridviewPanelProps<PanelParameters>;
+
+export const withPanelContainer = (Component: FunctionComponent) =>
+  memo((props: PanelProps) => {
+    return (
+      <AutoLayoutPanelContainer {...props}>
+        <Component />
+      </AutoLayoutPanelContainer>
+    );
+  });

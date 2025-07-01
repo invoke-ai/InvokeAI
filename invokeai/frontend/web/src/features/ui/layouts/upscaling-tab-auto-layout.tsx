@@ -14,13 +14,23 @@ import { GenerationProgressPanel } from 'features/gallery/components/ImageViewer
 import { ImageViewerPanel } from 'features/gallery/components/ImageViewer/ImageViewerPanel';
 import { FloatingLeftPanelButtons } from 'features/ui/components/FloatingLeftPanelButtons';
 import { FloatingRightPanelButtons } from 'features/ui/components/FloatingRightPanelButtons';
-import { AutoLayoutProvider, PanelHotkeysLogical, useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
+import type {
+  AutoLayoutDockviewComponents,
+  AutoLayoutGridviewComponents,
+  PanelParameters,
+  RootLayoutGridviewComponents,
+} from 'features/ui/layouts/auto-layout-context';
+import {
+  AutoLayoutProvider,
+  PanelHotkeysLogical,
+  useAutoLayoutContext,
+  withPanelContainer,
+} from 'features/ui/layouts/auto-layout-context';
 import { TabWithoutCloseButton } from 'features/ui/layouts/TabWithoutCloseButton';
 import { dockviewTheme } from 'features/ui/styles/theme';
 import { atom } from 'nanostores';
 import { memo, useCallback, useRef, useState } from 'react';
 
-import { registerFocusListener } from './layout-focus-bridge';
 import {
   BOARD_PANEL_DEFAULT_HEIGHT_PX,
   BOARD_PANEL_MIN_HEIGHT_PX,
@@ -51,32 +61,36 @@ const tabComponents = {
   [TAB_WITH_LAUNCHPAD_ICON_ID]: TabWithLaunchpadIcon,
 };
 
-const centerComponents: IDockviewReactProps['components'] = {
-  [LAUNCHPAD_PANEL_ID]: UpscalingLaunchpadPanel,
-  [VIEWER_PANEL_ID]: ImageViewerPanel,
-  [PROGRESS_PANEL_ID]: GenerationProgressPanel,
+const centerComponents: AutoLayoutDockviewComponents = {
+  [LAUNCHPAD_PANEL_ID]: withPanelContainer(UpscalingLaunchpadPanel),
+  [VIEWER_PANEL_ID]: withPanelContainer(ImageViewerPanel),
+  [PROGRESS_PANEL_ID]: withPanelContainer(GenerationProgressPanel),
 };
 
 const initializeCenterPanelLayout = (api: DockviewApi) => {
-  const launchpadPanel = api.addPanel({
+  const launchpadPanel = api.addPanel<PanelParameters>({
     id: LAUNCHPAD_PANEL_ID,
     component: LAUNCHPAD_PANEL_ID,
     title: 'Launchpad',
     tabComponent: TAB_WITH_LAUNCHPAD_ICON_ID,
+    params: {
+      focusRegion: 'launchpad',
+    },
   });
-  registerFocusListener(launchpadPanel, 'launchpad');
 
-  const viewerPanel = api.addPanel({
+  const viewerPanel = api.addPanel<PanelParameters>({
     id: VIEWER_PANEL_ID,
     component: VIEWER_PANEL_ID,
     title: 'Image Viewer',
     tabComponent: TAB_WITH_PROGRESS_INDICATOR_ID,
+    params: {
+      focusRegion: 'viewer',
+    },
     position: {
       direction: 'within',
       referencePanel: launchpadPanel.id,
     },
   });
-  registerFocusListener(viewerPanel, 'viewer');
 
   return { launchpadPanel, viewerPanel } satisfies Record<string, IDockviewPanel>;
 };
@@ -127,30 +141,34 @@ const CenterPanel = memo(() => {
 });
 CenterPanel.displayName = 'CenterPanel';
 
-const rightPanelComponents: IGridviewReactProps['components'] = {
-  [BOARDS_PANEL_ID]: BoardsPanel,
-  [GALLERY_PANEL_ID]: GalleryPanel,
+const rightPanelComponents: AutoLayoutGridviewComponents = {
+  [BOARDS_PANEL_ID]: withPanelContainer(BoardsPanel),
+  [GALLERY_PANEL_ID]: withPanelContainer(GalleryPanel),
 };
 
 export const initializeRightPanelLayout = (api: GridviewApi) => {
-  const galleryPanel = api.addPanel({
+  const galleryPanel = api.addPanel<PanelParameters>({
     id: GALLERY_PANEL_ID,
     component: GALLERY_PANEL_ID,
     minimumWidth: RIGHT_PANEL_MIN_SIZE_PX,
     minimumHeight: GALLERY_PANEL_MIN_HEIGHT_PX,
+    params: {
+      focusRegion: 'gallery',
+    },
   });
-  registerFocusListener(galleryPanel, 'gallery');
 
-  const boardsPanel = api.addPanel({
+  const boardsPanel = api.addPanel<PanelParameters>({
     id: BOARDS_PANEL_ID,
     component: BOARDS_PANEL_ID,
     minimumHeight: BOARD_PANEL_MIN_HEIGHT_PX,
+    params: {
+      focusRegion: 'boards',
+    },
     position: {
       direction: 'above',
       referencePanel: galleryPanel.id,
     },
   });
-  registerFocusListener(boardsPanel, 'boards');
 
   boardsPanel.api.setSize({ height: BOARD_PANEL_DEFAULT_HEIGHT_PX, width: RIGHT_PANEL_MIN_SIZE_PX });
 
@@ -175,16 +193,18 @@ const RightPanel = memo(() => {
 });
 RightPanel.displayName = 'RightPanel';
 
-const leftPanelComponents: IGridviewReactProps['components'] = {
-  [SETTINGS_PANEL_ID]: UpscalingTabLeftPanel,
+const leftPanelComponents: AutoLayoutGridviewComponents = {
+  [SETTINGS_PANEL_ID]: withPanelContainer(UpscalingTabLeftPanel),
 };
 
 export const initializeLeftPanelLayout = (api: GridviewApi) => {
-  const settingsPanel = api.addPanel({
+  const settingsPanel = api.addPanel<PanelParameters>({
     id: SETTINGS_PANEL_ID,
     component: SETTINGS_PANEL_ID,
+    params: {
+      focusRegion: 'settings',
+    },
   });
-  registerFocusListener(settingsPanel, 'settings');
 
   return { settingsPanel } satisfies Record<string, IGridviewPanel>;
 };
@@ -211,7 +231,7 @@ const LeftPanel = memo(() => {
 });
 LeftPanel.displayName = 'LeftPanel';
 
-export const rootPanelComponents: IGridviewReactProps['components'] = {
+export const rootPanelComponents: RootLayoutGridviewComponents = {
   [LEFT_PANEL_ID]: LeftPanel,
   [MAIN_PANEL_ID]: CenterPanel,
   [RIGHT_PANEL_ID]: RightPanel,

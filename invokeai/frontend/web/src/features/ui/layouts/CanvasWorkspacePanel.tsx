@@ -1,6 +1,5 @@
 import { ContextMenu, Divider, Flex, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { CanvasAlertsInvocationProgress } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsInvocationProgress';
 import { CanvasAlertsPreserveMask } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsPreserveMask';
 import { CanvasAlertsSelectedEntityStatus } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSelectedEntityStatus';
@@ -56,9 +55,7 @@ export const CanvasWorkspacePanel = memo(() => {
   }, []);
 
   return (
-    <FocusRegionWrapper
-      region="canvas"
-      as={Flex}
+    <Flex
       borderRadius="base"
       position="relative"
       flexDirection="column"
@@ -68,7 +65,6 @@ export const CanvasWorkspacePanel = memo(() => {
       alignItems="center"
       justifyContent="center"
       overflow="hidden"
-      p={2}
     >
       <CanvasManagerProviderGate>
         <CanvasToolbar />
@@ -136,7 +132,7 @@ export const CanvasWorkspacePanel = memo(() => {
       <CanvasManagerProviderGate>
         <CanvasDropArea />
       </CanvasManagerProviderGate>
-    </FocusRegionWrapper>
+    </Flex>
   );
 });
-CanvasWorkspacePanel.displayName = 'CanvasPanel';
+CanvasWorkspacePanel.displayName = 'CanvasWorkspacePanel';

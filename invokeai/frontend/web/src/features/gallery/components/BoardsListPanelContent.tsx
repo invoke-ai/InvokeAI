@@ -1,7 +1,6 @@
 import { Box, Button, Collapse, Divider, Flex, IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { BoardsListWrapper } from 'features/gallery/components/Boards/BoardsList/BoardsListWrapper';
 import { BoardsSearch } from 'features/gallery/components/Boards/BoardsList/BoardsSearch';
@@ -46,7 +45,7 @@ export const BoardsPanel = memo(() => {
   }, [boardSearchText.length, searchDisclosure, collapsibleApi, dispatch]);
 
   return (
-    <FocusRegionWrapper region="boards" as={Flex} flexDir="column" w="full" h="full" p={2}>
+    <Flex flexDir="column" w="full" h="full">
       <Flex alignItems="center" justifyContent="space-between" w="full">
         <Flex flexGrow={1} flexBasis={0}>
           <Button
@@ -82,7 +81,7 @@ export const BoardsPanel = memo(() => {
       </Collapse>
       <Divider pt={2} />
       <BoardsListWrapper />
-    </FocusRegionWrapper>
+    </Flex>
   );
 });
 BoardsPanel.displayName = 'BoardsPanel';
