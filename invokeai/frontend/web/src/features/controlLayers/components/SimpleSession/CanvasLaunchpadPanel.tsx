@@ -1,5 +1,6 @@
 import { Button, Flex, Grid, Heading, Text } from '@invoke-ai/ui-library';
 import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
+import { panelRegistry } from 'features/ui/layouts/panel-registry/panelApiRegistry';
 import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,10 +13,10 @@ import { LaunchpadUseALayoutImageButton } from './LaunchpadUseALayoutImageButton
 
 export const CanvasLaunchpadPanel = memo(() => {
   const { t } = useTranslation();
-  const ctx = useAutoLayoutContext();
+  const { tab } = useAutoLayoutContext();
   const focusCanvas = useCallback(() => {
-    ctx.focusPanel(WORKSPACE_PANEL_ID);
-  }, [ctx]);
+    panelRegistry.focusPanelInTab(tab, WORKSPACE_PANEL_ID);
+  }, [tab]);
   return (
     <Flex flexDir="column" h="full" w="full" alignItems="center" gap={2}>
       <Flex flexDir="column" w="full" gap={4} px={14} maxW={768} pt="20vh">

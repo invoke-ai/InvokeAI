@@ -1,8 +1,8 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectWorkflowMode, workflowModeChanged } from 'features/nodes/store/workflowLibrarySlice';
-import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
-import { VIEWER_PANEL_ID, WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
+import { panelRegistry } from 'features/ui/layouts/panel-registry/panelApiRegistry';
+import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import type { MouseEventHandler } from 'react';
 import { memo, useCallback } from 'react';
@@ -13,7 +13,6 @@ export const WorkflowViewEditToggleButton = memo(() => {
   const dispatch = useAppDispatch();
   const mode = useAppSelector(selectWorkflowMode);
   const { t } = useTranslation();
-  const { focusPanel } = useAutoLayoutContext();
 
   const onClickEdit = useCallback<MouseEventHandler<HTMLButtonElement>>(
     (e) => {
@@ -22,9 +21,9 @@ export const WorkflowViewEditToggleButton = memo(() => {
       dispatch(setActiveTab('workflows'));
       dispatch(workflowModeChanged('edit'));
       // Focus the Workflow Editor panel
-      focusPanel(WORKSPACE_PANEL_ID);
+      panelRegistry.focusPanelInTab('workflows', WORKSPACE_PANEL_ID);
     },
-    [dispatch, focusPanel]
+    [dispatch]
   );
 
   const onClickView = useCallback<MouseEventHandler<HTMLButtonElement>>(
@@ -34,9 +33,9 @@ export const WorkflowViewEditToggleButton = memo(() => {
       dispatch(setActiveTab('workflows'));
       dispatch(workflowModeChanged('view'));
       // Focus the Image Viewer panel
-      focusPanel(VIEWER_PANEL_ID);
+      panelRegistry.focusPanelInTab('workflows', WORKSPACE_PANEL_ID);
     },
-    [dispatch, focusPanel]
+    [dispatch]
   );
 
   if (mode === 'view') {

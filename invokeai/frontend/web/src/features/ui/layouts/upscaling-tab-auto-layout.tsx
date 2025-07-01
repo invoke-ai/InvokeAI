@@ -27,10 +27,11 @@ import {
   withPanelContainer,
 } from 'features/ui/layouts/auto-layout-context';
 import { TabWithoutCloseButton } from 'features/ui/layouts/TabWithoutCloseButton';
+import type { TabName } from 'features/ui/store/uiTypes';
 import { dockviewTheme } from 'features/ui/styles/theme';
-import { atom } from 'nanostores';
 import { memo, useCallback, useRef, useState } from 'react';
 
+import { panelRegistry } from './panel-registry/panelApiRegistry';
 import {
   BOARD_PANEL_DEFAULT_HEIGHT_PX,
   BOARD_PANEL_MIN_HEIGHT_PX,
@@ -61,51 +62,52 @@ const tabComponents = {
   [TAB_WITH_LAUNCHPAD_ICON_ID]: TabWithLaunchpadIcon,
 };
 
-const centerComponents: AutoLayoutDockviewComponents = {
+const mainPanelComponents: AutoLayoutDockviewComponents = {
   [LAUNCHPAD_PANEL_ID]: withPanelContainer(UpscalingLaunchpadPanel),
   [VIEWER_PANEL_ID]: withPanelContainer(ImageViewerPanel),
   [PROGRESS_PANEL_ID]: withPanelContainer(GenerationProgressPanel),
 };
 
-const initializeCenterPanelLayout = (api: DockviewApi) => {
-  const launchpadPanel = api.addPanel<PanelParameters>({
+const initializeCenterPanelLayout = (tab: TabName, api: DockviewApi) => {
+  const launchpad = api.addPanel<PanelParameters>({
     id: LAUNCHPAD_PANEL_ID,
     component: LAUNCHPAD_PANEL_ID,
     title: 'Launchpad',
     tabComponent: TAB_WITH_LAUNCHPAD_ICON_ID,
     params: {
+      tab,
       focusRegion: 'launchpad',
     },
   });
 
-  const viewerPanel = api.addPanel<PanelParameters>({
+  const viewer = api.addPanel<PanelParameters>({
     id: VIEWER_PANEL_ID,
     component: VIEWER_PANEL_ID,
     title: 'Image Viewer',
     tabComponent: TAB_WITH_PROGRESS_INDICATOR_ID,
     params: {
+      tab,
       focusRegion: 'viewer',
     },
     position: {
       direction: 'within',
-      referencePanel: launchpadPanel.id,
+      referencePanel: launchpad.id,
     },
   });
 
-  return { launchpadPanel, viewerPanel } satisfies Record<string, IDockviewPanel>;
+  return { launchpad, viewer } satisfies Record<string, IDockviewPanel>;
 };
 
-const CenterPanel = memo(() => {
-  const ctx = useAutoLayoutContext();
+const MainPanel = memo(() => {
+  const { tab } = useAutoLayoutContext();
   const onReady = useCallback<IDockviewReactProps['onReady']>(
-    (event) => {
-      const panels = initializeCenterPanelLayout(event.api);
-      panels.launchpadPanel.api.setActive();
-
-      ctx._$centerPanelApi.set(event.api);
+    ({ api }) => {
+      const panels = initializeCenterPanelLayout(tab, api);
+      panels.launchpad.api.setActive();
+      panelRegistry.registerPanel(tab, 'main', api);
 
       const disposables = [
-        event.api.onWillShowOverlay((e) => {
+        api.onWillShowOverlay((e) => {
           if (e.kind === 'header_space' || e.kind === 'tab') {
             return;
           }
@@ -119,7 +121,7 @@ const CenterPanel = memo(() => {
         });
       };
     },
-    [ctx._$centerPanelApi]
+    [tab]
   );
   return (
     <>
@@ -129,7 +131,7 @@ const CenterPanel = memo(() => {
         disableFloatingGroups={true}
         dndEdges={false}
         tabComponents={tabComponents}
-        components={centerComponents}
+        components={mainPanelComponents}
         onReady={onReady}
         theme={dockviewTheme}
       />
@@ -139,50 +141,53 @@ const CenterPanel = memo(() => {
     </>
   );
 });
-CenterPanel.displayName = 'CenterPanel';
+MainPanel.displayName = 'MainPanel';
 
 const rightPanelComponents: AutoLayoutGridviewComponents = {
   [BOARDS_PANEL_ID]: withPanelContainer(BoardsPanel),
   [GALLERY_PANEL_ID]: withPanelContainer(GalleryPanel),
 };
 
-export const initializeRightPanelLayout = (api: GridviewApi) => {
-  const galleryPanel = api.addPanel<PanelParameters>({
+export const initializeRightPanelLayout = (tab: TabName, api: GridviewApi) => {
+  const gallery = api.addPanel<PanelParameters>({
     id: GALLERY_PANEL_ID,
     component: GALLERY_PANEL_ID,
     minimumWidth: RIGHT_PANEL_MIN_SIZE_PX,
     minimumHeight: GALLERY_PANEL_MIN_HEIGHT_PX,
     params: {
+      tab,
       focusRegion: 'gallery',
     },
   });
 
-  const boardsPanel = api.addPanel<PanelParameters>({
+  const boards = api.addPanel<PanelParameters>({
     id: BOARDS_PANEL_ID,
     component: BOARDS_PANEL_ID,
     minimumHeight: BOARD_PANEL_MIN_HEIGHT_PX,
     params: {
+      tab,
       focusRegion: 'boards',
     },
     position: {
       direction: 'above',
-      referencePanel: galleryPanel.id,
+      referencePanel: gallery.id,
     },
   });
 
-  boardsPanel.api.setSize({ height: BOARD_PANEL_DEFAULT_HEIGHT_PX, width: RIGHT_PANEL_MIN_SIZE_PX });
+  boards.api.setSize({ height: BOARD_PANEL_DEFAULT_HEIGHT_PX, width: RIGHT_PANEL_MIN_SIZE_PX });
 
-  return { galleryPanel, boardsPanel } satisfies Record<string, IGridviewPanel>;
+  return { gallery, boards } satisfies Record<string, IGridviewPanel>;
 };
 
 const RightPanel = memo(() => {
-  const ctx = useAutoLayoutContext();
+  const { tab } = useAutoLayoutContext();
+
   const onReady = useCallback<IGridviewReactProps['onReady']>(
-    (event) => {
-      initializeRightPanelLayout(event.api);
-      ctx._$rightPanelApi.set(event.api);
+    ({ api }) => {
+      initializeRightPanelLayout(tab, api);
+      panelRegistry.registerPanel(tab, 'right', api);
     },
-    [ctx._$rightPanelApi]
+    [tab]
   );
   return (
     <GridviewReact
@@ -199,27 +204,30 @@ const leftPanelComponents: AutoLayoutGridviewComponents = {
   [SETTINGS_PANEL_ID]: withPanelContainer(UpscalingTabLeftPanel),
 };
 
-export const initializeLeftPanelLayout = (api: GridviewApi) => {
-  const settingsPanel = api.addPanel<PanelParameters>({
+export const initializeLeftPanelLayout = (tab: TabName, api: GridviewApi) => {
+  const settings = api.addPanel<PanelParameters>({
     id: SETTINGS_PANEL_ID,
     component: SETTINGS_PANEL_ID,
     params: {
+      tab,
       focusRegion: 'settings',
     },
   });
 
-  return { settingsPanel } satisfies Record<string, IGridviewPanel>;
+  return { settings } satisfies Record<string, IGridviewPanel>;
 };
 
 const LeftPanel = memo(() => {
-  const ctx = useAutoLayoutContext();
+  const { tab } = useAutoLayoutContext();
+
   const onReady = useCallback<IGridviewReactProps['onReady']>(
-    (event) => {
-      initializeLeftPanelLayout(event.api);
-      ctx._$leftPanelApi.set(event.api);
+    ({ api }) => {
+      initializeLeftPanelLayout(tab, api);
+      panelRegistry.registerPanel(tab, 'left', api);
     },
-    [ctx._$leftPanelApi]
+    [tab]
   );
+
   return (
     <GridviewReact
       className="dockview-theme-invoke"
@@ -233,58 +241,56 @@ LeftPanel.displayName = 'LeftPanel';
 
 export const rootPanelComponents: RootLayoutGridviewComponents = {
   [LEFT_PANEL_ID]: LeftPanel,
-  [MAIN_PANEL_ID]: CenterPanel,
+  [MAIN_PANEL_ID]: MainPanel,
   [RIGHT_PANEL_ID]: RightPanel,
 };
 
 export const initializeRootPanelLayout = (layoutApi: GridviewApi) => {
-  const mainPanel = layoutApi.addPanel({
+  const main = layoutApi.addPanel({
     id: MAIN_PANEL_ID,
     component: MAIN_PANEL_ID,
     priority: LayoutPriority.High,
   });
 
-  const leftPanel = layoutApi.addPanel({
+  const left = layoutApi.addPanel({
     id: LEFT_PANEL_ID,
     component: LEFT_PANEL_ID,
     minimumWidth: LEFT_PANEL_MIN_SIZE_PX,
     position: {
       direction: 'left',
-      referencePanel: mainPanel.id,
+      referencePanel: main.id,
     },
   });
 
-  const rightPanel = layoutApi.addPanel({
+  const right = layoutApi.addPanel({
     id: RIGHT_PANEL_ID,
     component: RIGHT_PANEL_ID,
     minimumWidth: RIGHT_PANEL_MIN_SIZE_PX,
     position: {
       direction: 'right',
-      referencePanel: mainPanel.id,
+      referencePanel: main.id,
     },
   });
 
-  leftPanel.api.setSize({ width: LEFT_PANEL_MIN_SIZE_PX });
-  rightPanel.api.setSize({ width: RIGHT_PANEL_MIN_SIZE_PX });
+  left.api.setSize({ width: LEFT_PANEL_MIN_SIZE_PX });
+  right.api.setSize({ width: RIGHT_PANEL_MIN_SIZE_PX });
 
-  return { mainPanel, leftPanel, rightPanel } satisfies Record<string, IGridviewPanel>;
+  return { main, left, right } satisfies Record<string, IGridviewPanel>;
 };
 
 export const UpscalingTabAutoLayout = memo(() => {
   const rootRef = useRef<HTMLDivElement>(null);
-  const $rootPanelApi = useState(() => atom<GridviewApi | null>(null))[0];
-  const onReady = useCallback<IGridviewReactProps['onReady']>(
-    (event) => {
-      $rootPanelApi.set(event.api);
-      const { mainPanel } = initializeRootPanelLayout(event.api);
-      mainPanel.api.setActive();
-    },
-    [$rootPanelApi]
-  );
-  useResizeMainPanelOnFirstVisit($rootPanelApi, rootRef);
+  const [rootApi, setRootApi] = useState<GridviewApi | null>(null);
+  const onReady = useCallback<IGridviewReactProps['onReady']>(({ api }) => {
+    const { main } = initializeRootPanelLayout(api);
+    panelRegistry.registerPanel('upscaling', 'root', api);
+    main.api.setActive();
+    setRootApi(api);
+  }, []);
+  useResizeMainPanelOnFirstVisit(rootApi, rootRef);
 
   return (
-    <AutoLayoutProvider $rootApi={$rootPanelApi} rootRef={rootRef} tab="upscaling">
+    <AutoLayoutProvider tab="upscaling" rootRef={rootRef}>
       <GridviewReact
         ref={rootRef}
         className="dockview-theme-invoke"

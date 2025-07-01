@@ -21,10 +21,10 @@ const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0 };
 export const BoardsPanel = memo(() => {
   const boardSearchText = useAppSelector(selectBoardSearchText);
   const searchDisclosure = useDisclosure(!!boardSearchText);
-  const { _$rightPanelApi } = useAutoLayoutContext();
-  const gridviewPanelApi = useStore(_$rightPanelApi);
+  const { tab } = useAutoLayoutContext();
   const collapsibleApi = useCollapsibleGridviewPanel(
-    gridviewPanelApi,
+    tab,
+    'right',
     BOARDS_PANEL_ID,
     'vertical',
     BOARD_PANEL_DEFAULT_HEIGHT_PX,

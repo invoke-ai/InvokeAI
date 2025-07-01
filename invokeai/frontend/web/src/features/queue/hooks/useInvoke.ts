@@ -5,7 +5,7 @@ import { withResultAsync } from 'common/util/result';
 import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { useEnqueueWorkflows } from 'features/queue/hooks/useEnqueueWorkflows';
 import { $isReadyToEnqueue } from 'features/queue/store/readiness';
-import { useAutoLayoutContextSafe } from 'features/ui/layouts/auto-layout-context';
+import { panelRegistry } from 'features/ui/layouts/panel-registry/panelApiRegistry';
 import { VIEWER_PANEL_ID, WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { useCallback } from 'react';
@@ -19,7 +19,6 @@ import { useEnqueueUpscaling } from './useEnqueueUpscaling';
 const log = logger('generation');
 
 export const useInvoke = () => {
-  const ctx = useAutoLayoutContextSafe();
   const tabName = useAppSelector(selectActiveTab);
   const isReady = useStore($isReadyToEnqueue);
   const isLocked = useIsWorkflowEditorLocked();
@@ -64,20 +63,20 @@ export const useInvoke = () => {
   const enqueueBack = useCallback(() => {
     enqueue(false, false);
     if (tabName === 'generate' || tabName === 'workflows' || tabName === 'upscaling') {
-      ctx?.focusPanel(VIEWER_PANEL_ID);
+      panelRegistry.focusPanelInTab(tabName, VIEWER_PANEL_ID);
     } else if (tabName === 'canvas') {
-      ctx?.focusPanel(WORKSPACE_PANEL_ID);
+      panelRegistry.focusPanelInTab(tabName, WORKSPACE_PANEL_ID);
     }
-  }, [ctx, enqueue, tabName]);
+  }, [enqueue, tabName]);
 
   const enqueueFront = useCallback(() => {
     enqueue(true, false);
     if (tabName === 'generate' || tabName === 'workflows' || tabName === 'upscaling') {
-      ctx?.focusPanel(VIEWER_PANEL_ID);
+      panelRegistry.focusPanelInTab(tabName, VIEWER_PANEL_ID);
     } else if (tabName === 'canvas') {
-      ctx?.focusPanel(WORKSPACE_PANEL_ID);
+      panelRegistry.focusPanelInTab(tabName, WORKSPACE_PANEL_ID);
     }
-  }, [ctx, enqueue, tabName]);
+  }, [enqueue, tabName]);
 
   return { enqueueBack, enqueueFront, isLoading, isDisabled: !isReady || isLocked, enqueue };
 };
