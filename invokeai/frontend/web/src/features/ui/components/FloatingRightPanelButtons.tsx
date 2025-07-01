@@ -1,6 +1,6 @@
 import { Flex, IconButton, Tooltip } from '@invoke-ai/ui-library';
 import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
-import { panelRegistry } from 'features/ui/layouts/panel-registry/panelApiRegistry';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiImagesSquareBold } from 'react-icons/pi';
@@ -19,10 +19,10 @@ const ToggleRightPanelButton = memo(() => {
   const { tab } = useAutoLayoutContext();
 
   const onClick = useCallback(() => {
-    if (panelRegistry.tabApi?.getTab() !== tab) {
+    if (navigationApi.tabApi?.getTab() !== tab) {
       return;
     }
-    panelRegistry.toggleLeftPanelInTab(tab);
+    navigationApi.toggleLeftPanelInTab(tab);
   }, [tab]);
 
   return (

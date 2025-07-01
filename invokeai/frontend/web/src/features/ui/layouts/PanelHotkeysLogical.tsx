@@ -1,8 +1,8 @@
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { memo } from 'react';
 
 import { useAutoLayoutContext } from './auto-layout-context';
-import { panelRegistry } from './panel-registry/panelApiRegistry';
 
 export const PanelHotkeysLogical = memo(() => {
   const { tab } = useAutoLayoutContext();
@@ -11,10 +11,10 @@ export const PanelHotkeysLogical = memo(() => {
     category: 'app',
     id: 'toggleLeftPanel',
     callback: () => {
-      if (panelRegistry.tabApi?.getTab() !== tab) {
+      if (navigationApi.tabApi?.getTab() !== tab) {
         return;
       }
-      panelRegistry.toggleLeftPanelInTab(tab);
+      navigationApi.toggleLeftPanelInTab(tab);
     },
     dependencies: [tab],
   });
@@ -22,10 +22,10 @@ export const PanelHotkeysLogical = memo(() => {
     category: 'app',
     id: 'toggleRightPanel',
     callback: () => {
-      if (panelRegistry.tabApi?.getTab() !== tab) {
+      if (navigationApi.tabApi?.getTab() !== tab) {
         return;
       }
-      panelRegistry.toggleRightPanelInTab(tab);
+      navigationApi.toggleRightPanelInTab(tab);
     },
     dependencies: [tab],
   });
@@ -33,10 +33,10 @@ export const PanelHotkeysLogical = memo(() => {
     category: 'app',
     id: 'resetPanelLayout',
     callback: () => {
-      if (panelRegistry.tabApi?.getTab() !== tab) {
+      if (navigationApi.tabApi?.getTab() !== tab) {
         return;
       }
-      panelRegistry.resetPanelsInTab(tab);
+      navigationApi.resetPanelsInTab(tab);
     },
     dependencies: [tab],
   });
@@ -44,10 +44,10 @@ export const PanelHotkeysLogical = memo(() => {
     category: 'app',
     id: 'togglePanels',
     callback: () => {
-      if (panelRegistry.tabApi?.getTab() !== tab) {
+      if (navigationApi.tabApi?.getTab() !== tab) {
         return;
       }
-      panelRegistry.toggleBothPanelsInTab(tab);
+      navigationApi.toggleBothPanelsInTab(tab);
     },
     dependencies: [tab],
   });

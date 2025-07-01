@@ -3,8 +3,8 @@ import type { TabName } from 'features/ui/store/uiTypes';
 import { atom } from 'nanostores';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { TabPanelApis } from './panel-registry/panelApiRegistry';
-import { panelRegistry } from './panel-registry/panelApiRegistry';
+import type { TabPanelApis } from './navigation-api';
+import { navigationApi } from './navigation-api';
 
 const getIsCollapsed = (
   panel: IGridviewPanel<GridviewPanelApi>,
@@ -28,7 +28,7 @@ export const useCollapsibleGridviewPanel = (
   const $isCollapsed = useState(() => atom(false))[0];
   const lastExpandedSizeRef = useRef<number>(0);
   const collapse = useCallback(() => {
-    const api = panelRegistry.getTabPanelApis(tab)?.[rootPanelId];
+    const api = navigationApi.getTabPanelApis(tab)?.[rootPanelId];
     if (!api) {
       return;
     }
@@ -47,7 +47,7 @@ export const useCollapsibleGridviewPanel = (
   }, [collapsedSize, orientation, panelId, rootPanelId, tab]);
 
   const expand = useCallback(() => {
-    const api = panelRegistry.getTabPanelApis(tab)?.[rootPanelId];
+    const api = navigationApi.getTabPanelApis(tab)?.[rootPanelId];
 
     if (!api) {
       return;
@@ -64,7 +64,7 @@ export const useCollapsibleGridviewPanel = (
   }, [defaultSize, orientation, panelId, rootPanelId, tab]);
 
   const toggle = useCallback(() => {
-    const api = panelRegistry.getTabPanelApis(tab)?.[rootPanelId];
+    const api = navigationApi.getTabPanelApis(tab)?.[rootPanelId];
 
     if (!api) {
       return;
@@ -82,7 +82,7 @@ export const useCollapsibleGridviewPanel = (
   }, [tab, rootPanelId, panelId, orientation, collapsedSize, expand, collapse]);
 
   useEffect(() => {
-    const api = panelRegistry.getTabPanelApis(tab)?.[rootPanelId];
+    const api = navigationApi.getTabPanelApis(tab)?.[rootPanelId];
 
     if (!api) {
       return;

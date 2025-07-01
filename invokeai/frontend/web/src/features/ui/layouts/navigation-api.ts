@@ -25,9 +25,9 @@ type AppTabApi = {
 };
 
 /**
- * Global registry for all panel APIs across all tabs
+ * Global API for managing application navigation and tab panels.
  */
-export class PanelRegistry {
+export class AppNavigationApi {
   private tabPanelApis = new Map<TabName, TabPanelApis>();
 
   tabApi: AppTabApi | null = null;
@@ -344,4 +344,4 @@ export class PanelRegistry {
 }
 
 // Global singleton instance
-export const panelRegistry = new PanelRegistry();
+export const navigationApi = new AppNavigationApi();
