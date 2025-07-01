@@ -92,8 +92,6 @@ export const useCollapsibleGridviewPanel = (
       return;
     }
 
-    lastExpandedSizeRef.current = orientation === 'vertical' ? panel.height : panel.width;
-
     const disposable = panel.api.onDidDimensionsChange(() => {
       const isCollapsed = getIsCollapsed(panel, orientation, collapsedSize);
       $isCollapsed.set(isCollapsed);
