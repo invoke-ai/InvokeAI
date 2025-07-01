@@ -4,7 +4,7 @@ import { allEntitiesDeleted } from 'features/controlLayers/store/canvasSlice';
 import { paramsReset } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowsCounterClockwiseBold, PiFilePlusBold } from 'react-icons/pi';
+import { PiArrowsCounterClockwiseBold } from 'react-icons/pi';
 
 export const SessionMenuItems = memo(() => {
   const { t } = useTranslation();
@@ -18,7 +18,6 @@ export const SessionMenuItems = memo(() => {
   }, [dispatch]);
   return (
     <>
-
       <MenuItem icon={<PiArrowsCounterClockwiseBold />} onClick={resetCanvasLayers}>
         {t('controlLayers.resetCanvasLayers')}
       </MenuItem>
