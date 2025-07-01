@@ -4,8 +4,18 @@ import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { bboxChangedFromCanvas } from 'features/controlLayers/store/canvasSlice';
 import { selectMaskBlur } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import type { 
+  Rect,
+  CanvasBrushLineState,
+  CanvasBrushLineWithPressureState,
+  CanvasEraserLineState,
+  CanvasEraserLineWithPressureState,
+  CanvasRectState,
+  CanvasImageState,
+} from 'features/controlLayers/store/types';
+import { transformMaskObjectsRelativeToBbox, calculateMaskBoundsFromBitmap } from 'features/controlLayers/util/maskObjectTransform';
+import { convertTransformedToOriginal } from 'features/controlLayers/util/coordinateTransform';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import type { Rect } from 'features/controlLayers/store/types';
 import { useCallback, useMemo } from 'react';
 
 export const useCanvasAdjustBboxHotkey = () => {
@@ -15,71 +25,55 @@ export const useCanvasAdjustBboxHotkey = () => {
   const maskBlur = useAppSelector(selectMaskBlur);
   const isBusy = useCanvasIsBusy();
   const inpaintMasks = canvasSlice.inpaintMasks.entities;
+  const bboxRect = canvasSlice.bbox.rect;
 
   // Calculate the bounding box that contains all inpaint masks
   const calculateMaskBbox = useCallback((): Rect | null => {
     if (inpaintMasks.length === 0) {
       return null;
     }
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
+
+    // Collect all mask objects from enabled masks
+    const allObjects: (
+      | CanvasBrushLineState
+      | CanvasBrushLineWithPressureState
+      | CanvasEraserLineState
+      | CanvasEraserLineWithPressureState
+      | CanvasRectState
+      | CanvasImageState
+    )[] = [];
+    
     for (const mask of inpaintMasks) {
       if (!mask.isEnabled || !mask.objects || mask.objects.length === 0) {
         continue;
       }
-      for (const obj of mask.objects) {
-        let objMinX = 0;
-        let objMinY = 0;
-        let objMaxX = 0;
-        let objMaxY = 0;
-        if (obj.type === 'rect') {
-          objMinX = mask.position.x + obj.rect.x;
-          objMinY = mask.position.y + obj.rect.y;
-          objMaxX = objMinX + obj.rect.width;
-          objMaxY = objMinY + obj.rect.height;
-        } else if (
-          obj.type === 'brush_line' ||
-          obj.type === 'brush_line_with_pressure' ||
-          obj.type === 'eraser_line' ||
-          obj.type === 'eraser_line_with_pressure'
-        ) {
-          for (let i = 0; i < obj.points.length; i += 2) {
-            const x = mask.position.x + (obj.points[i] ?? 0);
-            const y = mask.position.y + (obj.points[i + 1] ?? 0);
-            if (i === 0) {
-              objMinX = objMaxX = x;
-              objMinY = objMaxY = y;
-            } else {
-              objMinX = Math.min(objMinX, x);
-              objMinY = Math.min(objMinY, y);
-              objMaxX = Math.max(objMaxX, x);
-              objMaxY = Math.max(objMaxY, y);
-            }
-          }
-          const strokeRadius = (obj.strokeWidth ?? 50) / 2;
-          objMinX -= strokeRadius;
-          objMinY -= strokeRadius;
-          objMaxX += strokeRadius;
-          objMaxY += strokeRadius;
-        } else if (obj.type === 'image') {
-          objMinX = mask.position.x;
-          objMinY = mask.position.y;
-          objMaxX = objMinX + obj.image.width;
-          objMaxY = objMinY + obj.image.height;
-        }
-        minX = Math.min(minX, objMinX);
-        minY = Math.min(minY, objMinY);
-        maxX = Math.max(maxX, objMaxX);
-        maxY = Math.max(maxY, objMaxY);
-      }
+
+      // Transform objects to be relative to the bbox
+      const transformedObjects = transformMaskObjectsRelativeToBbox(mask.objects, bboxRect);
+      // Convert back to original types for compatibility
+      const originalObjects = transformedObjects.map(convertTransformedToOriginal);
+      allObjects.push(...originalObjects);
     }
-    if (minX === Infinity || minY === Infinity || maxX === -Infinity || maxY === -Infinity) {
+
+    if (allObjects.length === 0) {
       return null;
     }
-    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-  }, [inpaintMasks]);
+
+    // Calculate bounds from the rendered bitmap for accurate results
+    const maskBounds = calculateMaskBoundsFromBitmap(allObjects, bboxRect.width, bboxRect.height);
+    
+    if (!maskBounds) {
+      return null;
+    }
+
+    // Convert back to world coordinates relative to the bbox
+    return {
+      x: bboxRect.x + maskBounds.x,
+      y: bboxRect.y + maskBounds.y,
+      width: maskBounds.width,
+      height: maskBounds.height,
+    };
+  }, [inpaintMasks, bboxRect]);
 
   const handleAdjustBbox = useCallback(() => {
     const maskBbox = calculateMaskBbox();

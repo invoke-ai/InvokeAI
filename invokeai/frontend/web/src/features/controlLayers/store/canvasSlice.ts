@@ -1010,10 +1010,7 @@ export const canvasSlice = createSlice({
         return;
       }
 
-      // For now, we'll use a simple approach: create a full rectangle and add eraser lines
-      // This is a temporary solution until we can properly handle the bitmap conversion
-
-      // Get the bbox dimensions for the mask
+      // Get the current bbox dimensions for the mask
       const bboxRect = state.bbox.rect;
 
       // Create a full rectangle covering the bbox
@@ -1038,15 +1035,23 @@ export const canvasSlice = createSlice({
         | CanvasBrushLineWithPressureState
       )[] = [fillRect];
 
+      // Create a clip region that constrains all objects to the bbox
+      const bboxClip = {
+        x: bboxRect.x - entity.position.x,
+        y: bboxRect.y - entity.position.y,
+        width: bboxRect.width,
+        height: bboxRect.height,
+      };
+
       for (const obj of entity.objects) {
         if (obj.type === 'brush_line') {
-          // Convert brush line to eraser line
+          // Convert brush line to eraser line, ensuring it's clipped to the bbox
           const eraserLine: CanvasEraserLineState = {
             id: getPrefixedId('eraser_line'),
             type: 'eraser_line',
             strokeWidth: obj.strokeWidth,
             points: obj.points,
-            clip: obj.clip,
+            clip: bboxClip, // Always clip to the current bbox
           };
           invertedObjects.push(eraserLine);
         } else if (obj.type === 'brush_line_with_pressure') {
@@ -1056,7 +1061,7 @@ export const canvasSlice = createSlice({
             type: 'eraser_line_with_pressure',
             strokeWidth: obj.strokeWidth,
             points: obj.points,
-            clip: obj.clip,
+            clip: bboxClip, // Always clip to the current bbox
           };
           invertedObjects.push(eraserLine);
         } else if (obj.type === 'rect') {
@@ -1080,7 +1085,7 @@ export const canvasSlice = createSlice({
             type: 'eraser_line',
             points,
             strokeWidth: Math.max(width, height) / 2, // Use a stroke width that covers the rectangle
-            clip: null,
+            clip: bboxClip, // Always clip to the current bbox
           };
           invertedObjects.push(eraserLine);
         } else if (obj.type === 'eraser_line') {
@@ -1090,7 +1095,7 @@ export const canvasSlice = createSlice({
             type: 'brush_line',
             strokeWidth: obj.strokeWidth,
             points: obj.points,
-            clip: obj.clip,
+            clip: bboxClip, // Always clip to the current bbox
             color: { r: 255, g: 255, b: 255, a: 1 },
           };
           invertedObjects.push(brushLine);
@@ -1101,7 +1106,7 @@ export const canvasSlice = createSlice({
             type: 'brush_line_with_pressure',
             strokeWidth: obj.strokeWidth,
             points: obj.points,
-            clip: obj.clip,
+            clip: bboxClip, // Always clip to the current bbox
             color: { r: 255, g: 255, b: 255, a: 1 },
           };
           invertedObjects.push(brushLine);
