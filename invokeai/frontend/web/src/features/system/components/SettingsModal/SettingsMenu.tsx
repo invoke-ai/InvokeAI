@@ -36,6 +36,7 @@ const SettingsMenu = () => {
   const isBugLinkEnabled = useFeatureStatus('bugLink');
   const isDiscordLinkEnabled = useFeatureStatus('discordLink');
   const isGithubLinkEnabled = useFeatureStatus('githubLink');
+  const isAboutModalEnabled = useFeatureStatus('aboutModal');
 
   return (
     <Menu isOpen={isOpen} onOpen={onOpen} onClose={onClose} autoSelect={false}>
@@ -84,11 +85,13 @@ const SettingsMenu = () => {
             </SettingsModal>
           </MenuGroup>
           <MenuGroup title={t('accessibility.about')}>
-            <AboutModal>
-              <MenuItem as="button" icon={<PiInfoBold />}>
-                {t('accessibility.about')}
-              </MenuItem>
-            </AboutModal>
+            {isAboutModalEnabled && (
+              <AboutModal>
+                <MenuItem as="button" icon={<PiInfoBold />}>
+                  {t('accessibility.about')}
+                </MenuItem>
+              </AboutModal>
+            )}
           </MenuGroup>
         </MenuList>
       </Portal>
