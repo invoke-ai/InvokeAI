@@ -5,8 +5,10 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useRefImageEntity } from 'features/controlLayers/components/RefImage/useRefImageEntity';
 import { useRefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
 import { refImageDeleted, selectRefImageEntityIds } from 'features/controlLayers/store/refImagesSlice';
+import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { memo, useCallback, useMemo } from 'react';
-import { PiTrashBold } from 'react-icons/pi';
+import { useTranslation } from 'react-i18next';
+import { PiGearBold, PiTrashBold } from 'react-icons/pi';
 
 const textSx: SystemStyleObject = {
   color: 'base.300',
@@ -18,6 +20,7 @@ const textSx: SystemStyleObject = {
 export const RefImageHeader = memo(() => {
   const dispatch = useAppDispatch();
   const id = useRefImageIdContext();
+  const { t } = useTranslation();
   const selectRefImageNumber = useMemo(
     () => createSelector(selectRefImageEntityIds, (ids) => ids.indexOf(id) + 1),
     [id]
@@ -28,21 +31,39 @@ export const RefImageHeader = memo(() => {
     dispatch(refImageDeleted({ id }));
   }, [dispatch, id]);
 
+  // Advanced section toggle for IP Adapter settings
+  const { isOpen: isAdvancedOpen, onToggle: onToggleAdvanced } = useStandaloneAccordionToggle({
+    id: `reference-image-advanced-${id}`,
+    defaultIsOpen: false,
+  });
+
   return (
     <Flex justifyContent="space-between" alignItems="center" w="full" ps={2}>
       <Text fontWeight="semibold" sx={textSx} data-is-error={!entity.config.image}>
         Reference Image #{refImageNumber}
       </Text>
-      <IconButton
-        tooltip="Delete Reference Image"
-        size="xs"
-        variant="link"
-        alignSelf="stretch"
-        aria-label="Delete ref image"
-        onClick={deleteRefImage}
-        icon={<PiTrashBold />}
-        colorScheme="error"
-      />
+      <Flex gap={1}>
+        <IconButton
+          tooltip={t('accordions.advanced.title')}
+          size="xs"
+          variant="link"
+          alignSelf="stretch"
+          aria-label={t('accordions.advanced.title')}
+          onClick={onToggleAdvanced}
+          icon={<PiGearBold />}
+          colorScheme={isAdvancedOpen ? 'accent' : 'base'}
+        />
+        <IconButton
+          tooltip="Delete Reference Image"
+          size="xs"
+          variant="link"
+          alignSelf="stretch"
+          aria-label="Delete ref image"
+          onClick={deleteRefImage}
+          icon={<PiTrashBold />}
+          colorScheme="error"
+        />
+      </Flex>
     </Flex>
   );
 });

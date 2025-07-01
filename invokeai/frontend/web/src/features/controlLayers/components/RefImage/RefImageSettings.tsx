@@ -1,10 +1,9 @@
-import { Flex, StandaloneAccordion } from '@invoke-ai/ui-library';
+import { Flex } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
 import { FLUXReduxImageInfluence } from 'features/controlLayers/components/common/FLUXReduxImageInfluence';
 import { IPAdapterCLIPVisionModel } from 'features/controlLayers/components/common/IPAdapterCLIPVisionModel';
-import { PullBboxIntoRefImageIconButton } from 'features/controlLayers/components/common/PullBboxIntoRefImageIconButton';
 import { Weight } from 'features/controlLayers/components/common/Weight';
 import { IPAdapterMethod } from 'features/controlLayers/components/RefImage/IPAdapterMethod';
 import { RefImageModel } from 'features/controlLayers/components/RefImage/RefImageModel';
@@ -115,51 +114,29 @@ const RefImageSettingsContent = memo(() => {
   const isFLUX = useAppSelector(selectIsFLUX);
 
   // Advanced section toggle for IP Adapter settings
-  const { isOpen: isAdvancedOpen, onToggle: onToggleAdvanced } = useStandaloneAccordionToggle({
+  const { isOpen: isAdvancedOpen } = useStandaloneAccordionToggle({
     id: `reference-image-advanced-${id}`,
     defaultIsOpen: false,
   });
 
-  // Calculate badges for advanced section
-  const advancedBadges = useMemo(() => {
-    if (!isIPAdapterConfig(config)) {
-      return [];
-    }
-    const badges: string[] = [];
-    if (config.clipVisionModel !== 'ViT-H') {
-      badges.push(config.clipVisionModel);
-    }
-    if (config.beginEndStepPct[0] !== 0 || config.beginEndStepPct[1] !== 1) {
-      badges.push(`${Math.round(config.beginEndStepPct[0] * 100)}-${Math.round(config.beginEndStepPct[1] * 100)}%`);
-    }
-    return badges;
-  }, [config]);
-
   return (
     <Flex flexDir="column" gap={2} position="relative" w="full">
-      <Flex gap={2} alignItems="center" w="full">
-        <RefImageModel modelKey={config.model?.key ?? null} onChangeModel={onChangeModel} />
-        {tab === 'canvas' && (
-          <CanvasManagerProviderGate>
-            <PullBboxIntoRefImageIconButton />
-          </CanvasManagerProviderGate>
-        )}
-      </Flex>
       <Flex gap={2} w="full">
-        {isIPAdapterConfig(config) && (
-          <Flex flexDir="column" gap={2} w="full">
-            {!isFLUX && <IPAdapterMethod method={config.method} onChange={onChangeIPMethod} />}
-            <Weight weight={config.weight} onChange={onChangeWeight} />
-          </Flex>
-        )}
-        {isFLUXReduxConfig(config) && (
-          <Flex flexDir="column" gap={2} w="full" alignItems="flex-start">
+        <Flex flexDir="column" gap={2} w="full">
+          {isIPAdapterConfig(config) && (
+            <>
+              {!isFLUX && <IPAdapterMethod method={config.method} onChange={onChangeIPMethod} />}
+              <Weight weight={config.weight} onChange={onChangeWeight} />
+              <BeginEndStepPct beginEndStepPct={config.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
+            </>
+          )}
+          {isFLUXReduxConfig(config) && (
             <FLUXReduxImageInfluence
               imageInfluence={config.imageInfluence ?? 'lowest'}
               onChange={onChangeFLUXReduxImageInfluence}
             />
-          </Flex>
-        )}
+          )}
+        </Flex>
         <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1" flexGrow={1}>
           <RefImageImage
             image={config.image}
@@ -169,18 +146,13 @@ const RefImageSettingsContent = memo(() => {
           />
         </Flex>
       </Flex>
-      {isIPAdapterConfig(config) && (
-        <StandaloneAccordion
-          label={t('accordions.advanced.title')}
-          badges={advancedBadges}
-          isOpen={isAdvancedOpen}
-          onToggle={onToggleAdvanced}
-        >
-          <Flex flexDir="column" gap={2} p={4}>
+      {isIPAdapterConfig(config) && isAdvancedOpen && (
+        <Flex flexDir="column" gap={2} p={4} bg="base.900" borderRadius="base">
+          <Flex gap={2} w="full">
+            <RefImageModel modelKey={config.model?.key ?? null} onChangeModel={onChangeModel} />
             <IPAdapterCLIPVisionModel model={config.clipVisionModel} onChange={onChangeCLIPVisionModel} />
-            <BeginEndStepPct beginEndStepPct={config.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
           </Flex>
-        </StandaloneAccordion>
+        </Flex>
       )}
     </Flex>
   );
