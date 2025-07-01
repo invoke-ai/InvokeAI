@@ -18,6 +18,7 @@ import {
   getReferenceImageState,
   imageDTOToImageWithDims,
   initialChatGPT4oReferenceImage,
+  initialFluxKontextReferenceImage,
   initialFLUXRedux,
   initialIPAdapter,
 } from './util';
