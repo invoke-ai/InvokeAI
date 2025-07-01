@@ -15,10 +15,15 @@ import {
   selectRegionalGuidanceReferenceImage,
 } from 'features/controlLayers/store/selectors';
 import type {
+  CanvasBrushLineState,
+  CanvasBrushLineWithPressureState,
   CanvasEntityStateFromType,
   CanvasEntityType,
+  CanvasEraserLineState,
+  CanvasEraserLineWithPressureState,
   CanvasInpaintMaskState,
   CanvasMetadata,
+  CanvasRectState,
   ControlLoRAConfig,
   EntityMovedByPayload,
   FillStyle,
@@ -1005,11 +1010,16 @@ export const canvasSlice = createSlice({
         return;
       }
 
-      // Create a rectangle covering the current bounding box relative to the entity position
+      // For now, we'll use a simple approach: create a full rectangle and add eraser lines
+      // This is a temporary solution until we can properly handle the bitmap conversion
+
+      // Get the bbox dimensions for the mask
       const bboxRect = state.bbox.rect;
-      const fillRectObject = {
+
+      // Create a full rectangle covering the bbox
+      const fillRect: CanvasRectState = {
         id: getPrefixedId('rect'),
-        type: 'rect' as const,
+        type: 'rect',
         rect: {
           x: bboxRect.x - entity.position.x,
           y: bboxRect.y - entity.position.y,
@@ -1019,52 +1029,89 @@ export const canvasSlice = createSlice({
         color: { r: 255, g: 255, b: 255, a: 1 },
       };
 
-      // To invert a mask, we need to:
-      // 1. Start with a full rectangle covering the bbox (this becomes the "base mask")
-      // 2. Convert existing brush/rect objects to eraser lines to "punch holes" in the base mask
-      const convertedObjects = entity.objects.map((obj) => {
-        if (obj.type === 'brush_line') {
-          // Convert brush lines to eraser lines
-          return {
-            ...obj,
-            id: getPrefixedId('eraser_line'),
-            type: 'eraser_line' as const,
-          };
-        } else if (obj.type === 'brush_line_with_pressure') {
-          // Convert brush lines with pressure to eraser lines with pressure
-          return {
-            ...obj,
-            id: getPrefixedId('eraser_line'),
-            type: 'eraser_line_with_pressure' as const,
-          };
-        } else if (obj.type === 'rect') {
-          // Convert rectangles to eraser "rectangles" by making them transparent
-          return {
-            ...obj,
-            id: getPrefixedId('rect'),
-            color: { ...obj.color, a: 0 }, // Make transparent to act as eraser
-          };
-        } else if (obj.type === 'eraser_line') {
-          // Convert eraser lines to brush lines
-          return {
-            ...obj,
-            id: getPrefixedId('brush_line'),
-            type: 'brush_line' as const,
-          };
-        } else if (obj.type === 'eraser_line_with_pressure') {
-          // Convert eraser lines with pressure to brush lines with pressure
-          return {
-            ...obj,
-            id: getPrefixedId('brush_line'),
-            type: 'brush_line_with_pressure' as const,
-          };
-        }
-        // Keep images and other objects as is
-        return obj;
-      });
+      // Convert existing brush lines to eraser lines to "punch holes" in the full rectangle
+      const invertedObjects: (
+        | CanvasRectState
+        | CanvasEraserLineState
+        | CanvasEraserLineWithPressureState
+        | CanvasBrushLineState
+        | CanvasBrushLineWithPressureState
+      )[] = [fillRect];
 
-      // Replace all objects with the base rectangle followed by converted objects
-      entity.objects = [fillRectObject, ...convertedObjects];
+      for (const obj of entity.objects) {
+        if (obj.type === 'brush_line') {
+          // Convert brush line to eraser line
+          const eraserLine: CanvasEraserLineState = {
+            id: getPrefixedId('eraser_line'),
+            type: 'eraser_line',
+            strokeWidth: obj.strokeWidth,
+            points: obj.points,
+            clip: obj.clip,
+          };
+          invertedObjects.push(eraserLine);
+        } else if (obj.type === 'brush_line_with_pressure') {
+          // Convert brush line with pressure to eraser line with pressure
+          const eraserLine: CanvasEraserLineWithPressureState = {
+            id: getPrefixedId('eraser_line'),
+            type: 'eraser_line_with_pressure',
+            strokeWidth: obj.strokeWidth,
+            points: obj.points,
+            clip: obj.clip,
+          };
+          invertedObjects.push(eraserLine);
+        } else if (obj.type === 'rect') {
+          // Convert rectangle to eraser rectangle (we'll use eraser lines to trace the rectangle)
+          const { x, y, width, height } = obj.rect;
+          const points = [
+            x,
+            y,
+            x + width,
+            y,
+            x + width,
+            y + height,
+            x,
+            y + height,
+            x,
+            y, // Close the rectangle
+          ];
+
+          const eraserLine: CanvasEraserLineState = {
+            id: getPrefixedId('eraser_line'),
+            type: 'eraser_line',
+            points,
+            strokeWidth: Math.max(width, height) / 2, // Use a stroke width that covers the rectangle
+            clip: null,
+          };
+          invertedObjects.push(eraserLine);
+        } else if (obj.type === 'eraser_line') {
+          // Convert eraser line to brush line
+          const brushLine: CanvasBrushLineState = {
+            id: getPrefixedId('brush_line'),
+            type: 'brush_line',
+            strokeWidth: obj.strokeWidth,
+            points: obj.points,
+            clip: obj.clip,
+            color: { r: 255, g: 255, b: 255, a: 1 },
+          };
+          invertedObjects.push(brushLine);
+        } else if (obj.type === 'eraser_line_with_pressure') {
+          // Convert eraser line with pressure to brush line with pressure
+          const brushLine: CanvasBrushLineWithPressureState = {
+            id: getPrefixedId('brush_line'),
+            type: 'brush_line_with_pressure',
+            strokeWidth: obj.strokeWidth,
+            points: obj.points,
+            clip: obj.clip,
+            color: { r: 255, g: 255, b: 255, a: 1 },
+          };
+          invertedObjects.push(brushLine);
+        }
+        // Note: Image objects are not handled in this simple approach
+        // They would need to be processed through the compositor
+      }
+
+      // Replace the entity's objects with the inverted mask objects
+      entity.objects = invertedObjects;
     },
     //#region BBox
     bboxScaledWidthChanged: (state, action: PayloadAction<number>) => {
