@@ -1,6 +1,5 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { useNewCanvasSession } from 'features/controlLayers/components/NewSessionConfirmationAlertDialog';
 import { allEntitiesDeleted } from 'features/controlLayers/store/canvasSlice';
 import { paramsReset } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
@@ -10,7 +9,7 @@ import { PiArrowsCounterClockwiseBold, PiFilePlusBold } from 'react-icons/pi';
 export const SessionMenuItems = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const { newCanvasSessionWithDialog } = useNewCanvasSession();
+
   const resetCanvasLayers = useCallback(() => {
     dispatch(allEntitiesDeleted());
   }, [dispatch]);
@@ -19,9 +18,7 @@ export const SessionMenuItems = memo(() => {
   }, [dispatch]);
   return (
     <>
-      <MenuItem icon={<PiFilePlusBold />} onClick={newCanvasSessionWithDialog}>
-        {t('controlLayers.newCanvasSession')}
-      </MenuItem>
+
       <MenuItem icon={<PiArrowsCounterClockwiseBold />} onClick={resetCanvasLayers}>
         {t('controlLayers.resetCanvasLayers')}
       </MenuItem>
