@@ -3,10 +3,24 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { setUpscaleInitialImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
-import { creativityChanged, selectCreativity, selectStructure,selectUpscaleInitialImage, structureChanged, upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
+import {
+  creativityChanged,
+  selectCreativity,
+  selectStructure,
+  selectUpscaleInitialImage,
+  structureChanged,
+  upscaleInitialImageChanged,
+} from 'features/parameters/store/upscaleSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiImageBold, PiPaletteBold, PiScalesBold, PiShieldCheckBold, PiSparkleBold,PiUploadBold } from 'react-icons/pi';
+import {
+  PiImageBold,
+  PiPaletteBold,
+  PiScalesBold,
+  PiShieldCheckBold,
+  PiSparkleBold,
+  PiUploadBold,
+} from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
 import { LaunchpadButton } from './LaunchpadButton';
@@ -108,40 +122,40 @@ export const UpscalingLaunchpadPanel = memo(() => {
               Creativity & Structural Defaults
             </Text>
             <Flex flexDir="column" gap={2}>
-              <Button 
-                size="sm" 
-                variant={creativity === -5 && structure === 5 ? "solid" : "outline"} 
-                colorScheme="base" 
+              <Button
+                size="sm"
+                variant={creativity === -5 && structure === 5 ? 'solid' : 'outline'}
+                colorScheme="base"
                 justifyContent="center"
                 onClick={onConservativeClick}
                 leftIcon={<PiShieldCheckBold />}
               >
                 Conservative
               </Button>
-              <Button 
-                size="sm" 
-                variant={creativity === 0 && structure === 0 ? "solid" : "outline"} 
-                colorScheme="base" 
+              <Button
+                size="sm"
+                variant={creativity === 0 && structure === 0 ? 'solid' : 'outline'}
+                colorScheme="base"
                 justifyContent="center"
                 onClick={onBalancedClick}
                 leftIcon={<PiScalesBold />}
               >
                 Balanced
               </Button>
-              <Button 
-                size="sm" 
-                variant={creativity === 5 && structure === -2 ? "solid" : "outline"} 
-                colorScheme="base" 
+              <Button
+                size="sm"
+                variant={creativity === 5 && structure === -2 ? 'solid' : 'outline'}
+                colorScheme="base"
                 justifyContent="center"
                 onClick={onCreativeClick}
                 leftIcon={<PiPaletteBold />}
               >
                 Creative
               </Button>
-              <Button 
-                size="sm" 
-                variant={creativity === 8 && structure === -5 ? "solid" : "outline"} 
-                colorScheme="base" 
+              <Button
+                size="sm"
+                variant={creativity === 8 && structure === -5 ? 'solid' : 'outline'}
+                colorScheme="base"
                 justifyContent="center"
                 onClick={onArtisticClick}
                 leftIcon={<PiSparkleBold />}

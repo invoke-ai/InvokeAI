@@ -54,9 +54,9 @@ export const WorkflowsLaunchpadPanel = memo(() => {
         </Text>
 
         <Text>
-          <Button 
-            as="a" 
-            variant="link" 
+          <Button
+            as="a"
+            variant="link"
             href="https://support.invoke.ai/support/solutions/articles/151000189610-getting-started-with-workflows-denoise-latents"
             target="_blank"
             rel="noopener noreferrer"
