@@ -1,4 +1,4 @@
-import { Flex } from '@invoke-ai/ui-library';
+import { Flex, StandaloneAccordion } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
@@ -36,8 +36,10 @@ import type {
 import { isFLUXReduxConfig, isIPAdapterConfig } from 'features/controlLayers/store/types';
 import type { SetGlobalReferenceImageDndTargetData } from 'features/dnd/dnd';
 import { setGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
+import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { ApiModelConfig, FLUXReduxModelConfig, ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 
 import { RefImageImage } from './RefImageImage';
@@ -51,6 +53,7 @@ const buildSelectConfig = (id: string) =>
 const RefImageSettingsContent = memo(() => {
   const dispatch = useAppDispatch();
   const id = useRefImageIdContext();
+  const { t } = useTranslation();
   const selectConfig = useMemo(() => buildSelectConfig(id), [id]);
   const config = useAppSelector(selectConfig);
   const tab = useAppSelector(selectActiveTab);
@@ -111,13 +114,31 @@ const RefImageSettingsContent = memo(() => {
 
   const isFLUX = useAppSelector(selectIsFLUX);
 
+  // Advanced section toggle for IP Adapter settings
+  const { isOpen: isAdvancedOpen, onToggle: onToggleAdvanced } = useStandaloneAccordionToggle({
+    id: `reference-image-advanced-${id}`,
+    defaultIsOpen: false,
+  });
+
+  // Calculate badges for advanced section
+  const advancedBadges = useMemo(() => {
+    if (!isIPAdapterConfig(config)) {
+      return [];
+    }
+    const badges: string[] = [];
+    if (config.clipVisionModel !== 'ViT-H') {
+      badges.push(config.clipVisionModel);
+    }
+    if (config.beginEndStepPct[0] !== 0 || config.beginEndStepPct[1] !== 1) {
+      badges.push(`${Math.round(config.beginEndStepPct[0] * 100)}-${Math.round(config.beginEndStepPct[1] * 100)}%`);
+    }
+    return badges;
+  }, [config]);
+
   return (
     <Flex flexDir="column" gap={2} position="relative" w="full">
       <Flex gap={2} alignItems="center" w="full">
         <RefImageModel modelKey={config.model?.key ?? null} onChangeModel={onChangeModel} />
-        {isIPAdapterConfig(config) && (
-          <IPAdapterCLIPVisionModel model={config.clipVisionModel} onChange={onChangeCLIPVisionModel} />
-        )}
         {tab === 'canvas' && (
           <CanvasManagerProviderGate>
             <PullBboxIntoRefImageIconButton />
@@ -129,7 +150,6 @@ const RefImageSettingsContent = memo(() => {
           <Flex flexDir="column" gap={2} w="full">
             {!isFLUX && <IPAdapterMethod method={config.method} onChange={onChangeIPMethod} />}
             <Weight weight={config.weight} onChange={onChangeWeight} />
-            <BeginEndStepPct beginEndStepPct={config.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
           </Flex>
         )}
         {isFLUXReduxConfig(config) && (
@@ -149,6 +169,19 @@ const RefImageSettingsContent = memo(() => {
           />
         </Flex>
       </Flex>
+      {isIPAdapterConfig(config) && (
+        <StandaloneAccordion
+          label={t('accordions.advanced.title')}
+          badges={advancedBadges}
+          isOpen={isAdvancedOpen}
+          onToggle={onToggleAdvanced}
+        >
+          <Flex flexDir="column" gap={2} p={4}>
+            <IPAdapterCLIPVisionModel model={config.clipVisionModel} onChange={onChangeCLIPVisionModel} />
+            <BeginEndStepPct beginEndStepPct={config.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
+          </Flex>
+        </StandaloneAccordion>
+      )}
     </Flex>
   );
 });

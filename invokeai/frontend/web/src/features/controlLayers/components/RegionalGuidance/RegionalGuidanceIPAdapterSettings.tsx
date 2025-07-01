@@ -1,4 +1,4 @@
-import { Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
+import { Flex, IconButton, Spacer, StandaloneAccordion, Text } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
@@ -31,6 +31,7 @@ import type {
 } from 'features/controlLayers/store/types';
 import type { SetRegionalGuidanceReferenceImageDndTargetData } from 'features/dnd/dnd';
 import { setRegionalGuidanceReferenceImageDndTarget } from 'features/dnd/dnd';
+import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold, PiXBold } from 'react-icons/pi';
@@ -120,6 +121,27 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
   const pullBboxIntoIPAdapter = usePullBboxIntoRegionalGuidanceReferenceImage(entityIdentifier, referenceImageId);
   const isBusy = useCanvasIsBusy();
 
+  // Advanced section toggle for IP Adapter settings
+  const { isOpen: isAdvancedOpen, onToggle: onToggleAdvanced } = useStandaloneAccordionToggle({
+    id: `regional-guidance-reference-image-advanced-${referenceImageId}`,
+    defaultIsOpen: false,
+  });
+
+  // Calculate badges for advanced section
+  const advancedBadges = useMemo(() => {
+    if (config.type !== 'ip_adapter') {
+      return [];
+    }
+    const badges: string[] = [];
+    if (config.clipVisionModel !== 'ViT-H') {
+      badges.push(config.clipVisionModel);
+    }
+    if (config.beginEndStepPct[0] !== 0 || config.beginEndStepPct[1] !== 1) {
+      badges.push(`${Math.round(config.beginEndStepPct[0] * 100)}-${Math.round(config.beginEndStepPct[1] * 100)}%`);
+    }
+    return badges;
+  }, [config]);
+
   return (
     <Flex flexDir="column" gap={2}>
       <Flex alignItems="center" gap={2}>
@@ -141,9 +163,6 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
       <Flex flexDir="column" gap={2} position="relative" w="full">
         <Flex gap={2} alignItems="center" w="full">
           <RegionalReferenceImageModel modelKey={config.model?.key ?? null} onChangeModel={onChangeModel} />
-          {config.type === 'ip_adapter' && (
-            <IPAdapterCLIPVisionModel model={config.clipVisionModel} onChange={onChangeCLIPVisionModel} />
-          )}
           <IconButton
             onClick={pullBboxIntoIPAdapter}
             isDisabled={isBusy}
@@ -158,7 +177,6 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
             <Flex flexDir="column" gap={2} w="full">
               <IPAdapterMethod method={config.method} onChange={onChangeIPMethod} />
               <Weight weight={config.weight} onChange={onChangeWeight} />
-              <BeginEndStepPct beginEndStepPct={config.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
             </Flex>
           )}
           {config.type === 'flux_redux' && (
@@ -178,6 +196,19 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
             />
           </Flex>
         </Flex>
+        {config.type === 'ip_adapter' && (
+          <StandaloneAccordion
+            label={t('accordions.advanced.title')}
+            badges={advancedBadges}
+            isOpen={isAdvancedOpen}
+            onToggle={onToggleAdvanced}
+          >
+            <Flex flexDir="column" gap={2} p={4}>
+              <IPAdapterCLIPVisionModel model={config.clipVisionModel} onChange={onChangeCLIPVisionModel} />
+              <BeginEndStepPct beginEndStepPct={config.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
+            </Flex>
+          </StandaloneAccordion>
+        )}
       </Flex>
     </Flex>
   );
