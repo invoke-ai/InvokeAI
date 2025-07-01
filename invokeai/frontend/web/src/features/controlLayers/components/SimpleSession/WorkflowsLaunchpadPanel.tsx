@@ -1,4 +1,4 @@
-import { Flex, Heading, Icon, Link, Text } from '@invoke-ai/ui-library';
+import { Button, Flex, Heading, Icon, Text } from '@invoke-ai/ui-library';
 import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
 import { useNewWorkflow } from 'features/workflowLibrary/components/NewWorkflowConfirmationAlertDialog';
 import { useLoadWorkflowFromFile } from 'features/workflowLibrary/hooks/useLoadWorkflowFromFile';
@@ -53,14 +53,18 @@ export const WorkflowsLaunchpadPanel = memo(() => {
           {t('ui.launchpad.workflows.description')}
         </Text>
 
-        <Link
-          href="https://support.invoke.ai/support/solutions/articles/151000189610-getting-started-with-workflows-denoise-latents"
-          isExternal
-          color="invokeBlue.400"
-          fontSize="sm"
-        >
-          {t('ui.launchpad.workflows.learnMoreLink')}
-        </Link>
+        <Text>
+          <Button 
+            as="a" 
+            variant="link" 
+            href="https://support.invoke.ai/support/solutions/articles/151000189610-getting-started-with-workflows-denoise-latents"
+            target="_blank"
+            rel="noopener noreferrer"
+            size="sm"
+          >
+            {t('ui.launchpad.workflows.learnMoreLink')}
+          </Button>
+        </Text>
 
         {/* Action Buttons */}
         <Flex flexDir="column" gap={8}>

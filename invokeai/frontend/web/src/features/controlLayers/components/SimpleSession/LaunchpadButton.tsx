@@ -11,6 +11,7 @@ export const LaunchpadButton = memo(
         display="flex"
         position="relative"
         alignItems="center"
+        justifyContent="left"
         borderWidth={1}
         borderRadius="base"
         p={4}

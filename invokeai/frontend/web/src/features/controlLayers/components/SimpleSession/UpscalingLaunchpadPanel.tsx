@@ -1,17 +1,14 @@
-import { Box, Flex, Grid, Heading, Icon, Text } from '@invoke-ai/ui-library';
+import { Box, Button, Flex, Grid, Heading, Icon, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { setUpscaleInitialImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
 import { DndImageIcon } from 'features/dnd/DndImageIcon';
-import ParamSpandrelModel from 'features/parameters/components/Upscale/ParamSpandrelModel';
-import { selectUpscaleInitialImage, upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
-import { MainModelPicker } from 'features/settingsAccordions/components/GenerationSettingsAccordion/MainModelPicker';
-import { UpscaleScaleSlider } from 'features/settingsAccordions/components/UpscaleSettingsAccordion/UpscaleScaleSlider';
+import { selectUpscaleInitialImage, upscaleInitialImageChanged, creativityChanged, structureChanged, selectCreativity, selectStructure } from 'features/parameters/store/upscaleSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowCounterClockwiseBold, PiImageBold, PiUploadBold } from 'react-icons/pi';
+import { PiArrowCounterClockwiseBold, PiImageBold, PiUploadBold, PiShieldCheckBold, PiScalesBold, PiPaletteBold, PiSparkleBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
 import { LaunchpadButton } from './LaunchpadButton';
@@ -20,6 +17,8 @@ export const UpscalingLaunchpadPanel = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const upscaleInitialImage = useAppSelector(selectUpscaleInitialImage);
+  const creativity = useAppSelector(selectCreativity);
+  const structure = useAppSelector(selectStructure);
 
   const dndTargetData = useMemo(() => setUpscaleInitialImageDndTarget.getData(), []);
 
@@ -35,6 +34,27 @@ export const UpscalingLaunchpadPanel = memo(() => {
   }, [dispatch]);
 
   const uploadApi = useImageUploadButton({ allowMultiple: false, onUpload });
+
+  // Preset button handlers
+  const onConservativeClick = useCallback(() => {
+    dispatch(creativityChanged(-5));
+    dispatch(structureChanged(5));
+  }, [dispatch]);
+
+  const onBalancedClick = useCallback(() => {
+    dispatch(creativityChanged(0));
+    dispatch(structureChanged(0));
+  }, [dispatch]);
+
+  const onCreativeClick = useCallback(() => {
+    dispatch(creativityChanged(5));
+    dispatch(structureChanged(-2));
+  }, [dispatch]);
+
+  const onArtisticClick = useCallback(() => {
+    dispatch(creativityChanged(8));
+    dispatch(structureChanged(-5));
+  }, [dispatch]);
 
   return (
     <Flex flexDir="column" h="full" w="full" alignItems="center" gap={2}>
@@ -57,34 +77,14 @@ export const UpscalingLaunchpadPanel = memo(() => {
             </>
           ) : (
             <>
-              <Flex position="relative" w={16} h={16} alignItems="center" justifyContent="center">
-                <DndImage imageDTO={upscaleInitialImage} />
-                <Flex position="absolute" flexDir="column" top={1} insetInlineEnd={1} gap={1}>
-                  <DndImageIcon
-                    onClick={onReset}
-                    icon={<PiArrowCounterClockwiseBold size={12} />}
-                    tooltip={t('common.reset')}
-                  />
-                </Flex>
-                <Text
-                  position="absolute"
-                  background="base.900"
-                  color="base.50"
-                  fontSize="xs"
-                  fontWeight="semibold"
-                  bottom={0}
-                  left={0}
-                  opacity={0.7}
-                  px={1}
-                  lineHeight={1.25}
-                  borderTopEndRadius="base"
-                  borderBottomStartRadius="base"
-                  pointerEvents="none"
-                >{`${upscaleInitialImage.width}x${upscaleInitialImage.height}`}</Text>
-              </Flex>
+              <Icon as={PiImageBold} boxSize={8} color="base.500" />
               <Flex flexDir="column" alignItems="flex-start" gap={2}>
-                <Heading size="sm">{t('ui.launchpad.upscaling.imageReady.title')}</Heading>
-                <Text color="base.300">{t('ui.launchpad.upscaling.imageReady.description')}</Text>
+                <Heading size="sm">{t('ui.launchpad.upscaling.replaceImage.title')}</Heading>
+                <Text color="base.300">{t('ui.launchpad.upscaling.replaceImage.description')}</Text>
+              </Flex>
+              <Flex position="absolute" right={3} bottom={3}>
+                <PiUploadBold />
+                <input {...uploadApi.getUploadInputProps()} />
               </Flex>
             </>
           )}
@@ -108,33 +108,54 @@ export const UpscalingLaunchpadPanel = memo(() => {
         {/* Controls */}
         <style>{`.launchpad-hide-label .chakra-form__label { display: none !important; }`}</style>
         <Grid gridTemplateColumns="1fr 1fr" gap={10} alignItems="start" mt={upscaleInitialImage ? 8 : 12}>
-          {/* Left Column: All parameters stacked */}
-          <Flex flexDir="column" gap={6} alignItems="flex-start">
-            <Box w="full">
-              <Text fontWeight="semibold" fontSize="sm" mb={1}>
-                {t('ui.launchpad.upscaling.upscaleModel')}
-              </Text>
-              <Box className="launchpad-hide-label">
-                <ParamSpandrelModel />
-              </Box>
-            </Box>
-            <Box w="full">
-              <Text fontWeight="semibold" fontSize="sm" mb={1}>
-                {t('ui.launchpad.upscaling.model')}
-              </Text>
-              <Box className="launchpad-hide-label">
-                <MainModelPicker />
-              </Box>
-            </Box>
-            <Box w="full">
-              <Text fontWeight="semibold" fontSize="sm" mb={1}>
-                {t('ui.launchpad.upscaling.scale')}
-              </Text>
-              <Box className="launchpad-hide-label">
-                <UpscaleScaleSlider />
-              </Box>
-            </Box>
-          </Flex>
+          {/* Left Column: Creativity and Structural Defaults */}
+          <Box>
+            <Text fontWeight="semibold" fontSize="sm" mb={3}>
+              Creativity & Structural Defaults
+            </Text>
+            <Flex flexDir="column" gap={2}>
+              <Button 
+                size="sm" 
+                variant={creativity === -5 && structure === 5 ? "solid" : "outline"} 
+                colorScheme="base" 
+                justifyContent="center"
+                onClick={onConservativeClick}
+                leftIcon={<PiShieldCheckBold />}
+              >
+                Conservative
+              </Button>
+              <Button 
+                size="sm" 
+                variant={creativity === 0 && structure === 0 ? "solid" : "outline"} 
+                colorScheme="base" 
+                justifyContent="center"
+                onClick={onBalancedClick}
+                leftIcon={<PiScalesBold />}
+              >
+                Balanced
+              </Button>
+              <Button 
+                size="sm" 
+                variant={creativity === 5 && structure === -2 ? "solid" : "outline"} 
+                colorScheme="base" 
+                justifyContent="center"
+                onClick={onCreativeClick}
+                leftIcon={<PiPaletteBold />}
+              >
+                Creative
+              </Button>
+              <Button 
+                size="sm" 
+                variant={creativity === 8 && structure === -5 ? "solid" : "outline"} 
+                colorScheme="base" 
+                justifyContent="center"
+                onClick={onArtisticClick}
+                leftIcon={<PiSparkleBold />}
+              >
+                Artistic
+              </Button>
+            </Flex>
+          </Box>
           {/* Right Column: Description/help text */}
           <Box>
             <Text variant="subtext" fontSize="sm" lineHeight="1.6">
