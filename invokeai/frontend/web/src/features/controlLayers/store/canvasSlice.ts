@@ -1000,7 +1000,12 @@ export const canvasSlice = createSlice({
         return;
       }
 
-      // Create a rectangle covering the current bounding box
+      // If there are no objects to invert, do nothing
+      if (entity.objects.length === 0) {
+        return;
+      }
+
+      // Create a rectangle covering the current bounding box relative to the entity position
       const bboxRect = state.bbox.rect;
       const fillRectObject = {
         id: getPrefixedId('rect'),
@@ -1014,14 +1019,52 @@ export const canvasSlice = createSlice({
         color: { r: 255, g: 255, b: 255, a: 1 },
       };
 
-      // Convert existing objects to eraser effect by creating a composite inverted mask
-      // The strategy is to replace all existing objects with:
-      // 1. A full rectangle covering the bbox
-      // 2. The original objects as "erasers" to punch holes through the rectangle
-      const originalObjects = [...entity.objects];
+      // To invert a mask, we need to:
+      // 1. Start with a full rectangle covering the bbox (this becomes the "base mask")
+      // 2. Convert existing brush/rect objects to eraser lines to "punch holes" in the base mask
+      const convertedObjects = entity.objects.map((obj) => {
+        if (obj.type === 'brush_line') {
+          // Convert brush lines to eraser lines
+          return {
+            ...obj,
+            id: getPrefixedId('eraser_line'),
+            type: 'eraser_line' as const,
+          };
+        } else if (obj.type === 'brush_line_with_pressure') {
+          // Convert brush lines with pressure to eraser lines with pressure
+          return {
+            ...obj,
+            id: getPrefixedId('eraser_line'),
+            type: 'eraser_line_with_pressure' as const,
+          };
+        } else if (obj.type === 'rect') {
+          // Convert rectangles to eraser "rectangles" by making them transparent
+          return {
+            ...obj,
+            id: getPrefixedId('rect'),
+            color: { ...obj.color, a: 0 }, // Make transparent to act as eraser
+          };
+        } else if (obj.type === 'eraser_line') {
+          // Convert eraser lines to brush lines
+          return {
+            ...obj,
+            id: getPrefixedId('brush_line'),
+            type: 'brush_line' as const,
+          };
+        } else if (obj.type === 'eraser_line_with_pressure') {
+          // Convert eraser lines with pressure to brush lines with pressure
+          return {
+            ...obj,
+            id: getPrefixedId('brush_line'),
+            type: 'brush_line_with_pressure' as const,
+          };
+        }
+        // Keep images and other objects as is
+        return obj;
+      });
 
-      // Start with the full rectangle, then "erase" the original painted areas
-      entity.objects = [fillRectObject, ...originalObjects];
+      // Replace all objects with the base rectangle followed by converted objects
+      entity.objects = [fillRectObject, ...convertedObjects];
     },
     //#region BBox
     bboxScaledWidthChanged: (state, action: PayloadAction<number>) => {
