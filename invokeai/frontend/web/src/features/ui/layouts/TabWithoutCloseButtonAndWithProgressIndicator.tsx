@@ -8,7 +8,6 @@ import { useIsNonPromptExpansionGenerationInProgress } from 'services/api/endpoi
 
 import type { PanelParameters } from './auto-layout-context';
 
-
 export const TabWithoutCloseButtonAndWithProgressIndicator = memo(
   (props: IDockviewPanelHeaderProps<PanelParameters>) => {
     const isGenerationInProgress = useIsNonPromptExpansionGenerationInProgress();
