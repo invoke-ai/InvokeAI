@@ -60,6 +60,7 @@ const deleteImagesWithDialog = async (image_names: string[], store: AppStore): P
   if (!shouldConfirmOnDelete && !isAnyImageInUse(imageUsage)) {
     // If we don't need to confirm and the images are not in use, delete them directly
     await handleDeletions(image_names, store);
+    return;
   }
 
   return new Promise<void>((resolve, reject) => {

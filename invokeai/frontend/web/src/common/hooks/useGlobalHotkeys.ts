@@ -1,4 +1,6 @@
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppStore } from 'app/store/storeHooks';
+import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
+import { selectSelection } from 'features/gallery/store/gallerySelectors';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { useDeleteCurrentQueueItem } from 'features/queue/hooks/useDeleteCurrentQueueItem';
 import { useInvoke } from 'features/queue/hooks/useInvoke';
@@ -6,8 +8,10 @@ import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/us
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 
+import { getFocusedRegion } from './focus';
+
 export const useGlobalHotkeys = () => {
-  const dispatch = useAppDispatch();
+  const { dispatch, getState } = useAppStore();
   const isModelManagerEnabled = useFeatureStatus('modelManager');
   const queue = useInvoke();
 
@@ -118,19 +122,21 @@ export const useGlobalHotkeys = () => {
     dependencies: [dispatch, isModelManagerEnabled],
   });
 
-  // TODO: implement delete - needs to handle gallery focus, which has changed w/ dockview
-  // useRegisteredHotkeys({
-  //   id: 'deleteSelection',
-  //   category: 'gallery',
-  //   callback: () => {
-  //     if (!selection.length) {
-  //       return;
-  //     }
-  //     deleteImageModal.delete(selection);
-  //   },
-  //   options: {
-  //     enabled: (isGalleryFocused || isImageViewerFocused) && isDeleteEnabledByTab && !isWorkflowsFocused,
-  //   },
-  //   dependencies: [isWorkflowsFocused, isDeleteEnabledByTab, selection, isWorkflowsFocused],
-  // });
+  const deleteImageModalApi = useDeleteImageModalApi();
+  useRegisteredHotkeys({
+    id: 'deleteSelection',
+    category: 'gallery',
+    callback: () => {
+      const focusedRegion = getFocusedRegion();
+      if (focusedRegion !== 'gallery' && focusedRegion !== 'viewer') {
+        return;
+      }
+      const selection = selectSelection(getState());
+      if (!selection.length) {
+        return;
+      }
+      deleteImageModalApi.delete(selection);
+    },
+    dependencies: [getState, deleteImageModalApi],
+  });
 };
