@@ -1,11 +1,11 @@
 import { type Layer, type Psd, writePsd } from 'ag-psd';
 import { logger } from 'app/logging/logger';
+import { parseify } from 'common/util/serialize';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { downloadBlob } from 'features/controlLayers/konva/util';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { serializeError } from 'serialize-error';
 
 const log = logger('canvas');
 
@@ -30,7 +30,6 @@ export const useExportCanvasToPSD = () => {
         return;
       }
 
-      // Get visible raster layer adapters using the compositor module
       const adapters = canvasManager.compositor.getVisibleAdaptersOfType('raster_layer');
 
       if (adapters.length === 0) {
@@ -45,10 +44,8 @@ export const useExportCanvasToPSD = () => {
 
       log.debug(`Exporting ${adapters.length} visible raster layers to PSD`);
 
-      // Get the union rect of all adapters using the compositor module
       const visibleRect = canvasManager.compositor.getRectOfAdapters(adapters);
 
-      // Validate canvas dimensions
       if (visibleRect.width <= 0 || visibleRect.height <= 0) {
         toast({
           id: 'INVALID_CANVAS_DIMENSIONS',
@@ -58,7 +55,6 @@ export const useExportCanvasToPSD = () => {
         return;
       }
 
-      // Check size constraints using area only
       const canvasArea = visibleRect.width * visibleRect.height;
       if (canvasArea > MAX_CANVAS_AREA) {
         toast({
@@ -72,7 +68,6 @@ export const useExportCanvasToPSD = () => {
 
       log.debug(`PSD canvas dimensions: ${visibleRect.width}x${visibleRect.height}`);
 
-      // Create PSD layers from visible raster layer adapters
       const psdLayers: Layer[] = await Promise.all(
         adapters.map((adapter, index) => {
           const layer = adapter.state;
@@ -99,11 +94,10 @@ export const useExportCanvasToPSD = () => {
         })
       );
 
-      // Create PSD document using proper types
       const psd: Psd = {
         width: visibleRect.width,
         height: visibleRect.height,
-        channels: 3, // RGB
+        channels: 3,
         bitsPerChannel: 8,
         colorMode: 3, // RGB mode
         children: psdLayers,
@@ -122,10 +116,8 @@ export const useExportCanvasToPSD = () => {
         'Creating PSD with layers'
       );
 
-      // Generate PSD file
       const buffer = writePsd(psd);
 
-      // Create blob and download using the utility function
       const blob = new Blob([buffer], { type: 'application/octet-stream' });
       const fileName = `canvas-layers-${new Date().toISOString().slice(0, 10)}.psd`;
       downloadBlob(blob, fileName);
@@ -139,7 +131,7 @@ export const useExportCanvasToPSD = () => {
 
       log.debug('Successfully exported canvas to PSD');
     } catch (error) {
-      log.error({ error: serializeError(error as Error) }, 'Problem exporting canvas to PSD');
+      log.error({ error: parseify(error) }, 'Problem exporting canvas to PSD');
       toast({
         id: 'PROBLEM_EXPORTING_PSD',
         title: t('toast.problemExportingPSD'),
