@@ -3,8 +3,8 @@ import type {
   CanvasBrushLineWithPressureState,
   CanvasEraserLineState,
   CanvasEraserLineWithPressureState,
-  CanvasImageState,
   CanvasRectState,
+  CanvasImageState,
   Coordinate,
   Rect,
 } from 'features/controlLayers/store/types';
@@ -75,13 +75,7 @@ export interface TransformedImage {
  * @returns A new mask object with transformed coordinates
  */
 export function transformMaskObject(
-  obj:
-    | CanvasBrushLineState
-    | CanvasBrushLineWithPressureState
-    | CanvasEraserLineState
-    | CanvasEraserLineWithPressureState
-    | CanvasRectState
-    | CanvasImageState,
+  obj: CanvasBrushLineState | CanvasBrushLineWithPressureState | CanvasEraserLineState | CanvasEraserLineWithPressureState | CanvasRectState | CanvasImageState,
   offset: Coordinate
 ): TransformedMaskObject {
   switch (obj.type) {
@@ -157,7 +151,10 @@ export function transformRect(rect: Rect, offset: Coordinate): Rect {
  * @param container The container rectangle to clip to
  * @returns A new mask object clipped to the container boundaries, or null if completely outside
  */
-export function clipMaskObjectToContainer(obj: TransformedMaskObject, container: Rect): TransformedMaskObject | null {
+export function clipMaskObjectToContainer(
+  obj: TransformedMaskObject,
+  container: Rect
+): TransformedMaskObject | null {
   switch (obj.type) {
     case 'brush_line':
     case 'brush_line_with_pressure':
@@ -175,32 +172,28 @@ export function clipMaskObjectToContainer(obj: TransformedMaskObject, container:
  * Clips a line object to container boundaries.
  */
 function clipLineToContainer(
-  obj:
-    | TransformedBrushLine
-    | TransformedBrushLineWithPressure
-    | TransformedEraserLine
-    | TransformedEraserLineWithPressure,
+  obj: TransformedBrushLine | TransformedBrushLineWithPressure | TransformedEraserLine | TransformedEraserLineWithPressure,
   container: Rect
 ): typeof obj | null {
   // For lines, we clip the points to the container boundaries
   const clippedPoints: number[] = [];
-
+  
   for (let i = 0; i < obj.points.length; i += 2) {
     const x = obj.points[i] ?? 0;
     const y = obj.points[i + 1] ?? 0;
-
+    
     // Clip coordinates to container boundaries
     const clippedX = Math.max(container.x, Math.min(container.x + container.width, x));
     const clippedY = Math.max(container.y, Math.min(container.y + container.height, y));
-
+    
     clippedPoints.push(clippedX, clippedY);
   }
-
+  
   // If no points remain, return null
   if (clippedPoints.length === 0) {
     return null;
   }
-
+  
   return {
     ...obj,
     points: clippedPoints,
@@ -213,18 +206,18 @@ function clipLineToContainer(
  */
 function clipRectToContainer(obj: TransformedRect, container: Rect): TransformedRect | null {
   const rect = obj.rect;
-
+  
   // Calculate intersection
   const left = Math.max(rect.x, container.x);
   const top = Math.max(rect.y, container.y);
   const right = Math.min(rect.x + rect.width, container.x + container.width);
   const bottom = Math.min(rect.y + rect.height, container.y + container.height);
-
+  
   // If no intersection, return null
   if (left >= right || top >= bottom) {
     return null;
   }
-
+  
   return {
     ...obj,
     rect: {
@@ -239,7 +232,7 @@ function clipRectToContainer(obj: TransformedRect, container: Rect): Transformed
 /**
  * Clips an image object to container boundaries.
  */
-function clipImageToContainer(obj: TransformedImage, _container: Rect): TransformedImage | null {
+function clipImageToContainer(obj: TransformedImage, container: Rect): TransformedImage | null {
   // For images, we don't clip them - they remain as-is
   return obj;
 }
@@ -267,21 +260,17 @@ export function calculateMaskObjectBounds(obj: TransformedMaskObject): Rect | nu
  * Calculates bounds for a line object.
  */
 function calculateLineBounds(
-  obj:
-    | TransformedBrushLine
-    | TransformedBrushLineWithPressure
-    | TransformedEraserLine
-    | TransformedEraserLineWithPressure
+  obj: TransformedBrushLine | TransformedBrushLineWithPressure | TransformedEraserLine | TransformedEraserLineWithPressure
 ): Rect | null {
   if (obj.points.length < 2) {
     return null;
   }
-
+  
   let minX = obj.points[0] ?? 0;
   let minY = obj.points[1] ?? 0;
   let maxX = minX;
   let maxY = minY;
-
+  
   for (let i = 2; i < obj.points.length; i += 2) {
     const x = obj.points[i] ?? 0;
     const y = obj.points[i + 1] ?? 0;
@@ -290,7 +279,7 @@ function calculateLineBounds(
     maxX = Math.max(maxX, x);
     maxY = Math.max(maxY, y);
   }
-
+  
   // Add stroke width to bounds
   const strokeRadius = obj.strokeWidth / 2;
   return {
@@ -321,13 +310,7 @@ function calculateImageBounds(obj: TransformedImage): Rect | null {
  */
 export function convertTransformedToOriginal(
   obj: TransformedMaskObject
-):
-  | CanvasBrushLineState
-  | CanvasBrushLineWithPressureState
-  | CanvasEraserLineState
-  | CanvasEraserLineWithPressureState
-  | CanvasRectState
-  | CanvasImageState {
+): CanvasBrushLineState | CanvasBrushLineWithPressureState | CanvasEraserLineState | CanvasEraserLineWithPressureState | CanvasRectState | CanvasImageState {
   switch (obj.type) {
     case 'brush_line':
       return {
@@ -354,4 +337,4 @@ export function convertTransformedToOriginal(
     case 'image':
       return obj;
   }
-}
+} 
