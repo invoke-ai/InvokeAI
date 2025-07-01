@@ -22,8 +22,6 @@ export const useCollapsibleGridviewPanel = (
 ) => {
   const $isCollapsed = useState(() => atom(false))[0];
   const lastExpandedSizeRef = useRef<number>(0);
-  const retryCountRef = useRef<number>(0);
-  const maxRetries = 10;
 
   const collapse = useCallback(() => {
     if (!api) {
@@ -78,48 +76,33 @@ export const useCollapsibleGridviewPanel = (
     if (!api) {
       return;
     }
-    
-    const initializePanel = () => {
-      const panel = api.getPanel(panelId);
-      if (!panel) {
-        retryCountRef.current++;
-        if (retryCountRef.current >= maxRetries) {
-          // Panel not available after max retries, stop trying
-          return;
-        }
-        // Panel not available yet, retry after a short delay
-        setTimeout(initializePanel, 10);
-        return;
-      }
 
-      // Reset retry count on success
-      retryCountRef.current = 0;
+    const panel = api.getPanel(panelId);
+    if (!panel) {
+      return;
+    }
 
-      // Set initial state immediately
-      const initialIsCollapsed = getIsCollapsed(panel, orientation, collapsedSize);
-      $isCollapsed.set(initialIsCollapsed);
-      
-      // Initialize lastExpandedSizeRef properly
-      if (initialIsCollapsed) {
-        // If starting collapsed, use default size as the target expansion size
-        lastExpandedSizeRef.current = defaultSize;
-      } else {
-        // If starting expanded, use current size as the target expansion size
-        lastExpandedSizeRef.current = orientation === 'vertical' ? panel.height : panel.width;
-      }
+    // Set initial state immediately
+    const initialIsCollapsed = getIsCollapsed(panel, orientation, collapsedSize);
+    $isCollapsed.set(initialIsCollapsed);
 
-      const disposable = panel.api.onDidDimensionsChange(() => {
-        const isCollapsed = getIsCollapsed(panel, orientation, collapsedSize);
-        $isCollapsed.set(isCollapsed);
-      });
+    // Initialize lastExpandedSizeRef properly
+    if (initialIsCollapsed) {
+      // If starting collapsed, use default size as the target expansion size
+      lastExpandedSizeRef.current = defaultSize;
+    } else {
+      // If starting expanded, use current size as the target expansion size
+      lastExpandedSizeRef.current = orientation === 'vertical' ? panel.height : panel.width;
+    }
 
-      return () => {
-        disposable.dispose();
-      };
+    const disposable = panel.api.onDidDimensionsChange(() => {
+      const isCollapsed = getIsCollapsed(panel, orientation, collapsedSize);
+      $isCollapsed.set(isCollapsed);
+    });
+
+    return () => {
+      disposable.dispose();
     };
-
-    const cleanup = initializePanel();
-    return cleanup;
   }, [api, collapsedSize, orientation, panelId, defaultSize, $isCollapsed]);
 
   return useMemo(
