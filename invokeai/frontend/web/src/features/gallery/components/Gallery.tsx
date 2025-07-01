@@ -32,10 +32,10 @@ const selectSearchTerm = createSelector(selectGallerySlice, (gallery) => gallery
 export const GalleryPanel = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const { _$rightPanelApi } = useAutoLayoutContext();
-  const gridviewPanelApi = useStore(_$rightPanelApi);
+  const { tab } = useAutoLayoutContext();
   const collapsibleApi = useCollapsibleGridviewPanel(
-    gridviewPanelApi,
+    tab,
+    'right',
     GALLERY_PANEL_ID,
     'vertical',
     GALLERY_PANEL_DEFAULT_HEIGHT_PX,

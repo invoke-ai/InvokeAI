@@ -11,7 +11,6 @@ import {
 } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
 import { useOverlayScrollbars } from 'overlayscrollbars-react';
 import type { MutableRefObject, RefObject } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -446,15 +445,13 @@ export const NewGallery = memo(() => {
   const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const { isActiveTab } = useAutoLayoutContext();
-
   // Get the ordered list of image names - this is our primary data source for virtualization
   const { queryArgs, imageNames, isLoading } = useGalleryImageNames();
 
   // Use range-based fetching for bulk loading image DTOs into cache based on the visible range
   const { onRangeChanged } = useRangeBasedImageFetching({
     imageNames,
-    enabled: !isLoading && isActiveTab,
+    enabled: !isLoading,
   });
 
   useKeepSelectedImageInView(imageNames, virtuosoRef, rootRef, rangeRef);
@@ -482,7 +479,7 @@ export const NewGallery = memo(() => {
 
   if (isLoading) {
     return (
-      <Flex height="100%" alignItems="center" justifyContent="center" gap={4}>
+      <Flex w="full" h="full" alignItems="center" justifyContent="center" gap={4}>
         <Spinner size="lg" opacity={0.3} />
         <Text color="base.300">Loading gallery...</Text>
       </Flex>
@@ -491,7 +488,7 @@ export const NewGallery = memo(() => {
 
   if (imageNames.length === 0) {
     return (
-      <Flex height="100%" alignItems="center" justifyContent="center">
+      <Flex w="full" h="full" alignItems="center" justifyContent="center">
         <Text color="base.300">No images found</Text>
       </Flex>
     );

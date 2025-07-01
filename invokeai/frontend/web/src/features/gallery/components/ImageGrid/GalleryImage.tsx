@@ -21,7 +21,7 @@ import {
   selectSelection,
 } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectGallerySlice, selectionChanged } from 'features/gallery/store/gallerySlice';
-import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
+import { panelRegistry } from 'features/ui/layouts/panel-registry/panelApiRegistry';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import type { MouseEvent, MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
@@ -139,7 +139,6 @@ const buildOnClick =
 
 export const GalleryImage = memo(({ imageDTO }: Props) => {
   const store = useAppStore();
-  const autoLayoutContext = useAutoLayoutContext();
   const [isDragging, setIsDragging] = useState(false);
   const [dragPreviewState, setDragPreviewState] = useState<
     DndDragPreviewSingleImageState | DndDragPreviewMultipleImageState | null
@@ -239,8 +238,8 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
 
   const onDoubleClick = useCallback<MouseEventHandler<HTMLDivElement>>(() => {
     store.dispatch(imageToCompareChanged(null));
-    autoLayoutContext.focusPanel(VIEWER_PANEL_ID);
-  }, [autoLayoutContext, store]);
+    panelRegistry.focusPanelInActiveTab(VIEWER_PANEL_ID);
+  }, [store]);
 
   const dataTestId = useMemo(() => getGalleryImageDataTestId(imageDTO.image_name), [imageDTO.image_name]);
 

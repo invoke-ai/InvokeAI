@@ -17,6 +17,7 @@ import { useWorkflowBuilderWatcher } from 'features/nodes/components/sidePanel/w
 import { useReadinessWatcher } from 'features/queue/store/readiness';
 import { configChanged } from 'features/system/store/configSlice';
 import { selectLanguage } from 'features/system/store/systemSelectors';
+import { usePanelRegistryInit } from 'features/ui/layouts/panel-registry/use-panel-registry-init';
 import i18n from 'i18n';
 import { memo, useEffect } from 'react';
 import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
@@ -43,6 +44,7 @@ export const GlobalHookIsolator = memo(
     useGetOpenAPISchemaQuery();
     useSyncLoggingConfig();
     useCloseChakraTooltipsOnDragFix();
+    usePanelRegistryInit();
 
     // Persistent subscription to the queue counts query - canvas relies on this to know if there are pending
     // and/or in progress canvas sessions.

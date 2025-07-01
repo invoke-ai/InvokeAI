@@ -11,10 +11,9 @@ import { $hasTemplates } from 'features/nodes/store/nodesSlice';
 import { PostProcessingPopover } from 'features/parameters/components/PostProcessing/PostProcessingPopover';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { toast } from 'features/toast/toast';
-import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
+import { panelRegistry } from 'features/ui/layouts/panel-registry/panelApiRegistry';
 import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
 import { selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
-import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -45,7 +44,6 @@ export const CurrentImageButtons = memo(() => {
   const isStaging = useAppSelector(selectIsStaging);
   const isUpscalingEnabled = useFeatureStatus('upscaling');
   const { getState, dispatch } = useAppStore();
-  const autoLayoutContext = useAutoLayoutContext();
 
   const handleEdit = useCallback(async () => {
     if (!imageDTO) {
@@ -59,14 +57,13 @@ export const CurrentImageButtons = memo(() => {
       getState,
       dispatch,
     });
-    dispatch(setActiveTab('canvas'));
-    autoLayoutContext?.focusPanel(WORKSPACE_PANEL_ID);
+    panelRegistry.focusPanelInTab('canvas', WORKSPACE_PANEL_ID);
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
       status: 'success',
     });
-  }, [imageDTO, getState, dispatch, t, autoLayoutContext]);
+  }, [imageDTO, getState, dispatch, t]);
 
   return (
     <>
