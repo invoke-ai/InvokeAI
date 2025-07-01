@@ -25,9 +25,14 @@ export const CanvasLaunchpadPanel = memo(() => {
             <InitialStateMainModelPicker />
             <Flex flexDir="column" gap={2} justifyContent="center">
               <Text>
-                Want to learn what prompts work best for each model?{' '}
-                <Button as="a" variant="link" href="#" size="sm">
-                  Check our our Model Guide.
+                {t('ui.launchpad.modelGuideText')}{' '}
+                <Button
+                  as="a"
+                  variant="link"
+                  href="https://support.invoke.ai/support/solutions/articles/151000216086-model-guide"
+                  size="sm"
+                >
+                  {t('ui.launchpad.modelGuideLink')}
                 </Button>
               </Text>
             </Flex>
