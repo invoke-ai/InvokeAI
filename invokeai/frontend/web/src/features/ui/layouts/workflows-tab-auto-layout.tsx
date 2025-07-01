@@ -33,7 +33,6 @@ import { dockviewTheme } from 'features/ui/styles/theme';
 import { atom } from 'nanostores';
 import { memo, useCallback, useRef, useState } from 'react';
 
-import { registerFocusListener } from './layout-focus-bridge';
 import {
   BOARD_PANEL_DEFAULT_HEIGHT_PX,
   BOARD_PANEL_MIN_HEIGHT_PX,
@@ -203,14 +202,12 @@ const RightPanel = memo(() => {
     [ctx._$rightPanelApi]
   );
   return (
-    <>
-      <GridviewReact
-        className="dockview-theme-invoke"
-        orientation={Orientation.VERTICAL}
-        components={rightPanelComponents}
-        onReady={onReady}
-      />
-    </>
+    <GridviewReact
+      className="dockview-theme-invoke"
+      orientation={Orientation.VERTICAL}
+      components={rightPanelComponents}
+      onReady={onReady}
+    />
   );
 });
 RightPanel.displayName = 'RightPanel';
@@ -227,7 +224,6 @@ export const initializeLeftPanelLayout = (api: GridviewApi) => {
       focusRegion: 'settings',
     },
   });
-  registerFocusListener(settingsPanel, 'settings');
 
   return { settingsPanel } satisfies Record<string, IGridviewPanel>;
 };
@@ -242,14 +238,12 @@ const LeftPanel = memo(() => {
     [ctx._$leftPanelApi]
   );
   return (
-    <>
-      <GridviewReact
-        className="dockview-theme-invoke"
-        orientation={Orientation.VERTICAL}
-        components={leftPanelComponents}
-        onReady={onReady}
-      />
-    </>
+    <GridviewReact
+      className="dockview-theme-invoke"
+      orientation={Orientation.VERTICAL}
+      components={leftPanelComponents}
+      onReady={onReady}
+    />
   );
 });
 LeftPanel.displayName = 'LeftPanel';

@@ -218,14 +218,12 @@ const RightPanel = memo(() => {
     [ctx._$rightPanelApi]
   );
   return (
-    <>
-      <GridviewReact
-        className="dockview-theme-invoke"
-        orientation={Orientation.VERTICAL}
-        components={rightPanelComponents}
-        onReady={onReady}
-      />
-    </>
+    <GridviewReact
+      className="dockview-theme-invoke"
+      orientation={Orientation.VERTICAL}
+      components={rightPanelComponents}
+      onReady={onReady}
+    />
   );
 });
 RightPanel.displayName = 'RightPanel';
@@ -256,14 +254,12 @@ const LeftPanel = memo(() => {
     [ctx._$leftPanelApi]
   );
   return (
-    <>
-      <GridviewReact
-        className="dockview-theme-invoke"
-        orientation={Orientation.VERTICAL}
-        components={leftPanelComponents}
-        onReady={onReady}
-      />
-    </>
+    <GridviewReact
+      className="dockview-theme-invoke"
+      orientation={Orientation.VERTICAL}
+      components={leftPanelComponents}
+      onReady={onReady}
+    />
   );
 });
 LeftPanel.displayName = 'LeftPanel';

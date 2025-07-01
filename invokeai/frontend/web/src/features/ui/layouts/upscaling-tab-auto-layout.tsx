@@ -175,20 +175,22 @@ export const initializeRightPanelLayout = (api: GridviewApi) => {
   return { galleryPanel, boardsPanel } satisfies Record<string, IGridviewPanel>;
 };
 
-const onReadyRightPanel: IGridviewReactProps['onReady'] = (event) => {
-  initializeRightPanelLayout(event.api);
-};
-
 const RightPanel = memo(() => {
+  const ctx = useAutoLayoutContext();
+  const onReady = useCallback<IGridviewReactProps['onReady']>(
+    (event) => {
+      initializeRightPanelLayout(event.api);
+      ctx._$rightPanelApi.set(event.api);
+    },
+    [ctx._$rightPanelApi]
+  );
   return (
-    <>
-      <GridviewReact
-        className="dockview-theme-invoke"
-        orientation={Orientation.VERTICAL}
-        components={rightPanelComponents}
-        onReady={onReadyRightPanel}
-      />
-    </>
+    <GridviewReact
+      className="dockview-theme-invoke"
+      orientation={Orientation.VERTICAL}
+      components={rightPanelComponents}
+      onReady={onReady}
+    />
   );
 });
 RightPanel.displayName = 'RightPanel';
@@ -219,14 +221,12 @@ const LeftPanel = memo(() => {
     [ctx._$leftPanelApi]
   );
   return (
-    <>
-      <GridviewReact
-        className="dockview-theme-invoke"
-        orientation={Orientation.VERTICAL}
-        components={leftPanelComponents}
-        onReady={onReady}
-      />
-    </>
+    <GridviewReact
+      className="dockview-theme-invoke"
+      orientation={Orientation.VERTICAL}
+      components={leftPanelComponents}
+      onReady={onReady}
+    />
   );
 });
 LeftPanel.displayName = 'LeftPanel';
