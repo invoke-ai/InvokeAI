@@ -20,7 +20,6 @@ export const RasterLayerExportPSDButton = memo(() => {
       isDisabled={isBusy}
       size="sm"
       variant="link"
-      colorScheme="invokeBlue"
       alignSelf="stretch"
       aria-label={t('controlLayers.exportCanvasToPSD')}
       tooltip={t('controlLayers.exportCanvasToPSD')}
