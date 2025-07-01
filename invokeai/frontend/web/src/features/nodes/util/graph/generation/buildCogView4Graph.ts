@@ -1,6 +1,4 @@
 import { logger } from 'app/logging/logger';
-import type { RootState } from 'app/store/store';
-import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
@@ -11,15 +9,13 @@ import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChec
 import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
-import { getGenerationMode } from 'features/nodes/util/graph/generation/getGenerationMode';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   getSizes,
   selectCanvasOutputFields,
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
-import type { GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import type { Equals } from 'tsafe';
@@ -27,12 +23,8 @@ import { assert } from 'tsafe';
 
 const log = logger('system');
 
-export const buildCogView4Graph = async (
-  state: RootState,
-  manager: CanvasManager | null
-): Promise<GraphBuilderReturn> => {
-  const tab = selectActiveTab(state);
-  const generationMode = await getGenerationMode(manager, tab);
+export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
+  const { generationMode, state } = arg;
   log.debug({ generationMode }, 'Building CogView4 graph');
 
   const params = selectParamsSlice(state);
@@ -112,10 +104,9 @@ export const buildCogView4Graph = async (
     canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
     g.upsertMetadata({ generation_mode: 'cogview4_txt2img' });
   } else if (generationMode === 'img2img') {
-    assert(manager, 'Need manager to do img2img');
     canvasOutput = await addImageToImage({
       g,
-      manager,
+      manager: arg.canvasManager,
       l2i,
       i2lNodeType: 'cogview4_i2l',
       denoise,
@@ -128,11 +119,10 @@ export const buildCogView4Graph = async (
     });
     g.upsertMetadata({ generation_mode: 'cogview4_img2img' });
   } else if (generationMode === 'inpaint') {
-    assert(manager, 'Need manager to do inpaint');
     canvasOutput = await addInpaint({
       state,
       g,
-      manager,
+      manager: arg.canvasManager,
       l2i,
       i2lNodeType: 'cogview4_i2l',
       denoise,
@@ -146,11 +136,10 @@ export const buildCogView4Graph = async (
     });
     g.upsertMetadata({ generation_mode: 'cogview4_inpaint' });
   } else if (generationMode === 'outpaint') {
-    assert(manager, 'Need manager to do outpaint');
     canvasOutput = await addOutpaint({
       state,
       g,
-      manager,
+      manager: arg.canvasManager,
       l2i,
       i2lNodeType: 'cogview4_i2l',
       denoise,

@@ -2,6 +2,7 @@ import type { BoxProps, ButtonProps, SystemStyleObject } from '@invoke-ai/ui-lib
 import {
   Button,
   Flex,
+  Icon,
   Popover,
   PopoverArrow,
   PopoverBody,
@@ -12,13 +13,18 @@ import {
   Text,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { EMPTY_ARRAY } from 'app/store/constants';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { $onClickGoToModelManager } from 'app/store/nanostores/onClickGoToModelManager';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { Group, PickerContextState } from 'common/components/Picker/Picker';
-import { buildGroup, getRegex, Picker, usePickerContext } from 'common/components/Picker/Picker';
+import { buildGroup, getRegex, isOption, Picker, usePickerContext } from 'common/components/Picker/Picker';
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { typedMemo } from 'common/util/typedMemo';
-import { $installModelsTab } from 'features/modelManagerV2/subpanels/InstallModels';
+import { uniq } from 'es-toolkit/compat';
+import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
+import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
 import { BASE_COLOR_MAP } from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
 import ModelImage from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelImage';
 import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
@@ -28,17 +34,47 @@ import { setActiveTab } from 'features/ui/store/uiSlice';
 import { filesize } from 'filesize';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { PiCaretDownBold } from 'react-icons/pi';
+import { PiCaretDownBold, PiLinkSimple } from 'react-icons/pi';
+import { useGetRelatedModelIdsBatchQuery } from 'services/api/endpoints/modelRelationships';
 import type { AnyModelConfig, BaseModelType } from 'services/api/types';
 
-const getOptionId = (modelConfig: AnyModelConfig) => modelConfig.key;
+const selectSelectedModelKeys = createMemoizedSelector(selectParamsSlice, selectLoRAsSlice, (params, loras) => {
+  const keys: string[] = [];
+  const main = params.model;
+  const vae = params.vae;
+  const refiner = params.refinerModel;
+  const controlnet = params.controlLora;
+
+  if (main) {
+    keys.push(main.key);
+  }
+  if (vae) {
+    keys.push(vae.key);
+  }
+  if (refiner) {
+    keys.push(refiner.key);
+  }
+  if (controlnet) {
+    keys.push(controlnet.key);
+  }
+  for (const { model } of loras.loras) {
+    keys.push(model.key);
+  }
+
+  return uniq(keys);
+});
+
+type WithStarred<T> = T & { starred?: boolean };
+
+// Type for models with starred field
+const getOptionId = <T extends AnyModelConfig>(modelConfig: WithStarred<T>) => modelConfig.key;
 
 const ModelManagerLink = memo((props: ButtonProps) => {
   const onClickGoToModelManager = useStore($onClickGoToModelManager);
   const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
     dispatch(setActiveTab('models'));
-    $installModelsTab.set(3);
+    setInstallModelsTabByName('launchpad');
   }, [dispatch]);
 
   return (
@@ -58,14 +94,14 @@ const components = {
   LinkComponent: <ModelManagerLink />,
 };
 
-const NoOptionsFallback = memo(() => {
+const NoOptionsFallback = memo(({ noOptionsText }: { noOptionsText?: string }) => {
   const { t } = useTranslation();
   const isModelsTabDisabled = useAppSelector(selectIsModelsTabDisabled);
   const onClickGoToModelManager = useStore($onClickGoToModelManager);
 
   return (
     <Flex flexDir="column" gap={4} alignItems="center">
-      <Text color="base.200">{t('modelManager.modelPickerFallbackNoModelsInstalled')}</Text>
+      <Text color="base.200">{noOptionsText ?? t('modelManager.modelPickerFallbackNoModelsInstalled')}</Text>
       {(!isModelsTabDisabled || onClickGoToModelManager) && (
         <Text color="base.200">
           <Trans i18nKey="modelManager.modelPickerFallbackNoModelsInstalled2" components={components} />
@@ -104,6 +140,15 @@ const getGroupColorSchemeFromModelConfig = (modelConfig: AnyModelConfig): string
   return BASE_COLOR_MAP[modelConfig.base];
 };
 
+const relatedModelKeysQueryOptions = {
+  selectFromResult: ({ data }) => {
+    if (!data) {
+      return { relatedModelKeys: EMPTY_ARRAY };
+    }
+    return { relatedModelKeys: data };
+  },
+} satisfies Parameters<typeof useGetRelatedModelIdsBatchQuery>[1];
+
 const popperModifiers = [
   {
     // Prevents the popover from "touching" the edges of the screen
@@ -111,6 +156,11 @@ const popperModifiers = [
     options: { padding: 16 },
   },
 ];
+
+const removeStarred = <T,>(obj: WithStarred<T>): T => {
+  const { starred: _, ...rest } = obj;
+  return rest as T;
+};
 
 export const ModelPicker = typedMemo(
   <T extends AnyModelConfig = AnyModelConfig>({
@@ -124,6 +174,8 @@ export const ModelPicker = typedMemo(
     isDisabled,
     isInvalid,
     className,
+    noOptionsText,
+    initialGroupStates,
   }: {
     modelConfigs: T[];
     selectedModelConfig: T | undefined;
@@ -135,21 +187,42 @@ export const ModelPicker = typedMemo(
     isDisabled?: boolean;
     isInvalid?: boolean;
     className?: string;
+    noOptionsText?: string;
+    initialGroupStates?: Record<string, boolean>;
   }) => {
     const { t } = useTranslation();
-    const options = useMemo<T[] | Group<T>[]>(() => {
+    const selectedKeys = useAppSelector(selectSelectedModelKeys);
+
+    const { relatedModelKeys } = useGetRelatedModelIdsBatchQuery(selectedKeys, relatedModelKeysQueryOptions);
+
+    const options = useMemo<WithStarred<T>[] | Group<WithStarred<T>>[]>(() => {
       if (!grouped) {
-        return modelConfigs;
+        // Add starred field to model options and sort them
+        const modelsWithStarred = modelConfigs.map((model) => ({
+          ...model,
+          starred: relatedModelKeys.includes(model.key),
+        }));
+
+        // Sort so starred models come first
+        return modelsWithStarred.sort((a, b) => {
+          if (a.starred && !b.starred) {
+            return -1;
+          }
+          if (!a.starred && b.starred) {
+            return 1;
+          }
+          return 0;
+        });
       }
 
       // When all groups are disabled, we show all models
-      const groups: Record<string, Group<T>> = {};
+      const groups: Record<string, Group<WithStarred<T>>> = {};
 
       for (const modelConfig of modelConfigs) {
         const groupId = getGroupIDFromModelConfig(modelConfig);
         let group = groups[groupId];
         if (!group) {
-          group = buildGroup<T>({
+          group = buildGroup<WithStarred<T>>({
             id: modelConfig.base,
             color: `${getGroupColorSchemeFromModelConfig(modelConfig)}.300`,
             shortName: getGroupShortNameFromModelConfig(modelConfig),
@@ -160,15 +233,31 @@ export const ModelPicker = typedMemo(
           groups[groupId] = group;
         }
         if (group) {
-          group.options.push(modelConfig);
+          // Add starred field to the model
+          const modelWithStarred = {
+            ...modelConfig,
+            starred: relatedModelKeys.includes(modelConfig.key),
+          };
+          group.options.push(modelWithStarred);
         }
       }
 
-      const _options: Group<T>[] = [];
+      const _options: Group<WithStarred<T>>[] = [];
 
+      // Add groups in the original order
       for (const groupId of ['api', 'flux', 'cogview4', 'sdxl', 'sd-3', 'sd-2', 'sd-1']) {
         const group = groups[groupId];
         if (group) {
+          // Sort options within each group so starred ones come first
+          group.options.sort((a, b) => {
+            if (a.starred && !b.starred) {
+              return -1;
+            }
+            if (!a.starred && b.starred) {
+              return 1;
+            }
+            return 0;
+          });
           _options.push(group);
           delete groups[groupId];
         }
@@ -176,9 +265,17 @@ export const ModelPicker = typedMemo(
       _options.push(...Object.values(groups));
 
       return _options;
-    }, [grouped, modelConfigs, t]);
+    }, [grouped, modelConfigs, relatedModelKeys, t]);
     const popover = useDisclosure(false);
-    const pickerRef = useRef<PickerContextState<T>>(null);
+    const pickerRef = useRef<PickerContextState<WithStarred<T>>>(null);
+
+    const selectedOption = useMemo<WithStarred<T> | undefined>(() => {
+      if (!selectedModelConfig) {
+        return undefined;
+      }
+
+      return options.filter(isOption).find((o) => o.key === selectedModelConfig.key);
+    }, [options, selectedModelConfig]);
 
     const onClose = useCallback(() => {
       popover.close();
@@ -186,9 +283,10 @@ export const ModelPicker = typedMemo(
     }, [popover]);
 
     const onSelect = useCallback(
-      (model: T) => {
+      (model: WithStarred<T>) => {
         onClose();
-        onChange(model);
+        // Remove the starred field before passing to onChange
+        onChange(removeStarred(model));
       },
       [onChange, onClose]
     );
@@ -228,20 +326,21 @@ export const ModelPicker = typedMemo(
         <Portal appendToParentPortal={false}>
           <PopoverContent p={0} w={400} h={400}>
             <PopoverArrow />
-            <PopoverBody p={0} w="full" h="full">
-              <Picker<T>
+            <PopoverBody p={0} w="full" h="full" borderWidth={1} borderColor="base.700" borderRadius="base">
+              <Picker<WithStarred<T>>
                 handleRef={pickerRef}
                 optionsOrGroups={options}
-                getOptionId={getOptionId}
+                getOptionId={getOptionId<T>}
                 onSelect={onSelect}
-                selectedOption={selectedModelConfig}
-                isMatch={isMatch}
-                OptionComponent={PickerOptionComponent}
-                noOptionsFallback={<NoOptionsFallback />}
+                selectedOption={selectedOption}
+                isMatch={isMatch<T>}
+                OptionComponent={PickerOptionComponent<T>}
+                noOptionsFallback={<NoOptionsFallback noOptionsText={noOptionsText} />}
                 noMatchesFallback={t('modelManager.noMatchingModels')}
                 NextToSearchBar={<NavigateToModelManagerButton />}
                 getIsOptionDisabled={getIsOptionDisabled}
                 searchable
+                initialGroupStates={initialGroupStates}
               />
             </PopoverBody>
           </PopoverContent>
@@ -286,35 +385,38 @@ const optionNameSx: SystemStyleObject = {
   },
 };
 
-const PickerOptionComponent = typedMemo(({ option, ...rest }: { option: AnyModelConfig } & BoxProps) => {
-  const { $compactView } = usePickerContext<AnyModelConfig>();
-  const compactView = useStore($compactView);
+const PickerOptionComponent = typedMemo(
+  <T extends AnyModelConfig>({ option, ...rest }: { option: WithStarred<T> } & BoxProps) => {
+    const { $compactView } = usePickerContext<WithStarred<T>>();
+    const compactView = useStore($compactView);
 
-  return (
-    <Flex {...rest} sx={optionSx} data-is-compact={compactView}>
-      {!compactView && option.cover_image && <ModelImage image_url={option.cover_image} />}
-      <Flex flexDir="column" gap={1} flex={1}>
-        <Flex gap={2} alignItems="center">
-          <Text sx={optionNameSx} data-is-compact={compactView}>
-            {option.name}
-          </Text>
-          <Spacer />
-          {option.file_size > 0 && (
-            <Text variant="subtext" fontStyle="italic" noOfLines={1} flexShrink={0} overflow="visible">
-              {filesize(option.file_size)}
+    return (
+      <Flex {...rest} sx={optionSx} data-is-compact={compactView}>
+        {!compactView && option.cover_image && <ModelImage image_url={option.cover_image} />}
+        <Flex flexDir="column" gap={1} flex={1}>
+          <Flex gap={2} alignItems="center">
+            {option.starred && <Icon as={PiLinkSimple} color="invokeYellow.500" boxSize={4} />}
+            <Text sx={optionNameSx} data-is-compact={compactView}>
+              {option.name}
             </Text>
-          )}
-          {option.usage_info && (
-            <Text variant="subtext" fontStyle="italic" noOfLines={1} flexShrink={0} overflow="visible">
-              {option.usage_info}
-            </Text>
-          )}
+            <Spacer />
+            {option.file_size > 0 && (
+              <Text variant="subtext" fontStyle="italic" noOfLines={1} flexShrink={0} overflow="visible">
+                {filesize(option.file_size)}
+              </Text>
+            )}
+            {option.usage_info && (
+              <Text variant="subtext" fontStyle="italic" noOfLines={1} flexShrink={0} overflow="visible">
+                {option.usage_info}
+              </Text>
+            )}
+          </Flex>
+          {option.description && !compactView && <Text color="base.200">{option.description}</Text>}
         </Flex>
-        {option.description && !compactView && <Text color="base.200">{option.description}</Text>}
       </Flex>
-    </Flex>
-  );
-});
+    );
+  }
+);
 PickerOptionComponent.displayName = 'PickerItemComponent';
 
 const BASE_KEYWORDS: { [key in BaseModelType]?: string[] } = {
@@ -323,7 +425,7 @@ const BASE_KEYWORDS: { [key in BaseModelType]?: string[] } = {
   'sd-3': ['sd3', 'sd3.0', 'sd3.5', 'sd-3'],
 };
 
-const isMatch = (model: AnyModelConfig, searchTerm: string) => {
+const isMatch = <T extends AnyModelConfig>(model: WithStarred<T>, searchTerm: string) => {
   const regex = getRegex(searchTerm);
   const bases = BASE_KEYWORDS[model.base] ?? [model.base];
   const testString =

@@ -6,7 +6,8 @@ import { InvokeButtonTooltip } from 'features/queue/components/InvokeButtonToolt
 import { useDeleteCurrentQueueItem } from 'features/queue/hooks/useDeleteCurrentQueueItem';
 import { useInvoke } from 'features/queue/hooks/useInvoke';
 import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
-import { memo } from 'react';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiCircleNotchBold,
@@ -52,13 +53,21 @@ export const FloatingCanvasLeftPanelButtons = memo(() => {
 FloatingCanvasLeftPanelButtons.displayName = 'FloatingCanvasLeftPanelButtons';
 
 const ToggleLeftPanelButton = memo(() => {
-  const { toggleLeftPanel } = useAutoLayoutContext();
   const { t } = useTranslation();
+  const { tab } = useAutoLayoutContext();
+
+  const onClick = useCallback(() => {
+    if (navigationApi.tabApi?.getTab() !== tab) {
+      return;
+    }
+    navigationApi.toggleLeftPanelInTab(tab);
+  }, [tab]);
+
   return (
     <Tooltip label={t('accessibility.toggleLeftPanel')} placement="end">
       <IconButton
         aria-label={t('accessibility.toggleLeftPanel')}
-        onClick={toggleLeftPanel}
+        onClick={onClick}
         icon={<PiSlidersHorizontalBold />}
         flexGrow={1}
       />

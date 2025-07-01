@@ -7,7 +7,8 @@ import { useTranslation } from 'react-i18next';
 import { PiInfoBold, PiXBold } from 'react-icons/pi';
 import type { GetStarterModelsResponse } from 'services/api/endpoints/models';
 
-import { StarterBundle } from './StarterBundle';
+import { StarterBundleButton } from './StarterBundle';
+import { StarterBundleTooltipContent } from './StarterBundleTooltipContent';
 import { StarterModelsResultItem } from './StarterModelsResultItem';
 
 type StarterModelsResultsProps = {
@@ -61,8 +62,13 @@ export const StarterModelsResults = memo(({ results }: StarterModelsResultsProps
               </Tooltip>
             </Flex>
             <Flex gap={2}>
-              {map(results.starter_bundles, (bundle, bundleName) => (
-                <StarterBundle key={bundleName} bundleName={bundleName} bundle={bundle} />
+              {map(results.starter_bundles, (bundle) => (
+                <StarterBundleButton
+                  key={bundle.name}
+                  bundle={bundle}
+                  tooltip={<StarterBundleTooltipContent bundle={bundle} />}
+                  size="sm"
+                />
               ))}
             </Flex>
           </Flex>

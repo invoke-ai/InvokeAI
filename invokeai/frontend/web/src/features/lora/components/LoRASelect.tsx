@@ -1,11 +1,13 @@
-import type { ChakraProps } from '@invoke-ai/ui-library';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
+import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { useRelatedGroupedModelCombobox } from 'common/hooks/useRelatedGroupedModelCombobox';
+import type { GroupStatusMap } from 'common/components/Picker/Picker';
 import { loraAdded, selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
 import { selectBase } from 'features/controlLayers/store/paramsSlice';
+import { ModelPicker } from 'features/parameters/components/ModelPicker';
+import { API_BASE_MODELS } from 'features/parameters/types/constants';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLoRAModels } from 'services/api/hooks/modelsByType';
@@ -18,16 +20,26 @@ const LoRASelect = () => {
   const [modelConfigs, { isLoading }] = useLoRAModels();
   const { t } = useTranslation();
   const addedLoRAs = useAppSelector(selectLoRAs);
+
   const currentBaseModel = useAppSelector(selectBase);
 
-  const getIsDisabled = (model: LoRAModelConfig): boolean => {
-    const isCompatible = currentBaseModel === model.base;
-    const isAdded = Boolean(addedLoRAs.find((lora) => lora.model.key === model.key));
-    const hasMainModel = Boolean(currentBaseModel);
-    return !hasMainModel || !isCompatible || isAdded;
-  };
+  // Filter to only show compatible LoRAs
+  const compatibleLoRAs = useMemo(() => {
+    if (!currentBaseModel) {
+      return EMPTY_ARRAY;
+    }
+    return modelConfigs.filter((model) => model.base === currentBaseModel);
+  }, [modelConfigs, currentBaseModel]);
 
-  const _onChange = useCallback(
+  const getIsDisabled = useCallback(
+    (model: LoRAModelConfig): boolean => {
+      const isAdded = Boolean(addedLoRAs.find((lora) => lora.model.key === model.key));
+      return isAdded;
+    },
+    [addedLoRAs]
+  );
+
+  const onChange = useCallback(
     (model: LoRAModelConfig | null) => {
       if (!model) {
         return;
@@ -37,46 +49,49 @@ const LoRASelect = () => {
     [dispatch]
   );
 
-  const { options, onChange } = useRelatedGroupedModelCombobox({
-    modelConfigs,
-    getIsDisabled,
-    onChange: _onChange,
-  });
-
   const placeholder = useMemo(() => {
     if (isLoading) {
       return t('common.loading');
     }
 
-    if (options.length === 0) {
-      return t('models.noLoRAsInstalled');
+    if (compatibleLoRAs.length === 0) {
+      return currentBaseModel ? t('models.noCompatibleLoRAs') : t('models.selectModelFirst');
     }
 
     return t('models.addLora');
-  }, [isLoading, options.length, t]);
+  }, [isLoading, compatibleLoRAs.length, currentBaseModel, t]);
 
-  const noOptionsMessage = useCallback(() => t('models.noMatchingLoRAs'), [t]);
+  // Calculate initial group states to default to the current base model architecture
+  const initialGroupStates = useMemo(() => {
+    if (!currentBaseModel) {
+      return undefined;
+    }
+
+    // Determine the group ID for the current base model
+    const groupId = API_BASE_MODELS.includes(currentBaseModel) ? 'api' : currentBaseModel;
+
+    // Return a map with only the current base model group enabled
+    return { [groupId]: true } satisfies GroupStatusMap;
+  }, [currentBaseModel]);
 
   return (
-    <FormControl isDisabled={!options.length} gap={2}>
+    <FormControl gap={2}>
       <InformationalPopover feature="lora">
         <FormLabel>{t('models.concepts')} </FormLabel>
       </InformationalPopover>
-      <Combobox
-        placeholder={placeholder}
-        value={null}
-        options={options}
-        noOptionsMessage={noOptionsMessage}
+      <ModelPicker
+        modelConfigs={compatibleLoRAs}
         onChange={onChange}
-        data-testid="add-lora"
-        sx={selectStyles}
+        grouped={false}
+        selectedModelConfig={undefined}
+        allowEmpty
+        placeholder={placeholder}
+        getIsOptionDisabled={getIsDisabled}
+        initialGroupStates={initialGroupStates}
+        noOptionsText={currentBaseModel ? t('models.noCompatibleLoRAs') : t('models.selectModelFirst')}
       />
     </FormControl>
   );
 };
 
 export default memo(LoRASelect);
-
-const selectStyles: ChakraProps['sx'] = {
-  w: 'full',
-};

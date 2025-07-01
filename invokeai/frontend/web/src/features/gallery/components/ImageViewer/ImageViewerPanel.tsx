@@ -8,7 +8,7 @@ import { ImageViewerContextProvider } from './context';
 export const ImageViewerPanel = memo(() => {
   return (
     <ImageViewerContextProvider>
-      <Flex flexDir="column" w="full" h="full" overflow="hidden" p={2} gap={2}>
+      <Flex flexDir="column" w="full" h="full" overflow="hidden" gap={2}>
         <ViewerToolbar />
         <Divider />
         <ImageViewer />

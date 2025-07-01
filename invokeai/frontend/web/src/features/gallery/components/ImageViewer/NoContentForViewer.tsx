@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { InvokeLogoIcon } from 'common/components/InvokeLogoIcon';
 import { LOADING_SYMBOL, useHasImages } from 'features/gallery/hooks/useHasImages';
-import { $installModelsTab } from 'features/modelManagerV2/subpanels/InstallModels';
+import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectIsLocal } from 'features/system/store/configSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -133,12 +133,12 @@ const StarterBundlesCallout = () => {
 
   const handleClickDownloadStarterModels = useCallback(() => {
     dispatch(setActiveTab('models'));
-    $installModelsTab.set(3);
+    setInstallModelsTabByName('starterModels');
   }, [dispatch]);
 
   const handleClickImportModels = useCallback(() => {
     dispatch(setActiveTab('models'));
-    $installModelsTab.set(0);
+    setInstallModelsTabByName('urlOrLocal');
   }, [dispatch]);
 
   return (

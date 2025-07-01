@@ -1,5 +1,5 @@
 import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
-import { useAppStore } from 'app/store/nanostores/store';
+import { useAppStore } from 'app/store/storeHooks';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
 import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';
@@ -7,7 +7,8 @@ import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { sentImageToCanvas } from 'features/gallery/store/actions';
 import { createNewCanvasEntityFromImage } from 'features/imageActions/actions';
 import { toast } from 'features/toast/toast';
-import { setActiveTab } from 'features/ui/store/uiSlice';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
+import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
@@ -23,7 +24,7 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
     const { dispatch, getState } = store;
     createNewCanvasEntityFromImage({ imageDTO, type: 'raster_layer', dispatch, getState });
     dispatch(sentImageToCanvas());
-    dispatch(setActiveTab('canvas'));
+    navigationApi.focusPanelInTab('canvas', WORKSPACE_PANEL_ID);
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
@@ -35,7 +36,7 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
     const { dispatch, getState } = store;
     createNewCanvasEntityFromImage({ imageDTO, type: 'control_layer', dispatch, getState });
     dispatch(sentImageToCanvas());
-    dispatch(setActiveTab('canvas'));
+    navigationApi.focusPanelInTab('canvas', WORKSPACE_PANEL_ID);
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
@@ -47,7 +48,7 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
     const { dispatch, getState } = store;
     createNewCanvasEntityFromImage({ imageDTO, type: 'inpaint_mask', dispatch, getState });
     dispatch(sentImageToCanvas());
-    dispatch(setActiveTab('canvas'));
+    navigationApi.focusPanelInTab('canvas', WORKSPACE_PANEL_ID);
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
@@ -59,7 +60,7 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
     const { dispatch, getState } = store;
     createNewCanvasEntityFromImage({ imageDTO, type: 'regional_guidance', dispatch, getState });
     dispatch(sentImageToCanvas());
-    dispatch(setActiveTab('canvas'));
+    navigationApi.focusPanelInTab('canvas', WORKSPACE_PANEL_ID);
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
@@ -71,7 +72,7 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
     const { dispatch, getState } = store;
     createNewCanvasEntityFromImage({ imageDTO, type: 'regional_guidance_with_reference_image', dispatch, getState });
     dispatch(sentImageToCanvas());
-    dispatch(setActiveTab('canvas'));
+    navigationApi.focusPanelInTab('canvas', WORKSPACE_PANEL_ID);
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),

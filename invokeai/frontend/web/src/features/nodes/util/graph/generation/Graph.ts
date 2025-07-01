@@ -129,6 +129,14 @@ export class Graph {
   }
 
   /**
+   * Gets all nodes in the graph.
+   * @returns An array of all nodes in the graph.
+   */
+  getNodes(): AnyInvocation[] {
+    return Object.values(this._graph.nodes);
+  }
+
+  /**
    * Get the immediate incomers of a node.
    * @param node The node to get the incomers of.
    * @returns The incoming nodes.

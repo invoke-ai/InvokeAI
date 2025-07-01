@@ -11,6 +11,27 @@ import type { Atom } from 'nanostores';
 import { atom, effect } from 'nanostores';
 import type { Logger } from 'roarr';
 
+// To get pixel sizes corresponding to our theme tokens, first find the theme token CSS var in browser dev tools.
+// For example `var(--invoke-space-8)` is equivalent to using `8` as a space prop in a component.
+//
+// If it is already in pixels, you can use it directly. If it is in rems, you need to convert it to pixels.
+//
+// For example:
+// const style = window.getComputedStyle(document.documentElement)
+// parseFloat(style.fontSize) * parseFloat(style.getPropertyValue("--invoke-space-8"))
+//
+// This will give you the pixel value for the theme token in pixels.
+//
+// You cannot do this dynamically in this file, because it depends on the styles being applied to the document, which
+// will not have happened yet when this module is loaded.
+
+const SPACING_4 = 12; // --invoke-space-4 in pixels
+const BORDER_RADIUS_BASE = 4; // --invoke-radii-base in pixels
+const BORDER_WIDTH = 1;
+const FONT_SIZE_MD = 14.4; // --invoke-fontSizes-md
+const BADGE_WIDTH = 192;
+const BADGE_HEIGHT = 36;
+
 type ImageNameSrc = { type: 'imageName'; data: string };
 type DataURLSrc = { type: 'dataURL'; data: string };
 
@@ -27,7 +48,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     group: Konva.Group;
     placeholder: {
       group: Konva.Group;
-      rect: Konva.Rect;
+      badgeBg: Konva.Rect;
       text: Konva.Text;
     };
   };
@@ -49,8 +70,6 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
 
     this.log.debug('Creating module');
 
-    const { width, height } = this.manager.stateApi.getBbox().rect;
-
     this.konva = {
       group: new Konva.Group({
         name: `${this.type}:group`,
@@ -62,24 +81,31 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
           listening: false,
           visible: false,
         }),
-        rect: new Konva.Rect({
-          name: `${this.type}:placeholder_rect`,
-          fill: 'hsl(220 12% 10% / 1)', // 'base.900'
-          width,
-          height,
+        badgeBg: new Konva.Rect({
+          name: `${this.type}:placeholder_badge_bg`,
+          fill: 'hsl(220 12% 10% / 0.8)', // 'base.900' with opacity
+          x: SPACING_4,
+          y: SPACING_4,
+          width: BADGE_WIDTH,
+          height: BADGE_HEIGHT,
+          cornerRadius: BORDER_RADIUS_BASE,
+          stroke: 'hsl(220 12% 50% / 1)', // 'base.700'
+          strokeWidth: BORDER_WIDTH,
           listening: false,
           perfectDrawEnabled: false,
         }),
         text: new Konva.Text({
           name: `${this.type}:placeholder_text`,
-          fill: 'hsl(220 12% 80% / 1)', // 'base.900'
-          width,
-          height,
+          fill: 'hsl(220 12% 80% / 1)', // 'base.300'
+          x: SPACING_4,
+          y: SPACING_4,
+          width: BADGE_WIDTH,
+          height: BADGE_HEIGHT,
           align: 'center',
           verticalAlign: 'middle',
           fontFamily: '"Inter Variable", sans-serif',
-          fontSize: width / 24,
-          fontStyle: '600',
+          fontSize: FONT_SIZE_MD,
+          fontStyle: '600', // Equivalent to theme fontWeight "semibold"
           text: 'Waiting for Image',
           listening: false,
           perfectDrawEnabled: false,
@@ -87,7 +113,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
       },
     };
 
-    this.konva.placeholder.group.add(this.konva.placeholder.rect);
+    this.konva.placeholder.group.add(this.konva.placeholder.badgeBg);
     this.konva.placeholder.group.add(this.konva.placeholder.text);
     this.konva.group.add(this.konva.placeholder.group);
 
@@ -119,15 +145,6 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
       })
     );
   }
-
-  syncPlaceholderSize = () => {
-    const { width, height } = this.manager.stateApi.getBbox().rect;
-    this.konva.placeholder.rect.width(width);
-    this.konva.placeholder.rect.height(height);
-    this.konva.placeholder.text.width(width);
-    this.konva.placeholder.text.height(height);
-    this.konva.placeholder.text.fontSize(width / 24);
-  };
 
   initialize = () => {
     this.log.debug('Initializing module');
@@ -209,7 +226,6 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
       } else {
         this.image?.destroy();
         this.image = null;
-        this.syncPlaceholderSize();
         this.konva.placeholder.group.visible(true);
       }
 

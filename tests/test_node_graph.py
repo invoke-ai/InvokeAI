@@ -20,9 +20,11 @@ from invokeai.app.invocations.primitives import (
 from invokeai.app.invocations.upscale import ESRGANInvocation
 from invokeai.app.services.shared.graph import (
     CollectInvocation,
+    CollectInvocationOutput,
     Edge,
     EdgeConnection,
     Graph,
+    GraphExecutionState,
     InvalidEdgeError,
     IterateInvocation,
     NodeAlreadyInGraphError,
@@ -38,6 +40,8 @@ from tests.test_nodes import (
     PromptTestInvocation,
     PromptTestInvocationOutput,
     TextToImageTestInvocation,
+    get_single_output_from_session,
+    run_session_with_mock_context,
 )
 
 
@@ -758,3 +762,205 @@ def test_nodes_must_return_invocation_output():
         class NoOutputInvocation(BaseInvocation):
             def invoke(self) -> str:
                 return "foo"
+
+
+def test_collector_different_incomers():
+    """Tests an edge case where a collector has incoming edges from invocations with differently-named output fields."""
+    g = Graph()
+    # This node has a str type output field named "prompt"
+    n1 = PromptTestInvocation(id="1", prompt="Banana")
+    # This node has a str type output field named "value"
+    n2 = StringInvocation(id="2", value="Sushi")
+    n3 = CollectInvocation(id="3")
+    g.add_node(n1)
+    g.add_node(n2)
+    g.add_node(n3)
+    e1 = create_edge(n1.id, "prompt", n3.id, "item")
+    e2 = create_edge(n2.id, "value", n3.id, "item")
+    g.add_edge(e1)
+    g.add_edge(e2)
+    session = GraphExecutionState(graph=g)
+    # The bug resulted in an error like this when calling session.next():
+    #   Field types are incompatible (a0f9797b-1179-4200-81ae-6ef981660163.prompt -> ccc6af96-2a65-4bbe-a02f-4189bb4770ac.item)
+    run_session_with_mock_context(session)
+    output = get_single_output_from_session(session, n3.id)
+    assert isinstance(output, CollectInvocationOutput)
+    assert output.collection == ["Banana", "Sushi"]  # Both inputs should be collected
+
+
+def test_iterator_collector_iterator_chain():
+    """Test basic Iterator -> Collector -> Iterator chain execution."""
+    g = Graph()
+    # Start with a collection of strings
+    n1 = PromptCollectionTestInvocation(id="1", collection=["apple", "banana", "cherry"])
+    # First iterator breaks down the collection
+    n2 = IterateInvocation(id="2")
+    # Process each item (pass-through for simplicity)
+    n3 = PromptTestInvocation(id="3")
+    # Collector reassembles the processed items
+    n4 = CollectInvocation(id="4")
+    # Second iterator breaks down the collected items again
+    n5 = IterateInvocation(id="5")
+    # Process each item again
+    n6 = PromptTestInvocation(id="6")
+    # Final collector
+    n7 = CollectInvocation(id="7")
+
+    for node in [n1, n2, n3, n4, n5, n6, n7]:
+        g.add_node(node)
+
+    # Chain the nodes together
+    g.add_edge(create_edge(n1.id, "collection", n2.id, "collection"))
+    g.add_edge(create_edge(n2.id, "item", n3.id, "prompt"))
+    g.add_edge(create_edge(n3.id, "prompt", n4.id, "item"))
+    g.add_edge(create_edge(n4.id, "collection", n5.id, "collection"))
+    g.add_edge(create_edge(n5.id, "item", n6.id, "prompt"))
+    g.add_edge(create_edge(n6.id, "prompt", n7.id, "item"))
+
+    # Execute the graph
+    session = GraphExecutionState(graph=g)
+    run_session_with_mock_context(session)
+
+    # Verify the final output contains all original items
+    output = get_single_output_from_session(session, n7.id)
+    assert isinstance(output, CollectInvocationOutput)
+    assert set(output.collection) == {"apple", "banana", "cherry"}
+
+
+def test_parallel_iterator_collector_iterator_chains():
+    """Test two parallel Iterator -> Collector -> Iterator chains."""
+    g = Graph()
+
+    # First chain
+    n1 = PromptCollectionTestInvocation(id="1", collection=["a", "b"])
+    n2 = IterateInvocation(id="2")
+    n3 = PromptTestInvocation(id="3")
+    n4 = CollectInvocation(id="4")
+    n5 = IterateInvocation(id="5")
+    n6 = PromptTestInvocation(id="6")
+    n7 = CollectInvocation(id="7")
+
+    # Second chain
+    n8 = PromptCollectionTestInvocation(id="8", collection=["x", "y", "z"])
+    n9 = IterateInvocation(id="9")
+    n10 = PromptTestInvocation(id="10")
+    n11 = CollectInvocation(id="11")
+    n12 = IterateInvocation(id="12")
+    n13 = PromptTestInvocation(id="13")
+    n14 = CollectInvocation(id="14")
+
+    for node in [n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11, n12, n13, n14]:
+        g.add_node(node)
+
+    # First chain edges
+    g.add_edge(create_edge(n1.id, "collection", n2.id, "collection"))
+    g.add_edge(create_edge(n2.id, "item", n3.id, "prompt"))
+    g.add_edge(create_edge(n3.id, "prompt", n4.id, "item"))
+    g.add_edge(create_edge(n4.id, "collection", n5.id, "collection"))
+    g.add_edge(create_edge(n5.id, "item", n6.id, "prompt"))
+    g.add_edge(create_edge(n6.id, "prompt", n7.id, "item"))
+
+    # Second chain edges
+    g.add_edge(create_edge(n8.id, "collection", n9.id, "collection"))
+    g.add_edge(create_edge(n9.id, "item", n10.id, "prompt"))
+    g.add_edge(create_edge(n10.id, "prompt", n11.id, "item"))
+    g.add_edge(create_edge(n11.id, "collection", n12.id, "collection"))
+    g.add_edge(create_edge(n12.id, "item", n13.id, "prompt"))
+    g.add_edge(create_edge(n13.id, "prompt", n14.id, "item"))
+
+    # Execute the graph
+    session = GraphExecutionState(graph=g)
+    run_session_with_mock_context(session)
+
+    # Verify both chains executed correctly
+    output1 = get_single_output_from_session(session, n7.id)
+    output2 = get_single_output_from_session(session, n14.id)
+
+    assert isinstance(output1, CollectInvocationOutput)
+    assert isinstance(output2, CollectInvocationOutput)
+    assert set(output1.collection) == {"a", "b"}
+    assert set(output2.collection) == {"x", "y", "z"}
+
+
+def test_iterator_collector_iterator_chain_with_cross_dependency():
+    """Test Iterator -> Collector -> Iterator chain where the second iterator depends on both chains."""
+    g = Graph()
+
+    # First chain: process strings
+    n1 = PromptCollectionTestInvocation(id="1", collection=["hello", "world"])
+    n2 = IterateInvocation(id="2")
+    n3 = PromptTestInvocation(id="3")
+    n4 = CollectInvocation(id="4")
+
+    # Second chain: process the collected results
+    n5 = IterateInvocation(id="5")
+    n6 = PromptTestInvocation(id="6")
+
+    # Additional input that gets collected with the iterator results
+    n7 = PromptTestInvocation(id="7", prompt="extra")
+
+    # Collector that receives from both the iterator and the additional input
+    n8 = CollectInvocation(id="8")
+
+    for node in [n1, n2, n3, n4, n5, n6, n7, n8]:
+        g.add_node(node)
+
+    # First chain
+    g.add_edge(create_edge(n1.id, "collection", n2.id, "collection"))
+    g.add_edge(create_edge(n2.id, "item", n3.id, "prompt"))
+    g.add_edge(create_edge(n3.id, "prompt", n4.id, "item"))
+
+    # Second chain
+    g.add_edge(create_edge(n4.id, "collection", n5.id, "collection"))
+    g.add_edge(create_edge(n5.id, "item", n6.id, "prompt"))
+
+    # Cross-dependency: collector receives from both iterator and regular node
+    g.add_edge(create_edge(n6.id, "prompt", n8.id, "item"))
+    g.add_edge(create_edge(n7.id, "prompt", n8.id, "item"))
+
+    # Execute the graph
+    session = GraphExecutionState(graph=g)
+    run_session_with_mock_context(session)
+
+    # Verify the final output contains items from both sources
+    output = get_single_output_from_session(session, n8.id)
+    assert isinstance(output, CollectInvocationOutput)
+    # Should contain the processed items from the iterator plus the extra item
+    assert set(output.collection) == {"hello", "world", "extra"}
+
+
+def test_iterator_collector_iterator_chain_with_empty_collection():
+    """Test Iterator -> Collector -> Iterator chain with empty input collection."""
+    g = Graph()
+
+    # Start with empty collection
+    n1 = PromptCollectionTestInvocation(id="1", collection=[])
+    n2 = IterateInvocation(id="2")
+    n3 = PromptTestInvocation(id="3")
+    n4 = CollectInvocation(id="4")
+    n5 = IterateInvocation(id="5")
+    n6 = PromptTestInvocation(id="6")
+    n7 = CollectInvocation(id="7")
+
+    for node in [n1, n2, n3, n4, n5, n6, n7]:
+        g.add_node(node)
+
+    # Chain the nodes
+    g.add_edge(create_edge(n1.id, "collection", n2.id, "collection"))
+    g.add_edge(create_edge(n2.id, "item", n3.id, "prompt"))
+    g.add_edge(create_edge(n3.id, "prompt", n4.id, "item"))
+    g.add_edge(create_edge(n4.id, "collection", n5.id, "collection"))
+    g.add_edge(create_edge(n5.id, "item", n6.id, "prompt"))
+    g.add_edge(create_edge(n6.id, "prompt", n7.id, "item"))
+
+    # Execute the graph
+    session = GraphExecutionState(graph=g)
+    run_session_with_mock_context(session)
+
+    # With empty collection, iterators don't create execution nodes, so collectors don't execute
+    # Verify that the final collector was never prepared (which is correct behavior)
+    assert n7.id not in session.source_prepared_mapping
+
+    # Verify only the source collection node executed
+    assert n1.id in session.source_prepared_mapping
+    assert len(session.source_prepared_mapping[n1.id]) == 1

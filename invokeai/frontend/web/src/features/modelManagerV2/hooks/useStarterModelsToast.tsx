@@ -1,6 +1,6 @@
 import { Button, Text, useToast } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { $installModelsTab } from 'features/modelManagerV2/subpanels/InstallModels';
+import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useCallback, useEffect, useState } from 'react';
@@ -45,7 +45,7 @@ const ToastDescription = () => {
 
   const onClick = useCallback(() => {
     dispatch(setActiveTab('models'));
-    $installModelsTab.set(3);
+    setInstallModelsTabByName('launchpad');
     toast.close(TOAST_ID);
   }, [dispatch, toast]);
 

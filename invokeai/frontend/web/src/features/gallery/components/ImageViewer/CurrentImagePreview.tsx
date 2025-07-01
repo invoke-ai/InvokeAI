@@ -12,7 +12,6 @@ import { memo, useCallback, useRef, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
 import { useImageViewerContext } from './context';
-import { ImageMetadataMini } from './ImageMetadataMini';
 import { NoContentForViewer } from './NoContentForViewer';
 import { ProgressImage } from './ProgressImage2';
 import { ProgressIndicator } from './ProgressIndicator2';
@@ -65,7 +64,6 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       )}
       <Flex flexDir="column" gap={2} position="absolute" top={0} insetInlineStart={0} alignItems="flex-start">
         <CanvasAlertsInvocationProgress />
-        {imageDTO && !withProgress && <ImageMetadataMini imageName={imageDTO.image_name} />}
       </Flex>
       {shouldShowImageDetails && imageDTO && !withProgress && (
         <Box position="absolute" opacity={0.8} top={0} width="full" height="full" borderRadius="base">

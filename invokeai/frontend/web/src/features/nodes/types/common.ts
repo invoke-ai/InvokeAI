@@ -227,7 +227,7 @@ export type ProgressImage = z.infer<typeof zProgressImage>;
 // #endregion
 
 // #region ImageOutput
-const zImageOutput = z.object({
+export const zImageOutput = z.object({
   image: zImageField,
   width: z.number().int().gt(0),
   height: z.number().int().gt(0),

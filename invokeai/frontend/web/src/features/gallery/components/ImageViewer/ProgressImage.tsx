@@ -1,5 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Flex, Heading, Image } from '@invoke-ai/ui-library';
+import { Badge, Flex, Image } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -37,8 +37,24 @@ export const ProgressImage = memo(() => {
 
   if (!progressImage) {
     return (
-      <Flex width="full" height="full" alignItems="center" justifyContent="center" minW={0} minH={0}>
-        <Heading>Waiting for Image</Heading>
+      <Flex width="full" height="full" position="relative" minW={0} minH={0}>
+        <Badge
+          position="absolute"
+          top={2}
+          left={2}
+          color="base.300"
+          borderColor="base.700"
+          borderWidth={1}
+          bg="base.900"
+          opacity="0.8"
+          fontSize="sm"
+          fontWeight="semibold"
+          zIndex="docked"
+          pointerEvents="none"
+          borderRadius="base"
+        >
+          Waiting for Image
+        </Badge>
       </Flex>
     );
   }

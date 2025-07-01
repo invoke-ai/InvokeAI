@@ -833,6 +833,8 @@ export const canvasSlice = createSlice({
       }
 
       if (isIPAdapterConfig(referenceImage.config)) {
+        referenceImage.config.model = zModelIdentifierField.parse(modelConfig);
+
         // Ensure that the IP Adapter model is compatible with the CLIP Vision model
         if (referenceImage.config.model?.base === 'flux') {
           referenceImage.config.clipVisionModel = 'ViT-L';
@@ -1537,6 +1539,16 @@ export const canvasSlice = createSlice({
           break;
       }
     },
+    allNonRasterLayersIsHiddenToggled: (state) => {
+      const hasVisibleNonRasterLayers =
+        !state.controlLayers.isHidden || !state.inpaintMasks.isHidden || !state.regionalGuidance.isHidden;
+
+      const shouldHide = hasVisibleNonRasterLayers;
+
+      state.controlLayers.isHidden = shouldHide;
+      state.inpaintMasks.isHidden = shouldHide;
+      state.regionalGuidance.isHidden = shouldHide;
+    },
     allEntitiesDeleted: (state) => {
       // Deleting all entities is equivalent to resetting the state for each entity type
       const initialState = getInitialCanvasState();
@@ -1646,6 +1658,7 @@ export const {
   entitiesReordered,
   allEntitiesDeleted,
   allEntitiesOfTypeIsHiddenToggled,
+  allNonRasterLayersIsHiddenToggled,
   // bbox
   bboxChangedFromCanvas,
   bboxScaledWidthChanged,

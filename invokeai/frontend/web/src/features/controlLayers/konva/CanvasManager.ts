@@ -32,6 +32,7 @@ import { assert } from 'tsafe';
 import type { JsonObject } from 'type-fest';
 
 import { CanvasBackgroundModule } from './CanvasBackgroundModule';
+import { CanvasCompositionGuideModule } from './CanvasCompositionGuideModule';
 import { CanvasStateApiModule } from './CanvasStateApiModule';
 
 export class CanvasManager extends CanvasModuleBase {
@@ -61,6 +62,7 @@ export class CanvasManager extends CanvasModuleBase {
   compositor: CanvasCompositorModule;
   tool: CanvasToolModule;
   stagingArea: CanvasStagingAreaModule;
+  compositionGuide: CanvasCompositionGuideModule;
 
   konva: {
     previewLayer: Konva.Layer;
@@ -101,6 +103,7 @@ export class CanvasManager extends CanvasModuleBase {
 
     this.compositor = new CanvasCompositorModule(this);
     this.stagingArea = new CanvasStagingAreaModule(this);
+    this.compositionGuide = new CanvasCompositionGuideModule(this);
 
     this.$isBusy = computed(
       [
@@ -129,6 +132,7 @@ export class CanvasManager extends CanvasModuleBase {
     // Must add in this order for correct z-index
     this.konva.previewLayer.add(this.stagingArea.konva.group);
     this.konva.previewLayer.add(this.tool.konva.group);
+    this.konva.previewLayer.add(this.compositionGuide.konva.group);
   }
 
   getAdapter = <T extends CanvasEntityType = CanvasEntityType>(
@@ -236,6 +240,7 @@ export class CanvasManager extends CanvasModuleBase {
       this.entityRenderer,
       this.compositor,
       this.stage,
+      this.compositionGuide,
     ];
   };
 
@@ -281,6 +286,7 @@ export class CanvasManager extends CanvasModuleBase {
       entityRenderer: this.entityRenderer.repr(),
       compositor: this.compositor.repr(),
       stage: this.stage.repr(),
+      compositionGuide: this.compositionGuide.repr(),
     };
   };
 

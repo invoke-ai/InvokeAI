@@ -1,6 +1,5 @@
 import { ConfirmationAlertDialog, Divider, Flex, FormControl, FormLabel, Switch, Text } from '@invoke-ai/ui-library';
-import { useAppStore } from 'app/store/nanostores/store';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import ImageUsageMessage from 'features/deleteImageModal/components/ImageUsageMessage';
 import { useDeleteImageModalApi, useDeleteImageModalState } from 'features/deleteImageModal/store/state';
 import { selectSystemShouldConfirmOnDelete, setShouldConfirmOnDelete } from 'features/system/store/systemSlice';
@@ -22,7 +21,7 @@ export const DeleteImageModal = memo(() => {
 
   return (
     <ConfirmationAlertDialog
-      title={`${t('gallery.deleteImage', { count: state.image_names.length })}2`}
+      title={`${t('gallery.deleteImage', { count: state.image_names.length })}`}
       isOpen={state.isOpen}
       onClose={api.close}
       cancelButtonText={t('common.cancel')}

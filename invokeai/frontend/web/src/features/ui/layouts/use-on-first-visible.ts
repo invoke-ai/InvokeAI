@@ -1,9 +1,21 @@
 import type { GridviewApi } from 'dockview';
-import type { Atom } from 'nanostores';
 import type { RefObject } from 'react';
 import { useCallback, useEffect } from 'react';
 
 import { MAIN_PANEL_ID } from './shared';
+
+// Find the parent element that has display: none
+const findParentWithDisplayNone = (el: HTMLElement): HTMLElement | null => {
+  let parent = el.parentElement;
+  while (parent) {
+    const computedStyle = window.getComputedStyle(parent);
+    if (computedStyle.display === 'none') {
+      return parent;
+    }
+    parent = parent.parentElement;
+  }
+  return null;
+};
 
 export const useOnFirstVisible = (elementRef: RefObject<HTMLElement>, callback: () => void): void => {
   useEffect(() => {
@@ -12,20 +24,7 @@ export const useOnFirstVisible = (elementRef: RefObject<HTMLElement>, callback: 
       return;
     }
 
-    // Find the parent element that has display: none
-    const findParentWithDisplay = (el: HTMLElement): HTMLElement | null => {
-      let parent = el.parentElement;
-      while (parent) {
-        const computedStyle = window.getComputedStyle(parent);
-        if (computedStyle.display === 'none') {
-          return parent;
-        }
-        parent = parent.parentElement;
-      }
-      return null;
-    };
-
-    const targetParent = findParentWithDisplay(element);
+    const targetParent = findParentWithDisplayNone(element);
     if (!targetParent) {
       return;
     }
@@ -51,9 +50,8 @@ export const useOnFirstVisible = (elementRef: RefObject<HTMLElement>, callback: 
   }, [elementRef, callback]);
 };
 
-export const useResizeMainPanelOnFirstVisit = ($api: Atom<GridviewApi | null>, ref: RefObject<HTMLElement>) => {
+export const useResizeMainPanelOnFirstVisit = (api: GridviewApi | null, ref: RefObject<HTMLElement>) => {
   const resizeMainPanelOnFirstVisible = useCallback(() => {
-    const api = $api.get();
     if (!api) {
       return;
     }
@@ -76,6 +74,6 @@ export const useResizeMainPanelOnFirstVisit = ($api: Atom<GridviewApi | null>, r
       }
     };
     setSize();
-  }, [$api]);
+  }, [api]);
   useOnFirstVisible(ref, resizeMainPanelOnFirstVisible);
 };
