@@ -10,6 +10,7 @@ import { fixTooltipCloseOnScrollStyles } from 'common/util/fixTooltipCloseOnScro
 import { CanvasEntityAddOfTypeButton } from 'features/controlLayers/components/common/CanvasEntityAddOfTypeButton';
 import { CanvasEntityMergeVisibleButton } from 'features/controlLayers/components/common/CanvasEntityMergeVisibleButton';
 import { CanvasEntityTypeIsHiddenToggle } from 'features/controlLayers/components/common/CanvasEntityTypeIsHiddenToggle';
+import { InpaintMaskAdjustBboxButton } from 'features/controlLayers/components/InpaintMask/InpaintMaskAdjustBboxButton';
 import { RasterLayerExportPSDButton } from 'features/controlLayers/components/RasterLayer/RasterLayerExportPSDButton';
 import { useEntityTypeInformationalPopover } from 'features/controlLayers/hooks/useEntityTypeInformationalPopover';
 import { useEntityTypeTitle } from 'features/controlLayers/hooks/useEntityTypeTitle';
@@ -165,6 +166,7 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children, entityI
 
           <Spacer />
         </Flex>
+        {type === 'inpaint_mask' && <InpaintMaskAdjustBboxButton />}
         <CanvasEntityMergeVisibleButton type={type} />
         <CanvasEntityTypeIsHiddenToggle type={type} />
         {type === 'raster_layer' && <RasterLayerExportPSDButton />}

@@ -2074,6 +2074,7 @@
         "uploadOrDragAnImage": "Drag an image from the gallery or <UploadButton>upload an image</UploadButton>.",
         "imageNoise": "Image Noise",
         "denoiseLimit": "Denoise Limit",
+        "adjustBboxToMasks": "Adjust Bbox to Masks",
         "invertMask": "Invert Mask",
         "warnings": {
             "problemsFound": "Problems found",
