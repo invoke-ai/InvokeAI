@@ -10,6 +10,7 @@ import { CanvasEntityMenuItemsTransform } from 'features/controlLayers/component
 import { InpaintMaskMenuItemsAddModifiers } from 'features/controlLayers/components/InpaintMask/InpaintMaskMenuItemsAddModifiers';
 import { InpaintMaskMenuItemsConvertToSubMenu } from 'features/controlLayers/components/InpaintMask/InpaintMaskMenuItemsConvertToSubMenu';
 import { InpaintMaskMenuItemsCopyToSubMenu } from 'features/controlLayers/components/InpaintMask/InpaintMaskMenuItemsCopyToSubMenu';
+import { InpaintMaskMenuItemsInvert } from 'features/controlLayers/components/InpaintMask/InpaintMaskMenuItemsInvert';
 import { memo } from 'react';
 
 export const InpaintMaskMenuItems = memo(() => {
@@ -21,6 +22,7 @@ export const InpaintMaskMenuItems = memo(() => {
         <CanvasEntityMenuItemsDelete asIcon />
       </IconMenuItemGroup>
       <MenuDivider />
+      <InpaintMaskMenuItemsInvert />
       <InpaintMaskMenuItemsAddModifiers />
       <MenuDivider />
       <CanvasEntityMenuItemsTransform />
