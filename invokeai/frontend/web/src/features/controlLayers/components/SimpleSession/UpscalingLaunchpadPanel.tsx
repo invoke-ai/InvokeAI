@@ -1,4 +1,4 @@
-import { Box, Button, Flex, Grid, Heading, Icon, Text } from '@invoke-ai/ui-library';
+import { Box, Button, ButtonGroup, Flex, Grid, Heading, Icon, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { setUpscaleInitialImageDndTarget } from 'features/dnd/dnd';
@@ -66,8 +66,8 @@ export const UpscalingLaunchpadPanel = memo(() => {
 
   return (
     <Flex flexDir="column" h="full" w="full" alignItems="center" gap={2}>
-      <Flex flexDir="column" w="full" gap={4} px={14} maxW={768} pt="20vh">
-        <Heading mb={4}>{t('ui.launchpad.upscalingTitle')}</Heading>
+      <Flex flexDir="column" w="full" gap={8} px={14} maxW={768} pt="20vh">
+        <Heading>{t('ui.launchpad.upscalingTitle')}</Heading>
 
         {/* Upload Area */}
         <LaunchpadButton {...uploadApi.getUploadButtonProps()} position="relative" gap={8}>
@@ -105,7 +105,7 @@ export const UpscalingLaunchpadPanel = memo(() => {
 
         {/* Guidance text */}
         {upscaleInitialImage && (
-          <Flex bg="base.800" p={4} borderRadius="base" border="1px solid" borderColor="base.700" mt={6}>
+          <Flex bg="base.800" p={4} borderRadius="base" border="1px solid" borderColor="base.700">
             <Text variant="subtext" fontSize="sm" lineHeight="1.6">
               <strong>{t('ui.launchpad.upscaling.readyToUpscale.title')}</strong>{' '}
               {t('ui.launchpad.upscaling.readyToUpscale.description')}
@@ -114,18 +114,15 @@ export const UpscalingLaunchpadPanel = memo(() => {
         )}
 
         {/* Controls */}
-        <style>{`.launchpad-hide-label .chakra-form__label { display: none !important; }`}</style>
-        <Grid gridTemplateColumns="1fr 1fr" gap={10} alignItems="start" mt={upscaleInitialImage ? 8 : 12}>
+        <Grid gridTemplateColumns="1fr 1fr" gap={8} alignItems="start">
           {/* Left Column: Creativity and Structural Defaults */}
           <Box>
             <Text fontWeight="semibold" fontSize="sm" mb={3}>
-              Creativity & Structural Defaults
+              Creativity & Structure Defaults
             </Text>
-            <Flex flexDir="column" gap={2}>
+            <ButtonGroup size="sm" orientation="vertical" variant="outline" w="full">
               <Button
-                size="sm"
-                variant={creativity === -5 && structure === 5 ? 'solid' : 'outline'}
-                colorScheme="base"
+                colorScheme={creativity === -5 && structure === 5 ? 'invokeBlue' : undefined}
                 justifyContent="center"
                 onClick={onConservativeClick}
                 leftIcon={<PiShieldCheckBold />}
@@ -133,9 +130,7 @@ export const UpscalingLaunchpadPanel = memo(() => {
                 Conservative
               </Button>
               <Button
-                size="sm"
-                variant={creativity === 0 && structure === 0 ? 'solid' : 'outline'}
-                colorScheme="base"
+                colorScheme={creativity === 0 && structure === 0 ? 'invokeBlue' : undefined}
                 justifyContent="center"
                 onClick={onBalancedClick}
                 leftIcon={<PiScalesBold />}
@@ -143,9 +138,7 @@ export const UpscalingLaunchpadPanel = memo(() => {
                 Balanced
               </Button>
               <Button
-                size="sm"
-                variant={creativity === 5 && structure === -2 ? 'solid' : 'outline'}
-                colorScheme="base"
+                colorScheme={creativity === 5 && structure === -2 ? 'invokeBlue' : undefined}
                 justifyContent="center"
                 onClick={onCreativeClick}
                 leftIcon={<PiPaletteBold />}
@@ -153,16 +146,14 @@ export const UpscalingLaunchpadPanel = memo(() => {
                 Creative
               </Button>
               <Button
-                size="sm"
-                variant={creativity === 8 && structure === -5 ? 'solid' : 'outline'}
-                colorScheme="base"
+                colorScheme={creativity === 8 && structure === -5 ? 'invokeBlue' : undefined}
                 justifyContent="center"
                 onClick={onArtisticClick}
                 leftIcon={<PiSparkleBold />}
               >
                 Artistic
               </Button>
-            </Flex>
+            </ButtonGroup>
           </Box>
           {/* Right Column: Description/help text */}
           <Box>
