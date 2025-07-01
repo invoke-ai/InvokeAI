@@ -19,6 +19,9 @@ const baseSx: SystemStyleObject = {
   '&[data-is-open="true"]': {
     borderColor: 'invokeBlue.300',
   },
+  '&[data-is-error="true"]': {
+    borderColor: 'error.300',
+  },
 };
 
 const weightDisplaySx: SystemStyleObject = {
@@ -152,7 +155,7 @@ export const RefImagePreview = memo(() => {
           transform="translateX(-50%) translateY(-50%)"
           filter="drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 2px rgba(0, 0, 0, 1))"
           color="error.500"
-          boxSize={16}
+          boxSize={8}
           as={PiExclamationMarkBold}
         />
       )}
