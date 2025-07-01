@@ -1,6 +1,7 @@
 import { Button, Divider, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
@@ -44,6 +45,7 @@ export const CurrentImageButtons = memo(() => {
   const isStaging = useAppSelector(selectIsStaging);
   const isUpscalingEnabled = useFeatureStatus('upscaling');
   const { getState, dispatch } = useAppStore();
+  const canvasManager = useCanvasManagerSafe();
 
   const handleEdit = useCallback(async () => {
     if (!imageDTO) {
@@ -58,12 +60,18 @@ export const CurrentImageButtons = memo(() => {
       dispatch,
     });
     navigationApi.focusPanelInTab('canvas', WORKSPACE_PANEL_ID);
+
+    // Automatically select the brush tool when editing an image
+    if (canvasManager) {
+      canvasManager.tool.$tool.set('brush');
+    }
+
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
       status: 'success',
     });
-  }, [imageDTO, getState, dispatch, t]);
+  }, [imageDTO, getState, dispatch, t, canvasManager]);
 
   return (
     <>
