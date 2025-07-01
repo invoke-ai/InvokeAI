@@ -195,11 +195,10 @@ export const ModelPicker = typedMemo(
     const selectedKeys = useAppSelector(selectSelectedModelKeys);
     const isModelRelationshipsEnabled = useFeatureStatus('modelRelationships');
 
-    const { relatedModelKeys } = useGetRelatedModelIdsBatchQuery(
-      selectedKeys,
-      { ...relatedModelKeysQueryOptions, skip: !isModelRelationshipsEnabled },
-     
-    );
+    const { relatedModelKeys } = useGetRelatedModelIdsBatchQuery(selectedKeys, {
+      ...relatedModelKeysQueryOptions,
+      skip: !isModelRelationshipsEnabled,
+    });
 
     const options = useMemo<WithStarred<T>[] | Group<WithStarred<T>>[]>(() => {
       if (!grouped) {
