@@ -6,7 +6,7 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Heading } from '@invoke-ai/ui-library';
 import { getStore } from 'app/store/nanostores/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { $focusedRegion } from 'common/hooks/focus';
+import { getFocusedRegion } from 'common/hooks/focus';
 import { useClientSideUpload } from 'common/hooks/useClientSideUpload';
 import { setFileToPaste } from 'features/controlLayers/components/CanvasPasteModal';
 import { DndDropOverlay } from 'features/dnd/DndDropOverlay';
@@ -88,7 +88,7 @@ export const FullscreenDropzone = memo(() => {
         return;
       }
 
-      const focusedRegion = $focusedRegion.get();
+      const focusedRegion = getFocusedRegion();
 
       // While on the canvas tab and when pasting a single image, canvas may want to create a new layer. Let it handle
       // the paste event.

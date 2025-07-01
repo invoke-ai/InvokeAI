@@ -1,4 +1,4 @@
-import { $focusedRegion } from 'common/hooks/focus';
+import { getFocusedRegion } from 'common/hooks/focus';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
@@ -62,7 +62,7 @@ export class CanvasMoveToolModule extends CanvasModuleBase {
   };
 
   nudge = (nudgeKey: NudgeKey) => {
-    if ($focusedRegion.get() !== 'canvas') {
+    if (getFocusedRegion() !== 'canvas') {
       return;
     }
 
