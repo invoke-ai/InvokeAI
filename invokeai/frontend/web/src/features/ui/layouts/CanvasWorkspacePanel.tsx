@@ -56,7 +56,6 @@ export const CanvasWorkspacePanel = memo(() => {
 
   return (
     <Flex
-      tabIndex={-1}
       borderRadius="base"
       position="relative"
       flexDirection="column"
@@ -66,7 +65,6 @@ export const CanvasWorkspacePanel = memo(() => {
       alignItems="center"
       justifyContent="center"
       overflow="hidden"
-      p={2}
     >
       <CanvasManagerProviderGate>
         <CanvasToolbar />
@@ -137,4 +135,4 @@ export const CanvasWorkspacePanel = memo(() => {
     </Flex>
   );
 });
-CanvasWorkspacePanel.displayName = 'CanvasPanel';
+CanvasWorkspacePanel.displayName = 'CanvasWorkspacePanel';

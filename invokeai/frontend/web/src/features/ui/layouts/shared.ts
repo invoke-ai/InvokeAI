@@ -28,3 +28,6 @@ export const GALLERY_PANEL_DEFAULT_HEIGHT_PX = 232;
 
 export const LAYERS_PANEL_MIN_HEIGHT_PX = 36;
 export const LAYERS_PANEL_DEFAULT_HEIGHT_PX = 232;
+
+export const CANVAS_BOARD_PANEL_DEFAULT_HEIGHT_PX = 36; // Collapsed by default on Canvas
+export const CANVAS_GALLERY_PANEL_DEFAULT_HEIGHT_PX = 200; // Smaller default size on Canvas

@@ -5,7 +5,7 @@ import { memo } from 'react';
 
 const ModelManagerTab = () => {
   return (
-    <Flex layerStyle="body" w="full" h="full" gap="2">
+    <Flex layerStyle="body" w="full" h="full" gap="2" p={2}>
       <ModelManager />
       <ModelPane />
     </Flex>

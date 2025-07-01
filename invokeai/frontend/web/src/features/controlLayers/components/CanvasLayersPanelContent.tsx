@@ -14,7 +14,7 @@ export const CanvasLayersPanel = memo(() => {
 
   return (
     <CanvasManagerProviderGate>
-      <Flex flexDir="column" gap={2} w="full" h="full" p={2}>
+      <Flex flexDir="column" gap={2} w="full" h="full">
         <EntityListSelectedEntityActionBar />
         <Divider py={0} />
         <ParamDenoisingStrength />

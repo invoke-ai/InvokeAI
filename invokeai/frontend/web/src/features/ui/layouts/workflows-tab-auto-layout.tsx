@@ -1,4 +1,11 @@
-import type { DockviewApi, GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
+import type {
+  DockviewApi,
+  GridviewApi,
+  IDockviewPanel,
+  IDockviewReactProps,
+  IGridviewPanel,
+  IGridviewReactProps,
+} from 'dockview';
 import { DockviewReact, GridviewReact, LayoutPriority, Orientation } from 'dockview';
 import { WorkflowsLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/WorkflowsLaunchpadPanel';
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
@@ -9,17 +16,26 @@ import NodeEditor from 'features/nodes/components/NodeEditor';
 import WorkflowsTabLeftPanel from 'features/nodes/components/sidePanel/WorkflowsTabLeftPanel';
 import { FloatingLeftPanelButtons } from 'features/ui/components/FloatingLeftPanelButtons';
 import { FloatingRightPanelButtons } from 'features/ui/components/FloatingRightPanelButtons';
-import { AutoLayoutProvider, PanelHotkeysLogical, useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
+import type {
+  AutoLayoutDockviewComponents,
+  AutoLayoutGridviewComponents,
+  PanelParameters,
+  RootLayoutGridviewComponents,
+} from 'features/ui/layouts/auto-layout-context';
+import { AutoLayoutProvider, useAutoLayoutContext, withPanelContainer } from 'features/ui/layouts/auto-layout-context';
 import { TabWithoutCloseButton } from 'features/ui/layouts/TabWithoutCloseButton';
+import type { TabName } from 'features/ui/store/uiTypes';
 import { dockviewTheme } from 'features/ui/styles/theme';
-import { atom } from 'nanostores';
-import { memo, useCallback, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
+import { navigationApi } from './navigation-api';
+import { PanelHotkeysLogical } from './PanelHotkeysLogical';
 import {
   BOARD_PANEL_DEFAULT_HEIGHT_PX,
   BOARD_PANEL_MIN_HEIGHT_PX,
   BOARDS_PANEL_ID,
   DEFAULT_TAB_ID,
+  GALLERY_PANEL_DEFAULT_HEIGHT_PX,
   GALLERY_PANEL_ID,
   GALLERY_PANEL_MIN_HEIGHT_PX,
   LAUNCHPAD_PANEL_ID,
@@ -45,52 +61,69 @@ const tabComponents = {
   [TAB_WITH_LAUNCHPAD_ICON_ID]: TabWithLaunchpadIcon,
 };
 
-const centerPanelComponents: IDockviewReactProps['components'] = {
-  [LAUNCHPAD_PANEL_ID]: WorkflowsLaunchpadPanel,
-  [WORKSPACE_PANEL_ID]: NodeEditor,
-  [VIEWER_PANEL_ID]: ImageViewerPanel,
-  [PROGRESS_PANEL_ID]: GenerationProgressPanel,
+const mainPanelComponents: AutoLayoutDockviewComponents = {
+  [LAUNCHPAD_PANEL_ID]: withPanelContainer(WorkflowsLaunchpadPanel),
+  [WORKSPACE_PANEL_ID]: withPanelContainer(NodeEditor),
+  [VIEWER_PANEL_ID]: withPanelContainer(ImageViewerPanel),
+  [PROGRESS_PANEL_ID]: withPanelContainer(GenerationProgressPanel),
 };
 
-const initializeCenterPanelLayout = (api: DockviewApi) => {
-  api.addPanel({
+const initializeMainPanelLayout = (tab: TabName, api: DockviewApi) => {
+  const launchpad = api.addPanel<PanelParameters>({
     id: LAUNCHPAD_PANEL_ID,
     component: LAUNCHPAD_PANEL_ID,
     title: 'Launchpad',
     tabComponent: TAB_WITH_LAUNCHPAD_ICON_ID,
+    params: {
+      tab,
+      focusRegion: 'launchpad',
+    },
   });
-  api.addPanel({
+
+  const workspace = api.addPanel<PanelParameters>({
     id: WORKSPACE_PANEL_ID,
     component: WORKSPACE_PANEL_ID,
     title: 'Workflow Editor',
     tabComponent: DEFAULT_TAB_ID,
+    params: {
+      tab,
+      focusRegion: 'workflows',
+    },
     position: {
       direction: 'within',
-      referencePanel: LAUNCHPAD_PANEL_ID,
+      referencePanel: launchpad.id,
     },
   });
-  api.addPanel({
+
+  const viewer = api.addPanel<PanelParameters>({
     id: VIEWER_PANEL_ID,
     component: VIEWER_PANEL_ID,
     title: 'Image Viewer',
     tabComponent: TAB_WITH_PROGRESS_INDICATOR_ID,
+    params: {
+      tab,
+      focusRegion: 'viewer',
+    },
     position: {
       direction: 'within',
-      referencePanel: LAUNCHPAD_PANEL_ID,
+      referencePanel: launchpad.id,
     },
   });
 
-  api.getPanel(LAUNCHPAD_PANEL_ID)?.api.setActive();
+  return { launchpad, workspace, viewer } satisfies Record<string, IDockviewPanel>;
 };
 
-const CenterPanel = memo(() => {
-  const ctx = useAutoLayoutContext();
+const MainPanel = memo(() => {
+  const { tab } = useAutoLayoutContext();
+
   const onReady = useCallback<IDockviewReactProps['onReady']>(
-    (event) => {
-      initializeCenterPanelLayout(event.api);
-      ctx._$centerPanelApi.set(event.api);
+    ({ api }) => {
+      const panels = initializeMainPanelLayout(tab, api);
+      navigationApi.registerPanel(tab, 'main', api);
+      panels.launchpad.api.setActive();
+
       const disposables = [
-        event.api.onWillShowOverlay((e) => {
+        api.onWillShowOverlay((e) => {
           if (e.kind === 'header_space' || e.kind === 'tab') {
             return;
           }
@@ -104,7 +137,7 @@ const CenterPanel = memo(() => {
         });
       };
     },
-    [ctx._$centerPanelApi]
+    [tab]
   );
   return (
     <>
@@ -114,7 +147,7 @@ const CenterPanel = memo(() => {
         disableFloatingGroups={true}
         dndEdges={false}
         tabComponents={tabComponents}
-        components={centerPanelComponents}
+        components={mainPanelComponents}
         onReady={onReady}
         theme={dockviewTheme}
       />
@@ -124,100 +157,117 @@ const CenterPanel = memo(() => {
     </>
   );
 });
-CenterPanel.displayName = 'CenterPanel';
+MainPanel.displayName = 'MainPanel';
 
-const rightPanelComponents: IGridviewReactProps['components'] = {
-  [BOARDS_PANEL_ID]: BoardsPanel,
-  [GALLERY_PANEL_ID]: GalleryPanel,
+const rightPanelComponents: AutoLayoutGridviewComponents = {
+  [BOARDS_PANEL_ID]: withPanelContainer(BoardsPanel),
+  [GALLERY_PANEL_ID]: withPanelContainer(GalleryPanel),
 };
 
-export const initializeRightPanelLayout = (api: GridviewApi) => {
-  api.addPanel({
+export const initializeRightPanelLayout = (tab: TabName, api: GridviewApi) => {
+  const gallery = api.addPanel<PanelParameters>({
     id: GALLERY_PANEL_ID,
     component: GALLERY_PANEL_ID,
     minimumWidth: RIGHT_PANEL_MIN_SIZE_PX,
     minimumHeight: GALLERY_PANEL_MIN_HEIGHT_PX,
+    params: {
+      tab,
+      focusRegion: 'gallery',
+    },
   });
-  api.addPanel({
+
+  const boards = api.addPanel<PanelParameters>({
     id: BOARDS_PANEL_ID,
     component: BOARDS_PANEL_ID,
     minimumHeight: BOARD_PANEL_MIN_HEIGHT_PX,
+    params: {
+      tab,
+      focusRegion: 'boards',
+    },
     position: {
       direction: 'above',
-      referencePanel: GALLERY_PANEL_ID,
+      referencePanel: gallery.id,
     },
   });
-  api.getPanel(BOARDS_PANEL_ID)?.api.setSize({ height: BOARD_PANEL_DEFAULT_HEIGHT_PX, width: RIGHT_PANEL_MIN_SIZE_PX });
+
+  gallery.api.setSize({ height: GALLERY_PANEL_DEFAULT_HEIGHT_PX, width: RIGHT_PANEL_MIN_SIZE_PX });
+  boards.api.setSize({ height: BOARD_PANEL_DEFAULT_HEIGHT_PX, width: RIGHT_PANEL_MIN_SIZE_PX });
+
+  return { gallery, boards } satisfies Record<string, IGridviewPanel>;
 };
 
 const RightPanel = memo(() => {
-  const ctx = useAutoLayoutContext();
+  const { tab } = useAutoLayoutContext();
+
   const onReady = useCallback<IGridviewReactProps['onReady']>(
-    (event) => {
-      initializeRightPanelLayout(event.api);
-      ctx._$rightPanelApi.set(event.api);
+    ({ api }) => {
+      initializeRightPanelLayout(tab, api);
+      navigationApi.registerPanel(tab, 'right', api);
     },
-    [ctx._$rightPanelApi]
+    [tab]
   );
   return (
-    <>
-      <GridviewReact
-        className="dockview-theme-invoke"
-        orientation={Orientation.VERTICAL}
-        components={rightPanelComponents}
-        onReady={onReady}
-      />
-    </>
+    <GridviewReact
+      className="dockview-theme-invoke"
+      orientation={Orientation.VERTICAL}
+      components={rightPanelComponents}
+      onReady={onReady}
+    />
   );
 });
 RightPanel.displayName = 'RightPanel';
 
-const leftPanelComponents: IGridviewReactProps['components'] = {
-  [SETTINGS_PANEL_ID]: WorkflowsTabLeftPanel,
+const leftPanelComponents: AutoLayoutGridviewComponents = {
+  [SETTINGS_PANEL_ID]: withPanelContainer(WorkflowsTabLeftPanel),
 };
 
-export const initializeLeftPanelLayout = (api: GridviewApi) => {
-  api.addPanel({
+export const initializeLeftPanelLayout = (tab: TabName, api: GridviewApi) => {
+  const settings = api.addPanel<PanelParameters>({
     id: SETTINGS_PANEL_ID,
     component: SETTINGS_PANEL_ID,
+    params: {
+      tab,
+      focusRegion: 'settings',
+    },
   });
+
+  return { settings } satisfies Record<string, IGridviewPanel>;
 };
 
 const LeftPanel = memo(() => {
-  const ctx = useAutoLayoutContext();
+  const { tab } = useAutoLayoutContext();
+
   const onReady = useCallback<IGridviewReactProps['onReady']>(
-    (event) => {
-      initializeLeftPanelLayout(event.api);
-      ctx._$leftPanelApi.set(event.api);
+    ({ api }) => {
+      initializeLeftPanelLayout(tab, api);
+      navigationApi.registerPanel(tab, 'left', api);
     },
-    [ctx._$leftPanelApi]
+    [tab]
   );
   return (
-    <>
-      <GridviewReact
-        className="dockview-theme-invoke"
-        orientation={Orientation.VERTICAL}
-        components={leftPanelComponents}
-        onReady={onReady}
-      />
-    </>
+    <GridviewReact
+      className="dockview-theme-invoke"
+      orientation={Orientation.VERTICAL}
+      components={leftPanelComponents}
+      onReady={onReady}
+    />
   );
 });
 LeftPanel.displayName = 'LeftPanel';
 
-export const rootPanelComponents: IGridviewReactProps['components'] = {
+export const rootPanelComponents: RootLayoutGridviewComponents = {
   [LEFT_PANEL_ID]: LeftPanel,
-  [MAIN_PANEL_ID]: CenterPanel,
+  [MAIN_PANEL_ID]: MainPanel,
   [RIGHT_PANEL_ID]: RightPanel,
 };
 
 export const initializeRootPanelLayout = (api: GridviewApi) => {
-  api.addPanel({
+  const main = api.addPanel({
     id: MAIN_PANEL_ID,
     component: MAIN_PANEL_ID,
     priority: LayoutPriority.High,
   });
-  api.addPanel({
+  const left = api.addPanel({
     id: LEFT_PANEL_ID,
     component: LEFT_PANEL_ID,
     minimumWidth: LEFT_PANEL_MIN_SIZE_PX,
@@ -226,7 +276,7 @@ export const initializeRootPanelLayout = (api: GridviewApi) => {
       referencePanel: MAIN_PANEL_ID,
     },
   });
-  api.addPanel({
+  const right = api.addPanel({
     id: RIGHT_PANEL_ID,
     component: RIGHT_PANEL_ID,
     minimumWidth: RIGHT_PANEL_MIN_SIZE_PX,
@@ -235,25 +285,36 @@ export const initializeRootPanelLayout = (api: GridviewApi) => {
       referencePanel: MAIN_PANEL_ID,
     },
   });
-  api.getPanel(LEFT_PANEL_ID)?.api.setSize({ width: LEFT_PANEL_MIN_SIZE_PX });
-  api.getPanel(RIGHT_PANEL_ID)?.api.setSize({ width: RIGHT_PANEL_MIN_SIZE_PX });
-  api.getPanel(MAIN_PANEL_ID)?.api.setActive();
+  left.api.setSize({ width: LEFT_PANEL_MIN_SIZE_PX });
+  right.api.setSize({ width: RIGHT_PANEL_MIN_SIZE_PX });
+
+  return { main, left, right } satisfies Record<string, IGridviewPanel>;
 };
 
 export const WorkflowsTabAutoLayout = memo(() => {
   const rootRef = useRef<HTMLDivElement>(null);
-  const $rootPanelApi = useState(() => atom<GridviewApi | null>(null))[0];
-  const onReady = useCallback<IGridviewReactProps['onReady']>(
-    (event) => {
-      $rootPanelApi.set(event.api);
-      initializeRootPanelLayout(event.api);
-    },
-    [$rootPanelApi]
-  );
-  useResizeMainPanelOnFirstVisit($rootPanelApi, rootRef);
+  const [rootApi, setRootApi] = useState<GridviewApi | null>(null);
+  const onReady = useCallback<IGridviewReactProps['onReady']>(({ api }) => {
+    setRootApi(api);
+  }, []);
+
+  useResizeMainPanelOnFirstVisit(rootApi, rootRef);
+
+  useEffect(() => {
+    if (!rootApi) {
+      return;
+    }
+    initializeRootPanelLayout(rootApi);
+    navigationApi.registerPanel('workflows', 'root', rootApi);
+    navigationApi.focusPanelInTab('workflows', LAUNCHPAD_PANEL_ID, false);
+
+    return () => {
+      navigationApi.unregisterTab('workflows');
+    };
+  }, [rootApi]);
 
   return (
-    <AutoLayoutProvider $rootApi={$rootPanelApi} rootRef={rootRef} tab="workflows">
+    <AutoLayoutProvider tab="workflows" rootRef={rootRef}>
       <GridviewReact
         ref={rootRef}
         className="dockview-theme-invoke"

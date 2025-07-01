@@ -19,7 +19,7 @@ const WorkflowsTabLeftPanel = () => {
   const isInPublishFlow = useStore($isInPublishFlow);
 
   return (
-    <Flex flexDir="column" w="full" h="full" gap={2} py={2} pe={2}>
+    <Flex flexDir="column" w="full" h="full" gap={2}>
       <QueueControls />
       <Flex w="full" h="full" gap={2} flexDir="column">
         {isInPublishFlow && <PublishWorkflowPanelContent />}
