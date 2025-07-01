@@ -589,6 +589,14 @@
             "toggleNonRasterLayers": {
                 "title": "Toggle Non-Raster Layers",
                 "desc": "Show or hide all non-raster layer categories (Control Layers, Inpaint Masks, Regional Guidance)."
+            },
+            "invertMask": {
+                "title": "Invert Mask",
+                "desc": "Invert the selected inpaint mask. Only works when an inpaint mask is selected and has objects."
+            },
+            "adjustBbox": {
+                "title": "Adjust Bbox to Masks",
+                "desc": "Adjust the bounding box to fit all visible inpaint masks with padding."
             }
         },
         "workflows": {
