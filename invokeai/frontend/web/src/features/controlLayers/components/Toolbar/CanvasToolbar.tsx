@@ -16,6 +16,8 @@ import { useCanvasResetLayerHotkey } from 'features/controlLayers/hooks/useCanva
 import { useCanvasToggleNonRasterLayersHotkey } from 'features/controlLayers/hooks/useCanvasToggleNonRasterLayersHotkey';
 import { useCanvasTransformHotkey } from 'features/controlLayers/hooks/useCanvasTransformHotkey';
 import { useCanvasUndoRedoHotkeys } from 'features/controlLayers/hooks/useCanvasUndoRedoHotkeys';
+import { useCanvasInvertMaskHotkey } from 'features/controlLayers/hooks/useCanvasInvertMaskHotkey';
+import { useCanvasAdjustBboxHotkey } from 'features/controlLayers/hooks/useCanvasAdjustBboxHotkey';
 import { useNextPrevEntityHotkeys } from 'features/controlLayers/hooks/useNextPrevEntity';
 import { memo } from 'react';
 
@@ -28,6 +30,8 @@ export const CanvasToolbar = memo(() => {
   useCanvasTransformHotkey();
   useCanvasFilterHotkey();
   useCanvasToggleNonRasterLayersHotkey();
+  useCanvasInvertMaskHotkey();
+  useCanvasAdjustBboxHotkey();
 
   return (
     <Flex w="full" gap={2} alignItems="center" px={2}>
