@@ -23,7 +23,6 @@ export const InpaintMaskBboxAdjuster = memo(() => {
   const canvasSlice = useAppSelector(selectCanvasSlice);
   const maskBlur = useAppSelector(selectMaskBlur);
 
-  // Get all inpaint mask entities and bbox
   const inpaintMasks = canvasSlice.inpaintMasks.entities;
   const bboxRect = canvasSlice.bbox.rect;
 
@@ -33,11 +32,9 @@ export const InpaintMaskBboxAdjuster = memo(() => {
       return null;
     }
 
-    // Use the current bbox as the reference container
     const canvasWidth = bboxRect.width;
     const canvasHeight = bboxRect.height;
 
-    // Collect all mask objects and adjust their positions relative to the bbox
     const allObjects: (
       | CanvasBrushLineState
       | CanvasBrushLineWithPressureState
@@ -51,7 +48,6 @@ export const InpaintMaskBboxAdjuster = memo(() => {
         continue;
       }
 
-      // Adjust object positions relative to the bbox (not the entity position)
       for (const obj of mask.objects) {
         if (obj.type === 'rect') {
           const adjustedObj = {
@@ -81,7 +77,6 @@ export const InpaintMaskBboxAdjuster = memo(() => {
           allObjects.push(adjustedObj);
         } else if (obj.type === 'image') {
           // For image objects, we need to handle them differently since they don't have rect or points
-          // We'll skip them for now as they're not commonly used in masks
           continue;
         }
       }
@@ -95,7 +90,6 @@ export const InpaintMaskBboxAdjuster = memo(() => {
     const bitmap = maskObjectsToBitmap(allObjects, canvasWidth, canvasHeight);
     const { width, height, data } = bitmap;
 
-    // Find the actual bounds of the rendered mask
     let maskMinX = width;
     let maskMinY = height;
     let maskMaxX = 0;
@@ -106,7 +100,6 @@ export const InpaintMaskBboxAdjuster = memo(() => {
         const pixelIndex = (y * width + x) * 4;
         const alpha = data[pixelIndex + 3] ?? 0;
 
-        // If this pixel has any opacity, it's part of the mask
         if (alpha > 0) {
           maskMinX = Math.min(maskMinX, x);
           maskMinY = Math.min(maskMinY, y);
@@ -116,18 +109,15 @@ export const InpaintMaskBboxAdjuster = memo(() => {
       }
     }
 
-    // If no mask pixels found, return null
     if (maskMinX >= maskMaxX || maskMinY >= maskMaxY) {
       return null;
     }
 
-    // Clamp the mask bounds to the bbox boundaries
     maskMinX = Math.max(0, maskMinX);
     maskMinY = Math.max(0, maskMinY);
     maskMaxX = Math.min(width - 1, maskMaxX);
     maskMaxY = Math.min(height - 1, maskMaxY);
 
-    // Convert back to world coordinates relative to the bbox
     return {
       x: bboxRect.x + maskMinX,
       y: bboxRect.y + maskMinY,
@@ -155,7 +145,6 @@ export const InpaintMaskBboxAdjuster = memo(() => {
     dispatch(bboxChangedFromCanvas(adjustedBbox));
   }, [dispatch, maskBbox, maskBlur]);
 
-  // Only show if there are enabled inpaint masks with objects
   const hasValidMasks = inpaintMasks.some((mask) => mask.isEnabled && mask.objects.length > 0);
   if (!hasValidMasks) {
     return null;
