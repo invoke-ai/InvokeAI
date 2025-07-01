@@ -2464,8 +2464,8 @@
                     "description": "Start a new workflow from scratch"
                 },
                 "loadFromFile": {
-                    "title": "Load workflow from existing image or file",
-                    "description": "Drag or upload a workflow to start with an existing setup"
+                    "title": "Load workflow from file",
+                    "description": "Upload a workflow to start with an existing setup"
                 }
             },
             "upscaling": {
