@@ -5,7 +5,7 @@ import { withResultAsync } from 'common/util/result';
 import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { useEnqueueWorkflows } from 'features/queue/hooks/useEnqueueWorkflows';
 import { $isReadyToEnqueue } from 'features/queue/store/readiness';
-import { panelRegistry } from 'features/ui/layouts/panel-registry/panelApiRegistry';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID, WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { useCallback } from 'react';
@@ -63,18 +63,18 @@ export const useInvoke = () => {
   const enqueueBack = useCallback(() => {
     enqueue(false, false);
     if (tabName === 'generate' || tabName === 'workflows' || tabName === 'upscaling') {
-      panelRegistry.focusPanelInTab(tabName, VIEWER_PANEL_ID);
+      navigationApi.focusPanelInTab(tabName, VIEWER_PANEL_ID);
     } else if (tabName === 'canvas') {
-      panelRegistry.focusPanelInTab(tabName, WORKSPACE_PANEL_ID);
+      navigationApi.focusPanelInTab(tabName, WORKSPACE_PANEL_ID);
     }
   }, [enqueue, tabName]);
 
   const enqueueFront = useCallback(() => {
     enqueue(true, false);
     if (tabName === 'generate' || tabName === 'workflows' || tabName === 'upscaling') {
-      panelRegistry.focusPanelInTab(tabName, VIEWER_PANEL_ID);
+      navigationApi.focusPanelInTab(tabName, VIEWER_PANEL_ID);
     } else if (tabName === 'canvas') {
-      panelRegistry.focusPanelInTab(tabName, WORKSPACE_PANEL_ID);
+      navigationApi.focusPanelInTab(tabName, WORKSPACE_PANEL_ID);
     }
   }, [enqueue, tabName]);
 

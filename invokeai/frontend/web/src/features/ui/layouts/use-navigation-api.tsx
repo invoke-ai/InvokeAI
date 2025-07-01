@@ -5,13 +5,13 @@ import { setActiveTab } from 'features/ui/store/uiSlice';
 import type { TabName } from 'features/ui/store/uiTypes';
 import { useEffect, useMemo } from 'react';
 
-import { panelRegistry } from './panelApiRegistry';
+import { navigationApi } from './navigation-api';
 
 /**
- * Hook that initializes the global panel registry with the Redux store.
+ * Hook that initializes the global navigation API with callbacks to access and modify the active tab.
  */
-export const usePanelRegistryInit = () => {
-  useAssertSingleton('usePanelRegistryInit');
+export const useNavigationApi = () => {
+  useAssertSingleton('useNavigationApi');
   const store = useAppStore();
   const tabApi = useMemo(
     () => ({
@@ -26,6 +26,6 @@ export const usePanelRegistryInit = () => {
   );
 
   useEffect(() => {
-    panelRegistry.setTabApi(tabApi);
+    navigationApi.setTabApi(tabApi);
   }, [store, tabApi]);
 };

@@ -1,6 +1,6 @@
 import { Button, Flex, Grid, Heading, Text } from '@invoke-ai/ui-library';
 import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
-import { panelRegistry } from 'features/ui/layouts/panel-registry/panelApiRegistry';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,7 +15,7 @@ export const CanvasLaunchpadPanel = memo(() => {
   const { t } = useTranslation();
   const { tab } = useAutoLayoutContext();
   const focusCanvas = useCallback(() => {
-    panelRegistry.focusPanelInTab(tab, WORKSPACE_PANEL_ID);
+    navigationApi.focusPanelInTab(tab, WORKSPACE_PANEL_ID);
   }, [tab]);
   return (
     <Flex flexDir="column" h="full" w="full" alignItems="center" gap={2}>

@@ -11,7 +11,7 @@ import { $hasTemplates } from 'features/nodes/store/nodesSlice';
 import { PostProcessingPopover } from 'features/parameters/components/PostProcessing/PostProcessingPopover';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { toast } from 'features/toast/toast';
-import { panelRegistry } from 'features/ui/layouts/panel-registry/panelApiRegistry';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
 import { selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
@@ -57,7 +57,7 @@ export const CurrentImageButtons = memo(() => {
       getState,
       dispatch,
     });
-    panelRegistry.focusPanelInTab('canvas', WORKSPACE_PANEL_ID);
+    navigationApi.focusPanelInTab('canvas', WORKSPACE_PANEL_ID);
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),

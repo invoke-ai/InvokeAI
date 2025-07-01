@@ -6,7 +6,7 @@ import { InvokeButtonTooltip } from 'features/queue/components/InvokeButtonToolt
 import { useDeleteCurrentQueueItem } from 'features/queue/hooks/useDeleteCurrentQueueItem';
 import { useInvoke } from 'features/queue/hooks/useInvoke';
 import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
-import { panelRegistry } from 'features/ui/layouts/panel-registry/panelApiRegistry';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -57,10 +57,10 @@ const ToggleLeftPanelButton = memo(() => {
   const { tab } = useAutoLayoutContext();
 
   const onClick = useCallback(() => {
-    if (panelRegistry.tabApi?.getTab() !== tab) {
+    if (navigationApi.tabApi?.getTab() !== tab) {
       return;
     }
-    panelRegistry.toggleLeftPanelInTab(tab);
+    navigationApi.toggleLeftPanelInTab(tab);
   }, [tab]);
 
   return (

@@ -21,7 +21,7 @@ import {
   selectSelection,
 } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectGallerySlice, selectionChanged } from 'features/gallery/store/gallerySlice';
-import { panelRegistry } from 'features/ui/layouts/panel-registry/panelApiRegistry';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import type { MouseEvent, MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
@@ -238,7 +238,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
 
   const onDoubleClick = useCallback<MouseEventHandler<HTMLDivElement>>(() => {
     store.dispatch(imageToCompareChanged(null));
-    panelRegistry.focusPanelInActiveTab(VIEWER_PANEL_ID);
+    navigationApi.focusPanelInActiveTab(VIEWER_PANEL_ID);
   }, [store]);
 
   const dataTestId = useMemo(() => getGalleryImageDataTestId(imageDTO.image_name), [imageDTO.image_name]);

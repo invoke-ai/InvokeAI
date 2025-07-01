@@ -27,7 +27,7 @@ import { dockviewTheme } from 'features/ui/styles/theme';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 import { GenerateTabLeftPanel } from './GenerateTabLeftPanel';
-import { panelRegistry } from './panel-registry/panelApiRegistry';
+import { navigationApi } from './navigation-api';
 import { PanelHotkeysLogical } from './PanelHotkeysLogical';
 import {
   BOARD_PANEL_DEFAULT_HEIGHT_PX,
@@ -100,7 +100,7 @@ const MainPanel = memo(() => {
   const onReady = useCallback<IDockviewReactProps['onReady']>(
     ({ api }) => {
       const { launchpad } = initializeMainPanelLayout(tab, api);
-      panelRegistry.registerPanel(tab, 'main', api);
+      navigationApi.registerPanel(tab, 'main', api);
       launchpad.api.setActive();
 
       const disposables = [
@@ -182,7 +182,7 @@ const RightPanel = memo(() => {
   const onReady = useCallback<IGridviewReactProps['onReady']>(
     ({ api }) => {
       initializeRightPanelLayout(tab, api);
-      panelRegistry.registerPanel(tab, 'right', api);
+      navigationApi.registerPanel(tab, 'right', api);
     },
     [tab]
   );
@@ -220,7 +220,7 @@ const LeftPanel = memo(() => {
   const onReady = useCallback<IGridviewReactProps['onReady']>(
     ({ api }) => {
       initializeLeftPanelLayout(tab, api);
-      panelRegistry.registerPanel(tab, 'left', api);
+      navigationApi.registerPanel(tab, 'left', api);
     },
     [tab]
   );
@@ -288,11 +288,11 @@ export const GenerateTabAutoLayout = memo(() => {
       return;
     }
     initializeRootPanelLayout(rootApi);
-    panelRegistry.registerPanel('generate', 'root', rootApi);
-    panelRegistry.focusPanelInTab('generate', LAUNCHPAD_PANEL_ID, false);
+    navigationApi.registerPanel('generate', 'root', rootApi);
+    navigationApi.focusPanelInTab('generate', LAUNCHPAD_PANEL_ID, false);
 
     return () => {
-      panelRegistry.unregisterTab('generate');
+      navigationApi.unregisterTab('generate');
     };
   }, [rootApi]);
 
