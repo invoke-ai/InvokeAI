@@ -32,10 +32,11 @@ import { CanvasWorkspacePanel } from './CanvasWorkspacePanel';
 import { navigationApi } from './navigation-api';
 import { PanelHotkeysLogical } from './PanelHotkeysLogical';
 import {
-  BOARD_PANEL_DEFAULT_HEIGHT_PX,
   BOARD_PANEL_MIN_HEIGHT_PX,
   BOARDS_PANEL_ID,
+  CANVAS_BOARD_PANEL_DEFAULT_HEIGHT_PX,
   DEFAULT_TAB_ID,
+  GALLERY_PANEL_DEFAULT_HEIGHT_PX,
   GALLERY_PANEL_ID,
   GALLERY_PANEL_MIN_HEIGHT_PX,
   LAUNCHPAD_PANEL_ID,
@@ -207,7 +208,9 @@ export const initializeRightPanelLayout = (tab: TabName, api: GridviewApi) => {
     },
   });
 
-  boards.api.setSize({ height: BOARD_PANEL_DEFAULT_HEIGHT_PX, width: RIGHT_PANEL_MIN_SIZE_PX });
+  gallery.api.setSize({ height: GALLERY_PANEL_DEFAULT_HEIGHT_PX, width: RIGHT_PANEL_MIN_SIZE_PX });
+  boards.api.setSize({ height: CANVAS_BOARD_PANEL_DEFAULT_HEIGHT_PX, width: RIGHT_PANEL_MIN_SIZE_PX });
+
   return { gallery, layers, boards } satisfies Record<string, IGridviewPanel>;
 };
 
