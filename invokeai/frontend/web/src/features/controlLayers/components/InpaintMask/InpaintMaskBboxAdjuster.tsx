@@ -3,17 +3,20 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { bboxChangedFromCanvas } from 'features/controlLayers/store/canvasSlice';
 import { selectMaskBlur } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import type { 
-  Rect,
+import type {
   CanvasBrushLineState,
   CanvasBrushLineWithPressureState,
   CanvasEraserLineState,
   CanvasEraserLineWithPressureState,
-  CanvasRectState,
   CanvasImageState,
+  CanvasRectState,
+  Rect,
 } from 'features/controlLayers/store/types';
-import { transformMaskObjectsRelativeToBbox, calculateMaskBoundsFromBitmap } from 'features/controlLayers/util/maskObjectTransform';
 import { convertTransformedToOriginal } from 'features/controlLayers/util/coordinateTransform';
+import {
+  calculateMaskBoundsFromBitmap,
+  transformMaskObjectsRelativeToBbox,
+} from 'features/controlLayers/util/maskObjectTransform';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCropBold } from 'react-icons/pi';
@@ -43,7 +46,7 @@ export const InpaintMaskBboxAdjuster = memo(() => {
       | CanvasRectState
       | CanvasImageState
     )[] = [];
-    
+
     for (const mask of inpaintMasks) {
       if (!mask.isEnabled || !mask.objects || mask.objects.length === 0) {
         continue;
@@ -62,7 +65,7 @@ export const InpaintMaskBboxAdjuster = memo(() => {
 
     // Calculate bounds from the rendered bitmap for accurate results
     const maskBounds = calculateMaskBoundsFromBitmap(allObjects, bboxRect.width, bboxRect.height);
-    
+
     if (!maskBounds) {
       return null;
     }

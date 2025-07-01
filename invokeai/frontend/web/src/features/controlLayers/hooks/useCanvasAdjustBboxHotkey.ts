@@ -4,17 +4,20 @@ import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { bboxChangedFromCanvas } from 'features/controlLayers/store/canvasSlice';
 import { selectMaskBlur } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import type { 
-  Rect,
+import type {
   CanvasBrushLineState,
   CanvasBrushLineWithPressureState,
   CanvasEraserLineState,
   CanvasEraserLineWithPressureState,
-  CanvasRectState,
   CanvasImageState,
+  CanvasRectState,
+  Rect,
 } from 'features/controlLayers/store/types';
-import { transformMaskObjectsRelativeToBbox, calculateMaskBoundsFromBitmap } from 'features/controlLayers/util/maskObjectTransform';
 import { convertTransformedToOriginal } from 'features/controlLayers/util/coordinateTransform';
+import {
+  calculateMaskBoundsFromBitmap,
+  transformMaskObjectsRelativeToBbox,
+} from 'features/controlLayers/util/maskObjectTransform';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useCallback, useMemo } from 'react';
 
@@ -42,7 +45,7 @@ export const useCanvasAdjustBboxHotkey = () => {
       | CanvasRectState
       | CanvasImageState
     )[] = [];
-    
+
     for (const mask of inpaintMasks) {
       if (!mask.isEnabled || !mask.objects || mask.objects.length === 0) {
         continue;
@@ -61,7 +64,7 @@ export const useCanvasAdjustBboxHotkey = () => {
 
     // Calculate bounds from the rendered bitmap for accurate results
     const maskBounds = calculateMaskBoundsFromBitmap(allObjects, bboxRect.width, bboxRect.height);
-    
+
     if (!maskBounds) {
       return null;
     }
@@ -104,4 +107,4 @@ export const useCanvasAdjustBboxHotkey = () => {
     options: { enabled: isAdjustBboxAllowed && !isBusy, preventDefault: true },
     dependencies: [isAdjustBboxAllowed, isBusy, handleAdjustBbox],
   });
-}; 
+};

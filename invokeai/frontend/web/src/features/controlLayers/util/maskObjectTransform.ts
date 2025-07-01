@@ -3,19 +3,20 @@ import type {
   CanvasBrushLineWithPressureState,
   CanvasEraserLineState,
   CanvasEraserLineWithPressureState,
-  CanvasRectState,
   CanvasImageState,
+  CanvasRectState,
   Coordinate,
   Rect,
 } from 'features/controlLayers/store/types';
+
+import { maskObjectsToBitmap } from './bitmapToMaskObjects';
 import {
-  transformMaskObject,
-  clipMaskObjectToContainer,
   calculateMaskObjectBounds,
+  clipMaskObjectToContainer,
   convertTransformedToOriginal,
   type TransformedMaskObject,
+  transformMaskObject,
 } from './coordinateTransform';
-import { maskObjectsToBitmap } from './bitmapToMaskObjects';
 
 /**
  * Transforms mask objects relative to a bounding box container.
@@ -57,10 +58,7 @@ export function transformMaskObjectsRelativeToBbox(
  * @param container The container rectangle to clip to
  * @returns Array of clipped mask objects (null values are filtered out)
  */
-export function clipMaskObjectsToContainer(
-  objects: TransformedMaskObject[],
-  container: Rect
-): TransformedMaskObject[] {
+export function clipMaskObjectsToContainer(objects: TransformedMaskObject[], container: Rect): TransformedMaskObject[] {
   return objects
     .map((obj) => clipMaskObjectToContainer(obj, container))
     .filter((obj): obj is TransformedMaskObject => obj !== null);
@@ -122,7 +120,7 @@ export function calculateMaskBoundsFromBitmap(
 
   // Convert transformed objects back to original types for compatibility
   const originalObjects = objects.map(convertTransformedToOriginal);
-  
+
   // Render the consolidated mask to a bitmap
   const bitmap = maskObjectsToBitmap(originalObjects, canvasWidth, canvasHeight);
   const { width, height, data } = bitmap;
@@ -167,10 +165,7 @@ export function calculateMaskBoundsFromBitmap(
  * @param container The container rectangle to invert within
  * @returns Array of mask objects representing the inverted mask
  */
-export function invertMask(
-  objects: TransformedMaskObject[],
-  container: Rect
-): TransformedMaskObject[] {
+export function invertMask(objects: TransformedMaskObject[], container: Rect): TransformedMaskObject[] {
   // Create a rectangle that covers the entire container
   const fullCoverageRect: TransformedMaskObject = {
     id: 'inverted_mask_rect',
@@ -186,7 +181,7 @@ export function invertMask(
 
   // For each original mask object, create an eraser line that removes it
   const eraserObjects: TransformedMaskObject[] = [];
-  
+
   for (const obj of objects) {
     if (obj.type === 'rect') {
       // For rectangles, create an eraser rectangle
@@ -194,11 +189,16 @@ export function invertMask(
         id: `eraser_${obj.id}`,
         type: 'eraser_line',
         points: [
-          obj.rect.x, obj.rect.y,
-          obj.rect.x + obj.rect.width, obj.rect.y,
-          obj.rect.x + obj.rect.width, obj.rect.y + obj.rect.height,
-          obj.rect.x, obj.rect.y + obj.rect.height,
-          obj.rect.x, obj.rect.y, // Close the rectangle
+          obj.rect.x,
+          obj.rect.y,
+          obj.rect.x + obj.rect.width,
+          obj.rect.y,
+          obj.rect.x + obj.rect.width,
+          obj.rect.y + obj.rect.height,
+          obj.rect.x,
+          obj.rect.y + obj.rect.height,
+          obj.rect.x,
+          obj.rect.y, // Close the rectangle
         ],
         strokeWidth: 1,
         clip: container,
@@ -233,9 +233,6 @@ export function invertMask(
  * @param bboxRect The bounding box to clip to
  * @returns Array of clipped mask objects
  */
-export function ensureMaskObjectsWithinBbox(
-  objects: TransformedMaskObject[],
-  bboxRect: Rect
-): TransformedMaskObject[] {
+export function ensureMaskObjectsWithinBbox(objects: TransformedMaskObject[], bboxRect: Rect): TransformedMaskObject[] {
   return clipMaskObjectsToContainer(objects, bboxRect);
-} 
+}
