@@ -1,22 +1,28 @@
-import { Divider, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
+import { Button, Divider, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
 import { useImageActions } from 'features/gallery/hooks/useImageActions';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
+import { newCanvasFromImage } from 'features/imageActions/actions';
 import { $hasTemplates } from 'features/nodes/store/nodesSlice';
 import { PostProcessingPopover } from 'features/parameters/components/PostProcessing/PostProcessingPopover';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { toast } from 'features/toast/toast';
+import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
+import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
 import { selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
-import { memo } from 'react';
+import { setActiveTab } from 'features/ui/store/uiSlice';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiArrowsCounterClockwiseBold,
   PiAsteriskBold,
   PiDotsThreeOutlineFill,
   PiFlowArrowBold,
+  PiPencilBold,
   PiPlantBold,
   PiQuotesBold,
   PiRulerBold,
@@ -38,6 +44,29 @@ export const CurrentImageButtons = memo(() => {
   const imageActions = useImageActions(imageDTO);
   const isStaging = useAppSelector(selectIsStaging);
   const isUpscalingEnabled = useFeatureStatus('upscaling');
+  const { getState, dispatch } = useAppStore();
+  const autoLayoutContext = useAutoLayoutContext();
+
+  const handleEdit = useCallback(async () => {
+    if (!imageDTO) {
+      return;
+    }
+
+    await newCanvasFromImage({
+      imageDTO,
+      type: 'raster_layer',
+      withInpaintMask: true,
+      getState,
+      dispatch,
+    });
+    dispatch(setActiveTab('canvas'));
+    autoLayoutContext?.focusPanel(WORKSPACE_PANEL_ID);
+    toast({
+      id: 'SENT_TO_CANVAS',
+      title: t('toast.sentToCanvas'),
+      status: 'success',
+    });
+  }, [imageDTO, getState, dispatch, t, autoLayoutContext]);
 
   return (
     <>
@@ -53,6 +82,20 @@ export const CurrentImageButtons = memo(() => {
         />
         <MenuList>{imageDTO && <SingleSelectionMenuItems imageDTO={imageDTO} />}</MenuList>
       </Menu>
+
+      <Divider orientation="vertical" h={8} mx={2} />
+
+      <Button
+        leftIcon={<PiPencilBold />}
+        onClick={handleEdit}
+        isDisabled={isDisabledOverride || !imageDTO}
+        variant="link"
+        size="sm"
+        alignSelf="stretch"
+        px={2}
+      >
+        {t('common.edit')}
+      </Button>
 
       <Divider orientation="vertical" h={8} mx={2} />
 
