@@ -21,20 +21,16 @@ import type {
   PanelParameters,
   RootLayoutGridviewComponents,
 } from 'features/ui/layouts/auto-layout-context';
-import {
-  AutoLayoutProvider,
-  PanelHotkeysLogical,
-  useAutoLayoutContext,
-  withPanelContainer,
-} from 'features/ui/layouts/auto-layout-context';
+import { AutoLayoutProvider, useAutoLayoutContext, withPanelContainer } from 'features/ui/layouts/auto-layout-context';
 import { TabWithoutCloseButton } from 'features/ui/layouts/TabWithoutCloseButton';
 import type { TabName } from 'features/ui/store/uiTypes';
 import { dockviewTheme } from 'features/ui/styles/theme';
-import { memo, useCallback, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 import { CanvasTabLeftPanel } from './CanvasTabLeftPanel';
 import { CanvasWorkspacePanel } from './CanvasWorkspacePanel';
 import { panelRegistry } from './panel-registry/panelApiRegistry';
+import { PanelHotkeysLogical } from './PanelHotkeysLogical';
 import {
   BOARD_PANEL_DEFAULT_HEIGHT_PX,
   BOARD_PANEL_MIN_HEIGHT_PX,
@@ -317,13 +313,23 @@ export const CanvasTabAutoLayout = memo(() => {
   const rootRef = useRef<HTMLDivElement>(null);
   const [rootApi, setRootApi] = useState<GridviewApi | null>(null);
   const onReady = useCallback<IGridviewReactProps['onReady']>(({ api }) => {
-    const { main } = initializeRootPanelLayout(api);
-    panelRegistry.registerPanel('canvas', 'root', api);
-    main.api.setActive();
     setRootApi(api);
   }, []);
 
   useResizeMainPanelOnFirstVisit(rootApi, rootRef);
+
+  useEffect(() => {
+    if (!rootApi) {
+      return;
+    }
+    initializeRootPanelLayout(rootApi);
+    panelRegistry.registerPanel('canvas', 'root', rootApi);
+    panelRegistry.focusPanelInTab('canvas', LAUNCHPAD_PANEL_ID, false);
+
+    return () => {
+      panelRegistry.unregisterTab('canvas');
+    };
+  }, [rootApi]);
 
   return (
     <AutoLayoutProvider tab="canvas" rootRef={rootRef}>

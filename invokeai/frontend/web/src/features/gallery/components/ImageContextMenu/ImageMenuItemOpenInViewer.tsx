@@ -2,6 +2,8 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { IconMenuItem } from 'common/components/IconMenuItem';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { imageSelected, imageToCompareChanged } from 'features/gallery/store/gallerySlice';
+import { panelRegistry } from 'features/ui/layouts/panel-registry/panelApiRegistry';
+import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsOutBold } from 'react-icons/pi';
@@ -13,7 +15,7 @@ export const ImageMenuItemOpenInViewer = memo(() => {
   const onClick = useCallback(() => {
     dispatch(imageToCompareChanged(null));
     dispatch(imageSelected(imageDTO.image_name));
-    // TODO: figure out how to select the closest image viewer...
+    panelRegistry.focusPanelInActiveTab(VIEWER_PANEL_ID);
   }, [dispatch, imageDTO]);
 
   return (
