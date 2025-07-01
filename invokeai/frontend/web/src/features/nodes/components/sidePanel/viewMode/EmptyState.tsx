@@ -1,11 +1,13 @@
-import { Button, Flex, Image, Link, Text } from '@invoke-ai/ui-library';
+import { Flex, Heading, Icon, Image, Link, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { LaunchpadButton } from 'features/controlLayers/components/SimpleSession/LaunchpadButton';
 import { useIsWorkflowUntouched } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
 import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
 import { workflowModeChanged } from 'features/nodes/store/workflowLibrarySlice';
 import InvokeLogoSVG from 'public/assets/images/invoke-symbol-wht-lrg.svg';
 import { useCallback } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
+import { PiFolderOpenBold, PiPlusBold } from 'react-icons/pi';
 
 export const EmptyState = () => {
   const isWorkflowUntouched = useIsWorkflowUntouched();
@@ -18,8 +20,9 @@ export const EmptyState = () => {
         borderRadius="base"
         flexDir="column"
         gap={5}
-        maxW="230px"
+        maxW="400px"
         pt={24}
+        px={4}
       >
         <Image
           src={InvokeLogoSVG}
@@ -49,15 +52,27 @@ const CleanEditorContent = () => {
 
   return (
     <>
-      <Flex gap={2}>
-        <Button size="sm" onClick={onClickNewWorkflow}>
-          {t('nodes.newWorkflow')}
-        </Button>
-        <Button size="sm" colorScheme="invokeBlue" onClick={workflowLibraryModal.open}>
-          {t('nodes.loadWorkflow')}
-        </Button>
+      <Flex flexDir="column" gap={4} w="full">
+        <LaunchpadButton onClick={onClickNewWorkflow} gap={4}>
+          <Icon as={PiPlusBold} boxSize={6} color="base.500" />
+          <Flex flexDir="column" alignItems="flex-start" gap={1}>
+            <Heading size="sm">{t('nodes.newWorkflow')}</Heading>
+            <Text color="base.300" fontSize="sm">
+              Create a new workflow from scratch
+            </Text>
+          </Flex>
+        </LaunchpadButton>
+        <LaunchpadButton onClick={workflowLibraryModal.open} gap={4}>
+          <Icon as={PiFolderOpenBold} boxSize={6} color="base.500" />
+          <Flex flexDir="column" alignItems="flex-start" gap={1}>
+            <Heading size="sm">{t('nodes.loadWorkflow')}</Heading>
+            <Text color="base.300" fontSize="sm">
+              Browse and load existing workflows
+            </Text>
+          </Flex>
+        </LaunchpadButton>
       </Flex>
-      <Text textAlign="center" fontSize="md">
+      <Text textAlign="center" fontSize="sm" color="base.400" mt={4}>
         <Trans i18nKey="nodes.workflowHelpText" size="sm" components={workflowHelpTextComponents} />
       </Text>
     </>
@@ -74,12 +89,20 @@ const DirtyEditorContent = () => {
 
   return (
     <>
-      <Text textAlign="center" fontSize="md">
+      <Text textAlign="center" fontSize="md" mb={4}>
         {t('nodes.noFieldsViewMode')}
       </Text>
-      <Button size="sm" colorScheme="invokeBlue" onClick={onClick}>
-        {t('nodes.edit')}
-      </Button>
+      <Flex flexDir="column" gap={4} w="full">
+        <LaunchpadButton onClick={onClick} gap={4}>
+          <Icon as={PiPlusBold} boxSize={6} color="base.500" />
+          <Flex flexDir="column" alignItems="flex-start" gap={1}>
+            <Heading size="sm">{t('nodes.edit')}</Heading>
+            <Text color="base.300" fontSize="sm">
+              Switch to edit mode to build workflows
+            </Text>
+          </Flex>
+        </LaunchpadButton>
+      </Flex>
     </>
   );
 };

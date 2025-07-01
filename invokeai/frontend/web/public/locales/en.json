@@ -2471,6 +2471,10 @@
                     "title": "Upload Image to Upscale",
                     "description": "Click or drag an image to upscale (JPG, PNG, WebP up to 100MB)"
                 },
+                "replaceImage": {
+                    "title": "Replace Current Image",
+                    "description": "Click or drag a new image to replace the current one"
+                },
                 "imageReady": {
                     "title": "Image Ready",
                     "description": "Press Invoke to begin upscaling"
