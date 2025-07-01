@@ -1,6 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { AutoLayoutPanelContainer } from 'common/components/FocusRegionWrapper';
 import type { FocusRegionName } from 'common/hooks/focus';
 import type { DockviewApi, GridviewApi, IDockviewPanelProps, IGridviewPanelProps } from 'dockview';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
@@ -11,6 +10,7 @@ import { atom } from 'nanostores';
 import type { FunctionComponent, PropsWithChildren, RefObject } from 'react';
 import { createContext, memo, useCallback, useContext, useMemo, useState } from 'react';
 
+import { AutoLayoutPanelContainer } from './AutoLayoutPanelContainer';
 import { LEFT_PANEL_ID, LEFT_PANEL_MIN_SIZE_PX, RIGHT_PANEL_ID, RIGHT_PANEL_MIN_SIZE_PX } from './shared';
 
 type AutoLayoutContextValue = {

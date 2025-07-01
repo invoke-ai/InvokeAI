@@ -1,5 +1,6 @@
 import { Flex, Icon, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { setFocusedRegion } from 'common/hooks/focus';
 import { useCallbackOnDragEnter } from 'common/hooks/useCallbackOnDragEnter';
 import type { IDockviewPanelHeaderProps } from 'dockview';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -36,8 +37,12 @@ export const TabWithLaunchpadIcon = memo((props: IDockviewPanelHeaderProps) => {
 
   useCallbackOnDragEnter(setActive, ref, 300);
 
+  const onPointerDown = useCallback(() => {
+    setFocusedRegion(props.params.focusRegion);
+  }, [props.params.focusRegion]);
+
   return (
-    <Flex ref={ref} alignItems="center" h="full" px={4} gap={3}>
+    <Flex ref={ref} alignItems="center" h="full" px={4} gap={3} onPointerDown={onPointerDown}>
       <Icon as={TAB_ICONS[activeTab]} color="invokeYellow.300" boxSize={5} />
       <Text userSelect="none">{props.api.title ?? props.api.id}</Text>
     </Flex>
