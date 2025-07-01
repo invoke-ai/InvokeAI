@@ -9,48 +9,44 @@ interface FocusRegionWrapperProps extends BoxProps {
   focusOnMount?: boolean;
 }
 
-const FOCUS_REGION_STYLES: SystemStyleObject = {
+const BASE_FOCUS_REGION_STYLES: SystemStyleObject = {
   position: 'relative',
   '&[data-highlighted="true"]::after': {
-    borderColor: 'blue.700',
+    borderColor: 'invokeBlue.300',
   },
   '&::after': {
     content: '""',
     position: 'absolute',
-    inset: 0,
+    inset: '2px',
     zIndex: 1,
     borderRadius: 'base',
-    border: '2px solid',
+    border: '1px solid',
     borderColor: 'transparent',
     pointerEvents: 'none',
-    transition: 'border-color 0.1s ease-in-out',
+    // transition: 'border-color 0.1s ease-in-out',
   },
 };
 
-export const FocusRegionWrapper = memo(
-  ({ region, focusOnMount = false, sx, children, ...boxProps }: FocusRegionWrapperProps) => {
-    const shouldHighlightFocusedRegions = useAppSelector(selectSystemShouldEnableHighlightFocusedRegions);
+export const FocusRegionWrapper = memo((props: FocusRegionWrapperProps) => {
+  const { region, focusOnMount = false, sx: _sx, children, ...boxProps } = props;
 
-    const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
 
-    const options = useMemo(() => ({ focusOnMount }), [focusOnMount]);
+  const sx = useMemo(() => ({ ...BASE_FOCUS_REGION_STYLES, ..._sx }), [_sx]);
 
-    useFocusRegion(region, ref, options);
-    const isFocused = useIsRegionFocused(region);
-    const isHighlighted = isFocused && shouldHighlightFocusedRegions;
+  const shouldHighlightFocusedRegions = useAppSelector(selectSystemShouldEnableHighlightFocusedRegions);
 
-    return (
-      <Box
-        ref={ref}
-        tabIndex={-1}
-        sx={useMemo(() => ({ ...FOCUS_REGION_STYLES, ...sx }), [sx])}
-        data-highlighted={isHighlighted}
-        {...boxProps}
-      >
-        {children}
-      </Box>
-    );
-  }
-);
+  const options = useMemo(() => ({ focusOnMount }), [focusOnMount]);
+
+  useFocusRegion(region, ref, options);
+  const isFocused = useIsRegionFocused(region);
+  const isHighlighted = isFocused && shouldHighlightFocusedRegions;
+
+  return (
+    <Box ref={ref} tabIndex={-1} sx={sx} data-highlighted={isHighlighted} {...boxProps}>
+      {children}
+    </Box>
+  );
+});
 
 FocusRegionWrapper.displayName = 'FocusRegionWrapper';

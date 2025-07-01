@@ -2,6 +2,7 @@ import { Box, Button, ButtonGroup, Collapse, Divider, Flex, IconButton, Spacer }
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { useGallerySearchTerm } from 'features/gallery/components/ImageGrid/useGallerySearchTerm';
 import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
@@ -67,7 +68,17 @@ export const GalleryPanel = memo(() => {
   const boardName = useBoardName(selectedBoardId);
 
   return (
-    <Flex flexDirection="column" alignItems="center" justifyContent="space-between" h="full" w="full" minH={0} p={2}>
+    <FocusRegionWrapper
+      region="gallery"
+      as={Flex}
+      flexDirection="column"
+      alignItems="center"
+      justifyContent="space-between"
+      h="full"
+      w="full"
+      minH={0}
+      p={2}
+    >
       <Flex gap={2} fontSize="sm" alignItems="center" w="full">
         <Button
           size="sm"
@@ -123,7 +134,7 @@ export const GalleryPanel = memo(() => {
       <Flex w="full" h="full" pt={2}>
         <NewGallery />
       </Flex>
-    </Flex>
+    </FocusRegionWrapper>
   );
 });
 GalleryPanel.displayName = 'Gallery';

@@ -1,4 +1,5 @@
 import { Button, Flex, Heading, Icon, Text } from '@invoke-ai/ui-library';
+import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
 import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import { useNewWorkflow } from 'features/workflowLibrary/components/NewWorkflowConfirmationAlertDialog';
@@ -45,7 +46,7 @@ export const WorkflowsLaunchpadPanel = memo(() => {
   });
 
   return (
-    <Flex flexDir="column" h="full" w="full" alignItems="center" gap={2}>
+    <FocusRegionWrapper region="launchpad" as={Flex} flexDir="column" h="full" w="full" alignItems="center" gap={2}>
       <Flex flexDir="column" w="full" gap={4} px={14} maxW={768} pt="20vh">
         <Heading>{t('ui.launchpad.workflowsTitle')}</Heading>
 
@@ -101,7 +102,7 @@ export const WorkflowsLaunchpadPanel = memo(() => {
           </LaunchpadButton>
         </Flex>
       </Flex>
-    </Flex>
+    </FocusRegionWrapper>
   );
 });
 

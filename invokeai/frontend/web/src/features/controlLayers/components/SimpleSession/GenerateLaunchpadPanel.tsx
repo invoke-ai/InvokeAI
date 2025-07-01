@@ -1,5 +1,6 @@
 import { Alert, Button, Flex, Grid, Heading, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { InitialStateMainModelPicker } from 'features/controlLayers/components/SimpleSession/InitialStateMainModelPicker';
 import { LaunchpadAddStyleReference } from 'features/controlLayers/components/SimpleSession/LaunchpadAddStyleReference';
 import { setActiveTab } from 'features/ui/store/uiSlice';
@@ -14,7 +15,7 @@ export const GenerateLaunchpadPanel = memo(() => {
   }, [dispatch]);
 
   return (
-    <Flex flexDir="column" h="full" w="full" alignItems="center" gap={2}>
+    <FocusRegionWrapper region="launchpad" as={Flex} flexDir="column" h="full" w="full" alignItems="center" gap={2}>
       <Flex flexDir="column" w="full" gap={4} px={14} maxW={768} pt="20vh">
         <Heading mb={4}>Generate images from text prompts.</Heading>
         <Flex flexDir="column" gap={8}>
@@ -46,7 +47,7 @@ export const GenerateLaunchpadPanel = memo(() => {
           </Alert>
         </Flex>
       </Flex>
-    </Flex>
+    </FocusRegionWrapper>
   );
 });
 GenerateLaunchpadPanel.displayName = 'GenerateLaunchpad';

@@ -1,4 +1,11 @@
-import type { DockviewApi, GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
+import type {
+  DockviewApi,
+  GridviewApi,
+  IDockviewPanel,
+  IDockviewReactProps,
+  IGridviewPanel,
+  IGridviewReactProps,
+} from 'dockview';
 import { DockviewReact, GridviewReact, LayoutPriority, Orientation } from 'dockview';
 import { WorkflowsLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/WorkflowsLaunchpadPanel';
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
@@ -15,6 +22,7 @@ import { dockviewTheme } from 'features/ui/styles/theme';
 import { atom } from 'nanostores';
 import { memo, useCallback, useRef, useState } from 'react';
 
+import { registerFocusListener } from './layout-focus-bridge';
 import {
   BOARD_PANEL_DEFAULT_HEIGHT_PX,
   BOARD_PANEL_MIN_HEIGHT_PX,
@@ -53,42 +61,50 @@ const centerPanelComponents: IDockviewReactProps['components'] = {
 };
 
 const initializeCenterPanelLayout = (api: DockviewApi) => {
-  api.addPanel({
+  const launchpadPanel = api.addPanel({
     id: LAUNCHPAD_PANEL_ID,
     component: LAUNCHPAD_PANEL_ID,
     title: 'Launchpad',
     tabComponent: TAB_WITH_LAUNCHPAD_ICON_ID,
   });
-  api.addPanel({
+  registerFocusListener(launchpadPanel, 'launchpad');
+
+  const workspacePanel = api.addPanel({
     id: WORKSPACE_PANEL_ID,
     component: WORKSPACE_PANEL_ID,
     title: 'Workflow Editor',
     tabComponent: DEFAULT_TAB_ID,
     position: {
       direction: 'within',
-      referencePanel: LAUNCHPAD_PANEL_ID,
+      referencePanel: launchpadPanel.id,
     },
   });
-  api.addPanel({
+  registerFocusListener(workspacePanel, 'workflows');
+
+  const viewerPanel = api.addPanel({
     id: VIEWER_PANEL_ID,
     component: VIEWER_PANEL_ID,
     title: 'Image Viewer',
     tabComponent: TAB_WITH_PROGRESS_INDICATOR_ID,
     position: {
       direction: 'within',
-      referencePanel: LAUNCHPAD_PANEL_ID,
+      referencePanel: launchpadPanel.id,
     },
   });
+  registerFocusListener(viewerPanel, 'viewer');
 
-  api.getPanel(LAUNCHPAD_PANEL_ID)?.api.setActive();
+  return { launchpadPanel, workspacePanel, viewerPanel } satisfies Record<string, IDockviewPanel>;
 };
 
 const CenterPanel = memo(() => {
   const ctx = useAutoLayoutContext();
   const onReady = useCallback<IDockviewReactProps['onReady']>(
     (event) => {
-      initializeCenterPanelLayout(event.api);
+      const panels = initializeCenterPanelLayout(event.api);
       ctx._$centerPanelApi.set(event.api);
+
+      panels.launchpadPanel.api.setActive();
+
       const disposables = [
         event.api.onWillShowOverlay((e) => {
           if (e.kind === 'header_space' || e.kind === 'tab') {
@@ -132,22 +148,28 @@ const rightPanelComponents: IGridviewReactProps['components'] = {
 };
 
 export const initializeRightPanelLayout = (api: GridviewApi) => {
-  api.addPanel({
+  const galleryPanel = api.addPanel({
     id: GALLERY_PANEL_ID,
     component: GALLERY_PANEL_ID,
     minimumWidth: RIGHT_PANEL_MIN_SIZE_PX,
     minimumHeight: GALLERY_PANEL_MIN_HEIGHT_PX,
   });
-  api.addPanel({
+  registerFocusListener(galleryPanel, 'gallery');
+
+  const boardsPanel = api.addPanel({
     id: BOARDS_PANEL_ID,
     component: BOARDS_PANEL_ID,
     minimumHeight: BOARD_PANEL_MIN_HEIGHT_PX,
     position: {
       direction: 'above',
-      referencePanel: GALLERY_PANEL_ID,
+      referencePanel: galleryPanel.id,
     },
   });
-  api.getPanel(BOARDS_PANEL_ID)?.api.setSize({ height: BOARD_PANEL_DEFAULT_HEIGHT_PX, width: RIGHT_PANEL_MIN_SIZE_PX });
+  registerFocusListener(boardsPanel, 'boards');
+
+  boardsPanel.api.setSize({ height: BOARD_PANEL_DEFAULT_HEIGHT_PX, width: RIGHT_PANEL_MIN_SIZE_PX });
+
+  return { galleryPanel, boardsPanel } satisfies Record<string, IGridviewPanel>;
 };
 
 const RightPanel = memo(() => {
@@ -177,10 +199,13 @@ const leftPanelComponents: IGridviewReactProps['components'] = {
 };
 
 export const initializeLeftPanelLayout = (api: GridviewApi) => {
-  api.addPanel({
+  const settingsPanel = api.addPanel({
     id: SETTINGS_PANEL_ID,
     component: SETTINGS_PANEL_ID,
   });
+  registerFocusListener(settingsPanel, 'settings');
+
+  return { settingsPanel } satisfies Record<string, IGridviewPanel>;
 };
 
 const LeftPanel = memo(() => {
