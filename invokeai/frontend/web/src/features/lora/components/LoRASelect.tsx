@@ -55,7 +55,7 @@ const LoRASelect = () => {
     }
 
     if (compatibleLoRAs.length === 0) {
-      return currentBaseModel ? t('models.noCompatibleLoRAs') : t('models.selectModelFirst');
+      return currentBaseModel ? t('models.noCompatibleLoRAs') : t('models.selectModel');
     }
 
     return t('models.addLora');
@@ -88,7 +88,7 @@ const LoRASelect = () => {
         placeholder={placeholder}
         getIsOptionDisabled={getIsDisabled}
         initialGroupStates={initialGroupStates}
-        noOptionsText={currentBaseModel ? t('models.noCompatibleLoRAs') : t('models.selectModelFirst')}
+        noOptionsText={currentBaseModel ? t('models.noCompatibleLoRAs') : t('models.selectModel')}
       />
     </FormControl>
   );
