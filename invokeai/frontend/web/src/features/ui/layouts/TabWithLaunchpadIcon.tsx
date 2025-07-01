@@ -42,11 +42,11 @@ export const TabWithLaunchpadIcon = memo((props: IDockviewPanelHeaderProps) => {
   return (
     <Flex ref={ref} alignItems="center" h="full">
       {isLaunchpadPanel && currentTabIcon && (
-        <Flex alignItems="center" px={2}>
+        <Flex alignItems="center" pl={5} pr={2}>
           {currentTabIcon}
         </Flex>
       )}
-      <Text userSelect="none" px={isLaunchpadPanel ? 2 : 4}>
+      <Text userSelect="none" px={isLaunchpadPanel ? 3 : 4}>
         {props.api.title ?? props.api.id}
       </Text>
     </Flex>
