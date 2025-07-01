@@ -993,6 +993,36 @@ export const canvasSlice = createSlice({
         entity.denoiseLimit = undefined;
       }
     },
+    inpaintMaskInverted: (state, action: PayloadAction<EntityIdentifierPayload<void, 'inpaint_mask'>>) => {
+      const { entityIdentifier } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity || entity.type !== 'inpaint_mask') {
+        return;
+      }
+
+      // Create a rectangle covering the current bounding box
+      const bboxRect = state.bbox.rect;
+      const fillRectObject = {
+        id: getPrefixedId('rect'),
+        type: 'rect' as const,
+        rect: {
+          x: bboxRect.x - entity.position.x,
+          y: bboxRect.y - entity.position.y,
+          width: bboxRect.width,
+          height: bboxRect.height,
+        },
+        color: { r: 255, g: 255, b: 255, a: 1 },
+      };
+
+      // Convert existing objects to eraser effect by creating a composite inverted mask
+      // The strategy is to replace all existing objects with:
+      // 1. A full rectangle covering the bbox
+      // 2. The original objects as "erasers" to punch holes through the rectangle
+      const originalObjects = [...entity.objects];
+
+      // Start with the full rectangle, then "erase" the original painted areas
+      entity.objects = [fillRectObject, ...originalObjects];
+    },
     //#region BBox
     bboxScaledWidthChanged: (state, action: PayloadAction<number>) => {
       const gridSize = getGridSize(state.bbox.modelBase);
@@ -1713,6 +1743,7 @@ export const {
   inpaintMaskDenoiseLimitAdded,
   inpaintMaskDenoiseLimitChanged,
   inpaintMaskDenoiseLimitDeleted,
+  inpaintMaskInverted,
   // inpaintMaskRecalled,
 } = canvasSlice.actions;
 
