@@ -4,6 +4,14 @@ import 'features/ui/styles/dockview-theme-invoke.css';
 import { TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useDndMonitor } from 'features/dnd/useDndMonitor';
+import {
+  selectWithCanvasTab,
+  selectWithGenerateTab,
+  selectWithModelsTab,
+  selectWithQueueTab,
+  selectWithUpscalingTab,
+  selectWithWorkflowsTab,
+} from 'features/system/store/configSlice';
 import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
 import { CanvasTabAutoLayout } from 'features/ui/layouts/canvas-tab-auto-layout';
 import { GenerateTabAutoLayout } from 'features/ui/layouts/generate-tab-auto-layout';
@@ -12,48 +20,53 @@ import { WorkflowsTabAutoLayout } from 'features/ui/layouts/workflows-tab-auto-l
 import { selectActiveTabIndex } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 
-import { TabMountGate } from './TabMountGate';
 import ModelManagerTab from './tabs/ModelManagerTab';
 import QueueTab from './tabs/QueueTab';
 
 export const AppContent = memo(() => {
-  const tabIndex = useAppSelector(selectActiveTabIndex);
   useDndMonitor();
+  const tabIndex = useAppSelector(selectActiveTabIndex);
+  const withGenerateTab = useAppSelector(selectWithGenerateTab);
+  const withCanvasTab = useAppSelector(selectWithCanvasTab);
+  const withUpscalingTab = useAppSelector(selectWithUpscalingTab);
+  const withWorkflowsTab = useAppSelector(selectWithWorkflowsTab);
+  const withModelsTab = useAppSelector(selectWithModelsTab);
+  const withQueueTab = useAppSelector(selectWithQueueTab);
 
   return (
     <Tabs index={tabIndex} display="flex" w="full" h="full" p={0} overflow="hidden">
       <VerticalNavBar />
       <TabPanels w="full" h="full" p={0}>
-        <TabMountGate tab="generate">
+        {withGenerateTab && (
           <TabPanel w="full" h="full" p={0}>
             <GenerateTabAutoLayout />
           </TabPanel>
-        </TabMountGate>
-        <TabMountGate tab="canvas">
+        )}
+        {withCanvasTab && (
           <TabPanel w="full" h="full" p={0}>
             <CanvasTabAutoLayout />
           </TabPanel>
-        </TabMountGate>
-        <TabMountGate tab="upscaling">
+        )}
+        {withUpscalingTab && (
           <TabPanel w="full" h="full" p={0}>
             <UpscalingTabAutoLayout />
           </TabPanel>
-        </TabMountGate>
-        <TabMountGate tab="workflows">
+        )}
+        {withWorkflowsTab && (
           <TabPanel w="full" h="full" p={0}>
             <WorkflowsTabAutoLayout />
           </TabPanel>
-        </TabMountGate>
-        <TabMountGate tab="models">
+        )}
+        {withModelsTab && (
           <TabPanel w="full" h="full" p={0}>
             <ModelManagerTab />
           </TabPanel>
-        </TabMountGate>
-        <TabMountGate tab="queue">
+        )}
+        {withQueueTab && (
           <TabPanel w="full" h="full" p={0}>
             <QueueTab />
           </TabPanel>
-        </TabMountGate>
+        )}
       </TabPanels>
     </Tabs>
   );
