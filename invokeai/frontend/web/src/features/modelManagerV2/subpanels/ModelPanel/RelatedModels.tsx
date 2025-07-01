@@ -291,20 +291,22 @@ export const RelatedModels = memo(({ modelConfig }: Props) => {
           <FormErrorMessage key={error}>{error}</FormErrorMessage>
         ))}
       </FormControl>
-      <Box>
-        <Flex gap="2" flexWrap="wrap">
-          {groupedModelConfigs.map((group, i) => {
-            const withDivider = i < groupedModelConfigs.length - 1;
+      {groupedModelConfigs.length > 0 && (
+        <Box>
+          <Flex gap="2" flexWrap="wrap">
+            {groupedModelConfigs.map((group, i) => {
+              const withDivider = i < groupedModelConfigs.length - 1;
 
-            return (
-              <Box key={group.type} mb={4}>
-                <ModelTagGroup group={group} isLoading={isLoading} removeHandlers={removeHandlers} />
-                {withDivider && <Divider my={4} opacity={0.3} />}
-              </Box>
-            );
-          })}
-        </Flex>
-      </Box>
+              return (
+                <Box key={group.type} mb={4}>
+                  <ModelTagGroup group={group} isLoading={isLoading} removeHandlers={removeHandlers} />
+                  {withDivider && <Divider my={4} opacity={0.3} />}
+                </Box>
+              );
+            })}
+          </Flex>
+        </Box>
+      )}
     </Flex>
   );
 });
