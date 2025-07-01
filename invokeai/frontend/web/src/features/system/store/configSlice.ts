@@ -16,7 +16,8 @@ const baseDimensionConfig: NumericalParameterConfig = {
   coarseStep: 64,
 };
 
-const initialConfigState: AppConfig = {
+const initialConfigState: AppConfig & { didLoad: boolean } = {
+  didLoad: false,
   isLocal: true,
   shouldUpdateImagesOnConnect: false,
   shouldFetchMetadataFromApi: false,
@@ -192,6 +193,7 @@ export const configSlice = createSlice({
   reducers: {
     configChanged: (state, action: PayloadAction<PartialAppConfig>) => {
       merge(state, action.payload);
+      state.didLoad = true;
     },
   },
 });
@@ -199,7 +201,8 @@ export const configSlice = createSlice({
 export const { configChanged } = configSlice.actions;
 
 export const selectConfigSlice = (state: RootState) => state.config;
-const createConfigSelector = <T>(selector: Selector<AppConfig, T>) => createSelector(selectConfigSlice, selector);
+const createConfigSelector = <T>(selector: Selector<typeof initialConfigState, T>) =>
+  createSelector(selectConfigSlice, selector);
 
 export const selectWidthConfig = createConfigSelector((config) => config.sd.width);
 export const selectHeightConfig = createConfigSelector((config) => config.sd.height);
@@ -238,3 +241,23 @@ export const selectEnabledTabs = createConfigSelector((config) => {
   }
   return enabledTabs;
 });
+const selectDisabledTabs = createConfigSelector((config) => config.disabledTabs);
+const selectDidLoad = createConfigSelector((config) => config.didLoad);
+export const selectWithGenerateTab = createSelector(selectDidLoad, selectDisabledTabs, (didLoad, disabledTabs) =>
+  didLoad ? !disabledTabs.includes('generate') : false
+);
+export const selectWithCanvasTab = createSelector(selectDidLoad, selectDisabledTabs, (didLoad, disabledTabs) =>
+  didLoad ? !disabledTabs.includes('canvas') : false
+);
+export const selectWithUpscalingTab = createSelector(selectDidLoad, selectDisabledTabs, (didLoad, disabledTabs) =>
+  didLoad ? !disabledTabs.includes('upscaling') : false
+);
+export const selectWithWorkflowsTab = createSelector(selectDidLoad, selectDisabledTabs, (didLoad, disabledTabs) =>
+  didLoad ? !disabledTabs.includes('workflows') : false
+);
+export const selectWithModelsTab = createSelector(selectDidLoad, selectDisabledTabs, (didLoad, disabledTabs) =>
+  didLoad ? !disabledTabs.includes('models') : false
+);
+export const selectWithQueueTab = createSelector(selectDidLoad, selectDisabledTabs, (didLoad, disabledTabs) =>
+  didLoad ? !disabledTabs.includes('queue') : false
+);
