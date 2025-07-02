@@ -1,10 +1,11 @@
+from dataclasses import dataclass
+
 import einops
 import numpy as np
 import torch
+import torchvision.transforms as T
 from einops import repeat
 from PIL import Image
-import torchvision.transforms as T
-from dataclasses import dataclass
 
 from invokeai.app.invocations.fields import FluxKontextConditioningField
 from invokeai.app.invocations.flux_vae_encode import FluxVaeEncodeInvocation
