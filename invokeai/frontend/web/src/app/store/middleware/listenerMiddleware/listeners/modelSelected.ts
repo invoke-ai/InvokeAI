@@ -9,11 +9,11 @@ import { refImageModelChanged, selectRefImagesSlice } from 'features/controlLaye
 import { selectBboxModelBase, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { modelSelected } from 'features/parameters/store/actions';
+import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { selectIPAdapterModels } from 'services/api/hooks/modelsByType';
-import type { MainModelConfig } from 'services/api/types';
 
 const log = logger('models');
 
@@ -50,7 +50,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           modelsCleared += 1;
         }
 
-        handleReferenceImageModelSwitching(state, dispatch, newModel as MainModelConfig, log);
+        handleReferenceImageModelSwitching(state, dispatch, newModel, log);
 
         if (modelsCleared > 0) {
           toast({
@@ -76,27 +76,24 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
 const handleReferenceImageModelSwitching = (
   state: RootState,
   dispatch: AppDispatch,
-  newModel: MainModelConfig,
+  newModel: ParameterModel,
   log: ReturnType<typeof logger>
 ) => {
   const allIPAdapterModels = selectIPAdapterModels(state);
-  const compatibleIPAdapterModels = allIPAdapterModels.filter((model) => model.base === newModel.base);
-
-  const getBestCompatibleModel = () => {
-    return compatibleIPAdapterModels[0] ?? null;
-  };
+  const newBase = newModel.base;
+  const compatibleIPAdapterModels = allIPAdapterModels.filter((model) => model.base === newBase);
+  const firstCompatibleModel = compatibleIPAdapterModels[0] ?? null;
 
   selectRefImagesSlice(state).entities.forEach((entity) => {
     const currentModel = entity.config.model;
 
-    if (!currentModel || currentModel.base !== newModel.base) {
-      const bestModel = getBestCompatibleModel();
-      if (bestModel) {
+    if (!currentModel || currentModel.base !== newBase) {
+      if (firstCompatibleModel) {
         log.debug(
-          { previousModel: currentModel, newModel: bestModel },
+          { previousModel: currentModel, newModel: firstCompatibleModel },
           'Switching global reference image model to compatible model'
         );
-        dispatch(refImageModelChanged({ id: entity.id, modelConfig: bestModel }));
+        dispatch(refImageModelChanged({ id: entity.id, modelConfig: firstCompatibleModel }));
       } else if (currentModel) {
         log.debug({ previousModel: currentModel }, 'Clearing incompatible global reference image model');
         dispatch(refImageModelChanged({ id: entity.id, modelConfig: null }));
@@ -108,18 +105,17 @@ const handleReferenceImageModelSwitching = (
     entity.referenceImages.forEach(({ id: referenceImageId, config }) => {
       const currentModel = config.model;
 
-      if (!currentModel || currentModel.base !== newModel.base) {
-        const bestModel = getBestCompatibleModel();
-        if (bestModel) {
+      if (!currentModel || currentModel.base !== newBase) {
+        if (firstCompatibleModel) {
           log.debug(
-            { previousModel: currentModel, newModel: bestModel },
+            { previousModel: currentModel, newModel: firstCompatibleModel },
             'Switching regional guidance reference image model to compatible model'
           );
           dispatch(
             rgRefImageModelChanged({
               entityIdentifier: getEntityIdentifier(entity),
               referenceImageId,
-              modelConfig: bestModel,
+              modelConfig: firstCompatibleModel,
             })
           );
         } else if (currentModel) {
