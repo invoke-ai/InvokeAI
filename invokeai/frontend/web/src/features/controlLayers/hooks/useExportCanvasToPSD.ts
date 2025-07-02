@@ -71,11 +71,11 @@ export const useExportCanvasToPSD = () => {
       const psdLayers: Layer[] = await Promise.all(
         adapters.map((adapter, index) => {
           const layer = adapter.state;
-          
+
           // Get the actual content bounds for this layer (excluding transparent regions)
           const layerPosition = adapter.state.position;
           const pixelRect = adapter.transformer.$pixelRect.get();
-          
+
           // Calculate the layer's content bounds in stage coordinates
           const layerContentBounds = {
             x: layerPosition.x + pixelRect.x,
@@ -83,9 +83,9 @@ export const useExportCanvasToPSD = () => {
             width: pixelRect.width,
             height: pixelRect.height,
           };
-          
+
           // Get the canvas cropped to the layer's actual content bounds
-          const canvas = adapter.getCanvas({ rect: layerContentBounds });
+          const canvas = adapter.getCanvas(layerContentBounds);
 
           const layerDataPSD: Layer = {
             name: layer.name || `Layer ${index + 1}`,
