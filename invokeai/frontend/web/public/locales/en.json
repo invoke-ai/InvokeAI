@@ -948,7 +948,8 @@
         "selectModel": "Select a Model",
         "noLoRAsInstalled": "No LoRAs installed",
         "noRefinerModelsInstalled": "No SDXL Refiner models installed",
-        "defaultVAE": "Default VAE"
+        "defaultVAE": "Default VAE",
+        "noCompatibleLoRAs": "No Compatible LoRAs"
     },
     "nodes": {
         "arithmeticSequence": "Arithmetic Sequence",
