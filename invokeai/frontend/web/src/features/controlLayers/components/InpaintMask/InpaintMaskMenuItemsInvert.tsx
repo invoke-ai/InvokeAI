@@ -19,7 +19,7 @@ export const InpaintMaskMenuItemsInvert = memo(() => {
 
   // Only show if there are objects to invert and we have a valid bounding box
   const entity = canvasSlice.inpaintMasks.entities.find((entity) => entity.id === entityIdentifier.id);
-  const hasObjects = entity?.objects.length > 0;
+  const hasObjects = Boolean(entity?.objects && entity.objects.length > 0);
   const hasBbox = canvasSlice.bbox.rect.width > 0 && canvasSlice.bbox.rect.height > 0;
 
   if (!hasObjects || !hasBbox) {
