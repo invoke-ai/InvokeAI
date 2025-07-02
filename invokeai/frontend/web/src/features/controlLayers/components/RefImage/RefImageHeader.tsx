@@ -4,9 +4,13 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useRefImageEntity } from 'features/controlLayers/components/RefImage/useRefImageEntity';
 import { useRefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
-import { refImageDeleted, selectRefImageEntityIds } from 'features/controlLayers/store/refImagesSlice';
+import {
+  refImageDeleted,
+  refImageIsEnabledToggled,
+  selectRefImageEntityIds,
+} from 'features/controlLayers/store/refImagesSlice';
 import { memo, useCallback, useMemo } from 'react';
-import { PiTrashBold } from 'react-icons/pi';
+import { PiEyeBold, PiEyeSlashBold, PiTrashBold } from 'react-icons/pi';
 
 const textSx: SystemStyleObject = {
   color: 'base.300',
@@ -28,21 +32,37 @@ export const RefImageHeader = memo(() => {
     dispatch(refImageDeleted({ id }));
   }, [dispatch, id]);
 
+  const toggleIsEnabled = useCallback(() => {
+    dispatch(refImageIsEnabledToggled({ id }));
+  }, [dispatch, id]);
+
   return (
     <Flex justifyContent="space-between" alignItems="center" w="full" ps={2}>
       <Text fontWeight="semibold" sx={textSx} data-is-error={!entity.config.image}>
         Reference Image #{refImageNumber}
       </Text>
-      <IconButton
-        tooltip="Delete Reference Image"
-        size="xs"
-        variant="link"
-        alignSelf="stretch"
-        aria-label="Delete ref image"
-        onClick={deleteRefImage}
-        icon={<PiTrashBold />}
-        colorScheme="error"
-      />
+      <Flex>
+        <IconButton
+          tooltip={entity.isEnabled ? 'Disable Reference Image' : 'Enable Reference Image'}
+          size="xs"
+          variant="link"
+          alignSelf="stretch"
+          aria-label={entity.isEnabled ? 'Disable ref image' : 'Enable ref image'}
+          onClick={toggleIsEnabled}
+          icon={entity.isEnabled ? <PiEyeBold /> : <PiEyeSlashBold />}
+          colorScheme={entity.isEnabled ? 'base' : 'warning'}
+        />
+        <IconButton
+          tooltip="Delete Reference Image"
+          size="xs"
+          variant="link"
+          alignSelf="stretch"
+          aria-label="Delete ref image"
+          onClick={deleteRefImage}
+          icon={<PiTrashBold />}
+          colorScheme="error"
+        />
+      </Flex>
     </Flex>
   );
 });

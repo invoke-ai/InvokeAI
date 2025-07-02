@@ -132,6 +132,7 @@ export const initialControlLoRA: ControlLoRAConfig = {
 export const getReferenceImageState = (id: string, overrides?: PartialDeep<RefImageState>): RefImageState => {
   const entityState: RefImageState = {
     id,
+    isEnabled: true,
     config: deepClone(initialIPAdapter),
   };
   merge(entityState, overrides);

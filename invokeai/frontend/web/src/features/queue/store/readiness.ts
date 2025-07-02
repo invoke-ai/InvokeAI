@@ -632,7 +632,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   });
 
   // Flux Kontext only supports 1x Reference Image at a time.
-  const referenceImageCount = refImages.entities.length;
+  const referenceImageCount = refImages.entities.filter((entity) => entity.isEnabled).length;
 
   if (model?.base === 'flux-kontext' && referenceImageCount > 1) {
     reasons.push({ content: i18n.t('parameters.invoke.fluxKontextMultipleReferenceImages') });
