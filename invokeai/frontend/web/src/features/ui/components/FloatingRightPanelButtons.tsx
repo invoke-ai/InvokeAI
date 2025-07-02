@@ -22,7 +22,7 @@ const ToggleRightPanelButton = memo(() => {
     if (navigationApi.tabApi?.getTab() !== tab) {
       return;
     }
-    navigationApi.toggleLeftPanelInTab(tab);
+    navigationApi.toggleRightPanelInTab(tab);
   }, [tab]);
 
   return (
