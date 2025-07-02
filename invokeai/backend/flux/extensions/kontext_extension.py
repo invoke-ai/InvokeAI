@@ -96,7 +96,7 @@ class KontextExtension:
 
         # Reuse VAE encoding logic from FluxVaeEncodeInvocation
         vae_info = self._context.models.load(self._vae_field.vae)
-        image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
+        image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"), multiple_of=16)
         if image_tensor.dim() == 3:
             image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
         image_tensor = image_tensor.to(self._device)
