@@ -30,16 +30,11 @@ export type MainModelLoaderNodes =
 
 export type VaeSourceNodes = 'seamless' | 'vae_loader';
 
-export type GraphBuilderArg =
-  | {
-      generationMode: Extract<GenerationMode, 'txt2img'>;
-      state: RootState;
-    }
-  | {
-      generationMode: Exclude<GenerationMode, 'txt2img'>;
-      state: RootState;
-      canvasManager: CanvasManager;
-    };
+export type GraphBuilderArg = {
+  generationMode: GenerationMode;
+  state: RootState;
+  manager: CanvasManager | null;
+};
 
 export type GraphBuilderReturn = {
   g: Graph;
