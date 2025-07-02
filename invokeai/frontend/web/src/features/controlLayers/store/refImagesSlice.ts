@@ -121,7 +121,10 @@ export const refImagesSlice = createSlice({
         return;
       }
 
-      if (entity.config.model.base === 'flux-kontext') {
+      if (
+        entity.config.model.base === 'flux-kontext' ||
+        (entity.config.model.base === 'flux' && entity.config.model.name?.toLowerCase().includes('kontext'))
+      ) {
         // Switching to flux-kontext ref image
         entity.config = {
           ...initialFluxKontextReferenceImage,
