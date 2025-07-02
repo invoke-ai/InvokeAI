@@ -35,7 +35,6 @@ export const PromptExpansionOverlay = memo(() => {
       display="flex"
       alignItems="center"
       justifyContent="center"
-      animation="pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite"
     >
       {/* Show dimmed source image if available */}
       {imageDTO && (
