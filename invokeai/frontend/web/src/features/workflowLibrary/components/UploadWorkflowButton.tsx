@@ -37,6 +37,7 @@ export const UploadWorkflowButton = memo(() => {
         pointerEvents="auto"
         variant="ghost"
         justifyContent="flex-start"
+        title={t('workflows.dropWorkflowFile')}
       >
         {t('workflows.uploadWorkflow')}
       </Button>

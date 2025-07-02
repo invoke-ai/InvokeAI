@@ -72,8 +72,9 @@ const TooltipContent = () => {
       <Text pb={1} fontWeight="semibold">
         {t('stylePresets.importTemplates')}
       </Text>
-      <Text>{t('stylePresets.acceptedColumnsKeys')}</Text>
-      <UnorderedList>
+      <Text pb={2}>{t('stylePresets.dropStylePresetFile')}</Text>
+      <Text fontSize="sm">{t('stylePresets.acceptedColumnsKeys')}</Text>
+      <UnorderedList fontSize="sm">
         <ListItem>{t('stylePresets.nameColumn')}</ListItem>
         <ListItem>{t('stylePresets.positivePromptColumn')}</ListItem>
         <ListItem>{t('stylePresets.negativePromptColumn')}</ListItem>

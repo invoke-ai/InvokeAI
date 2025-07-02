@@ -114,7 +114,7 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
       <IconButton
         variant="ghost"
         aria-label={t('modelManager.uploadImage')}
-        tooltip={t('modelManager.uploadImage')}
+        tooltip={t('stylePresets.dropModelImageFile')}
         w={108}
         h={108}
         fontSize={36}

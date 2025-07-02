@@ -77,7 +77,7 @@ export const FullscreenDropzone = memo(() => {
       const parseResult = z.array(zUploadFile).safeParse(files);
 
       if (!parseResult.success) {
-        const description = t('toast.uploadFailedInvalidUploadDesc');
+        const description = t('toast.uploadFailedInvalidFormatDesc');
 
         toast({
           id: 'UPLOAD_FAILED',
@@ -188,9 +188,14 @@ const DropLabel = memo(() => {
   const boardName = useBoardName(boardId);
 
   return (
-    <Flex flexDir="column" gap={4} color="base.100" alignItems="center">
-      <Heading size="lg">{t('gallery.dropToUpload')}</Heading>
-      <Heading size="md">{t('toast.imagesWillBeAddedTo', { boardName })}</Heading>
+    <Flex flexDir="column" gap={4} color="base.100" alignItems="center" textAlign="center">
+      <Heading size="lg">{t('gallery.dropToUploadImagesWithFormats')}</Heading>
+      <Heading size="md" fontWeight="normal">
+        {t('gallery.dragDropOrClickToUpload')}
+      </Heading>
+      <Heading size="sm" fontWeight="normal" opacity={0.8}>
+        {t('toast.imagesWillBeAddedTo', { boardName })}
+      </Heading>
     </Flex>
   );
 });

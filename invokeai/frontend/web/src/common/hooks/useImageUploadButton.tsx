@@ -144,7 +144,7 @@ export const useImageUploadButton = ({
           file: rejection.file.path,
         }));
         log.error({ errors }, 'Invalid upload');
-        const description = t('toast.uploadFailedInvalidUploadDesc');
+        const description = t('toast.uploadFailedInvalidFormatDesc');
 
         toast({
           id: 'UPLOAD_FAILED',
