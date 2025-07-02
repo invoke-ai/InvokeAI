@@ -23,6 +23,7 @@ import { fieldImageCollectionValueChanged } from 'features/nodes/store/nodesSlic
 import { selectFieldInputInstanceSafe, selectNodesSlice } from 'features/nodes/store/selectors';
 import { type FieldIdentifier, isImageFieldCollectionInputInstance } from 'features/nodes/types/field';
 import { expandPrompt } from 'features/prompt/PromptExpansion/expand';
+import { promptExpansionApi } from 'features/prompt/PromptExpansion/state';
 import type { ImageDTO } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
@@ -538,6 +539,7 @@ export const promptGenerationFromImageDndTarget: DndTarget<
   },
   handler: ({ sourceData, dispatch, getState }) => {
     const { imageDTO } = sourceData.payload;
+    promptExpansionApi.setPending(imageDTO);
     expandPrompt({ dispatch, getState, imageDTO });
   },
 };

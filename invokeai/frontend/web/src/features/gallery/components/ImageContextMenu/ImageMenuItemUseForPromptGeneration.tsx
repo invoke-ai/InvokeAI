@@ -18,6 +18,7 @@ export const ImageMenuItemUseForPromptGeneration = memo(() => {
   const isPromptExpansionEnabled = useAppSelector(selectAllowPromptExpansion);
 
   const handleUseForPromptGeneration = useCallback(() => {
+    promptExpansionApi.setPending(imageDTO);
     expandPrompt({ dispatch, getState, imageDTO });
     toast({
       id: 'PROMPT_GENERATION_STARTED',
