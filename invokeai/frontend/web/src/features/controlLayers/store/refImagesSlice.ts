@@ -222,6 +222,14 @@ export const refImagesSlice = createSlice({
       }
       state.selectedEntityId = id;
     },
+    refImageIsEnabledToggled: (state, action: PayloadActionWithId) => {
+      const { id } = action.payload;
+      const entity = selectRefImageEntity(state, id);
+      if (!entity) {
+        return;
+      }
+      entity.isEnabled = !entity.isEnabled;
+    },
     refImagesReset: () => getInitialRefImagesState(),
   },
   extraReducers(builder) {
@@ -243,6 +251,7 @@ export const {
   refImageIPAdapterWeightChanged,
   refImageIPAdapterBeginEndStepPctChanged,
   refImageFLUXReduxImageInfluenceChanged,
+  refImageIsEnabledToggled,
 } = refImagesSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */

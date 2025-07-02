@@ -39,6 +39,7 @@ export const buildChatGPT4oGraph = async (arg: GraphBuilderArg): Promise<GraphBu
   assert(isChatGPT4oAspectRatioID(bbox.aspectRatio.id), 'ChatGPT 4o does not support this aspect ratio');
 
   const validRefImages = refImages.entities
+    .filter((entity) => entity.isEnabled)
     .filter((entity) => isChatGPT4oReferenceImageConfig(entity.config))
     .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0)
     .toReversed(); // sends them in order they are displayed in the list
