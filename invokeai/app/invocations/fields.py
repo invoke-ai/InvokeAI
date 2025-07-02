@@ -285,6 +285,12 @@ class FluxReduxConditioningField(BaseModel):
     )
 
 
+class FluxUnoReferenceField(BaseModel):
+    """A FLUX Uno image list primitive value"""
+
+    images: list[ImageField] = Field(description="The images to use as reference for FLUX Uno.")
+
+
 class FluxFillConditioningField(BaseModel):
     """A FLUX Fill conditioning field."""
 

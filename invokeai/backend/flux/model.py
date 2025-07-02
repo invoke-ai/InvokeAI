@@ -102,6 +102,8 @@ class Flux(nn.Module):
         controlnet_single_block_residuals: list[Tensor] | None,
         ip_adapter_extensions: list[XLabsIPAdapterExtension],
         regional_prompting_extension: RegionalPromptingExtension,
+        uno_ref_imgs: list[torch.Tensor] | None = None,
+        uno_ref_ids: list[torch.Tensor] | None = None,
     ) -> Tensor:
         if img.ndim != 3 or txt.ndim != 3:
             raise ValueError("Input img and txt tensors must have 3 dimensions.")
@@ -117,6 +119,14 @@ class Flux(nn.Module):
         txt = self.txt_in(txt)
 
         ids = torch.cat((txt_ids, img_ids), dim=1)
+        # Concatenate UNO reference images tokens and position ids
+        img_end = img.shape[1]  # length of original image vector
+        if uno_ref_imgs is not None and uno_ref_ids is not None:
+            img_in = [img] + [self.img_in(ref) for ref in uno_ref_imgs]
+            img_ids = [ids] + uno_ref_ids
+            img = torch.cat(img_in, dim=1)
+            ids = torch.cat(img_ids, dim=1)
+
         pe = self.pe_embedder(ids)
 
         # Validate double_block_residuals shape.
@@ -164,5 +174,7 @@ class Flux(nn.Module):
 
         img = img[:, txt.shape[1] :, ...]
 
+        # index img
+        img = img[:, :img_end, ...]
         img = self.final_layer(img, vec)  # (N, T, patch_size ** 2 * out_channels)
         return img
