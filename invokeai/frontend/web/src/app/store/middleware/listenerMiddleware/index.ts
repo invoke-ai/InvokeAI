@@ -19,7 +19,6 @@ import { addSocketConnectedEventListener } from 'app/store/middleware/listenerMi
 import type { AppDispatch, RootState } from 'app/store/store';
 
 import { addArchivedOrDeletedBoardListener } from './listeners/addArchivedOrDeletedBoardListener';
-import { addPromptExpansionRequestedListener } from './listeners/addPromptExpansionRequestedListener';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -72,5 +71,3 @@ addAppConfigReceivedListener(startAppListening);
 addAdHocPostProcessingRequestedListener(startAppListening);
 
 addSetDefaultSettingsListener(startAppListening);
-
-addPromptExpansionRequestedListener(startAppListening);

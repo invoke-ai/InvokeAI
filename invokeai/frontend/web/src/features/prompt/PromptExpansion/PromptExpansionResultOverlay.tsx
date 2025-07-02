@@ -1,9 +1,10 @@
 import { ButtonGroup, Flex, Icon, IconButton, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { positivePromptChanged, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { positivePromptChanged, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
 import { useCallback } from 'react';
 import { PiCheckBold, PiMagicWandBold, PiPlusBold, PiXBold } from 'react-icons/pi';
-import { $promptExpansionRequest, $promptExpansionResult } from 'services/events/stores';
+
+import { promptExpansionApi } from './state';
 
 interface PromptExpansionResultOverlayProps {
   expandedText: string;
@@ -11,25 +12,22 @@ interface PromptExpansionResultOverlayProps {
 
 export const PromptExpansionResultOverlay = ({ expandedText }: PromptExpansionResultOverlayProps) => {
   const dispatch = useAppDispatch();
-  const params = useAppSelector(selectParamsSlice);
+  const positivePrompt = useAppSelector(selectPositivePrompt);
 
   const handleReplace = useCallback(() => {
     dispatch(positivePromptChanged(expandedText));
-    $promptExpansionRequest.set(null);
-    $promptExpansionResult.set(null);
+    promptExpansionApi.reset();
   }, [dispatch, expandedText]);
 
   const handleInsert = useCallback(() => {
-    const currentText = params.positivePrompt;
+    const currentText = positivePrompt;
     const newText = currentText ? `${currentText}\n${expandedText}` : expandedText;
     dispatch(positivePromptChanged(newText));
-    $promptExpansionRequest.set(null);
-    $promptExpansionResult.set(null);
-  }, [dispatch, expandedText, params.positivePrompt]);
+    promptExpansionApi.reset();
+  }, [dispatch, expandedText, positivePrompt]);
 
   const handleDiscard = useCallback(() => {
-    $promptExpansionRequest.set(null);
-    $promptExpansionResult.set(null);
+    promptExpansionApi.reset();
   }, []);
 
   return (

@@ -11,7 +11,7 @@ import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 import { PiUploadBold } from 'react-icons/pi';
 import { uploadImages, useUploadImageMutation } from 'services/api/endpoints/images';
-import type { ImageDTO } from 'services/api/types';
+import type { ImageDTO, UploadImageArg } from 'services/api/types';
 import { assert } from 'tsafe';
 import type { SetOptional } from 'type-fest';
 
@@ -21,11 +21,17 @@ type UseImageUploadButtonArgs =
       isDisabled?: boolean;
       allowMultiple: false;
       onUpload?: (imageDTO: ImageDTO) => void;
+      uploadArgOverrides?: Partial<UploadImageArg>;
+      onUploadStarted?: (files: File) => void;
+      onError?: (error: unknown) => void;
     }
   | {
       isDisabled?: boolean;
       allowMultiple: true;
       onUpload?: (imageDTOs: ImageDTO[]) => void;
+      uploadArgOverrides?: Partial<UploadImageArg>;
+      onUploadStarted?: (files: File[]) => void;
+      onError?: (error: unknown) => void;
     };
 
 const log = logger('gallery');
@@ -49,7 +55,14 @@ const log = logger('gallery');
  * <Button {...getUploadButtonProps()} /> // will open the file dialog on click
  * <input {...getUploadInputProps()} /> // hidden, handles native upload functionality
  */
-export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: UseImageUploadButtonArgs) => {
+export const useImageUploadButton = ({
+  onUpload,
+  isDisabled,
+  allowMultiple,
+  uploadArgOverrides,
+  onUploadStarted,
+  onError,
+}: UseImageUploadButtonArgs) => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const isClientSideUploadEnabled = useAppSelector(selectIsClientSideUploadEnabled);
   const [uploadImage, request] = useUploadImageMutation();
@@ -71,17 +84,21 @@ export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: Us
           }
           const file = files[0];
           assert(file !== undefined); // should never happen
+          onUploadStarted?.(file);
           const imageDTO = await uploadImage({
             file,
             image_category: 'user',
             is_intermediate: false,
             board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
             silent: true,
+            ...uploadArgOverrides,
           }).unwrap();
           if (onUpload) {
             onUpload(imageDTO);
           }
         } else {
+          onUploadStarted?.(files);
+
           let imageDTOs: ImageDTO[] = [];
           if (isClientSideUploadEnabled && files.length > 1) {
             imageDTOs = await Promise.all(files.map((file, i) => clientSideUpload(file, i)));
@@ -94,6 +111,7 @@ export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: Us
                 board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
                 silent: false,
                 isFirstUploadOfBatch: i === 0,
+                ...uploadArgOverrides,
               }))
             );
           }
@@ -102,6 +120,7 @@ export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: Us
           }
         }
       } catch (error) {
+        onError?.(error);
         toast({
           id: 'UPLOAD_FAILED',
           title: t('toast.imageUploadFailed'),
@@ -109,7 +128,18 @@ export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: Us
         });
       }
     },
-    [allowMultiple, autoAddBoardId, onUpload, uploadImage, isClientSideUploadEnabled, clientSideUpload, t]
+    [
+      allowMultiple,
+      onUploadStarted,
+      uploadImage,
+      autoAddBoardId,
+      uploadArgOverrides,
+      onUpload,
+      isClientSideUploadEnabled,
+      clientSideUpload,
+      onError,
+      t,
+    ]
   );
 
   const onDropRejected = useCallback(

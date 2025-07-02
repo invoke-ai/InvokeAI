@@ -16,7 +16,6 @@ import {
 } from 'features/nodes/components/sidePanel/workflow/publish';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
-import { isPromptExpansionNode } from 'features/nodes/util/graph/buildPromptExpansionGraph';
 import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
@@ -37,7 +36,6 @@ import {
   $lastUpscalingProgressImage,
   $lastWorkflowsProgressEvent,
   $lastWorkflowsProgressImage,
-  $promptExpansionRequest,
 } from './stores';
 
 const log = logger('events');
@@ -142,18 +140,6 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   socket.on('invocation_error', (data) => {
     const { invocation_source_id, invocation, error_type, error_message, error_traceback } = data;
     log.error({ data } as JsonObject, `Invocation error (${invocation.type}, ${invocation_source_id})`);
-
-    // Handle prompt expansion errors
-    if (isPromptExpansionNode(invocation.type)) {
-      const currentRequest = $promptExpansionRequest.get();
-      if (currentRequest && currentRequest.status === 'pending') {
-        $promptExpansionRequest.set({
-          ...currentRequest,
-          status: 'error' as const,
-        });
-        log.debug({ error_message }, 'Prompt expansion failed');
-      }
-    }
 
     const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
     if (nes) {

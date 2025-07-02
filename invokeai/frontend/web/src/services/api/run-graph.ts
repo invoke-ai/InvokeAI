@@ -1,5 +1,5 @@
 import { logger } from 'app/logging/logger';
-import type { AppStore } from 'app/store/store';
+import type { AppDispatch } from 'app/store/store';
 import { Mutex } from 'async-mutex';
 import { withResultAsync, WrappedError } from 'common/util/result';
 import { parseify } from 'common/util/serialize';
@@ -135,7 +135,7 @@ export const runGraph = (arg: RunGraphArg): Promise<RunGraphReturn> => {
  * Creates production dependencies for runGraph using Redux store and socket.
  */
 export const buildRunGraphDependencies = (
-  store: AppStore,
+  dispatch: AppDispatch,
   socket: {
     on: (event: 'queue_item_status_changed', handler: (event: S['QueueItemStatusChangedEvent']) => void) => void;
     off: (event: 'queue_item_status_changed', handler: (event: S['QueueItemStatusChangedEvent']) => void) => void;
@@ -143,17 +143,15 @@ export const buildRunGraphDependencies = (
 ): GraphRunnerDependencies => ({
   executor: {
     enqueueBatch: (batch) =>
-      store
-        .dispatch(
-          queueApi.endpoints.enqueueBatch.initiate(batch, {
-            ...enqueueMutationFixedCacheKeyOptions,
-            track: false,
-          })
-        )
-        .unwrap(),
-    getQueueItem: (id) => store.dispatch(queueApi.endpoints.getQueueItem.initiate(id, { subscribe: false })).unwrap(),
+      dispatch(
+        queueApi.endpoints.enqueueBatch.initiate(batch, {
+          ...enqueueMutationFixedCacheKeyOptions,
+          track: false,
+        })
+      ).unwrap(),
+    getQueueItem: (id) => dispatch(queueApi.endpoints.getQueueItem.initiate(id, { subscribe: false })).unwrap(),
     cancelQueueItem: (id) =>
-      store.dispatch(queueApi.endpoints.cancelQueueItem.initiate({ item_id: id }, { track: false })).unwrap(),
+      dispatch(queueApi.endpoints.cancelQueueItem.initiate({ item_id: id }, { track: false })).unwrap(),
   },
   eventHandler: {
     subscribe: (handler) => socket.on('queue_item_status_changed', handler),
