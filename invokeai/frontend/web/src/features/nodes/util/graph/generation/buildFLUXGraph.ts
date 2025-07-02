@@ -87,7 +87,8 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     guidance = 30;
   }
 
-  const isFluxKontextDev = model.name.includes('kontext');
+  const isFluxKontextDev = model.name?.toLowerCase().includes('kontext');
+  const fluxKontextDevConditioning = refImages.entities[0]?.config.image?.image_name;
   if (isFluxKontextDev) {
     if (generationMode !== 'txt2img') {
       throw new UnsupportedGenerationModeError(t('toast.imagenIncompatibleGenerationMode', { model: 'FLUX Kontext' }));
@@ -135,12 +136,12 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     id: getPrefixedId('flux_vae_decode'),
   });
 
-  if (isFluxKontextDev) {
+  if (isFluxKontextDev && fluxKontextDevConditioning) {
     const kontextConditioning = g.addNode({
       type: 'flux_kontext',
       id: getPrefixedId('flux_kontext'),
       image: {
-        image_name: refImages.entities[0]?.config.image?.image_name ?? '',
+        image_name: fluxKontextDevConditioning,
       },
     });
     g.addEdge(kontextConditioning, 'kontext_cond', denoise, 'kontext_conditioning');
