@@ -1,3 +1,4 @@
+import { deepClone } from 'common/util/deepClone';
 import { atom } from 'nanostores';
 import type { ImageDTO } from 'services/api/types';
 
@@ -9,13 +10,6 @@ type SuccessState = {
   error: null;
   imageDTO?: ImageDTO;
 };
-const buildSuccessState = (result: string): SuccessState => ({
-  isSuccess: true,
-  isError: false,
-  isPending: false,
-  result,
-  error: null,
-});
 
 type ErrorState = {
   isSuccess: false;
@@ -25,13 +19,6 @@ type ErrorState = {
   error: Error;
   imageDTO?: ImageDTO;
 };
-const buildErrorState = (error: Error): ErrorState => ({
-  isSuccess: false,
-  isError: true,
-  isPending: false,
-  result: null,
-  error,
-});
 
 type PendingState = {
   isSuccess: false;
@@ -41,14 +28,6 @@ type PendingState = {
   error: null;
   imageDTO?: ImageDTO;
 };
-const buildPendingState = (imageDTO?: ImageDTO): PendingState => ({
-  isSuccess: false,
-  isError: false,
-  isPending: true,
-  result: null,
-  error: null,
-  imageDTO,
-});
 
 type IdleState = {
   isSuccess: false;
@@ -58,59 +37,56 @@ type IdleState = {
   error: null;
   imageDTO?: ImageDTO;
 };
-const buildIdleState = (): IdleState => ({
+
+export type PromptExpansionRequestState = IdleState | PendingState | SuccessState | ErrorState;
+
+const IDLE_STATE: IdleState = {
   isSuccess: false,
   isError: false,
   isPending: false,
   result: null,
   error: null,
-});
+  imageDTO: undefined,
+};
 
-export type PromptExpansionRequestState = IdleState | PendingState | SuccessState | ErrorState;
+const $state = atom<PromptExpansionRequestState>(deepClone(IDLE_STATE));
 
-const $state = atom<PromptExpansionRequestState>(buildIdleState());
 const reset = () => {
-  $state.set(buildIdleState());
+  $state.set(deepClone(IDLE_STATE));
 };
 
 const setPending = (imageDTO?: ImageDTO) => {
-  const currentState = $state.get() ?? buildPendingState(imageDTO);
-  const newState = {
-    ...currentState,
+  $state.set({
+    ...$state.get(),
     isSuccess: false,
     isError: false,
     isPending: true,
     result: null,
     error: null,
     imageDTO,
-  } satisfies PendingState;
-  $state.set(newState);
+  });
 };
 
 const setSuccess = (result: string) => {
-  const currentState = $state.get() ?? buildSuccessState(result);
-  const newState = {
-    ...currentState,
+  $state.set({
+    ...$state.get(),
     isSuccess: true,
     isError: false,
     isPending: false,
     result,
     error: null,
-  } satisfies SuccessState;
-  $state.set(newState);
+  });
 };
 
 const setError = (error: Error) => {
-  const currentState = $state.get() ?? buildErrorState(error);
-  const newState = {
-    ...currentState,
+  $state.set({
+    ...$state.get(),
     isSuccess: false,
     isError: true,
     isPending: false,
     result: null,
     error,
-  } satisfies ErrorState;
-  $state.set(newState);
+  });
 };
 
 export const promptExpansionApi = {
