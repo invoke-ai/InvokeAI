@@ -12,13 +12,8 @@ import { modelSelected } from 'features/parameters/store/actions';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
-import type { ApiModelConfig, FLUXReduxModelConfig, IPAdapterModelConfig, MainModelConfig } from 'services/api/types';
-import {
-  isApiModelConfig,
-  isFluxReduxModelConfig,
-  isIPAdapterModelConfig,
-} from 'services/api/types';
+import { selectIPAdapterModels } from 'services/api/hooks/modelsByType';
+import type { MainModelConfig } from 'services/api/types';
 
 const log = logger('models');
 
@@ -84,49 +79,11 @@ const handleReferenceImageModelSwitching = (
   newModel: MainModelConfig,
   log: ReturnType<typeof logger>
 ) => {
-  const modelsQueryResult = modelsApi.endpoints.getModelConfigs.select()(state);
-  if (!modelsQueryResult.data) {
-    return;
-  }
-
-  const allModels = modelConfigsAdapterSelectors.selectAll(modelsQueryResult.data);
-  const compatibleModels = allModels.filter((model) => {
-    return (
-      (isIPAdapterModelConfig(model) ||
-        isFluxReduxModelConfig(model) ||
-        isApiModelConfig(model)) &&
-      model.base === newModel.base
-    );
-  });
-
-  const isNewModelAPI = isApiModelConfig(newModel);
+  const allIPAdapterModels = selectIPAdapterModels(state);
+  const compatibleIPAdapterModels = allIPAdapterModels.filter((model) => model.base === newModel.base);
 
   const getBestCompatibleModel = () => {
-    if (isNewModelAPI) {
-      const matchingApiModel = compatibleModels.find(
-        (model) => isApiModelConfig(model) && model.name === newModel.name
-      );
-      if (matchingApiModel && isApiModelConfig(matchingApiModel)) {
-        return matchingApiModel;
-      }
-    }
-
-    const firstCompatible = compatibleModels[0];
-    if (!firstCompatible) {
-      return null;
-    }
-
-    if (isIPAdapterModelConfig(firstCompatible)) {
-      return firstCompatible;
-    }
-    if (isFluxReduxModelConfig(firstCompatible)) {
-      return firstCompatible;
-    }
-    if (isApiModelConfig(firstCompatible)) {
-      return firstCompatible;
-    }
-
-    return null;
+    return compatibleIPAdapterModels[0] ?? null;
   };
 
   selectRefImagesSlice(state).entities.forEach((entity) => {
