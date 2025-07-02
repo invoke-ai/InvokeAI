@@ -28,7 +28,9 @@ export const useCanvasInvertMaskHotkey = () => {
       return;
     }
 
-    dispatch(inpaintMaskInverted({ entityIdentifier: selectedEntityIdentifier as CanvasEntityIdentifier<'inpaint_mask'> }));
+    dispatch(
+      inpaintMaskInverted({ entityIdentifier: selectedEntityIdentifier as CanvasEntityIdentifier<'inpaint_mask'> })
+    );
   }, [dispatch, selectedEntityIdentifier, canvasSlice]);
 
   const isInvertMaskAllowed = useMemo(() => {
