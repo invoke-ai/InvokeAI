@@ -9,7 +9,6 @@ import { $queueId } from 'app/store/nanostores/queueId';
 import type { AppStore } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { forEach, isNil, round } from 'es-toolkit/compat';
-import { canvasSessionReset, selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   $isInPublishFlow,
   $outputNodeId,
@@ -347,15 +346,6 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     const { item_id, session_id, status, batch_status, error_type, error_message, destination } = data;
 
     log.debug({ data }, `Queue item ${item_id} status updated: ${status}`);
-
-    // If this queue item was canceled and it belongs to the current canvas session, reset the canvas session
-    if (status === 'canceled' && destination) {
-      const currentCanvasSessionId = selectCanvasSessionId(getState());
-      if (currentCanvasSessionId === destination) {
-        dispatch(canvasSessionReset());
-        log.debug(`Canvas session reset due to canceled queue item ${item_id}`);
-      }
-    }
 
     // Invalidate caches for things we cannot easily update
     const tagsToInvalidate: ApiTagDescription[] = [
