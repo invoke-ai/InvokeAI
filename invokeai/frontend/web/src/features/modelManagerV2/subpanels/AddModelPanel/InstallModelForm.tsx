@@ -7,9 +7,11 @@ import {
 } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { t } from 'i18next';
 import type { ChangeEvent } from 'react';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useState } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
+
+import { ManualModelConfigPanel } from './ManualModelConfigPanel';
 
 type SimpleImportModelConfig = {
   location: string;
@@ -19,6 +21,8 @@ export const InstallModelForm = memo(() => {
   const inplace = useAppSelector(selectShouldInstallInPlace);
   const dispatch = useAppDispatch();
   const [installModel, { isLoading }] = useInstallModel();
+  const [isManualConfig, setIsManualConfig] = useState(false);
+  const [manualConfig, setManualConfig] = useState({});
 
   const { register, handleSubmit, formState, reset } = useForm<SimpleImportModelConfig>({
     defaultValues: {
@@ -38,11 +42,12 @@ export const InstallModelForm = memo(() => {
       installModel({
         source: values.location,
         inplace: inplace,
+        config: isManualConfig ? manualConfig : {},
         onSuccess: resetForm,
         onError: resetForm,
       });
     },
-    [installModel, resetForm, inplace]
+    [installModel, resetForm, inplace, isManualConfig, manualConfig]
   );
 
   const onChangeInplace = useCallback(
@@ -51,6 +56,13 @@ export const InstallModelForm = memo(() => {
     },
     [dispatch]
   );
+
+  const onChangeManualConfig = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setIsManualConfig(e.target.checked);
+    if (!e.target.checked) {
+      setManualConfig({});
+    }
+  }, []);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
@@ -82,6 +94,18 @@ export const InstallModelForm = memo(() => {
             <FormHelperText>{t('modelManager.inplaceInstallDesc')}</FormHelperText>
           </Flex>
         </FormControl>
+
+        <FormControl>
+          <Flex flexDir="column" gap={2}>
+            <Flex gap={4}>
+              <Checkbox isChecked={isManualConfig} onChange={onChangeManualConfig} />
+              <FormLabel>{t('modelManager.manualConfiguration')}</FormLabel>
+            </Flex>
+            <FormHelperText>{t('modelManager.manualConfigurationDesc')}</FormHelperText>
+          </Flex>
+        </FormControl>
+
+        {isManualConfig && <ManualModelConfigPanel config={manualConfig} onChange={setManualConfig} />}
       </Flex>
     </form>
   );
