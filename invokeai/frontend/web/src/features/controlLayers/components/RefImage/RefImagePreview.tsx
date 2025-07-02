@@ -12,7 +12,7 @@ import {
 } from 'features/controlLayers/store/refImagesSlice';
 import { isIPAdapterConfig } from 'features/controlLayers/store/types';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { PiExclamationMarkBold, PiImageBold } from 'react-icons/pi';
+import { PiExclamationMarkBold, PiEyeSlashBold, PiImageBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
 const baseSx: SystemStyleObject = {
@@ -160,8 +160,20 @@ export const RefImagePreview = memo(() => {
           transform="translateX(-50%) translateY(-50%)"
           filter="drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 2px rgba(0, 0, 0, 1))"
           color="error.500"
-          boxSize={16}
+          boxSize={6}
           as={PiExclamationMarkBold}
+        />
+      )}
+      {!entity.isEnabled && (
+        <Icon
+          position="absolute"
+          top="50%"
+          left="50%"
+          transform="translateX(-50%) translateY(-50%)"
+          filter="drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 2px rgba(0, 0, 0, 1))"
+          color="base.100"
+          boxSize={6}
+          as={PiEyeSlashBold}
         />
       )}
     </Flex>
