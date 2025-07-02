@@ -17,8 +17,8 @@ export const StagingAreaItemsList = memo(() => {
       return;
     }
 
-    return canvasManager.stagingArea.connectToSession(ctx.$selectedItemId, ctx.$progressData);
-  }, [canvasManager, ctx.$progressData, ctx.$selectedItemId]);
+    return canvasManager.stagingArea.connectToSession(ctx.$selectedItemId, ctx.$progressData, ctx.$isPending);
+  }, [canvasManager, ctx.$progressData, ctx.$selectedItemId, ctx.$isPending]);
 
   return (
     <ScrollableContent overflowX="scroll" overflowY="hidden">
