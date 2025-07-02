@@ -275,7 +275,12 @@ export const selectIsSD3 = createParamsSelector((params) => params.model?.base =
 export const selectIsCogView4 = createParamsSelector((params) => params.model?.base === 'cogview4');
 export const selectIsImagen3 = createParamsSelector((params) => params.model?.base === 'imagen3');
 export const selectIsImagen4 = createParamsSelector((params) => params.model?.base === 'imagen4');
-export const selectIsFluxKontext = createParamsSelector((params) => params.model?.base === 'flux-kontext');
+export const selectIsFluxKontextApi = createParamsSelector((params) => params.model?.base === 'flux-kontext');
+export const selectIsFluxKontext = createParamsSelector(
+  (params) =>
+    params.model?.base === 'flux-kontext' ||
+    (params.model?.base === 'flux' && params.model?.name?.toLowerCase().includes('kontext'))
+);
 export const selectIsChatGPT4o = createParamsSelector((params) => params.model?.base === 'chatgpt-4o');
 
 export const selectModel = createParamsSelector((params) => params.model);
@@ -311,8 +316,8 @@ export const selectNegativePrompt = createParamsSelector((params) => params.nega
 export const selectNegativePromptWithFallback = createParamsSelector((params) => params.negativePrompt ?? '');
 export const selectHasNegativePrompt = createParamsSelector((params) => params.negativePrompt !== null);
 export const selectModelSupportsNegativePrompt = createSelector(
-  [selectIsFLUX, selectIsChatGPT4o],
-  (isFLUX, isChatGPT4o) => !isFLUX && !isChatGPT4o
+  [selectIsFLUX, selectIsChatGPT4o, selectIsFluxKontext],
+  (isFLUX, isChatGPT4o, isFluxKontext) => !isFLUX && !isChatGPT4o && !isFluxKontext
 );
 export const selectPositivePrompt2 = createParamsSelector((params) => params.positivePrompt2);
 export const selectNegativePrompt2 = createParamsSelector((params) => params.negativePrompt2);

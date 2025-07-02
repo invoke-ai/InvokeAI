@@ -87,6 +87,15 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     guidance = 30;
   }
 
+  const isFluxKontextDev = model.name.includes('kontext');
+  if (isFluxKontextDev) {
+    if (generationMode !== 'txt2img') {
+      throw new UnsupportedGenerationModeError(t('toast.imagenIncompatibleGenerationMode', { model: 'FLUX Kontext' }));
+    }
+
+    guidance = 30;
+  }
+
   const { positivePrompt } = selectPresetModifiedPrompts(state);
 
   const g = new Graph(getPrefixedId('flux_graph'));
@@ -108,6 +117,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     type: 'collect',
     id: getPrefixedId('pos_cond_collect'),
   });
+
   const denoise = g.addNode({
     type: 'flux_denoise',
     id: getPrefixedId('flux_denoise'),
@@ -124,6 +134,17 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     type: 'flux_vae_decode',
     id: getPrefixedId('flux_vae_decode'),
   });
+
+  if (isFluxKontextDev) {
+    const kontextConditioning = g.addNode({
+      type: 'flux_kontext',
+      id: getPrefixedId('flux_kontext'),
+      image: {
+        image_name: refImages.entities[0]?.config.image?.image_name ?? '',
+      },
+    });
+    g.addEdge(kontextConditioning, 'kontext_cond', denoise, 'kontext_conditioning');
+  }
 
   g.addEdge(modelLoader, 'transformer', denoise, 'transformer');
   g.addEdge(modelLoader, 'vae', denoise, 'controlnet_vae');
