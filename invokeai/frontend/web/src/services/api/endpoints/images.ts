@@ -270,25 +270,13 @@ export const imagesApi = api.injectEndpoints({
           // Don't add it to anything
           return [];
         }
-        const categories = getCategories(result);
         const boardId = result.board_id ?? 'none';
 
         return [
-          {
-            type: 'ImageList',
-            id: getListImagesUrl({
-              board_id: boardId,
-              categories,
-            }),
-          },
-          {
-            type: 'Board',
-            id: boardId,
-          },
-          {
-            type: 'BoardImagesTotal',
-            id: boardId,
-          },
+          ...getTagsToInvalidateForImageMutation([result.image_name]),
+          ...getTagsToInvalidateForBoardAffectingMutation([boardId]),
+          'ImageCollectionCounts',
+          { type: 'ImageCollection', id: LIST_TAG },
         ];
       },
     }),
