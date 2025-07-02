@@ -5,7 +5,6 @@ from einops import repeat
 from PIL import Image
 import torchvision.transforms as T
 from dataclasses import dataclass
-from typing
 
 from invokeai.app.invocations.fields import FluxKontextConditioningField
 from invokeai.app.invocations.flux_vae_encode import FluxVaeEncodeInvocation
