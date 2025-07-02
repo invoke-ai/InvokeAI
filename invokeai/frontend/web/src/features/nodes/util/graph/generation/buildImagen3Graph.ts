@@ -51,8 +51,11 @@ export const buildImagen3Graph = (arg: GraphBuilderArg): GraphBuilderReturn => {
     width: bbox.rect.width,
     height: bbox.rect.height,
     model: Graph.getModelMetadataField(model),
+    generation_mode: 'imagen3_txt2img',
     ...selectCanvasMetadata(state),
   });
+
+  g.setMetadataReceivingNode(imagen3);
 
   return {
     g,

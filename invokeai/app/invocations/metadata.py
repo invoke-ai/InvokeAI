@@ -158,6 +158,11 @@ GENERATION_MODES = Literal[
     "cogview4_img2img",
     "cogview4_inpaint",
     "cogview4_outpaint",
+    "imagen3_txt2img",
+    "imagen4_txt2img",
+    "imagen4_img2img",
+    "imagen4_inpaint",
+    "imagen4_outpaint",
 ]
 
 
