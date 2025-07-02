@@ -71,15 +71,29 @@ export const useExportCanvasToPSD = () => {
       const psdLayers: Layer[] = await Promise.all(
         adapters.map((adapter, index) => {
           const layer = adapter.state;
-          const canvas = adapter.getCanvas();
+          
+          // Get the actual content bounds for this layer (excluding transparent regions)
           const layerPosition = adapter.state.position;
+          const pixelRect = adapter.transformer.$pixelRect.get();
+          
+          // Calculate the layer's content bounds in stage coordinates
+          const layerContentBounds = {
+            x: layerPosition.x + pixelRect.x,
+            y: layerPosition.y + pixelRect.y,
+            width: pixelRect.width,
+            height: pixelRect.height,
+          };
+          
+          // Get the canvas cropped to the layer's actual content bounds
+          const canvas = adapter.getCanvas({ rect: layerContentBounds });
 
           const layerDataPSD: Layer = {
             name: layer.name || `Layer ${index + 1}`,
-            left: Math.floor(layerPosition.x - visibleRect.x),
-            top: Math.floor(layerPosition.y - visibleRect.y),
-            right: Math.floor(layerPosition.x - visibleRect.x + canvas.width),
-            bottom: Math.floor(layerPosition.y - visibleRect.y + canvas.height),
+            // Position relative to the visible rect, using the actual content bounds
+            left: Math.floor(layerContentBounds.x - visibleRect.x),
+            top: Math.floor(layerContentBounds.y - visibleRect.y),
+            right: Math.floor(layerContentBounds.x - visibleRect.x + canvas.width),
+            bottom: Math.floor(layerContentBounds.y - visibleRect.y + canvas.height),
             opacity: Math.floor(layer.opacity * 255),
             hidden: false,
             blendMode: 'normal',
