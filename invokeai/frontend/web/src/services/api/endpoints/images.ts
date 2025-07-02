@@ -15,7 +15,7 @@ import type {
   SQLiteDirection,
   UploadImageArg,
 } from 'services/api/types';
-import { getCategories, getListImagesUrl } from 'services/api/util';
+import { getListImagesUrl } from 'services/api/util';
 import stableHash from 'stable-hash';
 import type { Param0 } from 'tsafe';
 import type { JsonObject } from 'type-fest';
