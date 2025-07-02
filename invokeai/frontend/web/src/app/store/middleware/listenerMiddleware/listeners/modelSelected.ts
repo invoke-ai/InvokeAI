@@ -15,11 +15,8 @@ import { t } from 'i18next';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import type { ApiModelConfig, FLUXReduxModelConfig, IPAdapterModelConfig, MainModelConfig } from 'services/api/types';
 import {
-  isChatGPT4oModelConfig,
-  isFluxKontextModelConfig,
+  isApiModelConfig,
   isFluxReduxModelConfig,
-  isImagen3ModelConfig,
-  isImagen4ModelConfig,
   isIPAdapterModelConfig,
 } from 'services/api/types';
 
@@ -43,10 +40,8 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
       const didBaseModelChange = state.params.model?.base !== newBaseModel;
 
       if (didBaseModelChange) {
-        // we may need to reset some incompatible submodels
         let modelsCleared = 0;
 
-        // handle incompatible loras
         state.loras.loras.forEach((lora) => {
           if (lora.model.base !== newBaseModel) {
             dispatch(loraDeleted({ id: lora.id }));
@@ -54,25 +49,13 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           }
         });
 
-        // handle incompatible vae
         const { vae } = state.params;
         if (vae && vae.base !== newBaseModel) {
           dispatch(vaeSelected(null));
           modelsCleared += 1;
         }
 
-        // handle incompatible controlnets
-        // state.canvas.present.controlAdapters.entities.forEach((ca) => {
-        //   if (ca.model?.base !== newBaseModel) {
-        //     modelsCleared += 1;
-        //     if (ca.isEnabled) {
-        //       dispatch(entityIsEnabledToggled({ entityIdentifier: { id: ca.id, type: 'control_adapter' } }));
-        //     }
-        //   }
-        // });
-
-        // Handle reference image model switching
-        handleReferenceImageModelSwitching(state, dispatch, newModel, log);
+        handleReferenceImageModelSwitching(state, dispatch, newModel as MainModelConfig, log);
 
         if (modelsCleared > 0) {
           toast({
@@ -99,87 +82,58 @@ const handleReferenceImageModelSwitching = (
   state: RootState,
   dispatch: AppDispatch,
   newModel: MainModelConfig,
-  log: typeof logger
+  log: ReturnType<typeof logger>
 ) => {
-  // Get all available models from the models query
   const modelsQueryResult = modelsApi.endpoints.getModelConfigs.select()(state);
   if (!modelsQueryResult.data) {
     return;
   }
 
   const allModels = modelConfigsAdapterSelectors.selectAll(modelsQueryResult.data);
-
-  // Filter models compatible with the new main model
   const compatibleModels = allModels.filter((model) => {
     return (
       (isIPAdapterModelConfig(model) ||
         isFluxReduxModelConfig(model) ||
-        isChatGPT4oModelConfig(model) ||
-        isImagen3ModelConfig(model) ||
-        isImagen4ModelConfig(model) ||
-        isFluxKontextModelConfig(model)) &&
+        isApiModelConfig(model)) &&
       model.base === newModel.base
     );
   });
 
-  const isNewModelAPI =
-    isChatGPT4oModelConfig(newModel) ||
-    isImagen3ModelConfig(newModel) ||
-    isImagen4ModelConfig(newModel) ||
-    isFluxKontextModelConfig(newModel);
+  const isNewModelAPI = isApiModelConfig(newModel);
 
-  // Function to get the best compatible model
-  const getBestCompatibleModel = (
-    _currentModel: IPAdapterModelConfig | FLUXReduxModelConfig | ApiModelConfig | null
-  ): IPAdapterModelConfig | FLUXReduxModelConfig | ApiModelConfig | null => {
+  const getBestCompatibleModel = () => {
     if (isNewModelAPI) {
-      // For API models, try to find an API model with the same name
       const matchingApiModel = compatibleModels.find(
-        (model) =>
-          (isChatGPT4oModelConfig(model) ||
-            isImagen3ModelConfig(model) ||
-            isImagen4ModelConfig(model) ||
-            isFluxKontextModelConfig(model)) &&
-          model.name === newModel.name
+        (model) => isApiModelConfig(model) && model.name === newModel.name
       );
-      if (
-        matchingApiModel &&
-        (isChatGPT4oModelConfig(matchingApiModel) ||
-          isImagen3ModelConfig(matchingApiModel) ||
-          isImagen4ModelConfig(matchingApiModel) ||
-          isFluxKontextModelConfig(matchingApiModel))
-      ) {
-        return matchingApiModel as ApiModelConfig;
+      if (matchingApiModel && isApiModelConfig(matchingApiModel)) {
+        return matchingApiModel;
       }
     }
 
-    // Otherwise, return the first compatible model for this architecture
     const firstCompatible = compatibleModels[0];
-    if (firstCompatible) {
-      if (isIPAdapterModelConfig(firstCompatible)) {
-        return firstCompatible as IPAdapterModelConfig;
-      } else if (isFluxReduxModelConfig(firstCompatible)) {
-        return firstCompatible as FLUXReduxModelConfig;
-      } else if (
-        isChatGPT4oModelConfig(firstCompatible) ||
-        isImagen3ModelConfig(firstCompatible) ||
-        isImagen4ModelConfig(firstCompatible) ||
-        isFluxKontextModelConfig(firstCompatible)
-      ) {
-        return firstCompatible as ApiModelConfig;
-      }
+    if (!firstCompatible) {
+      return null;
+    }
+
+    if (isIPAdapterModelConfig(firstCompatible)) {
+      return firstCompatible;
+    }
+    if (isFluxReduxModelConfig(firstCompatible)) {
+      return firstCompatible;
+    }
+    if (isApiModelConfig(firstCompatible)) {
+      return firstCompatible;
     }
 
     return null;
   };
 
-  // Handle global reference images
   selectRefImagesSlice(state).entities.forEach((entity) => {
     const currentModel = entity.config.model;
 
-    // If current model is incompatible or null, try to set a compatible one
     if (!currentModel || currentModel.base !== newModel.base) {
-      const bestModel = getBestCompatibleModel(currentModel);
+      const bestModel = getBestCompatibleModel();
       if (bestModel) {
         log.debug(
           { previousModel: currentModel, newModel: bestModel },
@@ -187,21 +141,18 @@ const handleReferenceImageModelSwitching = (
         );
         dispatch(refImageModelChanged({ id: entity.id, modelConfig: bestModel }));
       } else if (currentModel) {
-        // Clear the model if no compatible model is found
         log.debug({ previousModel: currentModel }, 'Clearing incompatible global reference image model');
         dispatch(refImageModelChanged({ id: entity.id, modelConfig: null }));
       }
     }
   });
 
-  // Handle regional guidance reference images
   selectCanvasSlice(state).regionalGuidance.entities.forEach((entity) => {
     entity.referenceImages.forEach(({ id: referenceImageId, config }) => {
       const currentModel = config.model;
 
-      // If current model is incompatible or null, try to set a compatible one
       if (!currentModel || currentModel.base !== newModel.base) {
-        const bestModel = getBestCompatibleModel(currentModel);
+        const bestModel = getBestCompatibleModel();
         if (bestModel) {
           log.debug(
             { previousModel: currentModel, newModel: bestModel },
@@ -215,7 +166,6 @@ const handleReferenceImageModelSwitching = (
             })
           );
         } else if (currentModel) {
-          // Clear the model if no compatible model is found
           log.debug({ previousModel: currentModel }, 'Clearing incompatible regional guidance reference image model');
           dispatch(
             rgRefImageModelChanged({

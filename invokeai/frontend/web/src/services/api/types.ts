@@ -386,3 +386,12 @@ export type UploadImageArg = {
 
 export type ImageUploadEntryResponse = S['ImageUploadEntry'];
 export type ImageUploadEntryRequest = paths['/api/v1/images/']['post']['requestBody']['content']['application/json'];
+
+export const isApiModelConfig = (config: AnyModelConfig): config is ApiModelConfig => {
+  return (
+    isChatGPT4oModelConfig(config) ||
+    isImagen3ModelConfig(config) ||
+    isImagen4ModelConfig(config) ||
+    isFluxKontextModelConfig(config)
+  );
+};
