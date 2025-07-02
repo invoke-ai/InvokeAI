@@ -152,19 +152,7 @@ export const RefImagePreview = memo(() => {
           </Text>
         </Flex>
       )}
-      {!entity.config.model && (
-        <Icon
-          position="absolute"
-          top="50%"
-          left="50%"
-          transform="translateX(-50%) translateY(-50%)"
-          filter="drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 2px rgba(0, 0, 0, 1))"
-          color="error.500"
-          boxSize={6}
-          as={PiExclamationMarkBold}
-        />
-      )}
-      {!entity.isEnabled && (
+      {!entity.isEnabled ? (
         <Icon
           position="absolute"
           top="50%"
@@ -175,7 +163,18 @@ export const RefImagePreview = memo(() => {
           boxSize={6}
           as={PiEyeSlashBold}
         />
-      )}
+      ) : !entity.config.model ? (
+        <Icon
+          position="absolute"
+          top="50%"
+          left="50%"
+          transform="translateX(-50%) translateY(-50%)"
+          filter="drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 2px rgba(0, 0, 0, 1))"
+          color="error.500"
+          boxSize={6}
+          as={PiExclamationMarkBold}
+        />
+      ) : null}
     </Flex>
   );
 });
