@@ -21,7 +21,7 @@ const getExtendedPrompts = (arg: {
   // Normally, the seed behaviour implicity determines the batch size. But when we use models without seeds (like
   // ChatGPT 4o) in conjunction with the per-prompt seed behaviour, we lose out on that implicit batch size. To rectify
   // this, we need to create a batch of the right size by repeating the prompts.
-  if (seedBehaviour === 'PER_PROMPT' || model.base === 'chatgpt-4o') {
+  if (seedBehaviour === 'PER_PROMPT' || model.base === 'chatgpt-4o' || model.base === 'flux-kontext') {
     return range(iterations).flatMap(() => prompts);
   }
   return prompts;
