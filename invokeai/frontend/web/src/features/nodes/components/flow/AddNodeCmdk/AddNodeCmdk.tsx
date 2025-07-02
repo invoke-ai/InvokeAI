@@ -226,12 +226,35 @@ const cmdkItemSx: SystemStyleObject = {
   },
 };
 
+const cmdkGroupSx: SystemStyleObject = {
+  '&:not(:first-of-type)': {
+    mt: 4,
+  },
+};
+
+const cmdkGroupHeadingSx: SystemStyleObject = {
+  px: 2,
+  py: 1,
+  mb: 1,
+  fontSize: 'sm',
+  fontWeight: 'semibold',
+  color: 'base.300',
+  textTransform: 'uppercase',
+  letterSpacing: 'wider',
+};
+
 type NodeCommandItemData = {
   value: string;
   label: string;
   description: string;
   classification: S['Classification'];
   nodePack: string;
+};
+
+type NodeCategory = {
+  name: string;
+  displayName: string;
+  items: NodeCommandItemData[];
 };
 
 /**
@@ -303,6 +326,103 @@ const filter = memoize(
   (item: FilterableItem, searchTerm: string) => `${item.type}-${searchTerm}`
 );
 
+/**
+ * Categorizes a node based on its category, tags, and type
+ */
+const categorizeNode = (item: FilterableItem): string => {
+  const { type, tags } = item;
+
+  // Special nodes
+  if (type === 'current_image') {
+    return 'utilities';
+  }
+  if (type === 'notes') {
+    return 'utilities';
+  }
+
+  // AI Generation
+  if (tags.includes('denoise') || tags.includes('generation') || type.includes('denoise')) {
+    return 'generation';
+  }
+
+  // Image Processing
+  if (tags.includes('image') && !tags.includes('primitives')) {
+    if (tags.includes('crop') || tags.includes('resize') || tags.includes('scale')) {
+      return 'transform';
+    }
+    if (tags.includes('mask') || tags.includes('inpaint')) {
+      return 'masking';
+    }
+    if (tags.includes('blur') || tags.includes('filter') || tags.includes('channel')) {
+      return 'effects';
+    }
+    return 'image';
+  }
+
+  // Models and LoRA
+  if (tags.includes('model') || type.includes('model') || tags.includes('lora') || type.includes('lora')) {
+    return 'models';
+  }
+
+  // Conditioning and Prompts
+  if (tags.includes('conditioning') || tags.includes('prompt') || tags.includes('compel')) {
+    return 'conditioning';
+  }
+
+  // Control
+  if (tags.includes('controlnet') || tags.includes('control') || tags.includes('t2i_adapter')) {
+    return 'control';
+  }
+
+  // Math and Logic
+  if (
+    tags.includes('math') ||
+    tags.includes('logic') ||
+    tags.includes('integer') ||
+    tags.includes('float') ||
+    tags.includes('boolean') ||
+    tags.includes('string')
+  ) {
+    return 'math';
+  }
+
+  // Collections and Primitives
+  if (tags.includes('primitives') || tags.includes('collection')) {
+    return 'primitives';
+  }
+
+  // Latents
+  if (tags.includes('latents') || type.includes('latents')) {
+    return 'latents';
+  }
+
+  // Default fallback based on primary category
+  return 'other';
+};
+
+/**
+ * Gets the display name and order for a category
+ */
+const getCategoryInfo = (categoryName: string): { displayName: string; order: number } => {
+  const categoryMap = {
+    generation: { displayName: 'Generation', order: 1 },
+    conditioning: { displayName: 'Prompts & Conditioning', order: 2 },
+    models: { displayName: 'Models & LoRA', order: 3 },
+    control: { displayName: 'Control', order: 4 },
+    image: { displayName: 'Image Processing', order: 5 },
+    transform: { displayName: 'Transform & Resize', order: 6 },
+    masking: { displayName: 'Masks & Inpainting', order: 7 },
+    effects: { displayName: 'Effects & Filters', order: 8 },
+    latents: { displayName: 'Latents', order: 9 },
+    math: { displayName: 'Math & Logic', order: 10 },
+    primitives: { displayName: 'Primitives', order: 11 },
+    utilities: { displayName: 'Utilities', order: 12 },
+    other: { displayName: 'Other', order: 13 },
+  };
+
+  return categoryMap[categoryName as keyof typeof categoryMap] || { displayName: 'Other', order: 99 };
+};
+
 const NodeCommandList = memo(({ searchTerm, onSelect }: { searchTerm: string; onSelect: (value: string) => void }) => {
   const { t } = useTranslation();
   const templatesArray = useStore($templatesArray);
@@ -330,7 +450,7 @@ const NodeCommandList = memo(({ searchTerm, onSelect }: { searchTerm: string; on
     [t]
   );
 
-  const items = useMemo<NodeCommandItemData[]>(() => {
+  const categorizedItems = useMemo<NodeCategory[]>(() => {
     // If we have a connection in progress, we need to filter the node choices
     const _items: NodeCommandItemData[] = [];
 
@@ -384,28 +504,102 @@ const NodeCommandList = memo(({ searchTerm, onSelect }: { searchTerm: string; on
       }
     }
 
-    return _items;
+    // Group items by category
+    const categoryMap = new Map<string, NodeCommandItemData[]>();
+
+    for (const item of _items) {
+      // Find the original template to get tags for categorization
+      const template =
+        templatesArray.find((t) => t.type === item.value) ||
+        (item.value === 'current_image' ? currentImageFilterItem : item.value === 'notes' ? notesFilterItem : null);
+
+      if (template) {
+        const categoryName = categorizeNode(template);
+        if (!categoryMap.has(categoryName)) {
+          categoryMap.set(categoryName, []);
+        }
+        categoryMap.get(categoryName)!.push(item);
+      }
+    }
+
+    // Convert to array and sort
+    const categories: NodeCategory[] = Array.from(categoryMap.entries()).map(([name, items]) => {
+      const { displayName } = getCategoryInfo(name);
+      return {
+        name,
+        displayName,
+        items: items.sort((a, b) => a.label.localeCompare(b.label)),
+      };
+    });
+
+    // Sort categories by order
+    categories.sort((a, b) => {
+      const aInfo = getCategoryInfo(a.name);
+      const bInfo = getCategoryInfo(b.name);
+      return aInfo.order - bInfo.order;
+    });
+
+    return categories;
   }, [pendingConnection, templatesArray, searchTerm, currentImageFilterItem, notesFilterItem]);
 
+  // If there's a search term, show flat list for better search experience
+  if (searchTerm.trim()) {
+    const allItems = categorizedItems.flatMap((category) => category.items);
+    return (
+      <>
+        {allItems.map((item) => (
+          <CommandItem key={item.value} value={item.value} onSelect={onSelect} asChild>
+            <Flex role="button" flexDir="column" sx={cmdkItemSx} py={1} px={2} borderRadius="base">
+              <Flex alignItems="center" gap={2}>
+                {item.classification === 'beta' && <Icon boxSize={4} color="invokeYellow.300" as={PiHammerBold} />}
+                {item.classification === 'prototype' && <Icon boxSize={4} color="invokeRed.300" as={PiFlaskBold} />}
+                {item.classification === 'internal' && (
+                  <Icon boxSize={4} color="invokePurple.300" as={PiCircuitryBold} />
+                )}
+                {item.classification === 'special' && <Icon boxSize={4} color="invokeGreen.300" as={PiLightningFill} />}
+                <Text fontWeight="semibold">{item.label}</Text>
+                <Spacer />
+                <Text variant="subtext" fontWeight="semibold">
+                  {item.nodePack}
+                </Text>
+              </Flex>
+              {item.description && <Text color="base.200">{item.description}</Text>}
+            </Flex>
+          </CommandItem>
+        ))}
+      </>
+    );
+  }
+
+  // Show categorized view when not searching
   return (
     <>
-      {items.map((item) => (
-        <CommandItem key={item.value} value={item.value} onSelect={onSelect} asChild>
-          <Flex role="button" flexDir="column" sx={cmdkItemSx} py={1} px={2} borderRadius="base">
-            <Flex alignItems="center" gap={2}>
-              {item.classification === 'beta' && <Icon boxSize={4} color="invokeYellow.300" as={PiHammerBold} />}
-              {item.classification === 'prototype' && <Icon boxSize={4} color="invokeRed.300" as={PiFlaskBold} />}
-              {item.classification === 'internal' && <Icon boxSize={4} color="invokePurple.300" as={PiCircuitryBold} />}
-              {item.classification === 'special' && <Icon boxSize={4} color="invokeGreen.300" as={PiLightningFill} />}
-              <Text fontWeight="semibold">{item.label}</Text>
-              <Spacer />
-              <Text variant="subtext" fontWeight="semibold">
-                {item.nodePack}
-              </Text>
-            </Flex>
-            {item.description && <Text color="base.200">{item.description}</Text>}
-          </Flex>
-        </CommandItem>
+      {categorizedItems.map((category) => (
+        <Box key={category.name} sx={cmdkGroupSx}>
+          <Text sx={cmdkGroupHeadingSx}>{category.displayName}</Text>
+          {category.items.map((item) => (
+            <CommandItem key={item.value} value={item.value} onSelect={onSelect} asChild>
+              <Flex role="button" flexDir="column" sx={cmdkItemSx} py={1} px={2} borderRadius="base">
+                <Flex alignItems="center" gap={2}>
+                  {item.classification === 'beta' && <Icon boxSize={4} color="invokeYellow.300" as={PiHammerBold} />}
+                  {item.classification === 'prototype' && <Icon boxSize={4} color="invokeRed.300" as={PiFlaskBold} />}
+                  {item.classification === 'internal' && (
+                    <Icon boxSize={4} color="invokePurple.300" as={PiCircuitryBold} />
+                  )}
+                  {item.classification === 'special' && (
+                    <Icon boxSize={4} color="invokeGreen.300" as={PiLightningFill} />
+                  )}
+                  <Text fontWeight="semibold">{item.label}</Text>
+                  <Spacer />
+                  <Text variant="subtext" fontWeight="semibold">
+                    {item.nodePack}
+                  </Text>
+                </Flex>
+                {item.description && <Text color="base.200">{item.description}</Text>}
+              </Flex>
+            </CommandItem>
+          ))}
+        </Box>
       ))}
     </>
   );
