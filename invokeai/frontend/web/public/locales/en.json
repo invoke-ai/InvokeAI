@@ -225,7 +225,16 @@
     "prompt": {
         "addPromptTrigger": "Add Prompt Trigger",
         "compatibleEmbeddings": "Compatible Embeddings",
-        "noMatchingTriggers": "No matching triggers"
+        "noMatchingTriggers": "No matching triggers",
+        "generateFromImage": "Generate prompt from image",
+        "expandCurrentPrompt": "Expand Current Prompt",
+        "uploadImageForPromptGeneration": "Upload Image for Prompt Generation",
+        "expandingPrompt": "Expanding prompt...",
+        "resultTitle": "Prompt Expansion Complete",
+        "resultSubtitle": "Choose how to handle the expanded prompt:",
+        "replace": "Replace",
+        "insert": "Insert",
+        "discard": "Discard"
     },
     "queue": {
         "queue": "Queue",
@@ -342,7 +351,7 @@
         "copy": "Copy",
         "currentlyInUse": "This image is currently in use in the following features:",
         "drop": "Drop",
-        "dropOrUpload": "$t(gallery.drop) or Upload",
+        "dropOrUpload": "Drop or Upload",
         "dropToUpload": "$t(gallery.drop) to Upload",
         "deleteImage_one": "Delete Image",
         "deleteImage_other": "Delete {{count}} Images",
@@ -396,7 +405,8 @@
         "compareHelp4": "Press <Kbd>Z</Kbd> or <Kbd>Esc</Kbd> to exit.",
         "openViewer": "Open Viewer",
         "closeViewer": "Close Viewer",
-        "move": "Move"
+        "move": "Move",
+        "useForPromptGeneration": "Use for Prompt Generation"
     },
     "hotkeys": {
         "hotkeys": "Hotkeys",
@@ -938,7 +948,8 @@
         "selectModel": "Select a Model",
         "noLoRAsInstalled": "No LoRAs installed",
         "noRefinerModelsInstalled": "No SDXL Refiner models installed",
-        "defaultVAE": "Default VAE"
+        "defaultVAE": "Default VAE",
+        "noCompatibleLoRAs": "No Compatible LoRAs"
     },
     "nodes": {
         "arithmeticSequence": "Arithmetic Sequence",
@@ -1188,7 +1199,9 @@
             "canvasIsSelectingObject": "Canvas is busy (selecting object)",
             "noPrompts": "No prompts generated",
             "noNodesInGraph": "No nodes in graph",
-            "systemDisconnected": "System disconnected"
+            "systemDisconnected": "System disconnected",
+            "promptExpansionPending": "Prompt expansion in progress",
+            "promptExpansionResultPending": "Please accept or discard your prompt expansion result"
         },
         "maskBlur": "Mask Blur",
         "negativePromptPlaceholder": "Negative Prompt",
@@ -1389,7 +1402,12 @@
         "fluxKontextIncompatibleGenerationMode": "Flux Kontext supports Text to Image only. Use other models for Image to Image, Inpainting and Outpainting tasks.",
         "problemUnpublishingWorkflow": "Problem Unpublishing Workflow",
         "problemUnpublishingWorkflowDescription": "There was a problem unpublishing the workflow. Please try again.",
-        "workflowUnpublished": "Workflow Unpublished"
+        "workflowUnpublished": "Workflow Unpublished",
+        "sentToCanvas": "Sent to Canvas",
+        "sentToUpscale": "Sent to Upscale",
+        "promptGenerationStarted": "Prompt generation started",
+        "uploadAndPromptGenerationFailed": "Failed to upload image and generate prompt",
+        "promptExpansionFailed": "Prompt expansion failed"
     },
     "popovers": {
         "clipSkip": {

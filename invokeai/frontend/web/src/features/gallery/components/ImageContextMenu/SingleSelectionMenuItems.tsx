@@ -14,6 +14,7 @@ import { ImageMenuItemSelectForCompare } from 'features/gallery/components/Image
 import { ImageMenuItemSendToUpscale } from 'features/gallery/components/ImageContextMenu/ImageMenuItemSendToUpscale';
 import { ImageMenuItemStarUnstar } from 'features/gallery/components/ImageContextMenu/ImageMenuItemStarUnstar';
 import { ImageMenuItemUseAsRefImage } from 'features/gallery/components/ImageContextMenu/ImageMenuItemUseAsRefImage';
+import { ImageMenuItemUseForPromptGeneration } from 'features/gallery/components/ImageContextMenu/ImageMenuItemUseForPromptGeneration';
 import { ImageDTOContextProvider } from 'features/gallery/contexts/ImageDTOContext';
 import { memo } from 'react';
 import type { ImageDTO } from 'services/api/types';
@@ -38,6 +39,7 @@ const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) =
       <ImageMenuItemMetadataRecallActions />
       <MenuDivider />
       <ImageMenuItemSendToUpscale />
+      <ImageMenuItemUseForPromptGeneration />
       <ImageMenuItemUseAsRefImage />
       <ImageMenuItemNewCanvasFromImageSubMenu />
       <ImageMenuItemNewLayerFromImageSubMenu />

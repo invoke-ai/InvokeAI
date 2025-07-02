@@ -78,6 +78,7 @@ export type AppConfig = {
   allowPrivateStylePresets: boolean;
   allowClientSideUpload: boolean;
   allowPublishWorkflows: boolean;
+  allowPromptExpansion: boolean;
   disabledTabs: TabName[];
   disabledFeatures: AppFeature[];
   disabledSDFeatures: SDFeature[];
