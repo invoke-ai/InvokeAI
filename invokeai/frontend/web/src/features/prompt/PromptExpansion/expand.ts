@@ -1,5 +1,4 @@
 import type { AppDispatch, AppGetState } from 'app/store/store';
-import { WrappedError } from 'common/util/result';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { buildRunGraphDependencies, runGraph } from 'services/api/run-graph';
@@ -26,12 +25,15 @@ export const expandPrompt = async (arg: { dispatch: AppDispatch; getState: AppGe
       graph,
       outputNodeId,
       dependencies,
+      options: {
+        prepend: true,
+        timeout: 10000,
+      },
     });
     assert(output.type === 'string_output');
     promptExpansionApi.setSuccess(output.value);
   } catch (error) {
-    const wrappedError = WrappedError.wrap(error);
-    promptExpansionApi.setError(wrappedError);
+    promptExpansionApi.reset();
     toast({
       id: 'PROMPT_EXPANSION_FAILED',
       title: t('toast.promptExpansionFailed'),

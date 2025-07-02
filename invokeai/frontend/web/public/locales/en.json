@@ -1406,7 +1406,8 @@
         "sentToCanvas": "Sent to Canvas",
         "sentToUpscale": "Sent to Upscale",
         "promptGenerationStarted": "Prompt generation started",
-        "uploadAndPromptGenerationFailed": "Failed to upload image and generate prompt"
+        "uploadAndPromptGenerationFailed": "Failed to upload image and generate prompt",
+        "promptExpansionFailed": "Prompt expansion failed"
     },
     "popovers": {
         "clipSkip": {
