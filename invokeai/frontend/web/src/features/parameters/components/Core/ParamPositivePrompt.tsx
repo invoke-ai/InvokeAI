@@ -132,12 +132,12 @@ export const ParamPositivePrompt = memo(() => {
               label={`${t('parameters.positivePromptPlaceholder')} (${t('stylePresets.preview')})`}
             />
           )}
-          <DndDropTarget
+          {isPromptExpansionEnabled && <DndDropTarget
             dndTarget={promptGenerationFromImageDndTarget}
             dndTargetData={dndTargetData}
             label={t('prompt.generateFromImage')}
             isDisabled={isPromptExpansionPending}
-          />
+          />}
           <PromptExpansionOverlay />
         </Box>
       </PromptPopover>
