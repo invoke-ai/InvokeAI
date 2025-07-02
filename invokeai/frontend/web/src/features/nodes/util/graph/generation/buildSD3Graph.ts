@@ -22,8 +22,8 @@ import { assert } from 'tsafe';
 const log = logger('system');
 
 export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
-  const { generationMode, state } = arg;
-  log.debug({ generationMode }, 'Building SD3 graph');
+  const { generationMode, state, manager } = arg;
+  log.debug({ generationMode, manager: manager?.id }, 'Building SD3 graph');
 
   const model = selectMainModelConfig(state);
   assert(model, 'No model found in state');
@@ -128,9 +128,10 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
     g.upsertMetadata({ generation_mode: 'sd3_txt2img' });
   } else if (generationMode === 'img2img') {
+    assert(manager !== null);
     canvasOutput = await addImageToImage({
       g,
-      manager: arg.canvasManager,
+      manager,
       l2i,
       i2lNodeType: 'sd3_i2l',
       denoise,
@@ -143,10 +144,11 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     });
     g.upsertMetadata({ generation_mode: 'sd3_img2img' });
   } else if (generationMode === 'inpaint') {
+    assert(manager !== null);
     canvasOutput = await addInpaint({
       state,
       g,
-      manager: arg.canvasManager,
+      manager,
       l2i,
       i2lNodeType: 'sd3_i2l',
       denoise,
@@ -160,10 +162,11 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     });
     g.upsertMetadata({ generation_mode: 'sd3_inpaint' });
   } else if (generationMode === 'outpaint') {
+    assert(manager !== null);
     canvasOutput = await addOutpaint({
       state,
       g,
-      manager: arg.canvasManager,
+      manager,
       l2i,
       i2lNodeType: 'sd3_i2l',
       denoise,

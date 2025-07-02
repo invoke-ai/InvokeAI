@@ -49,7 +49,7 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
     const base = model.base;
 
     const generationMode = await canvasManager.compositor.getGenerationMode();
-    const graphBuilderArg: GraphBuilderArg = { generationMode, state, canvasManager };
+    const graphBuilderArg: GraphBuilderArg = { generationMode, state, manager: canvasManager };
 
     switch (base) {
       case 'sdxl':
