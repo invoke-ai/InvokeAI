@@ -10,7 +10,7 @@ import {
   selectRefImageEntityIds,
 } from 'features/controlLayers/store/refImagesSlice';
 import { memo, useCallback, useMemo } from 'react';
-import { PiEyeBold, PiEyeSlashBold, PiTrashBold } from 'react-icons/pi';
+import { PiCircleBold, PiCircleFill, PiTrashBold } from 'react-icons/pi';
 
 const textSx: SystemStyleObject = {
   color: 'base.300',
@@ -41,7 +41,12 @@ export const RefImageHeader = memo(() => {
       <Text fontWeight="semibold" sx={textSx} data-is-error={!entity.config.image}>
         Reference Image #{refImageNumber}
       </Text>
-      <Flex>
+      <Flex alignItems="center" gap={1}>
+        {!entity.isEnabled && (
+          <Text fontSize="xs" fontStyle="italic" color="base.400">
+            Disabled
+          </Text>
+        )}
         <IconButton
           tooltip={entity.isEnabled ? 'Disable Reference Image' : 'Enable Reference Image'}
           size="xs"
@@ -49,8 +54,7 @@ export const RefImageHeader = memo(() => {
           alignSelf="stretch"
           aria-label={entity.isEnabled ? 'Disable ref image' : 'Enable ref image'}
           onClick={toggleIsEnabled}
-          icon={entity.isEnabled ? <PiEyeBold /> : <PiEyeSlashBold />}
-          colorScheme={entity.isEnabled ? 'base' : 'warning'}
+          icon={entity.isEnabled ? <PiCircleFill /> : <PiCircleBold />}
         />
         <IconButton
           tooltip="Delete Reference Image"
