@@ -88,7 +88,7 @@ export const getDefaultRefImageConfig = (
     return config;
   }
 
-  if (base === 'flux-kontext') {
+  if (base === 'flux-kontext' || (base === 'flux' && mainModelConfig?.name?.toLowerCase().includes('kontext'))) {
     const config = deepClone(initialFluxKontextReferenceImage);
     config.model = zModelIdentifierField.parse(mainModelConfig);
     return config;
