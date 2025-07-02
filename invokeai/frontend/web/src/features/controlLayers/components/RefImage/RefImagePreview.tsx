@@ -19,6 +19,9 @@ const baseSx: SystemStyleObject = {
   '&[data-is-open="true"]': {
     borderColor: 'invokeBlue.300',
   },
+  '&[data-is-disabled="true"]': {
+    opacity: 0.4,
+  },
 };
 
 const weightDisplaySx: SystemStyleObject = {
@@ -36,6 +39,9 @@ const getImageSxWithWeight = (weight: number): SystemStyleObject => {
 
   return {
     ...baseSx,
+    '&[data-is-disabled="true"]': {
+      opacity: 0.4,
+    },
     _after: {
       content: '""',
       position: 'absolute',
@@ -97,6 +103,7 @@ export const RefImagePreview = memo(() => {
         flexShrink={0}
         data-is-open={selectedEntityId === id && isPanelOpen}
         data-is-error={true}
+        data-is-disabled={!entity.isEnabled}
         sx={sx}
       />
     );
@@ -114,6 +121,7 @@ export const RefImagePreview = memo(() => {
       sx={sx}
       data-is-open={selectedEntityId === id && isPanelOpen}
       data-is-error={!entity.config.model}
+      data-is-disabled={!entity.isEnabled}
       role="button"
       onClick={onClick}
       cursor="pointer"

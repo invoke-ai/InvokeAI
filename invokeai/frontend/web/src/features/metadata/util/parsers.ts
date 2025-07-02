@@ -632,6 +632,7 @@ const parseIPAdapterToIPAdapterLayer: MetadataParseFunc<RefImageState> = async (
 
   const layer: RefImageState = {
     id: getPrefixedId('ip_adapter'),
+    isEnabled: true,
     config: {
       type: 'ip_adapter',
       model: zModelIdentifierField.parse(ipAdapterModel),

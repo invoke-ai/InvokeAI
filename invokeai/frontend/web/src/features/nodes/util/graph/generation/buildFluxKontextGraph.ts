@@ -37,6 +37,7 @@ export const buildFluxKontextGraph = (arg: GraphBuilderArg): GraphBuilderReturn 
   assert(model.base === 'flux-kontext', 'Model is not a Flux Kontext model');
 
   const validRefImages = refImages.entities
+    .filter((entity) => entity.isEnabled)
     .filter((entity) => isFluxKontextReferenceImageConfig(entity.config))
     .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0)
     .toReversed(); // sends them in order they are displayed in the list
