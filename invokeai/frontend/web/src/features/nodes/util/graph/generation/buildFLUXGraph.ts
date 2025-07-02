@@ -32,8 +32,8 @@ import { addIPAdapters } from './addIPAdapters';
 const log = logger('system');
 
 export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
-  const { generationMode, state } = arg;
-  log.debug({ generationMode }, 'Building FLUX graph');
+  const { generationMode, state, manager } = arg;
+  log.debug({ generationMode, manager: manager?.id }, 'Building FLUX graph');
 
   const params = selectParamsSlice(state);
   const canvas = selectCanvasSlice(state);
@@ -164,10 +164,11 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   let canvasOutput: Invocation<ImageOutputNodes> = l2i;
 
   if (isFLUXFill && (generationMode === 'inpaint' || generationMode === 'outpaint')) {
+    assert(manager !== null);
     canvasOutput = await addFLUXFill({
       state,
       g,
-      manager: arg.canvasManager,
+      manager,
       l2i,
       denoise,
       originalSize,
@@ -177,9 +178,10 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
     g.upsertMetadata({ generation_mode: 'flux_txt2img' });
   } else if (generationMode === 'img2img') {
+    assert(manager !== null);
     canvasOutput = await addImageToImage({
       g,
-      manager: arg.canvasManager,
+      manager,
       l2i,
       i2lNodeType: 'flux_vae_encode',
       denoise,
@@ -192,10 +194,11 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     });
     g.upsertMetadata({ generation_mode: 'flux_img2img' });
   } else if (generationMode === 'inpaint') {
+    assert(manager !== null);
     canvasOutput = await addInpaint({
       state,
       g,
-      manager: arg.canvasManager,
+      manager,
       l2i,
       i2lNodeType: 'flux_vae_encode',
       denoise,
@@ -209,10 +212,11 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     });
     g.upsertMetadata({ generation_mode: 'flux_inpaint' });
   } else if (generationMode === 'outpaint') {
+    assert(manager !== null);
     canvasOutput = await addOutpaint({
       state,
       g,
-      manager: arg.canvasManager,
+      manager,
       l2i,
       i2lNodeType: 'flux_vae_encode',
       denoise,
@@ -229,13 +233,13 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     assert<Equals<typeof generationMode, never>>(false);
   }
 
-  if (generationMode === 'img2img' || generationMode === 'inpaint' || generationMode === 'outpaint') {
+  if (manager !== null) {
     const controlNetCollector = g.addNode({
       type: 'collect',
       id: getPrefixedId('control_net_collector'),
     });
     const controlNetResult = await addControlNets({
-      manager: arg.canvasManager,
+      manager,
       entities: canvas.controlLayers.entities,
       g,
       rect: canvas.bbox.rect,
@@ -249,7 +253,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     }
 
     await addControlLoRA({
-      manager: arg.canvasManager,
+      manager,
       entities: canvas.controlLayers.entities,
       g,
       rect: canvas.bbox.rect,
@@ -283,9 +287,9 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   });
   let totalReduxesAdded = fluxReduxResult.addedFLUXReduxes;
 
-  if (generationMode === 'img2img' || generationMode === 'inpaint' || generationMode === 'outpaint') {
+  if (manager !== null) {
     const regionsResult = await addRegions({
-      manager: arg.canvasManager,
+      manager,
       regions: canvas.regionalGuidance.entities,
       g,
       bbox: canvas.bbox.rect,

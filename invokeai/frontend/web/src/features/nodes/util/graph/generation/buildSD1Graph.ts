@@ -30,8 +30,8 @@ import { addRegions } from './addRegions';
 const log = logger('system');
 
 export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
-  const { generationMode, state } = arg;
-  log.debug({ generationMode }, 'Building SD1/SD2 graph');
+  const { generationMode, state, manager } = arg;
+  log.debug({ generationMode, manager: manager?.id }, 'Building SD1/SD2 graph');
 
   const params = selectParamsSlice(state);
   const canvas = selectCanvasSlice(state);
@@ -166,9 +166,10 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
     g.upsertMetadata({ generation_mode: 'txt2img' });
   } else if (generationMode === 'img2img') {
+    assert(manager !== null);
     canvasOutput = await addImageToImage({
       g,
-      manager: arg.canvasManager,
+      manager,
       l2i,
       i2lNodeType: 'i2l',
       denoise,
@@ -181,10 +182,11 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     });
     g.upsertMetadata({ generation_mode: 'img2img' });
   } else if (generationMode === 'inpaint') {
+    assert(manager !== null);
     canvasOutput = await addInpaint({
       state,
       g,
-      manager: arg.canvasManager,
+      manager,
       l2i,
       i2lNodeType: 'i2l',
       denoise,
@@ -198,10 +200,11 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     });
     g.upsertMetadata({ generation_mode: 'inpaint' });
   } else if (generationMode === 'outpaint') {
+    assert(manager !== null);
     canvasOutput = await addOutpaint({
       state,
       g,
-      manager: arg.canvasManager,
+      manager,
       l2i,
       i2lNodeType: 'i2l',
       denoise,
@@ -218,13 +221,13 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     assert<Equals<typeof generationMode, never>>(false);
   }
 
-  if (generationMode === 'img2img' || generationMode === 'inpaint' || generationMode === 'outpaint') {
+  if (manager !== null) {
     const controlNetCollector = g.addNode({
       type: 'collect',
       id: getPrefixedId('control_net_collector'),
     });
     const controlNetResult = await addControlNets({
-      manager: arg.canvasManager,
+      manager,
       entities: canvas.controlLayers.entities,
       g,
       rect: canvas.bbox.rect,
@@ -242,7 +245,7 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       id: getPrefixedId('t2i_adapter_collector'),
     });
     const t2iAdapterResult = await addT2IAdapters({
-      manager: arg.canvasManager,
+      manager,
       entities: canvas.controlLayers.entities,
       g,
       rect: canvas.bbox.rect,
@@ -268,9 +271,9 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   });
   let totalIPAdaptersAdded = ipAdapterResult.addedIPAdapters;
 
-  if (generationMode === 'img2img' || generationMode === 'inpaint' || generationMode === 'outpaint') {
+  if (manager !== null) {
     const regionsResult = await addRegions({
-      manager: arg.canvasManager,
+      manager,
       regions: canvas.regionalGuidance.entities,
       g,
       bbox: canvas.bbox.rect,

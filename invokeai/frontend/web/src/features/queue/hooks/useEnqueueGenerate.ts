@@ -47,7 +47,7 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
     assert(model, 'No model found in state');
     const base = model.base;
 
-    const graphBuilderArg: GraphBuilderArg = { generationMode: 'txt2img', state };
+    const graphBuilderArg: GraphBuilderArg = { generationMode: 'txt2img', state, manager: null };
 
     switch (base) {
       case 'sdxl':
