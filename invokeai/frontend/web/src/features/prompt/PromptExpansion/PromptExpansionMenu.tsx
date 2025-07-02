@@ -1,39 +1,58 @@
 import { IconButton, Menu, MenuButton, MenuItem, MenuList, Text } from '@invoke-ai/ui-library';
-import {
-  promptExpansionRequested,
-  promptGenerationFromUploadRequested,
-} from 'app/store/middleware/listenerMiddleware/listeners/addPromptExpansionRequestedListener';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { usePromptExpansionTracking } from 'features/prompt/PromptExpansion/usePromptExpansionTracking';
-import { useCallback, useRef } from 'react';
+import { useStore } from '@nanostores/react';
+import { useAppStore } from 'app/store/storeHooks';
+import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
+import { WrappedError } from 'common/util/result';
+import { toast } from 'features/toast/toast';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiMagicWandBold } from 'react-icons/pi';
+import type { ImageDTO } from 'services/api/types';
+
+import { expandPrompt } from './expand';
+import { promptExpansionApi } from './state';
 
 export const PromptExpansionMenu = () => {
-  const dispatch = useAppDispatch();
+  const { dispatch, getState } = useAppStore();
   const { t } = useTranslation();
-  const { isPending } = usePromptExpansionTracking();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { isPending } = useStore(promptExpansionApi.$state);
 
-  const onClickExpandPrompt = useCallback(() => {
-    dispatch(promptExpansionRequested());
-  }, [dispatch]);
-
-  const onClickUploadImage = useCallback(() => {
-    fileInputRef.current?.click();
+  const onUploadStarted = useCallback(() => {
+    promptExpansionApi.setPending();
   }, []);
 
-  const onFileSelected = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (file) {
-        dispatch(promptGenerationFromUploadRequested({ file }));
-        // Reset the input so the same file can be selected again
-        event.target.value = '';
-      }
+  const onUpload = useCallback(
+    (imageDTO: ImageDTO) => {
+      promptExpansionApi.setPending(imageDTO);
+      expandPrompt({ dispatch, getState, imageDTO });
     },
-    [dispatch]
+    [dispatch, getState]
   );
+
+  const onUploadError = useCallback(
+    (error: unknown) => {
+      const wrappedError = WrappedError.wrap(error);
+      promptExpansionApi.setError(wrappedError);
+      toast({
+        id: 'UPLOAD_AND_PROMPT_GENERATION_FAILED',
+        title: t('toast.uploadAndPromptGenerationFailed'),
+        status: 'error',
+      });
+    },
+    [t]
+  );
+
+  const uploadApi = useImageUploadButton({
+    allowMultiple: false,
+    onUpload,
+    onUploadStarted,
+    onError: onUploadError,
+  });
+
+  const onClickExpandPrompt = useCallback(() => {
+    promptExpansionApi.setPending();
+    expandPrompt({ dispatch, getState });
+  }, [dispatch, getState]);
 
   return (
     <>
@@ -50,18 +69,12 @@ export const PromptExpansionMenu = () => {
           <MenuItem onClick={onClickExpandPrompt} isDisabled={isPending}>
             <Text>{t('prompt.expandCurrentPrompt')}</Text>
           </MenuItem>
-          <MenuItem onClick={onClickUploadImage} isDisabled={isPending}>
+          <MenuItem {...uploadApi.getUploadButtonProps()} isDisabled={isPending}>
             <Text>{t('prompt.uploadImageForPromptGeneration')}</Text>
           </MenuItem>
         </MenuList>
       </Menu>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/png,image/jpeg,image/jpg,image/webp"
-        onChange={onFileSelected}
-        style={{ display: 'none' }}
-      />
+      <input {...uploadApi.getUploadInputProps()} />
     </>
   );
 };

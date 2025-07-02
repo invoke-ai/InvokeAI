@@ -1,6 +1,5 @@
 import { round } from 'es-toolkit/compat';
 import type { EphemeralProgressImage } from 'features/controlLayers/store/types';
-import type { PromptExpansionRequest } from 'features/prompt/PromptExpansion';
 import { atom, computed, map } from 'nanostores';
 import type { S } from 'services/api/types';
 import type { AppSocket } from 'services/events/types';
@@ -15,12 +14,6 @@ export const $lastWorkflowsProgressEvent = atom<S['InvocationProgressEvent'] | n
 export const $lastWorkflowsProgressImage = atom<EphemeralProgressImage | null>(null);
 export const $lastUpscalingProgressEvent = atom<S['InvocationProgressEvent'] | null>(null);
 export const $lastUpscalingProgressImage = atom<EphemeralProgressImage | null>(null);
-
-// Prompt expansion tracking - single request since only one at a time
-export const $promptExpansionRequest = atom<PromptExpansionRequest | null>(null);
-
-// Expanded text from prompt expansion - set when invocation completes
-export const $promptExpansionResult = atom<string | null>(null);
 
 export const $lastProgressImage = computed($lastProgressEvent, (val) => val?.image ?? null);
 export const $hasLastProgressImage = computed($lastProgressEvent, (val) => Boolean(val?.image));

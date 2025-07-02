@@ -1,5 +1,4 @@
 import { $queueId } from 'app/store/nanostores/queueId';
-import { isPromptExpansionNode } from 'features/nodes/util/graph/buildPromptExpansionGraph';
 import queryString from 'query-string';
 import type { components, paths } from 'services/api/schema';
 
@@ -398,16 +397,7 @@ export const enqueueMutationFixedCacheKeyOptions = {
   fixedCacheKey: 'enqueueBatch',
 } as const;
 
-export const useIsNonPromptExpansionGenerationInProgress = () => {
-  const { data } = useGetCurrentQueueItemQuery();
-
-  if (!data || !data.session?.graph?.nodes) {
-    return false;
-  }
-
-  const isPromptExpanstionGeneration =
-    Object.values(data.session.graph.nodes).length === 1 &&
-    isPromptExpansionNode(Object.values(data.session.graph.nodes)[0]?.type || '');
-
-  return data.status === 'in_progress' && !isPromptExpanstionGeneration;
+export const useIsGenerationInProgress = () => {
+  const { data } = useGetQueueStatusQuery();
+  return data && data.queue.in_progress > 0;
 };

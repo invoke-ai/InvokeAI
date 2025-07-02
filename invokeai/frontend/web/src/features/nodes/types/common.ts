@@ -14,46 +14,6 @@ type ImageFieldCollection = z.infer<typeof zImageFieldCollection>;
 export const isImageFieldCollection = (field: unknown): field is ImageFieldCollection =>
   zImageFieldCollection.safeParse(field).success;
 
-export const zStringField = z.object({
-  type: z.literal('string_output'),
-  value: z.string(),
-});
-export type StringField = z.infer<typeof zStringField>;
-export const isStringField = (field: unknown): field is StringField => zStringField.safeParse(field).success;
-
-export const zStringCollectionField = z.object({
-  type: z.literal('string_collection_output'),
-  collection: z.array(z.string()),
-});
-export type StringCollectionField = z.infer<typeof zStringCollectionField>;
-export const isStringFieldCollection = (field: unknown): field is StringCollectionField =>
-  zStringCollectionField.safeParse(field).success;
-
-export const zStringGeneratorField = z.object({
-  type: z.literal('string_generator_output'),
-  strings: z.array(z.string()),
-});
-export type StringGeneratorField = z.infer<typeof zStringGeneratorField>;
-export const isStringGeneratorField = (field: unknown): field is StringGeneratorField =>
-  zStringGeneratorField.safeParse(field).success;
-
-export const zString2Field = z.object({
-  type: z.literal('string_2_output'),
-  string_1: z.string(),
-  string_2: z.string(),
-});
-export type String2Field = z.infer<typeof zString2Field>;
-export const isString2Field = (field: unknown): field is String2Field => zString2Field.safeParse(field).success;
-
-export const zStringPosNegField = z.object({
-  type: z.literal('string_pos_neg_output'),
-  positive_string: z.string(),
-  negative_string: z.string(),
-});
-export type StringPosNegField = z.infer<typeof zStringPosNegField>;
-export const isStringPosNegField = (field: unknown): field is StringPosNegField =>
-  zStringPosNegField.safeParse(field).success;
-
 export const zBoardField = z.object({
   board_id: z.string().trim().min(1),
 });

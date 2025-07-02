@@ -11,13 +11,12 @@ import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gal
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { isImageField, isImageFieldCollection } from 'features/nodes/types/common';
 import { zNodeStatus } from 'features/nodes/types/invocation';
-import { isPromptExpansionNode } from 'features/nodes/util/graph/buildPromptExpansionGraph';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO, S } from 'services/api/types';
 import { getCategories } from 'services/api/util';
 import { insertImageIntoNamesResult } from 'services/api/util/optimisticUpdates';
-import { $lastProgressEvent, $promptExpansionRequest, $promptExpansionResult } from 'services/events/stores';
+import { $lastProgressEvent } from 'services/events/stores';
 import type { Param0 } from 'tsafe';
 import { objectEntries } from 'tsafe';
 import type { JsonObject } from 'type-fest';
@@ -171,30 +170,6 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
     return imageDTOs;
   };
 
-  const handleStringOutputs = (data: S['InvocationCompleteEvent']) => {
-    const { result, invocation } = data;
-
-    // If this is a prompt expansion or generation invocation, look for string output
-    if (isPromptExpansionNode(invocation.type) && result.type === 'string_output') {
-      const stringValue = result.value;
-
-      const currentRequest = $promptExpansionRequest.get();
-
-      if (currentRequest && currentRequest.status === 'pending') {
-        // Update the status to completed
-        $promptExpansionRequest.set({
-          ...currentRequest,
-          status: 'completed' as const,
-        });
-
-        // Set the expanded text in the separate nanostore
-        $promptExpansionResult.set(stringValue);
-
-        log.debug({ stringValue }, 'Prompt expansion/generation completed');
-      }
-    }
-  };
-
   return async (data: S['InvocationCompleteEvent']) => {
     log.debug({ data } as JsonObject, `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`);
 
@@ -211,7 +186,6 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
     }
 
     await addImagesToGallery(data);
-    handleStringOutputs(data);
 
     $lastProgressEvent.set(null);
   };

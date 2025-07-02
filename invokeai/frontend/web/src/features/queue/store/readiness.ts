@@ -36,7 +36,7 @@ import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
 import { getGridSize } from 'features/parameters/util/optimalDimension';
-import type { PromptExpansionRequest } from 'features/prompt/PromptExpansion';
+import { promptExpansionApi, type PromptExpansionRequestState } from 'features/prompt/PromptExpansion/state';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
@@ -44,7 +44,7 @@ import i18n from 'i18next';
 import { atom, computed } from 'nanostores';
 import { useEffect } from 'react';
 import type { MainModelConfig } from 'services/api/types';
-import { $isConnected, $promptExpansionRequest } from 'services/events/stores';
+import { $isConnected } from 'services/events/stores';
 
 /**
  * This file contains selectors and utilities for determining the app is ready to enqueue generations. The handling
@@ -91,7 +91,7 @@ const debouncedUpdateReasons = debounce(
     store: AppStore,
     isInPublishFlow: boolean,
     isChatGPT4oHighModelDisabled: (model: ParameterModel) => boolean,
-    promptExpansionRequest: PromptExpansionRequest | null
+    promptExpansionRequest: PromptExpansionRequestState
   ) => {
     if (tab === 'canvas') {
       const model = selectMainModelConfig(store.getState());
@@ -159,7 +159,7 @@ export const useReadinessWatcher = () => {
   const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $false);
   const isInPublishFlow = useStore($isInPublishFlow);
   const { isChatGPT4oHighModelDisabled } = useIsModelDisabled();
-  const promptExpansionRequest = useStore($promptExpansionRequest);
+  const promptExpansionRequest = useStore(promptExpansionApi.$state);
 
   useEffect(() => {
     debouncedUpdateReasons(
@@ -300,7 +300,7 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
   upscale: UpscaleState;
   config: AppConfig;
   params: ParamsState;
-  promptExpansionRequest: PromptExpansionRequest | null;
+  promptExpansionRequest: PromptExpansionRequestState;
 }) => {
   const { isConnected, upscale, config, params, promptExpansionRequest } = arg;
   const reasons: Reason[] = [];
@@ -339,12 +339,10 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
     }
   }
 
-  if (promptExpansionRequest) {
-    if (promptExpansionRequest.status === 'pending') {
-      reasons.push({ content: i18n.t('parameters.invoke.promptExpansionPending') });
-    } else if (promptExpansionRequest.status === 'completed') {
-      reasons.push({ content: i18n.t('parameters.invoke.promptExpansionResultPending') });
-    }
+  if (promptExpansionRequest.isPending) {
+    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionPending') });
+  } else if (promptExpansionRequest.isSuccess) {
+    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionResultPending') });
   }
 
   return reasons;
@@ -363,7 +361,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   canvasIsCompositing: boolean;
   canvasIsSelectingObject: boolean;
   isChatGPT4oHighModelDisabled: (model: ParameterModel) => boolean;
-  promptExpansionRequest: PromptExpansionRequest | null;
+  promptExpansionRequest: PromptExpansionRequestState;
 }) => {
   const {
     isConnected,
@@ -515,12 +513,10 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     reasons.push({ content: i18n.t('parameters.invoke.modelDisabledForTrial', { modelName: model.name }) });
   }
 
-  if (promptExpansionRequest) {
-    if (promptExpansionRequest.status === 'pending') {
-      reasons.push({ content: i18n.t('parameters.invoke.promptExpansionPending') });
-    } else if (promptExpansionRequest.status === 'completed') {
-      reasons.push({ content: i18n.t('parameters.invoke.promptExpansionResultPending') });
-    }
+  if (promptExpansionRequest.isPending) {
+    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionPending') });
+  } else if (promptExpansionRequest.isSuccess) {
+    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionResultPending') });
   }
 
   const enabledControlLayers = canvas.controlLayers.entities.filter((controlLayer) => controlLayer.isEnabled);

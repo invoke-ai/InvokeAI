@@ -1,25 +1,19 @@
 import { Box, Flex, Image, Spinner, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { PromptExpansionResultOverlay } from 'features/prompt/PromptExpansion/PromptExpansionResultOverlay';
-import { usePromptExpansionTracking } from 'features/prompt/PromptExpansion/usePromptExpansionTracking';
-import { memo, useMemo } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiMagicWandBold } from 'react-icons/pi';
-import { $promptExpansionRequest, $promptExpansionResult } from 'services/events/stores';
+
+import { promptExpansionApi } from './state';
 
 export const PromptExpansionOverlay = memo(() => {
-  const { isPending } = usePromptExpansionTracking();
-  const promptExpansionRequest = useStore($promptExpansionRequest);
-  const expandedText = useStore($promptExpansionResult);
+  const { isSuccess, isPending, result, imageDTO } = useStore(promptExpansionApi.$state);
   const { t } = useTranslation();
 
-  const showOverlay = useMemo(() => {
-    return promptExpansionRequest?.status === 'completed' && expandedText;
-  }, [promptExpansionRequest, expandedText]);
-
   // Show result overlay when completed
-  if (showOverlay) {
-    return <PromptExpansionResultOverlay expandedText={expandedText || ''} />;
+  if (isSuccess) {
+    return <PromptExpansionResultOverlay expandedText={result} />;
   }
 
   // Show pending overlay when pending
@@ -44,7 +38,7 @@ export const PromptExpansionOverlay = memo(() => {
       animation="pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite"
     >
       {/* Show dimmed source image if available */}
-      {promptExpansionRequest?.sourceImage && (
+      {imageDTO && (
         <Box
           position="absolute"
           top={2}
@@ -55,13 +49,7 @@ export const PromptExpansionOverlay = memo(() => {
           borderRadius="base"
           overflow="hidden"
         >
-          <Image
-            src={promptExpansionRequest.sourceImage.thumbnail_url}
-            objectFit="contain"
-            w="full"
-            h="full"
-            borderRadius="base"
-          />
+          <Image src={imageDTO.thumbnail_url} objectFit="contain" w="full" h="full" borderRadius="base" />
         </Box>
       )}
 

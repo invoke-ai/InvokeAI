@@ -1,4 +1,5 @@
 import { Box, Flex, Textarea } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { usePersistedTextAreaSize } from 'common/hooks/usePersistedTextareaSize';
 import {
@@ -17,7 +18,7 @@ import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModeP
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptExpansionMenu } from 'features/prompt/PromptExpansion/PromptExpansionMenu';
 import { PromptExpansionOverlay } from 'features/prompt/PromptExpansion/PromptExpansionOverlay';
-import { usePromptExpansionTracking } from 'features/prompt/PromptExpansion/usePromptExpansionTracking';
+import { promptExpansionApi } from 'features/prompt/PromptExpansion/state';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
 import { SDXLConcatButton } from 'features/sdxl/components/SDXLPrompts/SDXLConcatButton';
@@ -45,7 +46,7 @@ export const ParamPositivePrompt = memo(() => {
   const viewMode = useAppSelector(selectStylePresetViewMode);
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
   const modelSupportsNegativePrompt = useAppSelector(selectModelSupportsNegativePrompt);
-  const { isPending: isPromptExpansionPending } = usePromptExpansionTracking();
+  const { isPending: isPromptExpansionPending } = useStore(promptExpansionApi.$state);
   const isPromptExpansionEnabled = useAppSelector(selectAllowPromptExpansion);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
