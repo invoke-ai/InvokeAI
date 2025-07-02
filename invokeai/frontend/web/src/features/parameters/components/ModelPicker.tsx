@@ -29,6 +29,7 @@ import { BASE_COLOR_MAP } from 'features/modelManagerV2/subpanels/ModelManagerPa
 import ModelImage from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelImage';
 import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import { API_BASE_MODELS, MODEL_TYPE_MAP, MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectIsModelsTabDisabled } from 'features/system/store/configSlice';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { filesize } from 'filesize';
@@ -192,8 +193,12 @@ export const ModelPicker = typedMemo(
   }) => {
     const { t } = useTranslation();
     const selectedKeys = useAppSelector(selectSelectedModelKeys);
+    const isModelRelationshipsEnabled = useFeatureStatus('modelRelationships');
 
-    const { relatedModelKeys } = useGetRelatedModelIdsBatchQuery(selectedKeys, relatedModelKeysQueryOptions);
+    const { relatedModelKeys } = useGetRelatedModelIdsBatchQuery(selectedKeys, {
+      ...relatedModelKeysQueryOptions,
+      skip: !isModelRelationshipsEnabled,
+    });
 
     const options = useMemo<WithStarred<T>[] | Group<WithStarred<T>>[]>(() => {
       if (!grouped) {

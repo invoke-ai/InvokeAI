@@ -18,6 +18,7 @@ import {
   getReferenceImageState,
   imageDTOToImageWithDims,
   initialChatGPT4oReferenceImage,
+  initialFluxKontextReferenceImage,
   initialFLUXRedux,
   initialIPAdapter,
 } from './util';
@@ -115,6 +116,16 @@ export const refImagesSlice = createSlice({
         // Switching to chatgpt-4o ref image
         entity.config = {
           ...initialChatGPT4oReferenceImage,
+          image: entity.config.image,
+          model: entity.config.model,
+        };
+        return;
+      }
+
+      if (entity.config.model.base === 'flux-kontext') {
+        // Switching to flux-kontext ref image
+        entity.config = {
+          ...initialFluxKontextReferenceImage,
           image: entity.config.image,
           model: entity.config.model,
         };
