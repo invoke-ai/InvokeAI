@@ -11,7 +11,7 @@ import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 import { PiUploadBold } from 'react-icons/pi';
 import { uploadImages, useUploadImageMutation } from 'services/api/endpoints/images';
-import type { ImageDTO, UploadImageArg } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 import type { SetOptional } from 'type-fest';
 
@@ -21,7 +21,6 @@ type UseImageUploadButtonArgs =
       isDisabled?: boolean;
       allowMultiple: false;
       onUpload?: (imageDTO: ImageDTO) => void;
-      uploadArgOverrides?: Partial<UploadImageArg>;
       onUploadStarted?: (files: File) => void;
       onError?: (error: unknown) => void;
     }
@@ -29,7 +28,6 @@ type UseImageUploadButtonArgs =
       isDisabled?: boolean;
       allowMultiple: true;
       onUpload?: (imageDTOs: ImageDTO[]) => void;
-      uploadArgOverrides?: Partial<UploadImageArg>;
       onUploadStarted?: (files: File[]) => void;
       onError?: (error: unknown) => void;
     };
@@ -59,7 +57,6 @@ export const useImageUploadButton = ({
   onUpload,
   isDisabled,
   allowMultiple,
-  uploadArgOverrides,
   onUploadStarted,
   onError,
 }: UseImageUploadButtonArgs) => {
@@ -91,7 +88,6 @@ export const useImageUploadButton = ({
             is_intermediate: false,
             board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
             silent: true,
-            ...uploadArgOverrides,
           }).unwrap();
           if (onUpload) {
             onUpload(imageDTO);
@@ -111,7 +107,6 @@ export const useImageUploadButton = ({
                 board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
                 silent: false,
                 isFirstUploadOfBatch: i === 0,
-                ...uploadArgOverrides,
               }))
             );
           }
@@ -133,7 +128,6 @@ export const useImageUploadButton = ({
       onUploadStarted,
       uploadImage,
       autoAddBoardId,
-      uploadArgOverrides,
       onUpload,
       isClientSideUploadEnabled,
       clientSideUpload,
