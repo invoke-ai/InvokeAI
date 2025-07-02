@@ -13,9 +13,9 @@ const circleStyles: SystemStyleObject = {
 };
 
 export const ProgressIndicator = memo((props: CircularProgressProps) => {
-  const isNonPromptExpansionGenerationInProgress = useIsGenerationInProgress();
+  const isGenerationInProgress = useIsGenerationInProgress();
   const lastProgressEvent = useStore($lastProgressEvent);
-  if (!isNonPromptExpansionGenerationInProgress) {
+  if (!isGenerationInProgress) {
     return null;
   }
   if (!lastProgressEvent) {

@@ -24,12 +24,12 @@ import { api, LIST_ALL_TAG, LIST_TAG } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi } from 'services/api/endpoints/queue';
 import { workflowsApi } from 'services/api/endpoints/workflows';
+import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
+import { buildOnModelInstallError } from 'services/events/onModelInstallError';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import type { Socket } from 'socket.io-client';
 import type { JsonObject } from 'type-fest';
 
-import { buildOnInvocationComplete } from './onInvocationComplete';
-import { buildOnModelInstallError } from './onModelInstallError';
 import {
   $lastProgressEvent,
   $lastUpscalingProgressEvent,
@@ -140,7 +140,6 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   socket.on('invocation_error', (data) => {
     const { invocation_source_id, invocation, error_type, error_message, error_traceback } = data;
     log.error({ data } as JsonObject, `Invocation error (${invocation.type}, ${invocation_source_id})`);
-
     const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
     if (nes) {
       nes.status = zNodeStatus.enum.FAILED;

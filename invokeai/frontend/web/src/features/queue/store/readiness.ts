@@ -339,12 +339,10 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
     }
   }
 
-  if (promptExpansionRequest) {
-    if (promptExpansionRequest.isPending) {
-      reasons.push({ content: i18n.t('parameters.invoke.promptExpansionPending') });
-    } else if (promptExpansionRequest.isSuccess) {
-      reasons.push({ content: i18n.t('parameters.invoke.promptExpansionResultPending') });
-    }
+  if (promptExpansionRequest.isPending) {
+    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionPending') });
+  } else if (promptExpansionRequest.isSuccess) {
+    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionResultPending') });
   }
 
   return reasons;
@@ -515,12 +513,10 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     reasons.push({ content: i18n.t('parameters.invoke.modelDisabledForTrial', { modelName: model.name }) });
   }
 
-  if (promptExpansionRequest) {
-    if (promptExpansionRequest.isPending) {
-      reasons.push({ content: i18n.t('parameters.invoke.promptExpansionPending') });
-    } else if (promptExpansionRequest.isSuccess) {
-      reasons.push({ content: i18n.t('parameters.invoke.promptExpansionResultPending') });
-    }
+  if (promptExpansionRequest.isPending) {
+    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionPending') });
+  } else if (promptExpansionRequest.isSuccess) {
+    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionResultPending') });
   }
 
   const enabledControlLayers = canvas.controlLayers.entities.filter((controlLayer) => controlLayer.isEnabled);
