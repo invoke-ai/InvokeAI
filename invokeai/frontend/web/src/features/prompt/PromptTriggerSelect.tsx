@@ -42,19 +42,6 @@ export const PromptTriggerSelect = memo(({ onSelect, onClose }: PromptTriggerSel
   const options = useMemo(() => {
     const _options: GroupBase<ComboboxOption>[] = [];
 
-    if (tiModels) {
-      const embeddingOptions = tiModels
-        .filter((ti) => ti.base === mainModelConfig?.base)
-        .map((model) => ({ label: model.name, value: `<${model.name}>` }));
-
-      if (embeddingOptions.length > 0) {
-        _options.push({
-          label: t('prompt.compatibleEmbeddings'),
-          options: embeddingOptions,
-        });
-      }
-    }
-
     if (loraModels) {
       const triggerPhraseOptions = loraModels
         .filter((lora) => map(addedLoRAs, (l) => l.model.key).includes(lora.key))
@@ -70,6 +57,19 @@ export const PromptTriggerSelect = memo(({ onSelect, onClose }: PromptTriggerSel
         _options.push({
           label: t('modelManager.loraTriggerPhrases'),
           options: flatten(triggerPhraseOptions),
+        });
+      }
+    }
+
+    if (tiModels) {
+      const embeddingOptions = tiModels
+        .filter((ti) => ti.base === mainModelConfig?.base)
+        .map((model) => ({ label: model.name, value: `<${model.name}>` }));
+
+      if (embeddingOptions.length > 0) {
+        _options.push({
+          label: t('prompt.compatibleEmbeddings'),
+          options: embeddingOptions,
         });
       }
     }
