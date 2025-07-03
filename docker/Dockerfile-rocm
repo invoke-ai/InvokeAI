@@ -98,5 +98,5 @@ COPY invokeai ${INVOKEAI_SRC}/invokeai
 # in a previous layer
 RUN --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     ulimit -n 30000 && \
-    uv pip install -e . --force-reinstall
+    uv pip install -e .
 
