@@ -6,6 +6,7 @@ import { StagingAreaToolbarAcceptButton } from 'features/controlLayers/component
 import { StagingAreaToolbarDiscardAllButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarDiscardAllButton';
 import { StagingAreaToolbarDiscardSelectedButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarDiscardSelectedButton';
 import { StagingAreaToolbarImageCountButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarImageCountButton';
+import { StagingAreaToolbarInfoButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarInfoButton';
 import { StagingAreaToolbarMenu } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarMenu';
 import { StagingAreaToolbarNextButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarNextButton';
 import { StagingAreaToolbarPrevButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarPrevButton';
@@ -42,6 +43,7 @@ export const StagingAreaToolbar = memo(() => {
         <StagingAreaToolbarAcceptButton />
         <StagingAreaToolbarToggleShowResultsButton />
         <StagingAreaToolbarSaveSelectedToGalleryButton />
+        <StagingAreaToolbarInfoButton isDisabled={!shouldShowStagedImage} />
         <StagingAreaToolbarMenu />
         <StagingAreaToolbarDiscardSelectedButton isDisabled={!shouldShowStagedImage} />
         <StagingAreaToolbarDiscardAllButton isDisabled={!shouldShowStagedImage} />
