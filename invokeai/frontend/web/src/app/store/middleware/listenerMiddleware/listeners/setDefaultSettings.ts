@@ -1,4 +1,5 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { isNil } from 'es-toolkit';
 import { bboxHeightChanged, bboxWidthChanged } from 'features/controlLayers/store/canvasSlice';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
@@ -86,10 +87,16 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
           }
         }
 
-        if (cfg_rescale_multiplier) {
+        if (!isNil(cfg_rescale_multiplier)) {
           if (isParameterCFGRescaleMultiplier(cfg_rescale_multiplier)) {
             dispatch(setCfgRescaleMultiplier(cfg_rescale_multiplier));
           }
+        } else {
+          // Set this to 0 if it doesn't have a default. This value is
+          // easy to miss in the UI when users are resetting defaults
+          // and leaving it non-zero could lead to detrimental
+          // effects.
+          dispatch(setCfgRescaleMultiplier(0));
         }
 
         if (steps) {
