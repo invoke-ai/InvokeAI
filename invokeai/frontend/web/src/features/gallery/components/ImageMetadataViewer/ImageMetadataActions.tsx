@@ -1,7 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Box, Flex, IconButton } from '@invoke-ai/ui-library';
+import { useAppStore } from 'app/store/storeHooks';
 import { typedMemo } from 'common/util/typedMemo';
 import type {
   CollectionMetadataHandler,
+  ParsedSuccessData,
   SingleMetadataHandler,
   UnrecallableMetadataHandler,
 } from 'features/metadata/parsing';
@@ -11,7 +14,7 @@ import {
   useSingleMetadataDatum,
   useUnrecallableMetadataDatum,
 } from 'features/metadata/parsing';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { PiArrowBendUpLeftBold } from 'react-icons/pi';
 
 type Props = {
@@ -69,76 +72,83 @@ const UnrecallableMetadataDatum = typedMemo(
     }
 
     if (data.isSuccess) {
-      const { LabelComponent, ValueComponent } = handler;
-
-      return (
-        <Box as="span" lineHeight={1}>
-          <LabelComponent value={data.value} />
-          <ValueComponent value={data.value} />
-        </Box>
-      );
+      return <UnrecallableMetadataParsed data={data} handler={handler} />;
     }
   }
 );
 UnrecallableMetadataDatum.displayName = 'UnrecallableMetadataDatum';
 
+const UnrecallableMetadataParsed = typedMemo(
+  <T,>({ data, handler }: { data: ParsedSuccessData<T>; handler: UnrecallableMetadataHandler<T> }) => {
+    const { LabelComponent, ValueComponent } = handler;
+
+    return (
+      <Box as="span" lineHeight={1}>
+        <LabelComponent value={data.value} />
+        <ValueComponent value={data.value} />
+      </Box>
+    );
+  }
+);
+UnrecallableMetadataParsed.displayName = 'UnrecallableMetadataParsed';
+
 const SingleMetadataDatum = typedMemo(
   <T,>({ metadata, handler }: { metadata: unknown; handler: SingleMetadataHandler<T> }) => {
-    const { data, recall } = useSingleMetadataDatum(metadata, handler);
+    const { data } = useSingleMetadataDatum(metadata, handler);
 
     if (!data.isParsed) {
       return null;
     }
 
     if (data.isSuccess) {
-      const { LabelComponent, ValueComponent } = handler;
-      return (
-        <Flex gap={2}>
-          <IconButton
-            aria-label="Recall Parameter"
-            icon={<PiArrowBendUpLeftBold />}
-            size="xs"
-            variant="ghost"
-            onClick={recall}
-          />
-          <Box as="span" lineHeight={1}>
-            <LabelComponent value={data.value} />
-            <ValueComponent value={data.value} />
-          </Box>
-        </Flex>
-      );
+      return <SingleMetadataParsed data={data} handler={handler} />;
     }
   }
 );
 SingleMetadataDatum.displayName = 'SingleMetadataDatum';
 
+const SingleMetadataParsed = typedMemo(
+  <T,>({ data, handler }: { data: ParsedSuccessData<T>; handler: SingleMetadataHandler<T> }) => {
+    const store = useAppStore();
+
+    const { LabelComponent, ValueComponent } = handler;
+
+    const onClick = useCallback(() => {
+      handler.recall(data.value, store);
+    }, [data.value, handler, store]);
+
+    return (
+      <Flex gap={2}>
+        <IconButton
+          aria-label="Recall Parameter"
+          icon={<PiArrowBendUpLeftBold />}
+          size="xs"
+          variant="ghost"
+          onClick={onClick}
+        />
+        <Box as="span" lineHeight={1}>
+          <LabelComponent value={data.value} />
+          <ValueComponent value={data.value} />
+        </Box>
+      </Flex>
+    );
+  }
+);
+SingleMetadataParsed.displayName = 'SingleMetadataParsed';
+
 const CollectionMetadataDatum = typedMemo(
   <T extends any[]>({ metadata, handler }: { metadata: unknown; handler: CollectionMetadataHandler<T> }) => {
-    const { data, recallAll, recallItem } = useCollectionMetadataDatum(metadata, handler);
+    const { data } = useCollectionMetadataDatum(metadata, handler);
 
     if (!data.isParsed) {
       return null;
     }
 
     if (data.isSuccess) {
-      const { LabelComponent, ValueComponent } = handler;
-
       return (
         <>
           {data.value.map((value, i) => (
-            <Flex gap={2} key={i}>
-              <IconButton
-                aria-label="Recall Parameter"
-                icon={<PiArrowBendUpLeftBold />}
-                size="xs"
-                variant="ghost"
-                onClick={() => recallItem(value)}
-              />
-              <Box as="span" lineHeight={1}>
-                <LabelComponent values={data.value} i={i} />
-                <ValueComponent value={value} />
-              </Box>
-            </Flex>
+            <CollectionMetadataParsed key={i} value={value} i={i} handler={handler} data={data} />
           ))}
         </>
       );
@@ -146,3 +156,42 @@ const CollectionMetadataDatum = typedMemo(
   }
 );
 CollectionMetadataDatum.displayName = 'CollectionMetadataDatum';
+
+const CollectionMetadataParsed = typedMemo(
+  <T extends any[]>({
+    value,
+    i,
+    data,
+    handler,
+  }: {
+    value: T[number];
+    i: number;
+    data: ParsedSuccessData<T>;
+    handler: CollectionMetadataHandler<T>;
+  }) => {
+    const store = useAppStore();
+
+    const { LabelComponent, ValueComponent } = handler;
+
+    const onClick = useCallback(() => {
+      handler.recallOne(value, store);
+    }, [handler, store, value]);
+
+    return (
+      <Flex gap={2}>
+        <IconButton
+          aria-label="Recall Parameter"
+          icon={<PiArrowBendUpLeftBold />}
+          size="xs"
+          variant="ghost"
+          onClick={onClick}
+        />
+        <Box as="span" lineHeight={1}>
+          <LabelComponent values={data.value} i={i} />
+          <ValueComponent value={value} />
+        </Box>
+      </Flex>
+    );
+  }
+);
+CollectionMetadataParsed.displayName = 'CollectionMetadataParsed';
