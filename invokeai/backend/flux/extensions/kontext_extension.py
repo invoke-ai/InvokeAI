@@ -1,7 +1,7 @@
 import einops
+import numpy as np
 import torch
 from einops import repeat
-import numpy as np
 from PIL import Image
 
 from invokeai.app.invocations.fields import FluxKontextConditioningField
