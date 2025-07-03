@@ -25,7 +25,7 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
   // });
   const { t } = useTranslation();
 
-  const { metadata } = useDebouncedMetadata(image.image_name);
+  const { metadata, isLoading } = useDebouncedMetadata(image.image_name);
   const createdBy = useMetadataItem(metadata, handlers.createdBy);
 
   return (
@@ -58,7 +58,7 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
 
         <TabPanels>
           <TabPanel>
-            {metadata ? (
+            {metadata && !isLoading ? (
               <ScrollableContent>
                 <ImageMetadataActions metadata={metadata} />
               </ScrollableContent>
