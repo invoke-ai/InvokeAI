@@ -1,13 +1,15 @@
 import einops
 import torch
 from einops import repeat
+import numpy as np
+from PIL import Image
 
 from invokeai.app.invocations.fields import FluxKontextConditioningField
 from invokeai.app.invocations.flux_vae_encode import FluxVaeEncodeInvocation
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import pack
-from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
+from invokeai.backend.flux.util import PREFERED_KONTEXT_RESOLUTIONS
 
 
 def generate_img_ids_with_offset(
@@ -71,7 +73,7 @@ class KontextExtension:
 
     def __init__(
         self,
-        kontext_field: FluxKontextConditioningField,
+        kontext_conditioning: FluxKontextConditioningField,
         context: InvocationContext,
         vae_field: VAEField,
         device: torch.device,
@@ -85,30 +87,53 @@ class KontextExtension:
         self._device = device
         self._dtype = dtype
         self._vae_field = vae_field
-        self.kontext_field = kontext_field
+        self.kontext_conditioning = kontext_conditioning
 
         # Pre-process and cache the kontext latents and ids upon initialization.
         self.kontext_latents, self.kontext_ids = self._prepare_kontext()
 
     def _prepare_kontext(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Encodes the reference image and prepares its latents and IDs."""
-        image = self._context.images.get_pil(self.kontext_field.image.image_name)
-
-        # Reuse VAE encoding logic from FluxVaeEncodeInvocation
-        vae_info = self._context.models.load(self._vae_field.vae)
-        image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
-        if image_tensor.dim() == 3:
-            image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
+        image = self._context.images.get_pil(self.kontext_conditioning.image.image_name)
+        
+        # Calculate aspect ratio of input image
+        width, height = image.size
+        aspect_ratio = width / height
+        
+        # Find the closest preferred resolution by aspect ratio
+        _, target_width, target_height = min(
+            ((abs(aspect_ratio - w / h), w, h) for w, h in PREFERED_KONTEXT_RESOLUTIONS),
+            key=lambda x: x[0]
+        )
+        
+        # Apply BFL's scaling formula
+        # This ensures compatibility with the model's training
+        scaled_width = 2 * int(target_width / 16)
+        scaled_height = 2 * int(target_height / 16)
+        
+        # Resize to the exact resolution used during training
+        image = image.convert("RGB")
+        final_width = 8 * scaled_width
+        final_height = 8 * scaled_height
+        image = image.resize((final_width, final_height), Image.Resampling.LANCZOS)
+        
+        # Convert to tensor with same normalization as BFL
+        image_np = np.array(image)
+        image_tensor = torch.from_numpy(image_np).float() / 127.5 - 1.0
+        image_tensor = einops.rearrange(image_tensor, "h w c -> 1 c h w")
         image_tensor = image_tensor.to(self._device)
-
-        kontext_latents_unpacked = FluxVaeEncodeInvocation.vae_encode(vae_info=vae_info, image_tensor=image_tensor)
-
-        # Extract tensor dimensions with descriptive names
-        # Latent tensor shape: [batch_size, channels, latent_height, latent_width]
+        
+        # Continue with VAE encoding
+        vae_info = self._context.models.load(self._vae_field.vae)
+        kontext_latents_unpacked = FluxVaeEncodeInvocation.vae_encode(
+            vae_info=vae_info, 
+            image_tensor=image_tensor
+        )
+        
+        # Extract tensor dimensions
         batch_size, _, latent_height, latent_width = kontext_latents_unpacked.shape
-
-        # Pack the latents and generate IDs. The idx_offset distinguishes these
-        # tokens from the main image's tokens, which have an index of 0.
+        
+        # Pack the latents and generate IDs
         kontext_latents_packed = pack(kontext_latents_unpacked).to(self._device, self._dtype)
         kontext_ids = generate_img_ids_with_offset(
             latent_height=latent_height,
@@ -116,24 +141,13 @@ class KontextExtension:
             batch_size=batch_size,
             device=self._device,
             dtype=self._dtype,
-            idx_offset=1,  # Distinguishes reference tokens from main image tokens
+            idx_offset=1,
         )
-
+        
         return kontext_latents_packed, kontext_ids
 
-    def apply(
-        self,
-        img: torch.Tensor,
-        img_ids: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Concatenates the pre-processed kontext data to the main image sequence."""
-        # Ensure batch sizes match, repeating kontext data if necessary for batch operations.
-        if img.shape[0] != self.kontext_latents.shape[0]:
-            self.kontext_latents = self.kontext_latents.repeat(img.shape[0], 1, 1)
-            self.kontext_ids = self.kontext_ids.repeat(img.shape[0], 1, 1)
-
-        # Concatenate along the sequence dimension (dim=1)
-        combined_img = torch.cat([img, self.kontext_latents], dim=1)
-        combined_img_ids = torch.cat([img_ids, self.kontext_ids], dim=1)
-
-        return combined_img, combined_img_ids
+    def ensure_batch_size(self, target_batch_size: int) -> None:
+        """Ensures the kontext latents and IDs match the target batch size by repeating if necessary."""
+        if self.kontext_latents.shape[0] != target_batch_size:
+            self.kontext_latents = self.kontext_latents.repeat(target_batch_size, 1, 1)
+            self.kontext_ids = self.kontext_ids.repeat(target_batch_size, 1, 1)
