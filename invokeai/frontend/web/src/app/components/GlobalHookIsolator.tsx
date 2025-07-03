@@ -1,4 +1,5 @@
 import { useGlobalModifiersInit } from '@invoke-ai/ui-library';
+import { setupListeners } from '@reduxjs/toolkit/query';
 import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
 import { useStudioInitAction } from 'app/hooks/useStudioInitAction';
 import { useSyncQueueStatus } from 'app/hooks/useSyncQueueStatus';
@@ -60,6 +61,10 @@ export const GlobalHookIsolator = memo(
 
     useEffect(() => {
       dispatch(appStarted());
+    }, [dispatch]);
+
+    useEffect(() => {
+      return setupListeners(dispatch);
     }, [dispatch]);
 
     useStudioInitAction(studioInitAction);
