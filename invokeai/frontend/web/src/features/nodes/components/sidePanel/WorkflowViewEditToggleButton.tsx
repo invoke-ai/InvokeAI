@@ -2,7 +2,7 @@ import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectWorkflowMode, workflowModeChanged } from 'features/nodes/store/workflowLibrarySlice';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
-import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
+import { VIEWER_PANEL_ID, WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import type { MouseEventHandler } from 'react';
 import { memo, useCallback } from 'react';
@@ -33,7 +33,7 @@ export const WorkflowViewEditToggleButton = memo(() => {
       dispatch(setActiveTab('workflows'));
       dispatch(workflowModeChanged('view'));
       // Focus the Image Viewer panel
-      navigationApi.focusPanelInTab('workflows', WORKSPACE_PANEL_ID);
+      navigationApi.focusPanelInTab('workflows', VIEWER_PANEL_ID);
     },
     [dispatch]
   );

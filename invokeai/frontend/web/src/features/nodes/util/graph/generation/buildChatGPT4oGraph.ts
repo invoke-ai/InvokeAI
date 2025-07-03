@@ -17,13 +17,13 @@ import { assert } from 'tsafe';
 const log = logger('system');
 
 export const buildChatGPT4oGraph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
-  const { generationMode, state } = arg;
+  const { generationMode, state, manager } = arg;
 
   if (generationMode !== 'txt2img' && generationMode !== 'img2img') {
     throw new UnsupportedGenerationModeError(t('toast.chatGPT4oIncompatibleGenerationMode'));
   }
 
-  log.debug({ generationMode }, 'Building GPT Image graph');
+  log.debug({ generationMode, manager: manager?.id }, 'Building ChatGPT 4o graph');
 
   const model = selectMainModelConfig(state);
 
@@ -39,6 +39,7 @@ export const buildChatGPT4oGraph = async (arg: GraphBuilderArg): Promise<GraphBu
   assert(isChatGPT4oAspectRatioID(bbox.aspectRatio.id), 'ChatGPT 4o does not support this aspect ratio');
 
   const validRefImages = refImages.entities
+    .filter((entity) => entity.isEnabled)
     .filter((entity) => isChatGPT4oReferenceImageConfig(entity.config))
     .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0)
     .toReversed(); // sends them in order they are displayed in the list
@@ -79,8 +80,9 @@ export const buildChatGPT4oGraph = async (arg: GraphBuilderArg): Promise<GraphBu
   }
 
   if (generationMode === 'img2img') {
-    const adapters = arg.canvasManager.compositor.getVisibleAdaptersOfType('raster_layer');
-    const { image_name } = await arg.canvasManager.compositor.getCompositeImageDTO(adapters, bbox.rect, {
+    assert(manager !== null);
+    const adapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
+    const { image_name } = await manager.compositor.getCompositeImageDTO(adapters, bbox.rect, {
       is_intermediate: true,
       silent: true,
     });

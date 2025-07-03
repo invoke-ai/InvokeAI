@@ -12,12 +12,15 @@ import {
 } from 'features/controlLayers/store/refImagesSlice';
 import { isIPAdapterConfig } from 'features/controlLayers/store/types';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { PiExclamationMarkBold, PiImageBold } from 'react-icons/pi';
+import { PiExclamationMarkBold, PiEyeSlashBold, PiImageBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
 const baseSx: SystemStyleObject = {
   '&[data-is-open="true"]': {
     borderColor: 'invokeBlue.300',
+  },
+  '&[data-is-disabled="true"]': {
+    opacity: 0.4,
   },
 };
 
@@ -36,6 +39,9 @@ const getImageSxWithWeight = (weight: number): SystemStyleObject => {
 
   return {
     ...baseSx,
+    '&[data-is-disabled="true"]': {
+      opacity: 0.4,
+    },
     _after: {
       content: '""',
       position: 'absolute',
@@ -97,6 +103,7 @@ export const RefImagePreview = memo(() => {
         flexShrink={0}
         data-is-open={selectedEntityId === id && isPanelOpen}
         data-is-error={true}
+        data-is-disabled={!entity.isEnabled}
         sx={sx}
       />
     );
@@ -114,6 +121,7 @@ export const RefImagePreview = memo(() => {
       sx={sx}
       data-is-open={selectedEntityId === id && isPanelOpen}
       data-is-error={!entity.config.model}
+      data-is-disabled={!entity.isEnabled}
       role="button"
       onClick={onClick}
       cursor="pointer"
@@ -144,7 +152,18 @@ export const RefImagePreview = memo(() => {
           </Text>
         </Flex>
       )}
-      {!entity.config.model && (
+      {!entity.isEnabled ? (
+        <Icon
+          position="absolute"
+          top="50%"
+          left="50%"
+          transform="translateX(-50%) translateY(-50%)"
+          filter="drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 2px rgba(0, 0, 0, 1))"
+          color="base.100"
+          boxSize={6}
+          as={PiEyeSlashBold}
+        />
+      ) : !entity.config.model ? (
         <Icon
           position="absolute"
           top="50%"
@@ -152,10 +171,10 @@ export const RefImagePreview = memo(() => {
           transform="translateX(-50%) translateY(-50%)"
           filter="drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 2px rgba(0, 0, 0, 1))"
           color="error.500"
-          boxSize={16}
+          boxSize={6}
           as={PiExclamationMarkBold}
         />
-      )}
+      ) : null}
     </Flex>
   );
 });

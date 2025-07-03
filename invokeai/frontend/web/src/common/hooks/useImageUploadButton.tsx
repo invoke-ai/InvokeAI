@@ -21,11 +21,15 @@ type UseImageUploadButtonArgs =
       isDisabled?: boolean;
       allowMultiple: false;
       onUpload?: (imageDTO: ImageDTO) => void;
+      onUploadStarted?: (files: File) => void;
+      onError?: (error: unknown) => void;
     }
   | {
       isDisabled?: boolean;
       allowMultiple: true;
       onUpload?: (imageDTOs: ImageDTO[]) => void;
+      onUploadStarted?: (files: File[]) => void;
+      onError?: (error: unknown) => void;
     };
 
 const log = logger('gallery');
@@ -49,7 +53,13 @@ const log = logger('gallery');
  * <Button {...getUploadButtonProps()} /> // will open the file dialog on click
  * <input {...getUploadInputProps()} /> // hidden, handles native upload functionality
  */
-export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: UseImageUploadButtonArgs) => {
+export const useImageUploadButton = ({
+  onUpload,
+  isDisabled,
+  allowMultiple,
+  onUploadStarted,
+  onError,
+}: UseImageUploadButtonArgs) => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const isClientSideUploadEnabled = useAppSelector(selectIsClientSideUploadEnabled);
   const [uploadImage, request] = useUploadImageMutation();
@@ -71,6 +81,7 @@ export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: Us
           }
           const file = files[0];
           assert(file !== undefined); // should never happen
+          onUploadStarted?.(file);
           const imageDTO = await uploadImage({
             file,
             image_category: 'user',
@@ -82,6 +93,8 @@ export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: Us
             onUpload(imageDTO);
           }
         } else {
+          onUploadStarted?.(files);
+
           let imageDTOs: ImageDTO[] = [];
           if (isClientSideUploadEnabled && files.length > 1) {
             imageDTOs = await Promise.all(files.map((file, i) => clientSideUpload(file, i)));
@@ -102,6 +115,7 @@ export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: Us
           }
         }
       } catch (error) {
+        onError?.(error);
         toast({
           id: 'UPLOAD_FAILED',
           title: t('toast.imageUploadFailed'),
@@ -109,7 +123,17 @@ export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: Us
         });
       }
     },
-    [allowMultiple, autoAddBoardId, onUpload, uploadImage, isClientSideUploadEnabled, clientSideUpload, t]
+    [
+      allowMultiple,
+      onUploadStarted,
+      uploadImage,
+      autoAddBoardId,
+      onUpload,
+      isClientSideUploadEnabled,
+      clientSideUpload,
+      onError,
+      t,
+    ]
   );
 
   const onDropRejected = useCallback(

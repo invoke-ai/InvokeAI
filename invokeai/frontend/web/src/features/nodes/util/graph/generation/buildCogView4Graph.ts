@@ -24,8 +24,8 @@ import { assert } from 'tsafe';
 const log = logger('system');
 
 export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
-  const { generationMode, state } = arg;
-  log.debug({ generationMode }, 'Building CogView4 graph');
+  const { generationMode, state, manager } = arg;
+  log.debug({ generationMode, manager: manager?.id }, 'Building CogView4 graph');
 
   const params = selectParamsSlice(state);
   const canvas = selectCanvasSlice(state);
@@ -104,9 +104,10 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
     canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
     g.upsertMetadata({ generation_mode: 'cogview4_txt2img' });
   } else if (generationMode === 'img2img') {
+    assert(manager !== null);
     canvasOutput = await addImageToImage({
       g,
-      manager: arg.canvasManager,
+      manager,
       l2i,
       i2lNodeType: 'cogview4_i2l',
       denoise,
@@ -119,10 +120,11 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
     });
     g.upsertMetadata({ generation_mode: 'cogview4_img2img' });
   } else if (generationMode === 'inpaint') {
+    assert(manager !== null);
     canvasOutput = await addInpaint({
       state,
       g,
-      manager: arg.canvasManager,
+      manager,
       l2i,
       i2lNodeType: 'cogview4_i2l',
       denoise,
@@ -136,10 +138,11 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
     });
     g.upsertMetadata({ generation_mode: 'cogview4_inpaint' });
   } else if (generationMode === 'outpaint') {
+    assert(manager !== null);
     canvasOutput = await addOutpaint({
       state,
       g,
-      manager: arg.canvasManager,
+      manager,
       l2i,
       i2lNodeType: 'cogview4_i2l',
       denoise,

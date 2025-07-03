@@ -270,7 +270,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
     outputNodeId: string;
     options?: RunGraphOptions;
   }): Promise<ImageDTO> => {
-    const dependencies = buildRunGraphDependencies(this.store, this.manager.socket);
+    const dependencies = buildRunGraphDependencies(this.store.dispatch, this.manager.socket);
 
     const { output } = await runGraph({
       dependencies,

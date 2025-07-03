@@ -1,7 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import { pick } from 'es-toolkit/compat';
-import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import type { CanvasState, ParamsState } from 'features/controlLayers/store/types';
@@ -14,7 +13,7 @@ import { selectListStylePresetsRequestState } from 'services/api/endpoints/style
 import type { Invocation, S } from 'services/api/types';
 import { assert } from 'tsafe';
 
-import type { GraphBuilderArg, MainModelLoaderNodes } from './types';
+import type { MainModelLoaderNodes } from './types';
 
 /**
  * Gets the board field, based on the autoAddBoardId setting.
@@ -165,20 +164,4 @@ export const isCanvasOutputNodeId = (nodeId: string) => nodeId.split(':')[0] ===
 
 export const isCanvasOutputEvent = (data: S['InvocationCompleteEvent']) => {
   return isCanvasOutputNodeId(data.invocation_source_id);
-};
-
-export const getGraphBuilderArg = async (
-  state: RootState,
-  canvasManager: CanvasManager | null
-): Promise<GraphBuilderArg> => {
-  const tab = selectActiveTab(state);
-  if (tab === 'generate') {
-    return { generationMode: 'txt2img', state };
-  } else if (tab === 'canvas') {
-    assert(canvasManager !== null, 'CanvasManager should not be null in canvas tab');
-    const generationMode = await canvasManager.compositor.getGenerationMode();
-    return { generationMode, state, canvasManager };
-  } else {
-    assert(false, `Unknown tab: ${tab}`);
-  }
 };

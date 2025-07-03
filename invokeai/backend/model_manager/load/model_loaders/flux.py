@@ -7,7 +7,14 @@ from typing import Optional
 import accelerate
 import torch
 from safetensors.torch import load_file
-from transformers import AutoConfig, AutoModelForTextEncoding, CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
+from transformers import (
+    AutoConfig,
+    AutoModelForTextEncoding,
+    CLIPTextModel,
+    CLIPTokenizer,
+    T5EncoderModel,
+    T5TokenizerFast,
+)
 
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.flux.controlnet.instantx_controlnet_flux import InstantXControlNetFlux
@@ -139,7 +146,7 @@ class BnbQuantizedLlmInt8bCheckpointModel(ModelLoader):
             )
         match submodel_type:
             case SubModelType.Tokenizer2 | SubModelType.Tokenizer3:
-                return T5Tokenizer.from_pretrained(Path(config.path) / "tokenizer_2", max_length=512)
+                return T5TokenizerFast.from_pretrained(Path(config.path) / "tokenizer_2", max_length=512)
             case SubModelType.TextEncoder2 | SubModelType.TextEncoder3:
                 te2_model_path = Path(config.path) / "text_encoder_2"
                 model_config = AutoConfig.from_pretrained(te2_model_path)
@@ -183,7 +190,7 @@ class T5EncoderCheckpointModel(ModelLoader):
 
         match submodel_type:
             case SubModelType.Tokenizer2 | SubModelType.Tokenizer3:
-                return T5Tokenizer.from_pretrained(Path(config.path) / "tokenizer_2", max_length=512)
+                return T5TokenizerFast.from_pretrained(Path(config.path) / "tokenizer_2", max_length=512)
             case SubModelType.TextEncoder2 | SubModelType.TextEncoder3:
                 return T5EncoderModel.from_pretrained(
                     Path(config.path) / "text_encoder_2", torch_dtype="auto", low_cpu_mem_usage=True

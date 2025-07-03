@@ -302,6 +302,7 @@ const zCanvasEntityBase = z.object({
 
 const zRefImageState = z.object({
   id: zId,
+  isEnabled: z.boolean().default(true),
   // This should be named `referenceImage` but we need to keep it as `ipAdapter` for backwards compatibility
   config: z.discriminatedUnion('type', [
     zIPAdapterConfig,

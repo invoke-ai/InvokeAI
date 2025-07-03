@@ -15,7 +15,7 @@ import type {
   SQLiteDirection,
   UploadImageArg,
 } from 'services/api/types';
-import { getCategories, getListImagesUrl } from 'services/api/util';
+import { getListImagesUrl } from 'services/api/util';
 import stableHash from 'stable-hash';
 import type { Param0 } from 'tsafe';
 import type { JsonObject } from 'type-fest';
@@ -270,25 +270,13 @@ export const imagesApi = api.injectEndpoints({
           // Don't add it to anything
           return [];
         }
-        const categories = getCategories(result);
         const boardId = result.board_id ?? 'none';
 
         return [
-          {
-            type: 'ImageList',
-            id: getListImagesUrl({
-              board_id: boardId,
-              categories,
-            }),
-          },
-          {
-            type: 'Board',
-            id: boardId,
-          },
-          {
-            type: 'BoardImagesTotal',
-            id: boardId,
-          },
+          ...getTagsToInvalidateForImageMutation([result.image_name]),
+          ...getTagsToInvalidateForBoardAffectingMutation([boardId]),
+          'ImageCollectionCounts',
+          { type: 'ImageCollection', id: LIST_TAG },
         ];
       },
     }),

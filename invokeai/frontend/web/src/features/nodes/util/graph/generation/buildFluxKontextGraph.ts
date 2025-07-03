@@ -17,13 +17,13 @@ import { assert } from 'tsafe';
 const log = logger('system');
 
 export const buildFluxKontextGraph = (arg: GraphBuilderArg): GraphBuilderReturn => {
-  const { generationMode, state } = arg;
+  const { generationMode, state, manager } = arg;
 
   if (generationMode !== 'txt2img') {
     throw new UnsupportedGenerationModeError(t('toast.imagenIncompatibleGenerationMode', { model: 'FLUX Kontext' }));
   }
 
-  log.debug({ generationMode }, 'Building Flux Kontext graph');
+  log.debug({ generationMode, manager: manager?.id }, 'Building FLUX Kontext graph');
 
   const model = selectMainModelConfig(state);
 
@@ -37,6 +37,7 @@ export const buildFluxKontextGraph = (arg: GraphBuilderArg): GraphBuilderReturn 
   assert(model.base === 'flux-kontext', 'Model is not a Flux Kontext model');
 
   const validRefImages = refImages.entities
+    .filter((entity) => entity.isEnabled)
     .filter((entity) => isFluxKontextReferenceImageConfig(entity.config))
     .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0)
     .toReversed(); // sends them in order they are displayed in the list

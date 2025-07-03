@@ -36,6 +36,7 @@ import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
 import { getGridSize } from 'features/parameters/util/optimalDimension';
+import { promptExpansionApi, type PromptExpansionRequestState } from 'features/prompt/PromptExpansion/state';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
@@ -89,9 +90,22 @@ const debouncedUpdateReasons = debounce(
     config: AppConfig,
     store: AppStore,
     isInPublishFlow: boolean,
-    isChatGPT4oHighModelDisabled: (model: ParameterModel) => boolean
+    isChatGPT4oHighModelDisabled: (model: ParameterModel) => boolean,
+    promptExpansionRequest: PromptExpansionRequestState
   ) => {
-    if (tab === 'canvas') {
+    if (tab === 'generate') {
+      const model = selectMainModelConfig(store.getState());
+      const reasons = await getReasonsWhyCannotEnqueueGenerateTab({
+        isConnected,
+        model,
+        params,
+        refImages,
+        dynamicPrompts,
+        isChatGPT4oHighModelDisabled,
+        promptExpansionRequest,
+      });
+      $reasonsWhyCannotEnqueue.set(reasons);
+    } else if (tab === 'canvas') {
       const model = selectMainModelConfig(store.getState());
       const reasons = await getReasonsWhyCannotEnqueueCanvasTab({
         isConnected,
@@ -106,6 +120,7 @@ const debouncedUpdateReasons = debounce(
         canvasIsCompositing,
         canvasIsSelectingObject,
         isChatGPT4oHighModelDisabled,
+        promptExpansionRequest,
       });
       $reasonsWhyCannotEnqueue.set(reasons);
     } else if (tab === 'workflows') {
@@ -124,6 +139,7 @@ const debouncedUpdateReasons = debounce(
         upscale,
         config,
         params,
+        promptExpansionRequest,
       });
       $reasonsWhyCannotEnqueue.set(reasons);
     } else {
@@ -155,6 +171,7 @@ export const useReadinessWatcher = () => {
   const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $false);
   const isInPublishFlow = useStore($isInPublishFlow);
   const { isChatGPT4oHighModelDisabled } = useIsModelDisabled();
+  const promptExpansionRequest = useStore(promptExpansionApi.$state);
 
   useEffect(() => {
     debouncedUpdateReasons(
@@ -176,7 +193,8 @@ export const useReadinessWatcher = () => {
       config,
       store,
       isInPublishFlow,
-      isChatGPT4oHighModelDisabled
+      isChatGPT4oHighModelDisabled,
+      promptExpansionRequest
     );
   }, [
     store,
@@ -198,11 +216,88 @@ export const useReadinessWatcher = () => {
     workflowSettings,
     isInPublishFlow,
     isChatGPT4oHighModelDisabled,
+    promptExpansionRequest,
   ]);
 };
 
 const disconnectedReason = (t: typeof i18n.t) => ({ content: t('parameters.invoke.systemDisconnected') });
 
+const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
+  isConnected: boolean;
+  model: MainModelConfig | null | undefined;
+  params: ParamsState;
+  refImages: RefImagesState;
+  dynamicPrompts: DynamicPromptsState;
+  isChatGPT4oHighModelDisabled: (model: ParameterModel) => boolean;
+  promptExpansionRequest: PromptExpansionRequestState;
+}) => {
+  const {
+    isConnected,
+    model,
+    params,
+    refImages,
+    dynamicPrompts,
+    isChatGPT4oHighModelDisabled,
+    promptExpansionRequest,
+  } = arg;
+  const { positivePrompt } = params;
+  const reasons: Reason[] = [];
+
+  if (!isConnected) {
+    reasons.push(disconnectedReason(i18n.t));
+  }
+
+  if (dynamicPrompts.prompts.length === 0 && getShouldProcessPrompt(positivePrompt)) {
+    reasons.push({ content: i18n.t('parameters.invoke.noPrompts') });
+  }
+
+  if (!model) {
+    reasons.push({ content: i18n.t('parameters.invoke.noModelSelected') });
+  }
+
+  if (model?.base === 'flux') {
+    if (!params.t5EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noT5EncoderModelSelected') });
+    }
+    if (!params.clipEmbedModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noCLIPEmbedModelSelected') });
+    }
+    if (!params.fluxVAE) {
+      reasons.push({ content: i18n.t('parameters.invoke.noFLUXVAEModelSelected') });
+    }
+  }
+
+  if (model && isChatGPT4oHighModelDisabled(model)) {
+    reasons.push({ content: i18n.t('parameters.invoke.modelDisabledForTrial', { modelName: model.name }) });
+  }
+
+  if (promptExpansionRequest.isPending) {
+    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionPending') });
+  } else if (promptExpansionRequest.isSuccess) {
+    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionResultPending') });
+  }
+
+  // Flux Kontext only supports 1x Reference Image at a time.
+  const referenceImageCount = refImages.entities.length;
+
+  if (model?.base === 'flux-kontext' && referenceImageCount > 1) {
+    reasons.push({ content: i18n.t('parameters.invoke.fluxKontextMultipleReferenceImages') });
+  }
+
+  refImages.entities.forEach((entity, i) => {
+    const layerNumber = i + 1;
+    const refImageLiteral = i18n.t(LAYER_TYPE_TO_TKEY['reference_image']);
+    const prefix = `${refImageLiteral} #${layerNumber}`;
+    const problems = getGlobalReferenceImageWarnings(entity, model);
+
+    if (problems.length) {
+      const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
+      reasons.push({ prefix, content });
+    }
+  });
+
+  return reasons;
+};
 const getReasonsWhyCannotEnqueueWorkflowsTab = async (arg: {
   dispatch: AppDispatch;
   nodesState: NodesState;
@@ -293,8 +388,9 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
   upscale: UpscaleState;
   config: AppConfig;
   params: ParamsState;
+  promptExpansionRequest: PromptExpansionRequestState;
 }) => {
-  const { isConnected, upscale, config, params } = arg;
+  const { isConnected, upscale, config, params, promptExpansionRequest } = arg;
   const reasons: Reason[] = [];
 
   if (!isConnected) {
@@ -331,6 +427,12 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
     }
   }
 
+  if (promptExpansionRequest.isPending) {
+    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionPending') });
+  } else if (promptExpansionRequest.isSuccess) {
+    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionResultPending') });
+  }
+
   return reasons;
 };
 
@@ -347,6 +449,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   canvasIsCompositing: boolean;
   canvasIsSelectingObject: boolean;
   isChatGPT4oHighModelDisabled: (model: ParameterModel) => boolean;
+  promptExpansionRequest: PromptExpansionRequestState;
 }) => {
   const {
     isConnected,
@@ -361,6 +464,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     canvasIsCompositing,
     canvasIsSelectingObject,
     isChatGPT4oHighModelDisabled,
+    promptExpansionRequest,
   } = arg;
   const { positivePrompt } = params;
   const reasons: Reason[] = [];
@@ -497,6 +601,12 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     reasons.push({ content: i18n.t('parameters.invoke.modelDisabledForTrial', { modelName: model.name }) });
   }
 
+  if (promptExpansionRequest.isPending) {
+    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionPending') });
+  } else if (promptExpansionRequest.isSuccess) {
+    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionResultPending') });
+  }
+
   const enabledControlLayers = canvas.controlLayers.entities.filter((controlLayer) => controlLayer.isEnabled);
 
   // FLUX only supports 1x Control LoRA at a time.
@@ -522,7 +632,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   });
 
   // Flux Kontext only supports 1x Reference Image at a time.
-  const referenceImageCount = refImages.entities.length;
+  const referenceImageCount = refImages.entities.filter((entity) => entity.isEnabled).length;
 
   if (model?.base === 'flux-kontext' && referenceImageCount > 1) {
     reasons.push({ content: i18n.t('parameters.invoke.fluxKontextMultipleReferenceImages') });

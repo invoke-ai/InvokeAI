@@ -14,13 +14,13 @@ import { assert } from 'tsafe';
 const log = logger('system');
 
 export const buildImagen3Graph = (arg: GraphBuilderArg): GraphBuilderReturn => {
-  const { generationMode, state } = arg;
+  const { generationMode, state, manager } = arg;
 
   if (generationMode !== 'txt2img') {
     throw new UnsupportedGenerationModeError(t('toast.imagenIncompatibleGenerationMode', { model: 'Imagen3' }));
   }
 
-  log.debug({ generationMode }, 'Building Imagen3 graph');
+  log.debug({ generationMode, manager: manager?.id }, 'Building Imagen3 graph');
 
   const canvas = selectCanvasSlice(state);
 
