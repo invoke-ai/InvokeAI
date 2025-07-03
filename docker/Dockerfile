@@ -54,9 +54,9 @@ ENV \
 
 ARG GPU_DRIVER=cuda
 
-ARG CUDA_TORCH="https://download.pytorch.org/whl/cu124"
+ARG CUDA_TORCH="https://download.pytorch.org/whl/cu128"
 ARG CPU_TORCH="https://download.pytorch.org/whl/cpu"
-ARG ROCM_TORCH="https://download.pytorch.org/whl/rocm6.2.4"
+ARG ROCM_TORCH="https://download.pytorch.org/whl/rocm6.3"
 
 # Install `uv` for package management
 COPY --from=ghcr.io/astral-sh/uv:0.6.9 /uv /uvx /bin/
@@ -76,8 +76,7 @@ WORKDIR ${INVOKEAI_SRC}
 # x86_64/CUDA is the default
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    # Cannot use uv sync and uv.lock as that is locked to CUDA version packages, which breaks rocm...
-    # --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
     # this is just to get the package manager to recognize that the project exists, without making changes to the docker layer
     --mount=type=bind,source=invokeai/version,target=invokeai/version \
     ulimit -n 30000 && \
@@ -85,9 +84,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     elif [ "$GPU_DRIVER" = "rocm" ]; then export UV_INDEX="$ROCM_TORCH"; \
     else export UV_INDEX="$CUDA_TORCH"; \
     fi && \
-    uv venv --python 3.12 && \
-    # Use the public version to install existing known dependencies but using the UV_INDEX, not the hardcoded URLs within the uv.lock
-    uv pip install invokeai
+    uv sync --group $GPU_DRIVER --frozen
 
 RUN --mount=type=cache,target=/var/cache/apt \
     --mount=type=cache,target=/var/lib/apt \
@@ -106,6 +103,20 @@ RUN --mount=type=cache,target=/var/cache/apt \
     ldconfig && \
     update-alternatives --auto rocm; \
     fi
+
+## Heathen711: Leaving this for review input, will remove before merge
+# RUN --mount=type=cache,target=/var/cache/apt \
+#     --mount=type=cache,target=/var/lib/apt \
+#     if [ "$GPU_DRIVER" = "rocm" ]; then \
+#     groupadd render && \
+#     usermod -a -G render ubuntu && \
+#     usermod -a -G video ubuntu; \
+#     fi
+
+## Link amdgpu.ids for ROCm builds
+## contributed by https://github.com/Rubonnek
+# RUN mkdir -p "/opt/amdgpu/share/libdrm" &&\
+#     ln -s "/usr/share/libdrm/amdgpu.ids" "/opt/amdgpu/share/libdrm/amdgpu.ids"
 
 # build patchmatch
 RUN cd /usr/lib/$(uname -p)-linux-gnu/pkgconfig/ && ln -sf opencv4.pc opencv.pc
@@ -127,12 +138,11 @@ COPY invokeai ${INVOKEAI_SRC}/invokeai
 # in a previous layer
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    # Cannot use the uv.lock as that is locked to CUDA version packages, which breaks rocm...
-    # --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
     ulimit -n 30000 && \
     if [ "$TARGETPLATFORM" = "linux/arm64" ] || [ "$GPU_DRIVER" = "cpu" ]; then export UV_INDEX="$CPU_TORCH"; \
     elif [ "$GPU_DRIVER" = "rocm" ]; then export UV_INDEX="$ROCM_TORCH"; \
     else export UV_INDEX="$CUDA_TORCH"; \
     fi && \
-    uv pip install -e .
+    uv pip install -e .[$GPU_DRIVER]
 

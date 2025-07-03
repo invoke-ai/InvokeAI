@@ -73,8 +73,13 @@ dependencies = [
   "pypatchmatch",
   "python-multipart",
   "requests",
-  "semver~=3.0.1"
+  "semver~=3.0.1",
 ]
+
+[dependency-groups]
+cpu = ["torch==2.7.1+cpu"]
+cuda = ["torch==2.7.1+cu128"]
+rocm = ["torch==2.7.1+rocm6.3"]
 
 [project.optional-dependencies]
 "xformers" = [
@@ -82,6 +87,17 @@ dependencies = [
   "xformers>=0.0.28.post1; sys_platform!='darwin'",
   # torch 2.4+cu carries its own triton dependency
 ]
+
+# These enable the usage of installing the package with specific support.
+# uv pip install .[rocm] --python 3.12 --python-preference only-managed --force-reinstall --index-strategy unsafe-best-match
+# Problem is that these break `uv lock --index-strategy unsafe-best-match`
+# This does work though, as the pyproject.toml has the indexes defined.
+# uv pip install . torch==2.7.1+rocm6.3 --force-reinstall --index-strategy unsafe-best-match
+# Maybe we update the docs to show these instead of the --index way?
+
+# cpu = ["torch==2.7.1+cpu"]
+# cuda = ["torch==2.7.1+cu128"]
+# rocm = ["torch==2.7.1+rocm6.3"]
 
 "onnx" = ["onnxruntime"]
 "onnx-cuda" = ["onnxruntime-gpu"]
@@ -113,6 +129,24 @@ dependencies = [
 # Prevent opencv-python from ever being chosen during dependency resolution.
 # This prevents conflicts with opencv-contrib-python, which Invoke requires.
 override-dependencies = ["opencv-python; sys_platform=='never'"]
+conflicts = [[{ group = "cpu" }, { group = "cuda" }, { group = "rocm" }]]
+
+# This will cause: `uv lock --index-strategy unsafe-best-match` to be needed for future locks
+# If you are updating these, make sure to update the docker/Dockerfile as well.
+[[tool.uv.index]]
+name = "torch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+group = "cpu"
+
+[[tool.uv.index]]
+name = "torch-cuda"
+url = "https://download.pytorch.org/whl/cu128"
+group = "cuda"
+
+[[tool.uv.index]]
+name = "torch-rocm"
+url = "https://download.pytorch.org/whl/rocm6.3"
+group = "rocm"
 
 
 [project.scripts]
