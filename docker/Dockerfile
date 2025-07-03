@@ -54,10 +54,6 @@ ENV \
 
 ARG GPU_DRIVER=cuda
 
-ARG CUDA_TORCH="https://download.pytorch.org/whl/cu128"
-ARG CPU_TORCH="https://download.pytorch.org/whl/cpu"
-ARG ROCM_TORCH="https://download.pytorch.org/whl/rocm6.3"
-
 # Install `uv` for package management
 COPY --from=ghcr.io/astral-sh/uv:0.6.9 /uv /uvx /bin/
 
@@ -80,10 +76,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     # this is just to get the package manager to recognize that the project exists, without making changes to the docker layer
     --mount=type=bind,source=invokeai/version,target=invokeai/version \
     ulimit -n 30000 && \
-    if [ "$TARGETPLATFORM" = "linux/arm64" ] || [ "$GPU_DRIVER" = "cpu" ]; then export UV_INDEX="$CPU_TORCH"; \
-    elif [ "$GPU_DRIVER" = "rocm" ]; then export UV_INDEX="$ROCM_TORCH"; \
-    else export UV_INDEX="$CUDA_TORCH"; \
-    fi && \
     uv sync --group $GPU_DRIVER --frozen
 
 RUN --mount=type=cache,target=/var/cache/apt \
@@ -140,9 +132,5 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     ulimit -n 30000 && \
-    if [ "$TARGETPLATFORM" = "linux/arm64" ] || [ "$GPU_DRIVER" = "cpu" ]; then export UV_INDEX="$CPU_TORCH"; \
-    elif [ "$GPU_DRIVER" = "rocm" ]; then export UV_INDEX="$ROCM_TORCH"; \
-    else export UV_INDEX="$CUDA_TORCH"; \
-    fi && \
-    uv pip install -e .[$GPU_DRIVER]
+    uv pip install -e .
 
