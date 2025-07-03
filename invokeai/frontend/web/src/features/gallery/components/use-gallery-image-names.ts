@@ -5,6 +5,7 @@ import { useGetImageNamesQuery } from 'services/api/endpoints/images';
 import { useDebounce } from 'use-debounce';
 
 const getImageNamesQueryOptions = {
+  refetchOnReconnect: true,
   selectFromResult: ({ currentData, isLoading, isFetching }) => ({
     imageNames: currentData?.image_names ?? EMPTY_ARRAY,
     isLoading,
