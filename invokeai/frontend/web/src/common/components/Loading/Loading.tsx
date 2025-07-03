@@ -8,21 +8,16 @@ const Loading = () => {
   return (
     <Flex
       position="absolute"
-      width="100dvw"
-      height="100dvh"
       alignItems="center"
       justifyContent="center"
-      bg="#151519"
-      top={0}
-      right={0}
-      bottom={0}
-      left={0}
+      bg="hsl(220 12% 10% / 1)" // base.900
+      inset={0}
       zIndex={99999}
     >
       <Image src={InvokeLogoWhite} w="8rem" h="8rem" />
       <Spinner
         label="Loading"
-        color="grey"
+        color="hsl(220 12% 68% / 1)" // base.300
         position="absolute"
         size="sm"
         width="24px !important"
