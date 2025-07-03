@@ -112,6 +112,7 @@ export const api = customCreateApi({
   endpoints: () => ({}),
   invalidationBehavior: 'immediately',
   serializeQueryArgs: stableHash,
+  refetchOnReconnect: true,
 });
 
 function getCircularReplacer() {
