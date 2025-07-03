@@ -463,7 +463,7 @@ export class UnexpectedStatusError extends BaseSessionError {
     status: S['SessionQueueItem']['status']
   ) {
     super(queueItemId, session, `Session has unexpected status ${status}.`);
-    this.name = this.constructor.name;
+    this.name = 'UnexpectedStatusError';
     this.status = status;
   }
 }
@@ -473,7 +473,7 @@ export class OutputNodeNotFoundInCompletedSessionError extends BaseSessionError 
 
   constructor(queueItemId: number | null, session: S['SessionQueueItem']['session'], nodeId: string) {
     super(queueItemId, session, `Node '${nodeId}' not found in session.`);
-    this.name = this.constructor.name;
+    this.name = 'OutputNodeNotFoundInCompletedSessionError';
     this.nodeId = nodeId;
   }
 }
@@ -483,7 +483,7 @@ export class ResultNotFoundInCompletedSessionError extends BaseSessionError {
 
   constructor(queueItemId: number | null, session: S['SessionQueueItem']['session'], nodeId: string) {
     super(queueItemId, session, `Result for node '${nodeId}' not found in session.`);
-    this.name = this.constructor.name;
+    this.name = 'ResultNotFoundInCompletedSessionError';
     this.nodeId = nodeId;
   }
 }
@@ -501,7 +501,7 @@ export class SessionFailedError extends BaseSessionError {
     error_traceback?: string | null
   ) {
     super(queueItemId, session, 'Session execution failed');
-    this.name = this.constructor.name;
+    this.name = 'SessionFailedError';
     this.error_type = error_type;
     this.error_traceback = error_traceback;
     this.error_message = error_message;
@@ -511,7 +511,7 @@ export class SessionFailedError extends BaseSessionError {
 export class SessionCanceledError extends BaseSessionError {
   constructor(queueItemId: number | null, session: S['SessionQueueItem']['session']) {
     super(queueItemId, session, 'Session execution was canceled');
-    this.name = this.constructor.name;
+    this.name = 'SessionCanceledError';
   }
 }
 
@@ -524,7 +524,7 @@ export class SessionAbortedError extends BaseQueueItemError {
       ? 'Session execution was aborted via signal and cancellation failed'
       : 'Session execution was aborted via signal';
     super(queueItemId, message);
-    this.name = this.constructor.name;
+    this.name = 'SessionAbortedError';
     this.cancellationFailed = cancellationFailed;
     this.cancellationError = cancellationError;
   }
@@ -539,7 +539,7 @@ export class SessionTimeoutError extends BaseQueueItemError {
       ? 'Session execution timed out and cancellation failed'
       : 'Session execution timed out';
     super(queueItemId, message);
-    this.name = this.constructor.name;
+    this.name = 'SessionTimeoutError';
     this.cancellationFailed = cancellationFailed;
     this.cancellationError = cancellationError;
   }
