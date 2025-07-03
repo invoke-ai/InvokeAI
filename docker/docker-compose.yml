@@ -47,10 +47,6 @@ services:
 
   invokeai-rocm:
     <<: *invokeai
-    image: "ghcr.io/invoke-ai/invokeai:latest-rocm"
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile-rocm
     devices:
       - /dev/kfd:/dev/kfd
       - /dev/dri:/dev/dri
