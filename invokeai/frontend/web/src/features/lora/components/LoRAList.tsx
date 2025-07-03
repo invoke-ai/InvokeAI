@@ -5,19 +5,19 @@ import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
 import { LoRACard } from 'features/lora/components/LoRACard';
 import { memo } from 'react';
 
-const selectLoRAsArray = createMemoizedSelector(selectLoRAsSlice, (loras) => loras.loras);
+const selectLoRAIds = createMemoizedSelector(selectLoRAsSlice, (loras) => loras.loras.map(({ id }) => id));
 
 export const LoRAList = memo(() => {
-  const lorasArray = useAppSelector(selectLoRAsArray);
+  const ids = useAppSelector(selectLoRAIds);
 
-  if (!lorasArray.length) {
+  if (!ids.length) {
     return null;
   }
 
   return (
     <Flex flexWrap="wrap" gap={2}>
-      {lorasArray.map((lora) => (
-        <LoRACard key={lora.id} lora={lora} />
+      {ids.map((id) => (
+        <LoRACard key={id} id={id} />
       ))}
     </Flex>
   );
