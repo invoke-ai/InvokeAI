@@ -895,9 +895,7 @@ class FluxDenoiseInvocation(BaseInvocation):
             yield (lora_info.model, lora.weight)
             del lora_info
 
-    def _build_step_callback(
-        self, context: InvocationContext
-    ) -> Callable[[PipelineIntermediateState], None]:
+    def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:
             # The denoise function now handles Kontext conditioning correctly,
             # so we don't need to slice the latents here
