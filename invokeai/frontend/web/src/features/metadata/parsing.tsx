@@ -2,7 +2,7 @@
 import { Text } from '@invoke-ai/ui-library';
 import type { AppStore } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
-import { withResultAsync } from 'common/util/result';
+import { WrappedError } from 'common/util/result';
 import { get, isArray, isString } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { bboxHeightChanged, bboxWidthChanged } from 'features/controlLayers/store/canvasSlice';
@@ -111,7 +111,7 @@ const getProperty = (obj: unknown, path: string): unknown => {
   return get(obj, path) as unknown;
 };
 
-type UnparsedData = {
+export type UnparsedData = {
   isParsed: false;
   isSuccess: false;
   isError: false;
@@ -126,7 +126,7 @@ const buildUnparsedData = (): UnparsedData => ({
   error: null,
 });
 
-type ParsedSuccessData<T> = {
+export type ParsedSuccessData<T> = {
   isParsed: true;
   isSuccess: true;
   isError: false;
@@ -141,7 +141,7 @@ const buildParsedSuccessData = <T,>(value: T): ParsedSuccessData<T> => ({
   error: null,
 });
 
-type ParsedErrorData = {
+export type ParsedErrorData = {
   isParsed: true;
   isSuccess: false;
   isError: true;
@@ -167,7 +167,7 @@ type SingleMetadataValueProps<T> = {
 };
 export type SingleMetadataHandler<T> = {
   type: string;
-  parse: (metadata: unknown, store: AppStore) => Promise<T> | T;
+  parse: (metadata: unknown, store: AppStore) => Promise<T>;
   recall: (value: T, store: AppStore) => void;
   LabelComponent: ComponentType<SingleMetadataLabelProps<T>>;
   ValueComponent: ComponentType<SingleMetadataValueProps<T>>;
@@ -182,9 +182,9 @@ type CollectionMetadataValueProps<T extends any[]> = {
 };
 export type CollectionMetadataHandler<T extends any[]> = {
   type: string;
-  parse: (metadata: unknown, store: AppStore) => Promise<T> | T;
+  parse: (metadata: unknown, store: AppStore) => Promise<T>;
   recallAll: (values: T, store: AppStore) => void;
-  recallItem: (value: T[number], store: AppStore) => void;
+  recallOne: (value: T[number], store: AppStore) => void;
   LabelComponent: ComponentType<CollectionMetadataLabelProps<T>>;
   ValueComponent: ComponentType<CollectionMetadataValueProps<T>>;
 };
@@ -198,7 +198,7 @@ type UnrecallableMetadataValueProps<T> = {
 };
 export type UnrecallableMetadataHandler<T> = {
   type: string;
-  parse: (metadata: unknown, store: AppStore) => Promise<T> | T;
+  parse: (metadata: unknown, store: AppStore) => Promise<T>;
   LabelComponent: ComponentType<UnrecallableMetadataLabelProps<T>>;
   ValueComponent: ComponentType<UnrecallableMetadataValueProps<T>>;
 };
@@ -209,7 +209,7 @@ const CreatedBy: UnrecallableMetadataHandler<string> = {
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'created_by');
     const parsed = z.string().parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   LabelComponent: () => <MetadataLabel i18nKey="metadata.createdBy" />,
   ValueComponent: ({ value }: UnrecallableMetadataLabelProps<string>) => <MetadataPrimitiveValue value={value} />,
@@ -222,7 +222,7 @@ const GenerationMode: UnrecallableMetadataHandler<string> = {
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'generation_mode');
     const parsed = z.string().parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   LabelComponent: () => <MetadataLabel i18nKey="metadata.generationMode" />,
   ValueComponent: ({ value }: UnrecallableMetadataLabelProps<string>) => <MetadataPrimitiveValue value={value} />,
@@ -235,7 +235,7 @@ const PositivePrompt: SingleMetadataHandler<ParameterPositivePrompt> = {
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'positive_prompt');
     const parsed = zParameterPositivePrompt.parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(positivePromptChanged(value));
@@ -253,7 +253,7 @@ const NegativePrompt: SingleMetadataHandler<ParameterNegativePrompt> = {
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'negative_prompt');
     const parsed = zParameterNegativePrompt.parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(negativePromptChanged(value));
@@ -271,7 +271,7 @@ const PositiveStylePrompt: SingleMetadataHandler<ParameterPositiveStylePromptSDX
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'positive_style_prompt');
     const parsed = zParameterPositiveStylePromptSDXL.parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(positivePrompt2Changed(value));
@@ -289,7 +289,7 @@ const NegativeStylePrompt: SingleMetadataHandler<ParameterPositiveStylePromptSDX
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'negative_style_prompt');
     const parsed = zParameterNegativeStylePromptSDXL.parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(negativePrompt2Changed(value));
@@ -307,7 +307,7 @@ const CFGScale: SingleMetadataHandler<ParameterCFGScale> = {
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'cfg_scale');
     const parsed = zParameterCFGScale.parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(setCfgScale(value));
@@ -323,7 +323,7 @@ const CFGRescaleMultiplier: SingleMetadataHandler<ParameterCFGRescaleMultiplier>
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'cfg_rescale_multiplier');
     const parsed = zParameterCFGRescaleMultiplier.parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(setCfgRescaleMultiplier(value));
@@ -341,7 +341,7 @@ const Guidance: SingleMetadataHandler<ParameterGuidance> = {
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'guidance');
     const parsed = zParameterGuidance.parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(setGuidance(value));
@@ -357,7 +357,7 @@ const Scheduler: SingleMetadataHandler<ParameterScheduler> = {
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'scheduler');
     const parsed = zParameterScheduler.parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(setScheduler(value));
@@ -373,7 +373,7 @@ const Width: SingleMetadataHandler<ParameterWidth> = {
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'width');
     const parsed = zParameterImageDimension.parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(bboxWidthChanged({ width: value, updateAspectRatio: true, clamp: true }));
@@ -389,7 +389,7 @@ const Height: SingleMetadataHandler<ParameterHeight> = {
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'height');
     const parsed = zParameterImageDimension.parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(bboxHeightChanged({ height: value, updateAspectRatio: true, clamp: true }));
@@ -405,7 +405,7 @@ const Seed: SingleMetadataHandler<ParameterSeed> = {
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'seed');
     const parsed = zParameterSeed.parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(setSeed(value));
@@ -421,7 +421,7 @@ const Steps: SingleMetadataHandler<ParameterSteps> = {
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'steps');
     const parsed = zParameterSteps.parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(setSteps(value));
@@ -437,7 +437,7 @@ const DenoisingStrength: SingleMetadataHandler<ParameterStrength> = {
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'strength');
     const parsed = zParameterStrength.parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(setImg2imgStrength(value));
@@ -453,7 +453,7 @@ const SeamlessX: SingleMetadataHandler<ParameterSeamlessX> = {
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'seamless_x');
     const parsed = zParameterSeamlessX.parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(setSeamlessXAxis(value));
@@ -469,7 +469,7 @@ const SeamlessY: SingleMetadataHandler<ParameterSeamlessY> = {
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'seamless_y');
     const parsed = zParameterSeamlessY.parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(setSeamlessYAxis(value));
@@ -487,7 +487,7 @@ const RefinerModel: SingleMetadataHandler<ParameterSDXLRefinerModel> = {
     const parsed = await parseModelIdentifier(raw, store, 'main');
     assert(parsed.type === 'main');
     assert(parsed.base === 'sdxl-refiner');
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(refinerModelChanged(value));
@@ -505,7 +505,7 @@ const RefinerSteps: SingleMetadataHandler<ParameterSteps> = {
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'refiner_steps');
     const parsed = zParameterSteps.parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(setRefinerSteps(value));
@@ -521,7 +521,7 @@ const RefinerCFGScale: SingleMetadataHandler<ParameterCFGScale> = {
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'refiner_cfg_scale');
     const parsed = zParameterCFGScale.parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(setRefinerCFGScale(value));
@@ -537,7 +537,7 @@ const RefinerScheduler: SingleMetadataHandler<ParameterScheduler> = {
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'refiner_scheduler');
     const parsed = zParameterScheduler.parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(setRefinerScheduler(value));
@@ -553,7 +553,7 @@ const RefinerPositiveAestheticScore: SingleMetadataHandler<ParameterSDXLRefinerP
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'refiner_positive_aesthetic_score');
     const parsed = zParameterSDXLRefinerPositiveAestheticScore.parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(setRefinerPositiveAestheticScore(value));
@@ -571,7 +571,7 @@ const RefinerNegativeAestheticScore: SingleMetadataHandler<ParameterSDXLRefinerN
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'refiner_negative_aesthetic_score');
     const parsed = zParameterSDXLRefinerNegativeAestheticScore.parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(setRefinerNegativeAestheticScore(value));
@@ -589,7 +589,7 @@ const RefinerDenoisingStart: SingleMetadataHandler<ParameterSDXLRefinerStart> = 
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'refiner_start');
     const parsed = zParameterSDXLRefinerStart.parse(raw);
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(setRefinerStart(value));
@@ -608,7 +608,7 @@ const MainModel: SingleMetadataHandler<ParameterModel> = {
     const raw = getProperty(metadata, 'model');
     const parsed = await parseModelIdentifier(raw, store, 'main');
     assert(parsed.type === 'main');
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(modelSelected(value));
@@ -627,7 +627,7 @@ const VAEModel: SingleMetadataHandler<ParameterVAEModel> = {
     const raw = getProperty(metadata, 'vae');
     const parsed = await parseModelIdentifier(raw, store, 'vae');
     assert(parsed.type === 'vae');
-    return parsed;
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(vaeSelected(value));
@@ -656,11 +656,11 @@ const LoRAs: CollectionMetadataHandler<LoRA[]> = {
           const rawIdentifier = getProperty(rawItem, 'model');
           identifier = await parseModelIdentifier(rawIdentifier, store, 'lora');
         } catch {
-          // Old format - { lora : { key } }
+          // Old format - { lora : { key: string } }
           const key = getProperty(rawItem, 'lora.key');
           assert(isString(key));
-          const modelConfig = await getModelConfig(key, store);
-          identifier = zModelIdentifierField.parse(modelConfig);
+          // No need to catch here - if this throws, we move on to the next item
+          identifier = await getModelIdentiferFromKey(key, store);
         }
         assert(identifier.type === 'lora');
         const weight = getProperty(rawItem, 'weight');
@@ -681,7 +681,7 @@ const LoRAs: CollectionMetadataHandler<LoRA[]> = {
 
     throw new Error('No valid LoRAs found in metadata');
   },
-  recallItem: (value, store) => {
+  recallOne: (value, store) => {
     store.dispatch(loraRecalled({ lora: value }));
   },
   recallAll: (values, store) => {
@@ -744,11 +744,11 @@ export function useSingleMetadataDatum<T>(metadata: unknown, handler: SingleMeta
 
   const parse = useCallback(
     async (metadata: unknown) => {
-      const result = await withResultAsync(async () => await Promise.resolve(handler.parse(metadata, store)));
-      if (result.isOk()) {
-        setData(buildParsedSuccessData(result.value));
-      } else {
-        setData(buildParsedErrorData(result.error));
+      try {
+        const value = await handler.parse(metadata, store);
+        setData(buildParsedSuccessData(value));
+      } catch (error) {
+        setData(buildParsedErrorData(WrappedError.wrap(error)));
       }
     },
     [handler, store]
@@ -758,12 +758,12 @@ export function useSingleMetadataDatum<T>(metadata: unknown, handler: SingleMeta
     parse(metadata);
   }, [metadata, parse]);
 
-  const recall = useCallback(() => {
-    if (!data.isSuccess) {
-      return;
-    }
-    handler.recall?.(data.value, store);
-  }, [data.isSuccess, data.value, handler, store]);
+  const recall = useCallback(
+    (value: T) => {
+      handler.recall(value, store);
+    },
+    [handler, store]
+  );
 
   return { data, recall };
 }
@@ -775,11 +775,11 @@ export function useCollectionMetadataDatum<T extends any[]>(metadata: unknown, h
 
   const parse = useCallback(
     async (metadata: unknown) => {
-      const result = await withResultAsync(async () => await Promise.resolve(handler.parse(metadata, store)));
-      if (result.isOk()) {
-        setData(buildParsedSuccessData(result.value));
-      } else {
-        setData(buildParsedErrorData(result.error));
+      try {
+        const value = await handler.parse(metadata, store);
+        setData(buildParsedSuccessData(value));
+      } catch (error) {
+        setData(buildParsedErrorData(WrappedError.wrap(error)));
       }
     },
     [handler, store]
@@ -789,21 +789,21 @@ export function useCollectionMetadataDatum<T extends any[]>(metadata: unknown, h
     parse(metadata);
   }, [metadata, parse]);
 
-  const recallAll = useCallback(() => {
-    if (!data.isSuccess) {
-      return;
-    }
-    handler.recallAll(data.value, store);
-  }, [data.isSuccess, data.value, handler, store]);
-
-  const recallItem = useCallback(
-    (item: T) => {
-      handler.recallItem(item, store);
+  const recallAll = useCallback(
+    (values: T) => {
+      handler.recallAll(values, store);
     },
     [handler, store]
   );
 
-  return { data, recallAll, recallItem };
+  const recallOne = useCallback(
+    (value: T[number]) => {
+      handler.recallOne(value, store);
+    },
+    [handler, store]
+  );
+
+  return { data, recallAll, recallOne };
 }
 
 export function useUnrecallableMetadataDatum<T>(metadata: unknown, handler: UnrecallableMetadataHandler<T>) {
@@ -812,11 +812,11 @@ export function useUnrecallableMetadataDatum<T>(metadata: unknown, handler: Unre
 
   const parse = useCallback(
     async (metadata: unknown) => {
-      const result = await withResultAsync(async () => await Promise.resolve(handler.parse(metadata, store)));
-      if (result.isOk()) {
-        setData(buildParsedSuccessData(result.value));
-      } else {
-        setData(buildParsedErrorData(result.error));
+      try {
+        const value = await handler.parse(metadata, store);
+        setData(buildParsedSuccessData(value));
+      } catch (error) {
+        setData(buildParsedErrorData(WrappedError.wrap(error)));
       }
     },
     [handler, store]
@@ -829,10 +829,11 @@ export function useUnrecallableMetadataDatum<T>(metadata: unknown, handler: Unre
   return { data };
 }
 
-const getModelConfig = async (key: string, store: AppStore): Promise<AnyModelConfig> => {
-  const modelConfig = await store
-    .dispatch(modelsApi.endpoints.getModelConfig.initiate(key, { subscribe: false }))
-    .unwrap();
+const OPTIONS = { subscribe: false };
+
+const getModelIdentiferFromKey = async (key: string, store: AppStore): Promise<AnyModelConfig> => {
+  const req = store.dispatch(modelsApi.endpoints.getModelConfig.initiate(key, OPTIONS));
+  const modelConfig = await req.unwrap();
   return modelConfig;
 };
 
@@ -840,7 +841,7 @@ const parseModelIdentifier = async (raw: unknown, store: AppStore, type: ModelTy
   // First try the current format identifier: key, name, base, type, hash
   try {
     const { key } = zModelIdentifierField.parse(raw);
-    const req = store.dispatch(modelsApi.endpoints.getModelConfig.initiate(key, { subscribe: false }));
+    const req = store.dispatch(modelsApi.endpoints.getModelConfig.initiate(key, OPTIONS));
     const modelConfig = await req.unwrap();
     return zModelIdentifierField.parse(modelConfig);
   } catch {
@@ -850,9 +851,8 @@ const parseModelIdentifier = async (raw: unknown, store: AppStore, type: ModelTy
   // Fall back to old format identifier: model_name, base_model
   try {
     const { model_name: name, base_model: base } = zModelIdentifier.parse(raw);
-    const req = store.dispatch(
-      modelsApi.endpoints.getModelConfigByAttrs.initiate({ name, base, type }, { subscribe: false })
-    );
+    const arg = { name, base, type };
+    const req = store.dispatch(modelsApi.endpoints.getModelConfigByAttrs.initiate(arg, OPTIONS));
     const modelConfig = await req.unwrap();
     return zModelIdentifierField.parse(modelConfig);
   } catch {
