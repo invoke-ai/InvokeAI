@@ -9,7 +9,7 @@ import type {
   UnrecallableMetadataHandler,
 } from 'features/metadata/parsing';
 import {
-  MetadataHanders,
+  MetadataHandlers,
   useCollectionMetadataDatum,
   useSingleMetadataDatum,
   useUnrecallableMetadataDatum,
@@ -30,33 +30,33 @@ const ImageMetadataActions = (props: Props) => {
 
   return (
     <Flex flexDir="column" ps={8}>
-      <UnrecallableMetadataDatum metadata={metadata} handler={MetadataHanders.CreatedBy} />
-      <UnrecallableMetadataDatum metadata={metadata} handler={MetadataHanders.GenerationMode} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.PositivePrompt} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.NegativePrompt} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.PositiveStylePrompt} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.NegativeStylePrompt} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.MainModel} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.VAEModel} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.Width} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.Height} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.Seed} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.Steps} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.Scheduler} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.CFGScale} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.CFGRescaleMultiplier} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.Guidance} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.DenoisingStrength} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.SeamlessX} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.SeamlessY} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.RefinerModel} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.RefinerCFGScale} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.RefinerPositiveAestheticScore} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.RefinerNegativeAestheticScore} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.RefinerScheduler} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.RefinerDenoisingStart} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHanders.RefinerSteps} />
-      <CollectionMetadataDatum metadata={metadata} handler={MetadataHanders.LoRAs} />
+      <UnrecallableMetadataDatum metadata={metadata} handler={MetadataHandlers.CreatedBy} />
+      <UnrecallableMetadataDatum metadata={metadata} handler={MetadataHandlers.GenerationMode} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.PositivePrompt} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.NegativePrompt} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.PositiveStylePrompt} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.NegativeStylePrompt} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.MainModel} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.VAEModel} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.Width} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.Height} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.Seed} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.Steps} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.Scheduler} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.CFGScale} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.CFGRescaleMultiplier} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.Guidance} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.DenoisingStrength} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.SeamlessX} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.SeamlessY} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerModel} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerCFGScale} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerPositiveAestheticScore} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerNegativeAestheticScore} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerScheduler} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerDenoisingStart} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerSteps} />
+      <CollectionMetadataDatum metadata={metadata} handler={MetadataHandlers.LoRAs} />
     </Flex>
   );
 };
@@ -84,7 +84,7 @@ const UnrecallableMetadataParsed = typedMemo(
 
     return (
       <Box as="span" lineHeight={1}>
-        <LabelComponent value={data.value} />
+        <LabelComponent />
         <ValueComponent value={data.value} />
       </Box>
     );
@@ -127,7 +127,7 @@ const SingleMetadataParsed = typedMemo(
           onClick={onClick}
         />
         <Box as="span" lineHeight={1}>
-          <LabelComponent value={data.value} />
+          <LabelComponent />
           <ValueComponent value={data.value} />
         </Box>
       </Flex>
@@ -148,7 +148,7 @@ const CollectionMetadataDatum = typedMemo(
       return (
         <>
           {data.value.map((value, i) => (
-            <CollectionMetadataParsed key={i} value={value} i={i} handler={handler} data={data} />
+            <CollectionMetadataParsed key={i} value={value} handler={handler} />
           ))}
         </>
       );
@@ -158,17 +158,7 @@ const CollectionMetadataDatum = typedMemo(
 CollectionMetadataDatum.displayName = 'CollectionMetadataDatum';
 
 const CollectionMetadataParsed = typedMemo(
-  <T extends any[]>({
-    value,
-    i,
-    data,
-    handler,
-  }: {
-    value: T[number];
-    i: number;
-    data: ParsedSuccessData<T>;
-    handler: CollectionMetadataHandler<T>;
-  }) => {
+  <T extends any[]>({ value, handler }: { value: T[number]; handler: CollectionMetadataHandler<T> }) => {
     const store = useAppStore();
 
     const { LabelComponent, ValueComponent } = handler;
@@ -187,7 +177,7 @@ const CollectionMetadataParsed = typedMemo(
           onClick={onClick}
         />
         <Box as="span" lineHeight={1}>
-          <LabelComponent values={data.value} i={i} />
+          <LabelComponent />
           <ValueComponent value={value} />
         </Box>
       </Flex>

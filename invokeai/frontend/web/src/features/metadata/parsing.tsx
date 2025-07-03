@@ -13,6 +13,7 @@ import {
   positivePrompt2Changed,
   positivePromptChanged,
   refinerModelChanged,
+  selectBase,
   setCfgRescaleMultiplier,
   setCfgScale,
   setGuidance,
@@ -28,6 +29,7 @@ import {
   setSeamlessYAxis,
   setSeed,
   setSteps,
+  shouldConcatPromptsChanged,
   vaeSelected,
 } from 'features/controlLayers/store/paramsSlice';
 import type { LoRA } from 'features/controlLayers/store/types';
@@ -77,7 +79,9 @@ import {
   zParameterSteps,
   zParameterStrength,
 } from 'features/parameters/types/parameterSchemas';
-import type { ComponentType } from 'react';
+import { toast } from 'features/toast/toast';
+import { t } from 'i18next';
+import type { ComponentType, ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { modelsApi } from 'services/api/endpoints/models';
@@ -90,15 +94,6 @@ const MetadataLabel = ({ i18nKey }: { i18nKey: string }) => {
   return (
     <Text as="span" fontWeight="semibold" whiteSpace="pre-wrap" me={2}>
       {t(i18nKey)}:
-    </Text>
-  );
-};
-
-const MetadataLabelWithCount = <T extends any[]>({ i18nKey, i }: { i18nKey: string; i: number; values: T }) => {
-  const { t } = useTranslation();
-  return (
-    <Text as="span" fontWeight="semibold" whiteSpace="pre-wrap" me={2}>
-      {`${t(i18nKey)} ${i + 1}:`}
     </Text>
   );
 };
@@ -158,53 +153,60 @@ const buildParsedErrorData = (error: Error): ParsedErrorData => ({
 
 export type Data<T> = UnparsedData | ParsedSuccessData<T> | ParsedErrorData;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-type SingleMetadataLabelProps<T> = {
-  value: T;
-};
+const SingleMetadataKey = Symbol('SingleMetadataKey');
 type SingleMetadataValueProps<T> = {
   value: T;
 };
 export type SingleMetadataHandler<T> = {
+  [SingleMetadataKey]: true;
   type: string;
   parse: (metadata: unknown, store: AppStore) => Promise<T>;
   recall: (value: T, store: AppStore) => void;
-  LabelComponent: ComponentType<SingleMetadataLabelProps<T>>;
+  LabelComponent: ComponentType;
   ValueComponent: ComponentType<SingleMetadataValueProps<T>>;
 };
 
-type CollectionMetadataLabelProps<T extends any[]> = {
-  values: T;
-  i: number;
-};
+const CollectionMetadataKey = Symbol('CollectionMetadataKey');
 type CollectionMetadataValueProps<T extends any[]> = {
   value: T[number];
 };
 export type CollectionMetadataHandler<T extends any[]> = {
+  [CollectionMetadataKey]: true;
   type: string;
   parse: (metadata: unknown, store: AppStore) => Promise<T>;
-  recallAll: (values: T, store: AppStore) => void;
+  recall: (values: T, store: AppStore) => void;
   recallOne: (value: T[number], store: AppStore) => void;
-  LabelComponent: ComponentType<CollectionMetadataLabelProps<T>>;
+  LabelComponent: ComponentType;
   ValueComponent: ComponentType<CollectionMetadataValueProps<T>>;
 };
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-type UnrecallableMetadataLabelProps<T> = {
-  value: T;
-};
+const UnrecallableMetadataKey = Symbol('UnrecallableMetadataKey');
 type UnrecallableMetadataValueProps<T> = {
   value: T;
 };
 export type UnrecallableMetadataHandler<T> = {
+  [UnrecallableMetadataKey]: true;
   type: string;
   parse: (metadata: unknown, store: AppStore) => Promise<T>;
-  LabelComponent: ComponentType<UnrecallableMetadataLabelProps<T>>;
+  LabelComponent: ComponentType;
   ValueComponent: ComponentType<UnrecallableMetadataValueProps<T>>;
+};
+
+const isSingleMetadataHandler = (
+  handler: SingleMetadataHandler<any> | CollectionMetadataHandler<any[]> | UnrecallableMetadataHandler<any>
+): handler is SingleMetadataHandler<any> => {
+  return SingleMetadataKey in handler && handler[SingleMetadataKey] === true;
+};
+
+const isCollectionMetadataHandler = (
+  handler: SingleMetadataHandler<any> | CollectionMetadataHandler<any[]> | UnrecallableMetadataHandler<any>
+): handler is CollectionMetadataHandler<any[]> => {
+  return CollectionMetadataKey in handler && handler[CollectionMetadataKey] === true;
 };
 
 //#region Created By
 const CreatedBy: UnrecallableMetadataHandler<string> = {
+  [UnrecallableMetadataKey]: true,
   type: 'CreatedBy',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'created_by');
@@ -212,12 +214,13 @@ const CreatedBy: UnrecallableMetadataHandler<string> = {
     return Promise.resolve(parsed);
   },
   LabelComponent: () => <MetadataLabel i18nKey="metadata.createdBy" />,
-  ValueComponent: ({ value }: UnrecallableMetadataLabelProps<string>) => <MetadataPrimitiveValue value={value} />,
+  ValueComponent: ({ value }: UnrecallableMetadataValueProps<string>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion Created By
 
 //#region Generation Mode
 const GenerationMode: UnrecallableMetadataHandler<string> = {
+  [UnrecallableMetadataKey]: true,
   type: 'GenerationMode',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'generation_mode');
@@ -225,12 +228,13 @@ const GenerationMode: UnrecallableMetadataHandler<string> = {
     return Promise.resolve(parsed);
   },
   LabelComponent: () => <MetadataLabel i18nKey="metadata.generationMode" />,
-  ValueComponent: ({ value }: UnrecallableMetadataLabelProps<string>) => <MetadataPrimitiveValue value={value} />,
+  ValueComponent: ({ value }: UnrecallableMetadataValueProps<string>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion Generation Mode
 
 //#region Positive Prompt
 const PositivePrompt: SingleMetadataHandler<ParameterPositivePrompt> = {
+  [SingleMetadataKey]: true,
   type: 'PositivePrompt',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'positive_prompt');
@@ -249,6 +253,7 @@ const PositivePrompt: SingleMetadataHandler<ParameterPositivePrompt> = {
 
 //#region Negative Prompt
 const NegativePrompt: SingleMetadataHandler<ParameterNegativePrompt> = {
+  [SingleMetadataKey]: true,
   type: 'NegativePrompt',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'negative_prompt');
@@ -267,6 +272,7 @@ const NegativePrompt: SingleMetadataHandler<ParameterNegativePrompt> = {
 
 //#region SDXL Positive Style Prompt
 const PositiveStylePrompt: SingleMetadataHandler<ParameterPositiveStylePromptSDXL> = {
+  [SingleMetadataKey]: true,
   type: 'PositiveStylePrompt',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'positive_style_prompt');
@@ -285,6 +291,7 @@ const PositiveStylePrompt: SingleMetadataHandler<ParameterPositiveStylePromptSDX
 
 //#region SDXL Negative Style Prompt
 const NegativeStylePrompt: SingleMetadataHandler<ParameterPositiveStylePromptSDXL> = {
+  [SingleMetadataKey]: true,
   type: 'NegativeStylePrompt',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'negative_style_prompt');
@@ -303,6 +310,7 @@ const NegativeStylePrompt: SingleMetadataHandler<ParameterPositiveStylePromptSDX
 
 //#region CFG Scale
 const CFGScale: SingleMetadataHandler<ParameterCFGScale> = {
+  [SingleMetadataKey]: true,
   type: 'CFGScale',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'cfg_scale');
@@ -319,6 +327,7 @@ const CFGScale: SingleMetadataHandler<ParameterCFGScale> = {
 
 //#region CFG Rescale Multiplier
 const CFGRescaleMultiplier: SingleMetadataHandler<ParameterCFGRescaleMultiplier> = {
+  [SingleMetadataKey]: true,
   type: 'CFGRescaleMultiplier',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'cfg_rescale_multiplier');
@@ -337,6 +346,7 @@ const CFGRescaleMultiplier: SingleMetadataHandler<ParameterCFGRescaleMultiplier>
 
 //#region Guidance
 const Guidance: SingleMetadataHandler<ParameterGuidance> = {
+  [SingleMetadataKey]: true,
   type: 'Guidance',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'guidance');
@@ -353,6 +363,7 @@ const Guidance: SingleMetadataHandler<ParameterGuidance> = {
 
 //#region Scheduler
 const Scheduler: SingleMetadataHandler<ParameterScheduler> = {
+  [SingleMetadataKey]: true,
   type: 'Scheduler',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'scheduler');
@@ -369,6 +380,7 @@ const Scheduler: SingleMetadataHandler<ParameterScheduler> = {
 
 //#region Width
 const Width: SingleMetadataHandler<ParameterWidth> = {
+  [SingleMetadataKey]: true,
   type: 'Width',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'width');
@@ -385,6 +397,7 @@ const Width: SingleMetadataHandler<ParameterWidth> = {
 
 //#region Height
 const Height: SingleMetadataHandler<ParameterHeight> = {
+  [SingleMetadataKey]: true,
   type: 'Height',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'height');
@@ -401,6 +414,7 @@ const Height: SingleMetadataHandler<ParameterHeight> = {
 
 //#region Seed
 const Seed: SingleMetadataHandler<ParameterSeed> = {
+  [SingleMetadataKey]: true,
   type: 'Seed',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'seed');
@@ -417,6 +431,7 @@ const Seed: SingleMetadataHandler<ParameterSeed> = {
 
 //#region Steps
 const Steps: SingleMetadataHandler<ParameterSteps> = {
+  [SingleMetadataKey]: true,
   type: 'Steps',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'steps');
@@ -433,6 +448,7 @@ const Steps: SingleMetadataHandler<ParameterSteps> = {
 
 //#region DenoisingStrength
 const DenoisingStrength: SingleMetadataHandler<ParameterStrength> = {
+  [SingleMetadataKey]: true,
   type: 'DenoisingStrength',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'strength');
@@ -449,6 +465,7 @@ const DenoisingStrength: SingleMetadataHandler<ParameterStrength> = {
 
 //#region SeamlessX
 const SeamlessX: SingleMetadataHandler<ParameterSeamlessX> = {
+  [SingleMetadataKey]: true,
   type: 'SeamlessX',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'seamless_x');
@@ -465,6 +482,7 @@ const SeamlessX: SingleMetadataHandler<ParameterSeamlessX> = {
 
 //#region SeamlessY
 const SeamlessY: SingleMetadataHandler<ParameterSeamlessY> = {
+  [SingleMetadataKey]: true,
   type: 'SeamlessY',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'seamless_y');
@@ -481,12 +499,14 @@ const SeamlessY: SingleMetadataHandler<ParameterSeamlessY> = {
 
 //#region RefinerModel
 const RefinerModel: SingleMetadataHandler<ParameterSDXLRefinerModel> = {
+  [SingleMetadataKey]: true,
   type: 'RefinerModel',
   parse: async (metadata, store) => {
     const raw = getProperty(metadata, 'refiner_model');
     const parsed = await parseModelIdentifier(raw, store, 'main');
     assert(parsed.type === 'main');
     assert(parsed.base === 'sdxl-refiner');
+    assert(isCompatibleWithMainModel(parsed, store));
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
@@ -501,6 +521,7 @@ const RefinerModel: SingleMetadataHandler<ParameterSDXLRefinerModel> = {
 
 //#region RefinerSteps
 const RefinerSteps: SingleMetadataHandler<ParameterSteps> = {
+  [SingleMetadataKey]: true,
   type: 'RefinerSteps',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'refiner_steps');
@@ -517,6 +538,7 @@ const RefinerSteps: SingleMetadataHandler<ParameterSteps> = {
 
 //#region RefinerCFGScale
 const RefinerCFGScale: SingleMetadataHandler<ParameterCFGScale> = {
+  [SingleMetadataKey]: true,
   type: 'RefinerCFGScale',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'refiner_cfg_scale');
@@ -533,6 +555,7 @@ const RefinerCFGScale: SingleMetadataHandler<ParameterCFGScale> = {
 
 //#region RefinerScheduler
 const RefinerScheduler: SingleMetadataHandler<ParameterScheduler> = {
+  [SingleMetadataKey]: true,
   type: 'RefinerScheduler',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'refiner_scheduler');
@@ -549,6 +572,7 @@ const RefinerScheduler: SingleMetadataHandler<ParameterScheduler> = {
 
 //#region RefinerPositiveAestheticScore
 const RefinerPositiveAestheticScore: SingleMetadataHandler<ParameterSDXLRefinerPositiveAestheticScore> = {
+  [SingleMetadataKey]: true,
   type: 'RefinerPositiveAestheticScore',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'refiner_positive_aesthetic_score');
@@ -567,6 +591,7 @@ const RefinerPositiveAestheticScore: SingleMetadataHandler<ParameterSDXLRefinerP
 
 //#region RefinerNegativeAestheticScore
 const RefinerNegativeAestheticScore: SingleMetadataHandler<ParameterSDXLRefinerNegativeAestheticScore> = {
+  [SingleMetadataKey]: true,
   type: 'RefinerNegativeAestheticScore',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'refiner_negative_aesthetic_score');
@@ -585,6 +610,7 @@ const RefinerNegativeAestheticScore: SingleMetadataHandler<ParameterSDXLRefinerN
 
 //#region RefinerDenoisingStart
 const RefinerDenoisingStart: SingleMetadataHandler<ParameterSDXLRefinerStart> = {
+  [SingleMetadataKey]: true,
   type: 'RefinerDenoisingStart',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'refiner_start');
@@ -603,6 +629,7 @@ const RefinerDenoisingStart: SingleMetadataHandler<ParameterSDXLRefinerStart> = 
 
 //#region MainModel
 const MainModel: SingleMetadataHandler<ParameterModel> = {
+  [SingleMetadataKey]: true,
   type: 'MainModel',
   parse: async (metadata, store) => {
     const raw = getProperty(metadata, 'model');
@@ -622,11 +649,13 @@ const MainModel: SingleMetadataHandler<ParameterModel> = {
 
 //#region VAEModel
 const VAEModel: SingleMetadataHandler<ParameterVAEModel> = {
+  [SingleMetadataKey]: true,
   type: 'VAEModel',
   parse: async (metadata, store) => {
     const raw = getProperty(metadata, 'vae');
     const parsed = await parseModelIdentifier(raw, store, 'vae');
     assert(parsed.type === 'vae');
+    assert(isCompatibleWithMainModel(parsed, store));
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
@@ -641,6 +670,7 @@ const VAEModel: SingleMetadataHandler<ParameterVAEModel> = {
 
 //#region LoRAs
 const LoRAs: CollectionMetadataHandler<LoRA[]> = {
+  [CollectionMetadataKey]: true,
   type: 'LoRAs',
   parse: async (metadata, store) => {
     const rawArray = getProperty(metadata, 'loras');
@@ -651,6 +681,7 @@ const LoRAs: CollectionMetadataHandler<LoRA[]> = {
     for (const rawItem of rawArray) {
       try {
         let identifier: ModelIdentifierField | null = null;
+
         try {
           // New format - { model: ModelIdenfifierField }
           const rawIdentifier = getProperty(rawItem, 'model');
@@ -662,8 +693,12 @@ const LoRAs: CollectionMetadataHandler<LoRA[]> = {
           // No need to catch here - if this throws, we move on to the next item
           identifier = await getModelIdentiferFromKey(key, store);
         }
+
         assert(identifier.type === 'lora');
+        assert(isCompatibleWithMainModel(identifier, store));
+
         const weight = getProperty(rawItem, 'weight');
+
         loras.push({
           id: getPrefixedId('lora'),
           model: identifier,
@@ -684,22 +719,20 @@ const LoRAs: CollectionMetadataHandler<LoRA[]> = {
   recallOne: (value, store) => {
     store.dispatch(loraRecalled({ lora: value }));
   },
-  recallAll: (values, store) => {
+  recall: (values, store) => {
     store.dispatch(loraAllDeleted());
     for (const lora of values) {
       store.dispatch(loraRecalled({ lora }));
     }
   },
-  LabelComponent: ({ values, i }: CollectionMetadataLabelProps<LoRA[]>) => (
-    <MetadataLabelWithCount i18nKey="models.lora" values={values} i={i} />
-  ),
+  LabelComponent: () => <MetadataLabel i18nKey="models.lora" />,
   ValueComponent: ({ value }: CollectionMetadataValueProps<LoRA[]>) => (
     <MetadataPrimitiveValue value={`${value.model.name} (${value.model.base.toUpperCase()}) - ${value.weight}`} />
   ),
 };
 //#endregion LoRAs
 
-export const MetadataHanders = {
+export const MetadataHandlers = {
   CreatedBy,
   GenerationMode,
   PositivePrompt,
@@ -727,10 +760,174 @@ export const MetadataHanders = {
   MainModel,
   VAEModel,
   LoRAs,
-} satisfies Record<
-  string,
-  UnrecallableMetadataHandler<any> | SingleMetadataHandler<any> | CollectionMetadataHandler<any[]>
->;
+} as const;
+
+const successToast = (parameter: ReactNode) => {
+  toast({
+    id: 'PARAMETER_SET',
+    title: t('toast.parameterSet'),
+    description: t('toast.parameterSetDesc', { parameter }),
+    status: 'info',
+  });
+};
+
+const failedToast = (parameter: ReactNode, message?: ReactNode) => {
+  toast({
+    id: 'PARAMETER_NOT_SET',
+    title: t('toast.parameterNotSet'),
+    description: message
+      ? t('toast.parameterNotSetDescWithMessage', { parameter, message })
+      : t('toast.parameterNotSetDesc', { parameter }),
+    status: 'warning',
+  });
+};
+
+const recallByHandler = async (arg: {
+  metadata: unknown;
+  handler: SingleMetadataHandler<any> | CollectionMetadataHandler<any[]>;
+  store: AppStore;
+  silent?: boolean;
+}): Promise<boolean> => {
+  const { metadata, handler, store, silent = false } = arg;
+
+  let didRecall = false;
+
+  try {
+    const value = await handler.parse(metadata, store);
+    handler.recall(value, store);
+    didRecall = true;
+  } catch {
+    //
+  }
+
+  if (!silent) {
+    if (didRecall) {
+      successToast(<handler.LabelComponent />);
+    } else {
+      failedToast(<handler.LabelComponent />);
+    }
+  }
+
+  return didRecall;
+};
+
+const recallByHandlers = async (arg: {
+  metadata: unknown;
+  handlers: (SingleMetadataHandler<any> | CollectionMetadataHandler<any[]>)[];
+  store: AppStore;
+  silent?: boolean;
+}): Promise<Map<SingleMetadataHandler<any> | CollectionMetadataHandler<any[]>, unknown>> => {
+  const { metadata, handlers, store, silent = false } = arg;
+
+  const recalled = new Map<SingleMetadataHandler<any> | CollectionMetadataHandler<any[]>, unknown>();
+
+  // It's possible for some metadata item's recall to clobber the recall of another. For example, the model recall
+  // may change the width and height. If we are also recalling the width and height directly, we need to ensure that the
+  // model is recalled first, so it doesn't accidentally override the width and height. This is the only known case
+  // where the order of recall matters.
+  const sortedHandlers = handlers.sort((a, b) => {
+    if (a === MetadataHandlers.MainModel) {
+      return -1; // MainModel should be recalled first
+    } else if (b === MetadataHandlers.MainModel) {
+      return 1; // MainModel should be recalled first
+    } else {
+      return 0; // Keep the original order for other handlers
+    }
+  });
+
+  for (const handler of sortedHandlers) {
+    try {
+      const value = await handler.parse(metadata, store);
+      handler.recall(value, store);
+      recalled.set(handler, value);
+    } catch (error) {
+      //
+    }
+  }
+
+  // If we recalled style prompts, and they were _different_ from the positive prompt, we need to disable prompt concat.
+  const positivePrompt = recalled.get(MetadataHandlers.PositivePrompt);
+  const negativePrompt = recalled.get(MetadataHandlers.NegativePrompt);
+  const positiveStylePrompt = recalled.get(MetadataHandlers.PositiveStylePrompt);
+  const negativeStylePrompt = recalled.get(MetadataHandlers.NegativeStylePrompt);
+
+  if (
+    (positiveStylePrompt && positiveStylePrompt !== positivePrompt) ||
+    (negativeStylePrompt && negativeStylePrompt !== negativePrompt)
+  ) {
+    // If we set the negative style prompt or positive style prompt, we should disable prompt concat
+    store.dispatch(shouldConcatPromptsChanged(false));
+  } else {
+    // Otherwise, we should enable prompt concat
+    store.dispatch(shouldConcatPromptsChanged(true));
+  }
+
+  if (!silent) {
+    if (recalled.size > 0) {
+      toast({
+        id: 'PARAMETER_SET',
+        title: t('toast.parametersSet'),
+        status: 'info',
+      });
+    } else {
+      toast({
+        id: 'PARAMETER_SET',
+        title: t('toast.parametersNotSet'),
+        status: 'warning',
+      });
+    }
+  }
+
+  return recalled;
+};
+
+const recallPrompts = async (metadata: unknown, store: AppStore) => {
+  const recalled = await recallByHandlers({
+    metadata,
+    handlers: [
+      MetadataHandlers.PositivePrompt,
+      MetadataHandlers.NegativePrompt,
+      MetadataHandlers.PositiveStylePrompt,
+      MetadataHandlers.NegativeStylePrompt,
+    ],
+    store,
+    silent: true,
+  });
+  if (recalled.size > 0) {
+    successToast(t('metadata.allPrompts'));
+  }
+};
+
+const recallDimensions = async (metadata: unknown, store: AppStore) => {
+  const recalled = await recallByHandlers({
+    metadata,
+    handlers: [MetadataHandlers.Width, MetadataHandlers.Height],
+    store,
+    silent: true,
+  });
+  if (recalled.size > 0) {
+    successToast(t('metadata.imageDimensions'));
+  }
+};
+
+const recallAll = async (metadata: unknown, store: AppStore) => {
+  const handlers = Object.values(MetadataHandlers).filter(
+    (handler) => isSingleMetadataHandler(handler) || isCollectionMetadataHandler(handler)
+  );
+  await recallByHandlers({
+    metadata,
+    handlers,
+    store,
+  });
+};
+
+export const MetadataUtils = {
+  recallByHandler,
+  recallByHandlers,
+  recallAll,
+  recallPrompts,
+  recallDimensions,
+} as const;
 
 export function useSingleMetadataDatum<T>(metadata: unknown, handler: SingleMetadataHandler<T>) {
   const store = useAppStore();
@@ -791,7 +988,7 @@ export function useCollectionMetadataDatum<T extends any[]>(metadata: unknown, h
 
   const recallAll = useCallback(
     (values: T) => {
-      handler.recallAll(values, store);
+      handler.recall(values, store);
     },
     [handler, store]
   );
@@ -829,34 +1026,38 @@ export function useUnrecallableMetadataDatum<T>(metadata: unknown, handler: Unre
   return { data };
 }
 
-const OPTIONS = { subscribe: false };
+const options = { subscribe: false };
 
 const getModelIdentiferFromKey = async (key: string, store: AppStore): Promise<AnyModelConfig> => {
-  const req = store.dispatch(modelsApi.endpoints.getModelConfig.initiate(key, OPTIONS));
+  const req = store.dispatch(modelsApi.endpoints.getModelConfig.initiate(key, options));
   const modelConfig = await req.unwrap();
   return modelConfig;
 };
 
 const parseModelIdentifier = async (raw: unknown, store: AppStore, type: ModelType): Promise<ModelIdentifierField> => {
-  // First try the current format identifier: key, name, base, type, hash
   try {
+    // First try the current format identifier: key, name, base, type, hash
     const { key } = zModelIdentifierField.parse(raw);
-    const req = store.dispatch(modelsApi.endpoints.getModelConfig.initiate(key, OPTIONS));
+    const req = store.dispatch(modelsApi.endpoints.getModelConfig.initiate(key, options));
     const modelConfig = await req.unwrap();
     return zModelIdentifierField.parse(modelConfig);
   } catch {
-    // noop
+    // We'll try to parse the old format identifier next
   }
 
   // Fall back to old format identifier: model_name, base_model
-  try {
-    const { model_name: name, base_model: base } = zModelIdentifier.parse(raw);
-    const arg = { name, base, type };
-    const req = store.dispatch(modelsApi.endpoints.getModelConfigByAttrs.initiate(arg, OPTIONS));
-    const modelConfig = await req.unwrap();
-    return zModelIdentifierField.parse(modelConfig);
-  } catch {
-    // noop
+  // No error handling here - this is our last chance to get a model identifier
+  const { model_name, base_model } = zModelIdentifier.parse(raw);
+  const arg = { name: model_name, base: base_model, type };
+  const req = store.dispatch(modelsApi.endpoints.getModelConfigByAttrs.initiate(arg, options));
+  const modelConfig = await req.unwrap();
+  return zModelIdentifierField.parse(modelConfig);
+};
+
+const isCompatibleWithMainModel = (candidate: ModelIdentifierField, store: AppStore) => {
+  const base = selectBase(store.getState());
+  if (!base) {
+    return true;
   }
-  throw new Error('Unable to parse model identifier');
+  return candidate.base === base;
 };
