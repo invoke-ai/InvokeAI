@@ -28,7 +28,7 @@ import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endp
 import { assert, AssertionError } from 'tsafe';
 
 const log = logger('generation');
-export const enqueueRequestedCanvas = createAction('app/enqueueRequestedCanvas');
+const enqueueRequestedCanvas = createAction('app/enqueueRequestedCanvas');
 
 const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prepend: boolean) => {
   const { dispatch, getState } = store;

@@ -11,7 +11,7 @@ type LoRAsState = {
   loras: LoRA[];
 };
 
-export const defaultLoRAConfig: Pick<LoRA, 'weight' | 'isEnabled'> = {
+const defaultLoRAConfig: Pick<LoRA, 'weight' | 'isEnabled'> = {
   weight: 0.75,
   isEnabled: true,
 };

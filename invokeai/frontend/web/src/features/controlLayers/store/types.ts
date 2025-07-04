@@ -30,7 +30,6 @@ import {
   zParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
-import type { ImageDTO } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 import { z } from 'zod/v4';
 
@@ -383,7 +382,7 @@ const zControlLoRAConfig = z.object({
 });
 export type ControlLoRAConfig = z.infer<typeof zControlLoRAConfig>;
 
-export const zCanvasRasterLayerState = zCanvasEntityBase.extend({
+const zCanvasRasterLayerState = zCanvasEntityBase.extend({
   type: z.literal('raster_layer'),
   position: zCoordinate,
   opacity: zOpacity,
@@ -432,17 +431,6 @@ export type LoRA = {
   weight: number;
 };
 
-export type StagingAreaImage = {
-  type: 'staged';
-  sessionId: string;
-  imageDTO: ImageDTO;
-  offsetX: number;
-  offsetY: number;
-};
-export type StagingAreaProgressImage = {
-  type: 'progress';
-  sessionId: string;
-};
 export type EphemeralProgressImage = { sessionId: string; image: ProgressImage };
 
 export const zAspectRatioID = z.enum(['Free', '21:9', '9:21', '16:9', '3:2', '4:3', '1:1', '3:4', '2:3', '9:16']);
@@ -578,7 +566,7 @@ const zCanvasState = z.object({
 });
 export type CanvasState = z.infer<typeof zCanvasState>;
 
-export const zRefImagesState = z.object({
+const zRefImagesState = z.object({
   selectedEntityId: z.string().nullable().default(null),
   isPanelOpen: z.boolean().default(false),
   entities: z.array(zRefImageState).default(() => []),

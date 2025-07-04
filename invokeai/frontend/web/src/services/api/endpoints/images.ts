@@ -601,7 +601,7 @@ export const useImageDTO = (imageName: string | null | undefined) => {
   return imageDTO ?? null;
 };
 
-export const getTagsToInvalidateForImageMutation = (image_names: string[]): ApiTagDescription[] => {
+const getTagsToInvalidateForImageMutation = (image_names: string[]): ApiTagDescription[] => {
   const tags: ApiTagDescription[] = [];
 
   for (const image_name of image_names) {
@@ -622,7 +622,7 @@ export const getTagsToInvalidateForImageMutation = (image_names: string[]): ApiT
   return tags;
 };
 
-export const getTagsToInvalidateForBoardAffectingMutation = (affected_boards: string[]): ApiTagDescription[] => {
+const getTagsToInvalidateForBoardAffectingMutation = (affected_boards: string[]): ApiTagDescription[] => {
   const tags: ApiTagDescription[] = ['ImageNameList'];
 
   for (const board_id of affected_boards) {

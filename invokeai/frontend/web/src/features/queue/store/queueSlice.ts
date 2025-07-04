@@ -33,7 +33,7 @@ export const queueSlice = createSlice({
   },
 });
 
-export const { listCursorChanged, listPriorityChanged, listParamsReset } = queueSlice.actions;
+export const { listCursorChanged, listPriorityChanged } = queueSlice.actions;
 
 const selectQueueSlice = (state: RootState) => state.queue;
 const createQueueSelector = <T>(selector: Selector<QueueState, T>) => createSelector(selectQueueSlice, selector);

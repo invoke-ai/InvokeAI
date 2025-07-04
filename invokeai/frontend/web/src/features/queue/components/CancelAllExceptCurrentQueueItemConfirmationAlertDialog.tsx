@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 const [useCancelAllExceptCurrentQueueItemConfirmationAlertDialog] = buildUseBoolean(false);
 
-export const useCancelAllExceptCurrentQueueItemDialog = () => {
+const useCancelAllExceptCurrentQueueItemDialog = () => {
   const dialog = useCancelAllExceptCurrentQueueItemConfirmationAlertDialog();
   const cancelAllExceptCurrentQueueItem = useCancelAllExceptCurrentQueueItem();
 

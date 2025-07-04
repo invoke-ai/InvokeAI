@@ -23,7 +23,7 @@ const QueueControls = () => {
 
 export default memo(QueueControls);
 
-export const DeleteIconButton = memo(() => {
+const DeleteIconButton = memo(() => {
   const shift = useShiftModifier();
 
   if (!shift) {

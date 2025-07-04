@@ -11,9 +11,6 @@ export type ImageNamesResult = S['ImageNamesResult'];
 
 export type ListBoardsArgs = NonNullable<paths['/api/v1/boards/']['get']['parameters']['query']>;
 
-export type DeleteBoardResult =
-  paths['/api/v1/boards/{board_id}']['delete']['responses']['200']['content']['application/json'];
-
 export type CreateBoardArg = paths['/api/v1/boards/']['post']['parameters']['query'];
 
 export type UpdateBoardArg = paths['/api/v1/boards/{board_id}']['patch']['parameters']['path'] & {

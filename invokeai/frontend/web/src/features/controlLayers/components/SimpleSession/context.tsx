@@ -18,7 +18,7 @@ import { z } from 'zod/v4';
 
 const zAutoSwitchMode = z.enum(['off', 'switch_on_start', 'switch_on_finish']);
 export const isAutoSwitchMode = buildZodTypeGuard(zAutoSwitchMode);
-export type AutoSwitchMode = z.infer<typeof zAutoSwitchMode>;
+type AutoSwitchMode = z.infer<typeof zAutoSwitchMode>;
 
 export type ProgressData = {
   itemId: number;
