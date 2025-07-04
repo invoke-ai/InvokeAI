@@ -1,5 +1,5 @@
 import { ExternalLink, Flex, Tab, TabList, TabPanel, TabPanels, Tabs, Text } from '@invoke-ai/ui-library';
-import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { IAINoContentFallback, IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import ImageMetadataGraphTabContent from 'features/gallery/components/ImageMetadataViewer/ImageMetadataGraphTabContent';
 import { useMetadataItem } from 'features/metadata/hooks/useMetadataItem';
@@ -58,13 +58,13 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
 
         <TabPanels>
           <TabPanel>
-            {metadata && !isLoading ? (
+            {isLoading && <IAINoContentFallbackWithSpinner label="Loading metadata..." />}
+            {metadata && !isLoading && (
               <ScrollableContent>
                 <ImageMetadataActions metadata={metadata} />
               </ScrollableContent>
-            ) : (
-              <IAINoContentFallback label={t('metadata.noRecallParameters')} />
             )}
+            {!metadata && !isLoading && <IAINoContentFallback label={t('metadata.noRecallParameters')} />}
           </TabPanel>
           <TabPanel>
             {metadata ? (
