@@ -5,7 +5,7 @@ import { useAppStore } from 'app/store/storeHooks';
 import { WrappedError } from 'common/util/result';
 import { get, isArray, isString } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { bboxHeightChanged, bboxWidthChanged } from 'features/controlLayers/store/canvasSlice';
+import { bboxHeightChanged, bboxWidthChanged, canvasMetadataRecalled } from 'features/controlLayers/store/canvasSlice';
 import { loraAllDeleted, loraRecalled } from 'features/controlLayers/store/lorasSlice';
 import {
   negativePrompt2Changed,
@@ -32,7 +32,7 @@ import {
   shouldConcatPromptsChanged,
   vaeSelected,
 } from 'features/controlLayers/store/paramsSlice';
-import type { LoRA } from 'features/controlLayers/store/types';
+import { type CanvasMetadata, type LoRA, zCanvasMetadata } from 'features/controlLayers/store/types';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { zModelIdentifier } from 'features/nodes/types/v2/common';
@@ -732,6 +732,42 @@ const LoRAs: CollectionMetadataHandler<LoRA[]> = {
 };
 //#endregion LoRAs
 
+//#region CanvasLayers
+const CanvasLayers: SingleMetadataHandler<CanvasMetadata> = {
+  [SingleMetadataKey]: true,
+  type: 'CanvasLayers',
+  parse: async (metadata) => {
+    const raw = getProperty(metadata, 'canvas_v2_metadata');
+    // This validator fetches all referenced images. If any do not exist, validation fails. The logic for this is in
+    // the zImageWithDims schema.
+    const parsed = await zCanvasMetadata.parseAsync(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    if (
+      value.controlLayers.length === 0 &&
+      value.rasterLayers.length === 0 &&
+      value.inpaintMasks.length === 0 &&
+      value.regionalGuidance.length === 0
+    ) {
+      // Nothing to recall
+      return;
+    }
+    store.dispatch(canvasMetadataRecalled(value));
+  },
+  LabelComponent: () => <MetadataLabel i18nKey="metadata.canvasV2Metadata" />,
+  ValueComponent: ({ value }: SingleMetadataValueProps<CanvasMetadata>) => {
+    const { t } = useTranslation();
+    const count =
+      value.controlLayers.length +
+      value.rasterLayers.length +
+      value.inpaintMasks.length +
+      value.regionalGuidance.length;
+    return <MetadataPrimitiveValue value={`${count} ${t('controlLayers.layer', { count })}`} />;
+  },
+};
+//#endregion CanvasLayers
+
 export const MetadataHandlers = {
   CreatedBy,
   GenerationMode,
@@ -760,6 +796,7 @@ export const MetadataHandlers = {
   MainModel,
   VAEModel,
   LoRAs,
+  CanvasLayers,
   // TODO:
   // Ref images
   // controlNet: parseControlNet,

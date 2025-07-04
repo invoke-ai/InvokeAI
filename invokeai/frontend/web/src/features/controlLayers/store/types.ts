@@ -599,7 +599,7 @@ export const zCanvasMetadata = z.object({
   rasterLayers: z.array(zCanvasRasterLayerState),
   controlLayers: z.array(zCanvasControlLayerState),
   regionalGuidance: z.array(zCanvasRegionalGuidanceState),
-  referenceImages: z.array(zRefImageState),
+  // referenceImages: z.array(zRefImageState),
 });
 export type CanvasMetadata = z.infer<typeof zCanvasMetadata>;
 
