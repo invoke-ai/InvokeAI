@@ -20,11 +20,11 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
   const imageDTO = useImageDTOContext();
   const isBusy = useCanvasIsBusySafe();
 
-  const onClickNewRasterLayerFromImage = useCallback(() => {
+  const onClickNewRasterLayerFromImage = useCallback(async () => {
     const { dispatch, getState } = store;
+    await navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
     createNewCanvasEntityFromImage({ imageDTO, type: 'raster_layer', dispatch, getState });
     dispatch(sentImageToCanvas());
-    navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
@@ -32,11 +32,11 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
     });
   }, [imageDTO, store, t]);
 
-  const onClickNewControlLayerFromImage = useCallback(() => {
+  const onClickNewControlLayerFromImage = useCallback(async () => {
     const { dispatch, getState } = store;
+    await navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
     createNewCanvasEntityFromImage({ imageDTO, type: 'control_layer', dispatch, getState });
     dispatch(sentImageToCanvas());
-    navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
@@ -44,11 +44,11 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
     });
   }, [imageDTO, store, t]);
 
-  const onClickNewInpaintMaskFromImage = useCallback(() => {
+  const onClickNewInpaintMaskFromImage = useCallback(async () => {
     const { dispatch, getState } = store;
+    await navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
     createNewCanvasEntityFromImage({ imageDTO, type: 'inpaint_mask', dispatch, getState });
     dispatch(sentImageToCanvas());
-    navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
@@ -56,11 +56,11 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
     });
   }, [imageDTO, store, t]);
 
-  const onClickNewRegionalGuidanceFromImage = useCallback(() => {
+  const onClickNewRegionalGuidanceFromImage = useCallback(async () => {
     const { dispatch, getState } = store;
+    await navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
     createNewCanvasEntityFromImage({ imageDTO, type: 'regional_guidance', dispatch, getState });
     dispatch(sentImageToCanvas());
-    navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
@@ -68,11 +68,11 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
     });
   }, [imageDTO, store, t]);
 
-  const onClickNewRegionalReferenceImageFromImage = useCallback(() => {
+  const onClickNewRegionalReferenceImageFromImage = useCallback(async () => {
     const { dispatch, getState } = store;
+    await navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
     createNewCanvasEntityFromImage({ imageDTO, type: 'regional_guidance_with_reference_image', dispatch, getState });
     dispatch(sentImageToCanvas());
-    navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),

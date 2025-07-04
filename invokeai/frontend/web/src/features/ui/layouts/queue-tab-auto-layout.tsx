@@ -24,7 +24,7 @@ export const initializeRootPanelLayout = (layoutApi: GridviewApi) => {
   return { queue } satisfies Record<string, IGridviewPanel>;
 };
 
-export const QueueTabAutoLayout = memo(({ setIsLoading }: { setIsLoading: (isLoading: boolean) => void }) => {
+export const QueueTabAutoLayout = memo(() => {
   const rootRef = useRef<HTMLDivElement>(null);
   const [rootApi, setRootApi] = useState<GridviewApi | null>(null);
   const onReady = useCallback<IGridviewReactProps['onReady']>(({ api }) => {
@@ -32,22 +32,18 @@ export const QueueTabAutoLayout = memo(({ setIsLoading }: { setIsLoading: (isLoa
   }, []);
 
   useEffect(() => {
-    setIsLoading(true);
-
     if (!rootApi) {
       return;
     }
 
     initializeRootPanelLayout(rootApi);
 
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 300);
+    navigationApi.onSwitchedTab();
 
     return () => {
       navigationApi.unregisterTab('queue');
     };
-  }, [rootApi, setIsLoading]);
+  }, [rootApi]);
 
   return (
     <AutoLayoutProvider tab="queue" rootRef={rootRef}>

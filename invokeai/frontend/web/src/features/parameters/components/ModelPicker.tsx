@@ -16,7 +16,7 @@ import { useStore } from '@nanostores/react';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { $onClickGoToModelManager } from 'app/store/nanostores/onClickGoToModelManager';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import type { Group, PickerContextState } from 'common/components/Picker/Picker';
 import { buildGroup, getRegex, isOption, Picker, usePickerContext } from 'common/components/Picker/Picker';
 import { useDisclosure } from 'common/hooks/useBoolean';
@@ -31,7 +31,7 @@ import { NavigateToModelManagerButton } from 'features/parameters/components/Mai
 import { API_BASE_MODELS, MODEL_TYPE_MAP, MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectIsModelsTabDisabled } from 'features/system/store/configSlice';
-import { setActiveTab } from 'features/ui/store/uiSlice';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { filesize } from 'filesize';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
@@ -72,11 +72,10 @@ const getOptionId = <T extends AnyModelConfig>(modelConfig: WithStarred<T>) => m
 
 const ModelManagerLink = memo((props: ButtonProps) => {
   const onClickGoToModelManager = useStore($onClickGoToModelManager);
-  const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
-    dispatch(setActiveTab('models'));
+    navigationApi.switchToTab('models');
     setInstallModelsTabByName('launchpad');
-  }, [dispatch]);
+  }, []);
 
   return (
     <Button

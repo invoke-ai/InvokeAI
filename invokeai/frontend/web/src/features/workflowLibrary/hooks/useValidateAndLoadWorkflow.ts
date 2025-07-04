@@ -7,6 +7,8 @@ import { WorkflowMigrationError, WorkflowVersionError } from 'features/nodes/typ
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
 import { toast } from 'features/toast/toast';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
+import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { serializeError } from 'serialize-error';
@@ -47,6 +49,7 @@ export const useValidateAndLoadWorkflow = () => {
       origin: 'file' | 'image' | 'object' | 'library'
     ): Promise<WorkflowV3 | null> => {
       try {
+        await navigationApi.focusPanel('workflows', WORKSPACE_PANEL_ID);
         const templates = $templates.get();
         const { workflow, warnings } = await validateWorkflow({
           workflow: unvalidatedWorkflow,

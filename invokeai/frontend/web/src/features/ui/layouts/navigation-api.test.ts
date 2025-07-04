@@ -83,16 +83,16 @@ describe('AppNavigationApi', () => {
     it('should connect to app', () => {
       navigationApi.connectToApp({ setAppTab: mockSetAppTab, getAppTab: mockGetAppTab });
 
-      expect(navigationApi.setAppTab).toBe(mockSetAppTab);
-      expect(navigationApi.getAppTab).toBe(mockGetAppTab);
+      expect(navigationApi._setAppTab).toBe(mockSetAppTab);
+      expect(navigationApi._getAppTab).toBe(mockGetAppTab);
     });
 
     it('should disconnect from app', () => {
       navigationApi.connectToApp({ setAppTab: mockSetAppTab, getAppTab: mockGetAppTab });
       navigationApi.disconnectFromApp();
 
-      expect(navigationApi.setAppTab).toBeNull();
-      expect(navigationApi.getAppTab).toBeNull();
+      expect(navigationApi._setAppTab).toBeNull();
+      expect(navigationApi._getAppTab).toBeNull();
     });
   });
 
@@ -348,8 +348,8 @@ describe('AppNavigationApi', () => {
       unregister();
       navigationApi.disconnectFromApp();
 
-      expect(navigationApi.setAppTab).toBeNull();
-      expect(navigationApi.getAppTab).toBeNull();
+      expect(navigationApi._setAppTab).toBeNull();
+      expect(navigationApi._getAppTab).toBeNull();
       expect(navigationApi.isPanelRegistered('generate', SETTINGS_PANEL_ID)).toBe(false);
     });
 

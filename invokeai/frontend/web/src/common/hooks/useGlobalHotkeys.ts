@@ -6,7 +6,7 @@ import { useDeleteCurrentQueueItem } from 'features/queue/hooks/useDeleteCurrent
 import { useInvoke } from 'features/queue/hooks/useInvoke';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { setActiveTab } from 'features/ui/store/uiSlice';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
 
 import { getFocusedRegion } from './focus';
 
@@ -69,7 +69,7 @@ export const useGlobalHotkeys = () => {
     id: 'selectGenerateTab',
     category: 'app',
     callback: () => {
-      dispatch(setActiveTab('generate'));
+      navigationApi.switchToTab('generate');
     },
     dependencies: [dispatch],
   });
@@ -78,7 +78,7 @@ export const useGlobalHotkeys = () => {
     id: 'selectCanvasTab',
     category: 'app',
     callback: () => {
-      dispatch(setActiveTab('canvas'));
+      navigationApi.switchToTab('canvas');
     },
     dependencies: [dispatch],
   });
@@ -87,7 +87,7 @@ export const useGlobalHotkeys = () => {
     id: 'selectUpscalingTab',
     category: 'app',
     callback: () => {
-      dispatch(setActiveTab('upscaling'));
+      navigationApi.switchToTab('upscaling');
     },
     dependencies: [dispatch],
   });
@@ -96,7 +96,7 @@ export const useGlobalHotkeys = () => {
     id: 'selectWorkflowsTab',
     category: 'app',
     callback: () => {
-      dispatch(setActiveTab('workflows'));
+      navigationApi.switchToTab('workflows');
     },
     dependencies: [dispatch],
   });
@@ -105,7 +105,7 @@ export const useGlobalHotkeys = () => {
     id: 'selectModelsTab',
     category: 'app',
     callback: () => {
-      dispatch(setActiveTab('models'));
+      navigationApi.switchToTab('models');
     },
     options: {
       enabled: isModelManagerEnabled,
@@ -117,7 +117,7 @@ export const useGlobalHotkeys = () => {
     id: 'selectQueueTab',
     category: 'app',
     callback: () => {
-      dispatch(setActiveTab('queue'));
+      navigationApi.switchToTab('queue');
     },
     dependencies: [dispatch, isModelManagerEnabled],
   });
