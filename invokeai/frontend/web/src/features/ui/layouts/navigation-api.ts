@@ -20,6 +20,8 @@ export class NavigationApi {
   private panels: Map<string, PanelType> = new Map();
   private waiters: Map<string, Waiter> = new Map();
 
+  KEY_SEPARATOR = ':';
+
   setAppTab: ((tab: TabName) => void) | null = null;
   getAppTab: (() => TabName) | null = null;
 
@@ -42,7 +44,7 @@ export class NavigationApi {
    * @returns Cleanup function to unregister the panel
    */
   registerPanel = (tab: TabName, panelId: string, panel: PanelType): (() => void) => {
-    const key = `${tab}:${panelId}`;
+    const key = this.getPanelKey(tab, panelId);
 
     this.panels.set(key, panel);
 
@@ -78,7 +80,7 @@ export class NavigationApi {
       return Promise.reject(new Error(`Tab ${tab} is not enabled for panel registration`));
     }
 
-    const key = `${tab}:${panelId}`;
+    const key = this.getPanelKey(tab, panelId);
 
     if (this.panels.has(key)) {
       return Promise.resolve();
@@ -106,8 +108,12 @@ export class NavigationApi {
     return deferred.promise;
   };
 
+  getTabPrefix = (tab: TabName): string => {
+    return `${tab}${this.KEY_SEPARATOR}`;
+  };
+
   getPanelKey = (tab: TabName, panelId: string): string => {
-    return `${tab}:${panelId}`;
+    return `${this.getTabPrefix(tab)}${panelId}`;
   };
 
   /**
@@ -300,7 +306,7 @@ export class NavigationApi {
    * @returns True if the panel is registered
    */
   isPanelRegistered = (tab: TabName, panelId: string): boolean => {
-    const key = `${tab}:${panelId}`;
+    const key = this.getPanelKey(tab, panelId);
     return this.panels.has(key);
   };
 
@@ -310,7 +316,7 @@ export class NavigationApi {
    * @returns Array of panel IDs
    */
   getRegisteredPanels = (tab: TabName): string[] => {
-    const prefix = `${tab}:`;
+    const prefix = this.getTabPrefix(tab);
     return Array.from(this.panels.keys())
       .filter((key) => key.startsWith(prefix))
       .map((key) => key.substring(prefix.length));
@@ -321,7 +327,7 @@ export class NavigationApi {
    * @param tab - The tab to unregister panels for
    */
   unregisterTab = (tab: TabName): void => {
-    const prefix = `${tab}:`;
+    const prefix = this.getTabPrefix(tab);
     const keysToDelete = Array.from(this.panels.keys()).filter((key) => key.startsWith(prefix));
 
     for (const key of keysToDelete) {
