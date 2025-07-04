@@ -143,7 +143,7 @@
     "tsafe": "^1.8.5",
     "type-fest": "^4.40.0",
     "typescript": "^5.8.3",
-    "vite": "^6.3.3",
+    "vite": "^7.0.2",
     "vite-plugin-css-injected-by-js": "^3.5.2",
     "vite-plugin-dts": "^4.5.3",
     "vite-plugin-eslint": "^1.8.1",
