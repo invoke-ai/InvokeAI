@@ -5,12 +5,18 @@ import { selectBase } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGlobalReferenceImageModels } from 'services/api/hooks/modelsByType';
-
-type RefImageModelConfig = ReturnType<typeof useGlobalReferenceImageModels>[0][number];
+import type {
+  ChatGPT4oModelConfig,
+  FLUXKontextModelConfig,
+  FLUXReduxModelConfig,
+  IPAdapterModelConfig,
+} from 'services/api/types';
 
 type Props = {
   modelKey: string | null;
-  onChangeModel: (modelConfig: RefImageModelConfig) => void;
+  onChangeModel: (
+    modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | ChatGPT4oModelConfig | FLUXKontextModelConfig
+  ) => void;
 };
 
 export const RefImageModel = memo(({ modelKey, onChangeModel }: Props) => {
@@ -20,7 +26,9 @@ export const RefImageModel = memo(({ modelKey, onChangeModel }: Props) => {
   const selectedModel = useMemo(() => modelConfigs.find((m) => m.key === modelKey), [modelConfigs, modelKey]);
 
   const _onChangeModel = useCallback(
-    (modelConfig: RefImageModelConfig | null) => {
+    (
+      modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | ChatGPT4oModelConfig | FLUXKontextModelConfig | null
+    ) => {
       if (!modelConfig) {
         return;
       }
@@ -30,7 +38,7 @@ export const RefImageModel = memo(({ modelKey, onChangeModel }: Props) => {
   );
 
   const getIsDisabled = useCallback(
-    (model: RefImageModelConfig): boolean => {
+    (model: IPAdapterModelConfig | FLUXReduxModelConfig | ChatGPT4oModelConfig | FLUXKontextModelConfig): boolean => {
       const hasMainModel = Boolean(currentBaseModel);
       const hasSameBase = currentBaseModel === model.base;
       return !hasMainModel || !hasSameBase;
