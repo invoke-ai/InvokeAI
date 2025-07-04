@@ -1,6 +1,4 @@
 import { Badge, Portal } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
-import { $isLeftPanelOpen } from 'features/ui/store/uiSlice';
 import type { RefObject } from 'react';
 import { memo, useEffect, useState } from 'react';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
@@ -11,7 +9,6 @@ type Props = {
 
 export const QueueCountBadge = memo(({ targetRef }: Props) => {
   const [badgePos, setBadgePos] = useState<{ x: string; y: string } | null>(null);
-  const isParametersPanelOpen = useStore($isLeftPanelOpen);
   const { queueSize } = useGetQueueStatusQuery(undefined, {
     selectFromResult: (res) => ({
       queueSize: res.data ? res.data.queue.pending + res.data.queue.in_progress : 0,
@@ -31,9 +28,6 @@ export const QueueCountBadge = memo(({ targetRef }: Props) => {
     }
 
     const cb = () => {
-      if (!$isLeftPanelOpen.get()) {
-        return;
-      }
       const { x, y } = target.getBoundingClientRect();
       if (x === 0 || y === 0) {
         // If the target is not visible, do not show the badge
@@ -56,9 +50,6 @@ export const QueueCountBadge = memo(({ targetRef }: Props) => {
     return null;
   }
   if (!badgePos) {
-    return null;
-  }
-  if (!isParametersPanelOpen) {
     return null;
   }
 

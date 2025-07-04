@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 const [useNewGallerySessionDialog] = buildUseBoolean(false);
 const [useNewCanvasSessionDialog] = buildUseBoolean(false);
 
-export const useNewGallerySession = () => {
+const useNewGallerySession = () => {
   const dispatch = useAppDispatch();
   const shouldConfirmOnNewSession = useAppSelector(selectSystemShouldConfirmOnNewSession);
   const newSessionDialog = useNewGallerySessionDialog();
@@ -35,7 +35,7 @@ export const useNewGallerySession = () => {
   return { newGallerySessionImmediate, newGallerySessionWithDialog };
 };
 
-export const useNewCanvasSession = () => {
+const useNewCanvasSession = () => {
   const dispatch = useAppDispatch();
   const shouldConfirmOnNewSession = useAppSelector(selectSystemShouldConfirmOnNewSession);
   const newSessionDialog = useNewCanvasSessionDialog();

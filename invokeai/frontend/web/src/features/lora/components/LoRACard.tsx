@@ -40,7 +40,7 @@ export const LoRACard = memo((props: { id: string }) => {
 
 LoRACard.displayName = 'LoRACard';
 
-export const LoRAContent = memo(({ lora }: { lora: LoRA }) => {
+const LoRAContent = memo(({ lora }: { lora: LoRA }) => {
   const dispatch = useAppDispatch();
   const { data: loraConfig } = useGetModelConfigQuery(lora.model.key);
 

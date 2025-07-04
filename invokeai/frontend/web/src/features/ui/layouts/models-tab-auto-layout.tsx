@@ -8,11 +8,11 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { navigationApi } from './navigation-api';
 import { MODELS_PANEL_ID } from './shared';
 
-export const rootPanelComponents: RootLayoutGridviewComponents = {
+const rootPanelComponents: RootLayoutGridviewComponents = {
   [MODELS_PANEL_ID]: ModelManagerTab,
 };
 
-export const initializeRootPanelLayout = (layoutApi: GridviewApi) => {
+const initializeRootPanelLayout = (layoutApi: GridviewApi) => {
   const models = layoutApi.addPanel({
     id: MODELS_PANEL_ID,
     component: MODELS_PANEL_ID,

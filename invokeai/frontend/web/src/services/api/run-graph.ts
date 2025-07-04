@@ -330,7 +330,9 @@ const _runGraph = async (
       const { status, session, error_type, error_message, error_traceback } = queueItem;
 
       // We are confident that the queue item is not pending or in progress, at this time.
-      assert(status !== 'pending' && status !== 'in_progress');
+      if (status === 'pending' || status === 'in_progress') {
+        throw new UnexpectedStatusError(event.item_id, session, status);
+      }
 
       if (status === 'completed') {
         const output = getOutputFromSession(queueItemId, session, outputNodeId);
@@ -435,7 +437,7 @@ class BaseSessionError extends BaseQueueItemError {
   }
 }
 
-export class UnexpectedStatusError extends BaseSessionError {
+class UnexpectedStatusError extends BaseSessionError {
   public readonly status: S['SessionQueueItem']['status'];
 
   constructor(
