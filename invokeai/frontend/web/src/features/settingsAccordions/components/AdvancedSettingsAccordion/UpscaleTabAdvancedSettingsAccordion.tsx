@@ -12,7 +12,7 @@ import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
 
-export const AdvancedSettingsAccordion = memo(() => {
+export const UpscaleTabAdvancedSettingsAccordion = memo(() => {
   const vaeKey = useAppSelector(selectVAEKey);
   const { currentData: vaeConfig } = useGetModelConfigQuery(vaeKey ?? skipToken);
   const isFLUX = useAppSelector(selectIsFLUX);
@@ -78,4 +78,4 @@ export const AdvancedSettingsAccordion = memo(() => {
   );
 });
 
-AdvancedSettingsAccordion.displayName = 'AdvancedSettingsAccordion';
+UpscaleTabAdvancedSettingsAccordion.displayName = 'UpscaleTabAdvancedSettingsAccordion';
