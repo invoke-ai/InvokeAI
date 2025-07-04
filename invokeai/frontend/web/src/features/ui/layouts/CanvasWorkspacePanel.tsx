@@ -3,6 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasAlertsInvocationProgress } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsInvocationProgress';
 import { CanvasAlertsPreserveMask } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsPreserveMask';
 import { CanvasAlertsSelectedEntityStatus } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSelectedEntityStatus';
+import { CanvasBusySpinner } from 'features/controlLayers/components/CanvasBusySpinner';
 import { CanvasContextMenuGlobalMenuItems } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuGlobalMenuItems';
 import { CanvasContextMenuSelectedEntityMenuItems } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuSelectedEntityMenuItems';
 import { CanvasDropArea } from 'features/controlLayers/components/CanvasDropArea';
@@ -95,6 +96,7 @@ export const CanvasWorkspacePanel = memo(() => {
                   <MenuContent />
                 </Menu>
               </Flex>
+              <CanvasBusySpinner position="absolute" insetInlineEnd={2} bottom={2} />
             </CanvasManagerProviderGate>
           </Flex>
         )}
