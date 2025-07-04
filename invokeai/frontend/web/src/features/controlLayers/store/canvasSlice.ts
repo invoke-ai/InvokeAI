@@ -15,10 +15,15 @@ import {
   selectRegionalGuidanceReferenceImage,
 } from 'features/controlLayers/store/selectors';
 import type {
+  CanvasBrushLineState,
+  CanvasBrushLineWithPressureState,
   CanvasEntityStateFromType,
   CanvasEntityType,
+  CanvasEraserLineState,
+  CanvasEraserLineWithPressureState,
   CanvasInpaintMaskState,
   CanvasMetadata,
+  CanvasRectState,
   ControlLoRAConfig,
   EntityMovedByPayload,
   FillStyle,
@@ -993,6 +998,154 @@ export const canvasSlice = createSlice({
         entity.denoiseLimit = undefined;
       }
     },
+    inpaintMaskInverted: (state, action: PayloadAction<EntityIdentifierPayload<void, 'inpaint_mask'>>) => {
+      const { entityIdentifier } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity || entity.type !== 'inpaint_mask') {
+        return;
+      }
+
+      // If there are no objects to invert, do nothing
+      if (entity.objects.length === 0) {
+        return;
+      }
+
+      // Get the current bbox dimensions for the mask
+      const bboxRect = state.bbox.rect;
+
+      // Create a clip rect that constrains all objects to the bbox
+      const bboxClip = {
+        x: bboxRect.x - entity.position.x,
+        y: bboxRect.y - entity.position.y,
+        width: bboxRect.width,
+        height: bboxRect.height,
+      };
+
+      // Check if we already have a full rectangle covering the entire bbox
+      const hasFullRect = entity.objects.some((obj) => {
+        if (obj.type !== 'rect') {
+          return false;
+        }
+        const { x, y, width, height } = obj.rect;
+        return (
+          Math.abs(x - bboxClip.x) < 1 &&
+          Math.abs(y - bboxClip.y) < 1 &&
+          Math.abs(width - bboxClip.width) < 1 &&
+          Math.abs(height - bboxClip.height) < 1
+        );
+      });
+
+      // Convert existing brush lines to eraser lines to "punch holes" in the full rectangle
+      const invertedObjects: (
+        | CanvasRectState
+        | CanvasEraserLineState
+        | CanvasEraserLineWithPressureState
+        | CanvasBrushLineState
+        | CanvasBrushLineWithPressureState
+      )[] = [];
+
+      // Only add the fill rectangle if we don't already have one
+      if (!hasFullRect) {
+        const fillRect: CanvasRectState = {
+          id: getPrefixedId('rect'),
+          type: 'rect',
+          rect: {
+            x: bboxRect.x - entity.position.x,
+            y: bboxRect.y - entity.position.y,
+            width: bboxRect.width,
+            height: bboxRect.height,
+          },
+          color: { r: 255, g: 255, b: 255, a: 1 },
+        };
+
+        invertedObjects.push(fillRect);
+      }
+
+      for (const obj of entity.objects) {
+        if (obj.type === 'brush_line') {
+          // Convert brush line to eraser line, constrained to bbox
+          const eraserLine: CanvasEraserLineState = {
+            id: getPrefixedId('eraser_line'),
+            type: 'eraser_line',
+            strokeWidth: obj.strokeWidth,
+            points: obj.points,
+            clip: bboxClip, // Ensure the eraser line is clipped to the bbox
+          };
+          invertedObjects.push(eraserLine);
+        } else if (obj.type === 'brush_line_with_pressure') {
+          // Convert brush line with pressure to eraser line with pressure, constrained to bbox
+          const eraserLine: CanvasEraserLineWithPressureState = {
+            id: getPrefixedId('eraser_line'),
+            type: 'eraser_line_with_pressure',
+            strokeWidth: obj.strokeWidth,
+            points: obj.points,
+            clip: bboxClip, // Ensure the eraser line is clipped to the bbox
+          };
+          invertedObjects.push(eraserLine);
+        } else if (obj.type === 'rect') {
+          // Convert rectangle to eraser rectangle, constrained to bbox
+          const { x, y, width, height } = obj.rect;
+
+          // Clamp the rectangle to the bbox boundaries
+          const clampedX = Math.max(x, bboxClip.x);
+          const clampedY = Math.max(y, bboxClip.y);
+          const clampedWidth = Math.min(width, bboxClip.x + bboxClip.width - clampedX);
+          const clampedHeight = Math.min(height, bboxClip.y + bboxClip.height - clampedY);
+
+          // Only add the eraser rectangle if it has valid dimensions
+          if (clampedWidth > 0 && clampedHeight > 0) {
+            const points = [
+              clampedX,
+              clampedY,
+              clampedX + clampedWidth,
+              clampedY,
+              clampedX + clampedWidth,
+              clampedY + clampedHeight,
+              clampedX,
+              clampedY + clampedHeight,
+              clampedX,
+              clampedY, // Close the rectangle
+            ];
+
+            const eraserLine: CanvasEraserLineState = {
+              id: getPrefixedId('eraser_line'),
+              type: 'eraser_line',
+              points,
+              strokeWidth: Math.max(clampedWidth, clampedHeight) / 2, // Use a stroke width that covers the rectangle
+              clip: bboxClip, // Ensure the eraser line is clipped to the bbox
+            };
+            invertedObjects.push(eraserLine);
+          }
+        } else if (obj.type === 'eraser_line') {
+          // Convert eraser line to brush line, constrained to bbox
+          const brushLine: CanvasBrushLineState = {
+            id: getPrefixedId('brush_line'),
+            type: 'brush_line',
+            strokeWidth: obj.strokeWidth,
+            points: obj.points,
+            clip: bboxClip, // Ensure the brush line is clipped to the bbox
+            color: { r: 255, g: 255, b: 255, a: 1 },
+          };
+          invertedObjects.push(brushLine);
+        } else if (obj.type === 'eraser_line_with_pressure') {
+          // Convert eraser line with pressure to brush line with pressure, constrained to bbox
+          const brushLine: CanvasBrushLineWithPressureState = {
+            id: getPrefixedId('brush_line'),
+            type: 'brush_line_with_pressure',
+            strokeWidth: obj.strokeWidth,
+            points: obj.points,
+            clip: bboxClip, // Ensure the brush line is clipped to the bbox
+            color: { r: 255, g: 255, b: 255, a: 1 },
+          };
+          invertedObjects.push(brushLine);
+        }
+        // Note: Image objects are not handled in this simple approach
+        // They would need to be processed through the compositor
+      }
+
+      // Replace the entity's objects with the inverted mask objects
+      entity.objects = invertedObjects;
+    },
     //#region BBox
     bboxScaledWidthChanged: (state, action: PayloadAction<number>) => {
       const gridSize = getGridSize(state.bbox.modelBase);
@@ -1713,6 +1866,7 @@ export const {
   inpaintMaskDenoiseLimitAdded,
   inpaintMaskDenoiseLimitChanged,
   inpaintMaskDenoiseLimitDeleted,
+  inpaintMaskInverted,
   // inpaintMaskRecalled,
 } = canvasSlice.actions;
 
