@@ -51,7 +51,6 @@ import {
 import { TabWithLaunchpadIcon } from './TabWithLaunchpadIcon';
 import { TabWithoutCloseButtonAndWithProgressIndicator } from './TabWithoutCloseButtonAndWithProgressIndicator';
 import { UpscalingTabLeftPanel } from './UpscalingTabLeftPanel';
-import { useResizeMainPanelOnFirstVisit } from './use-on-first-visible';
 
 const tabComponents = {
   [DEFAULT_TAB_ID]: TabWithoutCloseButton,
@@ -288,28 +287,29 @@ export const initializeRootPanelLayout = (layoutApi: GridviewApi) => {
   return { main, left, right } satisfies Record<string, IGridviewPanel>;
 };
 
-export const UpscalingTabAutoLayout = memo(() => {
+export const UpscalingTabAutoLayout = memo(({ setIsLoading }: { setIsLoading: (isLoading: boolean) => void }) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const [rootApi, setRootApi] = useState<GridviewApi | null>(null);
   const onReady = useCallback<IGridviewReactProps['onReady']>(({ api }) => {
     setRootApi(api);
   }, []);
 
-  useResizeMainPanelOnFirstVisit(rootApi, rootRef);
-
   useEffect(() => {
+    setIsLoading(true);
+
     if (!rootApi) {
       return;
     }
+
     initializeRootPanelLayout(rootApi);
 
-    // Focus the launchpad panel once it's ready
-    navigationApi.focusPanel('upscaling', LAUNCHPAD_PANEL_ID);
-
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 300);
     return () => {
       navigationApi.unregisterTab('upscaling');
     };
-  }, [rootApi]);
+  }, [rootApi, setIsLoading]);
 
   return (
     <AutoLayoutProvider tab="upscaling" rootRef={rootRef}>
