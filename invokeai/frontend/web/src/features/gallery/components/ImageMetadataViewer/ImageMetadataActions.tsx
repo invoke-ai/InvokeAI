@@ -30,7 +30,6 @@ const ImageMetadataActions = (props: Props) => {
 
   return (
     <Flex flexDir="column" ps={8}>
-      <UnrecallableMetadataDatum metadata={metadata} handler={MetadataHandlers.CreatedBy} />
       <UnrecallableMetadataDatum metadata={metadata} handler={MetadataHandlers.GenerationMode} />
       <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.PositivePrompt} />
       <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.NegativePrompt} />
@@ -63,7 +62,7 @@ const ImageMetadataActions = (props: Props) => {
 
 export default memo(ImageMetadataActions);
 
-const UnrecallableMetadataDatum = typedMemo(
+export const UnrecallableMetadataDatum = typedMemo(
   <T,>({ metadata, handler }: { metadata: unknown; handler: UnrecallableMetadataHandler<T> }) => {
     const { data } = useUnrecallableMetadataDatum(metadata, handler);
 

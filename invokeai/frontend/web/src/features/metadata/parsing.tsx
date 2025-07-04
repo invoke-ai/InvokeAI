@@ -760,6 +760,20 @@ export const MetadataHandlers = {
   MainModel,
   VAEModel,
   LoRAs,
+  // TODO:
+  // Ref images
+  // controlNet: parseControlNet,
+  // controlNets: parseAllControlNets,
+  // t2iAdapter: parseT2IAdapter,
+  // t2iAdapters: parseAllT2IAdapters,
+  // ipAdapter: parseIPAdapter,
+  // ipAdapters: parseAllIPAdapters,
+  // controlNetToControlLayer: parseControlNetToControlAdapterLayer,
+  // t2iAdapterToControlAdapterLayer: parseT2IAdapterToControlAdapterLayer,
+  // ipAdapterToIPAdapterLayer: parseIPAdapterToIPAdapterLayer,
+  // layer: parseLayer,
+  // layers: parseLayers,
+  // canvasV2Metadata: parseCanvasV2Metadata,
 } as const;
 
 const successToast = (parameter: ReactNode) => {
@@ -815,17 +829,22 @@ const recallByHandlers = async (arg: {
   metadata: unknown;
   handlers: (SingleMetadataHandler<any> | CollectionMetadataHandler<any[]>)[];
   store: AppStore;
+  skip?: (SingleMetadataHandler<any> | CollectionMetadataHandler<any[]>)[];
   silent?: boolean;
 }): Promise<Map<SingleMetadataHandler<any> | CollectionMetadataHandler<any[]>, unknown>> => {
-  const { metadata, handlers, store, silent = false } = arg;
+  const { metadata, handlers, store, silent = false, skip = [] } = arg;
 
   const recalled = new Map<SingleMetadataHandler<any> | CollectionMetadataHandler<any[]>, unknown>();
+
+  const filteredHandlers = handlers.filter(
+    (handler) => !skip.some((skippedHandler) => skippedHandler.type === handler.type)
+  );
 
   // It's possible for some metadata item's recall to clobber the recall of another. For example, the model recall
   // may change the width and height. If we are also recalling the width and height directly, we need to ensure that the
   // model is recalled first, so it doesn't accidentally override the width and height. This is the only known case
   // where the order of recall matters.
-  const sortedHandlers = handlers.sort((a, b) => {
+  const sortedHandlers = filteredHandlers.sort((a, b) => {
     if (a === MetadataHandlers.MainModel) {
       return -1; // MainModel should be recalled first
     } else if (b === MetadataHandlers.MainModel) {
@@ -910,7 +929,11 @@ const recallDimensions = async (metadata: unknown, store: AppStore) => {
   }
 };
 
-const recallAll = async (metadata: unknown, store: AppStore) => {
+const recallAll = async (
+  metadata: unknown,
+  store: AppStore,
+  skip?: (SingleMetadataHandler<any> | CollectionMetadataHandler<any[]>)[]
+) => {
   const handlers = Object.values(MetadataHandlers).filter(
     (handler) => isSingleMetadataHandler(handler) || isCollectionMetadataHandler(handler)
   );
@@ -918,6 +941,7 @@ const recallAll = async (metadata: unknown, store: AppStore) => {
     metadata,
     handlers,
     store,
+    skip,
   });
 };
 
