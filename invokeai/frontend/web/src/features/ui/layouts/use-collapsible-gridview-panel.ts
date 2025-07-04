@@ -1,9 +1,8 @@
-import type { GridviewPanelApi, IGridviewPanel } from 'dockview';
+import { GridviewPanel, type GridviewPanelApi, type IGridviewPanel } from 'dockview';
 import type { TabName } from 'features/ui/store/uiTypes';
 import { atom } from 'nanostores';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { TabPanelApis } from './navigation-api';
 import { navigationApi } from './navigation-api';
 
 const getIsCollapsed = (
@@ -19,7 +18,6 @@ const getIsCollapsed = (
 
 export const useCollapsibleGridviewPanel = (
   tab: TabName,
-  rootPanelId: Exclude<keyof TabPanelApis, 'main'>,
   panelId: string,
   orientation: 'horizontal' | 'vertical',
   defaultSize: number,
@@ -28,12 +26,9 @@ export const useCollapsibleGridviewPanel = (
   const $isCollapsed = useState(() => atom(false))[0];
   const lastExpandedSizeRef = useRef<number>(0);
   const collapse = useCallback(() => {
-    const api = navigationApi.getTabPanelApis(tab)?.[rootPanelId];
-    if (!api) {
-      return;
-    }
-    const panel = api.getPanel(panelId);
-    if (!panel) {
+    const panel = navigationApi.getPanel(tab, panelId);
+
+    if (!panel || !(panel instanceof GridviewPanel)) {
       return;
     }
 
@@ -44,16 +39,11 @@ export const useCollapsibleGridviewPanel = (
     } else {
       panel.api.setSize({ width: collapsedSize ?? panel.minimumWidth });
     }
-  }, [collapsedSize, orientation, panelId, rootPanelId, tab]);
+  }, [collapsedSize, orientation, panelId, tab]);
 
   const expand = useCallback(() => {
-    const api = navigationApi.getTabPanelApis(tab)?.[rootPanelId];
-
-    if (!api) {
-      return;
-    }
-    const panel = api.getPanel(panelId);
-    if (!panel) {
+    const panel = navigationApi.getPanel(tab, panelId);
+    if (!panel || !(panel instanceof GridviewPanel)) {
       return;
     }
     if (orientation === 'vertical') {
@@ -61,16 +51,11 @@ export const useCollapsibleGridviewPanel = (
     } else {
       panel.api.setSize({ width: lastExpandedSizeRef.current || defaultSize });
     }
-  }, [defaultSize, orientation, panelId, rootPanelId, tab]);
+  }, [defaultSize, orientation, panelId, tab]);
 
   const toggle = useCallback(() => {
-    const api = navigationApi.getTabPanelApis(tab)?.[rootPanelId];
-
-    if (!api) {
-      return;
-    }
-    const panel = api.getPanel(panelId);
-    if (!panel) {
+    const panel = navigationApi.getPanel(tab, panelId);
+    if (!panel || !(panel instanceof GridviewPanel)) {
       return;
     }
     const isCollapsed = getIsCollapsed(panel, orientation, collapsedSize);
@@ -79,16 +64,11 @@ export const useCollapsibleGridviewPanel = (
     } else {
       collapse();
     }
-  }, [tab, rootPanelId, panelId, orientation, collapsedSize, expand, collapse]);
+  }, [tab, panelId, orientation, collapsedSize, expand, collapse]);
 
   useEffect(() => {
-    const api = navigationApi.getTabPanelApis(tab)?.[rootPanelId];
-
-    if (!api) {
-      return;
-    }
-    const panel = api.getPanel(panelId);
-    if (!panel) {
+    const panel = navigationApi.getPanel(tab, panelId);
+    if (!panel || !(panel instanceof GridviewPanel)) {
       return;
     }
 
@@ -100,7 +80,7 @@ export const useCollapsibleGridviewPanel = (
     return () => {
       disposable.dispose();
     };
-  }, [$isCollapsed, collapsedSize, orientation, panelId, rootPanelId, tab]);
+  }, [$isCollapsed, collapsedSize, orientation, panelId, tab]);
 
   return useMemo(
     () => ({

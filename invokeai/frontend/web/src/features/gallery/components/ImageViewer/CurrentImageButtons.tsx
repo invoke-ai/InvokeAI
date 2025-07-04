@@ -59,7 +59,7 @@ export const CurrentImageButtons = memo(() => {
       getState,
       dispatch,
     });
-    navigationApi.focusPanelInTab('canvas', WORKSPACE_PANEL_ID);
+    navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
 
     // Automatically select the brush tool when editing an image
     if (canvasManager) {

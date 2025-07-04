@@ -24,7 +24,7 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
     const { dispatch, getState } = store;
     createNewCanvasEntityFromImage({ imageDTO, type: 'raster_layer', dispatch, getState });
     dispatch(sentImageToCanvas());
-    navigationApi.focusPanelInTab('canvas', WORKSPACE_PANEL_ID);
+    navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
@@ -36,7 +36,7 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
     const { dispatch, getState } = store;
     createNewCanvasEntityFromImage({ imageDTO, type: 'control_layer', dispatch, getState });
     dispatch(sentImageToCanvas());
-    navigationApi.focusPanelInTab('canvas', WORKSPACE_PANEL_ID);
+    navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
@@ -48,7 +48,7 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
     const { dispatch, getState } = store;
     createNewCanvasEntityFromImage({ imageDTO, type: 'inpaint_mask', dispatch, getState });
     dispatch(sentImageToCanvas());
-    navigationApi.focusPanelInTab('canvas', WORKSPACE_PANEL_ID);
+    navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
@@ -60,7 +60,7 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
     const { dispatch, getState } = store;
     createNewCanvasEntityFromImage({ imageDTO, type: 'regional_guidance', dispatch, getState });
     dispatch(sentImageToCanvas());
-    navigationApi.focusPanelInTab('canvas', WORKSPACE_PANEL_ID);
+    navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
@@ -72,7 +72,7 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
     const { dispatch, getState } = store;
     createNewCanvasEntityFromImage({ imageDTO, type: 'regional_guidance_with_reference_image', dispatch, getState });
     dispatch(sentImageToCanvas());
-    navigationApi.focusPanelInTab('canvas', WORKSPACE_PANEL_ID);
+    navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
