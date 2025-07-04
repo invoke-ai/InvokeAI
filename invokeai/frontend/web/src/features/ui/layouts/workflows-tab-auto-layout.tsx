@@ -53,7 +53,6 @@ import {
 } from './shared';
 import { TabWithLaunchpadIcon } from './TabWithLaunchpadIcon';
 import { TabWithoutCloseButtonAndWithProgressIndicator } from './TabWithoutCloseButtonAndWithProgressIndicator';
-import { useResizeMainPanelOnFirstVisit } from './use-on-first-visible';
 
 const tabComponents = {
   [DEFAULT_TAB_ID]: TabWithoutCloseButton,
@@ -305,28 +304,30 @@ export const initializeRootPanelLayout = (api: GridviewApi) => {
   return { main, left, right } satisfies Record<string, IGridviewPanel>;
 };
 
-export const WorkflowsTabAutoLayout = memo(() => {
+export const WorkflowsTabAutoLayout = memo(({ setIsLoading }: { setIsLoading: (isLoading: boolean) => void }) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const [rootApi, setRootApi] = useState<GridviewApi | null>(null);
   const onReady = useCallback<IGridviewReactProps['onReady']>(({ api }) => {
     setRootApi(api);
   }, []);
 
-  useResizeMainPanelOnFirstVisit(rootApi, rootRef);
-
   useEffect(() => {
+    setIsLoading(true);
+
     if (!rootApi) {
       return;
     }
+
     initializeRootPanelLayout(rootApi);
 
-    // Focus the launchpad panel once it's ready
-    navigationApi.focusPanel('workflows', LAUNCHPAD_PANEL_ID);
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 300);
 
     return () => {
       navigationApi.unregisterTab('workflows');
     };
-  }, [rootApi]);
+  }, [rootApi, setIsLoading]);
 
   return (
     <AutoLayoutProvider tab="workflows" rootRef={rootRef}>
