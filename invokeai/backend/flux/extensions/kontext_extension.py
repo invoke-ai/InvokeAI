@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-
 import einops
 import numpy as np
 import torch
@@ -12,80 +10,6 @@ from invokeai.app.invocations.model import VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import pack
 from invokeai.backend.flux.util import PREFERED_KONTEXT_RESOLUTIONS
-
-
-@dataclass
-class KontextResizeConstraints:
-    """Configurable constraints for FLUX Kontext image resizing."""
-
-    min_dimension: int = 672
-    max_dimension: int = 1568
-    multiple: int = 16  # Ensure dimensions are multiples of this value
-
-
-def calculate_optimal_kontext_dimensions(
-    width: int, height: int, constraints: KontextResizeConstraints = KontextResizeConstraints()
-) -> tuple[int, int]:
-    """Calculate optimal dimensions for FLUX Kontext conditioning.
-
-    This function ensures:
-    1. Dimensions are multiples of the specified multiple
-    2. Dimensions are within the valid range
-    3. Aspect ratio is preserved as closely as possible
-    4. Implicit optimization for performance by maximizing within constraints
-
-    Args:
-        width: Original image width
-        height: Original image height
-        constraints: Resize constraints configuration
-
-    Returns:
-        Tuple of (optimal_width, optimal_height)
-    """
-    aspect_ratio = width / height
-
-    # Calculate the maximum possible dimensions while staying within bounds
-    if aspect_ratio >= 1.0:  # Landscape or square
-        # Width is the larger dimension
-        max_width = min(constraints.max_dimension, width)
-        max_width = (max_width // constraints.multiple) * constraints.multiple
-        optimal_width = max(constraints.min_dimension, max_width)
-        optimal_height = int(optimal_width / aspect_ratio)
-        optimal_height = (optimal_height // constraints.multiple) * constraints.multiple
-        optimal_height = max(constraints.min_dimension, optimal_height)
-    else:  # Portrait
-        # Height is the larger dimension
-        max_height = min(constraints.max_dimension, height)
-        max_height = (max_height // constraints.multiple) * constraints.multiple
-        optimal_height = max(constraints.min_dimension, max_height)
-        optimal_width = int(optimal_height * aspect_ratio)
-        optimal_width = (optimal_width // constraints.multiple) * constraints.multiple
-        optimal_width = max(constraints.min_dimension, optimal_width)
-
-    return optimal_width, optimal_height
-
-
-def resize_to_optimal_kontext_resolution(
-    image: Image.Image, constraints: KontextResizeConstraints = KontextResizeConstraints()
-) -> Image.Image:
-    """Resize image to optimal FLUX Kontext resolution.
-
-    This ensures the image dimensions are compatible with the FLUX packing operation
-    and provides optimal performance for Kontext conditioning.
-
-    Args:
-        image: PIL Image to resize
-        constraints: Resize constraints configuration
-
-    Returns:
-        Resized PIL Image with optimal dimensions
-    """
-    width, height = image.size
-    optimal_width, optimal_height = calculate_optimal_kontext_dimensions(width, height, constraints)
-
-    # Resize the image to the optimal resolution
-    resized_image = image.resize((optimal_width, optimal_height), Image.Resampling.LANCZOS)
-    return resized_image
 
 
 def generate_img_ids_with_offset(
