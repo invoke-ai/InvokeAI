@@ -108,7 +108,7 @@ const getProperty = (obj: unknown, path: string): unknown => {
   return get(obj, path) as unknown;
 };
 
-export type UnparsedData = {
+type UnparsedData = {
   isParsed: false;
   isSuccess: false;
   isError: false;
@@ -138,7 +138,7 @@ const buildParsedSuccessData = <T,>(value: T): ParsedSuccessData<T> => ({
   error: null,
 });
 
-export type ParsedErrorData = {
+type ParsedErrorData = {
   isParsed: true;
   isSuccess: false;
   isError: true;
@@ -153,7 +153,7 @@ const buildParsedErrorData = (error: Error): ParsedErrorData => ({
   error,
 });
 
-export type Data<T> = UnparsedData | ParsedSuccessData<T> | ParsedErrorData;
+type Data<T> = UnparsedData | ParsedSuccessData<T> | ParsedErrorData;
 
 const SingleMetadataKey = Symbol('SingleMetadataKey');
 type SingleMetadataValueProps<T> = {

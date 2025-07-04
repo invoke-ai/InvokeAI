@@ -6,7 +6,7 @@ import type { ImageDTO, ImageNamesResult } from 'services/api/types';
  * For starred_first=true: starred images go to position 0, unstarred go after all starred images
  * For starred_first=false: all new images go to position 0 (newest first)
  */
-export function calculateImageInsertionPosition(
+function calculateImageInsertionPosition(
   imageDTO: ImageDTO,
   starredFirst: boolean,
   starredCount: number,
@@ -56,44 +56,4 @@ export function insertImageIntoNamesResult(
     starred_count: starredFirst && imageDTO.starred ? currentResult.starred_count + 1 : currentResult.starred_count,
     total_count: currentResult.total_count + 1,
   };
-}
-
-/**
- * Optimistically removes an image from the ImageNamesResult
- */
-export function removeImageFromNamesResult(
-  currentResult: ImageNamesResult,
-  imageNameToRemove: string,
-  wasStarred: boolean,
-  starredFirst: boolean
-): ImageNamesResult {
-  const newImageNames = currentResult.image_names.filter((name) => name !== imageNameToRemove);
-
-  return {
-    image_names: newImageNames,
-    starred_count: starredFirst && wasStarred ? currentResult.starred_count - 1 : currentResult.starred_count,
-    total_count: currentResult.total_count - 1,
-  };
-}
-
-/**
- * Optimistically updates an image's position in the result when its starred status changes
- */
-export function updateImagePositionInNamesResult(
-  currentResult: ImageNamesResult,
-  updatedImageDTO: ImageDTO,
-  previouslyStarred: boolean,
-  starredFirst: boolean,
-  orderDir: OrderDir = 'DESC'
-): ImageNamesResult {
-  // First remove the image from its current position
-  const withoutImage = removeImageFromNamesResult(
-    currentResult,
-    updatedImageDTO.image_name,
-    previouslyStarred,
-    starredFirst
-  );
-
-  // Then insert it at the new correct position
-  return insertImageIntoNamesResult(withoutImage, updatedImageDTO, starredFirst, orderDir);
 }

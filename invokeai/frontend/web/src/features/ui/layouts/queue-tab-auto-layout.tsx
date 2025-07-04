@@ -8,11 +8,11 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { navigationApi } from './navigation-api';
 import { QUEUE_PANEL_ID } from './shared';
 
-export const rootPanelComponents: RootLayoutGridviewComponents = {
+const rootPanelComponents: RootLayoutGridviewComponents = {
   [QUEUE_PANEL_ID]: QueueTab,
 };
 
-export const initializeRootPanelLayout = (layoutApi: GridviewApi) => {
+const initializeRootPanelLayout = (layoutApi: GridviewApi) => {
   const queue = layoutApi.addPanel({
     id: QUEUE_PANEL_ID,
     component: QUEUE_PANEL_ID,

@@ -28,11 +28,6 @@ export const useAutoLayoutContext = () => {
   return value;
 };
 
-export const useAutoLayoutContextSafe = () => {
-  const value = useContext(AutoLayoutContext);
-  return value;
-};
-
 export type PanelParameters = {
   tab: TabName;
   focusRegion: FocusRegionName;
@@ -41,7 +36,7 @@ export type PanelParameters = {
 export type AutoLayoutGridviewComponents = Record<string, FunctionComponent<IGridviewPanelProps<PanelParameters>>>;
 export type AutoLayoutDockviewComponents = Record<string, FunctionComponent<IDockviewPanelProps<PanelParameters>>>;
 export type RootLayoutGridviewComponents = Record<string, FunctionComponent<IGridviewPanelProps<PanelParameters>>>;
-export type PanelProps = IDockviewPanelProps<PanelParameters> | IGridviewPanelProps<PanelParameters>;
+type PanelProps = IDockviewPanelProps<PanelParameters> | IGridviewPanelProps<PanelParameters>;
 
 export const withPanelContainer = (Component: FunctionComponent) =>
   memo((props: PanelProps) => {

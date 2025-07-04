@@ -12,7 +12,7 @@ import { useMeasure } from 'react-use';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
-export const ImageComparisonContent = memo(({ firstImage, secondImage, containerDims }: ComparisonProps) => {
+const ImageComparisonContent = memo(({ firstImage, secondImage, containerDims }: ComparisonProps) => {
   const comparisonMode = useAppSelector(selectComparisonMode);
 
   if (comparisonMode === 'slider') {

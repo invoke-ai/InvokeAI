@@ -10,7 +10,7 @@ import { buildPresetModifiedPrompt } from 'features/stylePresets/hooks/usePreset
 import { selectStylePresetSlice } from 'features/stylePresets/store/stylePresetSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { selectListStylePresetsRequestState } from 'services/api/endpoints/stylePresets';
-import type { Invocation, S } from 'services/api/types';
+import type { Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
 
 import type { MainModelLoaderNodes } from './types';
@@ -161,7 +161,3 @@ export const isMainModelWithoutUnet = (modelLoader: Invocation<MainModelLoaderNo
 };
 
 export const isCanvasOutputNodeId = (nodeId: string) => nodeId.split(':')[0] === CANVAS_OUTPUT_PREFIX;
-
-export const isCanvasOutputEvent = (data: S['InvocationCompleteEvent']) => {
-  return isCanvasOutputNodeId(data.invocation_source_id);
-};

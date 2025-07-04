@@ -281,12 +281,6 @@ export const selectRefImageEntityIds = createMemoizedSelector(selectReferenceIma
 );
 export const selectRefImageEntity = (state: RefImagesState, id: string) =>
   state.entities.find((entity) => entity.id === id) ?? null;
-export const selectSelectedRefEntity = createSelector(selectRefImagesSlice, (state) => {
-  if (!state.selectedEntityId) {
-    return null;
-  }
-  return selectRefImageEntity(state, state.selectedEntityId);
-});
 
 export function selectRefImageEntityOrThrow(state: RefImagesState, id: string, caller: string): RefImageState {
   const entity = selectRefImageEntity(state, id);
