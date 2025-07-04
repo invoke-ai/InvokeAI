@@ -13,6 +13,9 @@ export const LAYERS_PANEL_ID = 'layers';
 
 export const SETTINGS_PANEL_ID = 'settings';
 
+export const MODELS_PANEL_ID = 'models';
+export const QUEUE_PANEL_ID = 'queue';
+
 export const DEFAULT_TAB_ID = 'default-tab';
 export const TAB_WITH_PROGRESS_INDICATOR_ID = 'tab-with-progress-indicator';
 export const TAB_WITH_LAUNCHPAD_ICON_ID = 'tab-with-launchpad-icon';

@@ -3,7 +3,7 @@ import { createDeferredPromise, type Deferred } from 'common/util/createDeferred
 import { GridviewPanel, type IDockviewPanel, type IGridviewPanel } from 'dockview';
 import type { TabName } from 'features/ui/store/uiTypes';
 
-import { LEFT_PANEL_MIN_SIZE_PX, RIGHT_PANEL_MIN_SIZE_PX } from './shared';
+import { LEFT_PANEL_ID, LEFT_PANEL_MIN_SIZE_PX, RIGHT_PANEL_ID, RIGHT_PANEL_MIN_SIZE_PX } from './shared';
 
 const log = logger('system');
 
@@ -13,8 +13,6 @@ type Waiter = {
   deferred: Deferred<void>;
   timeoutId: ReturnType<typeof setTimeout> | null;
 };
-
-const PANEL_ENABLED_TABS: TabName[] = ['canvas', 'generate', 'workflows', 'upscaling'];
 
 export class NavigationApi {
   private panels: Map<string, PanelType> = new Map();
@@ -75,11 +73,6 @@ export class NavigationApi {
    * @returns Promise that resolves when the panel is ready
    */
   waitForPanel = (tab: TabName, panelId: string, timeout = 2000): Promise<void> => {
-    if (!PANEL_ENABLED_TABS.includes(tab)) {
-      log.error(`Tab ${tab} is not enabled for panel registration`);
-      return Promise.reject(new Error(`Tab ${tab} is not enabled for panel registration`));
-    }
-
     const key = this.getPanelKey(tab, panelId);
 
     if (this.panels.has(key)) {
@@ -123,11 +116,6 @@ export class NavigationApi {
    * @returns Promise that resolves to true if successful, false otherwise
    */
   focusPanel = async (tab: TabName, panelId: string): Promise<boolean> => {
-    if (!PANEL_ENABLED_TABS.includes(tab)) {
-      log.error(`Tab ${tab} is not enabled for panel registration`);
-      return Promise.resolve(false);
-    }
-
     try {
       // Switch to the target tab if needed
       if (this.setAppTab && this.getAppTab && this.getAppTab() !== tab) {
@@ -176,10 +164,6 @@ export class NavigationApi {
   };
 
   getPanel = (tab: TabName, panelId: string): PanelType | undefined => {
-    if (!PANEL_ENABLED_TABS.includes(tab)) {
-      log.warn(`Tab ${tab} is not enabled for panel registration`);
-      return undefined;
-    }
     const key = this.getPanelKey(tab, panelId);
     return this.panels.get(key);
   };
@@ -190,7 +174,7 @@ export class NavigationApi {
       log.warn('No active tab found to toggle left panel');
       return false;
     }
-    const leftPanel = this.getPanel(activeTab, 'left');
+    const leftPanel = this.getPanel(activeTab, LEFT_PANEL_ID);
     if (!leftPanel) {
       log.warn(`Left panel not found in active tab "${activeTab}"`);
       return false;
@@ -216,7 +200,7 @@ export class NavigationApi {
       log.warn('No active tab found to toggle right panel');
       return false;
     }
-    const rightPanel = this.getPanel(activeTab, 'right');
+    const rightPanel = this.getPanel(activeTab, RIGHT_PANEL_ID);
     if (!rightPanel) {
       log.warn(`Right panel not found in active tab "${activeTab}"`);
       return false;
@@ -242,8 +226,8 @@ export class NavigationApi {
       log.warn('No active tab found to toggle right panel');
       return false;
     }
-    const leftPanel = this.getPanel(activeTab, 'left');
-    const rightPanel = this.getPanel(activeTab, 'right');
+    const leftPanel = this.getPanel(activeTab, LEFT_PANEL_ID);
+    const rightPanel = this.getPanel(activeTab, RIGHT_PANEL_ID);
 
     if (!rightPanel || !leftPanel) {
       log.warn(`Right and/or left panel not found in tab "${activeTab}"`);
@@ -277,8 +261,8 @@ export class NavigationApi {
       log.warn('No active tab found to toggle right panel');
       return false;
     }
-    const leftPanel = this.getPanel(activeTab, 'left');
-    const rightPanel = this.getPanel(activeTab, 'right');
+    const leftPanel = this.getPanel(activeTab, LEFT_PANEL_ID);
+    const rightPanel = this.getPanel(activeTab, RIGHT_PANEL_ID);
 
     if (!rightPanel || !leftPanel) {
       log.warn(`Right and/or left panel not found in tab "${activeTab}"`);
