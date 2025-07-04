@@ -78,6 +78,8 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
       // Use the current gallery query args as base, but override board_id and categories for this specific image
       const expectedQueryArgs = {
         ...listImageNamesArg,
+        // We don't have enough information to do optimistic updates when a search term is present.
+        search_term: '',
         categories: getCategories(imageDTO),
         board_id: imageDTO.board_id ?? 'none',
       };
