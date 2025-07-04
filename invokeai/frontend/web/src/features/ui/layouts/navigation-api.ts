@@ -2,8 +2,15 @@ import { logger } from 'app/logging/logger';
 import { createDeferredPromise, type Deferred } from 'common/util/createDeferredPromise';
 import { GridviewPanel, type IDockviewPanel, type IGridviewPanel } from 'dockview';
 import type { TabName } from 'features/ui/store/uiTypes';
+import { atom } from 'nanostores';
 
-import { LEFT_PANEL_ID, LEFT_PANEL_MIN_SIZE_PX, RIGHT_PANEL_ID, RIGHT_PANEL_MIN_SIZE_PX } from './shared';
+import {
+  LEFT_PANEL_ID,
+  LEFT_PANEL_MIN_SIZE_PX,
+  RIGHT_PANEL_ID,
+  RIGHT_PANEL_MIN_SIZE_PX,
+  SWITCH_TABS_FAKE_DELAY_MS,
+} from './shared';
 
 const log = logger('system');
 
@@ -18,20 +25,49 @@ export class NavigationApi {
   private panels: Map<string, PanelType> = new Map();
   private waiters: Map<string, Waiter> = new Map();
 
+  $isSwitchingTabs = atom(false);
+  switchingTabsTimeout: ReturnType<typeof setTimeout> | null = null;
+
   KEY_SEPARATOR = ':';
 
-  setAppTab: ((tab: TabName) => void) | null = null;
-  getAppTab: (() => TabName) | null = null;
+  _setAppTab: ((tab: TabName) => void) | null = null;
+  _getAppTab: (() => TabName) | null = null;
 
   connectToApp = (arg: { setAppTab: (tab: TabName) => void; getAppTab: () => TabName }): void => {
     const { setAppTab, getAppTab } = arg;
-    this.setAppTab = setAppTab;
-    this.getAppTab = getAppTab;
+    this._setAppTab = setAppTab;
+    this._getAppTab = getAppTab;
   };
 
   disconnectFromApp = (): void => {
-    this.setAppTab = null;
-    this.getAppTab = null;
+    this._setAppTab = null;
+    this._getAppTab = null;
+  };
+
+  switchToTab = (tab: TabName): boolean => {
+    if (this.switchingTabsTimeout !== null) {
+      clearTimeout(this.switchingTabsTimeout);
+      this.switchingTabsTimeout = null;
+    }
+    if (tab === this._getAppTab?.()) {
+      return true;
+    }
+    this.$isSwitchingTabs.set(true);
+    log.debug(`Switching to tab: ${tab}`);
+    if (this._setAppTab) {
+      this._setAppTab(tab);
+      return true;
+    } else {
+      log.error('No setAppTab function available to switch tabs');
+      return false;
+    }
+  };
+
+  onSwitchedTab = (): void => {
+    log.debug('Tab switch completed');
+    this.switchingTabsTimeout = setTimeout(() => {
+      this.$isSwitchingTabs.set(false);
+    }, SWITCH_TABS_FAKE_DELAY_MS);
   };
 
   /**
@@ -118,9 +154,7 @@ export class NavigationApi {
   focusPanel = async (tab: TabName, panelId: string): Promise<boolean> => {
     try {
       // Switch to the target tab if needed
-      if (this.setAppTab && this.getAppTab && this.getAppTab() !== tab) {
-        this.setAppTab(tab);
-      }
+      this.switchToTab(tab);
 
       // Wait for the panel to be ready
       await this.waitForPanel(tab, panelId);
@@ -145,7 +179,7 @@ export class NavigationApi {
   };
 
   focusPanelInActiveTab = (panelId: string): Promise<boolean> => {
-    const activeTab = this.getAppTab ? this.getAppTab() : null;
+    const activeTab = this._getAppTab ? this._getAppTab() : null;
     if (!activeTab) {
       log.error('No active tab found');
       return Promise.resolve(false);
@@ -169,7 +203,7 @@ export class NavigationApi {
   };
 
   toggleLeftPanel = (): boolean => {
-    const activeTab = this.getAppTab ? this.getAppTab() : null;
+    const activeTab = this._getAppTab ? this._getAppTab() : null;
     if (!activeTab) {
       log.warn('No active tab found to toggle left panel');
       return false;
@@ -195,7 +229,7 @@ export class NavigationApi {
   };
 
   toggleRightPanel = (): boolean => {
-    const activeTab = this.getAppTab ? this.getAppTab() : null;
+    const activeTab = this._getAppTab ? this._getAppTab() : null;
     if (!activeTab) {
       log.warn('No active tab found to toggle right panel');
       return false;
@@ -221,7 +255,7 @@ export class NavigationApi {
   };
 
   toggleLeftAndRightPanels = (): boolean => {
-    const activeTab = this.getAppTab ? this.getAppTab() : null;
+    const activeTab = this._getAppTab ? this._getAppTab() : null;
     if (!activeTab) {
       log.warn('No active tab found to toggle right panel');
       return false;
@@ -256,7 +290,7 @@ export class NavigationApi {
    * Reset panels in a specific tab (expand both left and right)
    */
   resetLeftAndRightPanels = (): boolean => {
-    const activeTab = this.getAppTab ? this.getAppTab() : null;
+    const activeTab = this._getAppTab ? this._getAppTab() : null;
     if (!activeTab) {
       log.warn('No active tab found to toggle right panel');
       return false;

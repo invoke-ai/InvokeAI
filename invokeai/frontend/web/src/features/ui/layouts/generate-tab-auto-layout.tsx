@@ -287,7 +287,7 @@ export const initializeRootPanelLayout = (layoutApi: GridviewApi) => {
   return { main, left, right } satisfies Record<string, IGridviewPanel>;
 };
 
-export const GenerateTabAutoLayout = memo(({ setIsLoading }: { setIsLoading: (isLoading: boolean) => void }) => {
+export const GenerateTabAutoLayout = memo(() => {
   const rootRef = useRef<HTMLDivElement>(null);
   const [rootApi, setRootApi] = useState<GridviewApi | null>(null);
   const onReady = useCallback<IGridviewReactProps['onReady']>(({ api }) => {
@@ -295,22 +295,18 @@ export const GenerateTabAutoLayout = memo(({ setIsLoading }: { setIsLoading: (is
   }, []);
 
   useEffect(() => {
-    setIsLoading(true);
-
     if (!rootApi) {
       return;
     }
 
     initializeRootPanelLayout(rootApi);
 
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 300);
+    navigationApi.onSwitchedTab();
 
     return () => {
       navigationApi.unregisterTab('generate');
     };
-  }, [rootApi, setIsLoading]);
+  }, [rootApi]);
 
   return (
     <AutoLayoutProvider tab="generate" rootRef={rootRef}>

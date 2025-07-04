@@ -1,17 +1,15 @@
 import { Alert, Button, Flex, Grid, Heading, Text } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
 import { InitialStateMainModelPicker } from 'features/controlLayers/components/SimpleSession/InitialStateMainModelPicker';
 import { LaunchpadAddStyleReference } from 'features/controlLayers/components/SimpleSession/LaunchpadAddStyleReference';
-import { setActiveTab } from 'features/ui/store/uiSlice';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { memo, useCallback } from 'react';
 
 import { LaunchpadGenerateFromTextButton } from './LaunchpadGenerateFromTextButton';
 
 export const GenerateLaunchpadPanel = memo(() => {
-  const dispatch = useAppDispatch();
   const newCanvasSession = useCallback(() => {
-    dispatch(setActiveTab('canvas'));
-  }, [dispatch]);
+    navigationApi.switchToTab('canvas');
+  }, []);
 
   return (
     <Flex flexDir="column" h="full" w="full" alignItems="center" gap={2}>

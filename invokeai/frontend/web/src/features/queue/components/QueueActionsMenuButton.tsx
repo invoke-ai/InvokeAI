@@ -1,5 +1,4 @@
 import { IconButton, Menu, MenuButton, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
 import { SessionMenuItems } from 'common/components/SessionMenuItems';
 import { useDeleteAllExceptCurrentQueueItemDialog } from 'features/queue/components/DeleteAllExceptCurrentQueueItemConfirmationAlertDialog';
 import { QueueCountBadge } from 'features/queue/components/QueueCountBadge';
@@ -7,14 +6,13 @@ import { useDeleteCurrentQueueItem } from 'features/queue/hooks/useDeleteCurrent
 import { usePauseProcessor } from 'features/queue/hooks/usePauseProcessor';
 import { useResumeProcessor } from 'features/queue/hooks/useResumeProcessor';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { setActiveTab } from 'features/ui/store/uiSlice';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiListBold, PiPauseFill, PiPlayFill, PiQueueBold, PiXBold, PiXCircle } from 'react-icons/pi';
 
 export const QueueActionsMenuButton = memo(() => {
   const ref = useRef<HTMLDivElement>(null);
-  const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const isPauseEnabled = useFeatureStatus('pauseQueue');
   const isResumeEnabled = useFeatureStatus('resumeQueue');
@@ -23,8 +21,8 @@ export const QueueActionsMenuButton = memo(() => {
   const resumeProcessor = useResumeProcessor();
   const pauseProcessor = usePauseProcessor();
   const openQueue = useCallback(() => {
-    dispatch(setActiveTab('queue'));
-  }, [dispatch]);
+    navigationApi.switchToTab('queue');
+  }, []);
 
   return (
     <>
