@@ -35,7 +35,6 @@ export const GalleryPanel = memo(() => {
   const { tab } = useAutoLayoutContext();
   const collapsibleApi = useCollapsibleGridviewPanel(
     tab,
-    'right',
     GALLERY_PANEL_ID,
     'vertical',
     GALLERY_PANEL_DEFAULT_HEIGHT_PX,

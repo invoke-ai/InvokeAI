@@ -63,18 +63,18 @@ export const useInvoke = () => {
   const enqueueBack = useCallback(() => {
     enqueue(false, false);
     if (tabName === 'generate' || tabName === 'workflows' || tabName === 'upscaling') {
-      navigationApi.focusPanelInTab(tabName, VIEWER_PANEL_ID);
+      navigationApi.focusPanel(tabName, VIEWER_PANEL_ID);
     } else if (tabName === 'canvas') {
-      navigationApi.focusPanelInTab(tabName, WORKSPACE_PANEL_ID);
+      navigationApi.focusPanel(tabName, WORKSPACE_PANEL_ID);
     }
   }, [enqueue, tabName]);
 
   const enqueueFront = useCallback(() => {
     enqueue(true, false);
     if (tabName === 'generate' || tabName === 'workflows' || tabName === 'upscaling') {
-      navigationApi.focusPanelInTab(tabName, VIEWER_PANEL_ID);
+      navigationApi.focusPanel(tabName, VIEWER_PANEL_ID);
     } else if (tabName === 'canvas') {
-      navigationApi.focusPanelInTab(tabName, WORKSPACE_PANEL_ID);
+      navigationApi.focusPanel(tabName, WORKSPACE_PANEL_ID);
     }
   }, [enqueue, tabName]);
 

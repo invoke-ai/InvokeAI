@@ -24,7 +24,6 @@ export const BoardsPanel = memo(() => {
   const { tab } = useAutoLayoutContext();
   const collapsibleApi = useCollapsibleGridviewPanel(
     tab,
-    'right',
     BOARDS_PANEL_ID,
     'vertical',
     BOARD_PANEL_DEFAULT_HEIGHT_PX,

@@ -21,7 +21,7 @@ export const ImageMenuItemNewCanvasFromImageSubMenu = memo(() => {
   const onClickNewCanvasWithRasterLayerFromImage = useCallback(async () => {
     const { dispatch, getState } = store;
     await newCanvasFromImage({ imageDTO, withResize: false, type: 'raster_layer', dispatch, getState });
-    navigationApi.focusPanelInTab('canvas', WORKSPACE_PANEL_ID);
+    navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
@@ -32,7 +32,7 @@ export const ImageMenuItemNewCanvasFromImageSubMenu = memo(() => {
   const onClickNewCanvasWithControlLayerFromImage = useCallback(async () => {
     const { dispatch, getState } = store;
     await newCanvasFromImage({ imageDTO, withResize: false, type: 'control_layer', dispatch, getState });
-    navigationApi.focusPanelInTab('canvas', WORKSPACE_PANEL_ID);
+    navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
@@ -43,7 +43,7 @@ export const ImageMenuItemNewCanvasFromImageSubMenu = memo(() => {
   const onClickNewCanvasWithRasterLayerFromImageWithResize = useCallback(async () => {
     const { dispatch, getState } = store;
     await newCanvasFromImage({ imageDTO, withResize: true, type: 'raster_layer', dispatch, getState });
-    navigationApi.focusPanelInTab('canvas', WORKSPACE_PANEL_ID);
+    navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
@@ -54,7 +54,7 @@ export const ImageMenuItemNewCanvasFromImageSubMenu = memo(() => {
   const onClickNewCanvasWithControlLayerFromImageWithResize = useCallback(async () => {
     const { dispatch, getState } = store;
     await newCanvasFromImage({ imageDTO, withResize: true, type: 'control_layer', dispatch, getState });
-    navigationApi.focusPanelInTab('canvas', WORKSPACE_PANEL_ID);
+    navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),

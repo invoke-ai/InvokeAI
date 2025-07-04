@@ -21,7 +21,7 @@ export const WorkflowViewEditToggleButton = memo(() => {
       dispatch(setActiveTab('workflows'));
       dispatch(workflowModeChanged('edit'));
       // Focus the Workflow Editor panel
-      navigationApi.focusPanelInTab('workflows', WORKSPACE_PANEL_ID);
+      navigationApi.focusPanel('workflows', WORKSPACE_PANEL_ID);
     },
     [dispatch]
   );
@@ -33,7 +33,7 @@ export const WorkflowViewEditToggleButton = memo(() => {
       dispatch(setActiveTab('workflows'));
       dispatch(workflowModeChanged('view'));
       // Focus the Image Viewer panel
-      navigationApi.focusPanelInTab('workflows', VIEWER_PANEL_ID);
+      navigationApi.focusPanel('workflows', VIEWER_PANEL_ID);
     },
     [dispatch]
   );

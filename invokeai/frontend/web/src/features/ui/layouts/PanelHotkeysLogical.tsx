@@ -2,54 +2,26 @@ import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/us
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { memo } from 'react';
 
-import { useAutoLayoutContext } from './auto-layout-context';
-
 export const PanelHotkeysLogical = memo(() => {
-  const { tab } = useAutoLayoutContext();
-
   useRegisteredHotkeys({
     category: 'app',
     id: 'toggleLeftPanel',
-    callback: () => {
-      if (navigationApi.tabApi?.getTab() !== tab) {
-        return;
-      }
-      navigationApi.toggleLeftPanelInTab(tab);
-    },
-    dependencies: [tab],
+    callback: navigationApi.toggleLeftPanel,
   });
   useRegisteredHotkeys({
     category: 'app',
     id: 'toggleRightPanel',
-    callback: () => {
-      if (navigationApi.tabApi?.getTab() !== tab) {
-        return;
-      }
-      navigationApi.toggleRightPanelInTab(tab);
-    },
-    dependencies: [tab],
+    callback: navigationApi.toggleRightPanel,
   });
   useRegisteredHotkeys({
     category: 'app',
     id: 'resetPanelLayout',
-    callback: () => {
-      if (navigationApi.tabApi?.getTab() !== tab) {
-        return;
-      }
-      navigationApi.resetPanelsInTab(tab);
-    },
-    dependencies: [tab],
+    callback: navigationApi.resetLeftAndRightPanels,
   });
   useRegisteredHotkeys({
     category: 'app',
     id: 'togglePanels',
-    callback: () => {
-      if (navigationApi.tabApi?.getTab() !== tab) {
-        return;
-      }
-      navigationApi.toggleBothPanelsInTab(tab);
-    },
-    dependencies: [tab],
+    callback: navigationApi.toggleLeftAndRightPanels,
   });
 
   return null;

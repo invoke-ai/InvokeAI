@@ -1,6 +1,8 @@
 import { logger } from 'app/logging/logger';
 import type { AppDispatch } from 'app/store/store';
 import { Mutex } from 'async-mutex';
+import type { Deferred } from 'common/util/createDeferredPromise';
+import { createDeferredPromise } from 'common/util/createDeferredPromise';
 import { withResultAsync, WrappedError } from 'common/util/result';
 import { parseify } from 'common/util/serialize';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
@@ -14,27 +16,6 @@ import { enqueueMutationFixedCacheKeyOptions, queueApi } from './endpoints/queue
 import type { EnqueueBatchArg } from './types';
 
 const log = logger('system');
-
-type Deferred<T> = {
-  promise: Promise<T>;
-  resolve: (value: T) => void;
-  reject: (error: Error) => void;
-};
-
-/**
- * Create a promise and expose its resolve and reject callbacks.
- */
-const createDeferredPromise = <T>(): Deferred<T> => {
-  let resolve!: (value: T) => void;
-  let reject!: (error: Error) => void;
-
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-
-  return { promise, resolve, reject };
-};
 
 type QueueStatusEventHandler = {
   subscribe: (handler: (event: S['QueueItemStatusChangedEvent']) => void) => void;

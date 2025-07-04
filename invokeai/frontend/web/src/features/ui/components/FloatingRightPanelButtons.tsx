@@ -1,7 +1,6 @@
 import { Flex, IconButton, Tooltip } from '@invoke-ai/ui-library';
-import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
-import { memo, useCallback } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiImagesSquareBold } from 'react-icons/pi';
 
@@ -16,20 +15,12 @@ FloatingRightPanelButtons.displayName = 'FloatingRightPanelButtons';
 
 const ToggleRightPanelButton = memo(() => {
   const { t } = useTranslation();
-  const { tab } = useAutoLayoutContext();
-
-  const onClick = useCallback(() => {
-    if (navigationApi.tabApi?.getTab() !== tab) {
-      return;
-    }
-    navigationApi.toggleRightPanelInTab(tab);
-  }, [tab]);
 
   return (
     <Tooltip label={t('accessibility.toggleRightPanel')} placement="start">
       <IconButton
         aria-label={t('accessibility.toggleRightPanel')}
-        onClick={onClick}
+        onClick={navigationApi.toggleRightPanel}
         icon={<PiImagesSquareBold />}
         h={48}
       />
