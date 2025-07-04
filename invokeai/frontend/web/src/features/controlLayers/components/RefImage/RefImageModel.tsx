@@ -5,11 +5,12 @@ import { selectBase } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGlobalReferenceImageModels } from 'services/api/hooks/modelsByType';
-import type { AnyModelConfig, ApiModelConfig, FLUXReduxModelConfig, IPAdapterModelConfig } from 'services/api/types';
+
+type RefImageModelConfig = ReturnType<typeof useGlobalReferenceImageModels>[0][number];
 
 type Props = {
   modelKey: string | null;
-  onChangeModel: (modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | ApiModelConfig) => void;
+  onChangeModel: (modelConfig: RefImageModelConfig) => void;
 };
 
 export const RefImageModel = memo(({ modelKey, onChangeModel }: Props) => {
@@ -19,7 +20,7 @@ export const RefImageModel = memo(({ modelKey, onChangeModel }: Props) => {
   const selectedModel = useMemo(() => modelConfigs.find((m) => m.key === modelKey), [modelConfigs, modelKey]);
 
   const _onChangeModel = useCallback(
-    (modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | ApiModelConfig | null) => {
+    (modelConfig: RefImageModelConfig | null) => {
       if (!modelConfig) {
         return;
       }
@@ -29,7 +30,7 @@ export const RefImageModel = memo(({ modelKey, onChangeModel }: Props) => {
   );
 
   const getIsDisabled = useCallback(
-    (model: AnyModelConfig): boolean => {
+    (model: RefImageModelConfig): boolean => {
       const hasMainModel = Boolean(currentBaseModel);
       const hasSameBase = currentBaseModel === model.base;
       return !hasMainModel || !hasSameBase;
