@@ -2358,6 +2358,7 @@
             "newGlobalReferenceImage": "New Global Reference Image",
             "newRegionalReferenceImage": "New Regional Reference Image",
             "newControlLayer": "New Control Layer",
+            "newResizedControlLayer": "New Resized Control Layer",
             "newRasterLayer": "New Raster Layer",
             "newInpaintMask": "New Inpaint Mask",
             "newRegionalGuidance": "New Regional Guidance",

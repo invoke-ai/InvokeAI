@@ -29,6 +29,8 @@ export const CanvasLaunchpadPanel = memo(() => {
                   as="a"
                   variant="link"
                   href="https://support.invoke.ai/support/solutions/articles/151000216086-model-guide"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   size="sm"
                 >
                   {t('ui.launchpad.modelGuideLink')}

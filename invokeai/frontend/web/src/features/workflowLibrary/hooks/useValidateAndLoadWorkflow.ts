@@ -1,14 +1,16 @@
 import { logger } from 'app/logging/logger';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { getIsFormEmpty } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import { $nodeExecutionStates } from 'features/nodes/hooks/useNodeExecutionState';
 import { $templates, workflowLoaded } from 'features/nodes/store/nodesSlice';
 import { $needsFit } from 'features/nodes/store/reactFlowInstance';
+import { workflowModeChanged } from 'features/nodes/store/workflowLibrarySlice';
 import { WorkflowMigrationError, WorkflowVersionError } from 'features/nodes/types/error';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
 import { toast } from 'features/toast/toast';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
-import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
+import { VIEWER_PANEL_ID, WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { serializeError } from 'serialize-error';
@@ -49,7 +51,6 @@ export const useValidateAndLoadWorkflow = () => {
       origin: 'file' | 'image' | 'object' | 'library'
     ): Promise<WorkflowV3 | null> => {
       try {
-        await navigationApi.focusPanel('workflows', WORKSPACE_PANEL_ID);
         const templates = $templates.get();
         const { workflow, warnings } = await validateWorkflow({
           workflow: unvalidatedWorkflow,
@@ -68,6 +69,17 @@ export const useValidateAndLoadWorkflow = () => {
 
         $nodeExecutionStates.set({});
         dispatch(workflowLoaded(workflow));
+
+        // If the form is empty, assume the user is editing a new workflow.
+        if (getIsFormEmpty(workflow.form)) {
+          dispatch(workflowModeChanged('edit'));
+          navigationApi.focusPanel('workflows', WORKSPACE_PANEL_ID);
+        } else {
+          // Else assume they want to use the linear view of the workflow.
+          dispatch(workflowModeChanged('view'));
+          navigationApi.focusPanel('workflows', VIEWER_PANEL_ID);
+        }
+
         if (!warnings.length) {
           toast({
             id: 'WORKFLOW_LOADED',
