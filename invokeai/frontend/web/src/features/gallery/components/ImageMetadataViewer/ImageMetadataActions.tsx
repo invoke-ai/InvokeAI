@@ -56,6 +56,7 @@ const ImageMetadataActions = (props: Props) => {
       <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerDenoisingStart} />
       <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerSteps} />
       <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.CanvasLayers} />
+      <CollectionMetadataDatum metadata={metadata} handler={MetadataHandlers.RefImages} />
       <CollectionMetadataDatum metadata={metadata} handler={MetadataHandlers.LoRAs} />
     </Flex>
   );

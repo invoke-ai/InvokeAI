@@ -245,6 +245,7 @@ export const {
   refImageIPAdapterBeginEndStepPctChanged,
   refImageFLUXReduxImageInfluenceChanged,
   refImageIsEnabledToggled,
+  refImageRecalled,
 } = refImagesSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
