@@ -16,13 +16,12 @@ import {
 import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
 import { CanvasTabAutoLayout } from 'features/ui/layouts/canvas-tab-auto-layout';
 import { GenerateTabAutoLayout } from 'features/ui/layouts/generate-tab-auto-layout';
+import { ModelsTabAutoLayout } from 'features/ui/layouts/models-tab-auto-layout';
+import { QueueTabAutoLayout } from 'features/ui/layouts/queue-tab-auto-layout';
 import { UpscalingTabAutoLayout } from 'features/ui/layouts/upscaling-tab-auto-layout';
 import { WorkflowsTabAutoLayout } from 'features/ui/layouts/workflows-tab-auto-layout';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useState } from 'react';
-
-import ModelManagerTab from './tabs/ModelManagerTab';
-import QueueTab from './tabs/QueueTab';
 
 export const AppContent = memo(() => {
   useDndMonitor();
@@ -43,8 +42,8 @@ export const AppContent = memo(() => {
         {withCanvasTab && tab === 'canvas' && <CanvasTabAutoLayout setIsLoading={setIsLoading} />}
         {withUpscalingTab && tab === 'upscaling' && <UpscalingTabAutoLayout setIsLoading={setIsLoading} />}
         {withWorkflowsTab && tab === 'workflows' && <WorkflowsTabAutoLayout setIsLoading={setIsLoading} />}
-        {withModelsTab && tab === 'models' && <ModelManagerTab />}
-        {withQueueTab && tab === 'queue' && <QueueTab />}
+        {withModelsTab && tab === 'models' && <ModelsTabAutoLayout setIsLoading={setIsLoading} />}
+        {withQueueTab && tab === 'queue' && <QueueTabAutoLayout setIsLoading={setIsLoading} />}
         {isLoading && <Loading />}
       </Flex>
     </Flex>
