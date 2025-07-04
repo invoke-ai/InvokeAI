@@ -1,8 +1,9 @@
 import 'dockview/dist/styles/dockview.css';
 import 'features/ui/styles/dockview-theme-invoke.css';
 
-import { TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
+import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import Loading from 'common/components/Loading/Loading';
 import { useDndMonitor } from 'features/dnd/useDndMonitor';
 import {
   selectWithCanvasTab,
@@ -17,15 +18,16 @@ import { CanvasTabAutoLayout } from 'features/ui/layouts/canvas-tab-auto-layout'
 import { GenerateTabAutoLayout } from 'features/ui/layouts/generate-tab-auto-layout';
 import { UpscalingTabAutoLayout } from 'features/ui/layouts/upscaling-tab-auto-layout';
 import { WorkflowsTabAutoLayout } from 'features/ui/layouts/workflows-tab-auto-layout';
-import { selectActiveTabIndex } from 'features/ui/store/uiSelectors';
-import { memo } from 'react';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { memo, useState } from 'react';
 
 import ModelManagerTab from './tabs/ModelManagerTab';
 import QueueTab from './tabs/QueueTab';
 
 export const AppContent = memo(() => {
   useDndMonitor();
-  const tabIndex = useAppSelector(selectActiveTabIndex);
+  const tab = useAppSelector(selectActiveTab);
+  const [isLoading, setIsLoading] = useState(true);
   const withGenerateTab = useAppSelector(selectWithGenerateTab);
   const withCanvasTab = useAppSelector(selectWithCanvasTab);
   const withUpscalingTab = useAppSelector(selectWithUpscalingTab);
@@ -34,41 +36,18 @@ export const AppContent = memo(() => {
   const withQueueTab = useAppSelector(selectWithQueueTab);
 
   return (
-    <Tabs index={tabIndex} display="flex" w="full" h="full" p={0} overflow="hidden">
+    <Flex position="relative" w="full" h="full" overflow="hidden">
       <VerticalNavBar />
-      <TabPanels w="full" h="full" p={0}>
-        {withGenerateTab && (
-          <TabPanel w="full" h="full" p={0}>
-            <GenerateTabAutoLayout />
-          </TabPanel>
-        )}
-        {withCanvasTab && (
-          <TabPanel w="full" h="full" p={0}>
-            <CanvasTabAutoLayout />
-          </TabPanel>
-        )}
-        {withUpscalingTab && (
-          <TabPanel w="full" h="full" p={0}>
-            <UpscalingTabAutoLayout />
-          </TabPanel>
-        )}
-        {withWorkflowsTab && (
-          <TabPanel w="full" h="full" p={0}>
-            <WorkflowsTabAutoLayout />
-          </TabPanel>
-        )}
-        {withModelsTab && (
-          <TabPanel w="full" h="full" p={0}>
-            <ModelManagerTab />
-          </TabPanel>
-        )}
-        {withQueueTab && (
-          <TabPanel w="full" h="full" p={0}>
-            <QueueTab />
-          </TabPanel>
-        )}
-      </TabPanels>
-    </Tabs>
+      <Flex position="relative" w="full" h="full" overflow="hidden">
+        {withGenerateTab && tab === 'generate' && <GenerateTabAutoLayout setIsLoading={setIsLoading} />}
+        {withCanvasTab && tab === 'canvas' && <CanvasTabAutoLayout setIsLoading={setIsLoading} />}
+        {withUpscalingTab && tab === 'upscaling' && <UpscalingTabAutoLayout setIsLoading={setIsLoading} />}
+        {withWorkflowsTab && tab === 'workflows' && <WorkflowsTabAutoLayout setIsLoading={setIsLoading} />}
+        {withModelsTab && tab === 'models' && <ModelManagerTab />}
+        {withQueueTab && tab === 'queue' && <QueueTab />}
+        {isLoading && <Loading />}
+      </Flex>
+    </Flex>
   );
 });
 AppContent.displayName = 'AppContent';

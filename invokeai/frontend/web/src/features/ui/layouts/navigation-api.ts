@@ -14,7 +14,7 @@ type Waiter = {
   timeoutId: ReturnType<typeof setTimeout> | null;
 };
 
-const PANEL_ENABLED_TABS: TabName[] = ['canvas', 'generate', 'workflows', 'queue'];
+const PANEL_ENABLED_TABS: TabName[] = ['canvas', 'generate', 'workflows', 'upscaling'];
 
 export class NavigationApi {
   private panels: Map<string, PanelType> = new Map();
