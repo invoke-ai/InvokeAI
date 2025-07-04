@@ -376,7 +376,7 @@ export const newCanvasEntityFromImageDndTarget: DndTarget<
 //#endregion
 
 //#region New Canvas from Image
-const _newCanvas = buildTypeAndKey('new-canvas-entity-from-image');
+const _newCanvas = buildTypeAndKey('new-canvas-from-image');
 type NewCanvasFromImageDndTargetData = DndData<
   typeof _newCanvas.type,
   typeof _newCanvas.key,
