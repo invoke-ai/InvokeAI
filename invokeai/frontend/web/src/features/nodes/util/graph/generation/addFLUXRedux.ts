@@ -33,6 +33,8 @@ export const addFLUXReduxes = ({ entities, g, collector, model }: AddFLUXReduxAr
     addFLUXRedux(id, config, g, collector);
   }
 
+  g.upsertMetadata({ ref_images: validFLUXReduxes });
+
   return result;
 };
 
