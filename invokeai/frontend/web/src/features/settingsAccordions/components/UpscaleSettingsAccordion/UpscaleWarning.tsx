@@ -10,7 +10,7 @@ import {
   tileControlnetModelChanged,
 } from 'features/parameters/store/upscaleSlice';
 import { selectIsModelsTabDisabled, selectMaxUpscaleDimension } from 'features/system/store/configSlice';
-import { setActiveTab } from 'features/ui/store/uiSlice';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { useCallback, useEffect, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { useControlNetModels } from 'services/api/hooks/modelsByType';
@@ -68,9 +68,9 @@ export const UpscaleWarning = () => {
   const allWarnings = useMemo(() => [...modelWarnings, ...otherWarnings], [modelWarnings, otherWarnings]);
 
   const handleGoToModelManager = useCallback(() => {
-    dispatch(setActiveTab('models'));
+    navigationApi.switchToTab('models');
     setInstallModelsTabByName('launchpad');
-  }, [dispatch]);
+  }, []);
 
   if (isBaseModelCompatible && modelWarnings.length > 0 && isModelsTabDisabled) {
     return null;

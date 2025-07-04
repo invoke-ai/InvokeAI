@@ -1,9 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { canvasReset } from 'features/controlLayers/store/actions';
-import { canvasSessionReset, generateSessionReset } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { workflowLoaded } from 'features/nodes/store/nodesSlice';
 import { atom } from 'nanostores';
 
 import type { TabName, UIState } from './uiTypes';
@@ -64,23 +61,6 @@ export const uiSlice = createSlice({
     showCanvasTabSplashScreenChanged: (state, action: PayloadAction<UIState['showCanvasTabSplashScreen']>) => {
       state.showCanvasTabSplashScreen = action.payload;
     },
-  },
-  extraReducers(builder) {
-    builder.addCase(workflowLoaded, (state) => {
-      state.activeTab = 'workflows';
-    });
-    builder.addCase(canvasReset, (state) => {
-      state.activeTab = 'canvas';
-    });
-    builder.addCase(canvasSessionReset, (state) => {
-      state.activeTab = 'canvas';
-    });
-    builder.addCase(generateSessionReset, (state) => {
-      state.activeTab = 'generate';
-    });
-    // builder.addCase(canvasSessionTypeChanged, (state) => {
-    //   state.activeTab = 'canvas';
-    // });
   },
 });
 

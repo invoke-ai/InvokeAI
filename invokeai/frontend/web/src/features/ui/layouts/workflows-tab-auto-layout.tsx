@@ -304,7 +304,7 @@ export const initializeRootPanelLayout = (api: GridviewApi) => {
   return { main, left, right } satisfies Record<string, IGridviewPanel>;
 };
 
-export const WorkflowsTabAutoLayout = memo(({ setIsLoading }: { setIsLoading: (isLoading: boolean) => void }) => {
+export const WorkflowsTabAutoLayout = memo(() => {
   const rootRef = useRef<HTMLDivElement>(null);
   const [rootApi, setRootApi] = useState<GridviewApi | null>(null);
   const onReady = useCallback<IGridviewReactProps['onReady']>(({ api }) => {
@@ -312,22 +312,18 @@ export const WorkflowsTabAutoLayout = memo(({ setIsLoading }: { setIsLoading: (i
   }, []);
 
   useEffect(() => {
-    setIsLoading(true);
-
     if (!rootApi) {
       return;
     }
 
     initializeRootPanelLayout(rootApi);
 
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 300);
+    navigationApi.onSwitchedTab();
 
     return () => {
       navigationApi.unregisterTab('workflows');
     };
-  }, [rootApi, setIsLoading]);
+  }, [rootApi]);
 
   return (
     <AutoLayoutProvider tab="workflows" rootRef={rootRef}>

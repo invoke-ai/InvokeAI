@@ -325,7 +325,7 @@ export const initializeRootPanelLayout = (api: GridviewApi) => {
   return { main, left, right } satisfies Record<string, IGridviewPanel>;
 };
 
-export const CanvasTabAutoLayout = memo(({ setIsLoading }: { setIsLoading: (isLoading: boolean) => void }) => {
+export const CanvasTabAutoLayout = memo(() => {
   const rootRef = useRef<HTMLDivElement>(null);
   const [rootApi, setRootApi] = useState<GridviewApi | null>(null);
   const onReady = useCallback<IGridviewReactProps['onReady']>(({ api }) => {
@@ -333,22 +333,18 @@ export const CanvasTabAutoLayout = memo(({ setIsLoading }: { setIsLoading: (isLo
   }, []);
 
   useEffect(() => {
-    setIsLoading(true);
-
     if (!rootApi) {
       return;
     }
 
     initializeRootPanelLayout(rootApi);
 
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 300);
+    navigationApi.onSwitchedTab();
 
     return () => {
       navigationApi.unregisterTab('canvas');
     };
-  }, [rootApi, setIsLoading]);
+  }, [rootApi]);
 
   return (
     <AutoLayoutProvider tab="canvas" rootRef={rootRef}>

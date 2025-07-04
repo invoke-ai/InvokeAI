@@ -19,7 +19,8 @@ import {
 } from 'features/nodes/store/workflowLibrarySlice';
 import { $isStylePresetsMenuOpen, activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
 import { toast } from 'features/toast/toast';
-import { activeTabCanvasRightPanelChanged, setActiveTab } from 'features/ui/store/uiSlice';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
+import { activeTabCanvasRightPanelChanged } from 'features/ui/store/uiSlice';
 import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import { atom } from 'nanostores';
 import { useCallback, useEffect } from 'react';
@@ -122,17 +123,17 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
   );
 
   const handleLoadWorkflow = useCallback(
-    async (workflowId: string) => {
+    (workflowId: string) => {
       // This shows a toast
-      await loadWorkflowWithDialog({
+      loadWorkflowWithDialog({
         type: 'library',
         data: workflowId,
         onSuccess: () => {
-          store.dispatch(setActiveTab('workflows'));
+          navigationApi.switchToTab('workflows');
         },
       });
     },
-    [loadWorkflowWithDialog, store]
+    [loadWorkflowWithDialog]
   );
 
   const handleSelectStylePreset = useCallback(
@@ -146,7 +147,7 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
         return;
       }
       store.dispatch(activeStylePresetIdChanged(stylePresetId));
-      store.dispatch(setActiveTab('canvas'));
+      navigationApi.switchToTab('canvas');
       toast({
         title: t('toast.stylePresetLoaded'),
         status: 'info',
@@ -169,20 +170,20 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
           break;
         case 'workflows':
           // Go to the workflows tab
-          store.dispatch(setActiveTab('workflows'));
+          navigationApi.switchToTab('workflows');
           break;
         case 'upscaling':
           // Go to the upscaling tab
-          store.dispatch(setActiveTab('upscaling'));
+          navigationApi.switchToTab('upscaling');
           break;
         case 'viewAllWorkflows':
           // Go to the workflows tab and open the workflow library modal
-          store.dispatch(setActiveTab('workflows'));
+          navigationApi.switchToTab('workflows');
           $isWorkflowLibraryModalOpen.set(true);
           break;
         case 'viewAllWorkflowsRecommended':
           // Go to the workflows tab and open the workflow library modal with the recommended workflows view
-          store.dispatch(setActiveTab('workflows'));
+          navigationApi.switchToTab('workflows');
           $isWorkflowLibraryModalOpen.set(true);
           store.dispatch(workflowLibraryViewChanged('defaults'));
           store.dispatch(workflowLibraryTagsReset());
@@ -194,7 +195,7 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
           break;
         case 'viewAllStylePresets':
           // Go to the canvas tab and open the style presets menu
-          store.dispatch(setActiveTab('canvas'));
+          navigationApi.switchToTab('canvas');
           $isStylePresetsMenuOpen.set(true);
           break;
       }
