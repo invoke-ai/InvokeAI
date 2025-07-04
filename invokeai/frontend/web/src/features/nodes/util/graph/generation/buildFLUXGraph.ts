@@ -158,6 +158,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
         image,
       });
       g.addEdge(kontextConditioning, 'kontext_cond', denoise, 'kontext_conditioning');
+      g.upsertMetadata({ ref_images: [firstValidFLUXKontextConfig] }, 'merge');
     }
   }
 
