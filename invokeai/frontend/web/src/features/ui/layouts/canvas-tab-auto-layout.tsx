@@ -113,6 +113,11 @@ const initializeCenterPanelLayout = (tab: TabName, api: DockviewApi) => {
     },
   });
 
+  // Register panels with navigation API
+  navigationApi.registerPanel(tab, LAUNCHPAD_PANEL_ID, launchpad);
+  navigationApi.registerPanel(tab, WORKSPACE_PANEL_ID, workspace);
+  navigationApi.registerPanel(tab, VIEWER_PANEL_ID, viewer);
+
   return { launchpad, workspace, viewer } satisfies Record<string, IDockviewPanel>;
 };
 
@@ -122,7 +127,6 @@ const MainPanel = memo(() => {
   const onReady = useCallback<IDockviewReactProps['onReady']>(
     ({ api }) => {
       const panels = initializeCenterPanelLayout(tab, api);
-      navigationApi.registerPanel(tab, 'main', api);
       panels.launchpad.api.setActive();
 
       const disposables = [
@@ -211,6 +215,11 @@ export const initializeRightPanelLayout = (tab: TabName, api: GridviewApi) => {
   gallery.api.setSize({ height: GALLERY_PANEL_DEFAULT_HEIGHT_PX, width: RIGHT_PANEL_MIN_SIZE_PX });
   boards.api.setSize({ height: CANVAS_BOARD_PANEL_DEFAULT_HEIGHT_PX, width: RIGHT_PANEL_MIN_SIZE_PX });
 
+  // Register panels with navigation API
+  navigationApi.registerPanel(tab, GALLERY_PANEL_ID, gallery);
+  navigationApi.registerPanel(tab, LAYERS_PANEL_ID, layers);
+  navigationApi.registerPanel(tab, BOARDS_PANEL_ID, boards);
+
   return { gallery, layers, boards } satisfies Record<string, IGridviewPanel>;
 };
 
@@ -220,7 +229,6 @@ const RightPanel = memo(() => {
   const onReady = useCallback<IGridviewReactProps['onReady']>(
     ({ api }) => {
       initializeRightPanelLayout(tab, api);
-      navigationApi.registerPanel(tab, 'right', api);
     },
     [tab]
   );
@@ -249,6 +257,9 @@ export const initializeLeftPanelLayout = (tab: TabName, api: GridviewApi) => {
     },
   });
 
+  // Register panel with navigation API
+  navigationApi.registerPanel(tab, SETTINGS_PANEL_ID, settings);
+
   return { settings } satisfies Record<string, IGridviewPanel>;
 };
 
@@ -258,7 +269,6 @@ const LeftPanel = memo(() => {
   const onReady = useCallback<IGridviewReactProps['onReady']>(
     ({ api }) => {
       initializeLeftPanelLayout(tab, api);
-      navigationApi.registerPanel(tab, 'left', api);
     },
     [tab]
   );
@@ -309,6 +319,10 @@ export const initializeRootPanelLayout = (api: GridviewApi) => {
   left.api.setSize({ width: LEFT_PANEL_MIN_SIZE_PX });
   right.api.setSize({ width: RIGHT_PANEL_MIN_SIZE_PX });
 
+  navigationApi.registerPanel('canvas', LEFT_PANEL_ID, left);
+  navigationApi.registerPanel('canvas', MAIN_PANEL_ID, main);
+  navigationApi.registerPanel('canvas', RIGHT_PANEL_ID, right);
+
   return { main, left, right } satisfies Record<string, IGridviewPanel>;
 };
 
@@ -326,8 +340,9 @@ export const CanvasTabAutoLayout = memo(() => {
       return;
     }
     initializeRootPanelLayout(rootApi);
-    navigationApi.registerPanel('canvas', 'root', rootApi);
-    navigationApi.focusPanelInTab('canvas', LAUNCHPAD_PANEL_ID, false);
+
+    // Focus the launchpad panel once it's ready
+    navigationApi.focusPanel('canvas', LAUNCHPAD_PANEL_ID);
 
     return () => {
       navigationApi.unregisterTab('canvas');

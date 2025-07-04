@@ -15,7 +15,7 @@ export const CanvasLaunchpadPanel = memo(() => {
   const { t } = useTranslation();
   const { tab } = useAutoLayoutContext();
   const focusCanvas = useCallback(() => {
-    navigationApi.focusPanelInTab(tab, WORKSPACE_PANEL_ID);
+    navigationApi.focusPanel(tab, WORKSPACE_PANEL_ID);
   }, [tab]);
   return (
     <Flex flexDir="column" h="full" w="full" alignItems="center" gap={2}>
