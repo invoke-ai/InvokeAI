@@ -762,7 +762,7 @@
         "vae": "VAE",
         "width": "Width",
         "workflow": "Workflow",
-        "canvasV2Metadata": "Canvas"
+        "canvasV2Metadata": "Canvas Layers"
     },
     "modelManager": {
         "active": "active",
