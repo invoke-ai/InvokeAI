@@ -2,7 +2,6 @@ import type { Selector } from '@reduxjs/toolkit';
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
-import { selectReferenceImageEntities } from 'features/controlLayers/store/refImagesSlice';
 import type {
   CanvasControlLayerState,
   CanvasEntityIdentifier,
@@ -377,10 +376,8 @@ export const selectBboxModelBase = createSelector(selectBbox, (bbox) => bbox.mod
 
 export const selectCanvasMetadata = createSelector(
   selectCanvasSlice,
-  selectReferenceImageEntities,
-  (canvas, refImageEntities): { canvas_v2_metadata: CanvasMetadata } => {
+  (canvas): { canvas_v2_metadata: CanvasMetadata } => {
     const canvas_v2_metadata: CanvasMetadata = {
-      referenceImages: refImageEntities,
       controlLayers: selectAllEntitiesOfType(canvas, 'control_layer'),
       inpaintMasks: selectAllEntitiesOfType(canvas, 'inpaint_mask'),
       rasterLayers: selectAllEntitiesOfType(canvas, 'raster_layer'),
