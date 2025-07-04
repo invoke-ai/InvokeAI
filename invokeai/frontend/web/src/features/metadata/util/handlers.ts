@@ -311,7 +311,7 @@ export const handlers = {
 type ParsedValue = Awaited<ReturnType<(typeof handlers)[keyof typeof handlers]['parse']>>;
 type RecallResults = Partial<Record<keyof typeof handlers, ParsedValue>>;
 
-export const parseAndRecallPrompts = async (metadata: unknown) => {
+const parseAndRecallPrompts = async (metadata: unknown) => {
   const keysToRecall: (keyof typeof handlers)[] = [
     'positivePrompt',
     'negativePrompt',
@@ -324,7 +324,7 @@ export const parseAndRecallPrompts = async (metadata: unknown) => {
   }
 };
 
-export const parseAndRecallImageDimensions = (metadata: unknown) => {
+const parseAndRecallImageDimensions = (metadata: unknown) => {
   const recalled = recallKeys(['width', 'height'], metadata);
   if (size(recalled) > 0) {
     parameterSetToast(t('metadata.imageDimensions'));
@@ -336,7 +336,7 @@ const TO_CONTROL_LAYERS_SKIP_KEYS: (keyof typeof handlers)[] = ['strength'];
 // These handlers should be omitted when recalling to the rest of the app
 const NOT_TO_CONTROL_LAYERS_SKIP_KEYS: (keyof typeof handlers)[] = [];
 
-export const parseAndRecallAllMetadata = async (
+const parseAndRecallAllMetadata = async (
   metadata: unknown,
   toControlLayers: boolean,
   skip: (keyof typeof handlers)[] = []

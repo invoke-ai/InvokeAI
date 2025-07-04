@@ -8,7 +8,7 @@ import { paramsReset } from 'features/controlLayers/store/paramsSlice';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { sentImageToCanvas } from 'features/gallery/store/actions';
-import { parseAndRecallAllMetadata } from 'features/metadata/util/handlers';
+import { MetadataUtils } from 'features/metadata/parsing';
 import { $hasTemplates } from 'features/nodes/store/nodesSlice';
 import { $isWorkflowLibraryModalOpen } from 'features/nodes/store/workflowLibraryModal';
 import {
@@ -117,7 +117,7 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
       const metadata = getImageMetadataResult.value;
       store.dispatch(canvasReset());
       // This shows a toast
-      await parseAndRecallAllMetadata(metadata, true);
+      await MetadataUtils.recallAll(metadata, store);
     },
     [store, t]
   );
