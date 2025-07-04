@@ -40,18 +40,23 @@ export const useImageActions = (imageDTO: ImageDTO | null) => {
           setHasSeed(false);
         }
 
+        let hasPrompt = false;
         // Need to catch all of these to avoid unhandled promise rejections bubbling up to instrumented error handlers
-        const promptParseResults = await Promise.allSettled([
-          MetadataHandlers.PositivePrompt.parse(metadata, store).catch(() => {}),
-          MetadataHandlers.NegativePrompt.parse(metadata, store).catch(() => {}),
-          MetadataHandlers.PositiveStylePrompt.parse(metadata, store).catch(() => {}),
-          MetadataHandlers.NegativeStylePrompt.parse(metadata, store).catch(() => {}),
-        ]);
-        if (promptParseResults.some((result) => result.status === 'fulfilled')) {
-          setHasPrompts(true);
-        } else {
-          setHasPrompts(false);
+        for (const handler of [
+          MetadataHandlers.PositivePrompt,
+          MetadataHandlers.NegativePrompt,
+          MetadataHandlers.PositiveStylePrompt,
+          MetadataHandlers.NegativeStylePrompt,
+        ]) {
+          try {
+            await handler.parse(metadata, store);
+            hasPrompt = true;
+            break;
+          } catch {
+            // noop
+          }
         }
+        setHasPrompts(hasPrompt);
       } else {
         setHasMetadata(false);
         setHasSeed(false);
