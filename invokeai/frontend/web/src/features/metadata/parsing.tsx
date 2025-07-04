@@ -32,7 +32,9 @@ import {
   shouldConcatPromptsChanged,
   vaeSelected,
 } from 'features/controlLayers/store/paramsSlice';
-import { type CanvasMetadata, type LoRA, zCanvasMetadata } from 'features/controlLayers/store/types';
+import { refImageRecalled } from 'features/controlLayers/store/refImagesSlice';
+import type { CanvasMetadata, LoRA, RefImageState } from 'features/controlLayers/store/types';
+import { zCanvasMetadata, zCanvasReferenceImageState_OLD, zRefImageState } from 'features/controlLayers/store/types';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { zModelIdentifier } from 'features/nodes/types/v2/common';
@@ -768,6 +770,50 @@ const CanvasLayers: SingleMetadataHandler<CanvasMetadata> = {
 };
 //#endregion CanvasLayers
 
+//#region RefImages
+const RefImages: CollectionMetadataHandler<RefImageState[]> = {
+  [CollectionMetadataKey]: true,
+  type: 'RefImages',
+  parse: async (metadata) => {
+    try {
+      // First attempt to parse from the v6 slot
+      const raw = getProperty(metadata, 'ref_images');
+      // This validator fetches all referenced images. If any do not exist, validation fails. The logic for this is in
+      // the zImageWithDims schema.
+      const parsed = await z.array(zRefImageState).parseAsync(raw);
+      return Promise.resolve(parsed);
+    } catch {
+      // Fall back to extracting from canvas metadata]
+      const raw = getProperty(metadata, 'canvas_v2_metadata.referenceImages.entities');
+      // This validator fetches all referenced images. If any do not exist, validation fails. The logic for this is in
+      // the zImageWithDims schema.
+      const oldParsed = await z.array(zCanvasReferenceImageState_OLD).parseAsync(raw);
+      const parsed: RefImageState[] = oldParsed.map(({ id, ipAdapter, isEnabled }) => ({
+        id,
+        config: ipAdapter,
+        isEnabled,
+      }));
+      return parsed;
+    }
+  },
+  recall: (value, store) => {
+    for (const data of value) {
+      store.dispatch(refImageRecalled({ data: { ...data, id: getPrefixedId('reference_image') } }));
+    }
+  },
+  recallOne: (data, store) => {
+    store.dispatch(refImageRecalled({ data: { ...data, id: getPrefixedId('reference_image') } }));
+  },
+  LabelComponent: () => <MetadataLabel i18nKey="controlLayers.referenceImage" />,
+  ValueComponent: ({ value }: CollectionMetadataValueProps<RefImageState[]>) => {
+    if (value.config.model) {
+      return <MetadataPrimitiveValue value={value.config.model.name} />;
+    }
+    return <MetadataPrimitiveValue value="No model" />;
+  },
+};
+//#endregion RefImages
+
 export const MetadataHandlers = {
   CreatedBy,
   GenerationMode,
@@ -797,8 +843,8 @@ export const MetadataHandlers = {
   VAEModel,
   LoRAs,
   CanvasLayers,
-  // TODO:
-  // Ref images
+  RefImages,
+  // TODO: These had parsers in the prev implementation, but they were never actually used?
   // controlNet: parseControlNet,
   // controlNets: parseAllControlNets,
   // t2iAdapter: parseT2IAdapter,
@@ -808,9 +854,6 @@ export const MetadataHandlers = {
   // controlNetToControlLayer: parseControlNetToControlAdapterLayer,
   // t2iAdapterToControlAdapterLayer: parseT2IAdapterToControlAdapterLayer,
   // ipAdapterToIPAdapterLayer: parseIPAdapterToIPAdapterLayer,
-  // layer: parseLayer,
-  // layers: parseLayers,
-  // canvasV2Metadata: parseCanvasV2Metadata,
 } as const;
 
 const successToast = (parameter: ReactNode) => {
