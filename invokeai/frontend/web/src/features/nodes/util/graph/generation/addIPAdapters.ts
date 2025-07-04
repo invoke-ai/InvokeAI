@@ -32,7 +32,7 @@ export const addIPAdapters = ({ entities, g, collector, model }: AddIPAdaptersAr
     addIPAdapter(id, config, g, collector);
   }
 
-  g.upsertMetadata({ ref_images: validIPAdapters });
+  g.upsertMetadata({ ref_images: validIPAdapters }, 'merge');
 
   return result;
 };
