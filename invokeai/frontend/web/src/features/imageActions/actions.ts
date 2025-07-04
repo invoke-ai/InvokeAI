@@ -1,9 +1,6 @@
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
-import {
-  getDefaultRefImageConfig,
-  getDefaultRegionalGuidanceRefImageConfig,
-} from 'features/controlLayers/hooks/addLayerHooks';
+import { getDefaultRegionalGuidanceRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityTransformer';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasReset } from 'features/controlLayers/store/actions';
@@ -17,7 +14,7 @@ import {
   rgAdded,
   rgRefImageImageChanged,
 } from 'features/controlLayers/store/canvasSlice';
-import { refImageAdded, refImageImageChanged } from 'features/controlLayers/store/refImagesSlice';
+import { refImageImageChanged } from 'features/controlLayers/store/refImagesSlice';
 import { selectBboxModelBase, selectBboxRect } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
@@ -37,6 +34,8 @@ import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
+import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
 import { imageDTOToFile, imagesApi, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import type { Equals } from 'tsafe';
@@ -76,22 +75,39 @@ export const setComparisonImage = (arg: { image_name: string; dispatch: AppDispa
   dispatch(imageToCompareChanged(image_name));
 };
 
-export const createNewCanvasEntityFromImage = (arg: {
+export const createNewCanvasEntityFromImage = async (arg: {
   imageDTO: ImageDTO;
   type: CanvasEntityType | 'regional_guidance_with_reference_image';
+  withResize?: boolean;
   dispatch: AppDispatch;
   getState: AppGetState;
   overrides?: Partial<Pick<CanvasEntityState, 'isEnabled' | 'isLocked' | 'name' | 'position'>>;
 }) => {
-  const { type, imageDTO, dispatch, getState, overrides: _overrides } = arg;
+  const { type, imageDTO, dispatch, getState, withResize, overrides: _overrides } = arg;
   const state = getState();
-  const imageObject = imageDTOToImageObject(imageDTO);
-  const { x, y } = selectBboxRect(state);
+  const { x, y, width, height } = selectBboxRect(state);
+
+  let imageObject: CanvasImageState;
+
+  if (withResize && (width !== imageDTO.width || height !== imageDTO.height)) {
+    const resizedImageDTO = await uploadImage({
+      file: await imageDTOToFile(imageDTO),
+      image_category: 'general',
+      is_intermediate: true,
+      silent: true,
+      resize_to: { width, height },
+    });
+    imageObject = imageDTOToImageObject(resizedImageDTO);
+  } else {
+    imageObject = imageDTOToImageObject(imageDTO);
+  }
+
   const overrides = {
     objects: [imageObject],
     position: { x, y },
     ..._overrides,
   };
+
   switch (type) {
     case 'raster_layer': {
       dispatch(rasterLayerAdded({ overrides, isSelected: true }));
@@ -122,6 +138,8 @@ export const createNewCanvasEntityFromImage = (arg: {
       break;
     }
   }
+
+  navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
 };
 
 /**
@@ -137,7 +155,7 @@ export const createNewCanvasEntityFromImage = (arg: {
  */
 export const newCanvasFromImage = async (arg: {
   imageDTO: ImageDTO;
-  type: CanvasEntityType | 'regional_guidance_with_reference_image' | 'reference_image';
+  type: CanvasEntityType | 'regional_guidance_with_reference_image';
   withResize?: boolean;
   withInpaintMask?: boolean;
   dispatch: AppDispatch;
@@ -244,17 +262,6 @@ export const newCanvasFromImage = async (arg: {
       dispatch(canvasClearHistory());
       break;
     }
-    case 'reference_image': {
-      const config = deepClone(getDefaultRefImageConfig(getState));
-      config.image = imageDTOToImageWithDims(imageDTO);
-      dispatch(canvasReset());
-      dispatch(refImageAdded({ overrides: { config } }));
-      if (withInpaintMask) {
-        dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
-      }
-      dispatch(canvasClearHistory());
-      break;
-    }
     case 'regional_guidance_with_reference_image': {
       const config = getDefaultRegionalGuidanceRefImageConfig(getState);
       config.image = imageDTOToImageWithDims(imageDTO);
@@ -270,6 +277,9 @@ export const newCanvasFromImage = async (arg: {
     default:
       assert<Equals<typeof type, never>>(false);
   }
+
+  // Switch to the Canvas panel when creating a new canvas from image
+  navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
 };
 
 export const replaceCanvasEntityObjectsWithImage = (arg: {

@@ -7,6 +7,8 @@ import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
 import { workflowModeChanged } from 'features/nodes/store/workflowLibrarySlice';
 import { toast } from 'features/toast/toast';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
+import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -23,6 +25,8 @@ export const useNewWorkflow = () => {
     dispatch(nodeEditorReset());
     dispatch(workflowModeChanged('edit'));
     workflowLibraryModal.close();
+
+    navigationApi.focusPanel('workflows', WORKSPACE_PANEL_ID);
 
     toast({
       id: 'NEW_WORKFLOW_CREATED',
