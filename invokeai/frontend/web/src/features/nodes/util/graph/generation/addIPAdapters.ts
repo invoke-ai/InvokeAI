@@ -32,6 +32,8 @@ export const addIPAdapters = ({ entities, g, collector, model }: AddIPAdaptersAr
     addIPAdapter(id, config, g, collector);
   }
 
+  g.upsertMetadata({ ref_images: validIPAdapters });
+
   return result;
 };
 
