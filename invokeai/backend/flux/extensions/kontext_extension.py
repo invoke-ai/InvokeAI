@@ -3,7 +3,6 @@ from dataclasses import dataclass
 import einops
 import numpy as np
 import torch
-import torchvision.transforms as T
 from einops import repeat
 from PIL import Image
 
