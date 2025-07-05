@@ -1,14 +1,19 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { bboxSyncedToOptimalDimension } from 'features/controlLayers/store/canvasSlice';
+import type { AppDispatch, RootState } from 'app/store/store';
+import { bboxSyncedToOptimalDimension, rgRefImageModelChanged } from 'features/controlLayers/store/canvasSlice';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
 import { modelChanged, vaeSelected } from 'features/controlLayers/store/paramsSlice';
-import { selectBboxModelBase } from 'features/controlLayers/store/selectors';
+import { refImageModelChanged, selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
+import { selectBboxModelBase, selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { modelSelected } from 'features/parameters/store/actions';
+import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
+import { selectIPAdapterModels } from 'services/api/hooks/modelsByType';
 
 const log = logger('models');
 
@@ -30,10 +35,8 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
       const didBaseModelChange = state.params.model?.base !== newBaseModel;
 
       if (didBaseModelChange) {
-        // we may need to reset some incompatible submodels
         let modelsCleared = 0;
 
-        // handle incompatible loras
         state.loras.loras.forEach((lora) => {
           if (lora.model.base !== newBaseModel) {
             dispatch(loraDeleted({ id: lora.id }));
@@ -41,22 +44,13 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           }
         });
 
-        // handle incompatible vae
         const { vae } = state.params;
         if (vae && vae.base !== newBaseModel) {
           dispatch(vaeSelected(null));
           modelsCleared += 1;
         }
 
-        // handle incompatible controlnets
-        // state.canvas.present.controlAdapters.entities.forEach((ca) => {
-        //   if (ca.model?.base !== newBaseModel) {
-        //     modelsCleared += 1;
-        //     if (ca.isEnabled) {
-        //       dispatch(entityIsEnabledToggled({ entityIdentifier: { id: ca.id, type: 'control_adapter' } }));
-        //     }
-        //   }
-        // });
+        handleReferenceImageModelSwitching(state, dispatch, newModel, log);
 
         if (modelsCleared > 0) {
           toast({
@@ -76,5 +70,65 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         dispatch(bboxSyncedToOptimalDimension());
       }
     },
+  });
+};
+
+const handleReferenceImageModelSwitching = (
+  state: RootState,
+  dispatch: AppDispatch,
+  newModel: ParameterModel,
+  log: ReturnType<typeof logger>
+) => {
+  const allIPAdapterModels = selectIPAdapterModels(state);
+  const newBase = newModel.base;
+  const compatibleIPAdapterModels = allIPAdapterModels.filter((model) => model.base === newBase);
+  const firstCompatibleModel = compatibleIPAdapterModels[0] ?? null;
+
+  selectRefImagesSlice(state).entities.forEach((entity) => {
+    const currentModel = entity.config.model;
+
+    if (!currentModel || currentModel.base !== newBase) {
+      if (firstCompatibleModel) {
+        log.debug(
+          { previousModel: currentModel, newModel: firstCompatibleModel },
+          'Switching global reference image model to compatible model'
+        );
+        dispatch(refImageModelChanged({ id: entity.id, modelConfig: firstCompatibleModel }));
+      } else if (currentModel) {
+        log.debug({ previousModel: currentModel }, 'Clearing incompatible global reference image model');
+        dispatch(refImageModelChanged({ id: entity.id, modelConfig: null }));
+      }
+    }
+  });
+
+  selectCanvasSlice(state).regionalGuidance.entities.forEach((entity) => {
+    entity.referenceImages.forEach(({ id: referenceImageId, config }) => {
+      const currentModel = config.model;
+
+      if (!currentModel || currentModel.base !== newBase) {
+        if (firstCompatibleModel) {
+          log.debug(
+            { previousModel: currentModel, newModel: firstCompatibleModel },
+            'Switching regional guidance reference image model to compatible model'
+          );
+          dispatch(
+            rgRefImageModelChanged({
+              entityIdentifier: getEntityIdentifier(entity),
+              referenceImageId,
+              modelConfig: firstCompatibleModel,
+            })
+          );
+        } else if (currentModel) {
+          log.debug({ previousModel: currentModel }, 'Clearing incompatible regional guidance reference image model');
+          dispatch(
+            rgRefImageModelChanged({
+              entityIdentifier: getEntityIdentifier(entity),
+              referenceImageId,
+              modelConfig: null,
+            })
+          );
+        }
+      }
+    });
   });
 };
