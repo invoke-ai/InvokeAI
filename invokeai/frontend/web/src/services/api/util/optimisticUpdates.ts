@@ -1,5 +1,5 @@
 import type { OrderDir } from 'features/gallery/store/types';
-import type { ImageDTO, ImageNamesResult } from 'services/api/types';
+import type { GetImageNamesResult, ImageDTO } from 'services/api/types';
 
 /**
  * Calculates the optimal insertion position for a new image in the names list.
@@ -31,11 +31,11 @@ function calculateImageInsertionPosition(
  * Optimistically inserts a new image into the ImageNamesResult at the correct position
  */
 export function insertImageIntoNamesResult(
-  currentResult: ImageNamesResult,
+  currentResult: GetImageNamesResult,
   imageDTO: ImageDTO,
   starredFirst: boolean,
   orderDir: OrderDir = 'DESC'
-): ImageNamesResult {
+): GetImageNamesResult {
   // Don't insert if the image is already in the list
   if (currentResult.image_names.includes(imageDTO.image_name)) {
     return currentResult;

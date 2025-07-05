@@ -2,7 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
-import type { ListBoardsArgs } from 'services/api/types';
+import type { GetImageNamesArgs, ListBoardsArgs } from 'services/api/types';
 
 export const selectFirstSelectedImage = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(0));
 export const selectLastSelectedImage = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(-1));
@@ -27,7 +27,7 @@ const selectGallerySearchTerm = createSelector(selectGallerySlice, (gallery) => 
 const selectGalleryOrderDir = createSelector(selectGallerySlice, (gallery) => gallery.orderDir);
 const selectGalleryStarredFirst = createSelector(selectGallerySlice, (gallery) => gallery.starredFirst);
 
-export const selectListImageNamesQueryArgs = createMemoizedSelector(
+export const selectGetImageNamesQueryArgs = createMemoizedSelector(
   [
     selectSelectedBoardId,
     selectGalleryQueryCategories,
@@ -35,7 +35,7 @@ export const selectListImageNamesQueryArgs = createMemoizedSelector(
     selectGalleryOrderDir,
     selectGalleryStarredFirst,
   ],
-  (board_id, categories, search_term, order_dir, starred_first) => ({
+  (board_id, categories, search_term, order_dir, starred_first): GetImageNamesArgs => ({
     board_id,
     categories,
     search_term,

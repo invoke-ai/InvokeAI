@@ -16,7 +16,7 @@ import { useImageContextMenu } from 'features/gallery/components/ImageContextMen
 import { GalleryImageHoverIcons } from 'features/gallery/components/ImageGrid/GalleryImageHoverIcons';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
 import {
-  selectListImageNamesQueryArgs,
+  selectGetImageNamesQueryArgs,
   selectSelectedBoardId,
   selectSelection,
 } from 'features/gallery/store/gallerySelectors';
@@ -93,7 +93,7 @@ const buildOnClick =
   (imageName: string, dispatch: AppDispatch, getState: AppGetState) => (e: MouseEvent<HTMLDivElement>) => {
     const { shiftKey, ctrlKey, metaKey, altKey } = e;
     const state = getState();
-    const queryArgs = selectListImageNamesQueryArgs(state);
+    const queryArgs = selectGetImageNamesQueryArgs(state);
     const imageNames = imagesApi.endpoints.getImageNames.select(queryArgs)(state).data?.image_names ?? [];
 
     // If we don't have the image names cached, we can't perform selection operations
