@@ -32,7 +32,7 @@ import {
   shouldConcatPromptsChanged,
   vaeSelected,
 } from 'features/controlLayers/store/paramsSlice';
-import { refImageRecalled } from 'features/controlLayers/store/refImagesSlice';
+import { refImagesRecalled } from 'features/controlLayers/store/refImagesSlice';
 import type { CanvasMetadata, LoRA, RefImageState } from 'features/controlLayers/store/types';
 import { zCanvasMetadata, zCanvasReferenceImageState_OLD, zRefImageState } from 'features/controlLayers/store/types';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
@@ -797,12 +797,12 @@ const RefImages: CollectionMetadataHandler<RefImageState[]> = {
     }
   },
   recall: (value, store) => {
-    for (const data of value) {
-      store.dispatch(refImageRecalled({ data: { ...data, id: getPrefixedId('reference_image') } }));
-    }
+    const entities = value.map((data) => ({ ...data, id: getPrefixedId('reference_image') }));
+    store.dispatch(refImagesRecalled({ entities, replace: true }));
   },
   recallOne: (data, store) => {
-    store.dispatch(refImageRecalled({ data: { ...data, id: getPrefixedId('reference_image') } }));
+    const entities = [{ ...data, id: getPrefixedId('reference_image') }];
+    store.dispatch(refImagesRecalled({ entities, replace: false }));
   },
   LabelComponent: () => <MetadataLabel i18nKey="controlLayers.referenceImage" />,
   ValueComponent: ({ value }: CollectionMetadataValueProps<RefImageState[]>) => {
