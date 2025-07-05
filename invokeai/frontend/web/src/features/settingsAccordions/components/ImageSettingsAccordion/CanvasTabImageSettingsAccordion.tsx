@@ -46,7 +46,7 @@ const scalingLabelProps: FormLabelProps = {
   minW: '4.5rem',
 };
 
-export const ImageSettingsAccordion = memo(() => {
+export const CanvasTabImageSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const badges = useAppSelector(selectBadges);
   const scaleMethod = useAppSelector(selectScaleMethod);
@@ -99,4 +99,4 @@ export const ImageSettingsAccordion = memo(() => {
   );
 });
 
-ImageSettingsAccordion.displayName = 'ImageSettingsAccordion';
+CanvasTabImageSettingsAccordion.displayName = 'CanvasTabImageSettingsAccordion';
