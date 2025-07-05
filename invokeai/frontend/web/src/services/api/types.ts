@@ -249,7 +249,7 @@ export const isFluxKontextApiModelConfig = (config: AnyModelConfig): config is A
 };
 
 export const isFluxKontextModelConfig = (config: AnyModelConfig): config is FLUXKontextModelConfig => {
-  return config.type === 'main' && config.base === 'flux' && config.name?.toLowerCase().includes('kontext');
+  return config.type === 'main' && config.base === 'flux' && config.name.toLowerCase().includes('kontext');
 };
 
 export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {

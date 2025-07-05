@@ -16,8 +16,8 @@ import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToIm
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
-  getSizes,
   selectCanvasOutputFields,
+  selectOriginalAndScaledSizes,
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
@@ -59,7 +59,7 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   assert(model, 'No model found in state');
 
   const fp32 = vaePrecision === 'fp32';
-  const { originalSize, scaledSize } = getSizes(bbox);
+  const { originalSize, scaledSize } = selectOriginalAndScaledSizes(state);
   const { positivePrompt, negativePrompt, positiveStylePrompt, negativeStylePrompt } =
     selectPresetModifiedPrompts(state);
 
