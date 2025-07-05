@@ -1,6 +1,6 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import type { FlexProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Icon, Image } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import type { AppDispatch, AppGetState } from 'app/store/store';
@@ -14,7 +14,6 @@ import { createSingleImageDragPreview, setSingleImageDragPreview } from 'feature
 import { firefoxDndFix } from 'features/dnd/util';
 import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { GalleryImageHoverIcons } from 'features/gallery/components/ImageGrid/GalleryImageHoverIcons';
-import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
 import {
   selectGetImageNamesQueryArgs,
   selectSelectedBoardId,
@@ -241,13 +240,11 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
     navigationApi.focusPanelInActiveTab(VIEWER_PANEL_ID);
   }, [store]);
 
-  const dataTestId = useMemo(() => getGalleryImageDataTestId(imageDTO.image_name), [imageDTO.image_name]);
-
   useImageContextMenu(imageDTO, element);
 
   return (
     <>
-      <Box sx={galleryImageContainerSX} data-testid={dataTestId} data-is-dragging={isDragging}>
+      <Box sx={galleryImageContainerSX} data-is-dragging={isDragging} data-image-name={imageDTO.image_name}>
         <Flex
           role="button"
           className={GALLERY_IMAGE_CLASS}
@@ -279,8 +276,8 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
 
 GalleryImage.displayName = 'GalleryImage';
 
-export const GalleryImagePlaceholder = memo(() => (
-  <Flex w="full" h="full" bg="base.850" borderRadius="base" alignItems="center" justifyContent="center">
+export const GalleryImagePlaceholder = memo((props: FlexProps) => (
+  <Flex w="full" h="full" bg="base.850" borderRadius="base" alignItems="center" justifyContent="center" {...props}>
     <Icon as={PiImageBold} boxSize={16} color="base.800" />
   </Flex>
 ));
