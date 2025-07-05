@@ -3,7 +3,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useRangeBasedImageFetching } from 'features/gallery/hooks/useRangeBasedImageFetching';
-import type { selectListImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
+import type { selectGetImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import {
   selectGalleryImageMinimumWidth,
   selectImageToCompare,
@@ -32,7 +32,7 @@ import { useGalleryImageNames } from './use-gallery-image-names';
 
 const log = logger('gallery');
 
-type ListImageNamesQueryArgs = ReturnType<typeof selectListImageNamesQueryArgs>;
+type ListImageNamesQueryArgs = ReturnType<typeof selectGetImageNamesQueryArgs>;
 
 type GridContext = {
   queryArgs: ListImageNamesQueryArgs;

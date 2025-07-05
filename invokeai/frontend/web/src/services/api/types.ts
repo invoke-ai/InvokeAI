@@ -7,7 +7,9 @@ export type S = components['schemas'];
 export type ListImagesArgs = NonNullable<paths['/api/v1/images/']['get']['parameters']['query']>;
 export type ListImagesResponse = paths['/api/v1/images/']['get']['responses']['200']['content']['application/json'];
 
-export type ImageNamesResult = S['ImageNamesResult'];
+export type GetImageNamesResult =
+  paths['/api/v1/images/names']['get']['responses']['200']['content']['application/json'];
+export type GetImageNamesArgs = NonNullable<paths['/api/v1/images/names']['get']['parameters']['query']>;
 
 export type ListBoardsArgs = NonNullable<paths['/api/v1/boards/']['get']['parameters']['query']>;
 
@@ -36,6 +38,7 @@ export type ImageDTO = S['ImageDTO'];
 export type BoardDTO = S['BoardDTO'];
 export type ImageCategory = S['ImageCategory'];
 export type OffsetPaginatedResults_ImageDTO_ = S['OffsetPaginatedResults_ImageDTO_'];
+export type GetImageNamesArg = NonNullable<paths['/api/v1/images/names']['get']['parameters']['query']>;
 
 // Models
 export type ModelType = S['ModelType'];

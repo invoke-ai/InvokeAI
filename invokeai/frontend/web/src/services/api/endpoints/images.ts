@@ -4,15 +4,14 @@ import { getStore } from 'app/store/nanostores/store';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import type { components, paths } from 'services/api/schema';
 import type {
+  GetImageNamesArgs,
+  GetImageNamesResult,
   GraphAndWorkflowResponse,
-  ImageCategory,
   ImageDTO,
-  ImageNamesResult,
   ImageUploadEntryRequest,
   ImageUploadEntryResponse,
   ListImagesArgs,
   ListImagesResponse,
-  SQLiteDirection,
   UploadImageArg,
 } from 'services/api/types';
 import { getListImagesUrl } from 'services/api/util';
@@ -419,16 +418,7 @@ export const imagesApi = api.injectEndpoints({
     /**
      * Get ordered list of image names for selection operations
      */
-    getImageNames: build.query<
-      ImageNamesResult,
-      {
-        categories?: ImageCategory[] | null;
-        is_intermediate?: boolean | null;
-        board_id?: string | null;
-        search_term?: string | null;
-        order_dir?: SQLiteDirection;
-      }
-    >({
+    getImageNames: build.query<GetImageNamesResult, GetImageNamesArgs>({
       query: (queryArgs) => ({
         url: buildImagesUrl('names', queryArgs),
         method: 'GET',
