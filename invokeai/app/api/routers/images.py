@@ -72,7 +72,7 @@ async def upload_image(
     resize_to: Optional[str] = Body(
         default=None,
         description=f"Dimensions to resize the image to, must be stringified tuple of 2 integers. Max total pixel count: {ResizeToDimensions.MAX_SIZE}",
-        example='"[1024,1024]"',
+        examples=['"[1024,1024]"'],
     ),
     metadata: Optional[str] = Body(
         default=None,
