@@ -16,8 +16,8 @@ import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToIm
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
-  getSizes,
   selectCanvasOutputFields,
+  selectOriginalAndScaledSizes,
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
@@ -56,7 +56,7 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
 
   const fp32 = vaePrecision === 'fp32';
   const { positivePrompt, negativePrompt } = selectPresetModifiedPrompts(state);
-  const { originalSize, scaledSize } = getSizes(bbox);
+  const { originalSize, scaledSize } = selectOriginalAndScaledSizes(state);
 
   const g = new Graph(getPrefixedId('sd1_graph'));
   const modelLoader = g.addNode({

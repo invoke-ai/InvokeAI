@@ -1,9 +1,9 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import { pick } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
-import type { CanvasState, ParamsState } from 'features/controlLayers/store/types';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import type { ParamsState } from 'features/controlLayers/store/types';
 import type { BoardField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { buildPresetModifiedPrompt } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
@@ -94,11 +94,27 @@ export const selectPresetModifiedPrompts = createSelector(
   }
 );
 
-export const getSizes = (bboxState: CanvasState['bbox']) => {
-  const originalSize = pick(bboxState.rect, 'width', 'height');
-  const scaledSize = ['auto', 'manual'].includes(bboxState.scaleMethod) ? bboxState.scaledSize : originalSize;
-  return { originalSize, scaledSize };
-};
+export const selectOriginalAndScaledSizes = createSelector(
+  [selectActiveTab, selectParamsSlice, selectCanvasSlice],
+  (tab, params, canvas) => {
+    if (tab === 'generate') {
+      const { width, height } = params.dimensions.rect;
+      const { aspectRatio } = params.dimensions;
+      return {
+        originalSize: { width, height },
+        scaledSize: { width, height },
+        aspectRatio,
+      };
+    } else {
+      // tab === 'canvas'
+      const { width, height } = canvas.bbox.rect;
+      const { aspectRatio } = canvas.bbox;
+      const originalSize = { width, height };
+      const scaledSize = ['auto', 'manual'].includes(canvas.bbox.scaleMethod) ? canvas.bbox.scaledSize : originalSize;
+      return { originalSize, scaledSize, aspectRatio };
+    }
+  }
+);
 
 export const getInfill = (
   g: Graph,
