@@ -82,7 +82,7 @@ RUN --mount=type=cache,target=/var/cache/apt \
     --mount=type=cache,target=/var/lib/apt \
     if [ "$GPU_DRIVER" = "rocm" ]; then \
     wget -O /tmp/amdgpu-install.deb \
-    https://repo.radeon.com/amdgpu-install/6.2.4/ubuntu/noble/amdgpu-install_6.2.60204-1_all.deb && \
+    https://repo.radeon.com/amdgpu-install/6.3.4/ubuntu/noble/amdgpu-install_6.3.60304-1_all.deb && \
     apt install -y /tmp/amdgpu-install.deb && \
     apt update && \
     amdgpu-install --usecase=rocm -y && \
