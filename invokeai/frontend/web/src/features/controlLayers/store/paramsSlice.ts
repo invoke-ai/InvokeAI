@@ -494,6 +494,12 @@ export const selectRefinerScheduler = createParamsSelector((params) => params.re
 export const selectRefinerStart = createParamsSelector((params) => params.refinerStart);
 export const selectRefinerSteps = createParamsSelector((params) => params.refinerSteps);
 
+export const selectWidth = createParamsSelector((params) => params.dimensions.rect.width);
+export const selectHeight = createParamsSelector((params) => params.dimensions.rect.height);
+export const selectAspectRatioID = createParamsSelector((params) => params.dimensions.aspectRatio.id);
+export const selectAspectRatioValue = createParamsSelector((params) => params.dimensions.aspectRatio.value);
+export const selectAspectRatioIsLocked = createParamsSelector((params) => params.dimensions.aspectRatio.isLocked);
+
 export const selectMainModelConfig = createSelector(
   selectModelConfigsQuery,
   selectParamsSlice,
