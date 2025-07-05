@@ -1538,7 +1538,8 @@
             "modelIncompatibleBboxHeight": "Chiều dài hộp giới hạn là {{height}} nhưng {{model}} yêu cầu bội số của {{multiple}}",
             "modelIncompatibleScaledBboxHeight": "Chiều dài hộp giới hạn theo tỉ lệ là {{height}} nhưng {{model}} yêu cầu bội số của {{multiple}}",
             "modelIncompatibleScaledBboxWidth": "Chiều rộng hộp giới hạn theo tỉ lệ là {{width}} nhưng {{model}} yêu cầu bội số của {{multiple}}",
-            "modelDisabledForTrial": "Tạo sinh với {{modelName}} là không thể với tài khoản trial. Vào phần thiết lập tài khoản để nâng cấp."
+            "modelDisabledForTrial": "Tạo sinh với {{modelName}} là không thể với tài khoản trial. Vào phần thiết lập tài khoản để nâng cấp.",
+            "fluxKontextMultipleReferenceImages": "Chỉ có thể dùng 1 Ảnh Mẫu cùng lúc với Flux Kontext"
         },
         "cfgScale": "Thang CFG",
         "useSeed": "Dùng Hạt Giống",
@@ -2063,7 +2064,7 @@
         },
         "mergingLayers": "Đang gộp layer",
         "controlLayerEmptyState": "<UploadButton>Tải lên ảnh</UploadButton>, kéo thả ảnh từ <GalleryButton>thư viện</GalleryButton> vào layer này, <PullBboxButton>kéo hộp giới hạn vào layer này</PullBboxButton>, hoặc vẽ trên canvas để bắt đầu.",
-        "referenceImageEmptyState": "<UploadButton>Tải lên hình ảnh</UploadButton>, kéo ảnh từ <GalleryButton>thư viện ảnh</GalleryButton> vào layer này, hoặc <PullBboxButton>kéo hộp giới hạn vào layer này</PullBboxButton> để bắt đầu.",
+        "referenceImageEmptyState": "<UploadButton>Tải lên hình ảnh</UploadButton> hoặc kéo ảnh từ <GalleryButton>thư viện ảnh</GalleryButton> vào Ảnh Mẫu để bắt đầu.",
         "useImage": "Dùng Hình Ảnh",
         "resetCanvasLayers": "Khởi Động Lại Layer Canvas",
         "asRasterLayer": "Như $t(controlLayers.rasterLayer)",
@@ -2115,7 +2116,9 @@
         "addDenoiseLimit": "Thêm $t(controlLayers.denoiseLimit)",
         "imageNoise": "Độ Nhiễu Hình Ảnh",
         "denoiseLimit": "Giới Hạn Khử Nhiễu",
-        "addImageNoise": "Thêm $t(controlLayers.imageNoise)"
+        "addImageNoise": "Thêm $t(controlLayers.imageNoise)",
+        "referenceImageEmptyStateWithCanvasOptions": "<UploadButton>Tải lên hình ảnh</UploadButton>, kéo ảnh từ <GalleryButton>thư viện ảnh</GalleryButton> vào Ảnh Mẫu này, hoặc <PullBboxButton>kéo hộp giới hạn vào Ảnh Mẫu này</PullBboxButton> để bắt đầu.",
+        "uploadOrDragAnImage": "Kéo ảnh từ thư viện ảnh hoặc <UploadButton>tải lên ảnh</UploadButton>."
     },
     "stylePresets": {
         "negativePrompt": "Lệnh Tiêu Cực",
@@ -2257,7 +2260,8 @@
         "workflowUnpublished": "Workflow Đã Được Ngừng Đăng Tải",
         "problemUnpublishingWorkflow": "Có Vấn Đề Khi Ngừng Đăng Tải Workflow",
         "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4o chỉ hỗ trợ Từ Ngữ Sang Hình Ảnh và Hình Ảnh Sang Hình Ảnh. Hãy dùng model khác cho các tác vụ Inpaint và Outpaint.",
-        "imagenIncompatibleGenerationMode": "Google {{model}} chỉ hỗ trợ Từ Ngữ Sang Hình Ảnh. Dùng các model khác cho Hình Ảnh Sang Hình Ảnh, Inpaint và Outpaint."
+        "imagenIncompatibleGenerationMode": "Google {{model}} chỉ hỗ trợ Từ Ngữ Sang Hình Ảnh. Dùng các model khác cho Hình Ảnh Sang Hình Ảnh, Inpaint và Outpaint.",
+        "fluxKontextIncompatibleGenerationMode": "Flux Kontext chỉ hỗ trợ Từ Ngữ Sang Hình Ảnh. Hãy dùng model khác cho các tác vụ Hình Ảnh sang Hình Ảnh, Inpaint và Outpaint."
     },
     "ui": {
         "tabs": {
@@ -2439,8 +2443,8 @@
         "watchRecentReleaseVideos": "Xem Video Phát Hành Mới Nhất",
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
         "items": [
-            "Nvidia 50xx GPUs: Invoke sử dụng PyTorch 2.7.0, thứ tối quan trọng cho những GPU trên.",
-            "Mối Quan Hệ Model: Kết nối LoRA với model chính, và LoRA đó sẽ được hiển thị đầu danh sách."
+            "Trình Inpaint: Cấp độ nhiễu theo lớp phủ và giới hạn khử nhiễu.",
+            "Canvas: Tỉ lệ giao diện thông minh hơn cho SDXL và nâng cấp tính năng lăn để phóng to."
         ]
     },
     "upsell": {
