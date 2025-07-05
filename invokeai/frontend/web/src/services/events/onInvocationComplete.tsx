@@ -13,7 +13,7 @@ import { isImageField, isImageFieldCollection } from 'features/nodes/types/commo
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
-import type { ImageDTO, S } from 'services/api/types';
+import type { GetImageNamesArg, ImageDTO, S } from 'services/api/types';
 import { getCategories } from 'services/api/util';
 import { insertImageIntoNamesResult } from 'services/api/util/optimisticUpdates';
 import { $lastProgressEvent } from 'services/events/stores';
@@ -75,9 +75,13 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
 
     for (const imageDTO of imageDTOs) {
       // Construct the expected query args for this image's getImageNames query
-      // Use the current gallery query args as base, but override board_id and categories for this specific image
-      const expectedQueryArgs = {
+      // Use the current gallery query args as base, but override board_id and categories for this specific image.
+      const expectedQueryArgs: GetImageNamesArg = {
         ...listImageNamesArg,
+        // We cannot do optimistic updates when a search term is present because we don't have enough info to derive
+        // the correct position to insert the new image. By setting it to an empty string, we ensure that we only
+        // update caches where we can get it right.
+        search_term: '',
         categories: getCategories(imageDTO),
         board_id: imageDTO.board_id ?? 'none',
       };
