@@ -128,60 +128,69 @@ const getImagesPerRow = (rootEl: HTMLDivElement): number => {
  * Scroll the item at the given index into view if it is not currently visible.
  */
 const scrollIntoView = (
-  index: number,
+  targetImageName: string,
+  imageNames: string[],
   rootEl: HTMLDivElement,
   virtuosoGridHandle: VirtuosoGridHandle,
   range: ListRange
 ) => {
   if (range.endIndex === 0) {
+    // No range is rendered; no need to scroll to anything.
     return;
   }
 
-  // First get the virtuoso grid list root element
-  const gridList = rootEl.querySelector('.virtuoso-grid-list') as HTMLElement;
+  const targetIndex = imageNames.findIndex((name) => name === targetImageName);
 
-  if (!gridList) {
-    // No grid - cannot scroll!
+  if (targetIndex === -1) {
+    // The image isn't in the currently rendered list.
     return;
   }
 
-  // Then find the specific item within the grid list
-  const targetItem = gridList.querySelector(`.virtuoso-grid-item[data-index="${index}"]`) as HTMLElement;
+  const targetItem = rootEl.querySelector(
+    `.virtuoso-grid-item:has([data-image-name="${targetImageName}"])`
+  ) as HTMLElement;
 
   if (!targetItem) {
-    if (index > range.endIndex) {
+    if (targetIndex > range.endIndex) {
       virtuosoGridHandle.scrollToIndex({
-        index,
+        index: targetIndex,
         behavior: 'auto',
         align: 'start',
       });
-    } else if (index < range.startIndex) {
+    } else if (targetIndex < range.startIndex) {
       virtuosoGridHandle.scrollToIndex({
-        index,
+        index: targetIndex,
         behavior: 'auto',
         align: 'end',
       });
     } else {
-      log.warn(`Unable to find item index ${index} but it is in range ${range.startIndex}-${range.endIndex}`);
+      log.debug(
+        `Unable to find image ${targetImageName} at index ${targetIndex} but it is in the rendered range ${range.startIndex}-${range.endIndex}`
+      );
     }
     return;
   }
+
+  // We found the image in the DOM, but it might be in the overscan range - rendered but not in the visible viewport.
+  // Check if it is in the viewport and scroll if necessary.
 
   const itemRect = targetItem.getBoundingClientRect();
   const rootRect = rootEl.getBoundingClientRect();
 
   if (itemRect.top < rootRect.top) {
     virtuosoGridHandle.scrollToIndex({
-      index,
+      index: targetIndex,
       behavior: 'auto',
       align: 'start',
     });
   } else if (itemRect.bottom > rootRect.bottom) {
     virtuosoGridHandle.scrollToIndex({
-      index,
+      index: targetIndex,
       behavior: 'auto',
       align: 'end',
     });
+  } else {
+    // Image is already in view
   }
 
   return;
@@ -377,22 +386,18 @@ const useKeepSelectedImageInView = (
   rootRef: React.RefObject<HTMLDivElement>,
   rangeRef: MutableRefObject<ListRange>
 ) => {
-  const imageName = useAppSelector(selectLastSelectedImage);
+  const targetImageName = useAppSelector(selectLastSelectedImage);
 
   useEffect(() => {
     const virtuosoGridHandle = virtuosoRef.current;
     const rootEl = rootRef.current;
     const range = rangeRef.current;
 
-    if (!virtuosoGridHandle || !rootEl || !imageNames || imageNames.length === 0) {
+    if (!virtuosoGridHandle || !rootEl || !targetImageName || !imageNames || imageNames.length === 0) {
       return;
     }
-    const index = imageName ? imageNames.indexOf(imageName) : 0;
-    if (index === -1) {
-      return;
-    }
-    scrollIntoView(index, rootEl, virtuosoGridHandle, range);
-  }, [imageName, imageNames, rangeRef, rootRef, virtuosoRef]);
+    scrollIntoView(targetImageName, imageNames, rootEl, virtuosoGridHandle, range);
+  }, [targetImageName, imageNames, rangeRef, rootRef, virtuosoRef]);
 };
 
 /**
