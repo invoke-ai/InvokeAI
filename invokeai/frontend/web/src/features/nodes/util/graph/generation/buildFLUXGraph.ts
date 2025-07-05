@@ -17,8 +17,8 @@ import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToIm
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
-  getSizes,
   selectCanvasOutputFields,
+  selectOriginalAndScaledSizes,
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
@@ -43,7 +43,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
 
   const { bbox } = canvas;
 
-  const { originalSize, scaledSize } = getSizes(bbox);
+  const { originalSize, scaledSize } = selectOriginalAndScaledSizes(state);
 
   const model = selectMainModelConfig(state);
 

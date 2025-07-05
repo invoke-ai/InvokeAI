@@ -423,11 +423,15 @@ export const selectIsCogView4 = createParamsSelector((params) => params.model?.b
 export const selectIsImagen3 = createParamsSelector((params) => params.model?.base === 'imagen3');
 export const selectIsImagen4 = createParamsSelector((params) => params.model?.base === 'imagen4');
 export const selectIsFluxKontextApi = createParamsSelector((params) => params.model?.base === 'flux-kontext');
-export const selectIsFluxKontext = createParamsSelector(
-  (params) =>
-    params.model?.base === 'flux-kontext' ||
-    (params.model?.base === 'flux' && params.model?.name?.toLowerCase().includes('kontext'))
-);
+export const selectIsFluxKontext = createParamsSelector((params) => {
+  if (params.model?.base === 'flux-kontext') {
+    return true;
+  }
+  if (params.model?.base === 'flux' && params.model?.name.toLowerCase().includes('kontext')) {
+    return true;
+  }
+  return false;
+});
 export const selectIsChatGPT4o = createParamsSelector((params) => params.model?.base === 'chatgpt-4o');
 
 export const selectModel = createParamsSelector((params) => params.model);

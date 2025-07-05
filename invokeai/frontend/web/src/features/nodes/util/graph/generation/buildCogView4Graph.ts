@@ -11,8 +11,8 @@ import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToIm
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
-  getSizes,
   selectCanvasOutputFields,
+  selectOriginalAndScaledSizes,
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
@@ -36,7 +36,7 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
 
   assert(model, 'No model found in state');
 
-  const { originalSize, scaledSize } = getSizes(bbox);
+  const { originalSize, scaledSize } = selectOriginalAndScaledSizes(state);
   const { positivePrompt, negativePrompt } = selectPresetModifiedPrompts(state);
 
   const g = new Graph(getPrefixedId('cogview4_graph'));
