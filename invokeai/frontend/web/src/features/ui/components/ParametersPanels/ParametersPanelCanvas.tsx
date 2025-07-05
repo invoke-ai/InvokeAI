@@ -8,7 +8,7 @@ import { useIsApiModel } from 'features/parameters/hooks/useIsApiModel';
 import { AdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
 import { CompositingSettingsAccordion } from 'features/settingsAccordions/components/CompositingSettingsAccordion/CompositingSettingsAccordion';
 import { GenerationSettingsAccordion } from 'features/settingsAccordions/components/GenerationSettingsAccordion/GenerationSettingsAccordion';
-import { ImageSettingsAccordion } from 'features/settingsAccordions/components/ImageSettingsAccordion/ImageSettingsAccordion';
+import { CanvasTabImageSettingsAccordion } from 'features/settingsAccordions/components/ImageSettingsAccordion/CanvasTabImageSettingsAccordion';
 import { RefinerSettingsAccordion } from 'features/settingsAccordions/components/RefinerSettingsAccordion/RefinerSettingsAccordion';
 import { StylePresetMenu } from 'features/stylePresets/components/StylePresetMenu';
 import { StylePresetMenuTrigger } from 'features/stylePresets/components/StylePresetMenuTrigger';
@@ -44,7 +44,7 @@ export const ParametersPanelCanvas = memo(() => {
           <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
             <Flex gap={2} flexDirection="column" h="full" w="full">
               <Prompts />
-              <ImageSettingsAccordion />
+              <CanvasTabImageSettingsAccordion />
               <GenerationSettingsAccordion />
               {!isApiModel && <CompositingSettingsAccordion />}
               {isSDXL && <RefinerSettingsAccordion />}
