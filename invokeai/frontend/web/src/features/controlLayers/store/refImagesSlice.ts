@@ -5,10 +5,15 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { clamp } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { canvasMetadataRecalled } from 'features/controlLayers/store/canvasSlice';
 import type { FLUXReduxImageInfluence, RefImagesState } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import type { ApiModelConfig, FLUXReduxModelConfig, ImageDTO, IPAdapterModelConfig } from 'services/api/types';
+import type {
+  ChatGPT4oModelConfig,
+  FLUXKontextModelConfig,
+  FLUXReduxModelConfig,
+  ImageDTO,
+  IPAdapterModelConfig,
+} from 'services/api/types';
 import { assert } from 'tsafe';
 import type { PartialDeep } from 'type-fest';
 
@@ -18,6 +23,7 @@ import {
   getReferenceImageState,
   imageDTOToImageWithDims,
   initialChatGPT4oReferenceImage,
+  initialFluxKontextReferenceImage,
   initialFLUXRedux,
   initialIPAdapter,
 } from './util';
@@ -86,7 +92,9 @@ export const refImagesSlice = createSlice({
     },
     refImageModelChanged: (
       state,
-      action: PayloadActionWithId<{ modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | ApiModelConfig | null }>
+      action: PayloadActionWithId<{
+        modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | ChatGPT4oModelConfig | FLUXKontextModelConfig | null;
+      }>
     ) => {
       const { id, modelConfig } = action.payload;
       const entity = selectRefImageEntity(state, id);
@@ -115,6 +123,19 @@ export const refImagesSlice = createSlice({
         // Switching to chatgpt-4o ref image
         entity.config = {
           ...initialChatGPT4oReferenceImage,
+          image: entity.config.image,
+          model: entity.config.model,
+        };
+        return;
+      }
+
+      if (
+        entity.config.model.base === 'flux-kontext' ||
+        (entity.config.model.base === 'flux' && entity.config.model.name?.toLowerCase().includes('kontext'))
+      ) {
+        // Switching to flux-kontext ref image
+        entity.config = {
+          ...initialFluxKontextReferenceImage,
           image: entity.config.image,
           model: entity.config.model,
         };
@@ -211,13 +232,15 @@ export const refImagesSlice = createSlice({
       }
       state.selectedEntityId = id;
     },
+    refImageIsEnabledToggled: (state, action: PayloadActionWithId) => {
+      const { id } = action.payload;
+      const entity = selectRefImageEntity(state, id);
+      if (!entity) {
+        return;
+      }
+      entity.isEnabled = !entity.isEnabled;
+    },
     refImagesReset: () => getInitialRefImagesState(),
-  },
-  extraReducers(builder) {
-    builder.addCase(canvasMetadataRecalled, (state, action) => {
-      const { referenceImages } = action.payload;
-      state.entities = referenceImages;
-    });
   },
 });
 
@@ -232,6 +255,8 @@ export const {
   refImageIPAdapterWeightChanged,
   refImageIPAdapterBeginEndStepPctChanged,
   refImageFLUXReduxImageInfluenceChanged,
+  refImageIsEnabledToggled,
+  refImageRecalled,
 } = refImagesSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */

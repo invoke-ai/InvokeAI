@@ -1,6 +1,6 @@
 import type { ButtonGroupProps } from '@invoke-ai/ui-library';
 import { Button, ButtonGroup } from '@invoke-ai/ui-library';
-import { useAppStore } from 'app/store/nanostores/store';
+import { useAppStore } from 'app/store/storeHooks';
 import { newCanvasFromImage } from 'features/imageActions/actions';
 import { memo, useCallback } from 'react';
 import type { ImageDTO } from 'services/api/types';

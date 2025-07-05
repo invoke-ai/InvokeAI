@@ -138,6 +138,21 @@ describe('Graph', () => {
     });
   });
 
+  describe('getNodes', () => {
+    it('should return all nodes in the graph', () => {
+      const g = new Graph();
+      const n1 = g.addNode({
+        id: 'n1',
+        type: 'add',
+      });
+      const n2 = g.addNode({
+        id: 'n2',
+        type: 'sub',
+      });
+      expect(g.getNodes()).toEqual([n1, n2]);
+    });
+  });
+
   describe('addEdge', () => {
     const add: Invocation<'add'> = {
       id: 'from-node',
@@ -564,12 +579,20 @@ describe('Graph', () => {
         const metadata = g.getMetadataNode();
         expect(metadata).toHaveProperty('test');
       });
-      it('should update metadata on the metadata node', () => {
+      it("should overwrite metadata on the metadata node if the strategy is 'replace'", () => {
         const g = new Graph();
-        g.upsertMetadata({ test: 'test' });
-        g.upsertMetadata({ test: 'test2' });
+        g.upsertMetadata({ test: { foo: 'test' } }, 'replace');
+        g.upsertMetadata({ test: { bar: 'test2' } }, 'replace');
         const metadata = g.getMetadataNode();
-        expect(metadata.test).toBe('test2');
+        expect(metadata.test).toEqual({ bar: 'test2' });
+      });
+      it("should merge keys if the strategy is 'merge'", () => {
+        const g = new Graph();
+        g.upsertMetadata({ test: { foo: 'test' }, arr: [1] }, 'merge');
+        g.upsertMetadata({ test: { bar: 'test2' }, arr: [2] }, 'merge');
+        const metadata = g.getMetadataNode();
+        expect(metadata.test).toEqual({ foo: 'test', bar: 'test2' });
+        expect(metadata.arr).toEqual([1, 2]);
       });
     });
 

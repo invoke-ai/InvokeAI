@@ -1,4 +1,4 @@
-import { useAppStore } from 'app/store/nanostores/store';
+import { useAppStore } from 'app/store/storeHooks';
 import { debounce } from 'es-toolkit/compat';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import { selectUiSlice, textAreaSizesStateChanged } from 'features/ui/store/uiSlice';

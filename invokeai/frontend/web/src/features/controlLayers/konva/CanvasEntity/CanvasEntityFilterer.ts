@@ -274,8 +274,10 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
       this.manager.stateApi.runGraphAndReturnImageOutput({
         graph,
         outputNodeId,
-        prepend: true,
-        signal: controller.signal,
+        options: {
+          prepend: true,
+          signal: controller.signal,
+        },
       })
     );
 
@@ -422,9 +424,15 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     // the user has applied the filter and the image has been adopted by the parent entity.
     if (this.imageModule && this.imageModule.konva.group.parent === this.konva.group) {
       this.imageModule.destroy();
-      this.imageModule = null;
     }
+
+    // When a filter is applied, the image module is adopted by the parent entity as a "permanent" module.
+    // Null this reference to prevent the filter module from accidentally trying to destroy a module that the
+    // parent entity is now responsible for.
+    this.imageModule = null;
+
     const initialFilterConfig = deepClone(this.$initialFilterConfig.get() ?? this.createInitialFilterConfig());
+
     this.$filterConfig.set(initialFilterConfig);
     this.$imageState.set(null);
     this.$lastProcessedHash.set('');

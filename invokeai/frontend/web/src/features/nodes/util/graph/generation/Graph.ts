@@ -1,4 +1,5 @@
 import { objectEquals } from '@observ33r/object-equals';
+import { mergeWith } from 'es-toolkit';
 import { forEach, groupBy, unset, values } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { type ModelIdentifierField, zModelIdentifierField } from 'features/nodes/types/common';
@@ -126,6 +127,14 @@ export class Graph {
     Object.assign(node, changes);
 
     return node;
+  }
+
+  /**
+   * Gets all nodes in the graph.
+   * @returns An array of all nodes in the graph.
+   */
+  getNodes(): AnyInvocation[] {
+    return Object.values(this._graph.nodes);
   }
 
   /**
@@ -379,11 +388,25 @@ export class Graph {
    * Add metadata to the graph. If the metadata node does not exist, it is created. If the specific metadata key exists,
    * it is overwritten.
    * @param metadata The metadata to add.
+   * @param strategy The strategy to use when adding metadata. If 'replace', any existing key is replaced. If 'add',
+   *    the metadata is deeply merged with the existing metadata. Arrays will be concatenated.
    * @returns The metadata node.
    */
-  upsertMetadata(metadata: Partial<S['CoreMetadataInvocation']>): S['CoreMetadataInvocation'] {
+  upsertMetadata(
+    metadata: Partial<S['CoreMetadataInvocation']>,
+    strategy: 'replace' | 'merge' = 'replace'
+  ): S['CoreMetadataInvocation'] {
     const node = this.getMetadataNode();
-    Object.assign(node, metadata);
+    if (strategy === 'replace') {
+      Object.assign(node, metadata);
+    } else {
+      // strategy === 'merge'
+      mergeWith(node, metadata, (objValue, srcValue) => {
+        if (Array.isArray(objValue)) {
+          return objValue.concat(srcValue);
+        }
+      });
+    }
     return node;
   }
 

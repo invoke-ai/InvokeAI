@@ -1,16 +1,15 @@
-import { ExternalLink, Flex, Tab, TabList, TabPanel, TabPanels, Tabs, Text } from '@invoke-ai/ui-library';
-import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { ExternalLink, Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
+import { IAINoContentFallback, IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import ImageMetadataGraphTabContent from 'features/gallery/components/ImageMetadataViewer/ImageMetadataGraphTabContent';
-import { useMetadataItem } from 'features/metadata/hooks/useMetadataItem';
-import { handlers } from 'features/metadata/util/handlers';
+import { MetadataHandlers } from 'features/metadata/parsing';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 import type { ImageDTO } from 'services/api/types';
 
 import DataViewer from './DataViewer';
-import ImageMetadataActions from './ImageMetadataActions';
+import ImageMetadataActions, { UnrecallableMetadataDatum } from './ImageMetadataActions';
 import ImageMetadataWorkflowTabContent from './ImageMetadataWorkflowTabContent';
 
 type ImageMetadataViewerProps = {
@@ -25,8 +24,7 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
   // });
   const { t } = useTranslation();
 
-  const { metadata } = useDebouncedMetadata(image.image_name);
-  const createdBy = useMetadataItem(metadata, handlers.createdBy);
+  const { metadata, isLoading } = useDebouncedMetadata(image.image_name);
 
   return (
     <Flex
@@ -41,11 +39,7 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
       overflow="hidden"
     >
       <ExternalLink href={image.image_url} label={image.image_name} />
-      {createdBy.valueOrNull && (
-        <Text>
-          {t('metadata.createdBy')}: {createdBy.valueOrNull}
-        </Text>
-      )}
+      <UnrecallableMetadataDatum metadata={metadata} handler={MetadataHandlers.CreatedBy} />
 
       <Tabs variant="line" isLazy={true} display="flex" flexDir="column" w="full" h="full">
         <TabList>
@@ -58,13 +52,13 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
 
         <TabPanels>
           <TabPanel>
-            {metadata ? (
+            {isLoading && <IAINoContentFallbackWithSpinner label="Loading metadata..." />}
+            {metadata && !isLoading && (
               <ScrollableContent>
                 <ImageMetadataActions metadata={metadata} />
               </ScrollableContent>
-            ) : (
-              <IAINoContentFallback label={t('metadata.noRecallParameters')} />
             )}
+            {!metadata && !isLoading && <IAINoContentFallback label={t('metadata.noRecallParameters')} />}
           </TabPanel>
           <TabPanel>
             {metadata ? (

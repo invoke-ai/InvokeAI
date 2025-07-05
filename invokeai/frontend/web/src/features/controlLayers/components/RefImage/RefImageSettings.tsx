@@ -38,7 +38,13 @@ import type { SetGlobalReferenceImageDndTargetData } from 'features/dnd/dnd';
 import { setGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo } from 'react';
-import type { ApiModelConfig, FLUXReduxModelConfig, ImageDTO, IPAdapterModelConfig } from 'services/api/types';
+import type {
+  ChatGPT4oModelConfig,
+  FLUXKontextModelConfig,
+  FLUXReduxModelConfig,
+  ImageDTO,
+  IPAdapterModelConfig,
+} from 'services/api/types';
 
 import { RefImageImage } from './RefImageImage';
 
@@ -84,7 +90,7 @@ const RefImageSettingsContent = memo(() => {
   );
 
   const onChangeModel = useCallback(
-    (modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | ApiModelConfig) => {
+    (modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | ChatGPT4oModelConfig | FLUXKontextModelConfig) => {
       dispatch(refImageModelChanged({ id, modelConfig }));
     },
     [dispatch, id]

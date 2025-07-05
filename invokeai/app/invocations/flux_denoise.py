@@ -22,8 +22,6 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
-    WithBoard,
-    WithMetadata,
 )
 from invokeai.app.invocations.flux_controlnet import FluxControlNetField
 from invokeai.app.invocations.flux_vae_encode import FluxVaeEncodeInvocation
@@ -65,9 +63,9 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX Denoise",
     tags=["image", "flux"],
     category="image",
-    version="3.3.0",
+    version="4.0.0",
 )
-class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
+class FluxDenoiseInvocation(BaseInvocation):
     """Run denoising process with a FLUX transformer model."""
 
     # If latents is provided, this means we are doing image-to-image.
@@ -393,28 +391,29 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                     raise ValueError("A VAE (e.g., controlnet_vae) must be provided to use Kontext conditioning.")
 
                 kontext_extension = KontextExtension(
-                    kontext_field=self.kontext_conditioning,
                     context=context,
+                    kontext_conditioning=self.kontext_conditioning,
                     vae_field=self.controlnet_vae,
                     device=TorchDevice.choose_torch_device(),
                     dtype=inference_dtype,
                 )
 
-            final_img, final_img_ids = x, img_ids
-            original_seq_len = x.shape[1]
+            # Prepare Kontext conditioning if provided
+            img_cond_seq = None
+            img_cond_seq_ids = None
             if kontext_extension is not None:
-                final_img, final_img_ids = kontext_extension.apply(final_img, final_img_ids)
+                # Ensure batch sizes match
+                kontext_extension.ensure_batch_size(x.shape[0])
+                img_cond_seq, img_cond_seq_ids = kontext_extension.kontext_latents, kontext_extension.kontext_ids
 
             x = denoise(
                 model=transformer,
-                img=final_img,
-                img_ids=final_img_ids,
+                img=x,
+                img_ids=img_ids,
                 pos_regional_prompting_extension=pos_regional_prompting_extension,
                 neg_regional_prompting_extension=neg_regional_prompting_extension,
                 timesteps=timesteps,
-                step_callback=self._build_step_callback(
-                    context, original_seq_len if kontext_extension is not None else None
-                ),
+                step_callback=self._build_step_callback(context),
                 guidance=self.guidance,
                 cfg_scale=cfg_scale,
                 inpaint_extension=inpaint_extension,
@@ -422,10 +421,9 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 pos_ip_adapter_extensions=pos_ip_adapter_extensions,
                 neg_ip_adapter_extensions=neg_ip_adapter_extensions,
                 img_cond=img_cond,
+                img_cond_seq=img_cond_seq,
+                img_cond_seq_ids=img_cond_seq_ids,
             )
-
-            if kontext_extension is not None:
-                x = x[:, :original_seq_len, :]  # Keep only the first original_seq_len tokens
 
         x = unpack(x.float(), self.height, self.width)
         return x
@@ -897,14 +895,11 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             yield (lora_info.model, lora.weight)
             del lora_info
 
-    def _build_step_callback(
-        self, context: InvocationContext, original_seq_len: Optional[int] = None
-    ) -> Callable[[PipelineIntermediateState], None]:
+    def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:
-            # Extract only main image tokens if Kontext conditioning was applied
+            # The denoise function now handles Kontext conditioning correctly,
+            # so we don't need to slice the latents here
             latents = state.latents.float()
-            if original_seq_len is not None:
-                latents = latents[:, :original_seq_len, :]
             state.latents = unpack(latents, self.height, self.width).squeeze()
             context.util.flux_step_callback(state)
 

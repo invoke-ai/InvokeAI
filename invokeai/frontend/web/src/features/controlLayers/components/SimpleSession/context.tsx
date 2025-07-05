@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
-import { useAppStore } from 'app/store/nanostores/store';
+import { useAppStore } from 'app/store/storeHooks';
 import { buildZodTypeGuard } from 'common/util/zodUtils';
 import { getOutputImageName } from 'features/controlLayers/components/SimpleSession/shared';
 import type { ProgressImage } from 'features/nodes/types/common';
@@ -92,6 +92,7 @@ type CanvasSessionContextValue = {
   $items: Atom<S['SessionQueueItem'][]>;
   $itemCount: Atom<number>;
   $hasItems: Atom<boolean>;
+  $isPending: Atom<boolean>;
   $progressData: ProgressDataMap;
   $selectedItemId: WritableAtom<number | null>;
   $selectedItem: Atom<S['SessionQueueItem'] | null>;
@@ -169,6 +170,13 @@ export const CanvasSessionContextProvider = memo(
      * Whether there are any items. Computed from the queue items array.
      */
     const $hasItems = useState(() => computed([$items], (items) => items.length > 0))[0];
+
+    /**
+     * Whether there are any pending or in-progress items. Computed from the queue items array.
+     */
+    const $isPending = useState(() =>
+      computed([$items], (items) => items.some((item) => item.status === 'pending' || item.status === 'in_progress'))
+    )[0];
 
     /**
      * The currently selected queue item, or null if one is not selected.
@@ -506,6 +514,7 @@ export const CanvasSessionContextProvider = memo(
         session,
         $items,
         $hasItems,
+        $isPending,
         $progressData,
         $selectedItemId,
         $autoSwitch,
@@ -523,6 +532,7 @@ export const CanvasSessionContextProvider = memo(
         $autoSwitch,
         $items,
         $hasItems,
+        $isPending,
         $progressData,
         $selectedItem,
         $selectedItemId,

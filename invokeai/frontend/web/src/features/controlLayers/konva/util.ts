@@ -9,6 +9,7 @@ import type {
   CoordinateWithPressure,
   Rect,
   RgbaColor,
+  StageAttrs,
 } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -320,6 +321,7 @@ export const downloadBlob = (blob: Blob, fileName: string) => {
   a.click();
   document.body.removeChild(a);
   a.remove();
+  URL.revokeObjectURL(url);
 };
 
 /**
@@ -768,4 +770,8 @@ export const roundRect = (rect: Rect): Rect => {
     width: Math.round(rect.width),
     height: Math.round(rect.height),
   };
+};
+
+export const areStageAttrsGonnaExplode = (stageAttrs: StageAttrs): boolean => {
+  return stageAttrs.height === 0 || stageAttrs.width === 0 || stageAttrs.scale === 0;
 };

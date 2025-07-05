@@ -1,3 +1,6 @@
+import type { RootState } from 'app/store/store';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import type { GenerationMode } from 'features/controlLayers/store/types';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 
@@ -26,6 +29,12 @@ export type MainModelLoaderNodes =
   | 'cogview4_model_loader';
 
 export type VaeSourceNodes = 'seamless' | 'vae_loader';
+
+export type GraphBuilderArg = {
+  generationMode: GenerationMode;
+  state: RootState;
+  manager: CanvasManager | null;
+};
 
 export type GraphBuilderReturn = {
   g: Graph;

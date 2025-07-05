@@ -17,6 +17,15 @@ module.exports = {
     'no-promise-executor-return': 'error',
     // https://eslint.org/docs/latest/rules/require-await
     'require-await': 'error',
+    // Restrict setActiveTab calls to only use-navigation-api.tsx
+    'no-restricted-syntax': [
+      'error',
+      {
+        selector: 'CallExpression[callee.name="setActiveTab"]',
+        message:
+          'setActiveTab() can only be called from use-navigation-api.tsx. Use navigationApi.switchToTab() instead.',
+      },
+    ],
     // TODO: ENABLE THIS RULE BEFORE v6.0.0
     'react/display-name': 'off',
     'no-restricted-properties': [
@@ -56,6 +65,15 @@ module.exports = {
     ],
   },
   overrides: [
+    /**
+     * Allow setActiveTab calls only in use-navigation-api.tsx
+     */
+    {
+      files: ['**/use-navigation-api.tsx'],
+      rules: {
+        'no-restricted-syntax': 'off',
+      },
+    },
     /**
      * Overrides for stories
      */

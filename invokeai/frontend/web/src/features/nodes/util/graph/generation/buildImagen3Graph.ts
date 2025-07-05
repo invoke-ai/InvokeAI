@@ -1,34 +1,26 @@
 import { logger } from 'app/logging/logger';
-import type { RootState } from 'app/store/store';
-import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { isImagenAspectRatioID } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import { getGenerationMode } from 'features/nodes/util/graph/generation/getGenerationMode';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
-import { type GraphBuilderReturn, UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import type { GraphBuilderArg, GraphBuilderReturn } from 'features/nodes/util/graph/types';
+import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { t } from 'i18next';
-import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 const log = logger('system');
 
-export const buildImagen3Graph = async (
-  state: RootState,
-  manager: CanvasManager | null
-): Promise<GraphBuilderReturn> => {
-  const tab = selectActiveTab(state);
-  const generationMode = await getGenerationMode(manager, tab);
+export const buildImagen3Graph = (arg: GraphBuilderArg): GraphBuilderReturn => {
+  const { generationMode, state, manager } = arg;
 
   if (generationMode !== 'txt2img') {
     throw new UnsupportedGenerationModeError(t('toast.imagenIncompatibleGenerationMode', { model: 'Imagen3' }));
   }
 
-  log.debug({ generationMode }, 'Building Imagen3 graph');
+  log.debug({ generationMode, manager: manager?.id }, 'Building Imagen3 graph');
 
   const canvas = selectCanvasSlice(state);
 
@@ -41,33 +33,30 @@ export const buildImagen3Graph = async (
   assert(isImagenAspectRatioID(bbox.aspectRatio.id), 'Imagen3 does not support this aspect ratio');
   assert(positivePrompt.length > 0, 'Imagen3 requires positive prompt to have at least one character');
 
-  if (generationMode === 'txt2img') {
-    const g = new Graph(getPrefixedId('imagen3_txt2img_graph'));
-    const imagen3 = g.addNode({
-      // @ts-expect-error: These nodes are not available in the OSS application
-      type: 'google_imagen3_generate_image',
-      model: zModelIdentifierField.parse(model),
-      positive_prompt: positivePrompt,
-      negative_prompt: negativePrompt,
-      aspect_ratio: bbox.aspectRatio.id,
-      // When enhance_prompt is true, Imagen3 will return a new image every time, ignoring the seed.
-      enhance_prompt: true,
-      ...selectCanvasOutputFields(state),
-    });
-    g.upsertMetadata({
-      positive_prompt: positivePrompt,
-      negative_prompt: negativePrompt,
-      width: bbox.rect.width,
-      height: bbox.rect.height,
-      model: Graph.getModelMetadataField(model),
-      ...selectCanvasMetadata(state),
-    });
-    return {
-      g,
-      seedFieldIdentifier: { nodeId: imagen3.id, fieldName: 'seed' },
-      positivePromptFieldIdentifier: { nodeId: imagen3.id, fieldName: 'positive_prompt' },
-    };
-  }
+  const g = new Graph(getPrefixedId('imagen3_txt2img_graph'));
+  const imagen3 = g.addNode({
+    // @ts-expect-error: These nodes are not available in the OSS application
+    type: 'google_imagen3_generate_image',
+    model: zModelIdentifierField.parse(model),
+    positive_prompt: positivePrompt,
+    negative_prompt: negativePrompt,
+    aspect_ratio: bbox.aspectRatio.id,
+    // When enhance_prompt is true, Imagen3 will return a new image every time, ignoring the seed.
+    enhance_prompt: true,
+    ...selectCanvasOutputFields(state),
+  });
+  g.upsertMetadata({
+    positive_prompt: positivePrompt,
+    negative_prompt: negativePrompt,
+    width: bbox.rect.width,
+    height: bbox.rect.height,
+    model: Graph.getModelMetadataField(model),
+    ...selectCanvasMetadata(state),
+  });
 
-  assert<Equals<typeof generationMode, never>>(false, 'Invalid generation mode for Imagen3');
+  return {
+    g,
+    seedFieldIdentifier: { nodeId: imagen3.id, fieldName: 'seed' },
+    positivePromptFieldIdentifier: { nodeId: imagen3.id, fieldName: 'positive_prompt' },
+  };
 };

@@ -174,11 +174,13 @@ def generate_img_ids(h: int, w: int, batch_size: int, device: torch.device, dtyp
         dtype = torch.float16
 
     img_ids = torch.zeros(h // 2, w // 2, 3, device=device, dtype=dtype)
+    # Set batch offset to 0 for main image tokens
+    img_ids[..., 0] = 0
     img_ids[..., 1] = img_ids[..., 1] + torch.arange(h // 2, device=device, dtype=dtype)[:, None]
     img_ids[..., 2] = img_ids[..., 2] + torch.arange(w // 2, device=device, dtype=dtype)[None, :]
     img_ids = repeat(img_ids, "h w c -> b (h w) c", b=batch_size)
 
     if device.type == "mps":
-        img_ids.to(orig_dtype)
+        img_ids = img_ids.to(orig_dtype)
 
     return img_ids

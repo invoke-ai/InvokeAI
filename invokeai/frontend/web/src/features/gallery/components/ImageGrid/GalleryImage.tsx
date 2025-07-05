@@ -3,9 +3,8 @@ import { draggable, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Icon, Image } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppStore } from 'app/store/nanostores/store';
 import type { AppDispatch, AppGetState } from 'app/store/store';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { uniq } from 'es-toolkit';
 import { multipleImageDndSource, singleImageDndSource } from 'features/dnd/dnd';
 import type { DndDragPreviewMultipleImageState } from 'features/dnd/DndDragPreviewMultipleImage';
@@ -22,7 +21,7 @@ import {
   selectSelection,
 } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectGallerySlice, selectionChanged } from 'features/gallery/store/gallerySlice';
-import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import type { MouseEvent, MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
@@ -140,7 +139,6 @@ const buildOnClick =
 
 export const GalleryImage = memo(({ imageDTO }: Props) => {
   const store = useAppStore();
-  const autoLayoutContext = useAutoLayoutContext();
   const [isDragging, setIsDragging] = useState(false);
   const [dragPreviewState, setDragPreviewState] = useState<
     DndDragPreviewSingleImageState | DndDragPreviewMultipleImageState | null
@@ -240,8 +238,8 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
 
   const onDoubleClick = useCallback<MouseEventHandler<HTMLDivElement>>(() => {
     store.dispatch(imageToCompareChanged(null));
-    autoLayoutContext.focusPanel(VIEWER_PANEL_ID);
-  }, [autoLayoutContext, store]);
+    navigationApi.focusPanelInActiveTab(VIEWER_PANEL_ID);
+  }, [store]);
 
   const dataTestId = useMemo(() => getGalleryImageDataTestId(imageDTO.image_name), [imageDTO.image_name]);
 

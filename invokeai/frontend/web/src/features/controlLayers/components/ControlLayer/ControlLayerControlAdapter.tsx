@@ -1,7 +1,6 @@
 import { Flex, IconButton } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppStore } from 'app/store/nanostores/store';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
 import { Weight } from 'features/controlLayers/components/common/Weight';

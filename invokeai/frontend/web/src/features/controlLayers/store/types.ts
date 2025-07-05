@@ -300,9 +300,9 @@ const zCanvasEntityBase = z.object({
   isLocked: z.boolean(),
 });
 
-const zRefImageState = z.object({
+export const zRefImageState = z.object({
   id: zId,
-  // This should be named `referenceImage` but we need to keep it as `ipAdapter` for backwards compatibility
+  isEnabled: z.boolean().default(true),
   config: z.discriminatedUnion('type', [
     zIPAdapterConfig,
     zFLUXReduxConfig,
@@ -578,7 +578,7 @@ const zCanvasState = z.object({
 });
 export type CanvasState = z.infer<typeof zCanvasState>;
 
-const zRefImagesState = z.object({
+export const zRefImagesState = z.object({
   selectedEntityId: z.string().nullable().default(null),
   isPanelOpen: z.boolean().default(false),
   entities: z.array(zRefImageState).default(() => []),
@@ -593,12 +593,17 @@ export const getInitialRefImagesState = () => deepClone(INITIAL_REF_IMAGES_STATE
 const CANVAS_INITIAL_STATE = zCanvasState.parse({});
 export const getInitialCanvasState = () => deepClone(CANVAS_INITIAL_STATE);
 
+export const zCanvasReferenceImageState_OLD = zCanvasEntityBase.extend({
+  type: z.literal('reference_image'),
+  ipAdapter: z.discriminatedUnion('type', [zIPAdapterConfig, zFLUXReduxConfig, zChatGPT4oReferenceImageConfig]),
+});
+
 export const zCanvasMetadata = z.object({
   inpaintMasks: z.array(zCanvasInpaintMaskState),
   rasterLayers: z.array(zCanvasRasterLayerState),
   controlLayers: z.array(zCanvasControlLayerState),
   regionalGuidance: z.array(zCanvasRegionalGuidanceState),
-  referenceImages: z.array(zRefImageState),
+  // referenceImages: z.array(zRefImageState),
 });
 export type CanvasMetadata = z.infer<typeof zCanvasMetadata>;
 

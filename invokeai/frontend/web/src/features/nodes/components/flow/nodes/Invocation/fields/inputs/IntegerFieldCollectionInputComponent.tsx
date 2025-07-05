@@ -10,7 +10,7 @@ import {
   IconButton,
 } from '@invoke-ai/ui-library';
 import { NUMPY_RAND_MAX } from 'app/constants';
-import { useAppStore } from 'app/store/nanostores/store';
+import { useAppStore } from 'app/store/storeHooks';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
 import { isNil } from 'es-toolkit/compat';
 import { useInputFieldIsInvalid } from 'features/nodes/hooks/useInputFieldIsInvalid';

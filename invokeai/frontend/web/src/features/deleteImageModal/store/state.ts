@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react';
-import { getStore, useAppStore } from 'app/store/nanostores/store';
-import type { AppDispatch, AppGetState, RootState } from 'app/store/store';
+import type { AppDispatch, AppStore, RootState } from 'app/store/store';
+import { useAppStore } from 'app/store/storeHooks';
 import { forEach, intersection, some } from 'es-toolkit/compat';
 import { entityDeleted } from 'features/controlLayers/store/canvasSlice';
 import {
@@ -11,6 +11,7 @@ import {
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasState, RefImagesState } from 'features/controlLayers/store/types';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
+import { selectListImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { fieldImageCollectionValueChanged, fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
@@ -52,14 +53,15 @@ const getInitialState = (): DeleteImagesModalState => ({
 
 const $deleteModalState = atom<DeleteImagesModalState>(getInitialState());
 
-const deleteImagesWithDialog = async (image_names: string[]): Promise<void> => {
-  const { getState, dispatch } = getStore();
+const deleteImagesWithDialog = async (image_names: string[], store: AppStore): Promise<void> => {
+  const { getState } = store;
   const imageUsage = getImageUsageFromImageNames(image_names, getState());
   const shouldConfirmOnDelete = selectSystemShouldConfirmOnDelete(getState());
 
   if (!shouldConfirmOnDelete && !isAnyImageInUse(imageUsage)) {
     // If we don't need to confirm and the images are not in use, delete them directly
-    await handleDeletions(image_names, dispatch, getState);
+    await handleDeletions(image_names, store);
+    return;
   }
 
   return new Promise<void>((resolve, reject) => {
@@ -74,14 +76,22 @@ const deleteImagesWithDialog = async (image_names: string[]): Promise<void> => {
   });
 };
 
-const handleDeletions = async (image_names: string[], dispatch: AppDispatch, getState: AppGetState) => {
+const handleDeletions = async (image_names: string[], store: AppStore) => {
   try {
+    const { dispatch, getState } = store;
     const state = getState();
-    await dispatch(imagesApi.endpoints.deleteImages.initiate({ image_names }, { track: false })).unwrap();
+    const { data } = imagesApi.endpoints.getImageNames.select(selectListImageNamesQueryArgs(state))(state);
+    const index = data?.image_names.findIndex((name) => name === image_names[0]);
+    const { deleted_images } = await dispatch(
+      imagesApi.endpoints.deleteImages.initiate({ image_names }, { track: false })
+    ).unwrap();
+
+    const newImageNames = data?.image_names.filter((name) => !deleted_images.includes(name)) || [];
+    const newSelectedImage = newImageNames[index ?? 0] || null;
 
     if (intersection(state.gallery.selection, image_names).length > 0) {
       // Some selected images were deleted, clear selection
-      dispatch(imageSelected(null));
+      dispatch(imageSelected(newSelectedImage));
     }
 
     // We need to reset the features where the image is in use - none of these work if their image(s) don't exist
@@ -96,9 +106,9 @@ const handleDeletions = async (image_names: string[], dispatch: AppDispatch, get
   }
 };
 
-const confirmDeletion = async (dispatch: AppDispatch, getState: AppGetState) => {
+const confirmDeletion = async (store: AppStore) => {
   const state = $deleteModalState.get();
-  await handleDeletions(state.image_names, dispatch, getState);
+  await handleDeletions(state.image_names, store);
   state.resolve?.();
   closeSilently();
 };
@@ -119,16 +129,16 @@ export const useDeleteImageModalState = () => {
 };
 
 export const useDeleteImageModalApi = () => {
-  const { dispatch, getState } = useAppStore();
+  const store = useAppStore();
   const api = useMemo(
     () => ({
-      delete: deleteImagesWithDialog,
-      confirm: () => confirmDeletion(dispatch, getState),
+      delete: (image_names: string[]) => deleteImagesWithDialog(image_names, store),
+      confirm: () => confirmDeletion(store),
       cancel: cancelDeletion,
       close: closeSilently,
       getUsageSummary: getImageUsageSummary,
     }),
-    [dispatch, getState]
+    [store]
   );
 
   return api;

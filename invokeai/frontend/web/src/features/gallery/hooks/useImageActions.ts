@@ -1,15 +1,9 @@
 import { useStore } from '@nanostores/react';
 import { adHocPostProcessingRequested } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
-import { useAppStore } from 'app/store/nanostores/store';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
-import {
-  handlers,
-  parseAndRecallAllMetadata,
-  parseAndRecallImageDimensions,
-  parseAndRecallPrompts,
-} from 'features/metadata/util/handlers';
+import { MetadataHandlers, MetadataUtils } from 'features/metadata/parsing';
 import { $hasTemplates } from 'features/nodes/store/nodesSlice';
 import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
 import {
@@ -17,7 +11,6 @@ import {
   selectStylePresetActivePresetId,
 } from 'features/stylePresets/store/stylePresetSlice';
 import { toast } from 'features/toast/toast';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +18,7 @@ import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 import type { ImageDTO } from 'services/api/types';
 
 export const useImageActions = (imageDTO: ImageDTO | null) => {
-  const { dispatch, getState } = useAppStore();
+  const store = useAppStore();
   const { t } = useTranslation();
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
   const isStaging = useAppSelector(selectIsStaging);
@@ -41,24 +34,29 @@ export const useImageActions = (imageDTO: ImageDTO | null) => {
       if (metadata) {
         setHasMetadata(true);
         try {
-          await handlers.seed.parse(metadata);
+          await MetadataHandlers.Seed.parse(metadata, store);
           setHasSeed(true);
         } catch {
           setHasSeed(false);
         }
 
+        let hasPrompt = false;
         // Need to catch all of these to avoid unhandled promise rejections bubbling up to instrumented error handlers
-        const promptParseResults = await Promise.allSettled([
-          handlers.positivePrompt.parse(metadata).catch(() => {}),
-          handlers.negativePrompt.parse(metadata).catch(() => {}),
-          handlers.sdxlPositiveStylePrompt.parse(metadata).catch(() => {}),
-          handlers.sdxlNegativeStylePrompt.parse(metadata).catch(() => {}),
-        ]);
-        if (promptParseResults.some((result) => result.status === 'fulfilled')) {
-          setHasPrompts(true);
-        } else {
-          setHasPrompts(false);
+        for (const handler of [
+          MetadataHandlers.PositivePrompt,
+          MetadataHandlers.NegativePrompt,
+          MetadataHandlers.PositiveStylePrompt,
+          MetadataHandlers.NegativeStylePrompt,
+        ]) {
+          try {
+            await handler.parse(metadata, store);
+            hasPrompt = true;
+            break;
+          } catch {
+            // noop
+          }
         }
+        setHasPrompts(hasPrompt);
       } else {
         setHasMetadata(false);
         setHasSeed(false);
@@ -66,17 +64,17 @@ export const useImageActions = (imageDTO: ImageDTO | null) => {
       }
     };
     parseMetadata();
-  }, [metadata]);
+  }, [metadata, store]);
 
   const clearStylePreset = useCallback(() => {
     if (activeStylePresetId) {
-      dispatch(activeStylePresetIdChanged(null));
+      store.dispatch(activeStylePresetIdChanged(null));
       toast({
         status: 'info',
         title: t('stylePresets.promptTemplateCleared'),
       });
     }
-  }, [dispatch, activeStylePresetId, t]);
+  }, [activeStylePresetId, store, t]);
 
   const recallAll = useCallback(() => {
     if (!imageDTO) {
@@ -85,10 +83,9 @@ export const useImageActions = (imageDTO: ImageDTO | null) => {
     if (!metadata) {
       return;
     }
-    const activeTabName = selectActiveTab(getState());
-    parseAndRecallAllMetadata(metadata, activeTabName === 'canvas', isStaging ? ['width', 'height'] : []);
+    MetadataUtils.recallAll(metadata, store, isStaging ? [MetadataHandlers.Width, MetadataHandlers.Height] : []);
     clearStylePreset();
-  }, [imageDTO, metadata, getState, isStaging, clearStylePreset]);
+  }, [imageDTO, metadata, store, isStaging, clearStylePreset]);
 
   const remix = useCallback(() => {
     if (!imageDTO) {
@@ -97,11 +94,10 @@ export const useImageActions = (imageDTO: ImageDTO | null) => {
     if (!metadata) {
       return;
     }
-    const activeTabName = selectActiveTab(getState());
     // Recalls all metadata parameters except seed
-    parseAndRecallAllMetadata(metadata, activeTabName === 'canvas', ['seed']);
+    MetadataUtils.recallAll(metadata, store, [MetadataHandlers.Seed]);
     clearStylePreset();
-  }, [imageDTO, metadata, getState, clearStylePreset]);
+  }, [imageDTO, metadata, store, clearStylePreset]);
 
   const recallSeed = useCallback(() => {
     if (!imageDTO) {
@@ -110,15 +106,8 @@ export const useImageActions = (imageDTO: ImageDTO | null) => {
     if (!metadata) {
       return;
     }
-    handlers.seed
-      .parse(metadata)
-      .then((seed) => {
-        handlers.seed.recall?.(seed, true);
-      })
-      .catch(() => {
-        // no-op, the toast will show the error
-      });
-  }, [imageDTO, metadata]);
+    MetadataUtils.recallByHandler({ metadata, store, handler: MetadataHandlers.Seed });
+  }, [imageDTO, metadata, store]);
 
   const recallPrompts = useCallback(() => {
     if (!imageDTO) {
@@ -127,9 +116,9 @@ export const useImageActions = (imageDTO: ImageDTO | null) => {
     if (!metadata) {
       return;
     }
-    parseAndRecallPrompts(metadata);
+    MetadataUtils.recallPrompts(metadata, store);
     clearStylePreset();
-  }, [imageDTO, metadata, clearStylePreset]);
+  }, [imageDTO, metadata, store, clearStylePreset]);
 
   const createAsPreset = useCallback(async () => {
     if (!imageDTO) {
@@ -142,12 +131,12 @@ export const useImageActions = (imageDTO: ImageDTO | null) => {
     let negativePrompt: string;
 
     try {
-      positivePrompt = await handlers.positivePrompt.parse(metadata);
+      positivePrompt = await MetadataHandlers.PositivePrompt.parse(metadata, store);
     } catch (error) {
       positivePrompt = '';
     }
     try {
-      negativePrompt = (await handlers.negativePrompt.parse(metadata)) ?? '';
+      negativePrompt = (await MetadataHandlers.NegativePrompt.parse(metadata, store)) ?? '';
     } catch (error) {
       negativePrompt = '';
     }
@@ -163,7 +152,7 @@ export const useImageActions = (imageDTO: ImageDTO | null) => {
       updatingStylePresetId: null,
       isModalOpen: true,
     });
-  }, [metadata, imageDTO]);
+  }, [imageDTO, metadata, store]);
 
   const loadWorkflowWithDialog = useLoadWorkflowWithDialog();
 
@@ -185,15 +174,15 @@ export const useImageActions = (imageDTO: ImageDTO | null) => {
     if (isStaging) {
       return;
     }
-    parseAndRecallImageDimensions(imageDTO);
-  }, [imageDTO, isStaging]);
+    MetadataUtils.recallDimensions(imageDTO, store);
+  }, [imageDTO, isStaging, store]);
 
   const upscale = useCallback(() => {
     if (!imageDTO) {
       return;
     }
-    dispatch(adHocPostProcessingRequested({ imageDTO }));
-  }, [dispatch, imageDTO]);
+    store.dispatch(adHocPostProcessingRequested({ imageDTO }));
+  }, [imageDTO, store]);
 
   const _delete = useCallback(() => {
     if (!imageDTO) {

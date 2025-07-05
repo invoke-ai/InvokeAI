@@ -2,11 +2,10 @@ import { Button, ExternalLink, Spinner, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, AppGetState } from 'app/store/store';
-import { useAppDispatch } from 'app/store/storeHooks';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { toast, toastApi } from 'features/toast/toast';
-import { setActiveTab } from 'features/ui/store/uiSlice';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { t } from 'i18next';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -150,12 +149,11 @@ const HFUnauthorizedToastDescription = () => {
   const { data } = useGetHFTokenStatusQuery(isEnabled ? undefined : skipToken);
 
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
 
   const onClick = useCallback(() => {
-    dispatch(setActiveTab('models'));
+    navigationApi.switchToTab('models');
     toastApi.close(UNAUTHORIZED_TOAST_ID);
-  }, [dispatch]);
+  }, []);
 
   if (!data) {
     return <Spinner />;

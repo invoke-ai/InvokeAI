@@ -69,6 +69,8 @@ export type SigLipModelConfig = S['SigLIPConfig'];
 export type FLUXReduxModelConfig = S['FluxReduxConfig'];
 export type ApiModelConfig = S['ApiModelConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig | ApiModelConfig;
+export type FLUXKontextModelConfig = MainModelConfig;
+export type ChatGPT4oModelConfig = ApiModelConfig;
 export type AnyModelConfig =
   | ControlLoRAModelConfig
   | LoRAModelConfig
@@ -230,7 +232,7 @@ export const isFluxReduxModelConfig = (config: AnyModelConfig): config is FLUXRe
   return config.type === 'flux_redux';
 };
 
-export const isChatGPT4oModelConfig = (config: AnyModelConfig): config is ApiModelConfig => {
+export const isChatGPT4oModelConfig = (config: AnyModelConfig): config is ChatGPT4oModelConfig => {
   return config.type === 'main' && config.base === 'chatgpt-4o';
 };
 
@@ -242,8 +244,12 @@ export const isImagen4ModelConfig = (config: AnyModelConfig): config is ApiModel
   return config.type === 'main' && config.base === 'imagen4';
 };
 
-export const isFluxKontextModelConfig = (config: AnyModelConfig): config is ApiModelConfig => {
+export const isFluxKontextApiModelConfig = (config: AnyModelConfig): config is ApiModelConfig => {
   return config.type === 'main' && config.base === 'flux-kontext';
+};
+
+export const isFluxKontextModelConfig = (config: AnyModelConfig): config is FLUXKontextModelConfig => {
+  return config.type === 'main' && config.base === 'flux' && config.name?.toLowerCase().includes('kontext');
 };
 
 export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {

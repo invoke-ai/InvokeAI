@@ -1,13 +1,17 @@
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppStore } from 'app/store/storeHooks';
+import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
+import { selectSelection } from 'features/gallery/store/gallerySelectors';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { useDeleteCurrentQueueItem } from 'features/queue/hooks/useDeleteCurrentQueueItem';
 import { useInvoke } from 'features/queue/hooks/useInvoke';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { setActiveTab } from 'features/ui/store/uiSlice';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
+
+import { getFocusedRegion } from './focus';
 
 export const useGlobalHotkeys = () => {
-  const dispatch = useAppDispatch();
+  const { dispatch, getState } = useAppStore();
   const isModelManagerEnabled = useFeatureStatus('modelManager');
   const queue = useInvoke();
 
@@ -65,7 +69,7 @@ export const useGlobalHotkeys = () => {
     id: 'selectGenerateTab',
     category: 'app',
     callback: () => {
-      dispatch(setActiveTab('generate'));
+      navigationApi.switchToTab('generate');
     },
     dependencies: [dispatch],
   });
@@ -74,7 +78,7 @@ export const useGlobalHotkeys = () => {
     id: 'selectCanvasTab',
     category: 'app',
     callback: () => {
-      dispatch(setActiveTab('canvas'));
+      navigationApi.switchToTab('canvas');
     },
     dependencies: [dispatch],
   });
@@ -83,7 +87,7 @@ export const useGlobalHotkeys = () => {
     id: 'selectUpscalingTab',
     category: 'app',
     callback: () => {
-      dispatch(setActiveTab('upscaling'));
+      navigationApi.switchToTab('upscaling');
     },
     dependencies: [dispatch],
   });
@@ -92,7 +96,7 @@ export const useGlobalHotkeys = () => {
     id: 'selectWorkflowsTab',
     category: 'app',
     callback: () => {
-      dispatch(setActiveTab('workflows'));
+      navigationApi.switchToTab('workflows');
     },
     dependencies: [dispatch],
   });
@@ -101,7 +105,7 @@ export const useGlobalHotkeys = () => {
     id: 'selectModelsTab',
     category: 'app',
     callback: () => {
-      dispatch(setActiveTab('models'));
+      navigationApi.switchToTab('models');
     },
     options: {
       enabled: isModelManagerEnabled,
@@ -113,24 +117,26 @@ export const useGlobalHotkeys = () => {
     id: 'selectQueueTab',
     category: 'app',
     callback: () => {
-      dispatch(setActiveTab('queue'));
+      navigationApi.switchToTab('queue');
     },
     dependencies: [dispatch, isModelManagerEnabled],
   });
 
-  // TODO: implement delete - needs to handle gallery focus, which has changed w/ dockview
-  // useRegisteredHotkeys({
-  //   id: 'deleteSelection',
-  //   category: 'gallery',
-  //   callback: () => {
-  //     if (!selection.length) {
-  //       return;
-  //     }
-  //     deleteImageModal.delete(selection);
-  //   },
-  //   options: {
-  //     enabled: (isGalleryFocused || isImageViewerFocused) && isDeleteEnabledByTab && !isWorkflowsFocused,
-  //   },
-  //   dependencies: [isWorkflowsFocused, isDeleteEnabledByTab, selection, isWorkflowsFocused],
-  // });
+  const deleteImageModalApi = useDeleteImageModalApi();
+  useRegisteredHotkeys({
+    id: 'deleteSelection',
+    category: 'gallery',
+    callback: () => {
+      const focusedRegion = getFocusedRegion();
+      if (focusedRegion !== 'gallery' && focusedRegion !== 'viewer') {
+        return;
+      }
+      const selection = selectSelection(getState());
+      if (!selection.length) {
+        return;
+      }
+      deleteImageModalApi.delete(selection);
+    },
+    dependencies: [getState, deleteImageModalApi],
+  });
 };

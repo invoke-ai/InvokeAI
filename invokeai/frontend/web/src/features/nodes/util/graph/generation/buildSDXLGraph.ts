@@ -1,6 +1,4 @@
 import { logger } from 'app/logging/logger';
-import type { RootState } from 'app/store/store';
-import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
@@ -16,15 +14,13 @@ import { addSDXLRefiner } from 'features/nodes/util/graph/generation/addSDXLRefi
 import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
-import { getGenerationMode } from 'features/nodes/util/graph/generation/getGenerationMode';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   getSizes,
   selectCanvasOutputFields,
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
-import type { GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
@@ -33,10 +29,9 @@ import { addRegions } from './addRegions';
 
 const log = logger('system');
 
-export const buildSDXLGraph = async (state: RootState, manager: CanvasManager | null): Promise<GraphBuilderReturn> => {
-  const tab = selectActiveTab(state);
-  const generationMode = await getGenerationMode(manager, tab);
-  log.debug({ generationMode }, 'Building SDXL graph');
+export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
+  const { generationMode, state, manager } = arg;
+  log.debug({ generationMode, manager: manager?.id }, 'Building SDXL graph');
 
   const model = selectMainModelConfig(state);
   assert(model, 'No model found in state');
@@ -178,7 +173,7 @@ export const buildSDXLGraph = async (state: RootState, manager: CanvasManager | 
     canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
     g.upsertMetadata({ generation_mode: 'sdxl_txt2img' });
   } else if (generationMode === 'img2img') {
-    assert(manager, 'Need manager to do img2img');
+    assert(manager !== null);
     canvasOutput = await addImageToImage({
       g,
       manager,
@@ -194,7 +189,7 @@ export const buildSDXLGraph = async (state: RootState, manager: CanvasManager | 
     });
     g.upsertMetadata({ generation_mode: 'sdxl_img2img' });
   } else if (generationMode === 'inpaint') {
-    assert(manager, 'Need manager to do inpaint');
+    assert(manager !== null);
     canvasOutput = await addInpaint({
       state,
       g,
@@ -212,7 +207,7 @@ export const buildSDXLGraph = async (state: RootState, manager: CanvasManager | 
     });
     g.upsertMetadata({ generation_mode: 'sdxl_inpaint' });
   } else if (generationMode === 'outpaint') {
-    assert(manager, 'Need manager to do outpaint');
+    assert(manager !== null);
     canvasOutput = await addOutpaint({
       state,
       g,
@@ -233,7 +228,7 @@ export const buildSDXLGraph = async (state: RootState, manager: CanvasManager | 
     assert<Equals<typeof generationMode, never>>(false);
   }
 
-  if (manager) {
+  if (manager !== null) {
     const controlNetCollector = g.addNode({
       type: 'collect',
       id: getPrefixedId('control_net_collector'),
@@ -283,7 +278,7 @@ export const buildSDXLGraph = async (state: RootState, manager: CanvasManager | 
   });
   let totalIPAdaptersAdded = ipAdapterResult.addedIPAdapters;
 
-  if (manager) {
+  if (manager !== null) {
     const regionsResult = await addRegions({
       manager,
       regions: canvas.regionalGuidance.entities,

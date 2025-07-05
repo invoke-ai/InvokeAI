@@ -18,6 +18,7 @@ type AddFLUXReduxArg = {
 
 export const addFLUXReduxes = ({ entities, g, collector, model }: AddFLUXReduxArg): AddFLUXReduxResult => {
   const validFLUXReduxes = entities
+    .filter((entity) => entity.isEnabled)
     .filter((entity) => isFLUXReduxConfig(entity.config))
     .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0);
 
@@ -31,6 +32,8 @@ export const addFLUXReduxes = ({ entities, g, collector, model }: AddFLUXReduxAr
 
     addFLUXRedux(id, config, g, collector);
   }
+
+  g.upsertMetadata({ ref_images: validFLUXReduxes }, 'merge');
 
   return result;
 };

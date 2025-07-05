@@ -9,6 +9,7 @@ import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase'
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
 import {
   addCoords,
+  areStageAttrsGonnaExplode,
   getKonvaNodeDebugAttrs,
   getPrefixedId,
   offsetCoord,
@@ -443,6 +444,9 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     // Scale the SAM points when the stage scale changes
     this.subscriptions.add(
       this.manager.stage.$stageAttrs.listen((stageAttrs, oldStageAttrs) => {
+        if (areStageAttrsGonnaExplode(stageAttrs)) {
+          return;
+        }
         if (stageAttrs.scale !== oldStageAttrs.scale) {
           this.syncPointScales();
         }
@@ -590,8 +594,10 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       this.manager.stateApi.runGraphAndReturnImageOutput({
         graph,
         outputNodeId,
-        prepend: true,
-        signal: controller.signal,
+        options: {
+          prepend: true,
+          signal: controller.signal,
+        },
       })
     );
 

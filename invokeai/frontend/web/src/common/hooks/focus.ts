@@ -6,6 +6,7 @@ import { atom, computed } from 'nanostores';
 import type { RefObject } from 'react';
 import { useEffect } from 'react';
 import { objectKeys } from 'tsafe';
+import z from 'zod/v4';
 
 /**
  * We need to manage focus regions to conditionally enable hotkeys:
@@ -30,23 +31,34 @@ const log = logger('system');
 /**
  * The names of the focus regions.
  */
-export type FocusRegionName = 'gallery' | 'layers' | 'canvas' | 'workflows' | 'viewer';
+const zFocusRegionName = z.enum([
+  'launchpad',
+  'viewer',
+  'gallery',
+  'boards',
+  'layers',
+  'canvas',
+  'workflows',
+  'progress',
+  'settings',
+]);
+export type FocusRegionName = z.infer<typeof zFocusRegionName>;
 
 /**
  * A map of focus regions to the elements that are part of that region.
  */
-const REGION_TARGETS: Record<FocusRegionName, Set<HTMLElement>> = {
-  gallery: new Set<HTMLElement>(),
-  layers: new Set<HTMLElement>(),
-  canvas: new Set<HTMLElement>(),
-  workflows: new Set<HTMLElement>(),
-  viewer: new Set<HTMLElement>(),
-} as const;
+const REGION_TARGETS: Record<FocusRegionName, Set<HTMLElement>> = zFocusRegionName.options.values().reduce(
+  (acc, region) => {
+    acc[region] = new Set<HTMLElement>();
+    return acc;
+  },
+  {} as Record<FocusRegionName, Set<HTMLElement>>
+);
 
 /**
  * The currently-focused region or `null` if no region is focused.
  */
-export const $focusedRegion = atom<FocusRegionName | null>(null);
+const $focusedRegion = atom<FocusRegionName | null>(null);
 
 /**
  * A map of focus regions to atoms that indicate if that region is focused.
@@ -62,10 +74,12 @@ const FOCUS_REGIONS = objectKeys(REGION_TARGETS).reduce(
 /**
  * Sets the focused region, logging a trace level message.
  */
-const setFocus = (region: FocusRegionName | null) => {
+export const setFocusedRegion = (region: FocusRegionName | null) => {
   $focusedRegion.set(region);
   log.trace(`Focus changed: ${region}`);
 };
+
+export const getFocusedRegion = () => $focusedRegion.get();
 
 type UseFocusRegionOptions = {
   focusOnMount?: boolean;
@@ -99,14 +113,14 @@ export const useFocusRegion = (
     REGION_TARGETS[region].add(element);
 
     if (focusOnMount) {
-      setFocus(region);
+      setFocusedRegion(region);
     }
 
     return () => {
       REGION_TARGETS[region].delete(element);
 
       if (REGION_TARGETS[region].size === 0 && $focusedRegion.get() === region) {
-        setFocus(null);
+        setFocusedRegion(null);
       }
     };
   }, [options, ref, region]);
@@ -163,7 +177,7 @@ const onFocus = (_: FocusEvent) => {
     return;
   }
 
-  setFocus(focusedRegion);
+  setFocusedRegion(focusedRegion);
 };
 
 /**

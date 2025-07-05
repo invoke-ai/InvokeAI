@@ -14,6 +14,7 @@ export type AppFeature =
   | 'githubLink'
   | 'discordLink'
   | 'bugLink'
+  | 'aboutModal'
   | 'localization'
   | 'consoleLogging'
   | 'dynamicPrompting'
@@ -29,7 +30,8 @@ export type AppFeature =
   | 'hfToken'
   | 'retryQueueItem'
   | 'cancelAndClearAll'
-  | 'chatGPT4oHigh';
+  | 'chatGPT4oHigh'
+  | 'modelRelationships';
 /**
  * A disable-able Stable Diffusion feature
  */
@@ -76,6 +78,7 @@ export type AppConfig = {
   allowPrivateStylePresets: boolean;
   allowClientSideUpload: boolean;
   allowPublishWorkflows: boolean;
+  allowPromptExpansion: boolean;
   disabledTabs: TabName[];
   disabledFeatures: AppFeature[];
   disabledSDFeatures: SDFeature[];

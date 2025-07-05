@@ -332,6 +332,7 @@ class EnqueueBatchResult(BaseModel):
     requested: int = Field(description="The total number of queue items requested to be enqueued")
     batch: Batch = Field(description="The batch that was enqueued")
     priority: int = Field(description="The priority of the enqueued batch")
+    item_ids: list[int] = Field(description="The IDs of the queue items that were enqueued")
 
 
 class RetryItemsResult(BaseModel):

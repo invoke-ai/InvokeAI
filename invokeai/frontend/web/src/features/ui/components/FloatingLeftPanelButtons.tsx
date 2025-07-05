@@ -5,7 +5,7 @@ import { useDeleteAllExceptCurrentQueueItemDialog } from 'features/queue/compone
 import { InvokeButtonTooltip } from 'features/queue/components/InvokeButtonTooltip/InvokeButtonTooltip';
 import { useDeleteCurrentQueueItem } from 'features/queue/hooks/useDeleteCurrentQueueItem';
 import { useInvoke } from 'features/queue/hooks/useInvoke';
-import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -52,13 +52,13 @@ export const FloatingCanvasLeftPanelButtons = memo(() => {
 FloatingCanvasLeftPanelButtons.displayName = 'FloatingCanvasLeftPanelButtons';
 
 const ToggleLeftPanelButton = memo(() => {
-  const { toggleLeftPanel } = useAutoLayoutContext();
   const { t } = useTranslation();
+
   return (
     <Tooltip label={t('accessibility.toggleLeftPanel')} placement="end">
       <IconButton
         aria-label={t('accessibility.toggleLeftPanel')}
-        onClick={toggleLeftPanel}
+        onClick={navigationApi.toggleLeftPanel}
         icon={<PiSlidersHorizontalBold />}
         flexGrow={1}
       />

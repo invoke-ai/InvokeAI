@@ -32,10 +32,9 @@ const selectSearchTerm = createSelector(selectGallerySlice, (gallery) => gallery
 export const GalleryPanel = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const { _$rightPanelApi } = useAutoLayoutContext();
-  const gridviewPanelApi = useStore(_$rightPanelApi);
+  const { tab } = useAutoLayoutContext();
   const collapsibleApi = useCollapsibleGridviewPanel(
-    gridviewPanelApi,
+    tab,
     GALLERY_PANEL_ID,
     'vertical',
     GALLERY_PANEL_DEFAULT_HEIGHT_PX,
@@ -67,7 +66,7 @@ export const GalleryPanel = memo(() => {
   const boardName = useBoardName(selectedBoardId);
 
   return (
-    <Flex flexDirection="column" alignItems="center" justifyContent="space-between" h="full" w="full" minH={0} p={2}>
+    <Flex flexDirection="column" alignItems="center" justifyContent="space-between" h="full" w="full" minH={0}>
       <Flex gap={2} fontSize="sm" alignItems="center" w="full">
         <Button
           size="sm"
@@ -126,4 +125,4 @@ export const GalleryPanel = memo(() => {
     </Flex>
   );
 });
-GalleryPanel.displayName = 'Gallery';
+GalleryPanel.displayName = 'GalleryPanel';
