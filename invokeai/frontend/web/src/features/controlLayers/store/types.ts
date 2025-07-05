@@ -512,6 +512,16 @@ const zBboxState = z.object({
   modelBase: zMainModelBase,
 });
 
+const zDimensionsState = z.object({
+  rect: z.object({
+    x: z.number().int(),
+    y: z.number().int(),
+    width: zParameterImageDimension,
+    height: zParameterImageDimension,
+  }),
+  aspectRatio: zAspectRatioConfig,
+});
+
 const zParamsState = z.object({
   maskBlur: z.number().default(16),
   maskBlurMethod: zParameterMaskBlurMethod.default('box'),
@@ -560,6 +570,10 @@ const zParamsState = z.object({
   clipLEmbedModel: zParameterCLIPLEmbedModel.nullable().default(null),
   clipGEmbedModel: zParameterCLIPGEmbedModel.nullable().default(null),
   controlLora: zParameterControlLoRAModel.nullable().default(null),
+  dimensions: zDimensionsState.default({
+    rect: { x: 0, y: 0, width: 512, height: 512 },
+    aspectRatio: DEFAULT_ASPECT_RATIO_CONFIG,
+  }),
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 const INITIAL_PARAMS_STATE = zParamsState.parse({});
