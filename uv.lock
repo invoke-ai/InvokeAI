@@ -137,11 +137,10 @@ name = "bitsandbytes"
 version = "0.46.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy" },
-    { name = "torch", version = "2.7.1", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform == 'darwin' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda' and extra != 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
-    { name = "torch", version = "2.7.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "extra == 'group-8-invokeai-cpu' or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
-    { name = "torch", version = "2.7.1+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-8-invokeai-cuda' or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
-    { name = "torch", version = "2.7.1+rocm6.3", source = { registry = "https://download.pytorch.org/whl/rocm6.3" }, marker = "(sys_platform == 'darwin' and extra == 'group-8-invokeai-rocm') or (sys_platform != 'darwin' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
+    { name = "numpy", marker = "sys_platform != 'darwin' or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
+    { name = "torch", version = "2.7.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform != 'darwin' and extra == 'group-8-invokeai-cpu') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
+    { name = "torch", version = "2.7.1+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "(sys_platform != 'darwin' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
+    { name = "torch", version = "2.7.1+rocm6.3", source = { registry = "https://download.pytorch.org/whl/rocm6.3" }, marker = "(sys_platform != 'darwin' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d2/b2/9dadb4f8dca3948e35c1ebfee75ca82353e41468b41ff785430595f8e6f0/bitsandbytes-0.46.1-py3-none-manylinux_2_24_aarch64.whl", hash = "sha256:21b349f776d04c6c1380405961081de29c84f49640b79d3d199b6d719818da84", size = 30713241, upload-time = "2025-07-02T19:44:21.857Z" },
@@ -372,7 +371,7 @@ wheels = [
 [[package]]
 name = "colorama"
 version = "0.4.6"
-source = { registry = "https://download.pytorch.org/whl/rocm6.3" }
+source = { registry = "https://download.pytorch.org/whl/cpu" }
 wheels = [
     { url = "https://download.pytorch.org/whl/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6" },
 ]
@@ -1054,8 +1053,10 @@ dependencies = [
     { name = "torch", version = "2.7.1+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-8-invokeai-cuda' or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
     { name = "torch", version = "2.7.1+rocm6.3", source = { registry = "https://download.pytorch.org/whl/rocm6.3" }, marker = "(sys_platform == 'darwin' and extra == 'group-8-invokeai-rocm') or (sys_platform != 'darwin' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
     { name = "torchsde" },
-    { name = "torchvision", version = "0.22.1", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (platform_machine != 'aarch64' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (platform_machine != 'aarch64' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform != 'linux' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (sys_platform != 'linux' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (sys_platform != 'linux' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
-    { name = "torchvision", version = "0.22.1+rocm6.3", source = { registry = "https://download.pytorch.org/whl/rocm6.3" }, marker = "platform_machine != 'aarch64' or sys_platform != 'linux' or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
+    { name = "torchvision", version = "0.22.1", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda' and extra != 'group-8-invokeai-rocm') or (sys_platform == 'darwin' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda' and extra != 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
+    { name = "torchvision", version = "0.22.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "extra == 'group-8-invokeai-cpu' or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
+    { name = "torchvision", version = "0.22.1+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-8-invokeai-cuda' or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
+    { name = "torchvision", version = "0.22.1+rocm6.3", source = { registry = "https://download.pytorch.org/whl/rocm6.3" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'group-8-invokeai-rocm') or (platform_machine != 'aarch64' and sys_platform == 'linux' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda') or (platform_machine != 'aarch64' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda') or (sys_platform != 'linux' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform == 'darwin' and extra != 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform == 'darwin' and extra != 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
     { name = "transformers" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -1108,12 +1109,15 @@ xformers = [
 [package.dev-dependencies]
 cpu = [
     { name = "torch", version = "2.7.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" } },
+    { name = "torchvision", version = "0.22.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" } },
 ]
 cuda = [
     { name = "torch", version = "2.7.1+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" } },
+    { name = "torchvision", version = "0.22.1+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" } },
 ]
 rocm = [
     { name = "torch", version = "2.7.1+rocm6.3", source = { registry = "https://download.pytorch.org/whl/rocm6.3" } },
+    { name = "torchvision", version = "0.22.1+rocm6.3", source = { registry = "https://download.pytorch.org/whl/rocm6.3" } },
 ]
 
 [package.metadata]
@@ -1183,12 +1187,21 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"] },
     { name = "xformers", marker = "sys_platform != 'darwin' and extra == 'xformers'", specifier = ">=0.0.28.post1" },
 ]
-provides-extras = ["xformers", "onnx", "onnx-cuda", "onnx-directml", "dist", "docs", "dev", "test"]
+provides-extras = ["dev", "dist", "docs", "onnx", "onnx-cuda", "onnx-directml", "test", "xformers"]
 
 [package.metadata.requires-dev]
-cpu = [{ name = "torch", specifier = "==2.7.1+cpu" }]
-cuda = [{ name = "torch", specifier = "==2.7.1+cu128" }]
-rocm = [{ name = "torch", specifier = "==2.7.1+rocm6.3" }]
+cpu = [
+    { name = "torch", specifier = "==2.7.1+cpu" },
+    { name = "torchvision", specifier = "==0.22.1+cpu" },
+]
+cuda = [
+    { name = "torch", specifier = "==2.7.1+cu128" },
+    { name = "torchvision", specifier = "==0.22.1+cu128" },
+]
+rocm = [
+    { name = "torch", specifier = "==2.7.1+rocm6.3" },
+    { name = "torchvision", specifier = "==0.22.1+rocm6.3" },
+]
 
 [[package]]
 name = "jaraco-classes"
@@ -1294,8 +1307,7 @@ name = "jinja2"
 version = "3.1.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "markupsafe", version = "3.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or sys_platform != 'darwin' or extra == 'group-8-invokeai-cpu' or extra == 'group-8-invokeai-cuda' or extra != 'group-8-invokeai-rocm'" },
-    { name = "markupsafe", version = "3.0.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.12' and sys_platform == 'darwin' and extra == 'group-8-invokeai-rocm') or (python_full_version < '3.12' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform != 'darwin' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
+    { name = "markupsafe" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/df/bf/f7da0350254c0ed7c72f3e33cef02e048281fec7ecec5f032d4aac52226b/jinja2-3.1.6.tar.gz", hash = "sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d", size = 245115, upload-time = "2025-03-05T20:05:02.478Z" }
 wheels = [
@@ -1444,17 +1456,6 @@ wheels = [
 name = "markupsafe"
 version = "3.0.1"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.12' and platform_machine == 'aarch64' and sys_platform == 'linux'",
-    "(python_full_version >= '3.12' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.12' and sys_platform != 'darwin' and sys_platform != 'linux')",
-    "python_full_version == '3.11.*' and sys_platform == 'darwin'",
-    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and sys_platform == 'linux'",
-    "(python_full_version == '3.11.*' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version == '3.11.*' and sys_platform != 'darwin' and sys_platform != 'linux')",
-    "python_full_version < '3.11' and sys_platform == 'darwin'",
-    "python_full_version < '3.11' and platform_machine == 'aarch64' and sys_platform == 'linux'",
-    "(python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version < '3.11' and sys_platform != 'darwin' and sys_platform != 'linux')",
-    "python_full_version >= '3.12' and sys_platform == 'darwin'",
-]
 sdist = { url = "https://files.pythonhosted.org/packages/b4/d2/38ff920762f2247c3af5cbbbbc40756f575d9692d381d7c520f45deb9b8f/markupsafe-3.0.1.tar.gz", hash = "sha256:3e683ee4f5d0fa2dde4db77ed8dd8a876686e3fc417655c2ece9a90576905344", size = 20249, upload-time = "2024-10-08T17:01:32.703Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/43/a2/0482d1a157f5f10f72fc4fe8c3be9ffa3651c1f7a12b60a3ab71b2635e13/MarkupSafe-3.0.1-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:db842712984e91707437461930e6011e60b39136c7331e971952bb30465bc1a1", size = 14391, upload-time = "2024-10-08T17:00:31.096Z" },
@@ -1487,47 +1488,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/fb/3e/d26623ac7f16709823b4c80e0b4a1c9196eeb46182a6c1d47b5e0c8434f4/MarkupSafe-3.0.1-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:0f84af7e813784feb4d5e4ff7db633aba6c8ca64a833f61d8e4eade234ef0c38", size = 23610, upload-time = "2024-10-08T17:00:56.721Z" },
     { url = "https://files.pythonhosted.org/packages/51/04/1f8da0810c39cb9fcff96b6baed62272c97065e9cf11471965a161439e20/MarkupSafe-3.0.1-cp312-cp312-win32.whl", hash = "sha256:cbf445eb5628981a80f54087f9acdbf84f9b7d862756110d172993b9a5ae81aa", size = 15113, upload-time = "2024-10-08T17:00:57.587Z" },
     { url = "https://files.pythonhosted.org/packages/eb/24/a36dc37365bdd358b1e583cc40475593e36ab02cb7da6b3d0b9c05b0da7a/MarkupSafe-3.0.1-cp312-cp312-win_amd64.whl", hash = "sha256:a10860e00ded1dd0a65b83e717af28845bb7bd16d8ace40fe5531491de76b79f", size = 15611, upload-time = "2024-10-08T17:00:58.429Z" },
-]
-
-[[package]]
-name = "markupsafe"
-version = "3.0.2"
-source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.12' and sys_platform == 'darwin'",
-]
-sdist = { url = "https://files.pythonhosted.org/packages/b2/97/5d42485e71dfc078108a86d6de8fa46db44a1a9295e89c5d6d4a06e23a62/markupsafe-3.0.2.tar.gz", hash = "sha256:ee55d3edf80167e48ea11a923c7386f4669df67d7994554387f84e7d8b0a2bf0", size = 20537, upload-time = "2024-10-18T15:21:54.129Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/04/90/d08277ce111dd22f77149fd1a5d4653eeb3b3eaacbdfcbae5afb2600eebd/MarkupSafe-3.0.2-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:7e94c425039cde14257288fd61dcfb01963e658efbc0ff54f5306b06054700f8", size = 14357, upload-time = "2024-10-18T15:20:51.44Z" },
-    { url = "https://files.pythonhosted.org/packages/04/e1/6e2194baeae0bca1fae6629dc0cbbb968d4d941469cbab11a3872edff374/MarkupSafe-3.0.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:9e2d922824181480953426608b81967de705c3cef4d1af983af849d7bd619158", size = 12393, upload-time = "2024-10-18T15:20:52.426Z" },
-    { url = "https://files.pythonhosted.org/packages/1d/69/35fa85a8ece0a437493dc61ce0bb6d459dcba482c34197e3efc829aa357f/MarkupSafe-3.0.2-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:38a9ef736c01fccdd6600705b09dc574584b89bea478200c5fbf112a6b0d5579", size = 21732, upload-time = "2024-10-18T15:20:53.578Z" },
-    { url = "https://files.pythonhosted.org/packages/22/35/137da042dfb4720b638d2937c38a9c2df83fe32d20e8c8f3185dbfef05f7/MarkupSafe-3.0.2-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bbcb445fa71794da8f178f0f6d66789a28d7319071af7a496d4d507ed566270d", size = 20866, upload-time = "2024-10-18T15:20:55.06Z" },
-    { url = "https://files.pythonhosted.org/packages/29/28/6d029a903727a1b62edb51863232152fd335d602def598dade38996887f0/MarkupSafe-3.0.2-cp310-cp310-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:57cb5a3cf367aeb1d316576250f65edec5bb3be939e9247ae594b4bcbc317dfb", size = 20964, upload-time = "2024-10-18T15:20:55.906Z" },
-    { url = "https://files.pythonhosted.org/packages/cc/cd/07438f95f83e8bc028279909d9c9bd39e24149b0d60053a97b2bc4f8aa51/MarkupSafe-3.0.2-cp310-cp310-musllinux_1_2_aarch64.whl", hash = "sha256:3809ede931876f5b2ec92eef964286840ed3540dadf803dd570c3b7e13141a3b", size = 21977, upload-time = "2024-10-18T15:20:57.189Z" },
-    { url = "https://files.pythonhosted.org/packages/29/01/84b57395b4cc062f9c4c55ce0df7d3108ca32397299d9df00fedd9117d3d/MarkupSafe-3.0.2-cp310-cp310-musllinux_1_2_i686.whl", hash = "sha256:e07c3764494e3776c602c1e78e298937c3315ccc9043ead7e685b7f2b8d47b3c", size = 21366, upload-time = "2024-10-18T15:20:58.235Z" },
-    { url = "https://files.pythonhosted.org/packages/bd/6e/61ebf08d8940553afff20d1fb1ba7294b6f8d279df9fd0c0db911b4bbcfd/MarkupSafe-3.0.2-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:b424c77b206d63d500bcb69fa55ed8d0e6a3774056bdc4839fc9298a7edca171", size = 21091, upload-time = "2024-10-18T15:20:59.235Z" },
-    { url = "https://files.pythonhosted.org/packages/11/23/ffbf53694e8c94ebd1e7e491de185124277964344733c45481f32ede2499/MarkupSafe-3.0.2-cp310-cp310-win32.whl", hash = "sha256:fcabf5ff6eea076f859677f5f0b6b5c1a51e70a376b0579e0eadef8db48c6b50", size = 15065, upload-time = "2024-10-18T15:21:00.307Z" },
-    { url = "https://files.pythonhosted.org/packages/44/06/e7175d06dd6e9172d4a69a72592cb3f7a996a9c396eee29082826449bbc3/MarkupSafe-3.0.2-cp310-cp310-win_amd64.whl", hash = "sha256:6af100e168aa82a50e186c82875a5893c5597a0c1ccdb0d8b40240b1f28b969a", size = 15514, upload-time = "2024-10-18T15:21:01.122Z" },
-    { url = "https://files.pythonhosted.org/packages/6b/28/bbf83e3f76936960b850435576dd5e67034e200469571be53f69174a2dfd/MarkupSafe-3.0.2-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:9025b4018f3a1314059769c7bf15441064b2207cb3f065e6ea1e7359cb46db9d", size = 14353, upload-time = "2024-10-18T15:21:02.187Z" },
-    { url = "https://files.pythonhosted.org/packages/6c/30/316d194b093cde57d448a4c3209f22e3046c5bb2fb0820b118292b334be7/MarkupSafe-3.0.2-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:93335ca3812df2f366e80509ae119189886b0f3c2b81325d39efdb84a1e2ae93", size = 12392, upload-time = "2024-10-18T15:21:02.941Z" },
-    { url = "https://files.pythonhosted.org/packages/f2/96/9cdafba8445d3a53cae530aaf83c38ec64c4d5427d975c974084af5bc5d2/MarkupSafe-3.0.2-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:2cb8438c3cbb25e220c2ab33bb226559e7afb3baec11c4f218ffa7308603c832", size = 23984, upload-time = "2024-10-18T15:21:03.953Z" },
-    { url = "https://files.pythonhosted.org/packages/f1/a4/aefb044a2cd8d7334c8a47d3fb2c9f328ac48cb349468cc31c20b539305f/MarkupSafe-3.0.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a123e330ef0853c6e822384873bef7507557d8e4a082961e1defa947aa59ba84", size = 23120, upload-time = "2024-10-18T15:21:06.495Z" },
-    { url = "https://files.pythonhosted.org/packages/8d/21/5e4851379f88f3fad1de30361db501300d4f07bcad047d3cb0449fc51f8c/MarkupSafe-3.0.2-cp311-cp311-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:1e084f686b92e5b83186b07e8a17fc09e38fff551f3602b249881fec658d3eca", size = 23032, upload-time = "2024-10-18T15:21:07.295Z" },
-    { url = "https://files.pythonhosted.org/packages/00/7b/e92c64e079b2d0d7ddf69899c98842f3f9a60a1ae72657c89ce2655c999d/MarkupSafe-3.0.2-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:d8213e09c917a951de9d09ecee036d5c7d36cb6cb7dbaece4c71a60d79fb9798", size = 24057, upload-time = "2024-10-18T15:21:08.073Z" },
-    { url = "https://files.pythonhosted.org/packages/f9/ac/46f960ca323037caa0a10662ef97d0a4728e890334fc156b9f9e52bcc4ca/MarkupSafe-3.0.2-cp311-cp311-musllinux_1_2_i686.whl", hash = "sha256:5b02fb34468b6aaa40dfc198d813a641e3a63b98c2b05a16b9f80b7ec314185e", size = 23359, upload-time = "2024-10-18T15:21:09.318Z" },
-    { url = "https://files.pythonhosted.org/packages/69/84/83439e16197337b8b14b6a5b9c2105fff81d42c2a7c5b58ac7b62ee2c3b1/MarkupSafe-3.0.2-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:0bff5e0ae4ef2e1ae4fdf2dfd5b76c75e5c2fa4132d05fc1b0dabcd20c7e28c4", size = 23306, upload-time = "2024-10-18T15:21:10.185Z" },
-    { url = "https://files.pythonhosted.org/packages/9a/34/a15aa69f01e2181ed8d2b685c0d2f6655d5cca2c4db0ddea775e631918cd/MarkupSafe-3.0.2-cp311-cp311-win32.whl", hash = "sha256:6c89876f41da747c8d3677a2b540fb32ef5715f97b66eeb0c6b66f5e3ef6f59d", size = 15094, upload-time = "2024-10-18T15:21:11.005Z" },
-    { url = "https://files.pythonhosted.org/packages/da/b8/3a3bd761922d416f3dc5d00bfbed11f66b1ab89a0c2b6e887240a30b0f6b/MarkupSafe-3.0.2-cp311-cp311-win_amd64.whl", hash = "sha256:70a87b411535ccad5ef2f1df5136506a10775d267e197e4cf531ced10537bd6b", size = 15521, upload-time = "2024-10-18T15:21:12.911Z" },
-    { url = "https://files.pythonhosted.org/packages/22/09/d1f21434c97fc42f09d290cbb6350d44eb12f09cc62c9476effdb33a18aa/MarkupSafe-3.0.2-cp312-cp312-macosx_10_13_universal2.whl", hash = "sha256:9778bd8ab0a994ebf6f84c2b949e65736d5575320a17ae8984a77fab08db94cf", size = 14274, upload-time = "2024-10-18T15:21:13.777Z" },
-    { url = "https://files.pythonhosted.org/packages/6b/b0/18f76bba336fa5aecf79d45dcd6c806c280ec44538b3c13671d49099fdd0/MarkupSafe-3.0.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:846ade7b71e3536c4e56b386c2a47adf5741d2d8b94ec9dc3e92e5e1ee1e2225", size = 12348, upload-time = "2024-10-18T15:21:14.822Z" },
-    { url = "https://files.pythonhosted.org/packages/e0/25/dd5c0f6ac1311e9b40f4af06c78efde0f3b5cbf02502f8ef9501294c425b/MarkupSafe-3.0.2-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:1c99d261bd2d5f6b59325c92c73df481e05e57f19837bdca8413b9eac4bd8028", size = 24149, upload-time = "2024-10-18T15:21:15.642Z" },
-    { url = "https://files.pythonhosted.org/packages/f3/f0/89e7aadfb3749d0f52234a0c8c7867877876e0a20b60e2188e9850794c17/MarkupSafe-3.0.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e17c96c14e19278594aa4841ec148115f9c7615a47382ecb6b82bd8fea3ab0c8", size = 23118, upload-time = "2024-10-18T15:21:17.133Z" },
-    { url = "https://files.pythonhosted.org/packages/d5/da/f2eeb64c723f5e3777bc081da884b414671982008c47dcc1873d81f625b6/MarkupSafe-3.0.2-cp312-cp312-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:88416bd1e65dcea10bc7569faacb2c20ce071dd1f87539ca2ab364bf6231393c", size = 22993, upload-time = "2024-10-18T15:21:18.064Z" },
-    { url = "https://files.pythonhosted.org/packages/da/0e/1f32af846df486dce7c227fe0f2398dc7e2e51d4a370508281f3c1c5cddc/MarkupSafe-3.0.2-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:2181e67807fc2fa785d0592dc2d6206c019b9502410671cc905d132a92866557", size = 24178, upload-time = "2024-10-18T15:21:18.859Z" },
-    { url = "https://files.pythonhosted.org/packages/c4/f6/bb3ca0532de8086cbff5f06d137064c8410d10779c4c127e0e47d17c0b71/MarkupSafe-3.0.2-cp312-cp312-musllinux_1_2_i686.whl", hash = "sha256:52305740fe773d09cffb16f8ed0427942901f00adedac82ec8b67752f58a1b22", size = 23319, upload-time = "2024-10-18T15:21:19.671Z" },
-    { url = "https://files.pythonhosted.org/packages/a2/82/8be4c96ffee03c5b4a034e60a31294daf481e12c7c43ab8e34a1453ee48b/MarkupSafe-3.0.2-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:ad10d3ded218f1039f11a75f8091880239651b52e9bb592ca27de44eed242a48", size = 23352, upload-time = "2024-10-18T15:21:20.971Z" },
-    { url = "https://files.pythonhosted.org/packages/51/ae/97827349d3fcffee7e184bdf7f41cd6b88d9919c80f0263ba7acd1bbcb18/MarkupSafe-3.0.2-cp312-cp312-win32.whl", hash = "sha256:0f4ca02bea9a23221c0182836703cbf8930c5e9454bacce27e767509fa286a30", size = 15097, upload-time = "2024-10-18T15:21:22.646Z" },
-    { url = "https://files.pythonhosted.org/packages/c1/80/a61f99dc3a936413c3ee4e1eecac96c0da5ed07ad56fd975f1a9da5bc630/MarkupSafe-3.0.2-cp312-cp312-win_amd64.whl", hash = "sha256:8e06879fc22a25ca47312fbe7c8264eb0b662f6db27cb2d3bbbc74b1df4b9b87", size = 15601, upload-time = "2024-10-18T15:21:23.499Z" },
 ]
 
 [[package]]
@@ -1632,8 +1592,7 @@ dependencies = [
     { name = "ghp-import" },
     { name = "jinja2" },
     { name = "markdown" },
-    { name = "markupsafe", version = "3.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or sys_platform != 'darwin' or extra == 'group-8-invokeai-cpu' or extra == 'group-8-invokeai-cuda' or extra != 'group-8-invokeai-rocm'" },
-    { name = "markupsafe", version = "3.0.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.12' and sys_platform == 'darwin' and extra == 'group-8-invokeai-rocm') or (python_full_version < '3.12' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform != 'darwin' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
+    { name = "markupsafe" },
     { name = "mergedeep" },
     { name = "mkdocs-get-deps" },
     { name = "packaging" },
@@ -1653,8 +1612,7 @@ version = "1.4.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "markdown" },
-    { name = "markupsafe", version = "3.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or sys_platform != 'darwin' or extra == 'group-8-invokeai-cpu' or extra == 'group-8-invokeai-cuda' or extra != 'group-8-invokeai-rocm'" },
-    { name = "markupsafe", version = "3.0.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.12' and sys_platform == 'darwin' and extra == 'group-8-invokeai-rocm') or (python_full_version < '3.12' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform != 'darwin' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
+    { name = "markupsafe" },
     { name = "mkdocs" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/47/0c/c9826f35b99c67fa3a7cddfa094c1a6c43fafde558c309c6e4403e5b37dc/mkdocs_autorefs-1.4.2.tar.gz", hash = "sha256:e2ebe1abd2b67d597ed19378c0fff84d73d1dbce411fce7a7cc6f161888b6749", size = 54961, upload-time = "2025-05-20T13:09:09.886Z" }
@@ -1741,8 +1699,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jinja2" },
     { name = "markdown" },
-    { name = "markupsafe", version = "3.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or sys_platform != 'darwin' or extra == 'group-8-invokeai-cpu' or extra == 'group-8-invokeai-cuda' or extra != 'group-8-invokeai-rocm'" },
-    { name = "markupsafe", version = "3.0.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.12' and sys_platform == 'darwin' and extra == 'group-8-invokeai-rocm') or (python_full_version < '3.12' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform != 'darwin' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
+    { name = "markupsafe" },
     { name = "mkdocs" },
     { name = "mkdocs-autorefs" },
     { name = "pymdown-extensions" },
@@ -1807,7 +1764,7 @@ wheels = [
 [[package]]
 name = "mpmath"
 version = "1.3.0"
-source = { registry = "https://download.pytorch.org/whl/rocm6.3" }
+source = { registry = "https://download.pytorch.org/whl/cpu" }
 wheels = [
     { url = "https://download.pytorch.org/whl/mpmath-1.3.0-py3-none-any.whl", hash = "sha256:a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c" },
 ]
@@ -1985,7 +1942,7 @@ name = "nvidia-cudnn-cu12"
 version = "9.7.1.26"
 source = { registry = "https://download.pytorch.org/whl/cu128" }
 dependencies = [
-    { name = "nvidia-cublas-cu12", marker = "extra == 'group-8-invokeai-cuda' or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
+    { name = "nvidia-cublas-cu12", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-8-invokeai-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-8-invokeai-cuda') or (sys_platform == 'darwin' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform == 'linux' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
 ]
 wheels = [
     { url = "https://download.pytorch.org/whl/cu128/nvidia_cudnn_cu12-9.7.1.26-py3-none-manylinux_2_27_x86_64.whl" },
@@ -1996,7 +1953,7 @@ name = "nvidia-cufft-cu12"
 version = "11.3.3.41"
 source = { registry = "https://download.pytorch.org/whl/cu128" }
 dependencies = [
-    { name = "nvidia-nvjitlink-cu12", marker = "extra == 'group-8-invokeai-cuda' or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
+    { name = "nvidia-nvjitlink-cu12", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-8-invokeai-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-8-invokeai-cuda') or (sys_platform == 'darwin' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform == 'linux' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
 ]
 wheels = [
     { url = "https://download.pytorch.org/whl/cu128/nvidia_cufft_cu12-11.3.3.41-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" },
@@ -2024,9 +1981,9 @@ name = "nvidia-cusolver-cu12"
 version = "11.7.2.55"
 source = { registry = "https://download.pytorch.org/whl/cu128" }
 dependencies = [
-    { name = "nvidia-cublas-cu12", marker = "extra == 'group-8-invokeai-cuda' or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
-    { name = "nvidia-cusparse-cu12", marker = "extra == 'group-8-invokeai-cuda' or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
-    { name = "nvidia-nvjitlink-cu12", marker = "extra == 'group-8-invokeai-cuda' or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
+    { name = "nvidia-cublas-cu12", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-8-invokeai-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-8-invokeai-cuda') or (sys_platform == 'darwin' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform == 'linux' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
+    { name = "nvidia-cusparse-cu12", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-8-invokeai-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-8-invokeai-cuda') or (sys_platform == 'darwin' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform == 'linux' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
+    { name = "nvidia-nvjitlink-cu12", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-8-invokeai-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-8-invokeai-cuda') or (sys_platform == 'darwin' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform == 'linux' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
 ]
 wheels = [
     { url = "https://download.pytorch.org/whl/cu128/nvidia_cusolver_cu12-11.7.2.55-py3-none-manylinux_2_27_x86_64.whl" },
@@ -2037,7 +1994,7 @@ name = "nvidia-cusparse-cu12"
 version = "12.5.7.53"
 source = { registry = "https://download.pytorch.org/whl/cu128" }
 dependencies = [
-    { name = "nvidia-nvjitlink-cu12", marker = "extra == 'group-8-invokeai-cuda' or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
+    { name = "nvidia-nvjitlink-cu12", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'group-8-invokeai-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'group-8-invokeai-cuda') or (sys_platform == 'darwin' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform == 'linux' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
 ]
 wheels = [
     { url = "https://download.pytorch.org/whl/cu128/nvidia_cusparse_cu12-12.5.7.53-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" },
@@ -2194,7 +2151,7 @@ name = "opencv-python"
 version = "4.11.0.86"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy" },
+    { name = "numpy", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux') or (sys_platform == 'darwin' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (sys_platform == 'darwin' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (sys_platform == 'darwin' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform == 'linux' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (sys_platform == 'linux' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (sys_platform == 'linux' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/17/06/68c27a523103dad5837dc5b87e71285280c4f098c60e4fe8a8db6486ab09/opencv-python-4.11.0.86.tar.gz", hash = "sha256:03d60ccae62304860d232272e4a4fda93c39d595780cb40b161b310244b736a4", size = 95171956, upload-time = "2025-01-16T13:52:24.737Z" }
 wheels = [
@@ -2766,9 +2723,9 @@ wheels = [
 [[package]]
 name = "pytorch-triton-rocm"
 version = "3.3.1"
-source = { registry = "https://download.pytorch.org/whl/rocm6.3" }
+source = { registry = "https://download.pytorch.org/whl/cpu" }
 dependencies = [
-    { name = "setuptools" },
+    { name = "setuptools", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')" },
 ]
 wheels = [
     { url = "https://download.pytorch.org/whl/pytorch_triton_rocm-3.3.1-cp310-cp310-linux_x86_64.whl", hash = "sha256:d54db030d74dcd0df1d166f4d6a63c0a59310297af4a57cbe867dea6e82fb07b" },
@@ -3288,8 +3245,10 @@ dependencies = [
     { name = "torch", version = "2.7.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "extra == 'group-8-invokeai-cpu' or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
     { name = "torch", version = "2.7.1+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-8-invokeai-cuda' or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
     { name = "torch", version = "2.7.1+rocm6.3", source = { registry = "https://download.pytorch.org/whl/rocm6.3" }, marker = "(sys_platform == 'darwin' and extra == 'group-8-invokeai-rocm') or (sys_platform != 'darwin' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
-    { name = "torchvision", version = "0.22.1", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (platform_machine != 'aarch64' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (platform_machine != 'aarch64' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform != 'linux' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (sys_platform != 'linux' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (sys_platform != 'linux' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
-    { name = "torchvision", version = "0.22.1+rocm6.3", source = { registry = "https://download.pytorch.org/whl/rocm6.3" }, marker = "platform_machine != 'aarch64' or sys_platform != 'linux' or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
+    { name = "torchvision", version = "0.22.1", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda' and extra != 'group-8-invokeai-rocm') or (sys_platform == 'darwin' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda' and extra != 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
+    { name = "torchvision", version = "0.22.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "extra == 'group-8-invokeai-cpu' or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
+    { name = "torchvision", version = "0.22.1+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-8-invokeai-cuda' or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
+    { name = "torchvision", version = "0.22.1+rocm6.3", source = { registry = "https://download.pytorch.org/whl/rocm6.3" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'group-8-invokeai-rocm') or (platform_machine != 'aarch64' and sys_platform == 'linux' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda') or (platform_machine != 'aarch64' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda') or (sys_platform != 'linux' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform == 'darwin' and extra != 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform == 'darwin' and extra != 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
     { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/45/e0/048cd03119a9f2b685a79601a52311d5910ff6fd710c01f4ed6769a2892f/spandrel-0.4.1.tar.gz", hash = "sha256:646d9816a942e59d56aab2dc904353952e57dee4b2cb3f59f7ea4dc0fb11a1f2", size = 233544, upload-time = "2025-01-19T15:31:24.02Z" }
@@ -3543,23 +3502,86 @@ wheels = [
 [[package]]
 name = "torchvision"
 version = "0.22.1"
-source = { registry = "https://download.pytorch.org/whl/cu128" }
+source = { registry = "https://download.pytorch.org/whl/cpu" }
 resolution-markers = [
+    "python_full_version >= '3.12' and sys_platform == 'darwin'",
     "python_full_version >= '3.12' and platform_machine == 'aarch64' and sys_platform == 'linux'",
+    "python_full_version == '3.11.*' and sys_platform == 'darwin'",
     "python_full_version == '3.11.*' and platform_machine == 'aarch64' and sys_platform == 'linux'",
+    "python_full_version < '3.11' and sys_platform == 'darwin'",
     "python_full_version < '3.11' and platform_machine == 'aarch64' and sys_platform == 'linux'",
 ]
 dependencies = [
-    { name = "numpy", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (platform_machine != 'aarch64' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (platform_machine != 'aarch64' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform != 'linux' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (sys_platform != 'linux' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (sys_platform != 'linux' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
-    { name = "pillow", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (platform_machine != 'aarch64' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (platform_machine != 'aarch64' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform != 'linux' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (sys_platform != 'linux' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (sys_platform != 'linux' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
-    { name = "torch", version = "2.7.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'group-8-invokeai-cpu') or (platform_machine != 'aarch64' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (platform_machine != 'aarch64' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (platform_machine != 'aarch64' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform != 'linux' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (sys_platform != 'linux' and extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (sys_platform != 'linux' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (extra != 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
-    { name = "torch", version = "2.7.1+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'group-8-invokeai-cuda') or (platform_machine != 'aarch64' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform != 'linux' and extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
-    { name = "torch", version = "2.7.1+rocm6.3", source = { registry = "https://download.pytorch.org/whl/rocm6.3" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
+    { name = "numpy", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda' and extra != 'group-8-invokeai-rocm') or (sys_platform == 'darwin' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda' and extra != 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
+    { name = "pillow", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda' and extra != 'group-8-invokeai-rocm') or (sys_platform == 'darwin' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda' and extra != 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
+    { name = "torch", version = "2.7.1", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform == 'darwin' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda' and extra != 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
+    { name = "torch", version = "2.7.1+rocm6.3", source = { registry = "https://download.pytorch.org/whl/rocm6.3" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda' and extra != 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
 ]
 wheels = [
-    { url = "https://download.pytorch.org/whl/cu128/torchvision-0.22.1-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:3a41b87628c0d6095839c43a1dd706670e7e5a56edc5860e700e1ba22c3ef8af" },
-    { url = "https://download.pytorch.org/whl/cu128/torchvision-0.22.1-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:299fbd935f02b424e9166b7689de57067e24a228edc00abd5faf84f86c0643a0" },
-    { url = "https://download.pytorch.org/whl/cu128/torchvision-0.22.1-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:2ad7fe412b821333fc05b4046263d77c14ba86f3965366adbada8dc397ea45b4" },
+    { url = "https://download.pytorch.org/whl/cpu/torchvision-0.22.1-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:3b47d8369ee568c067795c0da0b4078f39a9dfea6f3bc1f3ac87530dfda1dd56" },
+    { url = "https://download.pytorch.org/whl/cpu/torchvision-0.22.1-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:990de4d657a41ed71680cd8be2e98ebcab55371f30993dc9bd2e676441f7180e" },
+    { url = "https://download.pytorch.org/whl/cpu/torchvision-0.22.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:4addf626e2b57fc22fd6d329cf1346d474497672e6af8383b7b5b636fba94a53" },
+    { url = "https://download.pytorch.org/whl/cpu/torchvision-0.22.1-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:8b4a53a6067d63adba0c52f2b8dd2290db649d642021674ee43c0c922f0c6a69" },
+    { url = "https://download.pytorch.org/whl/cpu/torchvision-0.22.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:153f1790e505bd6da123e21eee6e83e2e155df05c0fe7d56347303067d8543c5" },
+    { url = "https://download.pytorch.org/whl/cpu/torchvision-0.22.1-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:964414eef19459d55a10e886e2fca50677550e243586d1678f65e3f6f6bac47a" },
+]
+
+[[package]]
+name = "torchvision"
+version = "0.22.1+cpu"
+source = { registry = "https://download.pytorch.org/whl/cpu" }
+resolution-markers = [
+    "python_full_version >= '3.12' and sys_platform == 'darwin'",
+    "python_full_version >= '3.12' and platform_machine == 'aarch64' and sys_platform == 'linux'",
+    "(python_full_version >= '3.12' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.12' and sys_platform != 'darwin' and sys_platform != 'linux')",
+    "python_full_version == '3.11.*' and sys_platform == 'darwin'",
+    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and sys_platform == 'linux'",
+    "(python_full_version == '3.11.*' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version == '3.11.*' and sys_platform != 'darwin' and sys_platform != 'linux')",
+    "python_full_version < '3.11' and sys_platform == 'darwin'",
+    "python_full_version < '3.11' and platform_machine == 'aarch64' and sys_platform == 'linux'",
+    "(python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version < '3.11' and sys_platform != 'darwin' and sys_platform != 'linux')",
+]
+dependencies = [
+    { name = "numpy", marker = "extra == 'group-8-invokeai-cpu' or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
+    { name = "pillow", marker = "extra == 'group-8-invokeai-cpu' or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
+    { name = "torch", version = "2.7.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "extra == 'group-8-invokeai-cpu' or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
+]
+wheels = [
+    { url = "https://download.pytorch.org/whl/cpu/torchvision-0.22.1%2Bcpu-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:e31f1273a8dd9760906288036ac3c8f5fef25eed393da0491db150d7be78910d" },
+    { url = "https://download.pytorch.org/whl/cpu/torchvision-0.22.1%2Bcpu-cp310-cp310-win_amd64.whl", hash = "sha256:445e442b94c365f7fd96596347c8a5a7fcfcbfca17a23baa8c9dcc8cb00fceee" },
+    { url = "https://download.pytorch.org/whl/cpu/torchvision-0.22.1%2Bcpu-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:4e0cbc165a472605d0c13da68ae22e84b17a6b815d5e600834777823e1bcb658" },
+    { url = "https://download.pytorch.org/whl/cpu/torchvision-0.22.1%2Bcpu-cp311-cp311-win_amd64.whl", hash = "sha256:9482adee074f60a45fd69892f7488281aadfda7836948c94b0a9b0caf55d1d67" },
+    { url = "https://download.pytorch.org/whl/cpu/torchvision-0.22.1%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:b5fa7044bd82c6358e8229351c98070cf3a7bf4a6e89ea46352ae6c65745ef94" },
+    { url = "https://download.pytorch.org/whl/cpu/torchvision-0.22.1%2Bcpu-cp312-cp312-win_amd64.whl", hash = "sha256:433cb4dbced7291f17064cea08ac1e5aebd02ec190e1c207d117ad62a8961f2b" },
+]
+
+[[package]]
+name = "torchvision"
+version = "0.22.1+cu128"
+source = { registry = "https://download.pytorch.org/whl/cu128" }
+resolution-markers = [
+    "python_full_version >= '3.12' and sys_platform == 'darwin'",
+    "python_full_version >= '3.12' and platform_machine == 'aarch64' and sys_platform == 'linux'",
+    "(python_full_version >= '3.12' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.12' and sys_platform != 'darwin' and sys_platform != 'linux')",
+    "python_full_version == '3.11.*' and sys_platform == 'darwin'",
+    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and sys_platform == 'linux'",
+    "(python_full_version == '3.11.*' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version == '3.11.*' and sys_platform != 'darwin' and sys_platform != 'linux')",
+    "python_full_version < '3.11' and sys_platform == 'darwin'",
+    "python_full_version < '3.11' and platform_machine == 'aarch64' and sys_platform == 'linux'",
+    "(python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version < '3.11' and sys_platform != 'darwin' and sys_platform != 'linux')",
+]
+dependencies = [
+    { name = "numpy", marker = "extra == 'group-8-invokeai-cuda' or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
+    { name = "pillow", marker = "extra == 'group-8-invokeai-cuda' or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
+    { name = "torch", version = "2.7.1+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-8-invokeai-cuda' or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
+]
+wheels = [
+    { url = "https://download.pytorch.org/whl/cu128/torchvision-0.22.1%2Bcu128-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:538f4db667286d939b4eee0a66d31ed21b51186668006b0e0ffe20338ecc7e00" },
+    { url = "https://download.pytorch.org/whl/cu128/torchvision-0.22.1%2Bcu128-cp310-cp310-win_amd64.whl", hash = "sha256:ad48ba3c3ffd48027e3a8de42fcea131a53a524ee9416ca4efb22f9ac6b7328d" },
+    { url = "https://download.pytorch.org/whl/cu128/torchvision-0.22.1%2Bcu128-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:92568ac46b13a8c88b61589800b1b9c4629be091ea7ce080fc6fc622e11e0915" },
+    { url = "https://download.pytorch.org/whl/cu128/torchvision-0.22.1%2Bcu128-cp311-cp311-win_amd64.whl", hash = "sha256:85ecd729c947151eccea502853be6efc2c0029dc26e6e5148e04684aed008390" },
+    { url = "https://download.pytorch.org/whl/cu128/torchvision-0.22.1%2Bcu128-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:f64ef9bb91d71ab35d8384912a19f7419e35928685bc67544d58f45148334373" },
+    { url = "https://download.pytorch.org/whl/cu128/torchvision-0.22.1%2Bcu128-cp312-cp312-win_amd64.whl", hash = "sha256:650561ba326d21021243f5e064133dc62dc64d52f79623db5cd76637a9665f96" },
 ]
 
 [[package]]
@@ -3568,19 +3590,19 @@ version = "0.22.1+rocm6.3"
 source = { registry = "https://download.pytorch.org/whl/rocm6.3" }
 resolution-markers = [
     "python_full_version >= '3.12' and sys_platform == 'darwin'",
+    "python_full_version >= '3.12' and platform_machine == 'aarch64' and sys_platform == 'linux'",
     "(python_full_version >= '3.12' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.12' and sys_platform != 'darwin' and sys_platform != 'linux')",
     "python_full_version == '3.11.*' and sys_platform == 'darwin'",
+    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and sys_platform == 'linux'",
     "(python_full_version == '3.11.*' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version == '3.11.*' and sys_platform != 'darwin' and sys_platform != 'linux')",
     "python_full_version < '3.11' and sys_platform == 'darwin'",
+    "python_full_version < '3.11' and platform_machine == 'aarch64' and sys_platform == 'linux'",
     "(python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version < '3.11' and sys_platform != 'darwin' and sys_platform != 'linux')",
 ]
 dependencies = [
-    { name = "numpy", marker = "platform_machine != 'aarch64' or sys_platform != 'linux' or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
-    { name = "pillow", marker = "platform_machine != 'aarch64' or sys_platform != 'linux' or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
-    { name = "torch", version = "2.7.1", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform == 'darwin' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda' and extra != 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
-    { name = "torch", version = "2.7.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'aarch64' and extra == 'group-8-invokeai-cpu') or (sys_platform != 'linux' and extra == 'group-8-invokeai-cpu') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
-    { name = "torch", version = "2.7.1+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "(platform_machine != 'aarch64' and extra == 'group-8-invokeai-cuda') or (sys_platform != 'linux' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
-    { name = "torch", version = "2.7.1+rocm6.3", source = { registry = "https://download.pytorch.org/whl/rocm6.3" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda') or (sys_platform == 'darwin' and extra != 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (sys_platform == 'darwin' and extra != 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
+    { name = "numpy" },
+    { name = "pillow" },
+    { name = "torch", version = "2.7.1+rocm6.3", source = { registry = "https://download.pytorch.org/whl/rocm6.3" } },
 ]
 wheels = [
     { url = "https://download.pytorch.org/whl/rocm6.3/torchvision-0.22.1%2Brocm6.3-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:35b6e1ba34b009042e9dc00ed3f82a2b1700b738bd942615e68cd5e41faadb99" },
@@ -3651,9 +3673,9 @@ wheels = [
 [[package]]
 name = "triton"
 version = "3.3.1"
-source = { registry = "https://download.pytorch.org/whl/rocm6.3" }
+source = { registry = "https://download.pytorch.org/whl/cpu" }
 dependencies = [
-    { name = "setuptools", marker = "extra == 'group-8-invokeai-cuda' or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
+    { name = "setuptools", marker = "(sys_platform != 'darwin' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
 ]
 wheels = [
     { url = "https://download.pytorch.org/whl/triton-3.3.1-cp310-cp310-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl" },
@@ -4018,16 +4040,16 @@ wheels = [
 [[package]]
 name = "xformers"
 version = "0.0.31"
-source = { registry = "https://download.pytorch.org/whl/rocm6.3" }
+source = { registry = "https://download.pytorch.org/whl/cu128" }
 dependencies = [
-    { name = "numpy" },
-    { name = "torch", version = "2.7.1", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform == 'darwin' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda' and extra != 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
-    { name = "torch", version = "2.7.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "extra == 'group-8-invokeai-cpu' or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
-    { name = "torch", version = "2.7.1+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-8-invokeai-cuda' or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
-    { name = "torch", version = "2.7.1+rocm6.3", source = { registry = "https://download.pytorch.org/whl/rocm6.3" }, marker = "(sys_platform == 'darwin' and extra == 'group-8-invokeai-rocm') or (sys_platform != 'darwin' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm')" },
+    { name = "numpy", marker = "sys_platform != 'darwin' or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
+    { name = "torch", version = "2.7.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform != 'darwin' and extra == 'group-8-invokeai-cpu') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
+    { name = "torch", version = "2.7.1+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "(sys_platform != 'darwin' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
+    { name = "torch", version = "2.7.1+rocm6.3", source = { registry = "https://download.pytorch.org/whl/rocm6.3" }, marker = "(sys_platform != 'darwin' and extra != 'group-8-invokeai-cpu' and extra != 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-cuda') or (extra == 'group-8-invokeai-cpu' and extra == 'group-8-invokeai-rocm') or (extra == 'group-8-invokeai-cuda' and extra == 'group-8-invokeai-rocm')" },
 ]
 wheels = [
-    { url = "https://download.pytorch.org/whl/rocm6.3/xformers-0.0.31-cp39-abi3-manylinux_2_28_x86_64.whl" },
+    { url = "https://download.pytorch.org/whl/cu128/xformers-0.0.31-cp39-abi3-manylinux_2_28_x86_64.whl" },
+    { url = "https://download.pytorch.org/whl/cu128/xformers-0.0.31-cp39-abi3-win_amd64.whl" },
 ]
 
 [[package]]

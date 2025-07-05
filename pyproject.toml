@@ -77,9 +77,9 @@ dependencies = [
 ]
 
 [dependency-groups]
-cpu = ["torch==2.7.1+cpu"]
-cuda = ["torch==2.7.1+cu128"]
-rocm = ["torch==2.7.1+rocm6.3"]
+cpu = ["torch==2.7.1+cpu", "torchvision==0.22.1+cpu"]
+cuda = ["torch==2.7.1+cu128", "torchvision==0.22.1+cu128"]
+rocm = ["torch==2.7.1+rocm6.3", "torchvision==0.22.1+rocm6.3"]
 
 [project.optional-dependencies]
 "xformers" = [
