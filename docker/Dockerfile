@@ -31,7 +31,8 @@ RUN --mount=type=cache,target=/var/cache/apt \
     libglx-mesa0 \
     build-essential \
     libopencv-dev \
-    libstdc++-10-dev
+    libstdc++-10-dev \
+    wget
 
 ENV \
     PYTHONUNBUFFERED=1 \
@@ -44,7 +45,6 @@ ENV \
     UV_MANAGED_PYTHON=1 \
     UV_LINK_MODE=copy \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
-    UV_INDEX="https://download.pytorch.org/whl/cu124" \
     INVOKEAI_ROOT=/invokeai \
     INVOKEAI_HOST=0.0.0.0 \
     INVOKEAI_PORT=9090 \
@@ -75,19 +75,44 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     # this is just to get the package manager to recognize that the project exists, without making changes to the docker layer
     --mount=type=bind,source=invokeai/version,target=invokeai/version \
-    if [ "$TARGETPLATFORM" = "linux/arm64" ] || [ "$GPU_DRIVER" = "cpu" ]; then UV_INDEX="https://download.pytorch.org/whl/cpu"; \
-    elif [ "$GPU_DRIVER" = "rocm" ]; then UV_INDEX="https://download.pytorch.org/whl/rocm6.2"; \
-    fi && \
-    uv sync --frozen
+    ulimit -n 30000 && \
+    uv sync --group $GPU_DRIVER --frozen
+
+RUN --mount=type=cache,target=/var/cache/apt \
+    --mount=type=cache,target=/var/lib/apt \
+    if [ "$GPU_DRIVER" = "rocm" ]; then \
+    wget -O /tmp/amdgpu-install.deb \
+    https://repo.radeon.com/amdgpu-install/6.3.4/ubuntu/noble/amdgpu-install_6.3.60304-1_all.deb && \
+    apt install -y /tmp/amdgpu-install.deb && \
+    apt update && \
+    amdgpu-install --usecase=rocm -y && \
+    apt-get autoclean && \
+    apt clean && \
+    rm -rf /tmp/* /var/tmp/* && \
+    usermod -a -G render ubuntu && \
+    usermod -a -G video ubuntu && \
+    echo "\\n/opt/rocm/lib\\n/opt/rocm/lib64" >> /etc/ld.so.conf.d/rocm.conf && \
+    ldconfig && \
+    update-alternatives --auto rocm; \
+    fi
+
+## Heathen711: Leaving this for review input, will remove before merge
+# RUN --mount=type=cache,target=/var/cache/apt \
+#     --mount=type=cache,target=/var/lib/apt \
+#     if [ "$GPU_DRIVER" = "rocm" ]; then \
+#     groupadd render && \
+#     usermod -a -G render ubuntu && \
+#     usermod -a -G video ubuntu; \
+#     fi
+
+## Link amdgpu.ids for ROCm builds
+## contributed by https://github.com/Rubonnek
+# RUN mkdir -p "/opt/amdgpu/share/libdrm" &&\
+#     ln -s "/usr/share/libdrm/amdgpu.ids" "/opt/amdgpu/share/libdrm/amdgpu.ids"
 
 # build patchmatch
 RUN cd /usr/lib/$(uname -p)-linux-gnu/pkgconfig/ && ln -sf opencv4.pc opencv.pc
 RUN python -c "from patchmatch import patch_match"
-
-# Link amdgpu.ids for ROCm builds
-# contributed by https://github.com/Rubonnek
-RUN mkdir -p "/opt/amdgpu/share/libdrm" &&\
-    ln -s "/usr/share/libdrm/amdgpu.ids" "/opt/amdgpu/share/libdrm/amdgpu.ids"
 
 RUN mkdir -p ${INVOKEAI_ROOT} && chown -R ${CONTAINER_UID}:${CONTAINER_GID} ${INVOKEAI_ROOT}
 
@@ -106,8 +131,6 @@ COPY invokeai ${INVOKEAI_SRC}/invokeai
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     --mount=type=bind,source=uv.lock,target=uv.lock \
-    if [ "$TARGETPLATFORM" = "linux/arm64" ] || [ "$GPU_DRIVER" = "cpu" ]; then UV_INDEX="https://download.pytorch.org/whl/cpu"; \
-    elif [ "$GPU_DRIVER" = "rocm" ]; then UV_INDEX="https://download.pytorch.org/whl/rocm6.2"; \
-    fi && \
+    ulimit -n 30000 && \
     uv pip install -e .
 
