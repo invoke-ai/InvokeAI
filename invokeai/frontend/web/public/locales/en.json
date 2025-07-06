@@ -599,6 +599,10 @@
             "toggleNonRasterLayers": {
                 "title": "Toggle Non-Raster Layers",
                 "desc": "Show or hide all non-raster layer categories (Control Layers, Inpaint Masks, Regional Guidance)."
+            },
+            "snapToGrid": {
+                "title": "Snap to Grid",
+                "desc": "Snap the bounding box to canvas grid"
             }
         },
         "workflows": {

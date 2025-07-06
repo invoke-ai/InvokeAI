@@ -123,6 +123,7 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('canvas', 'applySegmentAnything', ['enter']);
     addHotkey('canvas', 'cancelSegmentAnything', ['esc']);
     addHotkey('canvas', 'toggleNonRasterLayers', ['shift+h']);
+    addHotkey('canvas', 'snapToGrid', ['shift+s']);
 
     // Workflows
     addHotkey('workflows', 'addNode', ['shift+a', 'space']);
@@ -209,7 +210,7 @@ export const useRegisteredHotkeys = ({ id, category, callback, options, dependen
         enabled: data.isEnabled,
       } satisfies Options;
     }
-    // Otherwise, return the provided optiosn, but override the enabled state.
+    // Otherwise, return the provided options, but override the enabled state.
     return {
       ...options,
       enabled: data.isEnabled ? options.enabled : false,
