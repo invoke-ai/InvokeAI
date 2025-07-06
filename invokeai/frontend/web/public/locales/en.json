@@ -431,6 +431,10 @@
                 "title": "Clear Queue",
                 "desc": "Cancel and clear all queue items."
             },
+            "selectGenerateTab": {
+                "title": "Select the Generate Tab",
+                "desc": "Selects the Generate tab."
+            },
             "selectCanvasTab": {
                 "title": "Select the Canvas Tab",
                 "desc": "Selects the Canvas tab."
@@ -602,7 +606,15 @@
             },
             "snapToGrid": {
                 "title": "Snap to Grid",
-                "desc": "Snap the bounding box to canvas grid"
+                "desc": "Snap the bounding box to canvas grid."
+            },
+            "applySegmentAnything": {
+                "title": "Apply Segment Anything",
+                "desc": "Apply the results of segmentation to the canvas."
+            },
+            "cancelSegmentAnything": {
+                "title": "Cancel Segment Anything",
+                "desc": "Cancel the results of the segmentation."
             }
         },
         "workflows": {
