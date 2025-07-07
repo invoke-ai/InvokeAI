@@ -85,11 +85,9 @@ const MaxRefImages = memo(() => {
 MaxRefImages.displayName = 'MaxRefImages';
 
 const AddRefImageDropTargetAndButton = memo(() => {
-  const { t } = useTranslation();
   const { dispatch, getState } = useAppStore();
   const tab = useAppSelector(selectActiveTab);
   const canvasManager = useCanvasManagerSafe();
-  const isBusy = useCanvasIsBusySafe();
 
   const uploadOptions = useMemo(
     () =>
