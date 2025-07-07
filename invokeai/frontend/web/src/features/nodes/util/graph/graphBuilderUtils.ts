@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectSaveAllStagingImagesToGallery } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectSaveAllImagesToGallery } from 'features/controlLayers/store/canvasSettingsSlice';
 import {
   selectImg2imgStrength,
   selectMainModelConfig,
@@ -45,11 +45,11 @@ export const selectCanvasOutputFields = (state: RootState) => {
   // Advanced session means working on canvas - images are not saved to gallery or added to a board.
   // Simple session means working in YOLO mode - images are saved to gallery & board.
   const tab = selectActiveTab(state);
-  const saveAllStagingImagesToGallery = selectSaveAllStagingImagesToGallery(state);
+  const saveAllImagesToGallery = selectSaveAllImagesToGallery(state);
 
-  // If we're on canvas and the save all staging images setting is enabled, save to gallery
-  const is_intermediate = tab === 'canvas' && !saveAllStagingImagesToGallery;
-  const board = tab === 'canvas' && !saveAllStagingImagesToGallery ? undefined : getBoardField(state);
+  // If we're on canvas and the save all images setting is enabled, save to gallery
+  const is_intermediate = tab === 'canvas' && !saveAllImagesToGallery;
+  const board = tab === 'canvas' && !saveAllImagesToGallery ? undefined : getBoardField(state);
 
   return {
     is_intermediate,
