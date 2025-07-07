@@ -22248,16 +22248,6 @@ export interface operations {
         };
         requestBody: {
             content: {
-                /** @example {
-                 *       "path": "/path/to/model",
-                 *       "name": "model_name",
-                 *       "base": "sd-1",
-                 *       "type": "main",
-                 *       "format": "checkpoint",
-                 *       "config_path": "configs/stable-diffusion/v1-inference.yaml",
-                 *       "description": "Model description",
-                 *       "variant": "normal"
-                 *     } */
                 "application/json": components["schemas"]["ModelRecordChanges"];
             };
         };
@@ -22543,10 +22533,6 @@ export interface operations {
         };
         requestBody: {
             content: {
-                /** @example {
-                 *       "name": "string",
-                 *       "description": "string"
-                 *     } */
                 "application/json": components["schemas"]["ModelRecordChanges"];
             };
         };
