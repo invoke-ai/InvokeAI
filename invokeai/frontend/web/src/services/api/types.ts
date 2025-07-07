@@ -322,6 +322,15 @@ type NonInputFields = 'id' | 'type' | 'is_intermediate' | 'use_cache' | 'board' 
 export type AnyInvocationInputField = Exclude<KeysOfUnion<Required<AnyInvocation>>, NonInputFields>;
 export type InputFields<T extends AnyInvocation> = Extract<keyof T, AnyInvocationInputField>;
 
+type ExcludeIndexSignature<T> = {
+  [K in keyof T as string extends K ? never : K]: T[K];
+};
+
+export type CoreMetadataFields = Exclude<
+  keyof ExcludeIndexSignature<components['schemas']['CoreMetadataInvocation']>,
+  NonInputFields
+>;
+
 type NonOutputFields = 'type';
 export type AnyInvocationOutputField = Exclude<KeysOfUnion<Required<AnyInvocationOutput>>, NonOutputFields>;
 export type OutputFields<T extends AnyInvocation> = Extract<
