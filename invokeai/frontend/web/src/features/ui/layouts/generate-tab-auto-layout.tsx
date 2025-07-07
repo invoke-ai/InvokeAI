@@ -104,11 +104,11 @@ const MainPanel = memo(() => {
   const onReady = useCallback<IDockviewReactProps['onReady']>(
     ({ api }) => {
       const panels = initializeMainPanelLayout(tab, api);
-      
+
       // Get the active panel from the navigation API's persisted state
       const activePanelId = navigationApi.getActiveTabMainPanel(tab);
       const activePanel = activePanelId ? panels[activePanelId as keyof typeof panels] : panels.launchpad;
-      
+
       // Set the active panel (default to launchpad if no persisted state)
       activePanel?.api.setActive();
 
@@ -183,7 +183,7 @@ const initializeRightPanelLayout = (tab: TabName, api: GridviewApi) => {
   // Check if there's persisted state for the gallery panel before setting default size
   const galleryPanelKey = `${tab}:${GALLERY_PANEL_ID}`;
   const savedGalleryState = navigationApi.getGridviewPanelState?.(galleryPanelKey);
-  
+
   // Only set default size if there's no persisted height
   if (!savedGalleryState?.height) {
     gallery.api.setSize({ height: GALLERY_PANEL_DEFAULT_HEIGHT_PX, width: RIGHT_PANEL_MIN_SIZE_PX });
@@ -195,7 +195,7 @@ const initializeRightPanelLayout = (tab: TabName, api: GridviewApi) => {
   // Check if there's persisted state for the boards panel before setting default size
   const boardsPanelKey = `${tab}:${BOARDS_PANEL_ID}`;
   const savedBoardsState = navigationApi.getGridviewPanelState?.(boardsPanelKey);
-  
+
   // Only set default size if there's no persisted height
   if (!savedBoardsState?.height) {
     boards.api.setSize({ height: BOARD_PANEL_DEFAULT_HEIGHT_PX, width: RIGHT_PANEL_MIN_SIZE_PX });

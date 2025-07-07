@@ -1,28 +1,29 @@
 import { useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import { 
-  selectActiveTab, 
+import {
+  selectActiveTab,
   selectActiveTabCanvasMainPanel,
   selectActiveTabGenerateMainPanel,
   selectActiveTabUpscalingMainPanel,
-  selectActiveTabWorkflowsMainPanel
+  selectActiveTabWorkflowsMainPanel,
 } from 'features/ui/store/uiSelectors';
-import { 
+import {
   activeTabCanvasMainPanelChanged,
   activeTabGenerateMainPanelChanged,
   activeTabUpscalingMainPanelChanged,
   activeTabWorkflowsMainPanelChanged,
   dockviewPanelStateChanged,
-  gridviewPanelStateChanged, 
-  setActiveTab} from 'features/ui/store/uiSlice';
-import type { 
+  gridviewPanelStateChanged,
+  setActiveTab,
+} from 'features/ui/store/uiSlice';
+import type {
   CanvasMainPanelTabName,
-  DockviewPanelState, 
+  DockviewPanelState,
   GenerateMainPanelTabName,
-  GridviewPanelState, 
-  TabName, 
+  GridviewPanelState,
+  TabName,
   UpscalingMainPanelTabName,
-  WorkflowsMainPanelTabName
+  WorkflowsMainPanelTabName,
 } from 'features/ui/store/uiTypes';
 import { useCallback, useEffect } from 'react';
 
@@ -124,7 +125,17 @@ export const useNavigationApi = () => {
         setDockviewPanelState,
         getActiveTabMainPanel,
         setActiveTabMainPanel,
-      }
+      },
     });
-  }, [getAppTab, setAppTab, getGridviewPanelState, setGridviewPanelState, getDockviewPanelState, setDockviewPanelState, getActiveTabMainPanel, setActiveTabMainPanel, store]);
+  }, [
+    getAppTab,
+    setAppTab,
+    getGridviewPanelState,
+    setGridviewPanelState,
+    getDockviewPanelState,
+    setDockviewPanelState,
+    getActiveTabMainPanel,
+    setActiveTabMainPanel,
+    store,
+  ]);
 };

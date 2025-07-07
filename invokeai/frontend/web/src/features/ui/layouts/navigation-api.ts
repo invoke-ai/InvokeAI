@@ -216,7 +216,7 @@ export class NavigationApi {
         const isActive = event.isActive;
         this._panelStateCallbacks!.setDockviewPanelState(key, { isActive });
         log.debug(`Persisted Dockview panel ${key} active state`);
-        
+
         // Special handling for main panels to persist active state
         if (this._panelStateCallbacks?.setActiveTabMainPanel && isActive) {
           this._panelStateCallbacks.setActiveTabMainPanel(tab, panelId);
