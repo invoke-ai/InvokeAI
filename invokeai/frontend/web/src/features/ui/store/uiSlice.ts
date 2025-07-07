@@ -15,6 +15,18 @@ export const uiSlice = createSlice({
     activeTabCanvasRightPanelChanged: (state, action: PayloadAction<UIState['activeTabCanvasRightPanel']>) => {
       state.activeTabCanvasRightPanel = action.payload;
     },
+    activeTabCanvasMainPanelChanged: (state, action: PayloadAction<UIState['activeTabCanvasMainPanel']>) => {
+      state.activeTabCanvasMainPanel = action.payload;
+    },
+    activeTabGenerateMainPanelChanged: (state, action: PayloadAction<UIState['activeTabGenerateMainPanel']>) => {
+      state.activeTabGenerateMainPanel = action.payload;
+    },
+    activeTabUpscalingMainPanelChanged: (state, action: PayloadAction<UIState['activeTabUpscalingMainPanel']>) => {
+      state.activeTabUpscalingMainPanel = action.payload;
+    },
+    activeTabWorkflowsMainPanelChanged: (state, action: PayloadAction<UIState['activeTabWorkflowsMainPanel']>) => {
+      state.activeTabWorkflowsMainPanel = action.payload;
+    },
     setShouldShowImageDetails: (state, action: PayloadAction<UIState['shouldShowImageDetails']>) => {
       state.shouldShowImageDetails = action.payload;
     },
@@ -80,6 +92,10 @@ export const uiSlice = createSlice({
 export const {
   setActiveTab,
   activeTabCanvasRightPanelChanged,
+  activeTabCanvasMainPanelChanged,
+  activeTabGenerateMainPanelChanged,
+  activeTabUpscalingMainPanelChanged,
+  activeTabWorkflowsMainPanelChanged,
   setShouldShowImageDetails,
   setShouldShowProgressInViewer,
   accordionStateChanged,

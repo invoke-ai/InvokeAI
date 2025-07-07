@@ -1,8 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { createDeferredPromise, type Deferred } from 'common/util/createDeferredPromise';
 import { GridviewPanel, type IDockviewPanel, type IGridviewPanel } from 'dockview';
-import type { TabName } from 'features/ui/store/uiTypes';
-import type { DockviewPanelState, GridviewPanelState } from 'features/ui/store/uiTypes';
+import type { DockviewPanelState, GridviewPanelState,TabName  } from 'features/ui/store/uiTypes';
 import { atom } from 'nanostores';
 
 import {
@@ -35,6 +34,8 @@ type PanelStateCallbacks = {
   setGridviewPanelState: (id: string, state: GridviewPanelState) => void;
   getDockviewPanelState: (id: string) => DockviewPanelState | undefined;
   setDockviewPanelState: (id: string, state: DockviewPanelState) => void;
+  getActiveTabMainPanel?: (tab: TabName) => string | undefined;
+  setActiveTabMainPanel?: (tab: TabName, panel: string) => void;
 };
 
 export class NavigationApi {
@@ -179,6 +180,16 @@ export class NavigationApi {
         log.debug(`Rehydrated Dockview panel ${key} with active state`);
       }
     }
+
+    // Special handling for main panels to restore active state
+    if (this._panelStateCallbacks.getActiveTabMainPanel) {
+      const activeMainPanel = this._panelStateCallbacks.getActiveTabMainPanel(tab);
+      if (activeMainPanel === panelId && panel instanceof GridviewPanel === false) {
+        // This is a dockview panel and it should be active
+        panel.api.setActive();
+        log.debug(`Rehydrated ${tab} main panel ${panelId} as active`);
+      }
+    }
   };
 
   /**
@@ -205,6 +216,12 @@ export class NavigationApi {
         const isActive = event.isActive;
         this._panelStateCallbacks!.setDockviewPanelState(key, { isActive });
         log.debug(`Persisted Dockview panel ${key} active state`);
+        
+        // Special handling for main panels to persist active state
+        if (this._panelStateCallbacks?.setActiveTabMainPanel && isActive) {
+          this._panelStateCallbacks.setActiveTabMainPanel(tab, panelId);
+          log.debug(`Persisted ${tab} main panel ${panelId} as active`);
+        }
       });
       disposables.push(() => onActiveChange.dispose());
     }
@@ -607,6 +624,32 @@ export class NavigationApi {
     }
 
     log.debug(`Unregistered all panels for tab ${tab}`);
+  };
+
+  /**
+   * Get the active main panel for a specific tab from the persisted state.
+   * @param tab - The tab to get the active main panel for
+   * @returns The active panel ID or undefined if not set
+   */
+  getActiveTabMainPanel = (tab: TabName): string | undefined => {
+    return this._panelStateCallbacks?.getActiveTabMainPanel?.(tab);
+  };
+
+  /**
+   * Get the active canvas main panel from the persisted state.
+   * @returns The active panel ID or undefined if not set
+   */
+  getActiveCanvasMainPanel = (): string | undefined => {
+    return this.getActiveTabMainPanel('canvas');
+  };
+
+  /**
+   * Get the persisted state for a gridview panel.
+   * @param id - The panel ID (including tab prefix)
+   * @returns The persisted panel state or undefined if not found
+   */
+  getGridviewPanelState = (id: string): GridviewPanelState | undefined => {
+    return this._panelStateCallbacks?.getGridviewPanelState?.(id);
   };
 }
 

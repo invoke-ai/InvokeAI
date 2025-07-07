@@ -1,12 +1,29 @@
 import { useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { 
-  setActiveTab, 
+  selectActiveTab, 
+  selectActiveTabCanvasMainPanel,
+  selectActiveTabGenerateMainPanel,
+  selectActiveTabUpscalingMainPanel,
+  selectActiveTabWorkflowsMainPanel
+} from 'features/ui/store/uiSelectors';
+import { 
+  activeTabCanvasMainPanelChanged,
+  activeTabGenerateMainPanelChanged,
+  activeTabUpscalingMainPanelChanged,
+  activeTabWorkflowsMainPanelChanged,
+  dockviewPanelStateChanged,
   gridviewPanelStateChanged, 
-  dockviewPanelStateChanged 
-} from 'features/ui/store/uiSlice';
-import type { TabName, GridviewPanelState, DockviewPanelState } from 'features/ui/store/uiTypes';
+  setActiveTab} from 'features/ui/store/uiSlice';
+import type { 
+  CanvasMainPanelTabName,
+  DockviewPanelState, 
+  GenerateMainPanelTabName,
+  GridviewPanelState, 
+  TabName, 
+  UpscalingMainPanelTabName,
+  WorkflowsMainPanelTabName
+} from 'features/ui/store/uiTypes';
 import { useCallback, useEffect } from 'react';
 
 import { navigationApi } from './navigation-api';
@@ -58,6 +75,44 @@ export const useNavigationApi = () => {
     [store]
   );
 
+  const getActiveTabMainPanel = useCallback(
+    (tab: TabName): string | undefined => {
+      switch (tab) {
+        case 'canvas':
+          return selectActiveTabCanvasMainPanel(store.getState());
+        case 'generate':
+          return selectActiveTabGenerateMainPanel(store.getState());
+        case 'upscaling':
+          return selectActiveTabUpscalingMainPanel(store.getState());
+        case 'workflows':
+          return selectActiveTabWorkflowsMainPanel(store.getState());
+        default:
+          return undefined;
+      }
+    },
+    [store]
+  );
+
+  const setActiveTabMainPanel = useCallback(
+    (tab: TabName, panel: string) => {
+      switch (tab) {
+        case 'canvas':
+          store.dispatch(activeTabCanvasMainPanelChanged(panel as CanvasMainPanelTabName));
+          break;
+        case 'generate':
+          store.dispatch(activeTabGenerateMainPanelChanged(panel as GenerateMainPanelTabName));
+          break;
+        case 'upscaling':
+          store.dispatch(activeTabUpscalingMainPanelChanged(panel as UpscalingMainPanelTabName));
+          break;
+        case 'workflows':
+          store.dispatch(activeTabWorkflowsMainPanelChanged(panel as WorkflowsMainPanelTabName));
+          break;
+      }
+    },
+    [store]
+  );
+
   useEffect(() => {
     navigationApi.connectToApp({ 
       getAppTab, 
@@ -67,7 +122,9 @@ export const useNavigationApi = () => {
         setGridviewPanelState,
         getDockviewPanelState,
         setDockviewPanelState,
+        getActiveTabMainPanel,
+        setActiveTabMainPanel,
       }
     });
-  }, [getAppTab, setAppTab, getGridviewPanelState, setGridviewPanelState, getDockviewPanelState, setDockviewPanelState, store]);
+  }, [getAppTab, setAppTab, getGridviewPanelState, setGridviewPanelState, getDockviewPanelState, setDockviewPanelState, getActiveTabMainPanel, setActiveTabMainPanel, store]);
 };
