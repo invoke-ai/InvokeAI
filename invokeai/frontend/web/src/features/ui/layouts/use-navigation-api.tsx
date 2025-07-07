@@ -39,7 +39,7 @@ export const useNavigationApi = () => {
   const getAppTab = useCallback(() => {
     return selectActiveTab(store.getState());
   }, [store]);
-  
+
   const setAppTab = useCallback(
     (tab: TabName) => {
       store.dispatch(setActiveTab(tab));
@@ -114,8 +114,8 @@ export const useNavigationApi = () => {
   );
 
   useEffect(() => {
-    navigationApi.connectToApp({ 
-      getAppTab, 
+    navigationApi.connectToApp({
+      getAppTab,
       setAppTab,
       panelStateCallbacks: {
         getGridviewPanelState,
