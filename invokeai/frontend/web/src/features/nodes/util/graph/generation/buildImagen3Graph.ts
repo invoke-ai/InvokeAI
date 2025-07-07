@@ -1,11 +1,14 @@
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { isImagenAspectRatioID } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import {
+  getOriginalAndScaledSizesForTextToImage,
+  selectCanvasOutputFields,
+  selectPresetModifiedPrompts,
+} from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { t } from 'i18next';
@@ -26,12 +29,11 @@ export const buildImagen3Graph = (arg: GraphBuilderArg): GraphBuilderReturn => {
     throw new UnsupportedGenerationModeError(t('toast.imagenIncompatibleGenerationMode', { model: 'Imagen3' }));
   }
 
-  const canvas = selectCanvasSlice(state);
-
-  const { bbox } = canvas;
   const prompts = selectPresetModifiedPrompts(state);
-  assert(isImagenAspectRatioID(bbox.aspectRatio.id), 'Imagen3 does not support this aspect ratio');
   assert(prompts.positive.length > 0, 'Imagen3 requires positive prompt to have at least one character');
+
+  const { originalSize, aspectRatio } = getOriginalAndScaledSizesForTextToImage(state);
+  assert(isImagenAspectRatioID(aspectRatio.id), 'Imagen3 does not support this aspect ratio');
 
   const g = new Graph(getPrefixedId('imagen3_txt2img_graph'));
   const positivePrompt = g.addNode({
@@ -43,7 +45,7 @@ export const buildImagen3Graph = (arg: GraphBuilderArg): GraphBuilderReturn => {
     type: 'google_imagen3_generate_image',
     model: zModelIdentifierField.parse(model),
     negative_prompt: prompts.negative,
-    aspect_ratio: bbox.aspectRatio.id,
+    aspect_ratio: aspectRatio.id,
     // When enhance_prompt is true, Imagen3 will return a new image every time, ignoring the seed.
     enhance_prompt: true,
     ...selectCanvasOutputFields(state),
@@ -60,10 +62,9 @@ export const buildImagen3Graph = (arg: GraphBuilderArg): GraphBuilderReturn => {
 
   g.upsertMetadata({
     negative_prompt: prompts.negative,
-    width: bbox.rect.width,
-    height: bbox.rect.height,
+    width: originalSize.width,
+    height: originalSize.height,
     model: Graph.getModelMetadataField(model),
-    ...selectCanvasMetadata(state),
   });
 
   return {

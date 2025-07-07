@@ -16,9 +16,10 @@ import { addRegions } from 'features/nodes/util/graph/generation/addRegions';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { selectCanvasOutputFields, selectOriginalAndScaledSizes } from 'features/nodes/util/graph/graphBuilderUtils';
+import { selectCanvasOutputFields } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
@@ -40,10 +41,6 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   const params = selectParamsSlice(state);
   const canvas = selectCanvasSlice(state);
   const refImages = selectRefImagesSlice(state);
-
-  const { bbox } = canvas;
-
-  const { originalSize, scaledSize } = selectOriginalAndScaledSizes(state);
 
   const { guidance: baseGuidance, steps, fluxVAE, t5EncoderModel, clipEmbedModel } = params;
 
@@ -118,17 +115,11 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     id: getPrefixedId('flux_denoise'),
     guidance,
     num_steps: steps,
-    width: scaledSize.width,
-    height: scaledSize.height,
   });
 
   const l2i = g.addNode({
     type: 'flux_vae_decode',
     id: getPrefixedId('flux_vae_decode'),
-  });
-  const i2l = g.addNode({
-    type: 'flux_vae_encode',
-    id: getPrefixedId('flux_vae_encode'),
   });
 
   g.addEdge(modelLoader, 'transformer', denoise, 'transformer');
@@ -149,8 +140,6 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
 
   g.upsertMetadata({
     guidance,
-    width: originalSize.width,
-    height: originalSize.height,
     model: Graph.getModelMetadataField(model),
     steps,
     vae: fluxVAE,
@@ -195,20 +184,21 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       manager,
       l2i,
       denoise,
-      originalSize,
-      scaledSize,
     });
   } else if (generationMode === 'txt2img') {
     canvasOutput = addTextToImage({
       g,
+      state,
       denoise,
       l2i,
-      originalSize,
-      scaledSize,
     });
     g.upsertMetadata({ generation_mode: 'flux_txt2img' });
   } else if (generationMode === 'img2img') {
     assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'flux_vae_encode',
+      id: getPrefixedId('flux_vae_encode'),
+    });
     canvasOutput = await addImageToImage({
       g,
       state,
@@ -217,13 +207,14 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       i2l,
       denoise,
       vaeSource: modelLoader,
-      originalSize,
-      scaledSize,
-      bbox,
     });
     g.upsertMetadata({ generation_mode: 'flux_img2img' });
   } else if (generationMode === 'inpaint') {
     assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'flux_vae_encode',
+      id: getPrefixedId('flux_vae_encode'),
+    });
     canvasOutput = await addInpaint({
       g,
       state,
@@ -233,13 +224,15 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       denoise,
       vaeSource: modelLoader,
       modelLoader,
-      originalSize,
-      scaledSize,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'flux_inpaint' });
   } else if (generationMode === 'outpaint') {
     assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'flux_vae_encode',
+      id: getPrefixedId('flux_vae_encode'),
+    });
     canvasOutput = await addOutpaint({
       g,
       state,
@@ -249,8 +242,6 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       denoise,
       vaeSource: modelLoader,
       modelLoader,
-      originalSize,
-      scaledSize,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'flux_outpaint' });
@@ -353,9 +344,11 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     canvasOutput = addWatermarker(g, canvasOutput);
   }
 
-  g.upsertMetadata(selectCanvasMetadata(state));
-
   g.updateNode(canvasOutput, selectCanvasOutputFields(state));
+
+  if (selectActiveTab(state) === 'canvas') {
+    g.upsertMetadata(selectCanvasMetadata(state));
+  }
 
   g.setMetadataReceivingNode(canvasOutput);
 

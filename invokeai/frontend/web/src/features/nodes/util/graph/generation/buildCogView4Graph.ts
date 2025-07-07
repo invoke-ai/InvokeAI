@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
@@ -10,12 +10,9 @@ import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import {
-  selectCanvasOutputFields,
-  selectOriginalAndScaledSizes,
-  selectPresetModifiedPrompts,
-} from 'features/nodes/util/graph/graphBuilderUtils';
+import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import type { Equals } from 'tsafe';
@@ -33,13 +30,9 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
   assert(model.base === 'cogview4', 'Selected model is not a CogView4 model');
 
   const params = selectParamsSlice(state);
-  const canvas = selectCanvasSlice(state);
-
-  const { bbox } = canvas;
 
   const { cfgScale: cfg_scale, steps } = params;
 
-  const { originalSize, scaledSize } = selectOriginalAndScaledSizes(state);
   const prompts = selectPresetModifiedPrompts(state);
 
   const g = new Graph(getPrefixedId('cogview4_graph'));
@@ -73,17 +66,11 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
     type: 'cogview4_denoise',
     id: getPrefixedId('denoise_latents'),
     cfg_scale,
-    width: scaledSize.width,
-    height: scaledSize.height,
     steps,
   });
   const l2i = g.addNode({
     type: 'cogview4_l2i',
     id: getPrefixedId('l2i'),
-  });
-  const i2l = g.addNode({
-    type: 'cogview4_i2l',
-    id: getPrefixedId('cogview4_i2l'),
   });
 
   g.addEdge(modelLoader, 'transformer', denoise, 'transformer');
@@ -104,8 +91,6 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
 
   g.upsertMetadata({
     cfg_scale,
-    width: originalSize.width,
-    height: originalSize.height,
     negative_prompt: prompts.negative,
     model: Graph.getModelMetadataField(modelConfig),
     steps,
@@ -118,14 +103,18 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
   if (generationMode === 'txt2img') {
     canvasOutput = addTextToImage({
       g,
+      state,
       denoise,
       l2i,
-      originalSize,
-      scaledSize,
     });
     g.upsertMetadata({ generation_mode: 'cogview4_txt2img' });
   } else if (generationMode === 'img2img') {
     assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'cogview4_i2l',
+      id: getPrefixedId('cogview4_i2l'),
+    });
+
     canvasOutput = await addImageToImage({
       g,
       state,
@@ -134,13 +123,15 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
       l2i,
       i2l,
       vaeSource: modelLoader,
-      originalSize,
-      scaledSize,
-      bbox,
     });
     g.upsertMetadata({ generation_mode: 'cogview4_img2img' });
   } else if (generationMode === 'inpaint') {
     assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'cogview4_i2l',
+      id: getPrefixedId('cogview4_i2l'),
+    });
+
     canvasOutput = await addInpaint({
       g,
       state,
@@ -150,13 +141,16 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
       denoise,
       vaeSource: modelLoader,
       modelLoader,
-      originalSize,
-      scaledSize,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'cogview4_inpaint' });
   } else if (generationMode === 'outpaint') {
     assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'cogview4_i2l',
+      id: getPrefixedId('cogview4_i2l'),
+    });
+
     canvasOutput = await addOutpaint({
       g,
       state,
@@ -166,8 +160,6 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
       denoise,
       vaeSource: modelLoader,
       modelLoader,
-      originalSize,
-      scaledSize,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'cogview4_outpaint' });
@@ -183,9 +175,11 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
     canvasOutput = addWatermarker(g, canvasOutput);
   }
 
-  g.upsertMetadata(selectCanvasMetadata(state));
-
   g.updateNode(canvasOutput, selectCanvasOutputFields(state));
+
+  if (selectActiveTab(state) === 'canvas') {
+    g.upsertMetadata(selectCanvasMetadata(state));
+  }
 
   g.setMetadataReceivingNode(canvasOutput);
 

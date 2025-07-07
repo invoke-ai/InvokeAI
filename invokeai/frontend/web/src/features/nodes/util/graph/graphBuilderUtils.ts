@@ -103,27 +103,43 @@ export const selectPresetModifiedPrompts = createSelector(
   }
 );
 
-export const selectOriginalAndScaledSizes = createSelector(
-  [selectActiveTab, selectParamsSlice, selectCanvasSlice],
-  (tab, params, canvas) => {
-    if (tab === 'generate') {
-      const { width, height } = params.dimensions.rect;
-      const { aspectRatio } = params.dimensions;
-      return {
-        originalSize: { width, height },
-        scaledSize: { width, height },
-        aspectRatio,
-      };
-    } else {
-      // tab === 'canvas'
-      const { width, height } = canvas.bbox.rect;
-      const { aspectRatio } = canvas.bbox;
-      const originalSize = { width, height };
-      const scaledSize = ['auto', 'manual'].includes(canvas.bbox.scaleMethod) ? canvas.bbox.scaledSize : originalSize;
-      return { originalSize, scaledSize, aspectRatio };
-    }
+export const getOriginalAndScaledSizesForTextToImage = (state: RootState) => {
+  const tab = selectActiveTab(state);
+  const params = selectParamsSlice(state);
+  const canvas = selectCanvasSlice(state);
+
+  if (tab === 'canvas') {
+    const { rect, aspectRatio } = canvas.bbox;
+    const { width, height } = rect;
+    const originalSize = { width, height };
+    const scaledSize = ['auto', 'manual'].includes(canvas.bbox.scaleMethod) ? canvas.bbox.scaledSize : originalSize;
+    return { originalSize, scaledSize, aspectRatio };
+  } else if (tab === 'generate') {
+    const { rect, aspectRatio } = params.dimensions;
+    const { width, height } = rect;
+    return {
+      originalSize: { width, height },
+      scaledSize: { width, height },
+      aspectRatio,
+    };
   }
-);
+
+  assert(false, `Cannot get sizes for tab ${tab} - this function is only for the Canvas or Generate tabs`);
+};
+
+export const getOriginalAndScaledSizesForOtherModes = (state: RootState) => {
+  const tab = selectActiveTab(state);
+  const canvas = selectCanvasSlice(state);
+
+  assert(tab === 'canvas', `Cannot get sizes for tab ${tab} - this function is only for the Canvas tab`);
+
+  const { rect, aspectRatio } = canvas.bbox;
+  const { width, height } = rect;
+  const originalSize = { width, height };
+  const scaledSize = ['auto', 'manual'].includes(canvas.bbox.scaleMethod) ? canvas.bbox.scaledSize : originalSize;
+
+  return { originalSize, scaledSize, aspectRatio, rect };
+};
 
 export const getInfill = (
   g: Graph,
