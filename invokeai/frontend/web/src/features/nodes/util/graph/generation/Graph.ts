@@ -9,6 +9,7 @@ import type {
   AnyInvocationInputField,
   AnyInvocationOutputField,
   AnyModelConfig,
+  CoreMetadataFields,
   InputFields,
   Invocation,
   InvocationType,
@@ -433,7 +434,7 @@ export class Graph {
   addEdgeToMetadata<TFrom extends AnyInvocation>(
     fromNode: TFrom,
     fromField: OutputFields<TFrom>,
-    metadataField: string
+    metadataField: CoreMetadataFields | (string & Record<string, never>)
   ): Edge {
     // @ts-expect-error `Graph` excludes `core_metadata` nodes due to its excessively wide typing
     return this.addEdge(fromNode, fromField, this.getMetadataNode(), metadataField);
