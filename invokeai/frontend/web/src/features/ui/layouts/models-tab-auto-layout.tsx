@@ -3,7 +3,7 @@ import { GridviewReact, LayoutPriority, Orientation } from 'dockview';
 import ModelManagerTab from 'features/ui/components/tabs/ModelManagerTab';
 import type { RootLayoutGridviewComponents } from 'features/ui/layouts/auto-layout-context';
 import { AutoLayoutProvider } from 'features/ui/layouts/auto-layout-context';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect } from 'react';
 
 import { navigationApi } from './navigation-api';
 import { MODELS_PANEL_ID } from './shared';
@@ -25,30 +25,21 @@ const initializeRootPanelLayout = (layoutApi: GridviewApi) => {
 };
 
 export const ModelsTabAutoLayout = memo(() => {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const [rootApi, setRootApi] = useState<GridviewApi | null>(null);
   const onReady = useCallback<IGridviewReactProps['onReady']>(({ api }) => {
-    setRootApi(api);
+    initializeRootPanelLayout(api);
+    navigationApi.onTabReady('models');
   }, []);
 
-  useEffect(() => {
-    if (!rootApi) {
-      return;
-    }
-
-    initializeRootPanelLayout(rootApi);
-
-    navigationApi.onSwitchedTab();
-
-    return () => {
+  useEffect(
+    () => () => {
       navigationApi.unregisterTab('models');
-    };
-  }, [rootApi]);
+    },
+    []
+  );
 
   return (
-    <AutoLayoutProvider tab="models" rootRef={rootRef}>
+    <AutoLayoutProvider tab="models">
       <GridviewReact
-        ref={rootRef}
         className="dockview-theme-invoke"
         components={rootPanelComponents}
         onReady={onReady}

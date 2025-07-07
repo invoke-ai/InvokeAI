@@ -3,7 +3,7 @@ import { GridviewReact, LayoutPriority, Orientation } from 'dockview';
 import QueueTab from 'features/ui/components/tabs/QueueTab';
 import type { RootLayoutGridviewComponents } from 'features/ui/layouts/auto-layout-context';
 import { AutoLayoutProvider } from 'features/ui/layouts/auto-layout-context';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect } from 'react';
 
 import { navigationApi } from './navigation-api';
 import { QUEUE_PANEL_ID } from './shared';
@@ -25,30 +25,21 @@ const initializeRootPanelLayout = (layoutApi: GridviewApi) => {
 };
 
 export const QueueTabAutoLayout = memo(() => {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const [rootApi, setRootApi] = useState<GridviewApi | null>(null);
   const onReady = useCallback<IGridviewReactProps['onReady']>(({ api }) => {
-    setRootApi(api);
+    initializeRootPanelLayout(api);
+    navigationApi.onTabReady('queue');
   }, []);
 
-  useEffect(() => {
-    if (!rootApi) {
-      return;
-    }
-
-    initializeRootPanelLayout(rootApi);
-
-    navigationApi.onSwitchedTab();
-
-    return () => {
+  useEffect(
+    () => () => {
       navigationApi.unregisterTab('queue');
-    };
-  }, [rootApi]);
+    },
+    []
+  );
 
   return (
-    <AutoLayoutProvider tab="queue" rootRef={rootRef}>
+    <AutoLayoutProvider tab="queue">
       <GridviewReact
-        ref={rootRef}
         className="dockview-theme-invoke"
         components={rootPanelComponents}
         onReady={onReady}
