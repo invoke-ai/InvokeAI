@@ -1,12 +1,8 @@
 import { useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import { 
-  setActiveTab, 
-  gridviewPanelStateChanged, 
-  dockviewPanelStateChanged 
-} from 'features/ui/store/uiSlice';
-import type { TabName, GridviewPanelState, DockviewPanelState } from 'features/ui/store/uiTypes';
+import { dockviewPanelStateChanged, gridviewPanelStateChanged, setActiveTab } from 'features/ui/store/uiSlice';
+import type { DockviewPanelState, GridviewPanelState, TabName } from 'features/ui/store/uiTypes';
 import { useCallback, useEffect } from 'react';
 
 import { navigationApi } from './navigation-api';
@@ -22,7 +18,7 @@ export const useNavigationApi = () => {
   const getAppTab = useCallback(() => {
     return selectActiveTab(store.getState());
   }, [store]);
-  
+
   const setAppTab = useCallback(
     (tab: TabName) => {
       store.dispatch(setActiveTab(tab));
@@ -59,15 +55,23 @@ export const useNavigationApi = () => {
   );
 
   useEffect(() => {
-    navigationApi.connectToApp({ 
-      getAppTab, 
+    navigationApi.connectToApp({
+      getAppTab,
       setAppTab,
       panelStateCallbacks: {
         getGridviewPanelState,
         setGridviewPanelState,
         getDockviewPanelState,
         setDockviewPanelState,
-      }
+      },
     });
-  }, [getAppTab, setAppTab, getGridviewPanelState, setGridviewPanelState, getDockviewPanelState, setDockviewPanelState, store]);
+  }, [
+    getAppTab,
+    setAppTab,
+    getGridviewPanelState,
+    setGridviewPanelState,
+    getDockviewPanelState,
+    setDockviewPanelState,
+    store,
+  ]);
 };

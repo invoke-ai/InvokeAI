@@ -1,8 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { createDeferredPromise, type Deferred } from 'common/util/createDeferredPromise';
 import { GridviewPanel, type IDockviewPanel, type IGridviewPanel } from 'dockview';
-import type { TabName } from 'features/ui/store/uiTypes';
-import type { DockviewPanelState, GridviewPanelState } from 'features/ui/store/uiTypes';
+import type { DockviewPanelState, GridviewPanelState, TabName } from 'features/ui/store/uiTypes';
 import { atom } from 'nanostores';
 
 import {
@@ -87,8 +86,8 @@ export class NavigationApi {
    * @param arg.getAppTab - Function to get the current app tab
    * @param arg.panelStateCallbacks - Optional callbacks for panel state persistence
    */
-  connectToApp = (arg: { 
-    setAppTab: (tab: TabName) => void; 
+  connectToApp = (arg: {
+    setAppTab: (tab: TabName) => void;
     getAppTab: () => TabName;
     panelStateCallbacks?: PanelStateCallbacks;
   }): void => {
