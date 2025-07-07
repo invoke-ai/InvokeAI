@@ -101,7 +101,13 @@ const MetadataLabel = ({ i18nKey }: { i18nKey: string }) => {
 };
 
 const MetadataPrimitiveValue = ({ value }: { value: string | number | boolean | null | undefined }) => {
-  return <Text as="span">{value}</Text>;
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (isString(value)) {
+    return <Text as="span">{value || '<empty string>'}</Text>;
+  }
+  return <Text as="span">{String(value)}</Text>;
 };
 
 const getProperty = (obj: unknown, path: string): unknown => {
