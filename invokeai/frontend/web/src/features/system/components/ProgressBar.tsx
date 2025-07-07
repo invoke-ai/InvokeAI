@@ -35,6 +35,10 @@ const ProgressBar = (props: ProgressProps) => {
       return true;
     }
 
+    if (lastProgressEvent.percentage === 0) {
+      return true;
+    }
+
     return false;
   }, [isConnected, lastProgressEvent, queueStatus?.queue.in_progress]);
 
