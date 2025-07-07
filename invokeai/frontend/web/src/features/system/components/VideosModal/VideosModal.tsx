@@ -13,7 +13,11 @@ import {
 import { useAppDispatch } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { buildUseDisclosure } from 'common/hooks/useBoolean';
-import { gettingStartedPlaylistLink, studioSessionsPlaylistLink, supportVideos } from 'features/system/components/VideosModal/data';
+import {
+  gettingStartedPlaylistLink,
+  studioSessionsPlaylistLink,
+  supportVideos,
+} from 'features/system/components/VideosModal/data';
 import { VideoCardList } from 'features/system/components/VideosModal/VideoCardList';
 import { videoModalLinkClicked } from 'features/system/store/actions';
 import { discordLink } from 'features/system/store/constants';
