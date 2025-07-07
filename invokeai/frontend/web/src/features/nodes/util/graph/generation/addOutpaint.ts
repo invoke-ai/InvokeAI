@@ -22,15 +22,14 @@ type AddOutpaintArg = {
   g: Graph;
   manager: CanvasManager;
   l2i: Invocation<LatentToImageNodes>;
-  i2lNodeType: ImageToLatentsNodes;
+  i2l: Invocation<ImageToLatentsNodes>;
   denoise: Invocation<DenoiseLatentsNodes>;
   vaeSource: Invocation<VaeSourceNodes | MainModelLoaderNodes>;
   modelLoader: Invocation<MainModelLoaderNodes>;
   originalSize: Dimensions;
   scaledSize: Dimensions;
   denoising_start: number;
-  fp32: boolean;
-  seed: number;
+  seed: Invocation<'integer'>;
 };
 
 export const addOutpaint = async ({
@@ -38,14 +37,13 @@ export const addOutpaint = async ({
   g,
   manager,
   l2i,
-  i2lNodeType,
+  i2l,
   denoise,
   vaeSource,
   modelLoader,
   originalSize,
   scaledSize,
   denoising_start,
-  fp32,
   seed,
 }: AddOutpaintArg): Promise<Invocation<'invokeai_img_blend' | 'apply_mask_to_image'>> => {
   denoise.denoising_start = denoising_start;
@@ -138,7 +136,7 @@ export const addOutpaint = async ({
       coherence_mode: params.canvasCoherenceMode,
       minimum_denoise: params.canvasCoherenceMinDenoise,
       edge_radius: params.canvasCoherenceEdgeSize,
-      fp32,
+      fp32: i2l.type === 'i2l' ? i2l.fp32 : false,
     });
     g.addEdge(infill, 'image', createGradientMask, 'image');
     g.addEdge(resizeInputMaskToScaledSize, 'image', createGradientMask, 'mask');
@@ -148,13 +146,6 @@ export const addOutpaint = async ({
     }
 
     g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');
-
-    // Decode infilled image and connect to denoise
-    const i2l = g.addNode({
-      id: i2lNodeType,
-      type: i2lNodeType,
-      ...(i2lNodeType === 'i2l' ? { fp32 } : {}),
-    });
 
     // If we have a noise mask, apply it to the input image before i2l conversion
     if (noiseMaskImage) {
@@ -173,9 +164,9 @@ export const addOutpaint = async ({
         noise_type: 'gaussian',
         amount: 1.0, // the mask controls the actual intensity
         noise_color: true,
-        seed: seed,
       });
 
+      g.addEdge(seed, 'value', noiseNode, 'seed');
       g.addEdge(resizeNoiseMaskToScaledSize, 'image', noiseNode, 'mask');
       g.addEdge(infill, 'image', noiseNode, 'image');
       g.addEdge(noiseNode, 'image', i2l, 'image');
@@ -232,11 +223,6 @@ export const addOutpaint = async ({
   } else {
     infill.image = { image_name: initialImage.image_name };
     // No scale before processing, much simpler
-    const i2l = g.addNode({
-      id: i2lNodeType,
-      type: i2lNodeType,
-      ...(i2lNodeType === 'i2l' ? { fp32 } : {}),
-    });
     const initialImageAlphaToMask = g.addNode({
       id: getPrefixedId('image_alpha_to_mask'),
       type: 'tomask',
@@ -253,7 +239,7 @@ export const addOutpaint = async ({
       coherence_mode: params.canvasCoherenceMode,
       minimum_denoise: params.canvasCoherenceMinDenoise,
       edge_radius: params.canvasCoherenceEdgeSize,
-      fp32,
+      fp32: i2l.type === 'i2l' ? i2l.fp32 : false,
       image: { image_name: initialImage.image_name },
     });
     g.addEdge(initialImageAlphaToMask, 'image', maskCombine, 'mask2');
@@ -269,10 +255,10 @@ export const addOutpaint = async ({
         noise_type: 'gaussian',
         amount: 1.0, // the mask controls the actual intensity
         noise_color: true,
-        seed: seed,
         mask: { image_name: noiseMaskImage.image_name },
       });
 
+      g.addEdge(seed, 'value', noiseNode, 'seed');
       g.addEdge(infill, 'image', noiseNode, 'image');
       g.addEdge(noiseNode, 'image', i2l, 'image');
     } else {

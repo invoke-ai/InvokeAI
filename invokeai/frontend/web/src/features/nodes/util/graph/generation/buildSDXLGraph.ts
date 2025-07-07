@@ -47,7 +47,7 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     cfgScale: cfg_scale,
     cfgRescaleMultiplier: cfg_rescale_multiplier,
     scheduler,
-    seed,
+    seed: _seed,
     steps,
     shouldUseCpuNoise,
     vaePrecision,
@@ -64,6 +64,11 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     selectPresetModifiedPrompts(state);
 
   const g = new Graph(getPrefixedId('sdxl_graph'));
+  const seed = g.addNode({
+    id: getPrefixedId('seed'),
+    type: 'integer',
+    value: _seed,
+  });
   const modelLoader = g.addNode({
     type: 'sdxl_model_loader',
     id: getPrefixedId('sdxl_model_loader'),
@@ -92,7 +97,6 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   const noise = g.addNode({
     type: 'noise',
     id: getPrefixedId('noise'),
-    seed,
     width: scaledSize.width,
     height: scaledSize.height,
     use_cpu: shouldUseCpuNoise,
@@ -112,6 +116,11 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     id: getPrefixedId('l2i'),
     fp32,
   });
+  const i2l = g.addNode({
+    type: 'i2l',
+    id: getPrefixedId('i2l'),
+    fp32,
+  });
   const vaeLoader =
     vae?.base === model.base
       ? g.addNode({
@@ -121,6 +130,7 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
         })
       : null;
 
+  g.addEdge(seed, 'value', noise, 'seed');
   g.addEdge(modelLoader, 'unet', denoise, 'unet');
   g.addEdge(modelLoader, 'clip', posCond, 'clip');
   g.addEdge(modelLoader, 'clip', negCond, 'clip');
@@ -141,7 +151,6 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     positive_prompt: positivePrompt,
     negative_prompt: negativePrompt,
     model: Graph.getModelMetadataField(model),
-    seed,
     steps,
     rand_device: shouldUseCpuNoise ? 'cpu' : 'cuda',
     scheduler,
@@ -178,14 +187,13 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       g,
       manager,
       l2i,
-      i2lNodeType: 'i2l',
+      i2l,
       denoise,
       vaeSource,
       originalSize,
       scaledSize,
       bbox,
       denoising_start,
-      fp32,
     });
     g.upsertMetadata({ generation_mode: 'sdxl_img2img' });
   } else if (generationMode === 'inpaint') {
@@ -195,14 +203,13 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       g,
       manager,
       l2i,
-      i2lNodeType: 'i2l',
+      i2l,
       denoise,
       vaeSource,
       modelLoader,
       originalSize,
       scaledSize,
       denoising_start,
-      fp32,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'sdxl_inpaint' });
@@ -213,14 +220,13 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       g,
       manager,
       l2i,
-      i2lNodeType: 'i2l',
+      i2l,
       denoise,
       vaeSource,
       modelLoader,
       originalSize,
       scaledSize,
       denoising_start,
-      fp32,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'sdxl_outpaint' });
@@ -316,7 +322,7 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   g.setMetadataReceivingNode(canvasOutput);
   return {
     g,
-    seedFieldIdentifier: { nodeId: noise.id, fieldName: 'seed' },
+    seedFieldIdentifier: { nodeId: seed.id, fieldName: 'value' },
     positivePromptFieldIdentifier: { nodeId: posCond.id, fieldName: 'prompt' },
   };
 };
