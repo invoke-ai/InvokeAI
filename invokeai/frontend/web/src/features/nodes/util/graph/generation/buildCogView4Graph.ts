@@ -32,7 +32,7 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
 
   const { bbox } = canvas;
 
-  const { model, cfgScale: cfg_scale, seed, steps } = params;
+  const { model, cfgScale: cfg_scale, seed: _seed, steps } = params;
 
   assert(model, 'No model found in state');
 
@@ -40,6 +40,11 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
   const { positivePrompt, negativePrompt } = selectPresetModifiedPrompts(state);
 
   const g = new Graph(getPrefixedId('cogview4_graph'));
+  const seed = g.addNode({
+    id: getPrefixedId('seed'),
+    type: 'integer',
+    value: _seed,
+  });
   const modelLoader = g.addNode({
     type: 'cogview4_model_loader',
     id: getPrefixedId('cogview4_model_loader'),
@@ -71,7 +76,12 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
     type: 'cogview4_l2i',
     id: getPrefixedId('l2i'),
   });
+  const i2l = g.addNode({
+    type: 'cogview4_i2l',
+    id: getPrefixedId('cogview4_i2l'),
+  });
 
+  g.addEdge(seed, 'value', denoise, 'seed');
   g.addEdge(modelLoader, 'transformer', denoise, 'transformer');
   g.addEdge(modelLoader, 'glm_encoder', posCond, 'glm_encoder');
   g.addEdge(modelLoader, 'glm_encoder', negCond, 'glm_encoder');
@@ -92,7 +102,6 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
     positive_prompt: positivePrompt,
     negative_prompt: negativePrompt,
     model: Graph.getModelMetadataField(modelConfig),
-    seed,
     steps,
   });
 
@@ -109,14 +118,13 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
       g,
       manager,
       l2i,
-      i2lNodeType: 'cogview4_i2l',
+      i2l,
       denoise,
       vaeSource: modelLoader,
       originalSize,
       scaledSize,
       bbox,
       denoising_start,
-      fp32: false,
     });
     g.upsertMetadata({ generation_mode: 'cogview4_img2img' });
   } else if (generationMode === 'inpaint') {
@@ -126,14 +134,13 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
       g,
       manager,
       l2i,
-      i2lNodeType: 'cogview4_i2l',
+      i2l,
       denoise,
       vaeSource: modelLoader,
       modelLoader,
       originalSize,
       scaledSize,
       denoising_start,
-      fp32: false,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'cogview4_inpaint' });
@@ -144,14 +151,13 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
       g,
       manager,
       l2i,
-      i2lNodeType: 'cogview4_i2l',
+      i2l,
       denoise,
       vaeSource: modelLoader,
       modelLoader,
       originalSize,
       scaledSize,
       denoising_start,
-      fp32: false,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'cogview4_outpaint' });
@@ -174,7 +180,7 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
   g.setMetadataReceivingNode(canvasOutput);
   return {
     g,
-    seedFieldIdentifier: { nodeId: denoise.id, fieldName: 'seed' },
+    seedFieldIdentifier: { nodeId: seed.id, fieldName: 'value' },
     positivePromptFieldIdentifier: { nodeId: posCond.id, fieldName: 'prompt' },
   };
 };

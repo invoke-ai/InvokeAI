@@ -36,7 +36,7 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
 
   const {
     cfgScale: cfg_scale,
-    seed,
+    seed: _seed,
     steps,
     vae,
     t5EncoderModel,
@@ -50,6 +50,11 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   const { positivePrompt, negativePrompt } = selectPresetModifiedPrompts(state);
 
   const g = new Graph(getPrefixedId('sd3_graph'));
+  const seed = g.addNode({
+    id: getPrefixedId('seed'),
+    type: 'integer',
+    value: _seed,
+  });
   const modelLoader = g.addNode({
     type: 'sd3_model_loader',
     id: getPrefixedId('sd3_model_loader'),
@@ -85,7 +90,12 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     type: 'sd3_l2i',
     id: getPrefixedId('l2i'),
   });
+  const i2l = g.addNode({
+    type: 'sd3_i2l',
+    id: getPrefixedId('sd3_i2l'),
+  });
 
+  g.addEdge(seed, 'value', denoise, 'seed');
   g.addEdge(modelLoader, 'transformer', denoise, 'transformer');
   g.addEdge(modelLoader, 'clip_l', posCond, 'clip_l');
   g.addEdge(modelLoader, 'clip_l', negCond, 'clip_l');
@@ -106,7 +116,6 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     positive_prompt: positivePrompt,
     negative_prompt: negativePrompt,
     model: Graph.getModelMetadataField(model),
-    seed,
     steps,
     vae: vae ?? undefined,
   });
@@ -133,14 +142,13 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       g,
       manager,
       l2i,
-      i2lNodeType: 'sd3_i2l',
+      i2l,
       denoise,
       vaeSource: modelLoader,
       originalSize,
       scaledSize,
       bbox,
       denoising_start,
-      fp32: false,
     });
     g.upsertMetadata({ generation_mode: 'sd3_img2img' });
   } else if (generationMode === 'inpaint') {
@@ -150,14 +158,13 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       g,
       manager,
       l2i,
-      i2lNodeType: 'sd3_i2l',
+      i2l,
       denoise,
       vaeSource: modelLoader,
       modelLoader,
       originalSize,
       scaledSize,
       denoising_start,
-      fp32: false,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'sd3_inpaint' });
@@ -168,14 +175,13 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       g,
       manager,
       l2i,
-      i2lNodeType: 'sd3_i2l',
+      i2l,
       denoise,
       vaeSource: modelLoader,
       modelLoader,
       originalSize,
       scaledSize,
       denoising_start,
-      fp32: false,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'sd3_outpaint' });
@@ -198,7 +204,7 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   g.setMetadataReceivingNode(canvasOutput);
   return {
     g,
-    seedFieldIdentifier: { nodeId: denoise.id, fieldName: 'seed' },
+    seedFieldIdentifier: { nodeId: seed.id, fieldName: 'value' },
     positivePromptFieldIdentifier: { nodeId: posCond.id, fieldName: 'prompt' },
   };
 };

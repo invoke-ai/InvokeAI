@@ -15,28 +15,26 @@ type AddImageToImageArg = {
   g: Graph;
   manager: CanvasManager;
   l2i: Invocation<LatentToImageNodes>;
-  i2lNodeType: 'i2l' | 'flux_vae_encode' | 'sd3_i2l' | 'cogview4_i2l';
+  i2l: Invocation<'i2l' | 'flux_vae_encode' | 'sd3_i2l' | 'cogview4_i2l'>;
   denoise: Invocation<DenoiseLatentsNodes>;
   vaeSource: Invocation<VaeSourceNodes | MainModelLoaderNodes>;
   originalSize: Dimensions;
   scaledSize: Dimensions;
   bbox: CanvasState['bbox'];
   denoising_start: number;
-  fp32: boolean;
 };
 
 export const addImageToImage = async ({
   g,
   manager,
   l2i,
-  i2lNodeType,
+  i2l,
   denoise,
   vaeSource,
   originalSize,
   scaledSize,
   bbox,
   denoising_start,
-  fp32,
 }: AddImageToImageArg): Promise<Invocation<'img_resize' | 'l2i' | 'flux_vae_decode' | 'sd3_l2i' | 'cogview4_l2i'>> => {
   denoise.denoising_start = denoising_start;
   const adapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
@@ -54,12 +52,7 @@ export const addImageToImage = async ({
       ...scaledSize,
     });
 
-    const i2l = g.addNode({
-      id: i2lNodeType,
-      type: i2lNodeType,
-      image: image_name ? { image_name } : undefined,
-      ...(i2lNodeType === 'i2l' ? { fp32 } : {}),
-    });
+    i2l.image = { image_name };
 
     const resizeImageToOriginalSize = g.addNode({
       type: 'img_resize',
@@ -76,12 +69,7 @@ export const addImageToImage = async ({
     return resizeImageToOriginalSize;
   } else {
     // No need to resize, just decode
-    const i2l = g.addNode({
-      id: i2lNodeType,
-      type: i2lNodeType,
-      image: image_name ? { image_name } : undefined,
-      ...(i2lNodeType === 'i2l' ? { fp32 } : {}),
-    });
+    i2l.image = { image_name };
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
     g.addEdge(i2l, 'latents', denoise, 'latents');
     return l2i;

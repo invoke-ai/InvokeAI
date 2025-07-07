@@ -21,15 +21,14 @@ type AddInpaintArg = {
   g: Graph;
   manager: CanvasManager;
   l2i: Invocation<LatentToImageNodes>;
-  i2lNodeType: 'i2l' | 'flux_vae_encode' | 'sd3_i2l' | 'cogview4_i2l';
+  i2l: Invocation<'i2l' | 'flux_vae_encode' | 'sd3_i2l' | 'cogview4_i2l'>;
   denoise: Invocation<DenoiseLatentsNodes>;
   vaeSource: Invocation<VaeSourceNodes | MainModelLoaderNodes>;
   modelLoader: Invocation<MainModelLoaderNodes>;
   originalSize: Dimensions;
   scaledSize: Dimensions;
   denoising_start: number;
-  fp32: boolean;
-  seed: number;
+  seed: Invocation<'integer'>;
 };
 
 export const addInpaint = async ({
@@ -37,14 +36,13 @@ export const addInpaint = async ({
   g,
   manager,
   l2i,
-  i2lNodeType,
+  i2l,
   denoise,
   vaeSource,
   modelLoader,
   originalSize,
   scaledSize,
   denoising_start,
-  fp32,
   seed,
 }: AddInpaintArg): Promise<Invocation<'invokeai_img_blend' | 'apply_mask_to_image'>> => {
   denoise.denoising_start = denoising_start;
@@ -97,12 +95,7 @@ export const addInpaint = async ({
 
   if (needsScaleBeforeProcessing) {
     // Scale before processing requires some resizing
-    const i2l = g.addNode({
-      id: i2lNodeType,
-      type: i2lNodeType,
-      image: initialImage.image_name ? { image_name: initialImage.image_name } : undefined,
-      ...(i2lNodeType === 'i2l' ? { fp32 } : {}),
-    });
+    i2l.image = { image_name: initialImage.image_name };
 
     const resizeImageToScaledSize = g.addNode({
       type: 'img_resize',
@@ -128,9 +121,9 @@ export const addInpaint = async ({
         noise_type: 'gaussian',
         amount: 1.0, // the mask controls the actual intensity
         noise_color: true,
-        seed: seed,
       });
 
+      g.addEdge(seed, 'value', noiseNode, 'seed');
       g.addEdge(resizeImageToScaledSize, 'image', noiseNode, 'image');
       g.addEdge(resizeNoiseMaskToScaledSize, 'image', noiseNode, 'mask');
       g.addEdge(noiseNode, 'image', i2l, 'image');
@@ -160,7 +153,7 @@ export const addInpaint = async ({
       coherence_mode: params.canvasCoherenceMode,
       minimum_denoise: params.canvasCoherenceMinDenoise,
       edge_radius: params.canvasCoherenceEdgeSize,
-      fp32,
+      fp32: i2l.type === 'i2l' ? i2l.fp32 : false,
     });
     const expandMask = g.addNode({
       type: 'expand_mask_with_fade',
@@ -208,12 +201,7 @@ export const addInpaint = async ({
     }
   } else {
     // No scale before processing, much simpler
-    const i2l = g.addNode({
-      id: i2lNodeType,
-      type: i2lNodeType,
-      image: initialImage.image_name ? { image_name: initialImage.image_name } : undefined,
-      ...(i2lNodeType === 'i2l' ? { fp32 } : {}),
-    });
+    i2l.image = { image_name: initialImage.image_name };
 
     // If we have a noise mask, apply it to the input image before i2l conversion
     if (noiseMaskImage) {
@@ -221,14 +209,18 @@ export const addInpaint = async ({
       const noiseNode = g.addNode({
         type: 'img_noise',
         id: getPrefixedId('add_inpaint_noise'),
-        image: initialImage.image_name ? { image_name: initialImage.image_name } : undefined,
+        image: {
+          image_name: initialImage.image_name,
+        },
         noise_type: 'gaussian',
         amount: 1.0, // the mask controls the actual intensity
         noise_color: true,
-        seed: seed,
-        mask: { image_name: noiseMaskImage.image_name },
+        mask: {
+          image_name: noiseMaskImage.image_name,
+        },
       });
 
+      g.addEdge(seed, 'value', noiseNode, 'seed');
       g.addEdge(noiseNode, 'image', i2l, 'image');
     }
 
@@ -238,7 +230,7 @@ export const addInpaint = async ({
       coherence_mode: params.canvasCoherenceMode,
       minimum_denoise: params.canvasCoherenceMinDenoise,
       edge_radius: params.canvasCoherenceEdgeSize,
-      fp32,
+      fp32: i2l.type === 'i2l' ? i2l.fp32 : false,
       image: { image_name: initialImage.image_name },
       mask: { image_name: maskImage.image_name },
     });

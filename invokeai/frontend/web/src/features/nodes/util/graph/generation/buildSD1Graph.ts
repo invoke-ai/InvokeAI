@@ -48,7 +48,7 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     clipSkip: skipped_layers,
     shouldUseCpuNoise,
     vaePrecision,
-    seed,
+    seed: _seed,
     vae,
   } = params;
 
@@ -59,6 +59,11 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   const { originalSize, scaledSize } = selectOriginalAndScaledSizes(state);
 
   const g = new Graph(getPrefixedId('sd1_graph'));
+  const seed = g.addNode({
+    id: getPrefixedId('seed'),
+    type: 'integer',
+    value: _seed,
+  });
   const modelLoader = g.addNode({
     type: 'main_model_loader',
     id: getPrefixedId('sd1_model_loader'),
@@ -90,7 +95,6 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   const noise = g.addNode({
     type: 'noise',
     id: getPrefixedId('noise'),
-    seed,
     width: scaledSize.width,
     height: scaledSize.height,
     use_cpu: shouldUseCpuNoise,
@@ -110,6 +114,11 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     id: getPrefixedId('l2i'),
     fp32,
   });
+  const i2l = g.addNode({
+    type: 'i2l',
+    id: getPrefixedId('i2l'),
+    fp32,
+  });
   const vaeLoader =
     vae?.base === model.base
       ? g.addNode({
@@ -119,6 +128,7 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
         })
       : null;
 
+  g.addEdge(seed, 'value', noise, 'seed');
   g.addEdge(modelLoader, 'unet', denoise, 'unet');
   g.addEdge(modelLoader, 'clip', clipSkip, 'clip');
   g.addEdge(clipSkip, 'clip', posCond, 'clip');
@@ -140,7 +150,6 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     positive_prompt: positivePrompt,
     negative_prompt: negativePrompt,
     model: Graph.getModelMetadataField(model),
-    seed,
     steps,
     rand_device: shouldUseCpuNoise ? 'cpu' : 'cuda',
     scheduler,
@@ -171,14 +180,13 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       g,
       manager,
       l2i,
-      i2lNodeType: 'i2l',
+      i2l,
       denoise,
       vaeSource,
       originalSize,
       scaledSize,
       bbox,
       denoising_start,
-      fp32: vaePrecision === 'fp32',
     });
     g.upsertMetadata({ generation_mode: 'img2img' });
   } else if (generationMode === 'inpaint') {
@@ -188,14 +196,13 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       g,
       manager,
       l2i,
-      i2lNodeType: 'i2l',
+      i2l,
       denoise,
       vaeSource,
       modelLoader,
       originalSize,
       scaledSize,
       denoising_start,
-      fp32: vaePrecision === 'fp32',
       seed,
     });
     g.upsertMetadata({ generation_mode: 'inpaint' });
@@ -206,14 +213,13 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       g,
       manager,
       l2i,
-      i2lNodeType: 'i2l',
+      i2l,
       denoise,
       vaeSource,
       modelLoader,
       originalSize,
       scaledSize,
       denoising_start,
-      fp32,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'outpaint' });
@@ -310,7 +316,7 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   g.setMetadataReceivingNode(canvasOutput);
   return {
     g,
-    seedFieldIdentifier: { nodeId: noise.id, fieldName: 'seed' },
+    seedFieldIdentifier: { nodeId: seed.id, fieldName: 'value' },
     positivePromptFieldIdentifier: { nodeId: posCond.id, fieldName: 'prompt' },
   };
 };
