@@ -52,7 +52,6 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     clipSkip: skipped_layers,
     shouldUseCpuNoise,
     vaePrecision,
-    seed: _seed,
     vae,
   } = params;
 
@@ -64,7 +63,6 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   const seed = g.addNode({
     id: getPrefixedId('seed'),
     type: 'integer',
-    value: _seed,
   });
   const positivePrompt = g.addNode({
     id: getPrefixedId('positive_prompt'),

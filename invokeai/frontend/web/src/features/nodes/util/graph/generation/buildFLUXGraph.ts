@@ -45,7 +45,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
 
   const { originalSize, scaledSize } = selectOriginalAndScaledSizes(state);
 
-  const { guidance: baseGuidance, seed: _seed, steps, fluxVAE, t5EncoderModel, clipEmbedModel } = params;
+  const { guidance: baseGuidance, steps, fluxVAE, t5EncoderModel, clipEmbedModel } = params;
 
   assert(t5EncoderModel, 'No T5 Encoder model found in state');
   assert(clipEmbedModel, 'No CLIP Embed model found in state');
@@ -112,7 +112,6 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   const seed = g.addNode({
     id: getPrefixedId('seed'),
     type: 'integer',
-    value: _seed,
   });
   const denoise = g.addNode({
     type: 'flux_denoise',

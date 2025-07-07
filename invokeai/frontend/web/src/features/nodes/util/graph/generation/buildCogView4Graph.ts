@@ -37,7 +37,7 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
 
   const { bbox } = canvas;
 
-  const { cfgScale: cfg_scale, seed: _seed, steps } = params;
+  const { cfgScale: cfg_scale, steps } = params;
 
   const { originalSize, scaledSize } = selectOriginalAndScaledSizes(state);
   const prompts = selectPresetModifiedPrompts(state);
@@ -68,7 +68,6 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
   const seed = g.addNode({
     id: getPrefixedId('seed'),
     type: 'integer',
-    value: _seed,
   });
   const denoise = g.addNode({
     type: 'cogview4_denoise',
