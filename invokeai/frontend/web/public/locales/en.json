@@ -2564,17 +2564,11 @@
     },
     "supportVideos": {
         "supportVideos": "Support Videos",
-        "supportPlaylists": "Video Playlists",
         "gettingStarted": "Getting Started",
-        "controlCanvas": "Control Canvas",
         "watch": "Watch",
-        "watchPlaylist": "Watch Playlist",
-        "videoCount": "{{count}} videos",
-        "videoCount_one": "{{count}} video",
-        "videoCount_other": "{{count}} videos",
         "studioSessionsDesc1": "Check out the <StudioSessionsPlaylistLink /> for Invoke deep dives.",
         "studioSessionsDesc2": "Join our <DiscordLink /> to participate in the live sessions and ask questions. Sessions are uploaded to the playlist the following week.",
-        "playlists": {
+        "videos": {
             "gettingStarted": {
                 "title": "Getting Started with Invoke",
                 "description": "Complete video series covering everything you need to know to get started with Invoke, from creating your first image to advanced techniques."
@@ -2582,60 +2576,6 @@
             "studioSessions": {
                 "title": "Studio Sessions",
                 "description": "Deep dive sessions exploring advanced Invoke features, creative workflows, and community discussions."
-            }
-        },
-        "videos": {
-            "creatingYourFirstImage": {
-                "title": "Creating Your First Image",
-                "description": "Introduction to creating an image from scratch using Invoke's tools."
-            },
-            "usingControlLayersAndReferenceGuides": {
-                "title": "Using Control Layers and Reference Guides",
-                "description": "Learn how to guide your image creation with control layers and reference images."
-            },
-            "understandingImageToImageAndDenoising": {
-                "title": "Understanding Image-to-Image and Denoising",
-                "description": "Overview of image-to-image transformations and denoising in Invoke."
-            },
-            "exploringAIModelsAndConceptAdapters": {
-                "title": "Exploring AI Models and Concept Adapters",
-                "description": "Dive into AI models and how to use concept adapters for creative control."
-            },
-            "creatingAndComposingOnInvokesControlCanvas": {
-                "title": "Creating and Composing on Invoke's Control Canvas",
-                "description": "Learn to compose images using Invoke's control canvas."
-            },
-            "upscaling": {
-                "title": "Upscaling",
-                "description": "How to upscale images with Invoke's tools to enhance resolution."
-            },
-            "howDoIGenerateAndSaveToTheGallery": {
-                "title": "How Do I Generate and Save to the Gallery?",
-                "description": "Steps to generate and save images to the gallery."
-            },
-            "howDoIEditOnTheCanvas": {
-                "title": "How Do I Edit on the Canvas?",
-                "description": "Guide to editing images directly on the canvas."
-            },
-            "howDoIDoImageToImageTransformation": {
-                "title": "How Do I Do Image-to-Image Transformation?",
-                "description": "Tutorial on performing image-to-image transformations in Invoke."
-            },
-            "howDoIUseControlNetsAndControlLayers": {
-                "title": "How Do I Use Control Nets and Control Layers?",
-                "description": "Learn to apply control layers and controlnets to your images."
-            },
-            "howDoIUseGlobalIPAdaptersAndReferenceImages": {
-                "title": "How Do I Use Global IP Adapters and Reference Images?",
-                "description": "Introduction to adding reference images and global IP adapters."
-            },
-            "howDoIUseInpaintMasks": {
-                "title": "How Do I Use Inpaint Masks?",
-                "description": "How to apply inpaint masks for image correction and variation."
-            },
-            "howDoIOutpaint": {
-                "title": "How Do I Outpaint?",
-                "description": "Guide to outpainting beyond the original image borders."
             }
         }
     }

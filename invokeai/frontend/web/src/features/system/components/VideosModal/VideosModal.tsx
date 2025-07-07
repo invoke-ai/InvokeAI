@@ -13,12 +13,7 @@ import {
 import { useAppDispatch } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { buildUseDisclosure } from 'common/hooks/useBoolean';
-import {
-  controlCanvasVideos,
-  studioSessionsPlaylistLink,
-  supportPlaylists,
-} from 'features/system/components/VideosModal/data';
-import { PlaylistCardList } from 'features/system/components/VideosModal/PlaylistCardList';
+import { studioSessionsPlaylistLink, supportVideos } from 'features/system/components/VideosModal/data';
 import { VideoCardList } from 'features/system/components/VideosModal/VideoCardList';
 import { videoModalLinkClicked } from 'features/system/store/actions';
 import { discordLink } from 'features/system/store/constants';
@@ -87,8 +82,7 @@ export const VideosModal = memo(() => {
                   <Trans i18nKey="supportVideos.studioSessionsDesc2" components={components} />
                 </Text>
               </Flex>
-              <PlaylistCardList category={t('supportVideos.supportPlaylists')} playlists={supportPlaylists} />
-              <VideoCardList category={t('supportVideos.controlCanvas')} videos={controlCanvasVideos} />
+              <VideoCardList category={t('supportVideos.supportVideos')} videos={supportVideos} />
             </Flex>
           </ScrollableContent>
         </ModalBody>
