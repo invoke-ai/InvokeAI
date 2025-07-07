@@ -51,6 +51,20 @@ export const uiSlice = createSlice({
       const { id, size } = action.payload;
       state.textAreaSizes[id] = size;
     },
+    panelStateChanged: (
+      state,
+      action: PayloadAction<{
+        id: keyof UIState['panels'];
+        state: UIState['panels'][keyof UIState['panels']] | undefined;
+      }>
+    ) => {
+      const { id, state: panelState } = action.payload;
+      if (panelState) {
+        state.panels[id] = panelState;
+      } else {
+        delete state.panels[id];
+      }
+    },
     shouldShowNotificationChanged: (state, action: PayloadAction<UIState['shouldShowNotificationV2']>) => {
       state.shouldShowNotificationV2 = action.payload;
     },
@@ -66,6 +80,7 @@ export const {
   expanderStateChanged,
   shouldShowNotificationChanged,
   textAreaSizesStateChanged,
+  panelStateChanged,
 } = uiSlice.actions;
 
 export const selectUiSlice = (state: RootState) => state.ui;
