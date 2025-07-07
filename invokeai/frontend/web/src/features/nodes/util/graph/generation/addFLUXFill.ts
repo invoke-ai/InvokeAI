@@ -7,6 +7,7 @@ import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { getDenoisingStartAndEnd } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { Invocation } from 'services/api/types';
 
 type AddFLUXFillArg = {
@@ -28,9 +29,9 @@ export const addFLUXFill = async ({
   originalSize,
   scaledSize,
 }: AddFLUXFillArg): Promise<Invocation<'invokeai_img_blend' | 'apply_mask_to_image'>> => {
-  // FLUX Fill always fully denoises
-  denoise.denoising_start = 0;
-  denoise.denoising_end = 1;
+  const { denoising_start, denoising_end } = getDenoisingStartAndEnd(state);
+  denoise.denoising_start = denoising_start;
+  denoise.denoising_end = denoising_end;
 
   const params = selectParamsSlice(state);
   const canvasSettings = selectCanvasSettingsSlice(state);

@@ -31,14 +31,18 @@ const log = logger('system');
 
 export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
   const { generationMode, state, manager } = arg;
+
   log.debug({ generationMode, manager: manager?.id }, 'Building SD1/SD2 graph');
+
+  const model = selectMainModelConfig(state);
+  assert(model, 'No model selected');
+  assert(model.base === 'sd-1' || model.base === 'sd-2', 'Selected model is not a SDXL model');
 
   const params = selectParamsSlice(state);
   const canvas = selectCanvasSlice(state);
   const refImages = selectRefImagesSlice(state);
 
   const { bbox } = canvas;
-  const model = selectMainModelConfig(state);
 
   const {
     cfgScale: cfg_scale,
@@ -52,10 +56,8 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     vae,
   } = params;
 
-  assert(model, 'No model found in state');
-
   const fp32 = vaePrecision === 'fp32';
-  const { positivePrompt, negativePrompt } = selectPresetModifiedPrompts(state);
+  const prompts = selectPresetModifiedPrompts(state);
   const { originalSize, scaledSize } = selectOriginalAndScaledSizes(state);
 
   const g = new Graph(getPrefixedId('sd1_graph'));
@@ -63,6 +65,10 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     id: getPrefixedId('seed'),
     type: 'integer',
     value: _seed,
+  });
+  const positivePrompt = g.addNode({
+    id: getPrefixedId('positive_prompt'),
+    type: 'string',
   });
   const modelLoader = g.addNode({
     type: 'main_model_loader',
@@ -77,7 +83,6 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   const posCond = g.addNode({
     type: 'compel',
     id: getPrefixedId('pos_cond'),
-    prompt: positivePrompt,
   });
   const posCondCollect = g.addNode({
     type: 'collect',
@@ -86,7 +91,7 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   const negCond = g.addNode({
     type: 'compel',
     id: getPrefixedId('neg_cond'),
-    prompt: negativePrompt,
+    prompt: prompts.negative,
   });
   const negCondCollect = g.addNode({
     type: 'collect',
@@ -128,27 +133,28 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
         })
       : null;
 
-  g.addEdge(seed, 'value', noise, 'seed');
   g.addEdge(modelLoader, 'unet', denoise, 'unet');
   g.addEdge(modelLoader, 'clip', clipSkip, 'clip');
   g.addEdge(clipSkip, 'clip', posCond, 'clip');
   g.addEdge(clipSkip, 'clip', negCond, 'clip');
+
+  g.addEdge(positivePrompt, 'value', posCond, 'prompt');
   g.addEdge(posCond, 'conditioning', posCondCollect, 'item');
-  g.addEdge(negCond, 'conditioning', negCondCollect, 'item');
   g.addEdge(posCondCollect, 'collection', denoise, 'positive_conditioning');
+
+  g.addEdge(negCond, 'conditioning', negCondCollect, 'item');
   g.addEdge(negCondCollect, 'collection', denoise, 'negative_conditioning');
+
+  g.addEdge(seed, 'value', noise, 'seed');
   g.addEdge(noise, 'noise', denoise, 'noise');
   g.addEdge(denoise, 'latents', l2i, 'latents');
-
-  assert(model.base === 'sd-1' || model.base === 'sd-2');
 
   g.upsertMetadata({
     cfg_scale,
     cfg_rescale_multiplier,
     width: originalSize.width,
     height: originalSize.height,
-    positive_prompt: positivePrompt,
-    negative_prompt: negativePrompt,
+    negative_prompt: prompts.negative,
     model: Graph.getModelMetadataField(model),
     steps,
     rand_device: shouldUseCpuNoise ? 'cpu' : 'cuda',
@@ -156,6 +162,8 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     clip_skip: skipped_layers,
     vae: vae ?? undefined,
   });
+  g.addEdgeToMetadata(seed, 'value', 'seed');
+  g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
 
   const seamless = addSeamless(state, g, denoise, modelLoader, vaeLoader);
 
@@ -167,17 +175,22 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   > = seamless ?? vaeLoader ?? modelLoader;
   g.addEdge(vaeSource, 'vae', l2i, 'vae');
 
-  const denoising_start = 1 - params.img2imgStrength;
-
   let canvasOutput: Invocation<ImageOutputNodes> = l2i;
 
   if (generationMode === 'txt2img') {
-    canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
+    canvasOutput = addTextToImage({
+      g,
+      denoise,
+      l2i,
+      originalSize,
+      scaledSize,
+    });
     g.upsertMetadata({ generation_mode: 'txt2img' });
   } else if (generationMode === 'img2img') {
     assert(manager !== null);
     canvasOutput = await addImageToImage({
       g,
+      state,
       manager,
       l2i,
       i2l,
@@ -186,14 +199,13 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       originalSize,
       scaledSize,
       bbox,
-      denoising_start,
     });
     g.upsertMetadata({ generation_mode: 'img2img' });
   } else if (generationMode === 'inpaint') {
     assert(manager !== null);
     canvasOutput = await addInpaint({
-      state,
       g,
+      state,
       manager,
       l2i,
       i2l,
@@ -202,15 +214,14 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       modelLoader,
       originalSize,
       scaledSize,
-      denoising_start,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'inpaint' });
   } else if (generationMode === 'outpaint') {
     assert(manager !== null);
     canvasOutput = await addOutpaint({
-      state,
       g,
+      state,
       manager,
       l2i,
       i2l,
@@ -219,7 +230,6 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       modelLoader,
       originalSize,
       scaledSize,
-      denoising_start,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'outpaint' });
@@ -314,9 +324,10 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   g.updateNode(canvasOutput, selectCanvasOutputFields(state));
 
   g.setMetadataReceivingNode(canvasOutput);
+
   return {
     g,
-    seedFieldIdentifier: { nodeId: seed.id, fieldName: 'value' },
-    positivePromptFieldIdentifier: { nodeId: posCond.id, fieldName: 'prompt' },
+    seed,
+    positivePrompt,
   };
 };
