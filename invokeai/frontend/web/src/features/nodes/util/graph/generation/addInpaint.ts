@@ -7,7 +7,7 @@ import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { isMainModelWithoutUnet } from 'features/nodes/util/graph/graphBuilderUtils';
+import { getDenoisingStartAndEnd, isMainModelWithoutUnet } from 'features/nodes/util/graph/graphBuilderUtils';
 import type {
   DenoiseLatentsNodes,
   LatentToImageNodes,
@@ -17,8 +17,8 @@ import type {
 import type { ImageDTO, Invocation } from 'services/api/types';
 
 type AddInpaintArg = {
-  state: RootState;
   g: Graph;
+  state: RootState;
   manager: CanvasManager;
   l2i: Invocation<LatentToImageNodes>;
   i2l: Invocation<'i2l' | 'flux_vae_encode' | 'sd3_i2l' | 'cogview4_i2l'>;
@@ -27,13 +27,12 @@ type AddInpaintArg = {
   modelLoader: Invocation<MainModelLoaderNodes>;
   originalSize: Dimensions;
   scaledSize: Dimensions;
-  denoising_start: number;
   seed: Invocation<'integer'>;
 };
 
 export const addInpaint = async ({
-  state,
   g,
+  state,
   manager,
   l2i,
   i2l,
@@ -42,10 +41,11 @@ export const addInpaint = async ({
   modelLoader,
   originalSize,
   scaledSize,
-  denoising_start,
   seed,
 }: AddInpaintArg): Promise<Invocation<'invokeai_img_blend' | 'apply_mask_to_image'>> => {
+  const { denoising_start, denoising_end } = getDenoisingStartAndEnd(state);
   denoise.denoising_start = denoising_start;
+  denoise.denoising_end = denoising_end;
 
   const params = selectParamsSlice(state);
   const canvasSettings = selectCanvasSettingsSlice(state);

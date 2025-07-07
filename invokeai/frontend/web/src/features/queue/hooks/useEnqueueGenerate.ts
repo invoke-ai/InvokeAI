@@ -95,15 +95,15 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
     return;
   }
 
-  const { g, seedFieldIdentifier, positivePromptFieldIdentifier } = buildGraphResult.value;
+  const { g, seed, positivePrompt } = buildGraphResult.value;
 
   const prepareBatchResult = withResult(() =>
     prepareLinearUIBatch({
       state,
       g,
       prepend,
-      seedFieldIdentifier,
-      positivePromptFieldIdentifier,
+      seedNode: seed,
+      positivePromptNode: positivePrompt,
       origin: 'canvas',
       destination,
     })
