@@ -35,7 +35,7 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
 
   const { bbox } = canvas;
 
-  const { cfgScale: cfg_scale, seed: _seed, steps, vae, t5EncoderModel, clipLEmbedModel, clipGEmbedModel } = params;
+  const { cfgScale: cfg_scale, steps, vae, t5EncoderModel, clipLEmbedModel, clipGEmbedModel } = params;
 
   const { originalSize, scaledSize } = selectOriginalAndScaledSizes(state);
   const prompts = selectPresetModifiedPrompts(state);
@@ -70,7 +70,6 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   const seed = g.addNode({
     id: getPrefixedId('seed'),
     type: 'integer',
-    value: _seed,
   });
   const denoise = g.addNode({
     type: 'sd3_denoise',
@@ -196,7 +195,7 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   g.setMetadataReceivingNode(canvasOutput);
   return {
     g,
-    seedFieldIdentifier: { nodeId: seed.id, fieldName: 'value' },
-    positivePromptFieldIdentifier: { nodeId: posCond.id, fieldName: 'prompt' },
+    seed,
+    positivePrompt,
   };
 };

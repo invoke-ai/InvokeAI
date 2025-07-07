@@ -48,7 +48,6 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     cfgScale: cfg_scale,
     cfgRescaleMultiplier: cfg_rescale_multiplier,
     scheduler,
-    seed: _seed,
     steps,
     shouldUseCpuNoise,
     vaePrecision,
@@ -95,7 +94,6 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   const seed = g.addNode({
     id: getPrefixedId('seed'),
     type: 'integer',
-    value: _seed,
   });
   const noise = g.addNode({
     type: 'noise',
