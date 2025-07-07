@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
@@ -9,12 +9,9 @@ import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import {
-  selectCanvasOutputFields,
-  selectOriginalAndScaledSizes,
-  selectPresetModifiedPrompts,
-} from 'features/nodes/util/graph/graphBuilderUtils';
+import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
@@ -31,13 +28,9 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   assert(model.base === 'sd-3');
 
   const params = selectParamsSlice(state);
-  const canvas = selectCanvasSlice(state);
-
-  const { bbox } = canvas;
 
   const { cfgScale: cfg_scale, steps, vae, t5EncoderModel, clipLEmbedModel, clipGEmbedModel } = params;
 
-  const { originalSize, scaledSize } = selectOriginalAndScaledSizes(state);
   const prompts = selectPresetModifiedPrompts(state);
 
   const g = new Graph(getPrefixedId('sd3_graph'));
@@ -78,16 +71,10 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     steps,
     denoising_start: 0,
     denoising_end: 1,
-    width: scaledSize.width,
-    height: scaledSize.height,
   });
   const l2i = g.addNode({
     type: 'sd3_l2i',
     id: getPrefixedId('l2i'),
-  });
-  const i2l = g.addNode({
-    type: 'sd3_i2l',
-    id: getPrefixedId('sd3_i2l'),
   });
 
   g.addEdge(modelLoader, 'transformer', denoise, 'transformer');
@@ -108,8 +95,6 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
 
   g.upsertMetadata({
     cfg_scale,
-    width: originalSize.width,
-    height: originalSize.height,
     negative_prompt: prompts.negative,
     model: Graph.getModelMetadataField(model),
     steps,
@@ -123,14 +108,17 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   if (generationMode === 'txt2img') {
     canvasOutput = addTextToImage({
       g,
+      state,
       denoise,
       l2i,
-      originalSize,
-      scaledSize,
     });
     g.upsertMetadata({ generation_mode: 'sd3_txt2img' });
   } else if (generationMode === 'img2img') {
     assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'sd3_i2l',
+      id: getPrefixedId('sd3_i2l'),
+    });
     canvasOutput = await addImageToImage({
       g,
       state,
@@ -139,13 +127,14 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       i2l,
       denoise,
       vaeSource: modelLoader,
-      originalSize,
-      scaledSize,
-      bbox,
     });
     g.upsertMetadata({ generation_mode: 'sd3_img2img' });
   } else if (generationMode === 'inpaint') {
     assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'sd3_i2l',
+      id: getPrefixedId('sd3_i2l'),
+    });
     canvasOutput = await addInpaint({
       g,
       state,
@@ -155,13 +144,15 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       denoise,
       vaeSource: modelLoader,
       modelLoader,
-      originalSize,
-      scaledSize,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'sd3_inpaint' });
   } else if (generationMode === 'outpaint') {
     assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'sd3_i2l',
+      id: getPrefixedId('sd3_i2l'),
+    });
     canvasOutput = await addOutpaint({
       g,
       state,
@@ -171,8 +162,6 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       denoise,
       vaeSource: modelLoader,
       modelLoader,
-      originalSize,
-      scaledSize,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'sd3_outpaint' });
@@ -188,9 +177,11 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     canvasOutput = addWatermarker(g, canvasOutput);
   }
 
-  g.upsertMetadata(selectCanvasMetadata(state));
-
   g.updateNode(canvasOutput, selectCanvasOutputFields(state));
+
+  if (selectActiveTab(state) === 'canvas') {
+    g.upsertMetadata(selectCanvasMetadata(state));
+  }
 
   g.setMetadataReceivingNode(canvasOutput);
   return {

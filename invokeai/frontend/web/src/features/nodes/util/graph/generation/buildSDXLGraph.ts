@@ -15,12 +15,9 @@ import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import {
-  selectCanvasOutputFields,
-  selectOriginalAndScaledSizes,
-  selectPresetModifiedPrompts,
-} from 'features/nodes/util/graph/graphBuilderUtils';
+import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
@@ -42,8 +39,6 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   const canvas = selectCanvasSlice(state);
   const refImages = selectRefImagesSlice(state);
 
-  const { bbox } = canvas;
-
   const {
     cfgScale: cfg_scale,
     cfgRescaleMultiplier: cfg_rescale_multiplier,
@@ -56,7 +51,6 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   } = params;
 
   const fp32 = vaePrecision === 'fp32';
-  const { originalSize, scaledSize } = selectOriginalAndScaledSizes(state);
   const prompts = selectPresetModifiedPrompts(state);
 
   const g = new Graph(getPrefixedId('sdxl_graph'));
@@ -98,8 +92,6 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   const noise = g.addNode({
     type: 'noise',
     id: getPrefixedId('noise'),
-    width: scaledSize.width,
-    height: scaledSize.height,
     use_cpu: shouldUseCpuNoise,
   });
   const denoise = g.addNode({
@@ -113,11 +105,6 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   const l2i = g.addNode({
     type: 'l2i',
     id: getPrefixedId('l2i'),
-    fp32,
-  });
-  const i2l = g.addNode({
-    type: 'i2l',
-    id: getPrefixedId('i2l'),
     fp32,
   });
   const vaeLoader =
@@ -149,8 +136,6 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   g.upsertMetadata({
     cfg_scale,
     cfg_rescale_multiplier,
-    width: originalSize.width,
-    height: originalSize.height,
     model: Graph.getModelMetadataField(model),
     steps,
     rand_device: shouldUseCpuNoise ? 'cpu' : 'cuda',
@@ -188,14 +173,19 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   if (generationMode === 'txt2img') {
     canvasOutput = addTextToImage({
       g,
+      state,
+      noise,
       denoise,
       l2i,
-      originalSize,
-      scaledSize,
     });
     g.upsertMetadata({ generation_mode: 'sdxl_txt2img' });
   } else if (generationMode === 'img2img') {
     assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'i2l',
+      id: getPrefixedId('i2l'),
+      fp32,
+    });
     canvasOutput = await addImageToImage({
       g,
       state,
@@ -204,13 +194,15 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       i2l,
       denoise,
       vaeSource,
-      originalSize,
-      scaledSize,
-      bbox,
     });
     g.upsertMetadata({ generation_mode: 'sdxl_img2img' });
   } else if (generationMode === 'inpaint') {
     assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'i2l',
+      id: getPrefixedId('i2l'),
+      fp32,
+    });
     canvasOutput = await addInpaint({
       g,
       state,
@@ -220,13 +212,16 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       denoise,
       vaeSource,
       modelLoader,
-      originalSize,
-      scaledSize,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'sdxl_inpaint' });
   } else if (generationMode === 'outpaint') {
     assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'i2l',
+      id: getPrefixedId('i2l'),
+      fp32,
+    });
     canvasOutput = await addOutpaint({
       g,
       state,
@@ -236,8 +231,6 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       denoise,
       vaeSource,
       modelLoader,
-      originalSize,
-      scaledSize,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'sdxl_outpaint' });
@@ -326,9 +319,11 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     canvasOutput = addWatermarker(g, canvasOutput);
   }
 
-  g.upsertMetadata(selectCanvasMetadata(state));
-
   g.updateNode(canvasOutput, selectCanvasOutputFields(state));
+
+  if (selectActiveTab(state) === 'canvas') {
+    g.upsertMetadata(selectCanvasMetadata(state));
+  }
 
   g.setMetadataReceivingNode(canvasOutput);
   return {

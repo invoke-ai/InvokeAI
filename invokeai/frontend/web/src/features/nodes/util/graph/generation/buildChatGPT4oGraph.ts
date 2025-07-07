@@ -2,13 +2,19 @@ import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
+import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import { isChatGPT4oAspectRatioID, isChatGPT4oReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { type ImageField, zModelIdentifierField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { selectCanvasOutputFields, selectOriginalAndScaledSizes } from 'features/nodes/util/graph/graphBuilderUtils';
+import {
+  getOriginalAndScaledSizesForOtherModes,
+  getOriginalAndScaledSizesForTextToImage,
+  selectCanvasOutputFields,
+} from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
@@ -27,8 +33,6 @@ export const buildChatGPT4oGraph = async (arg: GraphBuilderArg): Promise<GraphBu
   const model = selectMainModelConfig(state);
 
   const refImages = selectRefImagesSlice(state);
-
-  const { originalSize, scaledSize, aspectRatio } = selectOriginalAndScaledSizes(state);
 
   assert(model, 'No model selected');
   assert(model.base === 'chatgpt-4o', 'Selected model is not a ChatGPT 4o API model');
@@ -52,6 +56,7 @@ export const buildChatGPT4oGraph = async (arg: GraphBuilderArg): Promise<GraphBu
   }
 
   if (generationMode === 'txt2img') {
+    const { originalSize, aspectRatio } = getOriginalAndScaledSizesForTextToImage(state);
     assert(isChatGPT4oAspectRatioID(aspectRatio.id), 'ChatGPT 4o does not support this aspect ratio');
 
     const g = new Graph(getPrefixedId('chatgpt_4o_txt2img_graph'));
@@ -85,12 +90,13 @@ export const buildChatGPT4oGraph = async (arg: GraphBuilderArg): Promise<GraphBu
       g,
       positivePrompt,
     };
-  }
+  } else if (generationMode === 'img2img') {
+    const { aspectRatio, rect } = getOriginalAndScaledSizesForOtherModes(state);
+    assert(isChatGPT4oAspectRatioID(aspectRatio.id), 'ChatGPT 4o does not support this aspect ratio');
 
-  if (generationMode === 'img2img') {
     assert(manager !== null);
     const adapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
-    const { image_name } = await manager.compositor.getCompositeImageDTO(adapters, bbox.rect, {
+    const { image_name } = await manager.compositor.getCompositeImageDTO(adapters, rect, {
       is_intermediate: true,
       silent: true,
     });
@@ -103,7 +109,7 @@ export const buildChatGPT4oGraph = async (arg: GraphBuilderArg): Promise<GraphBu
       // @ts-expect-error: These nodes are not available in the OSS application
       type: 'chatgpt_4o_edit_image',
       model: zModelIdentifierField.parse(model),
-      aspect_ratio: bbox.aspectRatio.id,
+      aspect_ratio: aspectRatio.id,
       base_image: { image_name },
       reference_images,
       ...selectCanvasOutputFields(state),
@@ -119,9 +125,14 @@ export const buildChatGPT4oGraph = async (arg: GraphBuilderArg): Promise<GraphBu
     g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
     g.upsertMetadata({
       model: Graph.getModelMetadataField(model),
-      width: bbox.rect.width,
-      height: bbox.rect.height,
+      width: rect.width,
+      height: rect.height,
     });
+
+    if (selectActiveTab(state) === 'canvas') {
+      g.upsertMetadata(selectCanvasMetadata(state));
+    }
+
     return {
       g,
       positivePrompt,

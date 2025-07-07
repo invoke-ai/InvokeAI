@@ -15,12 +15,9 @@ import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import {
-  selectCanvasOutputFields,
-  selectOriginalAndScaledSizes,
-  selectPresetModifiedPrompts,
-} from 'features/nodes/util/graph/graphBuilderUtils';
+import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
@@ -42,8 +39,6 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   const canvas = selectCanvasSlice(state);
   const refImages = selectRefImagesSlice(state);
 
-  const { bbox } = canvas;
-
   const {
     cfgScale: cfg_scale,
     cfgRescaleMultiplier: cfg_rescale_multiplier,
@@ -57,7 +52,6 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
 
   const fp32 = vaePrecision === 'fp32';
   const prompts = selectPresetModifiedPrompts(state);
-  const { originalSize, scaledSize } = selectOriginalAndScaledSizes(state);
 
   const g = new Graph(getPrefixedId('sd1_graph'));
   const seed = g.addNode({
@@ -98,8 +92,6 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   const noise = g.addNode({
     type: 'noise',
     id: getPrefixedId('noise'),
-    width: scaledSize.width,
-    height: scaledSize.height,
     use_cpu: shouldUseCpuNoise,
   });
   const denoise = g.addNode({
@@ -115,11 +107,6 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   const l2i = g.addNode({
     type: 'l2i',
     id: getPrefixedId('l2i'),
-    fp32,
-  });
-  const i2l = g.addNode({
-    type: 'i2l',
-    id: getPrefixedId('i2l'),
     fp32,
   });
   const vaeLoader =
@@ -150,8 +137,6 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   g.upsertMetadata({
     cfg_scale,
     cfg_rescale_multiplier,
-    width: originalSize.width,
-    height: originalSize.height,
     negative_prompt: prompts.negative,
     model: Graph.getModelMetadataField(model),
     steps,
@@ -178,14 +163,19 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   if (generationMode === 'txt2img') {
     canvasOutput = addTextToImage({
       g,
+      state,
+      noise,
       denoise,
       l2i,
-      originalSize,
-      scaledSize,
     });
     g.upsertMetadata({ generation_mode: 'txt2img' });
   } else if (generationMode === 'img2img') {
     assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'i2l',
+      id: getPrefixedId('i2l'),
+      fp32,
+    });
     canvasOutput = await addImageToImage({
       g,
       state,
@@ -194,13 +184,15 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       i2l,
       denoise,
       vaeSource,
-      originalSize,
-      scaledSize,
-      bbox,
     });
     g.upsertMetadata({ generation_mode: 'img2img' });
   } else if (generationMode === 'inpaint') {
     assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'i2l',
+      id: getPrefixedId('i2l'),
+      fp32,
+    });
     canvasOutput = await addInpaint({
       g,
       state,
@@ -210,13 +202,16 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       denoise,
       vaeSource,
       modelLoader,
-      originalSize,
-      scaledSize,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'inpaint' });
   } else if (generationMode === 'outpaint') {
     assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'i2l',
+      id: getPrefixedId('i2l'),
+      fp32,
+    });
     canvasOutput = await addOutpaint({
       g,
       state,
@@ -226,8 +221,6 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       denoise,
       vaeSource,
       modelLoader,
-      originalSize,
-      scaledSize,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'outpaint' });
@@ -317,9 +310,11 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     canvasOutput = addWatermarker(g, canvasOutput);
   }
 
-  g.upsertMetadata(selectCanvasMetadata(state));
-
   g.updateNode(canvasOutput, selectCanvasOutputFields(state));
+
+  if (selectActiveTab(state) === 'canvas') {
+    g.upsertMetadata(selectCanvasMetadata(state));
+  }
 
   g.setMetadataReceivingNode(canvasOutput);
 
