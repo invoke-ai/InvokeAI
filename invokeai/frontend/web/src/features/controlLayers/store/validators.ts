@@ -5,7 +5,8 @@ import type {
   CanvasRegionalGuidanceState,
   RefImageState,
 } from 'features/controlLayers/store/types';
-import type { MainModelConfig } from 'services/api/types';
+import type { ModelIdentifierField } from 'features/nodes/types/common';
+import type { AnyModelConfig, MainModelConfig } from 'services/api/types';
 
 const WARNINGS = {
   UNSUPPORTED_MODEL: 'controlLayers.warnings.unsupportedModel',
@@ -77,6 +78,27 @@ export const getRegionalGuidanceWarnings = (
   return warnings;
 };
 
+export const areBasesCompatibleForRefImage = (
+  first?: ModelIdentifierField | AnyModelConfig | null,
+  second?: ModelIdentifierField | AnyModelConfig | null
+): boolean => {
+  if (!first || !second) {
+    return false;
+  }
+  if (first.base !== second.base) {
+    return false;
+  }
+  if (
+    first.base === 'flux' &&
+    (first.name.toLowerCase().includes('kontext') || second.name.toLowerCase().includes('kontext')) &&
+    first.key !== second.key
+  ) {
+    // FLUX Kontext requires the main model and the reference image model to be the same model
+    return false;
+  }
+  return true;
+};
+
 export const getGlobalReferenceImageWarnings = (
   entity: RefImageState,
   model: MainModelConfig | null | undefined
@@ -95,7 +117,7 @@ export const getGlobalReferenceImageWarnings = (
     if (!config.model) {
       // No model selected
       warnings.push(WARNINGS.IP_ADAPTER_NO_MODEL_SELECTED);
-    } else if (config.model.base !== model.base) {
+    } else if (!areBasesCompatibleForRefImage(config.model, model)) {
       // Supported model architecture but doesn't match
       warnings.push(WARNINGS.IP_ADAPTER_INCOMPATIBLE_BASE_MODEL);
     }
