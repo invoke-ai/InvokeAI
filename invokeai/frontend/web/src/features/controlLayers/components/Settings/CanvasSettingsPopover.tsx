@@ -26,6 +26,7 @@ import { CanvasSettingsPreserveMaskCheckbox } from 'features/controlLayers/compo
 import { CanvasSettingsPressureSensitivityCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsPressureSensitivity';
 import { CanvasSettingsRecalculateRectsButton } from 'features/controlLayers/components/Settings/CanvasSettingsRecalculateRectsButton';
 import { CanvasSettingsRuleOfThirdsSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsRuleOfThirdsGuideSwitch';
+import { CanvasSettingsSaveAllStagingImagesToGalleryCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsSaveAllStagingImagesToGalleryCheckbox';
 import { CanvasSettingsShowHUDSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsShowHUDSwitch';
 import { CanvasSettingsShowProgressOnCanvas } from 'features/controlLayers/components/Settings/CanvasSettingsShowProgressOnCanvasSwitch';
 import { memo } from 'react';
@@ -61,6 +62,7 @@ export const CanvasSettingsPopover = memo(() => {
               <CanvasSettingsPreserveMaskCheckbox />
               <CanvasSettingsClipToBboxCheckbox />
               <CanvasSettingsOutputOnlyMaskedRegionsCheckbox />
+              <CanvasSettingsSaveAllStagingImagesToGalleryCheckbox />
             </Flex>
 
             <Divider />
