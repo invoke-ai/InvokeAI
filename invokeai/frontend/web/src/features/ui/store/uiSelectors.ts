@@ -9,5 +9,3 @@ export const selectActiveTabCanvasMainPanel = createSelector(selectUiSlice, (ui)
 export const selectActiveTabGenerateMainPanel = createSelector(selectUiSlice, (ui) => ui.activeTabGenerateMainPanel);
 export const selectActiveTabUpscalingMainPanel = createSelector(selectUiSlice, (ui) => ui.activeTabUpscalingMainPanel);
 export const selectActiveTabWorkflowsMainPanel = createSelector(selectUiSlice, (ui) => ui.activeTabWorkflowsMainPanel);
-export const selectGridviewPanelStates = createSelector(selectUiSlice, (ui) => ui.gridviewPanelStates);
-export const selectDockviewPanelStates = createSelector(selectUiSlice, (ui) => ui.dockviewPanelStates);
