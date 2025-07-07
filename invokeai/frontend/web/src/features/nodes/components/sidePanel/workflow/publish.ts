@@ -137,6 +137,8 @@ const NODE_TYPE_PUBLISH_DENYLIST = [
   'chatgpt_4o_edit_image',
   'flux_kontext_generate_image',
   'flux_kontext_edit_image',
+  'claude_expand_prompt',
+  'claude_analyze_image',
 ];
 
 export const selectHasUnpublishableNodes = createSelector(selectNodes, (nodes) => {
