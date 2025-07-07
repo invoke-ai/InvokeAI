@@ -182,6 +182,7 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       manager,
       l2i,
       i2l,
+      noise,
       denoise,
       vaeSource,
     });
@@ -199,6 +200,7 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       manager,
       l2i,
       i2l,
+      noise,
       denoise,
       vaeSource,
       modelLoader,
@@ -218,6 +220,7 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       manager,
       l2i,
       i2l,
+      noise,
       denoise,
       vaeSource,
       modelLoader,
