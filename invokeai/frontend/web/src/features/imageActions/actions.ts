@@ -85,17 +85,34 @@ export const createNewCanvasEntityFromImage = async (arg: {
 }) => {
   const { type, imageDTO, dispatch, getState, withResize, overrides: _overrides } = arg;
   const state = getState();
-  const { x, y, width, height } = selectBboxRect(state);
+  const { x, y } = selectBboxRect(state);
 
   let imageObject: CanvasImageState;
+  let resizeWidth: number;
+  let resizeHeight: number;
 
-  if (withResize && (width !== imageDTO.width || height !== imageDTO.height)) {
+  if (withResize) {
+    // Use the same resizing logic as newCanvasFromImage
+    const base = selectBboxModelBase(state);
+    const ratio = imageDTO.width / imageDTO.height;
+    const optimalDimension = getOptimalDimension(base);
+    const { width, height } = calculateNewSize(ratio, optimalDimension ** 2, base);
+    resizeWidth = width;
+    resizeHeight = height;
+  } else {
+    // Use current bbox dimensions
+    const { width, height } = selectBboxRect(state);
+    resizeWidth = width;
+    resizeHeight = height;
+  }
+
+  if (withResize && (resizeWidth !== imageDTO.width || resizeHeight !== imageDTO.height)) {
     const resizedImageDTO = await uploadImage({
       file: await imageDTOToFile(imageDTO),
       image_category: 'general',
       is_intermediate: true,
       silent: true,
-      resize_to: { width, height },
+      resize_to: { width: resizeWidth, height: resizeHeight },
     });
     imageObject = imageDTOToImageObject(resizedImageDTO);
   } else {
