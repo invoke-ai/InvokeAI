@@ -1,29 +1,46 @@
 import { useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import { setActiveTab } from 'features/ui/store/uiSlice';
-import type { TabName } from 'features/ui/store/uiTypes';
-import { useCallback, useEffect } from 'react';
+import { panelStateChanged, setActiveTab } from 'features/ui/store/uiSlice';
+import type { StoredDockviewPanelState, StoredGridviewPanelState, TabName } from 'features/ui/store/uiTypes';
+import { useEffect, useMemo } from 'react';
 
 import { navigationApi } from './navigation-api';
 
 /**
- * Hook that initializes the global navigation API with callbacks to access and modify the active tab.
+ * Hook that initializes the global navigation API with callbacks to access and modify the active tab and handle
+ * stored panel states.
  */
 export const useNavigationApi = () => {
   useAssertSingleton('useNavigationApi');
   const store = useAppStore();
 
-  const getAppTab = useCallback(() => {
-    return selectActiveTab(store.getState());
-  }, [store]);
-  const setAppTab = useCallback(
-    (tab: TabName) => {
-      store.dispatch(setActiveTab(tab));
-    },
+  const appApi = useMemo(
+    () => ({
+      activeTab: {
+        get: (): TabName => {
+          return selectActiveTab(store.getState());
+        },
+        set: (tab: TabName) => {
+          store.dispatch(setActiveTab(tab));
+        },
+      },
+      panelStorage: {
+        get: (id: string) => {
+          return store.getState().ui.panels[id];
+        },
+        set: (id: string, state: StoredDockviewPanelState | StoredGridviewPanelState) => {
+          store.dispatch(panelStateChanged({ id, state }));
+        },
+        delete: (id: string) => {
+          store.dispatch(panelStateChanged({ id, state: undefined }));
+        },
+      },
+    }),
     [store]
   );
+
   useEffect(() => {
-    navigationApi.connectToApp({ getAppTab, setAppTab });
-  }, [getAppTab, setAppTab, store]);
+    navigationApi.connectToApp(appApi);
+  }, [appApi, store]);
 };

@@ -1,7 +1,8 @@
 import { logger } from 'app/logging/logger';
 import { createDeferredPromise, type Deferred } from 'common/util/createDeferredPromise';
-import { GridviewPanel, type IDockviewPanel, type IGridviewPanel } from 'dockview';
-import type { TabName } from 'features/ui/store/uiTypes';
+import { DockviewPanel, GridviewPanel, type IDockviewPanel, type IGridviewPanel } from 'dockview';
+import { debounce } from 'es-toolkit';
+import type { StoredDockviewPanelState, StoredGridviewPanelState, TabName } from 'features/ui/store/uiTypes';
 import { atom } from 'nanostores';
 
 import {
@@ -24,6 +25,18 @@ type PanelType = IGridviewPanel | IDockviewPanel;
 type Waiter = {
   deferred: Deferred<void>;
   timeoutId: ReturnType<typeof setTimeout> | null;
+};
+
+export type NavigationAppApi = {
+  activeTab: {
+    get: () => TabName;
+    set: (tab: TabName) => void;
+  };
+  panelStorage: {
+    get: (id: string) => StoredDockviewPanelState | StoredGridviewPanelState | undefined;
+    set: (id: string, state: StoredDockviewPanelState | StoredGridviewPanelState) => void;
+    delete: (id: string) => void;
+  };
 };
 
 export class NavigationApi {
@@ -55,33 +68,22 @@ export class NavigationApi {
    */
   KEY_SEPARATOR = ':';
 
-  /**
-   * Private imperative method to set the current app tab.
-   */
-  _setAppTab: ((tab: TabName) => void) | null = null;
-
-  /**
-   * Private imperative method to get the current app tab.
-   */
-  _getAppTab: (() => TabName) | null = null;
+  _app: NavigationAppApi | null = null;
 
   /**
    * Connect to the application to manage tab switching.
-   * @param arg.setAppTab - Function to set the current app tab
-   * @param arg.getAppTab - Function to get the current app tab
+   * @param api - The application API that provides methods to set and get the current app tab and manage panel
+   *    state storage.
    */
-  connectToApp = (arg: { setAppTab: (tab: TabName) => void; getAppTab: () => TabName }): void => {
-    const { setAppTab, getAppTab } = arg;
-    this._setAppTab = setAppTab;
-    this._getAppTab = getAppTab;
+  connectToApp = (api: NavigationAppApi): void => {
+    this._app = api;
   };
 
   /**
    * Disconnect from the application, clearing the tab management functions.
    */
   disconnectFromApp = (): void => {
-    this._setAppTab = null;
-    this._getAppTab = null;
+    this._app = null;
   };
 
   /**
@@ -97,13 +99,13 @@ export class NavigationApi {
       clearTimeout(this.switchingTabsTimeout);
       this.switchingTabsTimeout = null;
     }
-    if (tab === this._getAppTab?.()) {
+    if (tab === this._app?.activeTab.get?.()) {
       return true;
     }
     this.$isSwitchingTabs.set(true);
     log.debug(`Switching to tab: ${tab}`);
-    if (this._setAppTab) {
-      this._setAppTab(tab);
+    if (this._app) {
+      this._app.activeTab.set(tab);
       return true;
     } else {
       log.error('No setAppTab function available to switch tabs');
@@ -123,6 +125,100 @@ export class NavigationApi {
     }, SWITCH_TABS_FAKE_DELAY_MS);
   };
 
+  _initGridviewPanelStorage = (key: string, panel: IGridviewPanel) => {
+    if (!this._app) {
+      log.error('App not connected');
+      return;
+    }
+    const storedState = this._app.panelStorage.get(key);
+    if (!storedState) {
+      log.debug('No stored state for panel, setting initial state');
+      const { height, width } = panel.api;
+      this._app.panelStorage.set(key, {
+        id: key,
+        type: 'gridview-panel',
+        dimensions: { height, width },
+      });
+    } else {
+      if (storedState.type !== 'gridview-panel') {
+        log.error(`Panel ${key} type mismatch: expected gridview-panel, got ${storedState.type}`);
+        this._app.panelStorage.delete(key);
+        return;
+      }
+      log.debug({ storedState }, 'Found stored state for panel, restoring');
+
+      panel.api.setSize(storedState.dimensions);
+    }
+    const { dispose } = panel.api.onDidDimensionsChange(
+      debounce(({ width, height }) => {
+        log.debug({ key, width, height }, 'Panel dimensions changed');
+        if (!this._app) {
+          log.error('App not connected');
+          return;
+        }
+        this._app.panelStorage.set(key, {
+          id: key,
+          type: 'gridview-panel',
+          dimensions: { width, height },
+        });
+      }, 1000)
+    );
+
+    return dispose;
+  };
+
+  _initDockviewPanelStorage = (key: string, panel: IDockviewPanel) => {
+    if (!this._app) {
+      log.error('App not connected');
+      return;
+    }
+    const storedState = this._app.panelStorage.get(key);
+    if (!storedState) {
+      const { isActive } = panel.api;
+      this._app.panelStorage.set(key, {
+        id: key,
+        type: 'dockview-panel',
+        isActive,
+      });
+    } else {
+      if (storedState.type !== 'dockview-panel') {
+        log.error(`Panel ${key} type mismatch: expected dockview-panel, got ${storedState.type}`);
+        this._app.panelStorage.delete(key);
+        return;
+      }
+      if (storedState.isActive) {
+        panel.api.setActive();
+      }
+    }
+
+    const { dispose } = panel.api.onDidActiveChange(
+      debounce(({ isActive }) => {
+        if (!this._app) {
+          log.error('App not connected');
+          return;
+        }
+        this._app.panelStorage.set(key, {
+          id: key,
+          type: 'dockview-panel',
+          isActive,
+        });
+      }, 1000)
+    );
+
+    return dispose;
+  };
+
+  _initPanelStorage = (key: string, panel: PanelType) => {
+    if (panel instanceof GridviewPanel) {
+      return this._initGridviewPanelStorage(key, panel);
+    } else if (panel instanceof DockviewPanel) {
+      return this._initDockviewPanelStorage(key, panel);
+    } else {
+      log.error(`Unsupported panel type: ${panel.constructor.name}`);
+      return;
+    }
+  };
+
   /**
    * Registers a panel with the navigation API.
    *
@@ -135,6 +231,8 @@ export class NavigationApi {
     const key = this._getPanelKey(tab, panelId);
 
     this.panels.set(key, panel);
+
+    const cleanupPanelStorage = this._initPanelStorage(key, panel);
 
     // Resolve any pending waiters for this panel, notifying them that the panel is now registered.
     const waiter = this.waiters.get(key);
@@ -149,6 +247,7 @@ export class NavigationApi {
     log.debug(`Registered panel ${key}`);
 
     return () => {
+      cleanupPanelStorage?.();
       this.panels.delete(key);
       log.debug(`Unregistered panel ${key}`);
     };
@@ -280,7 +379,7 @@ export class NavigationApi {
    * }
    */
   focusPanelInActiveTab = (panelId: string, timeout = 2000): Promise<boolean> => {
-    const activeTab = this._getAppTab ? this._getAppTab() : null;
+    const activeTab = this._app?.activeTab.get() ?? null;
     if (!activeTab) {
       log.error('No active tab found');
       return Promise.resolve(false);
@@ -326,7 +425,7 @@ export class NavigationApi {
    * @returns True if the panel was toggled, false if it was not found or an error occurred
    */
   toggleLeftPanel = (): boolean => {
-    const activeTab = this._getAppTab ? this._getAppTab() : null;
+    const activeTab = this._app?.activeTab.get() ?? null;
     if (!activeTab) {
       log.warn('No active tab found to toggle left panel');
       return false;
@@ -359,7 +458,7 @@ export class NavigationApi {
    * @returns True if the panel was toggled, false if it was not found or an error occurred
    */
   toggleRightPanel = (): boolean => {
-    const activeTab = this._getAppTab ? this._getAppTab() : null;
+    const activeTab = this._app?.activeTab.get() ?? null;
     if (!activeTab) {
       log.warn('No active tab found to toggle right panel');
       return false;
@@ -393,7 +492,7 @@ export class NavigationApi {
    * @returns True if the panels were toggled, false if they were not found or an error occurred
    */
   toggleLeftAndRightPanels = (): boolean => {
-    const activeTab = this._getAppTab ? this._getAppTab() : null;
+    const activeTab = this._app?.activeTab.get() ?? null;
     if (!activeTab) {
       log.warn('No active tab found to toggle right panel');
       return false;
@@ -433,7 +532,7 @@ export class NavigationApi {
    * @returns True if the panels were reset, false if they were not found or an error occurred
    */
   resetLeftAndRightPanels = (): boolean => {
-    const activeTab = this._getAppTab ? this._getAppTab() : null;
+    const activeTab = this._app?.activeTab.get() ?? null;
     if (!activeTab) {
       log.warn('No active tab found to toggle right panel');
       return false;
