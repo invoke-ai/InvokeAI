@@ -17,6 +17,7 @@ import type {
   VaeSourceNodes,
 } from 'features/nodes/util/graph/types';
 import type { ImageDTO, Invocation } from 'services/api/types';
+import { assert } from 'tsafe';
 
 type AddInpaintArg = {
   g: Graph;
@@ -24,6 +25,7 @@ type AddInpaintArg = {
   manager: CanvasManager;
   l2i: Invocation<LatentToImageNodes>;
   i2l: Invocation<'i2l' | 'flux_vae_encode' | 'sd3_i2l' | 'cogview4_i2l'>;
+  noise?: Invocation<'noise'>;
   denoise: Invocation<DenoiseLatentsNodes>;
   vaeSource: Invocation<VaeSourceNodes | MainModelLoaderNodes>;
   modelLoader: Invocation<MainModelLoaderNodes>;
@@ -36,6 +38,7 @@ export const addInpaint = async ({
   manager,
   l2i,
   i2l,
+  noise,
   denoise,
   vaeSource,
   modelLoader,
@@ -49,6 +52,16 @@ export const addInpaint = async ({
   const canvasSettings = selectCanvasSettingsSlice(state);
 
   const { originalSize, scaledSize, rect } = getOriginalAndScaledSizesForOtherModes(state);
+
+  if (denoise.type === 'cogview4_denoise' || denoise.type === 'flux_denoise' || denoise.type === 'sd3_denoise') {
+    denoise.width = scaledSize.width;
+    denoise.height = scaledSize.height;
+  } else {
+    assert(denoise.type === 'denoise_latents');
+    assert(noise, 'SD1.5/SD2/SDXL graphs require a noise node to be passed in');
+    noise.width = scaledSize.width;
+    noise.height = scaledSize.height;
+  }
 
   const rasterAdapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
   const initialImage = await manager.compositor.getCompositeImageDTO(rasterAdapters, rect, {
@@ -92,8 +105,6 @@ export const addInpaint = async ({
 
   if (needsScaleBeforeProcessing) {
     // Scale before processing requires some resizing
-    i2l.image = { image_name: initialImage.image_name };
-
     const resizeImageToScaledSize = g.addNode({
       type: 'img_resize',
       id: getPrefixedId('resize_image_to_scaled_size'),
@@ -198,7 +209,6 @@ export const addInpaint = async ({
     }
   } else {
     // No scale before processing, much simpler
-    i2l.image = { image_name: initialImage.image_name };
 
     // If we have a noise mask, apply it to the input image before i2l conversion
     if (noiseMaskImage) {
@@ -219,6 +229,8 @@ export const addInpaint = async ({
 
       g.addEdge(seed, 'value', noiseNode, 'seed');
       g.addEdge(noiseNode, 'image', i2l, 'image');
+    } else {
+      i2l.image = { image_name: initialImage.image_name };
     }
 
     const createGradientMask = g.addNode({

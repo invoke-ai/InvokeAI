@@ -19,6 +19,7 @@ import type {
   VaeSourceNodes,
 } from 'features/nodes/util/graph/types';
 import type { ImageDTO, Invocation } from 'services/api/types';
+import { assert } from 'tsafe';
 
 type AddOutpaintArg = {
   g: Graph;
@@ -26,6 +27,7 @@ type AddOutpaintArg = {
   manager: CanvasManager;
   l2i: Invocation<LatentToImageNodes>;
   i2l: Invocation<ImageToLatentsNodes>;
+  noise?: Invocation<'noise'>;
   denoise: Invocation<DenoiseLatentsNodes>;
   vaeSource: Invocation<VaeSourceNodes | MainModelLoaderNodes>;
   modelLoader: Invocation<MainModelLoaderNodes>;
@@ -38,6 +40,7 @@ export const addOutpaint = async ({
   manager,
   l2i,
   i2l,
+  noise,
   denoise,
   vaeSource,
   modelLoader,
@@ -51,6 +54,16 @@ export const addOutpaint = async ({
   const canvasSettings = selectCanvasSettingsSlice(state);
 
   const { originalSize, scaledSize, rect } = getOriginalAndScaledSizesForOtherModes(state);
+
+  if (denoise.type === 'cogview4_denoise' || denoise.type === 'flux_denoise' || denoise.type === 'sd3_denoise') {
+    denoise.width = scaledSize.width;
+    denoise.height = scaledSize.height;
+  } else {
+    assert(denoise.type === 'denoise_latents');
+    assert(noise, 'SD1.5/SD2/SDXL graphs require a noise node to be passed in');
+    noise.width = scaledSize.width;
+    noise.height = scaledSize.height;
+  }
 
   const rasterAdapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
   const initialImage = await manager.compositor.getCompositeImageDTO(rasterAdapters, rect, {
