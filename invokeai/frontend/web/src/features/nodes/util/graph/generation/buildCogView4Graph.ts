@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
@@ -25,43 +25,51 @@ const log = logger('system');
 
 export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
   const { generationMode, state, manager } = arg;
+
   log.debug({ generationMode, manager: manager?.id }, 'Building CogView4 graph');
+
+  const model = selectMainModelConfig(state);
+  assert(model, 'No model selected');
+  assert(model.base === 'cogview4', 'Selected model is not a CogView4 model');
 
   const params = selectParamsSlice(state);
   const canvas = selectCanvasSlice(state);
 
   const { bbox } = canvas;
 
-  const { model, cfgScale: cfg_scale, seed: _seed, steps } = params;
-
-  assert(model, 'No model found in state');
+  const { cfgScale: cfg_scale, seed: _seed, steps } = params;
 
   const { originalSize, scaledSize } = selectOriginalAndScaledSizes(state);
-  const { positivePrompt, negativePrompt } = selectPresetModifiedPrompts(state);
+  const prompts = selectPresetModifiedPrompts(state);
 
   const g = new Graph(getPrefixedId('cogview4_graph'));
-  const seed = g.addNode({
-    id: getPrefixedId('seed'),
-    type: 'integer',
-    value: _seed,
-  });
+
   const modelLoader = g.addNode({
     type: 'cogview4_model_loader',
     id: getPrefixedId('cogview4_model_loader'),
     model,
   });
+
+  const positivePrompt = g.addNode({
+    id: getPrefixedId('positive_prompt'),
+    type: 'string',
+  });
   const posCond = g.addNode({
     type: 'cogview4_text_encoder',
     id: getPrefixedId('pos_prompt'),
-    prompt: positivePrompt,
   });
 
   const negCond = g.addNode({
     type: 'cogview4_text_encoder',
     id: getPrefixedId('neg_prompt'),
-    prompt: negativePrompt,
+    prompt: prompts.negative,
   });
 
+  const seed = g.addNode({
+    id: getPrefixedId('seed'),
+    type: 'integer',
+    value: _seed,
+  });
   const denoise = g.addNode({
     type: 'cogview4_denoise',
     id: getPrefixedId('denoise_latents'),
@@ -69,8 +77,6 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
     width: scaledSize.width,
     height: scaledSize.height,
     steps,
-    denoising_start: 0,
-    denoising_end: 1,
   });
   const l2i = g.addNode({
     type: 'cogview4_l2i',
@@ -81,15 +87,17 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
     id: getPrefixedId('cogview4_i2l'),
   });
 
-  g.addEdge(seed, 'value', denoise, 'seed');
   g.addEdge(modelLoader, 'transformer', denoise, 'transformer');
   g.addEdge(modelLoader, 'glm_encoder', posCond, 'glm_encoder');
   g.addEdge(modelLoader, 'glm_encoder', negCond, 'glm_encoder');
   g.addEdge(modelLoader, 'vae', l2i, 'vae');
 
+  g.addEdge(positivePrompt, 'value', posCond, 'prompt');
   g.addEdge(posCond, 'conditioning', denoise, 'positive_conditioning');
+
   g.addEdge(negCond, 'conditioning', denoise, 'negative_conditioning');
 
+  g.addEdge(seed, 'value', denoise, 'seed');
   g.addEdge(denoise, 'latents', l2i, 'latents');
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
@@ -99,39 +107,44 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
     cfg_scale,
     width: originalSize.width,
     height: originalSize.height,
-    positive_prompt: positivePrompt,
-    negative_prompt: negativePrompt,
+    negative_prompt: prompts.negative,
     model: Graph.getModelMetadataField(modelConfig),
     steps,
   });
-
-  const denoising_start = 1 - params.img2imgStrength;
+  g.addEdgeToMetadata(seed, 'value', 'seed');
+  g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
 
   let canvasOutput: Invocation<ImageOutputNodes> = l2i;
 
   if (generationMode === 'txt2img') {
-    canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
+    canvasOutput = addTextToImage({
+      g,
+      denoise,
+      l2i,
+      originalSize,
+      scaledSize,
+    });
     g.upsertMetadata({ generation_mode: 'cogview4_txt2img' });
   } else if (generationMode === 'img2img') {
     assert(manager !== null);
     canvasOutput = await addImageToImage({
       g,
+      state,
       manager,
+      denoise,
       l2i,
       i2l,
-      denoise,
       vaeSource: modelLoader,
       originalSize,
       scaledSize,
       bbox,
-      denoising_start,
     });
     g.upsertMetadata({ generation_mode: 'cogview4_img2img' });
   } else if (generationMode === 'inpaint') {
     assert(manager !== null);
     canvasOutput = await addInpaint({
-      state,
       g,
+      state,
       manager,
       l2i,
       i2l,
@@ -140,15 +153,14 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
       modelLoader,
       originalSize,
       scaledSize,
-      denoising_start,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'cogview4_inpaint' });
   } else if (generationMode === 'outpaint') {
     assert(manager !== null);
     canvasOutput = await addOutpaint({
-      state,
       g,
+      state,
       manager,
       l2i,
       i2l,
@@ -157,7 +169,6 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
       modelLoader,
       originalSize,
       scaledSize,
-      denoising_start,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'cogview4_outpaint' });
@@ -178,9 +189,10 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
   g.updateNode(canvasOutput, selectCanvasOutputFields(state));
 
   g.setMetadataReceivingNode(canvasOutput);
+
   return {
     g,
-    seedFieldIdentifier: { nodeId: seed.id, fieldName: 'value' },
-    positivePromptFieldIdentifier: { nodeId: posCond.id, fieldName: 'prompt' },
+    seed,
+    positivePrompt,
   };
 };

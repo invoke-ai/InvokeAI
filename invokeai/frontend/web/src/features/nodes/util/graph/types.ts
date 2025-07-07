@@ -1,8 +1,8 @@
 import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { GenerationMode } from 'features/controlLayers/store/types';
-import type { FieldIdentifier } from 'features/nodes/types/field';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import type { Invocation } from 'services/api/types';
 
 export type ImageOutputNodes =
   | 'l2i'
@@ -38,8 +38,8 @@ export type GraphBuilderArg = {
 
 export type GraphBuilderReturn = {
   g: Graph;
-  seedFieldIdentifier?: FieldIdentifier;
-  positivePromptFieldIdentifier: FieldIdentifier;
+  seed?: Invocation<'integer'>;
+  positivePrompt: Invocation<'string'>;
 };
 
 export class UnsupportedGenerationModeError extends Error {

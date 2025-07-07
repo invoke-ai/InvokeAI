@@ -1,7 +1,14 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import {
+  selectImg2imgStrength,
+  selectMainModelConfig,
+  selectOptimizedDenoisingEnabled,
+  selectParamsSlice,
+  selectRefinerModel,
+  selectRefinerStart,
+} from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { ParamsState } from 'features/controlLayers/store/types';
 import type { BoardField } from 'features/nodes/types/common';
@@ -77,19 +84,21 @@ export const selectPresetModifiedPrompts = createSelector(
         );
 
         return {
-          positivePrompt: presetModifiedPositivePrompt,
-          negativePrompt: presetModifiedNegativePrompt,
-          positiveStylePrompt: shouldConcatPrompts ? presetModifiedPositivePrompt : positivePrompt2,
-          negativeStylePrompt: shouldConcatPrompts ? presetModifiedNegativePrompt : negativePrompt2,
+          positive: presetModifiedPositivePrompt,
+          negative: presetModifiedNegativePrompt,
+          positiveStyle: positivePrompt2,
+          negativeStyle: negativePrompt2,
+          useMainPromptsForStyle: shouldConcatPrompts,
         };
       }
     }
 
     return {
-      positivePrompt,
-      negativePrompt,
-      positiveStylePrompt: shouldConcatPrompts ? positivePrompt : positivePrompt2,
-      negativeStylePrompt: shouldConcatPrompts ? negativePrompt : negativePrompt2,
+      positive: positivePrompt,
+      negative: negativePrompt,
+      positiveStyle: positivePrompt2,
+      negativeStyle: negativePrompt2,
+      useMainPromptsForStyle: shouldConcatPrompts,
     };
   }
 );
@@ -177,3 +186,66 @@ export const isMainModelWithoutUnet = (modelLoader: Invocation<MainModelLoaderNo
 };
 
 export const isCanvasOutputNodeId = (nodeId: string) => nodeId.split(':')[0] === CANVAS_OUTPUT_PREFIX;
+
+export const getDenoisingStartAndEnd = (state: RootState): { denoising_start: number; denoising_end: number } => {
+  const optimizedDenoisingEnabled = selectOptimizedDenoisingEnabled(state);
+  const denoisingStrength = selectImg2imgStrength(state);
+  const model = selectMainModelConfig(state);
+  const refinerModel = selectRefinerModel(state);
+  const refinerDenoisingStart = selectRefinerStart(state);
+
+  switch (model?.base) {
+    case 'sd-3': {
+      // We rescale the img2imgStrength (with exponent 0.2) to effectively use the entire range [0, 1] and make the scale
+      // more user-friendly for SD3.5. Without this, most of the 'change' is concentrated in the high denoise strength
+      // range (>0.9).
+      const exponent = optimizedDenoisingEnabled ? 0.2 : 1;
+      return {
+        denoising_start: 1 - denoisingStrength ** exponent,
+        denoising_end: 1,
+      };
+    }
+    case 'flux': {
+      if (model.variant === 'inpaint') {
+        // This is a FLUX Fill model - we always denoise fully
+        return {
+          denoising_start: 0,
+          denoising_end: 1,
+        };
+      } else {
+        // We rescale the img2imgStrength (with exponent 0.2) to effectively use the entire range [0, 1] and make the scale
+        // more user-friendly for SD3.5. Without this, most of the 'change' is concentrated in the high denoise strength
+        // range (>0.9).
+        const exponent = optimizedDenoisingEnabled ? 0.2 : 1;
+        return {
+          denoising_start: 1 - denoisingStrength ** exponent,
+          denoising_end: 1,
+        };
+      }
+    }
+    case 'sd-1':
+    case 'sd-2':
+    case 'cogview4': {
+      return {
+        denoising_start: 1 - denoisingStrength,
+        denoising_end: 1,
+      };
+    }
+    case 'sdxl': {
+      if (refinerModel) {
+        return {
+          denoising_start: Math.min(refinerDenoisingStart, 1 - denoisingStrength),
+          denoising_end: refinerDenoisingStart,
+        };
+      } else {
+        return {
+          denoising_start: 1 - denoisingStrength,
+          denoising_end: 1,
+        };
+      }
+    }
+    default: {
+      assert(false, `Unsupported base: ${model?.base}`);
+    }
+  }
+};

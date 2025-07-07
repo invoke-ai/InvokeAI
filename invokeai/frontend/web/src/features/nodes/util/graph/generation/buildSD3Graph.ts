@@ -23,6 +23,7 @@ const log = logger('system');
 
 export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
   const { generationMode, state, manager } = arg;
+
   log.debug({ generationMode, manager: manager?.id }, 'Building SD3 graph');
 
   const model = selectMainModelConfig(state);
@@ -34,27 +35,13 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
 
   const { bbox } = canvas;
 
-  const {
-    cfgScale: cfg_scale,
-    seed: _seed,
-    steps,
-    vae,
-    t5EncoderModel,
-    clipLEmbedModel,
-    clipGEmbedModel,
-    optimizedDenoisingEnabled,
-    img2imgStrength,
-  } = params;
+  const { cfgScale: cfg_scale, seed: _seed, steps, vae, t5EncoderModel, clipLEmbedModel, clipGEmbedModel } = params;
 
   const { originalSize, scaledSize } = selectOriginalAndScaledSizes(state);
-  const { positivePrompt, negativePrompt } = selectPresetModifiedPrompts(state);
+  const prompts = selectPresetModifiedPrompts(state);
 
   const g = new Graph(getPrefixedId('sd3_graph'));
-  const seed = g.addNode({
-    id: getPrefixedId('seed'),
-    type: 'integer',
-    value: _seed,
-  });
+
   const modelLoader = g.addNode({
     type: 'sd3_model_loader',
     id: getPrefixedId('sd3_model_loader'),
@@ -64,18 +51,27 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     clip_g_model: clipGEmbedModel,
     vae_model: vae,
   });
+
+  const positivePrompt = g.addNode({
+    id: getPrefixedId('positive_prompt'),
+    type: 'string',
+  });
   const posCond = g.addNode({
     type: 'sd3_text_encoder',
     id: getPrefixedId('pos_cond'),
-    prompt: positivePrompt,
   });
 
   const negCond = g.addNode({
     type: 'sd3_text_encoder',
     id: getPrefixedId('neg_cond'),
-    prompt: negativePrompt,
+    prompt: prompts.negative,
   });
 
+  const seed = g.addNode({
+    id: getPrefixedId('seed'),
+    type: 'integer',
+    value: _seed,
+  });
   const denoise = g.addNode({
     type: 'sd3_denoise',
     id: getPrefixedId('sd3_denoise'),
@@ -95,7 +91,6 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     id: getPrefixedId('sd3_i2l'),
   });
 
-  g.addEdge(seed, 'value', denoise, 'seed');
   g.addEdge(modelLoader, 'transformer', denoise, 'transformer');
   g.addEdge(modelLoader, 'clip_l', posCond, 'clip_l');
   g.addEdge(modelLoader, 'clip_l', negCond, 'clip_l');
@@ -103,43 +98,43 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   g.addEdge(modelLoader, 'clip_g', negCond, 'clip_g');
   g.addEdge(modelLoader, 't5_encoder', posCond, 't5_encoder');
   g.addEdge(modelLoader, 't5_encoder', negCond, 't5_encoder');
+  g.addEdge(modelLoader, 'vae', l2i, 'vae');
 
+  g.addEdge(positivePrompt, 'value', posCond, 'prompt');
   g.addEdge(posCond, 'conditioning', denoise, 'positive_conditioning');
   g.addEdge(negCond, 'conditioning', denoise, 'negative_conditioning');
 
+  g.addEdge(seed, 'value', denoise, 'seed');
   g.addEdge(denoise, 'latents', l2i, 'latents');
 
   g.upsertMetadata({
     cfg_scale,
     width: originalSize.width,
     height: originalSize.height,
-    positive_prompt: positivePrompt,
-    negative_prompt: negativePrompt,
+    negative_prompt: prompts.negative,
     model: Graph.getModelMetadataField(model),
     steps,
     vae: vae ?? undefined,
   });
-  g.addEdge(modelLoader, 'vae', l2i, 'vae');
-
-  let denoising_start: number;
-  if (optimizedDenoisingEnabled) {
-    // We rescale the img2imgStrength (with exponent 0.2) to effectively use the entire range [0, 1] and make the scale
-    // more user-friendly for SD3.5. Without this, most of the 'change' is concentrated in the high denoise strength
-    // range (>0.9).
-    denoising_start = 1 - img2imgStrength ** 0.2;
-  } else {
-    denoising_start = 1 - img2imgStrength;
-  }
+  g.addEdgeToMetadata(seed, 'value', 'seed');
+  g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
 
   let canvasOutput: Invocation<ImageOutputNodes> = l2i;
 
   if (generationMode === 'txt2img') {
-    canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
+    canvasOutput = addTextToImage({
+      g,
+      denoise,
+      l2i,
+      originalSize,
+      scaledSize,
+    });
     g.upsertMetadata({ generation_mode: 'sd3_txt2img' });
   } else if (generationMode === 'img2img') {
     assert(manager !== null);
     canvasOutput = await addImageToImage({
       g,
+      state,
       manager,
       l2i,
       i2l,
@@ -148,14 +143,13 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       originalSize,
       scaledSize,
       bbox,
-      denoising_start,
     });
     g.upsertMetadata({ generation_mode: 'sd3_img2img' });
   } else if (generationMode === 'inpaint') {
     assert(manager !== null);
     canvasOutput = await addInpaint({
-      state,
       g,
+      state,
       manager,
       l2i,
       i2l,
@@ -164,15 +158,14 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       modelLoader,
       originalSize,
       scaledSize,
-      denoising_start,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'sd3_inpaint' });
   } else if (generationMode === 'outpaint') {
     assert(manager !== null);
     canvasOutput = await addOutpaint({
-      state,
       g,
+      state,
       manager,
       l2i,
       i2l,
@@ -181,7 +174,6 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       modelLoader,
       originalSize,
       scaledSize,
-      denoising_start,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'sd3_outpaint' });

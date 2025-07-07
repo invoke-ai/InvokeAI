@@ -31,11 +31,12 @@ const log = logger('system');
 
 export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
   const { generationMode, state, manager } = arg;
+
   log.debug({ generationMode, manager: manager?.id }, 'Building SDXL graph');
 
   const model = selectMainModelConfig(state);
-  assert(model, 'No model found in state');
-  assert(model.base === 'sdxl');
+  assert(model, 'No model selected');
+  assert(model.base === 'sdxl', 'Selected model is not a SDXL Kontext model');
 
   const params = selectParamsSlice(state);
   const canvas = selectCanvasSlice(state);
@@ -53,46 +54,48 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     vaePrecision,
     vae,
     refinerModel,
-    refinerStart,
   } = params;
-
-  assert(model, 'No model found in state');
 
   const fp32 = vaePrecision === 'fp32';
   const { originalSize, scaledSize } = selectOriginalAndScaledSizes(state);
-  const { positivePrompt, negativePrompt, positiveStylePrompt, negativeStylePrompt } =
-    selectPresetModifiedPrompts(state);
+  const prompts = selectPresetModifiedPrompts(state);
 
   const g = new Graph(getPrefixedId('sdxl_graph'));
-  const seed = g.addNode({
-    id: getPrefixedId('seed'),
-    type: 'integer',
-    value: _seed,
-  });
+
   const modelLoader = g.addNode({
     type: 'sdxl_model_loader',
     id: getPrefixedId('sdxl_model_loader'),
     model,
   });
+
+  const positivePrompt = g.addNode({
+    id: getPrefixedId('positive_prompt'),
+    type: 'string',
+  });
   const posCond = g.addNode({
     type: 'sdxl_compel_prompt',
     id: getPrefixedId('pos_cond'),
-    prompt: positivePrompt,
-    style: positiveStylePrompt,
   });
   const posCondCollect = g.addNode({
     type: 'collect',
     id: getPrefixedId('pos_cond_collect'),
   });
+
   const negCond = g.addNode({
     type: 'sdxl_compel_prompt',
     id: getPrefixedId('neg_cond'),
-    prompt: negativePrompt,
-    style: negativeStylePrompt,
+    prompt: prompts.negative,
+    style: prompts.negativeStyle,
   });
   const negCondCollect = g.addNode({
     type: 'collect',
     id: getPrefixedId('neg_cond_collect'),
+  });
+
+  const seed = g.addNode({
+    id: getPrefixedId('seed'),
+    type: 'integer',
+    value: _seed,
   });
   const noise = g.addNode({
     type: 'noise',
@@ -108,8 +111,6 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     cfg_rescale_multiplier,
     scheduler,
     steps,
-    denoising_start: 0,
-    denoising_end: refinerModel ? refinerStart : 1,
   });
   const l2i = g.addNode({
     type: 'l2i',
@@ -130,16 +131,20 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
         })
       : null;
 
-  g.addEdge(seed, 'value', noise, 'seed');
   g.addEdge(modelLoader, 'unet', denoise, 'unet');
   g.addEdge(modelLoader, 'clip', posCond, 'clip');
   g.addEdge(modelLoader, 'clip', negCond, 'clip');
   g.addEdge(modelLoader, 'clip2', posCond, 'clip2');
   g.addEdge(modelLoader, 'clip2', negCond, 'clip2');
+
+  g.addEdge(positivePrompt, 'value', posCond, 'prompt');
   g.addEdge(posCond, 'conditioning', posCondCollect, 'item');
-  g.addEdge(negCond, 'conditioning', negCondCollect, 'item');
   g.addEdge(posCondCollect, 'collection', denoise, 'positive_conditioning');
+
+  g.addEdge(negCond, 'conditioning', negCondCollect, 'item');
   g.addEdge(negCondCollect, 'collection', denoise, 'negative_conditioning');
+
+  g.addEdge(seed, 'value', noise, 'seed');
   g.addEdge(noise, 'noise', denoise, 'noise');
   g.addEdge(denoise, 'latents', l2i, 'latents');
 
@@ -148,16 +153,24 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     cfg_rescale_multiplier,
     width: originalSize.width,
     height: originalSize.height,
-    positive_prompt: positivePrompt,
-    negative_prompt: negativePrompt,
     model: Graph.getModelMetadataField(model),
     steps,
     rand_device: shouldUseCpuNoise ? 'cpu' : 'cuda',
     scheduler,
-    positive_style_prompt: positiveStylePrompt,
-    negative_style_prompt: negativeStylePrompt,
+    negative_prompt: prompts.negative,
+    negative_style_prompt: prompts.negativeStyle,
     vae: vae ?? undefined,
   });
+  g.addEdgeToMetadata(seed, 'value', 'seed');
+  g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
+
+  if (prompts.useMainPromptsForStyle) {
+    g.addEdge(positivePrompt, 'value', posCond, 'style');
+    g.addEdgeToMetadata(positivePrompt, 'value', 'positive_style_prompt');
+  } else {
+    posCond.style = prompts.positiveStyle;
+    g.upsertMetadata({ positive_style_prompt: prompts.positiveStyle });
+  }
 
   const seamless = addSeamless(state, g, denoise, modelLoader, vaeLoader);
 
@@ -172,19 +185,22 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     await addSDXLRefiner(state, g, denoise, seamless, posCond, negCond, l2i);
   }
 
-  const denoising_start = refinerModel
-    ? Math.min(refinerStart, 1 - params.img2imgStrength)
-    : 1 - params.img2imgStrength;
-
   let canvasOutput: Invocation<ImageOutputNodes> = l2i;
 
   if (generationMode === 'txt2img') {
-    canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
+    canvasOutput = addTextToImage({
+      g,
+      denoise,
+      l2i,
+      originalSize,
+      scaledSize,
+    });
     g.upsertMetadata({ generation_mode: 'sdxl_txt2img' });
   } else if (generationMode === 'img2img') {
     assert(manager !== null);
     canvasOutput = await addImageToImage({
       g,
+      state,
       manager,
       l2i,
       i2l,
@@ -193,14 +209,13 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       originalSize,
       scaledSize,
       bbox,
-      denoising_start,
     });
     g.upsertMetadata({ generation_mode: 'sdxl_img2img' });
   } else if (generationMode === 'inpaint') {
     assert(manager !== null);
     canvasOutput = await addInpaint({
-      state,
       g,
+      state,
       manager,
       l2i,
       i2l,
@@ -209,15 +224,14 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       modelLoader,
       originalSize,
       scaledSize,
-      denoising_start,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'sdxl_inpaint' });
   } else if (generationMode === 'outpaint') {
     assert(manager !== null);
     canvasOutput = await addOutpaint({
-      state,
       g,
+      state,
       manager,
       l2i,
       i2l,
@@ -226,7 +240,6 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       modelLoader,
       originalSize,
       scaledSize,
-      denoising_start,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'sdxl_outpaint' });
@@ -322,7 +335,7 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   g.setMetadataReceivingNode(canvasOutput);
   return {
     g,
-    seedFieldIdentifier: { nodeId: seed.id, fieldName: 'value' },
-    positivePromptFieldIdentifier: { nodeId: posCond.id, fieldName: 'prompt' },
+    seed,
+    positivePrompt,
   };
 };

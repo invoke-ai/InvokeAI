@@ -1,8 +1,10 @@
 import { objectEquals } from '@observ33r/object-equals';
+import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasState, Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { getDenoisingStartAndEnd } from 'features/nodes/util/graph/graphBuilderUtils';
 import type {
   DenoiseLatentsNodes,
   LatentToImageNodes,
@@ -13,6 +15,7 @@ import type { Invocation } from 'services/api/types';
 
 type AddImageToImageArg = {
   g: Graph;
+  state: RootState;
   manager: CanvasManager;
   l2i: Invocation<LatentToImageNodes>;
   i2l: Invocation<'i2l' | 'flux_vae_encode' | 'sd3_i2l' | 'cogview4_i2l'>;
@@ -21,11 +24,11 @@ type AddImageToImageArg = {
   originalSize: Dimensions;
   scaledSize: Dimensions;
   bbox: CanvasState['bbox'];
-  denoising_start: number;
 };
 
 export const addImageToImage = async ({
   g,
+  state,
   manager,
   l2i,
   i2l,
@@ -34,9 +37,11 @@ export const addImageToImage = async ({
   originalSize,
   scaledSize,
   bbox,
-  denoising_start,
 }: AddImageToImageArg): Promise<Invocation<'img_resize' | 'l2i' | 'flux_vae_decode' | 'sd3_l2i' | 'cogview4_l2i'>> => {
+  const { denoising_start, denoising_end } = getDenoisingStartAndEnd(state);
   denoise.denoising_start = denoising_start;
+  denoise.denoising_end = denoising_end;
+
   const adapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
   const { image_name } = await manager.compositor.getCompositeImageDTO(adapters, bbox.rect, {
     is_intermediate: true,
