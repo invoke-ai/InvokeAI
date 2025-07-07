@@ -5,3 +5,5 @@ export const selectActiveTab = createSelector(selectUiSlice, (ui) => ui.activeTa
 export const selectShouldShowImageDetails = createSelector(selectUiSlice, (ui) => ui.shouldShowImageDetails);
 export const selectShouldShowProgressInViewer = createSelector(selectUiSlice, (ui) => ui.shouldShowProgressInViewer);
 export const selectActiveTabCanvasRightPanel = createSelector(selectUiSlice, (ui) => ui.activeTabCanvasRightPanel);
+export const selectGridviewPanelStates = createSelector(selectUiSlice, (ui) => ui.gridviewPanelStates);
+export const selectDockviewPanelStates = createSelector(selectUiSlice, (ui) => ui.dockviewPanelStates);

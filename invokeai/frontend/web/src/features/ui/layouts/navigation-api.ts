@@ -2,6 +2,7 @@ import { logger } from 'app/logging/logger';
 import { createDeferredPromise, type Deferred } from 'common/util/createDeferredPromise';
 import { GridviewPanel, type IDockviewPanel, type IGridviewPanel } from 'dockview';
 import type { TabName } from 'features/ui/store/uiTypes';
+import type { DockviewPanelState, GridviewPanelState } from 'features/ui/store/uiTypes';
 import { atom } from 'nanostores';
 
 import {
@@ -24,6 +25,16 @@ type PanelType = IGridviewPanel | IDockviewPanel;
 type Waiter = {
   deferred: Deferred<void>;
   timeoutId: ReturnType<typeof setTimeout> | null;
+};
+
+/**
+ * Callbacks for getting and setting panel state from the Redux store.
+ */
+type PanelStateCallbacks = {
+  getGridviewPanelState: (id: string) => GridviewPanelState | undefined;
+  setGridviewPanelState: (id: string, state: GridviewPanelState) => void;
+  getDockviewPanelState: (id: string) => DockviewPanelState | undefined;
+  setDockviewPanelState: (id: string, state: DockviewPanelState) => void;
 };
 
 export class NavigationApi {
@@ -66,22 +77,34 @@ export class NavigationApi {
   _getAppTab: (() => TabName) | null = null;
 
   /**
-   * Connect to the application to manage tab switching.
+   * Panel state callbacks for interacting with the Redux store.
+   */
+  private _panelStateCallbacks: PanelStateCallbacks | null = null;
+
+  /**
+   * Connect to the application to manage tab switching and panel state.
    * @param arg.setAppTab - Function to set the current app tab
    * @param arg.getAppTab - Function to get the current app tab
+   * @param arg.panelStateCallbacks - Optional callbacks for panel state persistence
    */
-  connectToApp = (arg: { setAppTab: (tab: TabName) => void; getAppTab: () => TabName }): void => {
-    const { setAppTab, getAppTab } = arg;
+  connectToApp = (arg: { 
+    setAppTab: (tab: TabName) => void; 
+    getAppTab: () => TabName;
+    panelStateCallbacks?: PanelStateCallbacks;
+  }): void => {
+    const { setAppTab, getAppTab, panelStateCallbacks } = arg;
     this._setAppTab = setAppTab;
     this._getAppTab = getAppTab;
+    this._panelStateCallbacks = panelStateCallbacks || null;
   };
 
   /**
-   * Disconnect from the application, clearing the tab management functions.
+   * Disconnect from the application, clearing the tab management functions and panel state callbacks.
    */
   disconnectFromApp = (): void => {
     this._setAppTab = null;
     this._getAppTab = null;
+    this._panelStateCallbacks = null;
   };
 
   /**
@@ -124,6 +147,74 @@ export class NavigationApi {
   };
 
   /**
+   * Rehydrates panel state from the Redux store if available.
+   */
+  private _rehydratePanelState = (tab: TabName, panelId: string, panel: PanelType): void => {
+    if (!this._panelStateCallbacks) {
+      return;
+    }
+
+    const key = this._getPanelKey(tab, panelId);
+
+    if (panel instanceof GridviewPanel) {
+      const savedState = this._panelStateCallbacks.getGridviewPanelState(key);
+      if (savedState) {
+        if (savedState.width !== undefined || savedState.height !== undefined) {
+          const size: { width?: number; height?: number } = {};
+          if (savedState.width !== undefined) {
+            size.width = savedState.width;
+          }
+          if (savedState.height !== undefined) {
+            size.height = savedState.height;
+          }
+          panel.api.setSize(size);
+          log.debug(`Rehydrated Gridview panel ${key} with state`);
+        }
+      }
+    } else {
+      // Dockview panel
+      const savedState = this._panelStateCallbacks.getDockviewPanelState(key);
+      if (savedState && savedState.isActive) {
+        panel.api.setActive();
+        log.debug(`Rehydrated Dockview panel ${key} with active state`);
+      }
+    }
+  };
+
+  /**
+   * Sets up listeners to persist panel state changes.
+   */
+  private _setupPanelStateListeners = (tab: TabName, panelId: string, panel: PanelType): (() => void) => {
+    if (!this._panelStateCallbacks) {
+      return () => {};
+    }
+
+    const key = this._getPanelKey(tab, panelId);
+    const disposables: (() => void)[] = [];
+
+    if (panel instanceof GridviewPanel) {
+      const onDimensionsChange = panel.api.onDidDimensionsChange(() => {
+        const { width, height } = panel.api;
+        this._panelStateCallbacks!.setGridviewPanelState(key, { width, height });
+        log.debug(`Persisted Gridview panel ${key} dimensions`);
+      });
+      disposables.push(() => onDimensionsChange.dispose());
+    } else {
+      // Dockview panel
+      const onActiveChange = panel.api.onDidActiveChange((event) => {
+        const isActive = event.isActive;
+        this._panelStateCallbacks!.setDockviewPanelState(key, { isActive });
+        log.debug(`Persisted Dockview panel ${key} active state`);
+      });
+      disposables.push(() => onActiveChange.dispose());
+    }
+
+    return () => {
+      disposables.forEach((dispose) => dispose());
+    };
+  };
+
+  /**
    * Registers a panel with the navigation API.
    *
    * @param tab - The tab this panel belongs to
@@ -135,6 +226,12 @@ export class NavigationApi {
     const key = this._getPanelKey(tab, panelId);
 
     this.panels.set(key, panel);
+
+    // Rehydrate panel state from Redux store
+    this._rehydratePanelState(tab, panelId, panel);
+
+    // Set up listeners to persist state changes
+    const cleanupListeners = this._setupPanelStateListeners(tab, panelId, panel);
 
     // Resolve any pending waiters for this panel, notifying them that the panel is now registered.
     const waiter = this.waiters.get(key);
@@ -149,6 +246,7 @@ export class NavigationApi {
     log.debug(`Registered panel ${key}`);
 
     return () => {
+      cleanupListeners();
       this.panels.delete(key);
       log.debug(`Unregistered panel ${key}`);
     };

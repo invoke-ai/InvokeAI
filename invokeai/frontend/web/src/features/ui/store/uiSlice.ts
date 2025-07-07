@@ -2,7 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 
-import type { UIState } from './uiTypes';
+import type { DockviewPanelState, GridviewPanelState, UIState } from './uiTypes';
 import { getInitialUIState } from './uiTypes';
 
 export const uiSlice = createSlice({
@@ -51,6 +51,26 @@ export const uiSlice = createSlice({
       const { id, size } = action.payload;
       state.textAreaSizes[id] = size;
     },
+    gridviewPanelStateChanged: (
+      state,
+      action: PayloadAction<{
+        id: string;
+        panelState: GridviewPanelState;
+      }>
+    ) => {
+      const { id, panelState } = action.payload;
+      state.gridviewPanelStates[id] = panelState;
+    },
+    dockviewPanelStateChanged: (
+      state,
+      action: PayloadAction<{
+        id: string;
+        panelState: DockviewPanelState;
+      }>
+    ) => {
+      const { id, panelState } = action.payload;
+      state.dockviewPanelStates[id] = panelState;
+    },
     shouldShowNotificationChanged: (state, action: PayloadAction<UIState['shouldShowNotificationV2']>) => {
       state.shouldShowNotificationV2 = action.payload;
     },
@@ -66,6 +86,8 @@ export const {
   expanderStateChanged,
   shouldShowNotificationChanged,
   textAreaSizesStateChanged,
+  gridviewPanelStateChanged,
+  dockviewPanelStateChanged,
 } = uiSlice.actions;
 
 export const selectUiSlice = (state: RootState) => state.ui;
@@ -82,6 +104,11 @@ const migrateUIState = (state: any): any => {
   if (state._version === 2) {
     state.activeTab = 'canvas';
     state._version = 3;
+  }
+  if (state._version === 3) {
+    state.gridviewPanelStates = {};
+    state.dockviewPanelStates = {};
+    state._version = 4;
   }
   return state;
 };
