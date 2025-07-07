@@ -91,7 +91,8 @@ const initializeMainPanelLayout = (tab: TabName, api: DockviewApi) => {
     },
   });
 
-  // Register panels with navigation API
+  launchpad.api.setActive();
+
   navigationApi.registerPanel(tab, LAUNCHPAD_PANEL_ID, launchpad);
   navigationApi.registerPanel(tab, VIEWER_PANEL_ID, viewer);
 
@@ -103,23 +104,7 @@ const MainPanel = memo(() => {
 
   const onReady = useCallback<IDockviewReactProps['onReady']>(
     ({ api }) => {
-      const { launchpad } = initializeMainPanelLayout(tab, api);
-      launchpad.api.setActive();
-
-      const disposables = [
-        api.onWillShowOverlay((e) => {
-          if (e.kind === 'header_space' || e.kind === 'tab') {
-            return;
-          }
-          e.preventDefault();
-        }),
-      ];
-
-      return () => {
-        disposables.forEach((disposable) => {
-          disposable.dispose();
-        });
-      };
+      initializeMainPanelLayout(tab, api);
     },
     [tab]
   );
