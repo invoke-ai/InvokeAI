@@ -49,7 +49,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
 
   const {
     guidance: baseGuidance,
-    seed,
+    seed: _seed,
     steps,
     fluxVAE,
     t5EncoderModel,
@@ -101,6 +101,11 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   const { positivePrompt } = selectPresetModifiedPrompts(state);
 
   const g = new Graph(getPrefixedId('flux_graph'));
+  const seed = g.addNode({
+    id: getPrefixedId('seed'),
+    type: 'integer',
+    value: _seed,
+  });
   const modelLoader = g.addNode({
     type: 'flux_model_loader',
     id: getPrefixedId('flux_model_loader'),
@@ -125,7 +130,6 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     id: getPrefixedId('flux_denoise'),
     guidance,
     num_steps: steps,
-    seed,
     denoising_start: 0,
     denoising_end: 1,
     width: scaledSize.width,
@@ -135,6 +139,10 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   const l2i = g.addNode({
     type: 'flux_vae_decode',
     id: getPrefixedId('flux_vae_decode'),
+  });
+  const i2l = g.addNode({
+    type: 'flux_vae_encode',
+    id: getPrefixedId('flux_vae_encode'),
   });
 
   if (isFluxKontextDev) {
@@ -162,6 +170,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     }
   }
 
+  g.addEdge(seed, 'value', denoise, 'seed');
   g.addEdge(modelLoader, 'transformer', denoise, 'transformer');
   g.addEdge(modelLoader, 'vae', denoise, 'controlnet_vae');
   g.addEdge(modelLoader, 'vae', l2i, 'vae');
@@ -181,7 +190,6 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     height: originalSize.height,
     positive_prompt: positivePrompt,
     model: Graph.getModelMetadataField(model),
-    seed,
     steps,
     vae: fluxVAE,
     t5_encoder: t5EncoderModel,
@@ -220,14 +228,13 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       g,
       manager,
       l2i,
-      i2lNodeType: 'flux_vae_encode',
+      i2l,
       denoise,
       vaeSource: modelLoader,
       originalSize,
       scaledSize,
       bbox,
       denoising_start,
-      fp32: false,
     });
     g.upsertMetadata({ generation_mode: 'flux_img2img' });
   } else if (generationMode === 'inpaint') {
@@ -237,14 +244,13 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       g,
       manager,
       l2i,
-      i2lNodeType: 'flux_vae_encode',
+      i2l,
       denoise,
       vaeSource: modelLoader,
       modelLoader,
       originalSize,
       scaledSize,
       denoising_start,
-      fp32: false,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'flux_inpaint' });
@@ -255,14 +261,13 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       g,
       manager,
       l2i,
-      i2lNodeType: 'flux_vae_encode',
+      i2l,
       denoise,
       vaeSource: modelLoader,
       modelLoader,
       originalSize,
       scaledSize,
       denoising_start,
-      fp32: false,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'flux_outpaint' });
@@ -372,7 +377,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   g.setMetadataReceivingNode(canvasOutput);
   return {
     g,
-    seedFieldIdentifier: { nodeId: denoise.id, fieldName: 'seed' },
+    seedFieldIdentifier: { nodeId: seed.id, fieldName: 'value' },
     positivePromptFieldIdentifier: { nodeId: posCond.id, fieldName: 'prompt' },
   };
 };
