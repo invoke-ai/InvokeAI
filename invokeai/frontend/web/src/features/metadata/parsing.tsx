@@ -269,7 +269,7 @@ const NegativePrompt: SingleMetadataHandler<ParameterNegativePrompt> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(negativePromptChanged(value));
+    store.dispatch(negativePromptChanged(value || null));
   },
   LabelComponent: () => <MetadataLabel i18nKey="metadata.negativePrompt" />,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterNegativePrompt>) => (
