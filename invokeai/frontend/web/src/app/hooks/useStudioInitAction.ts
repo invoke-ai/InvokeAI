@@ -162,13 +162,13 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
     async (destination: StudioDestinationAction['data']['destination']) => {
       switch (destination) {
         case 'generation':
-          // Go to the canvas tab, open the image viewer, and enable send-to-gallery mode
+          // Go to the generate tab, open the launchpad
           await navigationApi.focusPanel('generate', LAUNCHPAD_PANEL_ID);
           store.dispatch(paramsReset());
           store.dispatch(activeTabCanvasRightPanelChanged('gallery'));
           break;
         case 'canvas':
-          // Go to the canvas tab, close the image viewer, and disable send-to-gallery mode
+          // Go to the canvas tab, open the launchpad
           await navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
           store.dispatch(canvasReset());
           break;
