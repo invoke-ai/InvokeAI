@@ -1,7 +1,8 @@
 import { Combobox, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
-import { selectBase } from 'features/controlLayers/store/paramsSlice';
+import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
+import { areBasesCompatibleForRefImage } from 'features/controlLayers/store/validators';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGlobalReferenceImageModels } from 'services/api/hooks/modelsByType';
@@ -21,7 +22,7 @@ type Props = {
 
 export const RefImageModel = memo(({ modelKey, onChangeModel }: Props) => {
   const { t } = useTranslation();
-  const currentBaseModel = useAppSelector(selectBase);
+  const mainModelConfig = useAppSelector(selectMainModelConfig);
   const [modelConfigs, { isLoading }] = useGlobalReferenceImageModels();
   const selectedModel = useMemo(() => modelConfigs.find((m) => m.key === modelKey), [modelConfigs, modelKey]);
 
@@ -39,11 +40,9 @@ export const RefImageModel = memo(({ modelKey, onChangeModel }: Props) => {
 
   const getIsDisabled = useCallback(
     (model: IPAdapterModelConfig | FLUXReduxModelConfig | ChatGPT4oModelConfig | FLUXKontextModelConfig): boolean => {
-      const hasMainModel = Boolean(currentBaseModel);
-      const hasSameBase = currentBaseModel === model.base;
-      return !hasMainModel || !hasSameBase;
+      return !areBasesCompatibleForRefImage(mainModelConfig, model);
     },
-    [currentBaseModel]
+    [mainModelConfig]
   );
 
   const { options, value, onChange, noOptionsMessage } = useGroupedModelCombobox({
@@ -56,7 +55,11 @@ export const RefImageModel = memo(({ modelKey, onChangeModel }: Props) => {
 
   return (
     <Tooltip label={selectedModel?.description}>
-      <FormControl isInvalid={!value || currentBaseModel !== selectedModel?.base} w="full" minW={0}>
+      <FormControl
+        isInvalid={!value || !areBasesCompatibleForRefImage(mainModelConfig, selectedModel)}
+        w="full"
+        minW={0}
+      >
         <Combobox
           options={options}
           placeholder={t('common.placeholderSelectAModel')}

@@ -5,12 +5,14 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { round } from 'es-toolkit/compat';
 import { useRefImageEntity } from 'features/controlLayers/components/RefImage/useRefImageEntity';
 import { useRefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
+import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import {
   refImageSelected,
   selectIsRefImagePanelOpen,
   selectSelectedRefEntityId,
 } from 'features/controlLayers/store/refImagesSlice';
 import { isIPAdapterConfig } from 'features/controlLayers/store/types';
+import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { PiExclamationMarkBold, PiEyeSlashBold, PiImageBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
@@ -20,7 +22,17 @@ const baseSx: SystemStyleObject = {
     borderColor: 'invokeBlue.300',
   },
   '&[data-is-disabled="true"]': {
-    opacity: 0.4,
+    img: {
+      opacity: 0.4,
+      filter: 'grayscale(100%)',
+    },
+  },
+  '&[data-is-error="true"]': {
+    borderColor: 'error.500',
+    img: {
+      opacity: 0.4,
+      filter: 'grayscale(100%)',
+    },
   },
 };
 
@@ -57,6 +69,7 @@ export const RefImagePreview = memo(() => {
   const dispatch = useAppDispatch();
   const id = useRefImageIdContext();
   const entity = useRefImageEntity(id);
+  const mainModelConfig = useAppSelector(selectMainModelConfig);
   const selectedEntityId = useAppSelector(selectSelectedRefEntityId);
   const isPanelOpen = useAppSelector(selectIsRefImagePanelOpen);
   const [showWeightDisplay, setShowWeightDisplay] = useState(false);
@@ -81,6 +94,10 @@ export const RefImagePreview = memo(() => {
       window.clearTimeout(timeout);
     };
   }, [entity.config]);
+
+  const isInvalid = useMemo(() => {
+    return getGlobalReferenceImageWarnings(entity, mainModelConfig).length > 0;
+  }, [entity, mainModelConfig]);
 
   const onClick = useCallback(() => {
     dispatch(refImageSelected({ id }));
@@ -120,7 +137,7 @@ export const RefImagePreview = memo(() => {
       flexShrink={0}
       sx={sx}
       data-is-open={selectedEntityId === id && isPanelOpen}
-      data-is-error={!entity.config.model}
+      data-is-error={isInvalid}
       data-is-disabled={!entity.isEnabled}
       role="button"
       onClick={onClick}
@@ -152,18 +169,19 @@ export const RefImagePreview = memo(() => {
           </Text>
         </Flex>
       )}
-      {!entity.isEnabled ? (
+      {!entity.isEnabled && (
         <Icon
           position="absolute"
           top="50%"
           left="50%"
           transform="translateX(-50%) translateY(-50%)"
           filter="drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 2px rgba(0, 0, 0, 1))"
-          color="base.100"
-          boxSize={6}
+          color="base.300"
+          boxSize={8}
           as={PiEyeSlashBold}
         />
-      ) : !entity.config.model ? (
+      )}
+      {entity.isEnabled && isInvalid && (
         <Icon
           position="absolute"
           top="50%"
@@ -171,10 +189,10 @@ export const RefImagePreview = memo(() => {
           transform="translateX(-50%) translateY(-50%)"
           filter="drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 2px rgba(0, 0, 0, 1))"
           color="error.500"
-          boxSize={6}
+          boxSize={12}
           as={PiExclamationMarkBold}
         />
-      ) : null}
+      )}
     </Flex>
   );
 });
