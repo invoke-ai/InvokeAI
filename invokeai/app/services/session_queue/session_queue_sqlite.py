@@ -740,7 +740,7 @@ class SqliteSessionQueue(SessionQueueBase):
         counts_result = cast(list[sqlite3.Row], cursor.fetchall())
 
         current_item = self.get_current(queue_id=queue_id)
-        total = sum(row[1] for row in counts_result)
+        total = sum(row[1] or 0 for row in counts_result)
         counts: dict[str, int] = {row[0]: row[1] for row in counts_result}
         return SessionQueueStatus(
             queue_id=queue_id,
@@ -769,7 +769,7 @@ class SqliteSessionQueue(SessionQueueBase):
             (queue_id, batch_id),
         )
         result = cast(list[sqlite3.Row], cursor.fetchall())
-        total = sum(row[1] for row in result)
+        total = sum(row[1] or 0 for row in result)
         counts: dict[str, int] = {row[0]: row[1] for row in result}
         origin = result[0]["origin"] if result else None
         destination = result[0]["destination"] if result else None
@@ -801,7 +801,7 @@ class SqliteSessionQueue(SessionQueueBase):
         )
         counts_result = cast(list[sqlite3.Row], cursor.fetchall())
 
-        total = sum(row[1] for row in counts_result)
+        total = sum(row[1] or 0 for row in counts_result)
         counts: dict[str, int] = {row[0]: row[1] for row in counts_result}
 
         return SessionQueueCountsByDestination(
