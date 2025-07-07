@@ -409,12 +409,12 @@ export const CanvasSessionContextProvider = memo(
           if (!item) {
             toDelete.push(datum.itemId);
           } else if (item.status === 'canceled' || item.status === 'failed') {
-            toUpdate[datum.itemId] = {
+            toUpdate.push({
               ...datum,
               progressEvent: null,
               progressImage: null,
               imageDTO: null,
-            };
+            });
           }
         }
 
