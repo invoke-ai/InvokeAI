@@ -15,9 +15,10 @@ import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableCon
 import { buildUseDisclosure } from 'common/hooks/useBoolean';
 import {
   controlCanvasVideos,
-  gettingStartedVideos,
   studioSessionsPlaylistLink,
+  supportPlaylists,
 } from 'features/system/components/VideosModal/data';
+import { PlaylistCardList } from 'features/system/components/VideosModal/PlaylistCardList';
 import { VideoCardList } from 'features/system/components/VideosModal/VideoCardList';
 import { videoModalLinkClicked } from 'features/system/store/actions';
 import { discordLink } from 'features/system/store/constants';
@@ -86,7 +87,7 @@ export const VideosModal = memo(() => {
                   <Trans i18nKey="supportVideos.studioSessionsDesc2" components={components} />
                 </Text>
               </Flex>
-              <VideoCardList category={t('supportVideos.gettingStarted')} videos={gettingStartedVideos} />
+              <PlaylistCardList category={t('supportVideos.supportPlaylists')} playlists={supportPlaylists} />
               <VideoCardList category={t('supportVideos.controlCanvas')} videos={controlCanvasVideos} />
             </Flex>
           </ScrollableContent>
