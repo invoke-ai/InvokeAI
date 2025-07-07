@@ -2564,11 +2564,26 @@
     },
     "supportVideos": {
         "supportVideos": "Support Videos",
+        "supportPlaylists": "Video Playlists",
         "gettingStarted": "Getting Started",
         "controlCanvas": "Control Canvas",
         "watch": "Watch",
+        "watchPlaylist": "Watch Playlist",
+        "videoCount": "{{count}} videos",
+        "videoCount_one": "{{count}} video",
+        "videoCount_other": "{{count}} videos",
         "studioSessionsDesc1": "Check out the <StudioSessionsPlaylistLink /> for Invoke deep dives.",
         "studioSessionsDesc2": "Join our <DiscordLink /> to participate in the live sessions and ask questions. Sessions are uploaded to the playlist the following week.",
+        "playlists": {
+            "gettingStarted": {
+                "title": "Getting Started with Invoke",
+                "description": "Complete video series covering everything you need to know to get started with Invoke, from creating your first image to advanced techniques."
+            },
+            "studioSessions": {
+                "title": "Studio Sessions",
+                "description": "Deep dive sessions exploring advanced Invoke features, creative workflows, and community discussions."
+            }
+        },
         "videos": {
             "creatingYourFirstImage": {
                 "title": "Creating Your First Image",
