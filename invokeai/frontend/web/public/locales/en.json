@@ -2566,7 +2566,7 @@
         "supportVideos": "Support Videos",
         "gettingStarted": "Getting Started",
         "watch": "Watch",
-        "studioSessionsDesc1": "Check out the <StudioSessionsPlaylistLink /> for Invoke deep dives.",
+        "studioSessionsDesc1": "Check out our <GettingStartedPlaylistLink /> for basic tutorials, and the <StudioSessionsPlaylistLink /> for deep dives into advanced Invoke use-cases and techniques.",
         "studioSessionsDesc2": "Join our <DiscordLink /> to participate in the live sessions and ask questions. Sessions are uploaded to the playlist the following week.",
         "videos": {
             "gettingStarted": {
