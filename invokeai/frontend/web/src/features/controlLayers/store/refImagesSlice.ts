@@ -57,6 +57,8 @@ export const refImagesSlice = createSlice({
       const { entities, replace } = action.payload;
       if (replace) {
         state.entities = entities;
+        state.isPanelOpen = false;
+        state.selectedEntityId = null;
       } else {
         state.entities.push(...entities);
       }
