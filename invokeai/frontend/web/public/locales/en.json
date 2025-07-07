@@ -1407,7 +1407,7 @@
         "sentToUpscale": "Sent to Upscale",
         "promptGenerationStarted": "Prompt generation started",
         "uploadAndPromptGenerationFailed": "Failed to upload image and generate prompt",
-        "promptExpansionFailed": "Prompt expansion failed"
+        "promptExpansionFailed": "We ran into an issue. Please try prompt expansion again."
     },
     "popovers": {
         "clipSkip": {
