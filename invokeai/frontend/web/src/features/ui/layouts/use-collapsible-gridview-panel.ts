@@ -21,7 +21,8 @@ export const useCollapsibleGridviewPanel = (
   panelId: string,
   orientation: 'horizontal' | 'vertical',
   defaultSize: number,
-  collapsedSize?: number
+  collapsedSize?: number,
+  minExpandedSize?: number
 ) => {
   const $isCollapsed = useState(() => atom(false))[0];
   const lastExpandedSizeRef = useRef<number>(0);
@@ -46,12 +47,18 @@ export const useCollapsibleGridviewPanel = (
     if (!panel || !(panel instanceof GridviewPanel)) {
       return;
     }
-    if (orientation === 'vertical') {
-      panel.api.setSize({ height: lastExpandedSizeRef.current || defaultSize });
-    } else {
-      panel.api.setSize({ width: lastExpandedSizeRef.current || defaultSize });
+
+    let newSize = lastExpandedSizeRef.current || defaultSize;
+    if (minExpandedSize && newSize < minExpandedSize) {
+      newSize = minExpandedSize;
     }
-  }, [defaultSize, orientation, panelId, tab]);
+
+    if (orientation === 'vertical') {
+      panel.api.setSize({ height: newSize });
+    } else {
+      panel.api.setSize({ width: newSize });
+    }
+  }, [defaultSize, minExpandedSize, orientation, panelId, tab]);
 
   const toggle = useCallback(() => {
     const panel = navigationApi.getPanel(tab, panelId);
