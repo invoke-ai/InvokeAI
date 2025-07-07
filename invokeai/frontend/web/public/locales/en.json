@@ -1962,7 +1962,7 @@
         "recalculateRects": "Recalculate Rects",
         "clipToBbox": "Clip Strokes to Bbox",
         "outputOnlyMaskedRegions": "Output Only Generated Regions",
-        "saveAllStagingImagesToGallery": "Save All Staging Images to Gallery",
+        "saveAllImagesToGallery": "Save All Images to Gallery",
         "addLayer": "Add Layer",
         "duplicate": "Duplicate",
         "moveToFront": "Move to Front",
@@ -2331,8 +2331,8 @@
                 "label": "Preserve Masked Region",
                 "alert": "Preserving Masked Region"
             },
-            "saveAllStagingImagesToGallery": {
-                "alert": "Saving All Staging Images to Gallery"
+            "saveAllImagesToGallery": {
+                "alert": "Saving All Images to Gallery"
             },
             "isolatedStagingPreview": "Isolated Staging Preview",
             "isolatedPreview": "Isolated Preview",

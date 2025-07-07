@@ -80,7 +80,7 @@ type CanvasSettingsState = {
   /**
    * Whether to save all staging images to the gallery instead of keeping them as intermediate images.
    */
-  saveAllStagingImagesToGallery: boolean;
+  saveAllImagesToGallery: boolean;
 };
 
 const initialState: CanvasSettingsState = {
@@ -101,7 +101,7 @@ const initialState: CanvasSettingsState = {
   isolatedLayerPreview: true,
   pressureSensitivity: true,
   ruleOfThirds: false,
-  saveAllStagingImagesToGallery: false,
+  saveAllImagesToGallery: false,
 };
 
 export const canvasSettingsSlice = createSlice({
@@ -159,8 +159,8 @@ export const canvasSettingsSlice = createSlice({
     settingsRuleOfThirdsToggled: (state) => {
       state.ruleOfThirds = !state.ruleOfThirds;
     },
-    settingsSaveAllStagingImagesToGalleryToggled: (state) => {
-      state.saveAllStagingImagesToGallery = !state.saveAllStagingImagesToGallery;
+    settingsSaveAllImagesToGalleryToggled: (state) => {
+      state.saveAllImagesToGallery = !state.saveAllImagesToGallery;
     },
   },
 });
@@ -183,7 +183,7 @@ export const {
   settingsIsolatedLayerPreviewToggled,
   settingsPressureSensitivityToggled,
   settingsRuleOfThirdsToggled,
-  settingsSaveAllStagingImagesToGalleryToggled,
+  settingsSaveAllImagesToGalleryToggled,
 } = canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -218,6 +218,4 @@ export const selectIsolatedStagingPreview = createCanvasSettingsSelector((settin
 export const selectIsolatedLayerPreview = createCanvasSettingsSelector((settings) => settings.isolatedLayerPreview);
 export const selectPressureSensitivity = createCanvasSettingsSelector((settings) => settings.pressureSensitivity);
 export const selectRuleOfThirds = createCanvasSettingsSelector((settings) => settings.ruleOfThirds);
-export const selectSaveAllStagingImagesToGallery = createCanvasSettingsSelector(
-  (settings) => settings.saveAllStagingImagesToGallery
-);
+export const selectSaveAllImagesToGallery = createCanvasSettingsSelector((settings) => settings.saveAllImagesToGallery);
