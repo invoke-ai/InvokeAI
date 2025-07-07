@@ -2,7 +2,7 @@ import { ContextMenu, Divider, Flex, IconButton, Menu, MenuButton, MenuList } fr
 import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasAlertsInvocationProgress } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsInvocationProgress';
 import { CanvasAlertsPreserveMask } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsPreserveMask';
-import { CanvasAlertsSaveAllStagingImagesToGallery } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSaveAllStagingImagesToGallery';
+import { CanvasAlertsSaveAllImagesToGallery } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSaveAllImagesToGallery';
 import { CanvasAlertsSelectedEntityStatus } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSelectedEntityStatus';
 import { CanvasBusySpinner } from 'features/controlLayers/components/CanvasBusySpinner';
 import { CanvasContextMenuGlobalMenuItems } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuGlobalMenuItems';
@@ -89,7 +89,7 @@ export const CanvasWorkspacePanel = memo(() => {
                 {showHUD && <CanvasHUD />}
                 <CanvasAlertsSelectedEntityStatus />
                 <CanvasAlertsPreserveMask />
-                <CanvasAlertsSaveAllStagingImagesToGallery />
+                <CanvasAlertsSaveAllImagesToGallery />
                 <CanvasAlertsInvocationProgress />
               </Flex>
               <Flex position="absolute" top={1} insetInlineEnd={1}>
