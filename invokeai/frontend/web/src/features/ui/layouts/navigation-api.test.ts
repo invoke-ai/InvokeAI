@@ -436,7 +436,7 @@ describe('AppNavigationApi', () => {
       const mockPanel = createMockPanel();
       const width = 500;
 
-      navigationApi.expandPanel(mockPanel, width);
+      navigationApi._expandPanel(mockPanel, width);
 
       expect(mockPanel.api.setConstraints).toHaveBeenCalledWith({
         maximumWidth: Number.MAX_SAFE_INTEGER,
@@ -448,7 +448,7 @@ describe('AppNavigationApi', () => {
     it('should collapse panel with zero constraints and size', () => {
       const mockPanel = createMockPanel();
 
-      navigationApi.collapsePanel(mockPanel);
+      navigationApi._collapsePanel(mockPanel);
 
       expect(mockPanel.api.setConstraints).toHaveBeenCalledWith({
         maximumWidth: 0,
