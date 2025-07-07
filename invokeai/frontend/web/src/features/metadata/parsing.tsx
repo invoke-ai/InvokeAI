@@ -950,21 +950,24 @@ const recallByHandlers = async (arg: {
     }
   }
 
-  // If we recalled style prompts, and they were _different_ from the positive prompt, we need to disable prompt concat.
+  // We may need to update the prompt concat flag based on the recalled prompts
   const positivePrompt = recalled.get(MetadataHandlers.PositivePrompt);
   const negativePrompt = recalled.get(MetadataHandlers.NegativePrompt);
   const positiveStylePrompt = recalled.get(MetadataHandlers.PositiveStylePrompt);
   const negativeStylePrompt = recalled.get(MetadataHandlers.NegativeStylePrompt);
 
+  // The values will be undefined if the handler was not recalled
   if (
-    (positiveStylePrompt && positiveStylePrompt !== positivePrompt) ||
-    (negativeStylePrompt && negativeStylePrompt !== negativePrompt)
+    positivePrompt !== undefined ||
+    negativePrompt !== undefined ||
+    positiveStylePrompt !== undefined ||
+    negativeStylePrompt !== undefined
   ) {
-    // If we set the negative style prompt or positive style prompt, we should disable prompt concat
-    store.dispatch(shouldConcatPromptsChanged(false));
-  } else {
-    // Otherwise, we should enable prompt concat
-    store.dispatch(shouldConcatPromptsChanged(true));
+    const concat =
+      (Boolean(positiveStylePrompt) && positiveStylePrompt === positivePrompt) ||
+      (Boolean(negativeStylePrompt) && negativeStylePrompt === negativePrompt);
+
+    store.dispatch(shouldConcatPromptsChanged(concat));
   }
 
   if (!silent) {
