@@ -5,6 +5,8 @@ import { QueueActionsMenuButton } from 'features/queue/components/QueueActionsMe
 import ProgressBar from 'features/system/components/ProgressBar';
 import { memo } from 'react';
 
+import { CancelAllExceptCurrentIconButton } from './CancelAllExceptCurrentIconButton';
+import { CancelCurrentQueueItemIconButton } from './CancelCurrentQueueItemIconButton';
 import { InvokeButton } from './InvokeQueueBackButton';
 
 const QueueControls = () => {
@@ -14,7 +16,7 @@ const QueueControls = () => {
         <InvokeButton />
         <Spacer />
         <QueueActionsMenuButton />
-        <DeleteIconButton />
+        <CancelIconButton />
       </Flex>
       <ProgressBar />
     </Flex>
@@ -34,3 +36,15 @@ const DeleteIconButton = memo(() => {
 });
 
 DeleteIconButton.displayName = 'DeleteIconButton';
+
+const CancelIconButton = memo(() => {
+  const shift = useShiftModifier();
+
+  if (!shift) {
+    return <CancelCurrentQueueItemIconButton />;
+  }
+
+  return <CancelAllExceptCurrentIconButton />;
+});
+
+CancelIconButton.displayName = 'CancelIconButton';
