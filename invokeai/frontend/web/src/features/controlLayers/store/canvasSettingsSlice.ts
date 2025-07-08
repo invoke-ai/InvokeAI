@@ -3,6 +3,8 @@ import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import type { RgbaColor } from 'features/controlLayers/store/types';
 
+type AutoSwitchMode = 'off' | 'switch_on_start' | 'switch_on_finish';
+
 type CanvasSettingsState = {
   /**
    * Whether to show HUD (Heads-Up Display) on the canvas.
@@ -81,6 +83,10 @@ type CanvasSettingsState = {
    * Whether to save all staging images to the gallery instead of keeping them as intermediate images.
    */
   saveAllImagesToGallery: boolean;
+  /**
+   * The default auto-switch mode for new canvas sessions.
+   */
+  defaultAutoSwitch: AutoSwitchMode;
 };
 
 const initialState: CanvasSettingsState = {
@@ -102,6 +108,7 @@ const initialState: CanvasSettingsState = {
   pressureSensitivity: true,
   ruleOfThirds: false,
   saveAllImagesToGallery: false,
+  defaultAutoSwitch: 'switch_on_start',
 };
 
 export const canvasSettingsSlice = createSlice({
@@ -162,6 +169,9 @@ export const canvasSettingsSlice = createSlice({
     settingsSaveAllImagesToGalleryToggled: (state) => {
       state.saveAllImagesToGallery = !state.saveAllImagesToGallery;
     },
+    settingsDefaultAutoSwitchChanged: (state, action: PayloadAction<AutoSwitchMode>) => {
+      state.defaultAutoSwitch = action.payload;
+    },
   },
 });
 
@@ -184,6 +194,7 @@ export const {
   settingsPressureSensitivityToggled,
   settingsRuleOfThirdsToggled,
   settingsSaveAllImagesToGalleryToggled,
+  settingsDefaultAutoSwitchChanged,
 } = canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -219,3 +230,4 @@ export const selectIsolatedLayerPreview = createCanvasSettingsSelector((settings
 export const selectPressureSensitivity = createCanvasSettingsSelector((settings) => settings.pressureSensitivity);
 export const selectRuleOfThirds = createCanvasSettingsSelector((settings) => settings.ruleOfThirds);
 export const selectSaveAllImagesToGallery = createCanvasSettingsSelector((settings) => settings.saveAllImagesToGallery);
+export const selectDefaultAutoSwitch = createCanvasSettingsSelector((settings) => settings.defaultAutoSwitch);
