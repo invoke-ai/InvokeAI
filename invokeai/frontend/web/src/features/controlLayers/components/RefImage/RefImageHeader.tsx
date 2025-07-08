@@ -4,13 +4,17 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useRefImageEntity } from 'features/controlLayers/components/RefImage/useRefImageEntity';
 import { useRefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
+import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import {
   refImageDeleted,
   refImageIsEnabledToggled,
   selectRefImageEntityIds,
 } from 'features/controlLayers/store/refImagesSlice';
+import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { memo, useCallback, useMemo } from 'react';
-import { PiCircleBold, PiCircleFill, PiTrashBold } from 'react-icons/pi';
+import { PiCircleBold, PiCircleFill, PiTrashBold, PiWarningBold } from 'react-icons/pi';
+
+import { RefImageWarningTooltipContent } from './RefImageWarningTooltipContent';
 
 const textSx: SystemStyleObject = {
   color: 'base.300',
@@ -28,6 +32,12 @@ export const RefImageHeader = memo(() => {
   );
   const refImageNumber = useAppSelector(selectRefImageNumber);
   const entity = useRefImageEntity(id);
+  const mainModelConfig = useAppSelector(selectMainModelConfig);
+
+  const warnings = useMemo(() => {
+    return getGlobalReferenceImageWarnings(entity, mainModelConfig);
+  }, [entity, mainModelConfig]);
+
   const deleteRefImage = useCallback(() => {
     dispatch(refImageDeleted({ id }));
   }, [dispatch, id]);
@@ -42,6 +52,18 @@ export const RefImageHeader = memo(() => {
         Reference Image #{refImageNumber}
       </Text>
       <Flex alignItems="center" gap={1}>
+        {warnings.length > 0 && (
+          <IconButton
+            as="span"
+            size="sm"
+            variant="link"
+            alignSelf="stretch"
+            aria-label="warnings"
+            tooltip={<RefImageWarningTooltipContent warnings={warnings} />}
+            icon={<PiWarningBold />}
+            colorScheme="warning"
+          />
+        )}
         {!entity.isEnabled && (
           <Text fontSize="xs" fontStyle="italic" color="base.400">
             Disabled
