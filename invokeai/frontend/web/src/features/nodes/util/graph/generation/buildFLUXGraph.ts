@@ -78,8 +78,6 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     if (generationMode !== 'txt2img') {
       throw new UnsupportedGenerationModeError(t('toast.fluxKontextIncompatibleGenerationMode'));
     }
-
-    guidance = 30;
   }
 
   const g = new Graph(getPrefixedId('flux_graph'));
