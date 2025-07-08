@@ -66,6 +66,7 @@ class SqliteSessionQueue(SessionQueueBase):
                 WHERE status = 'in_progress';
                 """
             )
+            self._conn.commit()
         except Exception:
             self._conn.rollback()
             raise
@@ -133,8 +134,6 @@ class SqliteSessionQueue(SessionQueueBase):
                     """,
                     values_to_insert,
                 )
-            with self._conn:
-                cursor = self._conn.cursor()
                 cursor.execute(
                     """--sql
                     SELECT item_id
@@ -145,7 +144,9 @@ class SqliteSessionQueue(SessionQueueBase):
                     (batch.batch_id,),
                 )
                 item_ids = [row[0] for row in cursor.fetchall()]
+            self._conn.commit()
         except Exception:
+            self._conn.rollback()
             raise
         enqueue_result = EnqueueBatchResult(
             queue_id=queue_id,
