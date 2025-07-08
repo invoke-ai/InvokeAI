@@ -18,7 +18,7 @@ import { modelSelected } from 'features/parameters/store/actions';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { selectIPAdapterModels } from 'services/api/hooks/modelsByType';
+import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import type {
   AnyModelConfig,
   ChatGPT4oModelConfig,
@@ -38,16 +38,20 @@ const log = logger('models');
 
 // Selector for global reference image models
 const selectGlobalReferenceImageModels = (state: RootState): AnyModelConfig[] => {
-  const allModels = selectIPAdapterModels(state);
-  // Add other model types that can be used as reference images
-  return allModels.filter(
-    (model: AnyModelConfig) =>
-      isIPAdapterModelConfig(model) ||
-      isFluxReduxModelConfig(model) ||
-      isChatGPT4oModelConfig(model) ||
-      isFluxKontextApiModelConfig(model) ||
-      isFluxKontextModelConfig(model)
-  );
+  const result = selectModelConfigsQuery(state);
+  if (!result.data) {
+    return [];
+  }
+  return modelConfigsAdapterSelectors
+    .selectAll(result.data)
+    .filter(
+      (model: AnyModelConfig) =>
+        isIPAdapterModelConfig(model) ||
+        isFluxReduxModelConfig(model) ||
+        isChatGPT4oModelConfig(model) ||
+        isFluxKontextApiModelConfig(model) ||
+        isFluxKontextModelConfig(model)
+    );
 };
 
 // Type guard to check if entity is a regional guidance entity
@@ -110,15 +114,36 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         const compatibleIPAdapterModels = availableRefImageModels.filter(isIPAdapterModelConfig);
         const compatibleFLUXReduxModels = availableRefImageModels.filter(isFluxReduxModelConfig);
         const compatibleChatGPT4oModels = availableRefImageModels.filter(isChatGPT4oModelConfig);
-        const compatibleFLUXKontextModels = availableRefImageModels.filter(isFluxKontextModelConfig);
+        const compatibleFLUXKontextDevModels = availableRefImageModels.filter(isFluxKontextModelConfig);
+        const compatibleFLUXKontextModels = availableRefImageModels.filter(isFluxKontextApiModelConfig);
 
-        // For global reference images, we can use any of the compatible model types
-        const firstCompatibleGlobalModel =
-          compatibleIPAdapterModels[0] ||
-          compatibleFLUXReduxModels[0] ||
-          compatibleChatGPT4oModels[0] ||
-          compatibleFLUXKontextModels[0] ||
-          null;
+        // For global reference images, prioritize the same model type as the main model
+        let firstCompatibleGlobalModel = null;
+
+        // If the main model is a Flux Kontext model, prioritize Flux Kontext models
+        if (newModel.base === 'flux' && newModel.name.toLowerCase().includes('kontext')) {
+          firstCompatibleGlobalModel = compatibleFLUXKontextDevModels[0] || null;
+        } else if (newModel.base === 'chatgpt-4o') {
+          // If the main model is a ChatGPT4o model, prioritize models that match the exact name
+          const exactMatch = compatibleChatGPT4oModels.find((model) => model.name === newModel.name);
+          firstCompatibleGlobalModel = exactMatch || compatibleChatGPT4oModels[0] || null;
+        } else if (newModel.base === 'flux-kontext') {
+          // If the main model is a Flux Kontext API model, prioritize models that match the exact name
+          const exactMatch = compatibleFLUXKontextModels.find((model) => model.name === newModel.name);
+          firstCompatibleGlobalModel = exactMatch || compatibleFLUXKontextModels[0] || null;
+        } else if (newModel.base === 'flux') {
+          // If the main model is a FLUX Redux model, prioritize FLUX Redux models
+          firstCompatibleGlobalModel = compatibleFLUXReduxModels[0] || null;
+        } else {
+          // Otherwise, fall back to the original order
+          firstCompatibleGlobalModel =
+            compatibleIPAdapterModels[0] ||
+            compatibleFLUXReduxModels[0] ||
+            compatibleChatGPT4oModels[0] ||
+            compatibleFLUXKontextDevModels[0] ||
+            compatibleFLUXKontextModels[0] ||
+            null;
+        }
 
         // For regional guidance, we can only use IP adapter or FLUX redux models
         const firstCompatibleRegionalModel = compatibleIPAdapterModels[0] || compatibleFLUXReduxModels[0] || null;
