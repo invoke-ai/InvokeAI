@@ -76,7 +76,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         let modelsCleared = 0;
 
         // handle incompatible loras
-        state.loras.loras.forEach((lora: any) => {
+        state.loras.loras.forEach((lora) => {
           if (lora.model.base !== newBaseModel) {
             dispatch(loraDeleted({ id: lora.id }));
             modelsCleared += 1;
