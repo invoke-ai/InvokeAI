@@ -15,6 +15,7 @@ import { CanvasSettingsBboxOverlaySwitch } from 'features/controlLayers/componen
 import { CanvasSettingsClearCachesButton } from 'features/controlLayers/components/Settings/CanvasSettingsClearCachesButton';
 import { CanvasSettingsClearHistoryButton } from 'features/controlLayers/components/Settings/CanvasSettingsClearHistoryButton';
 import { CanvasSettingsClipToBboxCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsClipToBboxCheckbox';
+import { CanvasSettingsDefaultAutoSwitchSelect } from 'features/controlLayers/components/Settings/CanvasSettingsDefaultAutoSwitchSelect';
 import { CanvasSettingsDynamicGridSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsDynamicGridSwitch';
 import { CanvasSettingsSnapToGridCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsGridSize';
 import { CanvasSettingsInvertScrollCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsInvertScrollCheckbox';
@@ -57,6 +58,7 @@ export const CanvasSettingsPopover = memo(() => {
                   {t('hotkeys.canvas.settings.behavior')}
                 </Text>
               </Flex>
+              <CanvasSettingsDefaultAutoSwitchSelect />
               <CanvasSettingsInvertScrollCheckbox />
               <CanvasSettingsPressureSensitivityCheckbox />
               <CanvasSettingsPreserveMaskCheckbox />

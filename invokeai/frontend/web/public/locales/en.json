@@ -2339,7 +2339,8 @@
             "isolatedLayerPreview": "Isolated Layer Preview",
             "isolatedLayerPreviewDesc": "Whether to show only this layer when performing operations like filtering or transforming.",
             "invertBrushSizeScrollDirection": "Invert Scroll for Brush Size",
-            "pressureSensitivity": "Pressure Sensitivity"
+            "pressureSensitivity": "Pressure Sensitivity",
+            "defaultAutoSwitch": "Default Auto-Switch Mode"
         },
         "HUD": {
             "bbox": "Bbox",
@@ -2380,6 +2381,11 @@
             "saveToGallery": "Save To Gallery",
             "showResultsOn": "Showing Results",
             "showResultsOff": "Hiding Results"
+        },
+        "autoSwitch": {
+            "off": "Off",
+            "switchOnStart": "Switch on Start",
+            "switchOnFinish": "Switch on Finish"
         }
     },
     "upscaling": {
