@@ -380,6 +380,7 @@ export const {
   useGetQueueStatusQuery,
   useListQueueItemsQuery,
   useCancelQueueItemMutation,
+  useCancelQueueItemsByDestinationMutation,
 
   useDeleteQueueItemMutation,
   useDeleteQueueItemsByDestinationMutation,

@@ -20,7 +20,7 @@ export const StagingAreaToolbarDiscardSelectedButton = memo(({ isDisabled }: { i
     if (selectedItemId === null) {
       return;
     }
-    await deleteQueueItem.trigger(selectedItemId);
+    await deleteQueueItem.trigger(selectedItemId, { withToast: false });
     const itemCount = ctx.$itemCount.get();
     if (itemCount <= 1) {
       if (ctx.session.type === 'advanced') {
