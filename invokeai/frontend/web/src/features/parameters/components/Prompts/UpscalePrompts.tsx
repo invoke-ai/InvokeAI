@@ -31,4 +31,4 @@ export const UpscalePrompts = memo(() => {
   );
 });
 
-UpscalePrompts.displayName = 'UpscalePrompts'; 
+UpscalePrompts.displayName = 'UpscalePrompts';
