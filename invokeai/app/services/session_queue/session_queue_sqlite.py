@@ -404,6 +404,8 @@ class SqliteSessionQueue(SessionQueueBase):
                   AND status != 'canceled'
                   AND status != 'completed'
                   AND status != 'failed'
+                  -- We will cancel the current item separately below - skip it here
+                  AND status != 'in_progress'
                 """
             params = [queue_id] + batch_ids
             cursor.execute(
@@ -442,6 +444,8 @@ class SqliteSessionQueue(SessionQueueBase):
                   AND status != 'canceled'
                   AND status != 'completed'
                   AND status != 'failed'
+                  -- We will cancel the current item separately below - skip it here
+                  AND status != 'in_progress'
                 """
             params = (queue_id, destination)
             cursor.execute(
@@ -544,6 +548,8 @@ class SqliteSessionQueue(SessionQueueBase):
                   AND status != 'canceled'
                   AND status != 'completed'
                   AND status != 'failed'
+                  -- We will cancel the current item separately below - skip it here
+                  AND status != 'in_progress'
                 """
             params = [queue_id]
             cursor.execute(
@@ -564,12 +570,9 @@ class SqliteSessionQueue(SessionQueueBase):
                 tuple(params),
             )
             self._conn.commit()
+
             if current_queue_item is not None and current_queue_item.queue_id == queue_id:
-                batch_status = self.get_batch_status(queue_id=queue_id, batch_id=current_queue_item.batch_id)
-                queue_status = self.get_queue_status(queue_id=queue_id)
-                self.__invoker.services.events.emit_queue_item_status_changed(
-                    current_queue_item, batch_status, queue_status
-                )
+                self._set_queue_item_status(current_queue_item.item_id, "canceled")
         except Exception:
             self._conn.rollback()
             raise
