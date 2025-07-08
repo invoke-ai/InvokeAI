@@ -1,6 +1,9 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { bboxSyncedToOptimalDimension } from 'features/controlLayers/store/canvasSlice';
+import type { RootState } from 'app/store/store';
+import { bboxSyncedToOptimalDimension , 
+  rgRefImageModelChanged
+} from 'features/controlLayers/store/canvasSlice';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
 import { modelChanged, syncedToOptimalDimension, vaeSelected } from 'features/controlLayers/store/paramsSlice';
@@ -8,21 +11,19 @@ import {
   refImageModelChanged,
   selectReferenceImageEntities 
 } from 'features/controlLayers/store/refImagesSlice';
-import { selectBboxModelBase, selectAllEntities } from 'features/controlLayers/store/selectors';
-import { 
-  rgRefImageModelChanged
-} from 'features/controlLayers/store/canvasSlice';
-import { 
-  getEntityIdentifier,
-  isRegionalGuidanceEntityIdentifier
-} from 'features/controlLayers/store/types';
+import { selectAllEntities,selectBboxModelBase } from 'features/controlLayers/store/selectors';
 import type { 
   CanvasEntityState,
   RefImageState 
 } from 'features/controlLayers/store/types';
+import { 
+  getEntityIdentifier,
+  isRegionalGuidanceEntityIdentifier
+} from 'features/controlLayers/store/types';
 import { modelSelected } from 'features/parameters/store/actions';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
+import { t } from 'i18next';
 import { 
   selectIPAdapterModels
 } from 'services/api/hooks/modelsByType';
@@ -30,14 +31,11 @@ import type {
   AnyModelConfig
 } from 'services/api/types';
 import { 
-  isIPAdapterModelConfig,
-  isFluxReduxModelConfig,
   isChatGPT4oModelConfig,
   isFluxKontextApiModelConfig,
-  isFluxKontextModelConfig
-} from 'services/api/types';
-import type { RootState } from 'app/store/store';
-import { t } from 'i18next';
+  isFluxKontextModelConfig,
+  isFluxReduxModelConfig,
+  isIPAdapterModelConfig} from 'services/api/types';
 
 const log = logger('models');
 
