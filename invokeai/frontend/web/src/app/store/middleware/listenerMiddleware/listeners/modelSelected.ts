@@ -14,9 +14,8 @@ import {
 import { selectAllEntities,selectBboxModelBase } from 'features/controlLayers/store/selectors';
 import type { 
   CanvasEntityState,
-  RefImageState,
-  CanvasRegionalGuidanceState
-} from 'features/controlLayers/store/types';
+  CanvasRegionalGuidanceState,
+  RefImageState} from 'features/controlLayers/store/types';
 import { 
   getEntityIdentifier,
   isRegionalGuidanceEntityIdentifier
@@ -30,11 +29,10 @@ import {
 } from 'services/api/hooks/modelsByType';
 import type { 
   AnyModelConfig,
-  IPAdapterModelConfig,
-  FLUXReduxModelConfig,
   ChatGPT4oModelConfig,
-  FLUXKontextModelConfig
-} from 'services/api/types';
+  FLUXKontextModelConfig,
+  FLUXReduxModelConfig,
+  IPAdapterModelConfig} from 'services/api/types';
 import { 
   isChatGPT4oModelConfig,
   isFluxKontextApiModelConfig,
