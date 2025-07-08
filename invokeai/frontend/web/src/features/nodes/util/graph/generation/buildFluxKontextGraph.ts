@@ -26,7 +26,7 @@ export const buildFluxKontextGraph = (arg: GraphBuilderArg): GraphBuilderReturn 
   assert(model.base === 'flux-kontext', 'Selected model is not a FLUX Kontext API model');
 
   if (generationMode !== 'txt2img') {
-    throw new UnsupportedGenerationModeError(t('toast.imagenIncompatibleGenerationMode', { model: 'FLUX Kontext' }));
+    throw new UnsupportedGenerationModeError(t('toast.fluxKontextIncompatibleGenerationMode'));
   }
 
   log.debug({ generationMode, manager: manager?.id }, 'Building FLUX Kontext graph');
