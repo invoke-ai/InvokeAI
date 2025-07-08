@@ -27,7 +27,6 @@ const initializeRootPanelLayout = (layoutApi: GridviewApi) => {
 export const QueueTabAutoLayout = memo(() => {
   const onReady = useCallback<IGridviewReactProps['onReady']>(({ api }) => {
     initializeRootPanelLayout(api);
-    navigationApi.onTabReady('queue');
   }, []);
 
   useEffect(

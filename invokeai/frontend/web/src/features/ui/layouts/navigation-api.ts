@@ -3,6 +3,7 @@ import { createDeferredPromise, type Deferred } from 'common/util/createDeferred
 import { DockviewPanel, GridviewPanel, type IDockviewPanel, type IGridviewPanel } from 'dockview';
 import { debounce } from 'es-toolkit';
 import type { StoredDockviewPanelState, StoredGridviewPanelState, TabName } from 'features/ui/store/uiTypes';
+import type { Atom } from 'nanostores';
 import { atom } from 'nanostores';
 
 import {
@@ -54,14 +55,8 @@ export class NavigationApi {
   /**
    * A flag indicating if the application is currently switching tabs, which can take some time.
    */
-  $isSwitchingTabs = atom(false);
-  /**
-   * The timeout used to add a short additional delay when switching tabs.
-   *
-   * The time it takes to switch tabs varies depending on the tab, and sometimes it is very fast, resulting in a flicker
-   * of the loading screen. This timeout is used to artificially extend the time the loading screen is shown.
-   */
-  switchingTabsTimeout: ReturnType<typeof setTimeout> | null = null;
+  private _$isLoading = atom(false);
+  $isLoading: Atom<boolean> = this._$isLoading;
 
   /**
    * Separator used to create unique keys for panels. Typo protection.
@@ -87,42 +82,45 @@ export class NavigationApi {
   };
 
   /**
+   * Sets the flag indicating that the navigation is loading and schedules a debounced hide of the loading screen.
+   */
+  _showFakeLoadingScreen = () => {
+    log.debug('Showing fake loading screen for tab switch');
+    this._$isLoading.set(true);
+    this._hideLoadingScreenDebounced();
+  };
+
+  /**
+   * Debounced function to hide the loading screen after a delay.
+   */
+  _hideLoadingScreenDebounced = debounce(() => {
+    log.debug('Hiding fake loading screen for tab switch');
+    this._$isLoading.set(false);
+  }, SWITCH_TABS_FAKE_DELAY_MS);
+
+  /**
    * Switch to a specific app tab.
    *
-   * The loading screen will be shown while the tab is switching.
+   * The loading screen will be shown while the tab is switching (and for a little while longer to smooth out the UX).
    *
    * @param tab - The tab to switch to
    * @return True if the switch was successful, false otherwise
    */
   switchToTab = (tab: TabName): boolean => {
-    if (this.switchingTabsTimeout !== null) {
-      clearTimeout(this.switchingTabsTimeout);
-      this.switchingTabsTimeout = null;
-    }
-    if (tab === this._app?.activeTab.get?.()) {
-      return true;
-    }
-    this.$isSwitchingTabs.set(true);
-    log.debug(`Switching to tab: ${tab}`);
-    if (this._app) {
-      this._app.activeTab.set(tab);
-      return true;
-    } else {
-      log.error('No setAppTab function available to switch tabs');
+    if (!this._app) {
+      log.error('No app connected to switch tabs');
       return false;
     }
-  };
 
-  /**
-   * Callback for when a tab is ready after switching.
-   *
-   * Hides the loading screen after a short delay.
-   */
-  onTabReady = (tab: TabName): void => {
-    this.switchingTabsTimeout = setTimeout(() => {
-      this.$isSwitchingTabs.set(false);
-      log.debug(`Tab ${tab} ready`);
-    }, SWITCH_TABS_FAKE_DELAY_MS);
+    if (tab === this._app.activeTab.get()) {
+      log.debug(`Already on tab: ${tab}`);
+      return true;
+    }
+
+    log.debug(`Switching to tab: ${tab}`);
+    this._showFakeLoadingScreen();
+    this._app.activeTab.set(tab);
+    return true;
   };
 
   _initGridviewPanelStorage = (key: string, panel: IGridviewPanel) => {

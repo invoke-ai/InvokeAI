@@ -275,7 +275,6 @@ const initializeRootPanelLayout = (layoutApi: GridviewApi) => {
 export const UpscalingTabAutoLayout = memo(() => {
   const onReady = useCallback<IGridviewReactProps['onReady']>(({ api }) => {
     initializeRootPanelLayout(api);
-    navigationApi.onTabReady('upscaling');
   }, []);
 
   useEffect(

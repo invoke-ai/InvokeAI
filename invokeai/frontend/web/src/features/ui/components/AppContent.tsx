@@ -58,7 +58,7 @@ const TabContent = memo(() => {
 TabContent.displayName = 'TabContent';
 
 const SwitchingTabsLoader = memo(() => {
-  const isSwitchingTabs = useStore(navigationApi.$isSwitchingTabs);
+  const isSwitchingTabs = useStore(navigationApi.$isLoading);
 
   if (isSwitchingTabs) {
     return <Loading />;
