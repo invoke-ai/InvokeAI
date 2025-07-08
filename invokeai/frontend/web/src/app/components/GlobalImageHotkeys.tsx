@@ -6,7 +6,8 @@ import { useImageActions } from 'features/gallery/hooks/useImageActions';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { memo } from 'react';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { memo, useMemo } from 'react';
 import { useImageDTO } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
@@ -29,7 +30,10 @@ const GlobalImageHotkeysInternal = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
   const isViewerFocused = useIsRegionFocused('viewer');
   const imageActions = useImageActions(imageDTO);
   const isStaging = useAppSelector(selectIsStaging);
+  const activeTab = useAppSelector(selectActiveTab);
   const isUpscalingEnabled = useFeatureStatus('upscaling');
+
+  const isCanvasTabAndStaging = useMemo(() => activeTab === 'canvas' && isStaging, [activeTab, isStaging]);
 
   useRegisteredHotkeys({
     id: 'loadWorkflow',
@@ -42,8 +46,8 @@ const GlobalImageHotkeysInternal = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
     id: 'recallAll',
     category: 'viewer',
     callback: imageActions.recallAll,
-    options: { enabled: !isStaging && (isGalleryFocused || isViewerFocused) },
-    dependencies: [imageActions.recallAll, isStaging, isGalleryFocused, isViewerFocused],
+    options: { enabled: !isCanvasTabAndStaging && (isGalleryFocused || isViewerFocused) },
+    dependencies: [imageActions.recallAll, isCanvasTabAndStaging, isGalleryFocused, isViewerFocused],
   });
   useRegisteredHotkeys({
     id: 'recallSeed',
