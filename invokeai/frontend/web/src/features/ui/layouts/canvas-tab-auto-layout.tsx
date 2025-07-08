@@ -313,7 +313,6 @@ const initializeRootPanelLayout = (api: GridviewApi) => {
 export const CanvasTabAutoLayout = memo(() => {
   const onReady = useCallback<IGridviewReactProps['onReady']>(({ api }) => {
     initializeRootPanelLayout(api);
-    navigationApi.onTabReady('canvas');
   }, []);
 
   useEffect(

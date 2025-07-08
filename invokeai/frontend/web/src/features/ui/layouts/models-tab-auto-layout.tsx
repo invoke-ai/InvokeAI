@@ -27,7 +27,6 @@ const initializeRootPanelLayout = (layoutApi: GridviewApi) => {
 export const ModelsTabAutoLayout = memo(() => {
   const onReady = useCallback<IGridviewReactProps['onReady']>(({ api }) => {
     initializeRootPanelLayout(api);
-    navigationApi.onTabReady('models');
   }, []);
 
   useEffect(

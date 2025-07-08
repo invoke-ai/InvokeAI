@@ -10,6 +10,7 @@ import {
   RIGHT_PANEL_ID,
   RIGHT_PANEL_MIN_SIZE_PX,
   SETTINGS_PANEL_ID,
+  SWITCH_TABS_FAKE_DELAY_MS,
   WORKSPACE_PANEL_ID,
 } from './shared';
 
@@ -125,6 +126,85 @@ describe('AppNavigationApi', () => {
       navigationApi.disconnectFromApp();
 
       expect(navigationApi._app).toBeNull();
+    });
+  });
+
+  describe('Tab Switching', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    });
+
+    it('should switch tabs', () => {
+      navigationApi.connectToApp(mockAppApi);
+      navigationApi.switchToTab('canvas');
+      expect(mockSetAppTab).toHaveBeenCalledWith('canvas');
+    });
+
+    it('should not set the tab if it is already on that tab', () => {
+      navigationApi.connectToApp(mockAppApi);
+      mockGetAppTab.mockReturnValue('canvas');
+
+      navigationApi.switchToTab('canvas');
+      expect(mockSetAppTab).not.toHaveBeenCalled();
+    });
+
+    it('should set the $isLoading atom when switching', () => {
+      navigationApi.connectToApp(mockAppApi);
+      mockGetAppTab.mockReturnValue('generate');
+
+      navigationApi.switchToTab('canvas');
+      expect(navigationApi.$isLoading.get()).toBe(true);
+    });
+
+    it('should unset the $isLoading atom after a fake delay', () => {
+      navigationApi.connectToApp(mockAppApi);
+      mockGetAppTab.mockReturnValue('generate');
+
+      navigationApi.switchToTab('canvas');
+      expect(navigationApi.$isLoading.get()).toBe(true);
+
+      vi.advanceTimersByTime(SWITCH_TABS_FAKE_DELAY_MS);
+      expect(navigationApi.$isLoading.get()).toBe(false);
+    });
+
+    it('should handle rapid tab changes', () => {
+      navigationApi.connectToApp(mockAppApi);
+      mockGetAppTab.mockReturnValue('generate');
+
+      navigationApi.switchToTab('canvas');
+      expect(navigationApi.$isLoading.get()).toBe(true);
+
+      navigationApi.switchToTab('generate');
+      expect(navigationApi.$isLoading.get()).toBe(true);
+
+      vi.advanceTimersByTime(SWITCH_TABS_FAKE_DELAY_MS / 5);
+
+      navigationApi.switchToTab('canvas');
+      expect(navigationApi.$isLoading.get()).toBe(true);
+
+      vi.advanceTimersByTime(SWITCH_TABS_FAKE_DELAY_MS / 5);
+
+      navigationApi.switchToTab('generate');
+      expect(navigationApi.$isLoading.get()).toBe(true);
+
+      vi.advanceTimersByTime(SWITCH_TABS_FAKE_DELAY_MS / 5);
+
+      navigationApi.switchToTab('canvas');
+      expect(navigationApi.$isLoading.get()).toBe(true);
+
+      vi.advanceTimersByTime(SWITCH_TABS_FAKE_DELAY_MS);
+
+      expect(navigationApi.$isLoading.get()).toBe(false);
+    });
+
+    it('should not switch tabs if the app is not connected', () => {
+      navigationApi.switchToTab('canvas');
+      expect(mockSetAppTab).not.toHaveBeenCalled();
     });
   });
 

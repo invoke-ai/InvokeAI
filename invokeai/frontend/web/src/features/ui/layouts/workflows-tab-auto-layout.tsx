@@ -292,7 +292,6 @@ const initializeRootPanelLayout = (api: GridviewApi) => {
 export const WorkflowsTabAutoLayout = memo(() => {
   const onReady = useCallback<IGridviewReactProps['onReady']>(({ api }) => {
     initializeRootPanelLayout(api);
-    navigationApi.onTabReady('workflows');
   }, []);
 
   useEffect(
