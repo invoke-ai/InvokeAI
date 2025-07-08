@@ -13,17 +13,7 @@ import type { ParameterModel } from 'features/parameters/types/parameterSchemas'
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import { selectIPAdapterModels } from 'services/api/hooks/modelsByType';
-import type { ApiModelConfig, FLUXReduxModelConfig, IPAdapterModelConfig, MainModelConfig } from 'services/api/types';
-import {
-  isChatGPT4oModelConfig,
-  isFluxKontextModelConfig,
-  isFluxReduxModelConfig,
-  isImagen3ModelConfig,
-  isImagen4ModelConfig,
-  isIPAdapterModelConfig,
-} from 'services/api/types';
 
 const log = logger('models');
 
