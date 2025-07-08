@@ -1,6 +1,7 @@
-import { GridviewPanel, type IDockviewPanel } from 'dockview';
+import { DockviewPanel, GridviewPanel } from 'dockview';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { NavigationAppApi } from './navigation-api';
 import { NavigationApi } from './navigation-api';
 import {
   LAUNCHPAD_PANEL_ID,
@@ -33,6 +34,7 @@ vi.mock('dockview', async () => {
       setActive: vi.fn(),
       setConstraints: vi.fn(),
       setSize: vi.fn(),
+      onDidDimensionsChange: vi.fn(() => ({ dispose: vi.fn() })),
     };
 
     constructor(config: { maximumWidth?: number; minimumWidth?: number } = {}) {
@@ -41,9 +43,20 @@ vi.mock('dockview', async () => {
     }
   }
 
+  // Mock GridviewPanel class for instanceof checks
+  class MockDockviewPanel {
+    api = {
+      setActive: vi.fn(),
+      setConstraints: vi.fn(),
+      setSize: vi.fn(),
+      onDidActiveChange: vi.fn(() => ({ dispose: vi.fn() })),
+    };
+  }
+
   return {
     ...actual,
     GridviewPanel: MockGridviewPanel,
+    DockviewPanel: MockDockviewPanel,
   };
 });
 
@@ -53,22 +66,38 @@ const createMockPanel = (config: { maximumWidth?: number; minimumWidth?: number 
   return new GridviewPanel(config);
 };
 
-const createMockDockPanel = () =>
-  ({
-    api: {
-      setActive: vi.fn(),
-    },
-  }) as unknown as IDockviewPanel;
+const createMockDockPanel = () => {
+  /* @ts-expect-error we are mocking GridviewPanel to be a concrete class */
+  return new DockviewPanel();
+};
 
 describe('AppNavigationApi', () => {
   let navigationApi: NavigationApi;
   let mockSetAppTab: ReturnType<typeof vi.fn>;
   let mockGetAppTab: ReturnType<typeof vi.fn>;
+  let mockSetPanelState: ReturnType<typeof vi.fn>;
+  let mockGetPanelState: ReturnType<typeof vi.fn>;
+  let mockDeletePanelState: ReturnType<typeof vi.fn>;
+  let mockAppApi: NavigationAppApi;
 
   beforeEach(() => {
     navigationApi = new NavigationApi();
     mockSetAppTab = vi.fn();
     mockGetAppTab = vi.fn();
+    mockSetPanelState = vi.fn();
+    mockGetPanelState = vi.fn();
+    mockDeletePanelState = vi.fn();
+    mockAppApi = {
+      activeTab: {
+        set: mockSetAppTab,
+        get: mockGetAppTab,
+      },
+      panelStorage: {
+        set: mockSetPanelState,
+        get: mockGetPanelState,
+        delete: mockDeletePanelState,
+      },
+    };
   });
 
   afterEach(() => {
@@ -81,18 +110,21 @@ describe('AppNavigationApi', () => {
 
   describe('Basic Connection', () => {
     it('should connect to app', () => {
-      navigationApi.connectToApp({ setAppTab: mockSetAppTab, getAppTab: mockGetAppTab });
+      navigationApi.connectToApp(mockAppApi);
 
-      expect(navigationApi._setAppTab).toBe(mockSetAppTab);
-      expect(navigationApi._getAppTab).toBe(mockGetAppTab);
+      expect(navigationApi._app).not.toBeNull();
+      expect(navigationApi._app?.activeTab.set).toBe(mockSetAppTab);
+      expect(navigationApi._app?.activeTab.get).toBe(mockGetAppTab);
+      expect(navigationApi._app?.panelStorage.set).toBe(mockSetPanelState);
+      expect(navigationApi._app?.panelStorage.get).toBe(mockGetPanelState);
+      expect(navigationApi._app?.panelStorage.delete).toBe(mockDeletePanelState);
     });
 
     it('should disconnect from app', () => {
-      navigationApi.connectToApp({ setAppTab: mockSetAppTab, getAppTab: mockGetAppTab });
+      navigationApi.connectToApp(mockAppApi);
       navigationApi.disconnectFromApp();
 
-      expect(navigationApi._setAppTab).toBeNull();
-      expect(navigationApi._getAppTab).toBeNull();
+      expect(navigationApi._app).toBeNull();
     });
   });
 
@@ -155,7 +187,7 @@ describe('AppNavigationApi', () => {
 
   describe('Panel Focus', () => {
     beforeEach(() => {
-      navigationApi.connectToApp({ setAppTab: mockSetAppTab, getAppTab: mockGetAppTab });
+      navigationApi.connectToApp(mockAppApi);
     });
 
     it('should focus panel in already registered tab', async () => {
@@ -331,7 +363,7 @@ describe('AppNavigationApi', () => {
       const mockPanel = createMockPanel();
 
       // Connect to app
-      navigationApi.connectToApp({ setAppTab: mockSetAppTab, getAppTab: mockGetAppTab });
+      navigationApi.connectToApp(mockAppApi);
       mockGetAppTab.mockReturnValue('canvas');
 
       // Register panel
@@ -348,8 +380,7 @@ describe('AppNavigationApi', () => {
       unregister();
       navigationApi.disconnectFromApp();
 
-      expect(navigationApi._setAppTab).toBeNull();
-      expect(navigationApi._getAppTab).toBeNull();
+      expect(navigationApi._app).toBeNull();
       expect(navigationApi.isPanelRegistered('generate', SETTINGS_PANEL_ID)).toBe(false);
     });
 
@@ -358,7 +389,7 @@ describe('AppNavigationApi', () => {
       const mockPanel2 = createMockDockPanel();
       const mockPanel3 = createMockPanel();
 
-      navigationApi.connectToApp({ setAppTab: mockSetAppTab, getAppTab: mockGetAppTab });
+      navigationApi.connectToApp(mockAppApi);
       mockGetAppTab.mockReturnValue('generate');
 
       // Register panels
@@ -400,7 +431,7 @@ describe('AppNavigationApi', () => {
 
   describe('focusPanelInActiveTab', () => {
     beforeEach(() => {
-      navigationApi.connectToApp({ setAppTab: mockSetAppTab, getAppTab: mockGetAppTab });
+      navigationApi.connectToApp(mockAppApi);
     });
 
     it('should focus panel in active tab', async () => {
@@ -483,7 +514,7 @@ describe('AppNavigationApi', () => {
 
   describe('toggleLeftPanel', () => {
     beforeEach(() => {
-      navigationApi.connectToApp({ setAppTab: mockSetAppTab, getAppTab: mockGetAppTab });
+      navigationApi.connectToApp(mockAppApi);
     });
 
     it('should expand collapsed left panel', () => {
@@ -545,7 +576,7 @@ describe('AppNavigationApi', () => {
 
   describe('toggleRightPanel', () => {
     beforeEach(() => {
-      navigationApi.connectToApp({ setAppTab: mockSetAppTab, getAppTab: mockGetAppTab });
+      navigationApi.connectToApp(mockAppApi);
     });
 
     it('should expand collapsed right panel', () => {
@@ -607,7 +638,7 @@ describe('AppNavigationApi', () => {
 
   describe('toggleLeftAndRightPanels', () => {
     beforeEach(() => {
-      navigationApi.connectToApp({ setAppTab: mockSetAppTab, getAppTab: mockGetAppTab });
+      navigationApi.connectToApp(mockAppApi);
     });
 
     it('should expand both panels when left is collapsed', () => {
@@ -734,7 +765,7 @@ describe('AppNavigationApi', () => {
 
   describe('resetLeftAndRightPanels', () => {
     beforeEach(() => {
-      navigationApi.connectToApp({ setAppTab: mockSetAppTab, getAppTab: mockGetAppTab });
+      navigationApi.connectToApp(mockAppApi);
     });
 
     it('should reset both panels to expanded state', () => {
@@ -795,7 +826,7 @@ describe('AppNavigationApi', () => {
 
   describe('Integration Tests', () => {
     beforeEach(() => {
-      navigationApi.connectToApp({ setAppTab: mockSetAppTab, getAppTab: mockGetAppTab });
+      navigationApi.connectToApp(mockAppApi);
     });
 
     it('should handle complete panel management workflow', async () => {
