@@ -383,7 +383,6 @@ export const {
   useCancelQueueItemsByDestinationMutation,
 
   useDeleteQueueItemMutation,
-  useDeleteQueueItemsByDestinationMutation,
   useDeleteAllExceptCurrentMutation,
   useGetBatchStatusQuery,
 
