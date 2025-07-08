@@ -132,7 +132,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           const exactMatch = compatibleFLUXKontextModels.find((model) => model.name === newModel.name);
           firstCompatibleGlobalModel = exactMatch || compatibleFLUXKontextModels[0] || null;
         } else if (newModel.base === 'flux') {
-          // If the main model is a FLUX Redux model, prioritize FLUX Redux models
+          // If the main model is a FLUX model, prioritize FLUX Redux models
           firstCompatibleGlobalModel = compatibleFLUXReduxModels[0] || null;
         } else {
           // Otherwise, fall back to the original order
