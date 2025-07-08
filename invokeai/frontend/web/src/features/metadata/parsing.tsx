@@ -8,6 +8,7 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { bboxHeightChanged, bboxWidthChanged, canvasMetadataRecalled } from 'features/controlLayers/store/canvasSlice';
 import { loraAllDeleted, loraRecalled } from 'features/controlLayers/store/lorasSlice';
 import {
+  heightChanged,
   negativePrompt2Changed,
   negativePromptChanged,
   positivePrompt2Changed,
@@ -31,6 +32,7 @@ import {
   setSteps,
   shouldConcatPromptsChanged,
   vaeSelected,
+  widthChanged,
 } from 'features/controlLayers/store/paramsSlice';
 import { refImagesRecalled } from 'features/controlLayers/store/refImagesSlice';
 import type { CanvasMetadata, LoRA, RefImageState } from 'features/controlLayers/store/types';
@@ -82,6 +84,7 @@ import {
   zParameterStrength,
 } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
 import type { ComponentType, ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
@@ -396,7 +399,12 @@ const Width: SingleMetadataHandler<ParameterWidth> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(bboxWidthChanged({ width: value, updateAspectRatio: true, clamp: true }));
+    const activeTab = selectActiveTab(store.getState());
+    if (activeTab === 'canvas') {
+      store.dispatch(bboxWidthChanged({ width: value, updateAspectRatio: true, clamp: true }));
+    } else if (activeTab === 'generate') {
+      store.dispatch(widthChanged({ width: value, updateAspectRatio: true, clamp: true }));
+    }
   },
   LabelComponent: () => <MetadataLabel i18nKey="metadata.width" />,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterWidth>) => <MetadataPrimitiveValue value={value} />,
@@ -413,7 +421,12 @@ const Height: SingleMetadataHandler<ParameterHeight> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(bboxHeightChanged({ height: value, updateAspectRatio: true, clamp: true }));
+    const activeTab = selectActiveTab(store.getState());
+    if (activeTab === 'canvas') {
+      store.dispatch(bboxHeightChanged({ height: value, updateAspectRatio: true, clamp: true }));
+    } else if (activeTab === 'generate') {
+      store.dispatch(heightChanged({ height: value, updateAspectRatio: true, clamp: true }));
+    }
   },
   LabelComponent: () => <MetadataLabel i18nKey="metadata.height" />,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterHeight>) => <MetadataPrimitiveValue value={value} />,
