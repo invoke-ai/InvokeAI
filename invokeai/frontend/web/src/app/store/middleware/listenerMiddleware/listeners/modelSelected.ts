@@ -2,14 +2,9 @@ import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import type { AppDispatch, RootState } from 'app/store/store';
 import { bboxSyncedToOptimalDimension, rgRefImageModelChanged } from 'features/controlLayers/store/canvasSlice';
-import type { AppDispatch, RootState } from 'app/store/store';
-import { bboxSyncedToOptimalDimension, rgRefImageModelChanged } from 'features/controlLayers/store/canvasSlice';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
 import { modelChanged, syncedToOptimalDimension, vaeSelected } from 'features/controlLayers/store/paramsSlice';
-import { refImageModelChanged, selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { selectBboxModelBase, selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { refImageModelChanged, selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectBboxModelBase, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
@@ -18,8 +13,8 @@ import type { ParameterModel } from 'features/parameters/types/parameterSchemas'
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { selectIPAdapterModels } from 'services/api/hooks/modelsByType';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
+import { selectIPAdapterModels } from 'services/api/hooks/modelsByType';
 import type { ApiModelConfig, FLUXReduxModelConfig, IPAdapterModelConfig, MainModelConfig } from 'services/api/types';
 import {
   isChatGPT4oModelConfig,
