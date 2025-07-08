@@ -138,7 +138,14 @@ export const CanvasSessionContextProvider = memo(
      * Manually-synced atom containing queue items for the current session. This is populated from the RTK Query cache
      * and kept in sync with it via a redux subscription.
      */
-    const $items = useState(() => atom<S['SessionQueueItem'][]>([]))[0];
+    const $allItems = useState(() => atom<S['SessionQueueItem'][]>([]))[0];
+
+    /**
+     * All queue items for the current session, excluding canceled and failed items.
+     */
+    const $items = useState(() =>
+      computed([$allItems], (allItems) => allItems.filter(({ status }) => status !== 'canceled' && status !== 'failed'))
+    )[0];
 
     /**
      * Whether auto-switch is enabled.
@@ -232,10 +239,9 @@ export const CanvasSessionContextProvider = memo(
      */
     const selectQueueItems = useMemo(
       () =>
-        createSelector(
-          queueApi.endpoints.listAllQueueItems.select({ destination: session.id }),
-          ({ data }) => data ?? EMPTY_ARRAY
-        ),
+        createSelector(queueApi.endpoints.listAllQueueItems.select({ destination: session.id }), ({ data }) => {
+          return data ?? EMPTY_ARRAY;
+        }),
       [session.id]
     );
 
@@ -344,51 +350,52 @@ export const CanvasSessionContextProvider = memo(
 
     // Set up state subscriptions and effects
     useEffect(() => {
-      let _prevItems: readonly S['SessionQueueItem'][] = [];
-      // Seed the $items atom with the initial query cache state
-      $items.set(selectQueueItems(store.getState()));
+      let _prevAllItems: readonly S['SessionQueueItem'][] = [];
+      // Seed the $allItems atom with the initial query cache state
+      $allItems.set(selectQueueItems(store.getState()));
 
-      // Manually keep the $items atom in sync as the query cache is updated
+      // Manually keep the $allItems atom in sync as the query cache is updated
       const unsubReduxSyncToItemsAtom = store.subscribe(() => {
-        const prevItems = $items.get();
+        const prevItems = $allItems.get();
         const items = selectQueueItems(store.getState());
         if (items !== prevItems) {
-          _prevItems = prevItems;
-          $items.set(items);
+          _prevAllItems = prevItems;
+          $allItems.set(items);
         }
       });
+
+      let _prevItems: readonly S['SessionQueueItem'][] = [];
 
       // Handle cases that could result in a nonexistent queue item being selected.
       const unsubEnsureSelectedItemIdExists = effect(
         [$items, $selectedItemId, $lastStartedItemId],
         (items, selectedItemId, lastStartedItemId) => {
-          // If there are no items, cannot have a selected item.
           if (items.length === 0) {
+            // If there are no items, cannot have a selected item.
             $selectedItemId.set(null);
-            return;
-          }
-          // If there is no selected item but there are items, select the first one.
-          if (selectedItemId === null && items.length > 0) {
+          } else if (selectedItemId === null && items.length > 0) {
+            // If there is no selected item but there are items, select the first one.
             $selectedItemId.set(items[0]?.item_id ?? null);
             return;
-          }
-          if (
+          } else if (
             $autoSwitch.get() === 'switch_on_start' &&
             items.findIndex(({ item_id }) => item_id === lastStartedItemId) !== -1
           ) {
             $selectedItemId.set(lastStartedItemId);
             $lastStartedItemId.set(null);
-          }
-          // If an item is selected and it is not in the list of items, un-set it. This effect will run again and we'll
-          // the above case, selecting the first item if there are any.
-          if (selectedItemId !== null && items.findIndex(({ item_id }) => item_id === selectedItemId) === -1) {
+          } else if (selectedItemId !== null && items.findIndex(({ item_id }) => item_id === selectedItemId) === -1) {
+            // If an item is selected and it is not in the list of items, un-set it. This effect will run again and we'll
+            // the above case, selecting the first item if there are any.
             let prevIndex = _prevItems.findIndex(({ item_id }) => item_id === selectedItemId);
             if (prevIndex >= items.length) {
               prevIndex = items.length - 1;
             }
             const nextItem = items[prevIndex];
             $selectedItemId.set(nextItem?.item_id ?? null);
-            return;
+          }
+
+          if (items !== _prevItems) {
+            _prevItems = items;
           }
         }
       );
@@ -493,11 +500,12 @@ export const CanvasSessionContextProvider = memo(
         unsubReduxSyncToItemsAtom();
         unsubEnsureSelectedItemIdExists();
         unsubCleanUpProgressData();
-        $items.set([]);
+        $allItems.set([]);
         $progressData.set({});
         $selectedItemId.set(null);
       };
     }, [
+      $allItems,
       $autoSwitch,
       $items,
       $lastLoadedItemId,
