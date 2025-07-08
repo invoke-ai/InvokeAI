@@ -71,6 +71,12 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
     }
     dispatch(boardsApi.util.upsertQueryEntries(entries));
 
+    // Invalidate board cache to update image counts in the UI
+    const boardIds = Object.keys(boardTotalAdditions);
+    if (boardIds.length > 0) {
+      dispatch(boardsApi.util.invalidateTags(boardIds.map((boardId) => ({ type: 'Board' as const, id: boardId }))));
+    }
+
     /**
      * Optimistic update and cache invalidation for image names queries that match this image's board and categories.
      * - Optimistic update for the cache that does not have a search term (we cannot derive the correct insertion
