@@ -2555,8 +2555,9 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "Inpainting: Per-mask noise levels and denoise limits.",
-            "Canvas: Smarter aspect ratios for SDXL and improved scroll-to-zoom."
+            "Generate images faster with new Launchpads and a simplified Generate tab.",
+            "Edit with prompts using Flux Kontext Dev.",
+            "Export to PSD, bulk-hide overlays, organize models & images — all in a reimagined interface built for control."
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
