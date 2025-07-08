@@ -1,23 +1,47 @@
 import { objectEquals } from '@observ33r/object-equals';
+import type { RootState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type { Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
-import type { LatentToImageNodes } from 'features/nodes/util/graph/types';
+import { getOriginalAndScaledSizesForTextToImage } from 'features/nodes/util/graph/graphBuilderUtils';
+import type { DenoiseLatentsNodes, LatentToImageNodes } from 'features/nodes/util/graph/types';
 import type { Invocation } from 'services/api/types';
+import { assert } from 'tsafe';
 
 type AddTextToImageArg = {
   g: Graph;
+  state: RootState;
+  noise?: Invocation<'noise'>;
+  denoise: Invocation<DenoiseLatentsNodes>;
   l2i: Invocation<LatentToImageNodes>;
-  originalSize: Dimensions;
-  scaledSize: Dimensions;
 };
 
 export const addTextToImage = ({
   g,
+  state,
+  noise,
+  denoise,
   l2i,
-  originalSize,
-  scaledSize,
 }: AddTextToImageArg): Invocation<'img_resize' | 'l2i' | 'flux_vae_decode' | 'sd3_l2i' | 'cogview4_l2i'> => {
+  denoise.denoising_start = 0;
+  denoise.denoising_end = 1;
+
+  const { originalSize, scaledSize } = getOriginalAndScaledSizesForTextToImage(state);
+
+  if (denoise.type === 'cogview4_denoise' || denoise.type === 'flux_denoise' || denoise.type === 'sd3_denoise') {
+    denoise.width = scaledSize.width;
+    denoise.height = scaledSize.height;
+  } else {
+    assert(denoise.type === 'denoise_latents');
+    assert(noise, 'SD1.5/SD2/SDXL graphs require a noise node to be passed in');
+    noise.width = scaledSize.width;
+    noise.height = scaledSize.height;
+  }
+
+  g.upsertMetadata({
+    width: originalSize.width,
+    height: originalSize.height,
+  });
+
   if (!objectEquals(scaledSize, originalSize)) {
     // We need to resize the output image back to the original size
     const resizeImageToOriginalSize = g.addNode({

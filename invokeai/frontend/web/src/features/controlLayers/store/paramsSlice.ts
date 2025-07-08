@@ -1,9 +1,22 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { deepClone } from 'common/util/deepClone';
+import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
 import { clamp } from 'es-toolkit/compat';
-import type { ParamsState, RgbaColor } from 'features/controlLayers/store/types';
-import { getInitialParamsState } from 'features/controlLayers/store/types';
+import type { AspectRatioID, ParamsState, RgbaColor } from 'features/controlLayers/store/types';
+import {
+  ASPECT_RATIO_MAP,
+  CHATGPT_ASPECT_RATIOS,
+  DEFAULT_ASPECT_RATIO_CONFIG,
+  FLUX_KONTEXT_ASPECT_RATIOS,
+  getInitialParamsState,
+  IMAGEN_ASPECT_RATIOS,
+  isChatGPT4oAspectRatioID,
+  isFluxKontextAspectRatioID,
+  isImagenAspectRatioID,
+} from 'features/controlLayers/store/types';
+import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import type {
   ParameterCanvasCoherenceMode,
@@ -23,6 +36,7 @@ import type {
   ParameterT5EncoderModel,
   ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
+import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 
@@ -186,6 +200,129 @@ export const paramsSlice = createSlice({
     setCanvasCoherenceMinDenoise: (state, action: PayloadAction<number>) => {
       state.canvasCoherenceMinDenoise = action.payload;
     },
+
+    //#region Dimensions
+    widthChanged: (state, action: PayloadAction<{ width: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
+      const { width, updateAspectRatio, clamp } = action.payload;
+      const gridSize = getGridSize(state.model?.base);
+      state.dimensions.rect.width = clamp ? Math.max(roundDownToMultiple(width, gridSize), 64) : width;
+
+      if (state.dimensions.aspectRatio.isLocked) {
+        state.dimensions.rect.height = roundToMultiple(
+          state.dimensions.rect.width / state.dimensions.aspectRatio.value,
+          gridSize
+        );
+      }
+
+      if (updateAspectRatio || !state.dimensions.aspectRatio.isLocked) {
+        state.dimensions.aspectRatio.value = state.dimensions.rect.width / state.dimensions.rect.height;
+        state.dimensions.aspectRatio.id = 'Free';
+        state.dimensions.aspectRatio.isLocked = false;
+      }
+    },
+    heightChanged: (state, action: PayloadAction<{ height: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
+      const { height, updateAspectRatio, clamp } = action.payload;
+      const gridSize = getGridSize(state.model?.base);
+      state.dimensions.rect.height = clamp ? Math.max(roundDownToMultiple(height, gridSize), 64) : height;
+
+      if (state.dimensions.aspectRatio.isLocked) {
+        state.dimensions.rect.width = roundToMultiple(
+          state.dimensions.rect.height * state.dimensions.aspectRatio.value,
+          gridSize
+        );
+      }
+
+      if (updateAspectRatio || !state.dimensions.aspectRatio.isLocked) {
+        state.dimensions.aspectRatio.value = state.dimensions.rect.width / state.dimensions.rect.height;
+        state.dimensions.aspectRatio.id = 'Free';
+        state.dimensions.aspectRatio.isLocked = false;
+      }
+    },
+    aspectRatioLockToggled: (state) => {
+      state.dimensions.aspectRatio.isLocked = !state.dimensions.aspectRatio.isLocked;
+    },
+    aspectRatioIdChanged: (state, action: PayloadAction<{ id: AspectRatioID }>) => {
+      const { id } = action.payload;
+      state.dimensions.aspectRatio.id = id;
+      if (id === 'Free') {
+        state.dimensions.aspectRatio.isLocked = false;
+      } else if ((state.model?.base === 'imagen3' || state.model?.base === 'imagen4') && isImagenAspectRatioID(id)) {
+        const { width, height } = IMAGEN_ASPECT_RATIOS[id];
+        state.dimensions.rect.width = width;
+        state.dimensions.rect.height = height;
+        state.dimensions.aspectRatio.value = state.dimensions.rect.width / state.dimensions.rect.height;
+        state.dimensions.aspectRatio.isLocked = true;
+      } else if (state.model?.base === 'chatgpt-4o' && isChatGPT4oAspectRatioID(id)) {
+        const { width, height } = CHATGPT_ASPECT_RATIOS[id];
+        state.dimensions.rect.width = width;
+        state.dimensions.rect.height = height;
+        state.dimensions.aspectRatio.value = state.dimensions.rect.width / state.dimensions.rect.height;
+        state.dimensions.aspectRatio.isLocked = true;
+      } else if (state.model?.base === 'flux-kontext' && isFluxKontextAspectRatioID(id)) {
+        const { width, height } = FLUX_KONTEXT_ASPECT_RATIOS[id];
+        state.dimensions.rect.width = width;
+        state.dimensions.rect.height = height;
+        state.dimensions.aspectRatio.value = state.dimensions.rect.width / state.dimensions.rect.height;
+        state.dimensions.aspectRatio.isLocked = true;
+      } else {
+        state.dimensions.aspectRatio.isLocked = true;
+        state.dimensions.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
+        const { width, height } = calculateNewSize(
+          state.dimensions.aspectRatio.value,
+          state.dimensions.rect.width * state.dimensions.rect.height,
+          state.model?.base
+        );
+        state.dimensions.rect.width = width;
+        state.dimensions.rect.height = height;
+      }
+    },
+    dimensionsSwapped: (state) => {
+      state.dimensions.aspectRatio.value = 1 / state.dimensions.aspectRatio.value;
+      if (state.dimensions.aspectRatio.id === 'Free') {
+        const newWidth = state.dimensions.rect.height;
+        const newHeight = state.dimensions.rect.width;
+        state.dimensions.rect.width = newWidth;
+        state.dimensions.rect.height = newHeight;
+      } else {
+        const { width, height } = calculateNewSize(
+          state.dimensions.aspectRatio.value,
+          state.dimensions.rect.width * state.dimensions.rect.height,
+          state.model?.base
+        );
+        state.dimensions.rect.width = width;
+        state.dimensions.rect.height = height;
+        state.dimensions.aspectRatio.id = ASPECT_RATIO_MAP[state.dimensions.aspectRatio.id].inverseID;
+      }
+    },
+    sizeOptimized: (state) => {
+      const optimalDimension = getOptimalDimension(state.model?.base);
+      if (state.dimensions.aspectRatio.isLocked) {
+        const { width, height } = calculateNewSize(
+          state.dimensions.aspectRatio.value,
+          optimalDimension * optimalDimension,
+          state.model?.base
+        );
+        state.dimensions.rect.width = width;
+        state.dimensions.rect.height = height;
+      } else {
+        state.dimensions.aspectRatio = deepClone(DEFAULT_ASPECT_RATIO_CONFIG);
+        state.dimensions.rect.width = optimalDimension;
+        state.dimensions.rect.height = optimalDimension;
+      }
+    },
+    syncedToOptimalDimension: (state) => {
+      const optimalDimension = getOptimalDimension(state.model?.base);
+
+      if (!getIsSizeOptimal(state.dimensions.rect.width, state.dimensions.rect.height, state.model?.base)) {
+        const bboxDims = calculateNewSize(
+          state.dimensions.aspectRatio.value,
+          optimalDimension * optimalDimension,
+          state.model?.base
+        );
+        state.dimensions.rect.width = bboxDims.width;
+        state.dimensions.rect.height = bboxDims.height;
+      }
+    },
     paramsReset: (state) => resetState(state),
   },
 });
@@ -249,6 +386,16 @@ export const {
   setRefinerNegativeAestheticScore,
   setRefinerStart,
   modelChanged,
+
+  // Dimensions
+  widthChanged,
+  heightChanged,
+  aspectRatioLockToggled,
+  aspectRatioIdChanged,
+  dimensionsSwapped,
+  sizeOptimized,
+  syncedToOptimalDimension,
+
   paramsReset,
 } = paramsSlice.actions;
 
@@ -276,11 +423,15 @@ export const selectIsCogView4 = createParamsSelector((params) => params.model?.b
 export const selectIsImagen3 = createParamsSelector((params) => params.model?.base === 'imagen3');
 export const selectIsImagen4 = createParamsSelector((params) => params.model?.base === 'imagen4');
 export const selectIsFluxKontextApi = createParamsSelector((params) => params.model?.base === 'flux-kontext');
-export const selectIsFluxKontext = createParamsSelector(
-  (params) =>
-    params.model?.base === 'flux-kontext' ||
-    (params.model?.base === 'flux' && params.model?.name?.toLowerCase().includes('kontext'))
-);
+export const selectIsFluxKontext = createParamsSelector((params) => {
+  if (params.model?.base === 'flux-kontext') {
+    return true;
+  }
+  if (params.model?.base === 'flux' && params.model?.name.toLowerCase().includes('kontext')) {
+    return true;
+  }
+  return false;
+});
 export const selectIsChatGPT4o = createParamsSelector((params) => params.model?.base === 'chatgpt-4o');
 
 export const selectModel = createParamsSelector((params) => params.model);
@@ -346,6 +497,12 @@ export const selectRefinerNegativeAestheticScore = createParamsSelector(
 export const selectRefinerScheduler = createParamsSelector((params) => params.refinerScheduler);
 export const selectRefinerStart = createParamsSelector((params) => params.refinerStart);
 export const selectRefinerSteps = createParamsSelector((params) => params.refinerSteps);
+
+export const selectWidth = createParamsSelector((params) => params.dimensions.rect.width);
+export const selectHeight = createParamsSelector((params) => params.dimensions.rect.height);
+export const selectAspectRatioID = createParamsSelector((params) => params.dimensions.aspectRatio.id);
+export const selectAspectRatioValue = createParamsSelector((params) => params.dimensions.aspectRatio.value);
+export const selectAspectRatioIsLocked = createParamsSelector((params) => params.dimensions.aspectRatio.isLocked);
 
 export const selectMainModelConfig = createSelector(
   selectModelConfigsQuery,

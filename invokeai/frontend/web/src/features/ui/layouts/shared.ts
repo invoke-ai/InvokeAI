@@ -24,15 +24,15 @@ export const LEFT_PANEL_MIN_SIZE_PX = 420;
 export const RIGHT_PANEL_MIN_SIZE_PX = 420;
 
 export const BOARD_PANEL_MIN_HEIGHT_PX = 36;
+export const BOARD_PANEL_MIN_EXPANDED_HEIGHT_PX = 128;
 export const BOARD_PANEL_DEFAULT_HEIGHT_PX = 232;
 
 export const GALLERY_PANEL_MIN_HEIGHT_PX = 36;
+export const GALLERY_PANEL_MIN_EXPANDED_HEIGHT_PX = 128;
 export const GALLERY_PANEL_DEFAULT_HEIGHT_PX = 232;
 
 export const LAYERS_PANEL_MIN_HEIGHT_PX = 36;
-export const LAYERS_PANEL_DEFAULT_HEIGHT_PX = 232;
 
 export const CANVAS_BOARD_PANEL_DEFAULT_HEIGHT_PX = 36; // Collapsed by default on Canvas
-export const CANVAS_GALLERY_PANEL_DEFAULT_HEIGHT_PX = 200; // Smaller default size on Canvas
 
 export const SWITCH_TABS_FAKE_DELAY_MS = 300;

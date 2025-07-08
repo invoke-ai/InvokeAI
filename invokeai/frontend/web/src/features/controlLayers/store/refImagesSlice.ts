@@ -53,9 +53,15 @@ export const refImagesSlice = createSlice({
         payload: { ...payload, id: getPrefixedId('reference_image') },
       }),
     },
-    refImageRecalled: (state, action: PayloadAction<{ data: RefImageState }>) => {
-      const { data } = action.payload;
-      state.entities.push(data);
+    refImagesRecalled: (state, action: PayloadAction<{ entities: RefImageState[]; replace: boolean }>) => {
+      const { entities, replace } = action.payload;
+      if (replace) {
+        state.entities = entities;
+        state.isPanelOpen = false;
+        state.selectedEntityId = null;
+      } else {
+        state.entities.push(...entities);
+      }
     },
     refImageImageChanged: (state, action: PayloadActionWithId<{ imageDTO: ImageDTO | null }>) => {
       const { id, imageDTO } = action.payload;
@@ -256,7 +262,7 @@ export const {
   refImageIPAdapterBeginEndStepPctChanged,
   refImageFLUXReduxImageInfluenceChanged,
   refImageIsEnabledToggled,
-  refImageRecalled,
+  refImagesRecalled,
 } = refImagesSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -281,12 +287,6 @@ export const selectRefImageEntityIds = createMemoizedSelector(selectReferenceIma
 );
 export const selectRefImageEntity = (state: RefImagesState, id: string) =>
   state.entities.find((entity) => entity.id === id) ?? null;
-export const selectSelectedRefEntity = createSelector(selectRefImagesSlice, (state) => {
-  if (!state.selectedEntityId) {
-    return null;
-  }
-  return selectRefImageEntity(state, state.selectedEntityId);
-});
 
 export function selectRefImageEntityOrThrow(state: RefImagesState, id: string, caller: string): RefImageState {
   const entity = selectRefImageEntity(state, id);

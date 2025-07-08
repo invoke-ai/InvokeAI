@@ -5,14 +5,10 @@ import { videoModalLinkClicked } from 'features/system/store/actions';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const formatTime = ({ minutes, seconds }: { minutes: number; seconds: number }) => {
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-};
-
 export const VideoCard = memo(({ video }: { video: VideoData }) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const { tKey, link, length } = video;
+  const { tKey, link } = video;
   const handleLinkClick = useCallback(() => {
     dispatch(videoModalLinkClicked(t(`supportVideos.videos.${tKey}.title`)));
   }, [dispatch, t, tKey]);
@@ -24,7 +20,6 @@ export const VideoCard = memo(({ video }: { video: VideoData }) => {
           {t(`supportVideos.videos.${tKey}.title`)}
         </Text>
         <Spacer />
-        <Text variant="subtext">{formatTime(length)}</Text>
         <ExternalLink fontSize="sm" href={link} label={t('supportVideos.watch')} onClick={handleLinkClick} />
       </Flex>
       <Text fontSize="md" variant="subtext">

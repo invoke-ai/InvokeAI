@@ -32,7 +32,7 @@ import {
   shouldConcatPromptsChanged,
   vaeSelected,
 } from 'features/controlLayers/store/paramsSlice';
-import { refImageRecalled } from 'features/controlLayers/store/refImagesSlice';
+import { refImagesRecalled } from 'features/controlLayers/store/refImagesSlice';
 import type { CanvasMetadata, LoRA, RefImageState } from 'features/controlLayers/store/types';
 import { zCanvasMetadata, zCanvasReferenceImageState_OLD, zRefImageState } from 'features/controlLayers/store/types';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
@@ -101,14 +101,20 @@ const MetadataLabel = ({ i18nKey }: { i18nKey: string }) => {
 };
 
 const MetadataPrimitiveValue = ({ value }: { value: string | number | boolean | null | undefined }) => {
-  return <Text as="span">{value}</Text>;
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (isString(value)) {
+    return <Text as="span">{value || '<empty string>'}</Text>;
+  }
+  return <Text as="span">{String(value)}</Text>;
 };
 
 const getProperty = (obj: unknown, path: string): unknown => {
   return get(obj, path) as unknown;
 };
 
-export type UnparsedData = {
+type UnparsedData = {
   isParsed: false;
   isSuccess: false;
   isError: false;
@@ -138,7 +144,7 @@ const buildParsedSuccessData = <T,>(value: T): ParsedSuccessData<T> => ({
   error: null,
 });
 
-export type ParsedErrorData = {
+type ParsedErrorData = {
   isParsed: true;
   isSuccess: false;
   isError: true;
@@ -153,7 +159,7 @@ const buildParsedErrorData = (error: Error): ParsedErrorData => ({
   error,
 });
 
-export type Data<T> = UnparsedData | ParsedSuccessData<T> | ParsedErrorData;
+type Data<T> = UnparsedData | ParsedSuccessData<T> | ParsedErrorData;
 
 const SingleMetadataKey = Symbol('SingleMetadataKey');
 type SingleMetadataValueProps<T> = {
@@ -263,7 +269,7 @@ const NegativePrompt: SingleMetadataHandler<ParameterNegativePrompt> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(negativePromptChanged(value));
+    store.dispatch(negativePromptChanged(value || null));
   },
   LabelComponent: () => <MetadataLabel i18nKey="metadata.negativePrompt" />,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterNegativePrompt>) => (
@@ -797,12 +803,12 @@ const RefImages: CollectionMetadataHandler<RefImageState[]> = {
     }
   },
   recall: (value, store) => {
-    for (const data of value) {
-      store.dispatch(refImageRecalled({ data: { ...data, id: getPrefixedId('reference_image') } }));
-    }
+    const entities = value.map((data) => ({ ...data, id: getPrefixedId('reference_image') }));
+    store.dispatch(refImagesRecalled({ entities, replace: true }));
   },
   recallOne: (data, store) => {
-    store.dispatch(refImageRecalled({ data: { ...data, id: getPrefixedId('reference_image') } }));
+    const entities = [{ ...data, id: getPrefixedId('reference_image') }];
+    store.dispatch(refImagesRecalled({ entities, replace: false }));
   },
   LabelComponent: () => <MetadataLabel i18nKey="controlLayers.referenceImage" />,
   ValueComponent: ({ value }: CollectionMetadataValueProps<RefImageState[]>) => {
@@ -944,21 +950,24 @@ const recallByHandlers = async (arg: {
     }
   }
 
-  // If we recalled style prompts, and they were _different_ from the positive prompt, we need to disable prompt concat.
+  // We may need to update the prompt concat flag based on the recalled prompts
   const positivePrompt = recalled.get(MetadataHandlers.PositivePrompt);
   const negativePrompt = recalled.get(MetadataHandlers.NegativePrompt);
   const positiveStylePrompt = recalled.get(MetadataHandlers.PositiveStylePrompt);
   const negativeStylePrompt = recalled.get(MetadataHandlers.NegativeStylePrompt);
 
+  // The values will be undefined if the handler was not recalled
   if (
-    (positiveStylePrompt && positiveStylePrompt !== positivePrompt) ||
-    (negativeStylePrompt && negativeStylePrompt !== negativePrompt)
+    positivePrompt !== undefined ||
+    negativePrompt !== undefined ||
+    positiveStylePrompt !== undefined ||
+    negativeStylePrompt !== undefined
   ) {
-    // If we set the negative style prompt or positive style prompt, we should disable prompt concat
-    store.dispatch(shouldConcatPromptsChanged(false));
-  } else {
-    // Otherwise, we should enable prompt concat
-    store.dispatch(shouldConcatPromptsChanged(true));
+    const concat =
+      (Boolean(positiveStylePrompt) && positiveStylePrompt === positivePrompt) ||
+      (Boolean(negativeStylePrompt) && negativeStylePrompt === negativePrompt);
+
+    store.dispatch(shouldConcatPromptsChanged(concat));
   }
 
   if (!silent) {

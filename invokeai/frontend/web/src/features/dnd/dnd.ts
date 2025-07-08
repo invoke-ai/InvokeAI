@@ -159,7 +159,7 @@ export const setGlobalReferenceImageDndTarget: DndTarget<
 
 //#region Add Global Reference Image
 const _addGlobalReferenceImage = buildTypeAndKey('add-global-reference-image');
-export type AddGlobalReferenceImageDndTargetData = DndData<
+type AddGlobalReferenceImageDndTargetData = DndData<
   typeof _addGlobalReferenceImage.type,
   typeof _addGlobalReferenceImage.key
 >;
@@ -522,7 +522,7 @@ export const removeImageFromBoardDndTarget: DndTarget<
 
 //#region Prompt Generation From Image
 const _promptGenerationFromImage = buildTypeAndKey('prompt-generation-from-image');
-export type PromptGenerationFromImageDndTargetData = DndData<
+type PromptGenerationFromImageDndTargetData = DndData<
   typeof _promptGenerationFromImage.type,
   typeof _promptGenerationFromImage.key,
   void

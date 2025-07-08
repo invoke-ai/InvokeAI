@@ -1,6 +1,6 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { selectListImageNamesQueryArgs, selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
+import { selectGetImageNamesQueryArgs, selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
 import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
 import { imagesApi } from 'services/api/endpoints/images';
 
@@ -20,7 +20,7 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
 
       const board_id = selectSelectedBoardId(state);
 
-      const queryArgs = { ...selectListImageNamesQueryArgs(state), board_id };
+      const queryArgs = { ...selectGetImageNamesQueryArgs(state), board_id };
 
       // wait until the board has some images - maybe it already has some from a previous fetch
       // must use getState() to ensure we do not have stale state

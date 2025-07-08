@@ -20,6 +20,7 @@ import {
 import { $isStylePresetsMenuOpen, activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
 import { toast } from 'features/toast/toast';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
+import { LAUNCHPAD_PANEL_ID, WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
 import { activeTabCanvasRightPanelChanged } from 'features/ui/store/uiSlice';
 import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import { atom } from 'nanostores';
@@ -91,6 +92,7 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
       const overrides: Partial<CanvasRasterLayerState> = {
         objects: [imageObject],
       };
+      await navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
       store.dispatch(canvasReset());
       store.dispatch(rasterLayerAdded({ overrides, isSelected: true }));
       store.dispatch(sentImageToCanvas());
@@ -157,15 +159,17 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
   );
 
   const handleGoToDestination = useCallback(
-    (destination: StudioDestinationAction['data']['destination']) => {
+    async (destination: StudioDestinationAction['data']['destination']) => {
       switch (destination) {
         case 'generation':
-          // Go to the canvas tab, open the image viewer, and enable send-to-gallery mode
+          // Go to the generate tab, open the launchpad
+          await navigationApi.focusPanel('generate', LAUNCHPAD_PANEL_ID);
           store.dispatch(paramsReset());
           store.dispatch(activeTabCanvasRightPanelChanged('gallery'));
           break;
         case 'canvas':
-          // Go to the canvas tab, close the image viewer, and disable send-to-gallery mode
+          // Go to the canvas tab, open the launchpad
+          await navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
           store.dispatch(canvasReset());
           break;
         case 'workflows':

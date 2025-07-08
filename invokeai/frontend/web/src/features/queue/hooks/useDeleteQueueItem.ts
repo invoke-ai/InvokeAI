@@ -5,25 +5,34 @@ import { useTranslation } from 'react-i18next';
 import { useDeleteQueueItemMutation } from 'services/api/endpoints/queue';
 import { $isConnected } from 'services/events/stores';
 
+const DEFAULTS = {
+  withToast: true,
+};
+
 export const useDeleteQueueItem = () => {
   const isConnected = useStore($isConnected);
   const [_trigger, { isLoading }] = useDeleteQueueItemMutation();
   const { t } = useTranslation();
   const trigger = useCallback(
-    async (item_id: number) => {
+    async (item_id: number, options?: { withToast?: boolean }) => {
+      const { withToast } = { ...DEFAULTS, ...options };
       try {
         await _trigger({ item_id }).unwrap();
-        toast({
-          id: 'QUEUE_CANCEL_SUCCEEDED',
-          title: t('queue.cancelSucceeded'),
-          status: 'success',
-        });
+        if (withToast) {
+          toast({
+            id: 'QUEUE_CANCEL_SUCCEEDED',
+            title: t('queue.cancelSucceeded'),
+            status: 'success',
+          });
+        }
       } catch {
-        toast({
-          id: 'QUEUE_CANCEL_FAILED',
-          title: t('queue.cancelFailed'),
-          status: 'error',
-        });
+        if (withToast) {
+          toast({
+            id: 'QUEUE_CANCEL_FAILED',
+            title: t('queue.cancelFailed'),
+            status: 'error',
+          });
+        }
       }
     },
     [t, _trigger]

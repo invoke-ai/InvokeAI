@@ -4,7 +4,7 @@ import { deepClone } from 'common/util/deepClone';
 import {
   selectAutoSwitch,
   selectGalleryView,
-  selectListImageNamesQueryArgs,
+  selectGetImageNamesQueryArgs,
   selectSelectedBoardId,
 } from 'features/gallery/store/gallerySelectors';
 import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
@@ -17,6 +17,7 @@ import type { ImageDTO, S } from 'services/api/types';
 import { getCategories } from 'services/api/util';
 import { insertImageIntoNamesResult } from 'services/api/util/optimisticUpdates';
 import { $lastProgressEvent } from 'services/events/stores';
+import stableHash from 'stable-hash';
 import type { Param0 } from 'tsafe';
 import { objectEntries } from 'tsafe';
 import type { JsonObject } from 'type-fest';
@@ -40,7 +41,7 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
     // For efficiency's sake, we want to minimize the number of dispatches and invalidations we do.
     // We'll keep track of each change we need to make and do them all at once.
     const boardTotalAdditions: Record<string, number> = {};
-    const listImageNamesArg = selectListImageNamesQueryArgs(getState());
+    const getImageNamesArg = selectGetImageNamesQueryArgs(getState());
 
     for (const imageDTO of imageDTOs) {
       if (imageDTO.is_intermediate) {
@@ -70,26 +71,38 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
     }
     dispatch(boardsApi.util.upsertQueryEntries(entries));
 
-    // Optimistically update image names lists - DTOs are already cached by getResultImageDTOs
-    const state = getState();
-
+    /**
+     * Optimistic update and cache invalidation for image names queries that match this image's board and categories.
+     * - Optimistic update for the cache that does not have a search term (we cannot derive the correct insertion
+     *   position when a search term is present).
+     * - Cache invalidation for the query that has a search term, so it will be refetched.
+     *
+     * Note: The image DTO objects are already implicitly cached by the getResultImageDTOs function. We do not need
+     * to explicitly cache them again here.
+     */
     for (const imageDTO of imageDTOs) {
-      // Construct the expected query args for this image's getImageNames query
-      // Use the current gallery query args as base, but override board_id and categories for this specific image
-      const expectedQueryArgs = {
-        ...listImageNamesArg,
+      // Override board_id and categories for this specific image to build the "expected" args for the query.
+      const imageSpecificArgs = {
         categories: getCategories(imageDTO),
         board_id: imageDTO.board_id ?? 'none',
       };
 
-      // Check if we have cached image names for this query
-      const cachedNamesResult = imagesApi.endpoints.getImageNames.select(expectedQueryArgs)(state);
+      const expectedQueryArgs = {
+        ...getImageNamesArg,
+        ...imageSpecificArgs,
+        search_term: '',
+      };
 
-      if (cachedNamesResult.data) {
-        // We have cached names - optimistically insert the new image
-        dispatch(
-          imagesApi.util.updateQueryData('getImageNames', expectedQueryArgs, (draft) => {
-            // Use the utility function to insert at the correct position
+      // If the cache for the query args provided here does not exist, RTK Query will ignore the update.
+      dispatch(
+        imagesApi.util.updateQueryData(
+          'getImageNames',
+          {
+            ...getImageNamesArg,
+            ...imageSpecificArgs,
+            search_term: '',
+          },
+          (draft) => {
             const updatedResult = insertImageIntoNamesResult(
               draft,
               imageDTO,
@@ -97,14 +110,21 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
               expectedQueryArgs.order_dir
             );
 
-            // Replace the draft contents
             draft.image_names = updatedResult.image_names;
             draft.starred_count = updatedResult.starred_count;
             draft.total_count = updatedResult.total_count;
-          })
-        );
+          }
+        )
+      );
+
+      // If there is a search term present, we need to invalidate that query to ensure the search results are updated.
+      if (getImageNamesArg.search_term) {
+        const expectedQueryArgs = {
+          ...getImageNamesArg,
+          ...imageSpecificArgs,
+        };
+        dispatch(imagesApi.util.invalidateTags([{ type: 'ImageNameList', id: stableHash(expectedQueryArgs) }]));
       }
-      // If no cached data, we don't need to do anything - there's no list to update
     }
 
     // No need to invalidate tags since we're doing optimistic updates

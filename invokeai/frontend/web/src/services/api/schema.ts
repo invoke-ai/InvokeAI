@@ -22171,6 +22171,24 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+                    /** @example {
+                     *       "path": "string",
+                     *       "name": "string",
+                     *       "base": "sd-1",
+                     *       "type": "main",
+                     *       "format": "checkpoint",
+                     *       "config_path": "string",
+                     *       "key": "string",
+                     *       "hash": "string",
+                     *       "file_size": 1,
+                     *       "description": "string",
+                     *       "source": "string",
+                     *       "converted_at": 0,
+                     *       "variant": "normal",
+                     *       "prediction_type": "epsilon",
+                     *       "repo_variant": "fp16",
+                     *       "upcast_attention": false
+                     *     } */
                     "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRAOmiConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["LlavaOnevisionConfig"] | components["schemas"]["ApiModelConfig"];
                 };
             };
@@ -22258,6 +22276,24 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+                    /** @example {
+                     *       "path": "string",
+                     *       "name": "string",
+                     *       "base": "sd-1",
+                     *       "type": "main",
+                     *       "format": "checkpoint",
+                     *       "config_path": "string",
+                     *       "key": "string",
+                     *       "hash": "string",
+                     *       "file_size": 1,
+                     *       "description": "string",
+                     *       "source": "string",
+                     *       "converted_at": 0,
+                     *       "variant": "normal",
+                     *       "prediction_type": "epsilon",
+                     *       "repo_variant": "fp16",
+                     *       "upcast_attention": false
+                     *     } */
                     "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRAOmiConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["LlavaOnevisionConfig"] | components["schemas"]["ApiModelConfig"];
                 };
             };
@@ -22754,6 +22790,24 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+                    /** @example {
+                     *       "path": "string",
+                     *       "name": "string",
+                     *       "base": "sd-1",
+                     *       "type": "main",
+                     *       "format": "checkpoint",
+                     *       "config_path": "string",
+                     *       "key": "string",
+                     *       "hash": "string",
+                     *       "file_size": 1,
+                     *       "description": "string",
+                     *       "source": "string",
+                     *       "converted_at": 0,
+                     *       "variant": "normal",
+                     *       "prediction_type": "epsilon",
+                     *       "repo_variant": "fp16",
+                     *       "upcast_attention": false
+                     *     } */
                     "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRAOmiConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["LlavaOnevisionConfig"] | components["schemas"]["ApiModelConfig"];
                 };
             };
@@ -24240,6 +24294,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+                    /** @example [
+                     *       "15e9eb28-8cfe-47c9-b610-37907a79fc3c",
+                     *       "71272e82-0e5f-46d5-bca9-9a61f4bd8a82",
+                     *       "a5d7cd49-1b98-4534-a475-aeee4ccf5fa2"
+                     *     ] */
                     "application/json": string[];
                 };
             };
@@ -24378,6 +24437,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+                    /** @example [
+                     *       "ca562b14-995e-4a42-90c1-9528f1a5921d",
+                     *       "cc0c2b8a-c62e-41d6-878e-cc74dde5ca8f",
+                     *       "18ca7649-6a9e-47d5-bc17-41ab1e8cec81",
+                     *       "7c12d1b2-0ef9-4bec-ba55-797b2d8f2ee1",
+                     *       "c382eaa3-0e28-4ab0-9446-408667699aeb",
+                     *       "71272e82-0e5f-46d5-bca9-9a61f4bd8a82",
+                     *       "a5d7cd49-1b98-4534-a475-aeee4ccf5fa2"
+                     *     ] */
                     "application/json": string[];
                 };
             };

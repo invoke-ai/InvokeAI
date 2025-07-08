@@ -381,17 +381,16 @@ export const {
   useListQueueItemsQuery,
   useCancelQueueItemMutation,
   useCancelQueueItemsByDestinationMutation,
+
   useDeleteQueueItemMutation,
-  useDeleteQueueItemsByDestinationMutation,
   useDeleteAllExceptCurrentMutation,
   useGetBatchStatusQuery,
-  useGetCurrentQueueItemQuery,
+
   useGetQueueCountsByDestinationQuery,
   useRetryItemsByIdMutation,
 } = queueApi;
 
 export const selectQueueStatus = queueApi.endpoints.getQueueStatus.select();
-export const selectCanvasQueueCounts = queueApi.endpoints.getQueueCountsByDestination.select({ destination: 'canvas' });
 
 export const enqueueMutationFixedCacheKeyOptions = {
   fixedCacheKey: 'enqueueBatch',

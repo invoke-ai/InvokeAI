@@ -1,16 +1,20 @@
-import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
 import { useCurrentQueueItemId } from 'features/queue/hooks/useCurrentQueueItemId';
 import { useCallback } from 'react';
+
+import { useCancelQueueItem } from './useCancelQueueItem';
 
 export const useCancelCurrentQueueItem = () => {
   const currentQueueItemId = useCurrentQueueItemId();
   const cancelQueueItem = useCancelQueueItem();
-  const trigger = useCallback(() => {
-    if (currentQueueItemId === null) {
-      return;
-    }
-    cancelQueueItem.trigger(currentQueueItemId);
-  }, [currentQueueItemId, cancelQueueItem]);
+  const trigger = useCallback(
+    (options?: { withToast?: boolean }) => {
+      if (currentQueueItemId === null) {
+        return;
+      }
+      cancelQueueItem.trigger(currentQueueItemId, options);
+    },
+    [currentQueueItemId, cancelQueueItem]
+  );
 
   return {
     trigger,

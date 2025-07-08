@@ -77,6 +77,10 @@ type CanvasSettingsState = {
    * Whether to show the rule of thirds composition guide overlay on the canvas.
    */
   ruleOfThirds: boolean;
+  /**
+   * Whether to save all staging images to the gallery instead of keeping them as intermediate images.
+   */
+  saveAllImagesToGallery: boolean;
 };
 
 const initialState: CanvasSettingsState = {
@@ -97,6 +101,7 @@ const initialState: CanvasSettingsState = {
   isolatedLayerPreview: true,
   pressureSensitivity: true,
   ruleOfThirds: false,
+  saveAllImagesToGallery: false,
 };
 
 export const canvasSettingsSlice = createSlice({
@@ -154,6 +159,9 @@ export const canvasSettingsSlice = createSlice({
     settingsRuleOfThirdsToggled: (state) => {
       state.ruleOfThirds = !state.ruleOfThirds;
     },
+    settingsSaveAllImagesToGalleryToggled: (state) => {
+      state.saveAllImagesToGallery = !state.saveAllImagesToGallery;
+    },
   },
 });
 
@@ -175,6 +183,7 @@ export const {
   settingsIsolatedLayerPreviewToggled,
   settingsPressureSensitivityToggled,
   settingsRuleOfThirdsToggled,
+  settingsSaveAllImagesToGalleryToggled,
 } = canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -209,3 +218,4 @@ export const selectIsolatedStagingPreview = createCanvasSettingsSelector((settin
 export const selectIsolatedLayerPreview = createCanvasSettingsSelector((settings) => settings.isolatedLayerPreview);
 export const selectPressureSensitivity = createCanvasSettingsSelector((settings) => settings.pressureSensitivity);
 export const selectRuleOfThirds = createCanvasSettingsSelector((settings) => settings.ruleOfThirds);
+export const selectSaveAllImagesToGallery = createCanvasSettingsSelector((settings) => settings.saveAllImagesToGallery);
