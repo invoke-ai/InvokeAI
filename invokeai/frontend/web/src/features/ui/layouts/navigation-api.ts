@@ -28,11 +28,20 @@ type Waiter = {
   timeoutId: ReturnType<typeof setTimeout> | null;
 };
 
+/**
+ * The API exposed by the application to manage navigation and panel states.
+ */
 export type NavigationAppApi = {
+  /**
+   * API to manage the currently active tab in the application.
+   */
   activeTab: {
     get: () => TabName;
     set: (tab: TabName) => void;
   };
+  /**
+   * API to manage the storage of panel states.
+   */
   panelStorage: {
     get: (id: string) => StoredDockviewPanelState | StoredGridviewPanelState | undefined;
     set: (id: string, state: StoredDockviewPanelState | StoredGridviewPanelState) => void;
@@ -63,6 +72,9 @@ export class NavigationApi {
    */
   KEY_SEPARATOR = ':';
 
+  /**
+   * The application API that provides methods to set and get the current app tab and manage panel storage.
+   */
   _app: NavigationAppApi | null = null;
 
   /**
@@ -123,6 +135,13 @@ export class NavigationApi {
     return true;
   };
 
+  /**
+   * Initializes storage for Gridview panels.
+   *
+   * - If the panel has no stored state, it its current dimensions are saved.
+   * - If the panel has a stored state, it is restored to those dimensions.
+   * - If the stored state has dimensions of 0, it is assumed that the panel was collapsed by the user.
+   */
   _initGridviewPanelStorage = (key: string, panel: IGridviewPanel) => {
     if (!this._app) {
       log.error('App not connected');
@@ -182,6 +201,12 @@ export class NavigationApi {
     return dispose;
   };
 
+  /**
+   * Initializes storage for Dockview panels.
+   *
+   * - If the panel has no stored state, it saves its current active state.
+   * - If the panel has a stored state, it restores that state.
+   */
   _initDockviewPanelStorage = (key: string, panel: IDockviewPanel) => {
     if (!this._app) {
       log.error('App not connected');
@@ -223,6 +248,9 @@ export class NavigationApi {
     return dispose;
   };
 
+  /**
+   * Helper function to initialize storage for a panel based on its type.
+   */
   _initPanelStorage = (key: string, panel: PanelType) => {
     if (panel instanceof GridviewPanel) {
       return this._initGridviewPanelStorage(key, panel);
