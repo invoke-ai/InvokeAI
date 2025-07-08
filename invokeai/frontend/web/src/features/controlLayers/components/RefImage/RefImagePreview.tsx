@@ -1,5 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Flex, Icon, IconButton, Image, Skeleton, Text } from '@invoke-ai/ui-library';
+import { Flex, Icon, IconButton, Image, Skeleton, Text, Tooltip } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { round } from 'es-toolkit/compat';
@@ -16,6 +16,8 @@ import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/va
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { PiExclamationMarkBold, PiEyeSlashBold, PiImageBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+
+import { RefImageWarningTooltipContent } from './RefImageWarningTooltipContent';
 
 const baseSx: SystemStyleObject = {
   '&[data-is-open="true"]': {
@@ -51,9 +53,6 @@ const getImageSxWithWeight = (weight: number): SystemStyleObject => {
 
   return {
     ...baseSx,
-    '&[data-is-disabled="true"]': {
-      opacity: 0.4,
-    },
     _after: {
       content: '""',
       position: 'absolute',
@@ -95,8 +94,8 @@ export const RefImagePreview = memo(() => {
     };
   }, [entity.config]);
 
-  const isInvalid = useMemo(() => {
-    return getGlobalReferenceImageWarnings(entity, mainModelConfig).length > 0;
+  const warnings = useMemo(() => {
+    return getGlobalReferenceImageWarnings(entity, mainModelConfig);
   }, [entity, mainModelConfig]);
 
   const onClick = useCallback(() => {
@@ -126,74 +125,76 @@ export const RefImagePreview = memo(() => {
     );
   }
   return (
-    <Flex
-      position="relative"
-      borderWidth={1}
-      borderStyle="solid"
-      borderRadius="base"
-      aspectRatio="1/1"
-      maxW="full"
-      maxH="full"
-      flexShrink={0}
-      sx={sx}
-      data-is-open={selectedEntityId === id && isPanelOpen}
-      data-is-error={isInvalid}
-      data-is-disabled={!entity.isEnabled}
-      role="button"
-      onClick={onClick}
-      cursor="pointer"
-    >
-      <Image
-        src={imageDTO?.thumbnail_url}
-        objectFit="contain"
+    <Tooltip label={warnings.length > 0 ? <RefImageWarningTooltipContent warnings={warnings} /> : undefined}>
+      <Flex
+        position="relative"
+        borderWidth={1}
+        borderStyle="solid"
+        borderRadius="base"
         aspectRatio="1/1"
-        height={imageDTO?.height}
-        fallback={<Skeleton h="full" aspectRatio="1/1" />}
         maxW="full"
         maxH="full"
-        borderRadius="base"
-      />
-      {isIPAdapterConfig(entity.config) && (
-        <Flex
-          position="absolute"
-          inset={0}
-          fontWeight="semibold"
-          alignItems="center"
-          justifyContent="center"
-          zIndex={1}
-          data-visible={showWeightDisplay}
-          sx={weightDisplaySx}
-        >
-          <Text filter="drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 2px rgba(0, 0, 0, 1))">
-            {`${round(entity.config.weight * 100, 2)}%`}
-          </Text>
-        </Flex>
-      )}
-      {!entity.isEnabled && (
-        <Icon
-          position="absolute"
-          top="50%"
-          left="50%"
-          transform="translateX(-50%) translateY(-50%)"
-          filter="drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 2px rgba(0, 0, 0, 1))"
-          color="base.300"
-          boxSize={8}
-          as={PiEyeSlashBold}
+        flexShrink={0}
+        sx={sx}
+        data-is-open={selectedEntityId === id && isPanelOpen}
+        data-is-error={warnings.length > 0}
+        data-is-disabled={!entity.isEnabled}
+        role="button"
+        onClick={onClick}
+        cursor="pointer"
+      >
+        <Image
+          src={imageDTO?.thumbnail_url}
+          objectFit="contain"
+          aspectRatio="1/1"
+          height={imageDTO?.height}
+          fallback={<Skeleton h="full" aspectRatio="1/1" />}
+          maxW="full"
+          maxH="full"
+          borderRadius="base"
         />
-      )}
-      {entity.isEnabled && isInvalid && (
-        <Icon
-          position="absolute"
-          top="50%"
-          left="50%"
-          transform="translateX(-50%) translateY(-50%)"
-          filter="drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 2px rgba(0, 0, 0, 1))"
-          color="error.500"
-          boxSize={12}
-          as={PiExclamationMarkBold}
-        />
-      )}
-    </Flex>
+        {isIPAdapterConfig(entity.config) && (
+          <Flex
+            position="absolute"
+            inset={0}
+            fontWeight="semibold"
+            alignItems="center"
+            justifyContent="center"
+            zIndex={1}
+            data-visible={showWeightDisplay}
+            sx={weightDisplaySx}
+          >
+            <Text filter="drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 2px rgba(0, 0, 0, 1))">
+              {`${round(entity.config.weight * 100, 2)}%`}
+            </Text>
+          </Flex>
+        )}
+        {!entity.isEnabled && (
+          <Icon
+            position="absolute"
+            top="50%"
+            left="50%"
+            transform="translateX(-50%) translateY(-50%)"
+            filter="drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 2px rgba(0, 0, 0, 1))"
+            color="base.300"
+            boxSize={8}
+            as={PiEyeSlashBold}
+          />
+        )}
+        {entity.isEnabled && warnings.length > 0 && (
+          <Icon
+            position="absolute"
+            top="50%"
+            left="50%"
+            transform="translateX(-50%) translateY(-50%)"
+            filter="drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 2px rgba(0, 0, 0, 1))"
+            color="error.500"
+            boxSize={12}
+            as={PiExclamationMarkBold}
+          />
+        )}
+      </Flex>
+    </Tooltip>
   );
 });
 RefImagePreview.displayName = 'RefImagePreview';
