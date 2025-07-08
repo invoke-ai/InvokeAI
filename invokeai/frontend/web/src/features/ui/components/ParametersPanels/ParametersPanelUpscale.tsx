@@ -1,7 +1,7 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import { Prompts } from 'features/parameters/components/Prompts/Prompts';
+import { UpscalePrompts } from 'features/parameters/components/Prompts/UpscalePrompts';
 import { UpscaleTabAdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/UpscaleTabAdvancedSettingsAccordion';
 import { UpscaleTabGenerationSettingsAccordion } from 'features/settingsAccordions/components/GenerationSettingsAccordion/UpscaleTabGenerationSettingsAccordion';
 import { UpscaleSettingsAccordion } from 'features/settingsAccordions/components/UpscaleSettingsAccordion/UpscaleSettingsAccordion';
@@ -34,7 +34,7 @@ export const ParametersPanelUpscale = memo(() => {
           )}
           <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
             <Flex gap={2} flexDirection="column" h="full" w="full">
-              <Prompts />
+              <UpscalePrompts />
               <UpscaleSettingsAccordion />
               <UpscaleTabGenerationSettingsAccordion />
               <UpscaleTabAdvancedSettingsAccordion />
