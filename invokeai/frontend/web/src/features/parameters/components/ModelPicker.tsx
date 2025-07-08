@@ -372,7 +372,11 @@ const optionSx: SystemStyleObject = {
   cursor: 'pointer',
   borderRadius: 'base',
   '&[data-selected="true"]': {
-    bg: 'base.700',
+    bg: 'invokeBlue.300',
+    color: 'base.900',
+    '.extra-info': {
+      color: 'base.700',
+    },
     '.picker-option': {
       fontWeight: 'bold',
       '&[data-is-compact="true"]': {
@@ -380,7 +384,7 @@ const optionSx: SystemStyleObject = {
       },
     },
     '&[data-active="true"]': {
-      bg: 'base.650',
+      bg: 'invokeBlue.250',
     },
   },
   '&[data-active="true"]': {
@@ -422,12 +426,26 @@ const PickerOptionComponent = typedMemo(
             </Text>
             <Spacer />
             {option.file_size > 0 && (
-              <Text variant="subtext" fontStyle="italic" noOfLines={1} flexShrink={0} overflow="visible">
+              <Text
+                className="extra-info"
+                variant="subtext"
+                fontStyle="italic"
+                noOfLines={1}
+                flexShrink={0}
+                overflow="visible"
+              >
                 {filesize(option.file_size)}
               </Text>
             )}
             {option.usage_info && (
-              <Text variant="subtext" fontStyle="italic" noOfLines={1} flexShrink={0} overflow="visible">
+              <Text
+                className="extra-info"
+                variant="subtext"
+                fontStyle="italic"
+                noOfLines={1}
+                flexShrink={0}
+                overflow="visible"
+              >
                 {option.usage_info}
               </Text>
             )}
