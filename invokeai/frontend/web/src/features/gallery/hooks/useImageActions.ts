@@ -11,8 +11,9 @@ import {
   selectStylePresetActivePresetId,
 } from 'features/stylePresets/store/stylePresetSlice';
 import { toast } from 'features/toast/toast';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 import type { ImageDTO } from 'services/api/types';
@@ -22,12 +23,15 @@ export const useImageActions = (imageDTO: ImageDTO | null) => {
   const { t } = useTranslation();
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
   const isStaging = useAppSelector(selectIsStaging);
+  const activeTab = useAppSelector(selectActiveTab);
   const { metadata } = useDebouncedMetadata(imageDTO?.image_name ?? null);
   const [hasMetadata, setHasMetadata] = useState(false);
   const [hasSeed, setHasSeed] = useState(false);
   const [hasPrompts, setHasPrompts] = useState(false);
   const hasTemplates = useStore($hasTemplates);
   const deleteImageModal = useDeleteImageModalApi();
+
+  const isCanvasTabAndStaging = useMemo(() => activeTab === 'canvas' && isStaging, [activeTab, isStaging]);
 
   useEffect(() => {
     const parseMetadata = async () => {
@@ -83,9 +87,13 @@ export const useImageActions = (imageDTO: ImageDTO | null) => {
     if (!metadata) {
       return;
     }
-    MetadataUtils.recallAll(metadata, store, isStaging ? [MetadataHandlers.Width, MetadataHandlers.Height] : []);
+    MetadataUtils.recallAll(
+      metadata,
+      store,
+      isCanvasTabAndStaging ? [MetadataHandlers.Width, MetadataHandlers.Height] : []
+    );
     clearStylePreset();
-  }, [imageDTO, metadata, store, isStaging, clearStylePreset]);
+  }, [imageDTO, metadata, store, isCanvasTabAndStaging, clearStylePreset]);
 
   const remix = useCallback(() => {
     if (!imageDTO) {
@@ -171,11 +179,11 @@ export const useImageActions = (imageDTO: ImageDTO | null) => {
     if (!imageDTO) {
       return;
     }
-    if (isStaging) {
+    if (isCanvasTabAndStaging) {
       return;
     }
     MetadataUtils.recallDimensions(imageDTO, store);
-  }, [imageDTO, isStaging, store]);
+  }, [imageDTO, isCanvasTabAndStaging, store]);
 
   const upscale = useCallback(() => {
     if (!imageDTO) {
