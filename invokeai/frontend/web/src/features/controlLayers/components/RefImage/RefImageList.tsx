@@ -1,11 +1,8 @@
-import { Button, Collapse, Divider, Flex } from '@invoke-ai/ui-library';
+import { Button, Collapse, Divider, Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { RefImagePreview } from 'features/controlLayers/components/RefImage/RefImagePreview';
-import {
-  CanvasManagerProviderGate,
-  useCanvasManagerSafe,
-} from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { RefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
 import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { useNewGlobalReferenceImageFromBbox } from 'features/controlLayers/hooks/saveCanvasHooks';
@@ -87,7 +84,6 @@ MaxRefImages.displayName = 'MaxRefImages';
 const AddRefImageDropTargetAndButton = memo(() => {
   const { dispatch, getState } = useAppStore();
   const tab = useAppSelector(selectActiveTab);
-  const canvasManager = useCanvasManagerSafe();
 
   const uploadOptions = useMemo(
     () =>
@@ -122,7 +118,7 @@ const AddRefImageDropTargetAndButton = memo(() => {
         <input {...uploadApi.getUploadInputProps()} />
         <DndDropTarget label="Drop" dndTarget={addGlobalReferenceImageDndTarget} dndTargetData={dndTargetData} />
       </Button>
-      {tab === 'canvas' && canvasManager && (
+      {tab === 'canvas' && (
         <CanvasManagerProviderGate>
           <BboxButton />
         </CanvasManagerProviderGate>
@@ -137,22 +133,16 @@ const BboxButton = memo(() => {
   const newGlobalReferenceImageFromBbox = useNewGlobalReferenceImageFromBbox();
 
   return (
-    <Button
-      size="sm"
-      variant="ghost"
+    <IconButton
+      size="lg"
+      variant="outline"
       h="full"
-      minW="auto"
-      px={2}
-      borderWidth="2px !important"
-      borderStyle="solid !important"
-      borderRadius="base"
+      icon={<PiBoundingBoxBold />}
       onClick={newGlobalReferenceImageFromBbox}
       isDisabled={isBusy}
       aria-label={t('controlLayers.pullBboxIntoReferenceImage')}
       tooltip={t('controlLayers.pullBboxIntoReferenceImage')}
-    >
-      <PiBoundingBoxBold />
-    </Button>
+    />
   );
 });
 AddRefImageDropTargetAndButton.displayName = 'AddRefImageDropTargetAndButton';
