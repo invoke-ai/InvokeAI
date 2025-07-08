@@ -147,6 +147,23 @@ export class NavigationApi {
       }
       log.debug({ storedState }, 'Found stored state for panel, restoring');
 
+      // If the panel's dimensions are 0, we assume it was collapsed by the user. But when panels are initialzed,
+      // by default they may have a minimize dimension greater than 0. If we attempt to set a size of 0, it will
+      // not work - dockview will instead set the size to the minimum size.
+      //
+      // The user-facing issue is that the panel will not remember if it was collapsed or not, and will always
+      // be expanded when navigating to the tab.
+      //
+      // To fix this, if we find a stored state with dimensions of 0, we set the constraints to 0 before setting the
+      // size.
+      if (storedState.dimensions.width === 0) {
+        panel.api.setConstraints({ minimumWidth: 0, maximumWidth: 0 });
+      }
+
+      if (storedState.dimensions.height === 0) {
+        panel.api.setConstraints({ minimumHeight: 0, maximumHeight: 0 });
+      }
+
       panel.api.setSize(storedState.dimensions);
     }
     const { dispose } = panel.api.onDidDimensionsChange(
