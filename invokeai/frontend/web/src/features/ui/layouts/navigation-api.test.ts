@@ -185,6 +185,95 @@ describe('AppNavigationApi', () => {
     });
   });
 
+  describe('Panel Storage', () => {
+    beforeEach(() => {
+      navigationApi.connectToApp(mockAppApi);
+    });
+
+    it('stores initial gridview state when none exists', () => {
+      const key = `generate:${LEFT_PANEL_ID}`;
+      mockGetPanelState.mockReturnValue(undefined);
+
+      const panel = createMockPanel();
+      // simulate real dimensions
+      panel.api.height = 200;
+      panel.api.width = 400;
+
+      navigationApi.registerPanel('generate', LEFT_PANEL_ID, panel);
+
+      expect(mockGetPanelState).toHaveBeenCalledWith(key);
+      expect(mockSetPanelState).toHaveBeenCalledWith(key, {
+        id: key,
+        type: 'gridview-panel',
+        dimensions: { height: 200, width: 400 },
+      });
+    });
+
+    it('restores gridview from stored state', () => {
+      const key = `generate:${LEFT_PANEL_ID}`;
+      const stored = { id: key, type: 'gridview-panel', dimensions: { height: 50, width: 75 } };
+      mockGetPanelState.mockReturnValue(stored);
+
+      const panel = createMockPanel();
+      navigationApi.registerPanel('generate', LEFT_PANEL_ID, panel);
+
+      expect(panel.api.setSize).toHaveBeenCalledWith({ height: 50, width: 75 });
+      expect(mockDeletePanelState).not.toHaveBeenCalled();
+    });
+
+    it('collapses gridview when stored dimensions are zero', () => {
+      const key = `generate:${LEFT_PANEL_ID}`;
+      const stored = { id: key, type: 'gridview-panel', dimensions: { height: 0, width: 0 } };
+      mockGetPanelState.mockReturnValue(stored);
+
+      const panel = createMockPanel();
+      navigationApi.registerPanel('generate', LEFT_PANEL_ID, panel);
+
+      expect(panel.api.setConstraints).toHaveBeenCalledWith({ minimumWidth: 0, maximumWidth: 0 });
+      expect(panel.api.setConstraints).toHaveBeenCalledWith({ minimumHeight: 0, maximumHeight: 0 });
+      expect(panel.api.setSize).toHaveBeenCalledWith({ height: 0, width: 0 });
+    });
+
+    it('stores initial dockview state when none exists', () => {
+      const key = `generate:${LAUNCHPAD_PANEL_ID}`;
+      mockGetPanelState.mockReturnValue(undefined);
+
+      const panel = createMockDockPanel();
+      Object.defineProperty(panel.api, 'isActive', { value: true });
+
+      navigationApi.registerPanel('generate', LAUNCHPAD_PANEL_ID, panel);
+
+      expect(mockGetPanelState).toHaveBeenCalledWith(key);
+      expect(mockSetPanelState).toHaveBeenCalledWith(key, {
+        id: key,
+        type: 'dockview-panel',
+        isActive: true,
+      });
+    });
+
+    it('restores dockview active state', () => {
+      const key = `generate:${LAUNCHPAD_PANEL_ID}`;
+      const stored = { id: key, type: 'dockview-panel', isActive: true };
+      mockGetPanelState.mockReturnValue(stored);
+
+      const panel = createMockDockPanel();
+      navigationApi.registerPanel('generate', LAUNCHPAD_PANEL_ID, panel);
+
+      expect(panel.api.setActive).toHaveBeenCalled();
+    });
+
+    it('deletes mismatched dockview state', () => {
+      const key = `generate:${LAUNCHPAD_PANEL_ID}`;
+      const stored = { id: key, type: 'gridview-panel', dimensions: { height: 5, width: 5 } };
+      mockGetPanelState.mockReturnValue(stored);
+
+      const panel = createMockDockPanel();
+      navigationApi.registerPanel('generate', LAUNCHPAD_PANEL_ID, panel);
+
+      expect(mockDeletePanelState).toHaveBeenCalledWith(key);
+    });
+  });
+
   describe('Panel Focus', () => {
     beforeEach(() => {
       navigationApi.connectToApp(mockAppApi);
