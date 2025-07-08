@@ -4,6 +4,7 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppStore } from 'app/store/storeHooks';
 import { buildZodTypeGuard } from 'common/util/zodUtils';
 import { getOutputImageName } from 'features/controlLayers/components/SimpleSession/shared';
+import { selectDefaultAutoSwitch } from 'features/controlLayers/store/canvasSettingsSlice';
 import { canvasQueueItemDiscarded, selectDiscardedItems } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { ProgressImage } from 'features/nodes/types/common';
 import type { Atom, MapStore, StoreValue, WritableAtom } from 'nanostores';
@@ -145,7 +146,8 @@ export const CanvasSessionContextProvider = memo(
     /**
      * Whether auto-switch is enabled.
      */
-    const $autoSwitch = useState(() => atom<AutoSwitchMode>('switch_on_start'))[0];
+    const defaultAutoSwitch = selectDefaultAutoSwitch(store.getState());
+    const $autoSwitch = useState(() => atom<AutoSwitchMode>(defaultAutoSwitch))[0];
 
     /**
      * An internal flag used to work around race conditions with auto-switch switching to queue items before their
