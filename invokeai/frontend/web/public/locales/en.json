@@ -1399,7 +1399,7 @@
         "fluxFillIncompatibleWithT2IAndI2I": "FLUX Fill is not compatible with Text to Image or Image to Image. Use other FLUX models for these tasks.",
         "imagenIncompatibleGenerationMode": "Google {{model}} supports Text to Image only. Use other models for Image to Image, Inpainting and Outpainting tasks.",
         "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4o supports Text to Image and Image to Image only. Use other models Inpainting and Outpainting tasks.",
-        "fluxKontextIncompatibleGenerationMode": "FLUX Kontext supports Text to Image only. Use other models for Image to Image, Inpainting and Outpainting tasks.",
+        "fluxKontextIncompatibleGenerationMode": "FLUX Kontext does not support generation from images placed on the canvas. Re-try using the Reference Image section and disable any Raster Layers.",
         "problemUnpublishingWorkflow": "Problem Unpublishing Workflow",
         "problemUnpublishingWorkflowDescription": "There was a problem unpublishing the workflow. Please try again.",
         "workflowUnpublished": "Workflow Unpublished",
