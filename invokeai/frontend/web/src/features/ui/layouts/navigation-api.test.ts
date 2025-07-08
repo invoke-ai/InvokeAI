@@ -413,8 +413,10 @@ describe('AppNavigationApi', () => {
       await expect(waitPromise).rejects.toThrow('Panel generate:settings registration timed out after 200ms');
 
       const elapsed = Date.now() - start;
-      expect(elapsed).toBeGreaterThanOrEqual(200);
-      expect(elapsed).toBeLessThan(300); // Allow some margin
+      // TODO(psyche): Use vitest's fake timeres
+      // Allow some margin for timer resolution
+      expect(elapsed).toBeGreaterThanOrEqual(190);
+      expect(elapsed).toBeLessThan(210);
     });
   });
 
