@@ -4,6 +4,7 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppStore } from 'app/store/storeHooks';
 import { buildZodTypeGuard } from 'common/util/zodUtils';
 import { getOutputImageName } from 'features/controlLayers/components/SimpleSession/shared';
+import { canvasQueueItemDiscarded, selectDiscardedItems } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { ProgressImage } from 'features/nodes/types/common';
 import type { Atom, MapStore, StoreValue, WritableAtom } from 'nanostores';
 import { atom, computed, effect, map, subscribeKeys } from 'nanostores';
@@ -104,6 +105,7 @@ type CanvasSessionContextValue = {
   selectFirst: () => void;
   selectLast: () => void;
   onImageLoad: (itemId: number) => void;
+  discard: (itemId: number) => void;
 };
 
 const CanvasSessionContext = createContext<CanvasSessionContextValue | null>(null);
@@ -138,14 +140,7 @@ export const CanvasSessionContextProvider = memo(
      * Manually-synced atom containing queue items for the current session. This is populated from the RTK Query cache
      * and kept in sync with it via a redux subscription.
      */
-    const $allItems = useState(() => atom<S['SessionQueueItem'][]>([]))[0];
-
-    /**
-     * All queue items for the current session, excluding canceled and failed items.
-     */
-    const $items = useState(() =>
-      computed([$allItems], (allItems) => allItems.filter(({ status }) => status !== 'canceled' && status !== 'failed'))
-    )[0];
+    const $items = useState(() => atom<S['SessionQueueItem'][]>([]))[0];
 
     /**
      * Whether auto-switch is enabled.
@@ -239,10 +234,25 @@ export const CanvasSessionContextProvider = memo(
      */
     const selectQueueItems = useMemo(
       () =>
-        createSelector(queueApi.endpoints.listAllQueueItems.select({ destination: session.id }), ({ data }) => {
-          return data ?? EMPTY_ARRAY;
-        }),
+        createSelector(
+          [queueApi.endpoints.listAllQueueItems.select({ destination: session.id }), selectDiscardedItems],
+          ({ data }, discardedItems) => {
+            if (!data) {
+              return EMPTY_ARRAY;
+            }
+            return data.filter(
+              ({ status, item_id }) => status !== 'canceled' && status !== 'failed' && !discardedItems.includes(item_id)
+            );
+          }
+        ),
       [session.id]
+    );
+
+    const discard = useCallback(
+      (itemId: number) => {
+        store.dispatch(canvasQueueItemDiscarded({ itemId }));
+      },
+      [store]
     );
 
     const selectNext = useCallback(() => {
@@ -350,21 +360,19 @@ export const CanvasSessionContextProvider = memo(
 
     // Set up state subscriptions and effects
     useEffect(() => {
-      let _prevAllItems: readonly S['SessionQueueItem'][] = [];
-      // Seed the $allItems atom with the initial query cache state
-      $allItems.set(selectQueueItems(store.getState()));
+      let _prevItems: readonly S['SessionQueueItem'][] = [];
+      // Seed the $items atom with the initial query cache state
+      $items.set(selectQueueItems(store.getState()));
 
-      // Manually keep the $allItems atom in sync as the query cache is updated
+      // Manually keep the $items atom in sync as the query cache is updated
       const unsubReduxSyncToItemsAtom = store.subscribe(() => {
-        const prevItems = $allItems.get();
+        const prevItems = $items.get();
         const items = selectQueueItems(store.getState());
         if (items !== prevItems) {
-          _prevAllItems = prevItems;
-          $allItems.set(items);
+          _prevItems = prevItems;
+          $items.set(items);
         }
       });
-
-      let _prevItems: readonly S['SessionQueueItem'][] = [];
 
       // Handle cases that could result in a nonexistent queue item being selected.
       const unsubEnsureSelectedItemIdExists = effect(
@@ -500,14 +508,13 @@ export const CanvasSessionContextProvider = memo(
         unsubReduxSyncToItemsAtom();
         unsubEnsureSelectedItemIdExists();
         unsubCleanUpProgressData();
-        $allItems.set([]);
+        $items.set([]);
         $progressData.set({});
         $selectedItemId.set(null);
       };
     }, [
-      $allItems,
-      $autoSwitch,
       $items,
+      $autoSwitch,
       $lastLoadedItemId,
       $lastStartedItemId,
       $progressData,
@@ -535,6 +542,7 @@ export const CanvasSessionContextProvider = memo(
         selectFirst,
         selectLast,
         onImageLoad,
+        discard,
       }),
       [
         $autoSwitch,
@@ -553,6 +561,7 @@ export const CanvasSessionContextProvider = memo(
         selectFirst,
         selectLast,
         onImageLoad,
+        discard,
       ]
     );
 
