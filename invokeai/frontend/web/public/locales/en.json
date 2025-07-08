@@ -2384,8 +2384,8 @@
         },
         "autoSwitch": {
             "off": "Off",
-            "switchOnStart": "Switch on Start",
-            "switchOnFinish": "Switch on Finish"
+            "switchOnStart": "On Start",
+            "switchOnFinish": "On Finish"
         }
     },
     "upscaling": {
