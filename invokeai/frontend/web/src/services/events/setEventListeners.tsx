@@ -22,7 +22,7 @@ import { t } from 'i18next';
 import type { ApiTagDescription } from 'services/api';
 import { api, LIST_ALL_TAG, LIST_TAG } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
-import { queueApi } from 'services/api/endpoints/queue';
+import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
 import { workflowsApi } from 'services/api/endpoints/workflows';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import { buildOnModelInstallError } from 'services/events/onModelInstallError';
@@ -343,9 +343,41 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
   socket.on('queue_item_status_changed', (data) => {
     // we've got new status for the queue item, batch and queue
-    const { item_id, session_id, status, batch_status, error_type, error_message, destination } = data;
+    const {
+      item_id,
+      session_id,
+      status,
+      batch_status,
+      error_type,
+      error_message,
+      destination,
+      started_at,
+      updated_at,
+      completed_at,
+      error_traceback,
+      credits,
+    } = data;
 
     log.debug({ data }, `Queue item ${item_id} status updated: ${status}`);
+
+    // // Update this specific queue item in the list of queue items
+    dispatch(
+      queueApi.util.updateQueryData('listQueueItems', undefined, (draft) => {
+        queueItemsAdapter.updateOne(draft, {
+          id: String(item_id),
+          changes: {
+            status,
+            started_at,
+            updated_at: updated_at ?? undefined,
+            completed_at: completed_at ?? undefined,
+            error_type,
+            error_message,
+            error_traceback,
+            credits,
+          },
+        });
+      })
+    );
 
     // Invalidate caches for things we cannot easily update
     const tagsToInvalidate: ApiTagDescription[] = [

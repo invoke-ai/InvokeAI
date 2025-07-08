@@ -5,7 +5,7 @@ import { useDestinationText } from 'features/queue/components/QueueList/useDesti
 import { useOriginText } from 'features/queue/components/QueueList/useOriginText';
 import { useBatchIsCanceled } from 'features/queue/hooks/useBatchIsCanceled';
 import { useCancelBatch } from 'features/queue/hooks/useCancelBatch';
-import { useDeleteQueueItem } from 'features/queue/hooks/useDeleteQueueItem';
+import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
 import { useRetryQueueItem } from 'features/queue/hooks/useRetryQueueItem';
 import { getSecondsFromTimestamps } from 'features/queue/util/getSecondsFromTimestamps';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
@@ -13,20 +13,22 @@ import type { ReactNode } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiXBold } from 'react-icons/pi';
+import { useGetQueueItemQuery } from 'services/api/endpoints/queue';
 import type { S } from 'services/api/types';
 
 type Props = {
   queueItem: S['SessionQueueItem'];
 };
 
-const QueueItemComponent = ({ queueItem }: Props) => {
-  const { session_id, batch_id, item_id, origin, destination } = queueItem;
+const QueueItemComponent = ({ queueItem: queueItemDTO }: Props) => {
+  const { session_id, batch_id, item_id, origin, destination } = queueItemDTO;
   const { t } = useTranslation();
   const isRetryEnabled = useFeatureStatus('retryQueueItem');
   const isBatchCanceled = useBatchIsCanceled(batch_id);
   const cancelBatch = useCancelBatch();
-  const deleteQueueItem = useDeleteQueueItem();
+  const cancelQueueItem = useCancelQueueItem();
   const retryQueueItem = useRetryQueueItem();
+  const { data: queueItem } = useGetQueueItemQuery(item_id);
 
   const originText = useOriginText(origin);
   const destinationText = useDestinationText(destination);
@@ -57,8 +59,8 @@ const QueueItemComponent = ({ queueItem }: Props) => {
   }, [cancelBatch, batch_id]);
 
   const onCancelQueueItem = useCallback(() => {
-    deleteQueueItem.trigger(item_id);
-  }, [deleteQueueItem, item_id]);
+    cancelQueueItem.trigger(item_id);
+  }, [cancelQueueItem, item_id]);
 
   const onRetryQueueItem = useCallback(() => {
     retryQueueItem.trigger(item_id);
@@ -85,8 +87,8 @@ const QueueItemComponent = ({ queueItem }: Props) => {
           {(!isFailed || !isRetryEnabled) && (
             <Button
               onClick={onCancelQueueItem}
-              isLoading={deleteQueueItem.isLoading}
-              isDisabled={deleteQueueItem.isDisabled || queueItem ? isCanceled : true}
+              isLoading={cancelQueueItem.isLoading}
+              isDisabled={cancelQueueItem.isDisabled || queueItem ? isCanceled : true}
               aria-label={t('queue.cancelItem')}
               leftIcon={<PiXBold />}
               colorScheme="error"
