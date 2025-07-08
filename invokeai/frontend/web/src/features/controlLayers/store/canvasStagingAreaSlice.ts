@@ -6,11 +6,13 @@ import { canvasReset } from 'features/controlLayers/store/actions';
 type CanvasStagingAreaState = {
   generateSessionId: string | null;
   canvasSessionId: string | null;
+  canvasDiscardedQueueItems: number[];
 };
 
 const INITIAL_STATE: CanvasStagingAreaState = {
   generateSessionId: null,
   canvasSessionId: null,
+  canvasDiscardedQueueItems: [],
 };
 
 const getInitialState = (): CanvasStagingAreaState => deepClone(INITIAL_STATE);
@@ -26,12 +28,20 @@ export const canvasSessionSlice = createSlice({
     generateSessionReset: (state) => {
       state.generateSessionId = null;
     },
+    canvasQueueItemDiscarded: (state, action: PayloadAction<{ itemId: number }>) => {
+      const { itemId } = action.payload;
+      if (!state.canvasDiscardedQueueItems.includes(itemId)) {
+        state.canvasDiscardedQueueItems.push(itemId);
+      }
+    },
     canvasSessionIdChanged: (state, action: PayloadAction<{ id: string }>) => {
       const { id } = action.payload;
       state.canvasSessionId = id;
+      state.canvasDiscardedQueueItems = [];
     },
     canvasSessionReset: (state) => {
       state.canvasSessionId = null;
+      state.canvasDiscardedQueueItems = [];
     },
   },
   extraReducers(builder) {
@@ -41,8 +51,13 @@ export const canvasSessionSlice = createSlice({
   },
 });
 
-export const { generateSessionIdChanged, generateSessionReset, canvasSessionIdChanged, canvasSessionReset } =
-  canvasSessionSlice.actions;
+export const {
+  generateSessionIdChanged,
+  generateSessionReset,
+  canvasSessionIdChanged,
+  canvasSessionReset,
+  canvasQueueItemDiscarded,
+} = canvasSessionSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrate = (state: any): any => {
@@ -64,3 +79,7 @@ export const selectGenerateSessionId = createSelector(
   ({ generateSessionId }) => generateSessionId
 );
 export const selectIsStaging = createSelector(selectCanvasSessionId, (canvasSessionId) => canvasSessionId !== null);
+export const selectDiscardedItems = createSelector(
+  selectCanvasSessionSlice,
+  ({ canvasDiscardedQueueItems }) => canvasDiscardedQueueItems
+);
