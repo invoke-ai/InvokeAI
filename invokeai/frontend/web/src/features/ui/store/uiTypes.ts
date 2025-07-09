@@ -10,11 +10,6 @@ const zPartialDimensions = z.object({
   height: z.number().optional(),
 });
 
-const zDimensions = z.object({
-  width: z.number(),
-  height: z.number(),
-});
-
 const zDockviewPanelState = z.object({
   id: z.string(),
   type: z.literal('dockview-panel'),
@@ -25,7 +20,7 @@ export type StoredDockviewPanelState = z.infer<typeof zDockviewPanelState>;
 const zGridviewPanelState = z.object({
   id: z.string(),
   type: z.literal('gridview-panel'),
-  dimensions: zDimensions,
+  dimensions: zPartialDimensions,
 });
 export type StoredGridviewPanelState = z.infer<typeof zGridviewPanelState>;
 
