@@ -85,7 +85,7 @@ const UnrecallableMetadataParsed = typedMemo(
 
     return (
       <Box as="span" lineHeight={1}>
-        <LabelComponent />
+        <LabelComponent i18nKey={handler.i18nKey} />
         <ValueComponent value={data.value} />
       </Box>
     );
@@ -128,7 +128,7 @@ const SingleMetadataParsed = typedMemo(
           onClick={onClick}
         />
         <Box as="span" lineHeight={1}>
-          <LabelComponent />
+          <LabelComponent i18nKey={handler.i18nKey} />
           <ValueComponent value={data.value} />
         </Box>
       </Flex>
@@ -178,7 +178,7 @@ const CollectionMetadataParsed = typedMemo(
           onClick={onClick}
         />
         <Box as="span" lineHeight={1}>
-          <LabelComponent />
+          <LabelComponent i18nKey={handler.i18nKey} />
           <ValueComponent value={value} />
         </Box>
       </Flex>
