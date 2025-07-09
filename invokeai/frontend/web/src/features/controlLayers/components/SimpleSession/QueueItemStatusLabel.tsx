@@ -16,21 +16,21 @@ export const QueueItemStatusLabel = memo(({ item, ...rest }: Props) => {
 
   if (item.status === 'pending') {
     return (
-      <Text pointerEvents="none" userSelect="none" fontWeight="semibold" color="base.300" {...rest}>
+      <Text fontSize="xs" pointerEvents="none" userSelect="none" fontWeight="semibold" color="base.300" {...rest}>
         Pending
       </Text>
     );
   }
   if (item.status === 'canceled') {
     return (
-      <Text pointerEvents="none" userSelect="none" fontWeight="semibold" color="warning.300" {...rest}>
+      <Text fontSize="xs" pointerEvents="none" userSelect="none" fontWeight="semibold" color="warning.300" {...rest}>
         Canceled
       </Text>
     );
   }
   if (item.status === 'failed') {
     return (
-      <Text pointerEvents="none" userSelect="none" fontWeight="semibold" color="error.300" {...rest}>
+      <Text fontSize="xs" pointerEvents="none" userSelect="none" fontWeight="semibold" color="error.300" {...rest}>
         Failed
       </Text>
     );
@@ -38,7 +38,7 @@ export const QueueItemStatusLabel = memo(({ item, ...rest }: Props) => {
 
   if (item.status === 'in_progress') {
     return (
-      <Text pointerEvents="none" userSelect="none" fontWeight="semibold" color="invokeBlue.300" {...rest}>
+      <Text fontSize="xs" pointerEvents="none" userSelect="none" fontWeight="semibold" color="invokeBlue.300" {...rest}>
         In Progress
       </Text>
     );
@@ -46,7 +46,14 @@ export const QueueItemStatusLabel = memo(({ item, ...rest }: Props) => {
 
   if (item.status === 'completed') {
     return (
-      <Text pointerEvents="none" userSelect="none" fontWeight="semibold" color="invokeGreen.300" {...rest}>
+      <Text
+        fontSize="xs"
+        pointerEvents="none"
+        userSelect="none"
+        fontWeight="semibold"
+        color="invokeGreen.300"
+        {...rest}
+      >
         Completed
       </Text>
     );

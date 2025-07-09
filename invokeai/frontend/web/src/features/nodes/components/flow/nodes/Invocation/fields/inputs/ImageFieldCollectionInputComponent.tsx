@@ -146,6 +146,7 @@ const ImageGridItemContent = memo(
     return (
       <>
         <DndImage
+          borderRadius="base"
           imageDTO={query.data}
           asThumbnail
           objectFit="contain"

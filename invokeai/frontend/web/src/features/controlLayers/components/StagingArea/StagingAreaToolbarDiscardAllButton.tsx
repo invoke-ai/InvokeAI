@@ -32,7 +32,6 @@ export const StagingAreaToolbarDiscardAllButton = memo(({ isDisabled }: { isDisa
       icon={<PiTrashSimpleBold />}
       onClick={discardAll}
       colorScheme="error"
-      fontSize={16}
       isDisabled={isDisabled || cancelQueueItemsByDestination.isDisabled}
       isLoading={cancelQueueItemsByDestination.isLoading}
     />
