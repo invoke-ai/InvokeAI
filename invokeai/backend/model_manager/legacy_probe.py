@@ -126,6 +126,7 @@ class ModelProbe(object):
 
     CLASS2TYPE = {
         "BriaPipeline": ModelType.Main,
+        "BriaControlNetModel": ModelType.ControlNet,
         "FluxPipeline": ModelType.Main,
         "StableDiffusionPipeline": ModelType.Main,
         "StableDiffusionInpaintPipeline": ModelType.Main,
@@ -1012,6 +1013,9 @@ class ControlNetFolderProbe(FolderProbeBase):
 
         if config.get("_class_name", None) == "FluxControlNetModel":
             return BaseModelType.Flux
+
+        if config.get("_class_name", None) == "BriaControlNetModel":
+            return BaseModelType.Bria
 
         # no obvious way to distinguish between sd2-base and sd2-768
         dimension = config["cross_attention_dim"]

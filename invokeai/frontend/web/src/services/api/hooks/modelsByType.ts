@@ -9,7 +9,9 @@ import {
 } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 import {
+  isBriaControlNetModelConfig,
   isBriaMainModelModelConfig,
+  isChatGPT4oModelConfig,
   isCLIPEmbedModelConfig,
   isCLIPVisionModelConfig,
   isCogView4MainModelModelConfig,
@@ -66,6 +68,7 @@ export const useNonSDXLMainModels = buildModelsHook(isNonSDXLMainModelConfig);
 export const useRefinerModels = buildModelsHook(isRefinerMainModelModelConfig);
 export const useFluxModels = buildModelsHook(isFluxMainModelModelConfig);
 export const useBriaModels = buildModelsHook(isBriaMainModelModelConfig);
+export const useBriaControlNetModels = buildModelsHook(isBriaControlNetModelConfig);
 export const useSD3Models = buildModelsHook(isSD3MainModelModelConfig);
 export const useCogView4Models = buildModelsHook(isCogView4MainModelModelConfig);
 export const useSDXLModels = buildModelsHook(isSDXLMainModelModelConfig);
