@@ -1,4 +1,5 @@
 import { useAppSelector } from 'app/store/storeHooks';
+import { useIsRegionFocused } from 'common/hooks/focus';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useLoadWorkflow } from 'features/gallery/hooks/useLoadWorkflow';
 import { useRecallAll } from 'features/gallery/hooks/useRecallAll';
@@ -27,6 +28,11 @@ export const GlobalImageHotkeys = memo(() => {
 GlobalImageHotkeys.displayName = 'GlobalImageHotkeys';
 
 const GlobalImageHotkeysInternal = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
+  const isGalleryFocused = useIsRegionFocused('gallery');
+  const isViewerFocused = useIsRegionFocused('viewer');
+
+  const isFocusOK = isGalleryFocused || isViewerFocused;
+
   const recallAll = useRecallAll(imageDTO);
   const recallRemix = useRecallRemix(imageDTO);
   const recallPrompts = useRecallPrompts(imageDTO);
@@ -38,48 +44,48 @@ const GlobalImageHotkeysInternal = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
     id: 'loadWorkflow',
     category: 'viewer',
     callback: loadWorkflow.load,
-    options: { enabled: loadWorkflow.isEnabled },
-    dependencies: [loadWorkflow],
+    options: { enabled: loadWorkflow.isEnabled && isFocusOK },
+    dependencies: [loadWorkflow, isFocusOK],
   });
 
   useRegisteredHotkeys({
     id: 'recallAll',
     category: 'viewer',
     callback: recallAll.recall,
-    options: { enabled: recallAll.isEnabled },
-    dependencies: [recallAll],
+    options: { enabled: recallAll.isEnabled && isFocusOK },
+    dependencies: [recallAll, isFocusOK],
   });
 
   useRegisteredHotkeys({
     id: 'recallSeed',
     category: 'viewer',
     callback: recallSeed.recall,
-    options: { enabled: recallSeed.isEnabled },
-    dependencies: [recallSeed],
+    options: { enabled: recallSeed.isEnabled && isFocusOK },
+    dependencies: [recallSeed, isFocusOK],
   });
 
   useRegisteredHotkeys({
     id: 'recallPrompts',
     category: 'viewer',
     callback: recallPrompts.recall,
-    options: { enabled: recallPrompts.isEnabled },
-    dependencies: [recallPrompts],
+    options: { enabled: recallPrompts.isEnabled && isFocusOK },
+    dependencies: [recallPrompts, isFocusOK],
   });
 
   useRegisteredHotkeys({
     id: 'remix',
     category: 'viewer',
     callback: recallRemix.recall,
-    options: { enabled: recallRemix.isEnabled },
-    dependencies: [recallRemix],
+    options: { enabled: recallRemix.isEnabled && isFocusOK },
+    dependencies: [recallRemix, isFocusOK],
   });
 
   useRegisteredHotkeys({
     id: 'useSize',
     category: 'viewer',
     callback: recallDimensions.recall,
-    options: { enabled: recallDimensions.isEnabled },
-    dependencies: [recallDimensions],
+    options: { enabled: recallDimensions.isEnabled && isFocusOK },
+    dependencies: [recallDimensions, isFocusOK],
   });
 
   return null;

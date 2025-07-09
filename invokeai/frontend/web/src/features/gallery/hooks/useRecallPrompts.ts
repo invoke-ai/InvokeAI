@@ -1,5 +1,4 @@
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
-import { useIsRegionFocused } from 'common/hooks/focus';
 import { MetadataHandlers, MetadataUtils } from 'features/metadata/parsing';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -8,15 +7,13 @@ import type { ImageDTO } from 'services/api/types';
 
 import { useClearStylePresetWithToast } from './useClearStylePresetWithToast';
 
-export const useRecallPrompts = (imageDTO?: ImageDTO | null) => {
+export const useRecallPrompts = (imageDTO: ImageDTO) => {
   const store = useAppStore();
   const tab = useAppSelector(selectActiveTab);
-  const isGalleryFocused = useIsRegionFocused('gallery');
-  const isViewerFocused = useIsRegionFocused('viewer');
   const clearStylePreset = useClearStylePresetWithToast();
   const [hasPrompts, setHasPrompts] = useState(false);
 
-  const { metadata } = useDebouncedMetadata(imageDTO?.image_name);
+  const { metadata, isLoading } = useDebouncedMetadata(imageDTO.image_name);
 
   useEffect(() => {
     const parse = async () => {
@@ -42,7 +39,7 @@ export const useRecallPrompts = (imageDTO?: ImageDTO | null) => {
   }, [metadata, store]);
 
   const isEnabled = useMemo(() => {
-    if (!isGalleryFocused && !isViewerFocused) {
+    if (isLoading) {
       return false;
     }
 
@@ -55,7 +52,7 @@ export const useRecallPrompts = (imageDTO?: ImageDTO | null) => {
     }
 
     return true;
-  }, [hasPrompts, isGalleryFocused, isViewerFocused, tab]);
+  }, [hasPrompts, isLoading, tab]);
 
   const recall = useCallback(() => {
     if (!metadata) {

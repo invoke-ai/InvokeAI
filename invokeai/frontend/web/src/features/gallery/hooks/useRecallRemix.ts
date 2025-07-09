@@ -1,5 +1,4 @@
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
-import { useIsRegionFocused } from 'common/hooks/focus';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { MetadataHandlers, MetadataUtils } from 'features/metadata/parsing';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -9,18 +8,16 @@ import type { ImageDTO } from 'services/api/types';
 
 import { useClearStylePresetWithToast } from './useClearStylePresetWithToast';
 
-export const useRecallRemix = (imageDTO?: ImageDTO | null) => {
+export const useRecallRemix = (imageDTO: ImageDTO) => {
   const store = useAppStore();
   const tab = useAppSelector(selectActiveTab);
   const isStaging = useAppSelector(selectIsStaging);
-  const isGalleryFocused = useIsRegionFocused('gallery');
-  const isViewerFocused = useIsRegionFocused('viewer');
   const clearStylePreset = useClearStylePresetWithToast();
 
-  const { metadata } = useDebouncedMetadata(imageDTO?.image_name);
+  const { metadata, isLoading } = useDebouncedMetadata(imageDTO.image_name);
 
   const isEnabled = useMemo(() => {
-    if (!isGalleryFocused && !isViewerFocused) {
+    if (isLoading) {
       return false;
     }
 
@@ -33,7 +30,7 @@ export const useRecallRemix = (imageDTO?: ImageDTO | null) => {
     }
 
     return true;
-  }, [isGalleryFocused, isViewerFocused, metadata, tab]);
+  }, [isLoading, metadata, tab]);
 
   const handlersToSkip = useMemo(() => {
     // Remix always skips the seed handler

@@ -1,5 +1,4 @@
 import { useAppStore } from 'app/store/storeHooks';
-import { useIsRegionFocused } from 'common/hooks/focus';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { newCanvasFromImage } from 'features/imageActions/actions';
 import { toast } from 'features/toast/toast';
@@ -11,8 +10,6 @@ import type { ImageDTO } from 'services/api/types';
 
 export const useEditImage = (imageDTO?: ImageDTO | null) => {
   const { t } = useTranslation();
-  const isGalleryFocused = useIsRegionFocused('gallery');
-  const isViewerFocused = useIsRegionFocused('viewer');
 
   const { getState, dispatch } = useAppStore();
   const canvasManager = useCanvasManagerSafe();
@@ -21,11 +18,8 @@ export const useEditImage = (imageDTO?: ImageDTO | null) => {
     if (!imageDTO) {
       return false;
     }
-    if (!isGalleryFocused && !isViewerFocused) {
-      return false;
-    }
     return true;
-  }, [imageDTO, isGalleryFocused, isViewerFocused]);
+  }, [imageDTO]);
 
   const edit = useCallback(async () => {
     if (!imageDTO) {
