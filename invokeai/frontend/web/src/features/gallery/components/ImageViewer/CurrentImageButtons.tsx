@@ -1,5 +1,4 @@
 import { Button, Divider, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
@@ -11,10 +10,9 @@ import { useRecallDimensions } from 'features/gallery/hooks/useRecallDimensions'
 import { useRecallPrompts } from 'features/gallery/hooks/useRecallPrompts';
 import { useRecallRemix } from 'features/gallery/hooks/useRecallRemix';
 import { useRecallSeed } from 'features/gallery/hooks/useRecallSeed';
-import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { PostProcessingPopover } from 'features/parameters/components/PostProcessing/PostProcessingPopover';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -27,19 +25,12 @@ import {
   PiQuotesBold,
   PiRulerBold,
 } from 'react-icons/pi';
-import { useImageDTO } from 'services/api/endpoints/images';
+import type { ImageDTO } from 'services/api/types';
 
-import { useImageViewerContext } from './context';
-
-export const CurrentImageButtons = memo(() => {
+export const CurrentImageButtons = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
   const { t } = useTranslation();
-  const ctx = useImageViewerContext();
-  const hasProgressImage = useStore(ctx.$hasProgressImage);
-  const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
-  const isDisabledOverride = hasProgressImage && shouldShowProgressInViewer;
-
-  const imageName = useAppSelector(selectLastSelectedImage);
-  const imageDTO = useImageDTO(imageName);
+  const tab = useAppSelector(selectActiveTab);
+  const isCanvasOrGenerateTab = tab === 'canvas' || tab === 'generate';
 
   const isUpscalingEnabled = useFeatureStatus('upscaling');
 
@@ -52,8 +43,6 @@ export const CurrentImageButtons = memo(() => {
   const editImage = useEditImage(imageDTO);
   const deleteImage = useDeleteImage(imageDTO);
 
-  console.log(isDisabledOverride, recallSeed.isEnabled);
-
   return (
     <>
       <Menu isLazy>
@@ -61,7 +50,7 @@ export const CurrentImageButtons = memo(() => {
           as={IconButton}
           aria-label={t('parameters.imageActions')}
           tooltip={t('parameters.imageActions')}
-          isDisabled={isDisabledOverride || !imageDTO}
+          isDisabled={!imageDTO}
           variant="link"
           alignSelf="stretch"
           icon={<PiDotsThreeOutlineFill />}
@@ -74,7 +63,7 @@ export const CurrentImageButtons = memo(() => {
       <Button
         leftIcon={<PiPencilBold />}
         onClick={editImage.edit}
-        isDisabled={isDisabledOverride || !editImage.isEnabled}
+        isDisabled={!editImage.isEnabled}
         variant="link"
         size="sm"
         alignSelf="stretch"
@@ -89,62 +78,72 @@ export const CurrentImageButtons = memo(() => {
         icon={<PiFlowArrowBold />}
         tooltip={`${t('nodes.loadWorkflow')} (W)`}
         aria-label={`${t('nodes.loadWorkflow')} (W)`}
-        isDisabled={isDisabledOverride || !loadWorkflow.isEnabled}
+        isDisabled={!loadWorkflow.isEnabled}
         variant="link"
         alignSelf="stretch"
         onClick={loadWorkflow.load}
       />
-      <IconButton
-        icon={<PiArrowsCounterClockwiseBold />}
-        tooltip={`${t('parameters.remixImage')} (R)`}
-        aria-label={`${t('parameters.remixImage')} (R)`}
-        isDisabled={isDisabledOverride || !recallRemix.isEnabled}
-        variant="link"
-        alignSelf="stretch"
-        onClick={recallRemix.recall}
-      />
-      <IconButton
-        icon={<PiQuotesBold />}
-        tooltip={`${t('parameters.usePrompt')} (P)`}
-        aria-label={`${t('parameters.usePrompt')} (P)`}
-        isDisabled={isDisabledOverride || !recallPrompts.isEnabled}
-        variant="link"
-        alignSelf="stretch"
-        onClick={recallPrompts.recall}
-      />
-      <IconButton
-        icon={<PiPlantBold />}
-        tooltip={`${t('parameters.useSeed')} (S)`}
-        aria-label={`${t('parameters.useSeed')} (S)`}
-        isDisabled={isDisabledOverride || !recallSeed.isEnabled}
-        variant="link"
-        alignSelf="stretch"
-        onClick={recallSeed.recall}
-      />
-      <IconButton
-        icon={<PiRulerBold />}
-        tooltip={`${t('parameters.useSize')} (D)`}
-        aria-label={`${t('parameters.useSize')} (D)`}
-        variant="link"
-        alignSelf="stretch"
-        onClick={recallDimensions.recall}
-        isDisabled={isDisabledOverride || !recallDimensions.isEnabled}
-      />
-      <IconButton
-        icon={<PiAsteriskBold />}
-        tooltip={`${t('parameters.useAll')} (A)`}
-        aria-label={`${t('parameters.useAll')} (A)`}
-        isDisabled={isDisabledOverride || !recallAll.isEnabled}
-        variant="link"
-        alignSelf="stretch"
-        onClick={recallAll.recall}
-      />
+      {isCanvasOrGenerateTab && (
+        <IconButton
+          icon={<PiArrowsCounterClockwiseBold />}
+          tooltip={`${t('parameters.remixImage')} (R)`}
+          aria-label={`${t('parameters.remixImage')} (R)`}
+          isDisabled={!recallRemix.isEnabled}
+          variant="link"
+          alignSelf="stretch"
+          onClick={recallRemix.recall}
+        />
+      )}
+      {isCanvasOrGenerateTab && (
+        <IconButton
+          icon={<PiQuotesBold />}
+          tooltip={`${t('parameters.usePrompt')} (P)`}
+          aria-label={`${t('parameters.usePrompt')} (P)`}
+          isDisabled={!recallPrompts.isEnabled}
+          variant="link"
+          alignSelf="stretch"
+          onClick={recallPrompts.recall}
+        />
+      )}
+      {isCanvasOrGenerateTab && (
+        <IconButton
+          icon={<PiPlantBold />}
+          tooltip={`${t('parameters.useSeed')} (S)`}
+          aria-label={`${t('parameters.useSeed')} (S)`}
+          isDisabled={!recallSeed.isEnabled}
+          variant="link"
+          alignSelf="stretch"
+          onClick={recallSeed.recall}
+        />
+      )}
+      {isCanvasOrGenerateTab && (
+        <IconButton
+          icon={<PiRulerBold />}
+          tooltip={`${t('parameters.useSize')} (D)`}
+          aria-label={`${t('parameters.useSize')} (D)`}
+          variant="link"
+          alignSelf="stretch"
+          onClick={recallDimensions.recall}
+          isDisabled={!recallDimensions.isEnabled}
+        />
+      )}
+      {isCanvasOrGenerateTab && (
+        <IconButton
+          icon={<PiAsteriskBold />}
+          tooltip={`${t('parameters.useAll')} (A)`}
+          aria-label={`${t('parameters.useAll')} (A)`}
+          isDisabled={!recallAll.isEnabled}
+          variant="link"
+          alignSelf="stretch"
+          onClick={recallAll.recall}
+        />
+      )}
 
-      {isUpscalingEnabled && <PostProcessingPopover imageDTO={imageDTO} isDisabled={isDisabledOverride} />}
+      {isUpscalingEnabled && <PostProcessingPopover imageDTO={imageDTO} isDisabled={false} />}
 
       <Divider orientation="vertical" h={8} mx={2} />
 
-      <DeleteImageButton onClick={deleteImage.delete} isDisabled={isDisabledOverride || !deleteImage.isEnabled} />
+      <DeleteImageButton onClick={deleteImage.delete} isDisabled={!deleteImage.isEnabled} />
     </>
   );
 });

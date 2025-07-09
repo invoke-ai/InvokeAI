@@ -1,8 +1,8 @@
 import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
-import { useCreateStylePresetFromMetadata } from 'features/gallery/hooks/useCreateStylePresetFromMetadata';
 import { useRecallAll } from 'features/gallery/hooks/useRecallAll';
+import { useRecallDimensions } from 'features/gallery/hooks/useRecallDimensions';
 import { useRecallPrompts } from 'features/gallery/hooks/useRecallPrompts';
 import { useRecallRemix } from 'features/gallery/hooks/useRecallRemix';
 import { useRecallSeed } from 'features/gallery/hooks/useRecallSeed';
@@ -12,9 +12,9 @@ import {
   PiArrowBendUpLeftBold,
   PiArrowsCounterClockwiseBold,
   PiAsteriskBold,
-  PiPaintBrushBold,
   PiPlantBold,
   PiQuotesBold,
+  PiRulerBold,
 } from 'react-icons/pi';
 
 export const ImageMenuItemMetadataRecallActions = memo(() => {
@@ -27,7 +27,7 @@ export const ImageMenuItemMetadataRecallActions = memo(() => {
   const recallRemix = useRecallRemix(imageDTO);
   const recallPrompts = useRecallPrompts(imageDTO);
   const recallSeed = useRecallSeed(imageDTO);
-  const stylePreset = useCreateStylePresetFromMetadata(imageDTO);
+  const recallDimensions = useRecallDimensions(imageDTO);
 
   return (
     <MenuItem {...subMenu.parentMenuItemProps} icon={<PiArrowBendUpLeftBold />}>
@@ -52,8 +52,8 @@ export const ImageMenuItemMetadataRecallActions = memo(() => {
           <MenuItem icon={<PiAsteriskBold />} onClick={recallAll.recall} isDisabled={!recallAll.isEnabled}>
             {t('parameters.useAll')}
           </MenuItem>
-          <MenuItem icon={<PiPaintBrushBold />} onClick={stylePreset.create} isDisabled={!stylePreset.isEnabled}>
-            {t('stylePresets.useForTemplate')}
+          <MenuItem icon={<PiRulerBold />} onClick={recallDimensions.recall} isDisabled={!recallDimensions.isEnabled}>
+            {t('parameters.useSize')}
           </MenuItem>
         </MenuList>
       </Menu>

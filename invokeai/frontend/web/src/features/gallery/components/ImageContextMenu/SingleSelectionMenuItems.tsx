@@ -21,6 +21,8 @@ import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
+import { ImageMenuItemUseAsPromptTemplate } from './ImageMenuItemUseAsPromptTemplate';
+
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
 };
@@ -45,6 +47,7 @@ const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) =
       <ImageMenuItemSendToUpscale />
       <ImageMenuItemUseForPromptGeneration />
       {(tab === 'canvas' || tab === 'generate') && <ImageMenuItemUseAsRefImage />}
+      <ImageMenuItemUseAsPromptTemplate />
       <ImageMenuItemNewCanvasFromImageSubMenu />
       {tab === 'canvas' && <ImageMenuItemNewLayerFromImageSubMenu />}
       <MenuDivider />
