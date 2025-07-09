@@ -104,7 +104,7 @@ export const selectIsStaging = (state: RootState) => {
     ({ status, item_id }) => status !== 'canceled' && status !== 'failed' && !discardedItems.includes(item_id)
   );
 };
-export const selectDiscardedItems = createSelector(
+const selectDiscardedItems = createSelector(
   selectCanvasSessionSlice,
   ({ canvasDiscardedQueueItems }) => canvasDiscardedQueueItems
 );
