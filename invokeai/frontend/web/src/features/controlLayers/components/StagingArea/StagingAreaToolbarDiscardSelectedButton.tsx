@@ -20,9 +20,9 @@ export const StagingAreaToolbarDiscardSelectedButton = memo(({ isDisabled }: { i
     if (selectedItemId === null) {
       return;
     }
+    const itemCount = ctx.$itemCount.get();
     ctx.discard(selectedItemId);
     await cancelQueueItem.trigger(selectedItemId, { withToast: false });
-    const itemCount = ctx.$itemCount.get();
     if (itemCount <= 1) {
       if (ctx.session.type === 'advanced') {
         dispatch(canvasSessionReset());
