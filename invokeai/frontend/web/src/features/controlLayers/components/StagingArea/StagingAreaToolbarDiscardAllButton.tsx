@@ -1,7 +1,5 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
-import { canvasSessionReset, generateSessionReset } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { useCancelQueueItemsByDestination } from 'features/queue/hooks/useCancelQueueItemsByDestination';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,21 +7,13 @@ import { PiTrashSimpleBold } from 'react-icons/pi';
 
 export const StagingAreaToolbarDiscardAllButton = memo(({ isDisabled }: { isDisabled?: boolean }) => {
   const ctx = useCanvasSessionContext();
-  const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const cancelQueueItemsByDestination = useCancelQueueItemsByDestination();
 
   const discardAll = useCallback(() => {
-    if (ctx.$isPending.get()) {
-      cancelQueueItemsByDestination.trigger(ctx.session.id, { withToast: false });
-    }
-    if (ctx.session.type === 'advanced') {
-      dispatch(canvasSessionReset());
-    } else {
-      // ctx.session.type === 'simple'
-      dispatch(generateSessionReset());
-    }
-  }, [cancelQueueItemsByDestination, ctx.$isPending, ctx.session.id, ctx.session.type, dispatch]);
+    ctx.discardAll();
+    cancelQueueItemsByDestination.trigger(ctx.session.id, { withToast: false });
+  }, [cancelQueueItemsByDestination, ctx]);
 
   return (
     <IconButton
