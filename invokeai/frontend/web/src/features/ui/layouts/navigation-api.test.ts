@@ -29,8 +29,9 @@ vi.mock('dockview', async () => {
 
   // Mock GridviewPanel class for instanceof checks
   class MockGridviewPanel {
-    maximumWidth: number;
-    minimumWidth: number;
+    maximumWidth?: number;
+    minimumWidth?: number;
+    width?: number;
     api = {
       setActive: vi.fn(),
       setConstraints: vi.fn(),
@@ -38,9 +39,10 @@ vi.mock('dockview', async () => {
       onDidDimensionsChange: vi.fn(() => ({ dispose: vi.fn() })),
     };
 
-    constructor(config: { maximumWidth?: number; minimumWidth?: number } = {}) {
-      this.maximumWidth = config.maximumWidth ?? Number.MAX_SAFE_INTEGER;
-      this.minimumWidth = config.minimumWidth ?? 0;
+    constructor(config: { maximumWidth?: number; minimumWidth?: number; width?: number } = {}) {
+      this.maximumWidth = config.maximumWidth;
+      this.minimumWidth = config.minimumWidth;
+      this.width = config.width;
     }
   }
 
@@ -62,7 +64,7 @@ vi.mock('dockview', async () => {
 });
 
 // Mock panel with setActive method
-const createMockPanel = (config: { maximumWidth?: number; minimumWidth?: number } = {}) => {
+const createMockPanel = (config: { maximumWidth?: number; minimumWidth?: number; width?: number } = {}) => {
   /* @ts-expect-error we are mocking GridviewPanel to be a concrete class */
   return new GridviewPanel(config);
 };
@@ -93,7 +95,7 @@ describe('AppNavigationApi', () => {
         set: mockSetAppTab,
         get: mockGetAppTab,
       },
-      panelStorage: {
+      storage: {
         set: mockSetPanelState,
         get: mockGetPanelState,
         delete: mockDeletePanelState,
@@ -116,9 +118,9 @@ describe('AppNavigationApi', () => {
       expect(navigationApi._app).not.toBeNull();
       expect(navigationApi._app?.activeTab.set).toBe(mockSetAppTab);
       expect(navigationApi._app?.activeTab.get).toBe(mockGetAppTab);
-      expect(navigationApi._app?.panelStorage.set).toBe(mockSetPanelState);
-      expect(navigationApi._app?.panelStorage.get).toBe(mockGetPanelState);
-      expect(navigationApi._app?.panelStorage.delete).toBe(mockDeletePanelState);
+      expect(navigationApi._app?.storage.set).toBe(mockSetPanelState);
+      expect(navigationApi._app?.storage.get).toBe(mockGetPanelState);
+      expect(navigationApi._app?.storage.delete).toBe(mockDeletePanelState);
     });
 
     it('should disconnect from app', () => {
@@ -211,7 +213,7 @@ describe('AppNavigationApi', () => {
   describe('Panel Registration', () => {
     it('should register and unregister panels', () => {
       const mockPanel = createMockPanel();
-      const unregister = navigationApi.registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
+      const unregister = navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
 
       expect(typeof unregister).toBe('function');
       expect(navigationApi.isPanelRegistered('generate', SETTINGS_PANEL_ID)).toBe(true);
@@ -228,7 +230,7 @@ describe('AppNavigationApi', () => {
       const waitPromise = navigationApi.waitForPanel('generate', SETTINGS_PANEL_ID);
 
       // Register the panel
-      navigationApi.registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
+      navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
 
       // Wait should resolve
       await expect(waitPromise).resolves.toBeUndefined();
@@ -238,8 +240,8 @@ describe('AppNavigationApi', () => {
       const mockPanel1 = createMockPanel();
       const mockPanel2 = createMockDockPanel();
 
-      navigationApi.registerPanel('generate', SETTINGS_PANEL_ID, mockPanel1);
-      navigationApi.registerPanel('generate', LAUNCHPAD_PANEL_ID, mockPanel2);
+      navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockPanel1);
+      navigationApi._registerPanel('generate', LAUNCHPAD_PANEL_ID, mockPanel2);
 
       expect(navigationApi.isPanelRegistered('generate', SETTINGS_PANEL_ID)).toBe(true);
       expect(navigationApi.isPanelRegistered('generate', LAUNCHPAD_PANEL_ID)).toBe(true);
@@ -253,8 +255,8 @@ describe('AppNavigationApi', () => {
       const mockPanel1 = createMockPanel();
       const mockPanel2 = createMockPanel();
 
-      navigationApi.registerPanel('generate', SETTINGS_PANEL_ID, mockPanel1);
-      navigationApi.registerPanel('canvas', SETTINGS_PANEL_ID, mockPanel2);
+      navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockPanel1);
+      navigationApi._registerPanel('canvas', SETTINGS_PANEL_ID, mockPanel2);
 
       expect(navigationApi.isPanelRegistered('generate', SETTINGS_PANEL_ID)).toBe(true);
       expect(navigationApi.isPanelRegistered('canvas', SETTINGS_PANEL_ID)).toBe(true);
@@ -265,95 +267,6 @@ describe('AppNavigationApi', () => {
     });
   });
 
-  describe('Panel Storage', () => {
-    beforeEach(() => {
-      navigationApi.connectToApp(mockAppApi);
-    });
-
-    it('stores initial gridview state when none exists', () => {
-      const key = `generate:${LEFT_PANEL_ID}`;
-      mockGetPanelState.mockReturnValue(undefined);
-
-      const panel = createMockPanel();
-      // simulate real dimensions
-      panel.api.height = 200;
-      panel.api.width = 400;
-
-      navigationApi.registerPanel('generate', LEFT_PANEL_ID, panel);
-
-      expect(mockGetPanelState).toHaveBeenCalledWith(key);
-      expect(mockSetPanelState).toHaveBeenCalledWith(key, {
-        id: key,
-        type: 'gridview-panel',
-        dimensions: { height: 200, width: 400 },
-      });
-    });
-
-    it('restores gridview from stored state', () => {
-      const key = `generate:${LEFT_PANEL_ID}`;
-      const stored = { id: key, type: 'gridview-panel', dimensions: { height: 50, width: 75 } };
-      mockGetPanelState.mockReturnValue(stored);
-
-      const panel = createMockPanel();
-      navigationApi.registerPanel('generate', LEFT_PANEL_ID, panel);
-
-      expect(panel.api.setSize).toHaveBeenCalledWith({ height: 50, width: 75 });
-      expect(mockDeletePanelState).not.toHaveBeenCalled();
-    });
-
-    it('collapses gridview when stored dimensions are zero', () => {
-      const key = `generate:${LEFT_PANEL_ID}`;
-      const stored = { id: key, type: 'gridview-panel', dimensions: { height: 0, width: 0 } };
-      mockGetPanelState.mockReturnValue(stored);
-
-      const panel = createMockPanel();
-      navigationApi.registerPanel('generate', LEFT_PANEL_ID, panel);
-
-      expect(panel.api.setConstraints).toHaveBeenCalledWith({ minimumWidth: 0, maximumWidth: 0 });
-      expect(panel.api.setConstraints).toHaveBeenCalledWith({ minimumHeight: 0, maximumHeight: 0 });
-      expect(panel.api.setSize).toHaveBeenCalledWith({ height: 0, width: 0 });
-    });
-
-    it('stores initial dockview state when none exists', () => {
-      const key = `generate:${LAUNCHPAD_PANEL_ID}`;
-      mockGetPanelState.mockReturnValue(undefined);
-
-      const panel = createMockDockPanel();
-      Object.defineProperty(panel.api, 'isActive', { value: true });
-
-      navigationApi.registerPanel('generate', LAUNCHPAD_PANEL_ID, panel);
-
-      expect(mockGetPanelState).toHaveBeenCalledWith(key);
-      expect(mockSetPanelState).toHaveBeenCalledWith(key, {
-        id: key,
-        type: 'dockview-panel',
-        isActive: true,
-      });
-    });
-
-    it('restores dockview active state', () => {
-      const key = `generate:${LAUNCHPAD_PANEL_ID}`;
-      const stored = { id: key, type: 'dockview-panel', isActive: true };
-      mockGetPanelState.mockReturnValue(stored);
-
-      const panel = createMockDockPanel();
-      navigationApi.registerPanel('generate', LAUNCHPAD_PANEL_ID, panel);
-
-      expect(panel.api.setActive).toHaveBeenCalled();
-    });
-
-    it('deletes mismatched dockview state', () => {
-      const key = `generate:${LAUNCHPAD_PANEL_ID}`;
-      const stored = { id: key, type: 'gridview-panel', dimensions: { height: 5, width: 5 } };
-      mockGetPanelState.mockReturnValue(stored);
-
-      const panel = createMockDockPanel();
-      navigationApi.registerPanel('generate', LAUNCHPAD_PANEL_ID, panel);
-
-      expect(mockDeletePanelState).toHaveBeenCalledWith(key);
-    });
-  });
-
   describe('Panel Focus', () => {
     beforeEach(() => {
       navigationApi.connectToApp(mockAppApi);
@@ -361,7 +274,7 @@ describe('AppNavigationApi', () => {
 
     it('should focus panel in already registered tab', async () => {
       const mockPanel = createMockPanel();
-      navigationApi.registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
+      navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
       mockGetAppTab.mockReturnValue('generate');
 
       const result = await navigationApi.focusPanel('generate', SETTINGS_PANEL_ID);
@@ -373,7 +286,7 @@ describe('AppNavigationApi', () => {
 
     it('should switch tab before focusing panel', async () => {
       const mockPanel = createMockPanel();
-      navigationApi.registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
+      navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
       mockGetAppTab.mockReturnValue('canvas'); // Currently on different tab
 
       const result = await navigationApi.focusPanel('generate', SETTINGS_PANEL_ID);
@@ -392,7 +305,7 @@ describe('AppNavigationApi', () => {
 
       // Register panel after a short delay
       setTimeout(() => {
-        navigationApi.registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
+        navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
       }, 100);
 
       const result = await focusPromise;
@@ -405,8 +318,8 @@ describe('AppNavigationApi', () => {
       const mockGridPanel = createMockPanel();
       const mockDockPanel = createMockDockPanel();
 
-      navigationApi.registerPanel('generate', SETTINGS_PANEL_ID, mockGridPanel);
-      navigationApi.registerPanel('generate', LAUNCHPAD_PANEL_ID, mockDockPanel);
+      navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockGridPanel);
+      navigationApi._registerPanel('generate', LAUNCHPAD_PANEL_ID, mockDockPanel);
       mockGetAppTab.mockReturnValue('generate');
 
       // Test gridview panel
@@ -437,7 +350,7 @@ describe('AppNavigationApi', () => {
         throw new Error('Mock error');
       });
 
-      navigationApi.registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
+      navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
       mockGetAppTab.mockReturnValue('generate');
 
       const result = await navigationApi.focusPanel('generate', SETTINGS_PANEL_ID);
@@ -447,7 +360,7 @@ describe('AppNavigationApi', () => {
 
     it('should work without app connection', async () => {
       const mockPanel = createMockPanel();
-      navigationApi.registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
+      navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
 
       // Don't connect to app
       const result = await navigationApi.focusPanel('generate', SETTINGS_PANEL_ID);
@@ -460,7 +373,7 @@ describe('AppNavigationApi', () => {
   describe('Panel Waiting', () => {
     it('should resolve immediately for already registered panels', async () => {
       const mockPanel = createMockPanel();
-      navigationApi.registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
+      navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
 
       const waitPromise = navigationApi.waitForPanel('generate', SETTINGS_PANEL_ID);
 
@@ -474,7 +387,7 @@ describe('AppNavigationApi', () => {
       const waitPromise2 = navigationApi.waitForPanel('generate', SETTINGS_PANEL_ID);
 
       setTimeout(() => {
-        navigationApi.registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
+        navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
       }, 50);
 
       await expect(Promise.all([waitPromise1, waitPromise2])).resolves.toEqual([undefined, undefined]);
@@ -483,14 +396,14 @@ describe('AppNavigationApi', () => {
     it('should timeout if panel is not registered', async () => {
       const waitPromise = navigationApi.waitForPanel('generate', SETTINGS_PANEL_ID, 100);
 
-      await expect(waitPromise).rejects.toThrow('Panel generate:settings registration timed out after 100ms');
+      await expect(waitPromise).rejects.toThrow(/Panel .* registration timed out after 100ms/);
     });
 
     it('should handle custom timeout', async () => {
       const start = Date.now();
       const waitPromise = navigationApi.waitForPanel('generate', SETTINGS_PANEL_ID, 200);
 
-      await expect(waitPromise).rejects.toThrow('Panel generate:settings registration timed out after 200ms');
+      await expect(waitPromise).rejects.toThrow(/Panel .* registration timed out after 200ms/);
 
       const elapsed = Date.now() - start;
       // TODO(psyche): Use vitest's fake timeres
@@ -506,9 +419,9 @@ describe('AppNavigationApi', () => {
       const mockPanel2 = createMockPanel();
       const mockPanel3 = createMockPanel();
 
-      navigationApi.registerPanel('generate', SETTINGS_PANEL_ID, mockPanel1);
-      navigationApi.registerPanel('generate', LAUNCHPAD_PANEL_ID, mockPanel2);
-      navigationApi.registerPanel('canvas', SETTINGS_PANEL_ID, mockPanel3);
+      navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockPanel1);
+      navigationApi._registerPanel('generate', LAUNCHPAD_PANEL_ID, mockPanel2);
+      navigationApi._registerPanel('canvas', SETTINGS_PANEL_ID, mockPanel3);
 
       expect(navigationApi.getRegisteredPanels('generate')).toHaveLength(2);
       expect(navigationApi.getRegisteredPanels('canvas')).toHaveLength(1);
@@ -538,7 +451,7 @@ describe('AppNavigationApi', () => {
       mockGetAppTab.mockReturnValue('canvas');
 
       // Register panel
-      const unregister = navigationApi.registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
+      const unregister = navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
 
       // Focus panel (should switch tab and focus)
       const result = await navigationApi.focusPanel('generate', SETTINGS_PANEL_ID);
@@ -564,9 +477,9 @@ describe('AppNavigationApi', () => {
       mockGetAppTab.mockReturnValue('generate');
 
       // Register panels
-      navigationApi.registerPanel('generate', SETTINGS_PANEL_ID, mockPanel1);
-      navigationApi.registerPanel('generate', LAUNCHPAD_PANEL_ID, mockPanel2);
-      navigationApi.registerPanel('canvas', WORKSPACE_PANEL_ID, mockPanel3);
+      navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockPanel1);
+      navigationApi._registerPanel('generate', LAUNCHPAD_PANEL_ID, mockPanel2);
+      navigationApi._registerPanel('canvas', WORKSPACE_PANEL_ID, mockPanel3);
 
       // Focus panels
       await navigationApi.focusPanel('generate', SETTINGS_PANEL_ID);
@@ -590,7 +503,7 @@ describe('AppNavigationApi', () => {
 
       // Register after delay
       setTimeout(() => {
-        navigationApi.registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
+        navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
       }, 50);
 
       const result = await focusPromise;
@@ -607,7 +520,7 @@ describe('AppNavigationApi', () => {
 
     it('should focus panel in active tab', async () => {
       const mockPanel = createMockPanel();
-      navigationApi.registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
+      navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
       mockGetAppTab.mockReturnValue('generate');
 
       const result = await navigationApi.focusPanelInActiveTab(SETTINGS_PANEL_ID);
@@ -663,7 +576,7 @@ describe('AppNavigationApi', () => {
   describe('getPanel', () => {
     it('should return registered panel', () => {
       const mockPanel = createMockPanel();
-      navigationApi.registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
+      navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockPanel);
 
       const result = navigationApi.getPanel('generate', SETTINGS_PANEL_ID);
 
@@ -689,8 +602,8 @@ describe('AppNavigationApi', () => {
     });
 
     it('should expand collapsed left panel', () => {
-      const mockPanel = createMockPanel({ maximumWidth: 0 });
-      navigationApi.registerPanel('generate', LEFT_PANEL_ID, mockPanel);
+      const mockPanel = createMockPanel({ width: 0 });
+      navigationApi._registerPanel('generate', LEFT_PANEL_ID, mockPanel);
       mockGetAppTab.mockReturnValue('generate');
 
       const result = navigationApi.toggleLeftPanel();
@@ -705,7 +618,7 @@ describe('AppNavigationApi', () => {
 
     it('should collapse expanded left panel', () => {
       const mockPanel = createMockPanel({ maximumWidth: Number.MAX_SAFE_INTEGER });
-      navigationApi.registerPanel('generate', LEFT_PANEL_ID, mockPanel);
+      navigationApi._registerPanel('generate', LEFT_PANEL_ID, mockPanel);
       mockGetAppTab.mockReturnValue('generate');
 
       const result = navigationApi.toggleLeftPanel();
@@ -736,7 +649,7 @@ describe('AppNavigationApi', () => {
 
     it('should return false when panel is not GridviewPanel', () => {
       const mockPanel = createMockDockPanel();
-      navigationApi.registerPanel('generate', LEFT_PANEL_ID, mockPanel);
+      navigationApi._registerPanel('generate', LEFT_PANEL_ID, mockPanel);
       mockGetAppTab.mockReturnValue('generate');
 
       const result = navigationApi.toggleLeftPanel();
@@ -751,8 +664,8 @@ describe('AppNavigationApi', () => {
     });
 
     it('should expand collapsed right panel', () => {
-      const mockPanel = createMockPanel({ maximumWidth: 0 });
-      navigationApi.registerPanel('generate', RIGHT_PANEL_ID, mockPanel);
+      const mockPanel = createMockPanel({ width: 0 });
+      navigationApi._registerPanel('generate', RIGHT_PANEL_ID, mockPanel);
       mockGetAppTab.mockReturnValue('generate');
 
       const result = navigationApi.toggleRightPanel();
@@ -767,7 +680,7 @@ describe('AppNavigationApi', () => {
 
     it('should collapse expanded right panel', () => {
       const mockPanel = createMockPanel({ maximumWidth: Number.MAX_SAFE_INTEGER });
-      navigationApi.registerPanel('generate', RIGHT_PANEL_ID, mockPanel);
+      navigationApi._registerPanel('generate', RIGHT_PANEL_ID, mockPanel);
       mockGetAppTab.mockReturnValue('generate');
 
       const result = navigationApi.toggleRightPanel();
@@ -798,7 +711,7 @@ describe('AppNavigationApi', () => {
 
     it('should return false when panel is not GridviewPanel', () => {
       const mockPanel = createMockDockPanel();
-      navigationApi.registerPanel('generate', RIGHT_PANEL_ID, mockPanel);
+      navigationApi._registerPanel('generate', RIGHT_PANEL_ID, mockPanel);
       mockGetAppTab.mockReturnValue('generate');
 
       const result = navigationApi.toggleRightPanel();
@@ -813,11 +726,11 @@ describe('AppNavigationApi', () => {
     });
 
     it('should expand both panels when left is collapsed', () => {
-      const leftPanel = createMockPanel({ maximumWidth: 0 });
+      const leftPanel = createMockPanel({ width: 0 });
       const rightPanel = createMockPanel({ maximumWidth: Number.MAX_SAFE_INTEGER });
 
-      navigationApi.registerPanel('generate', LEFT_PANEL_ID, leftPanel);
-      navigationApi.registerPanel('generate', RIGHT_PANEL_ID, rightPanel);
+      navigationApi._registerPanel('generate', LEFT_PANEL_ID, leftPanel);
+      navigationApi._registerPanel('generate', RIGHT_PANEL_ID, rightPanel);
       mockGetAppTab.mockReturnValue('generate');
 
       const result = navigationApi.toggleLeftAndRightPanels();
@@ -837,10 +750,10 @@ describe('AppNavigationApi', () => {
 
     it('should expand both panels when right is collapsed', () => {
       const leftPanel = createMockPanel({ maximumWidth: Number.MAX_SAFE_INTEGER });
-      const rightPanel = createMockPanel({ maximumWidth: 0 });
+      const rightPanel = createMockPanel({ width: 0 });
 
-      navigationApi.registerPanel('generate', LEFT_PANEL_ID, leftPanel);
-      navigationApi.registerPanel('generate', RIGHT_PANEL_ID, rightPanel);
+      navigationApi._registerPanel('generate', LEFT_PANEL_ID, leftPanel);
+      navigationApi._registerPanel('generate', RIGHT_PANEL_ID, rightPanel);
       mockGetAppTab.mockReturnValue('generate');
 
       const result = navigationApi.toggleLeftAndRightPanels();
@@ -862,8 +775,8 @@ describe('AppNavigationApi', () => {
       const leftPanel = createMockPanel({ maximumWidth: Number.MAX_SAFE_INTEGER });
       const rightPanel = createMockPanel({ maximumWidth: Number.MAX_SAFE_INTEGER });
 
-      navigationApi.registerPanel('generate', LEFT_PANEL_ID, leftPanel);
-      navigationApi.registerPanel('generate', RIGHT_PANEL_ID, rightPanel);
+      navigationApi._registerPanel('generate', LEFT_PANEL_ID, leftPanel);
+      navigationApi._registerPanel('generate', RIGHT_PANEL_ID, rightPanel);
       mockGetAppTab.mockReturnValue('generate');
 
       const result = navigationApi.toggleLeftAndRightPanels();
@@ -882,11 +795,11 @@ describe('AppNavigationApi', () => {
     });
 
     it('should expand both panels when both are collapsed', () => {
-      const leftPanel = createMockPanel({ maximumWidth: 0 });
-      const rightPanel = createMockPanel({ maximumWidth: 0 });
+      const leftPanel = createMockPanel({ width: 0 });
+      const rightPanel = createMockPanel({ width: 0 });
 
-      navigationApi.registerPanel('generate', LEFT_PANEL_ID, leftPanel);
-      navigationApi.registerPanel('generate', RIGHT_PANEL_ID, rightPanel);
+      navigationApi._registerPanel('generate', LEFT_PANEL_ID, leftPanel);
+      navigationApi._registerPanel('generate', RIGHT_PANEL_ID, rightPanel);
       mockGetAppTab.mockReturnValue('generate');
 
       const result = navigationApi.toggleLeftAndRightPanels();
@@ -924,8 +837,8 @@ describe('AppNavigationApi', () => {
       const leftPanel = createMockDockPanel();
       const rightPanel = createMockDockPanel();
 
-      navigationApi.registerPanel('generate', LEFT_PANEL_ID, leftPanel);
-      navigationApi.registerPanel('generate', RIGHT_PANEL_ID, rightPanel);
+      navigationApi._registerPanel('generate', LEFT_PANEL_ID, leftPanel);
+      navigationApi._registerPanel('generate', RIGHT_PANEL_ID, rightPanel);
       mockGetAppTab.mockReturnValue('generate');
 
       const result = navigationApi.toggleLeftAndRightPanels();
@@ -940,11 +853,11 @@ describe('AppNavigationApi', () => {
     });
 
     it('should reset both panels to expanded state', () => {
-      const leftPanel = createMockPanel({ maximumWidth: 0 });
-      const rightPanel = createMockPanel({ maximumWidth: 0 });
+      const leftPanel = createMockPanel({ width: 0 });
+      const rightPanel = createMockPanel({ width: 0 });
 
-      navigationApi.registerPanel('generate', LEFT_PANEL_ID, leftPanel);
-      navigationApi.registerPanel('generate', RIGHT_PANEL_ID, rightPanel);
+      navigationApi._registerPanel('generate', LEFT_PANEL_ID, leftPanel);
+      navigationApi._registerPanel('generate', RIGHT_PANEL_ID, rightPanel);
       mockGetAppTab.mockReturnValue('generate');
 
       const result = navigationApi.resetLeftAndRightPanels();
@@ -985,8 +898,8 @@ describe('AppNavigationApi', () => {
       const leftPanel = createMockDockPanel();
       const rightPanel = createMockDockPanel();
 
-      navigationApi.registerPanel('generate', LEFT_PANEL_ID, leftPanel);
-      navigationApi.registerPanel('generate', RIGHT_PANEL_ID, rightPanel);
+      navigationApi._registerPanel('generate', LEFT_PANEL_ID, leftPanel);
+      navigationApi._registerPanel('generate', RIGHT_PANEL_ID, rightPanel);
       mockGetAppTab.mockReturnValue('generate');
 
       const result = navigationApi.resetLeftAndRightPanels();
@@ -1006,9 +919,9 @@ describe('AppNavigationApi', () => {
       const settingsPanel = createMockPanel();
 
       // Register panels
-      navigationApi.registerPanel('generate', LEFT_PANEL_ID, leftPanel);
-      navigationApi.registerPanel('generate', RIGHT_PANEL_ID, rightPanel);
-      navigationApi.registerPanel('generate', SETTINGS_PANEL_ID, settingsPanel);
+      navigationApi._registerPanel('generate', LEFT_PANEL_ID, leftPanel);
+      navigationApi._registerPanel('generate', RIGHT_PANEL_ID, rightPanel);
+      navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, settingsPanel);
       mockGetAppTab.mockReturnValue('generate');
 
       // Focus a panel in active tab
@@ -1035,10 +948,10 @@ describe('AppNavigationApi', () => {
 
     it('should handle tab switching with panel operations', () => {
       const generateLeftPanel = createMockPanel({ maximumWidth: Number.MAX_SAFE_INTEGER });
-      const canvasLeftPanel = createMockPanel({ maximumWidth: 0 });
+      const canvasLeftPanel = createMockPanel({ width: 0 });
 
-      navigationApi.registerPanel('generate', LEFT_PANEL_ID, generateLeftPanel);
-      navigationApi.registerPanel('canvas', LEFT_PANEL_ID, canvasLeftPanel);
+      navigationApi._registerPanel('generate', LEFT_PANEL_ID, generateLeftPanel);
+      navigationApi._registerPanel('canvas', LEFT_PANEL_ID, canvasLeftPanel);
 
       // Start on generate tab
       mockGetAppTab.mockReturnValue('generate');

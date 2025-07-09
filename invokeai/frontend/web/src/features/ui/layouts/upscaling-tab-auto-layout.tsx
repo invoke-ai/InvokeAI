@@ -1,11 +1,4 @@
-import type {
-  DockviewApi,
-  GridviewApi,
-  IDockviewPanel,
-  IDockviewReactProps,
-  IGridviewPanel,
-  IGridviewReactProps,
-} from 'dockview';
+import type { DockviewApi, GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
 import { DockviewReact, GridviewReact, LayoutPriority, Orientation } from 'dockview';
 import { UpscalingLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/UpscalingLaunchpadPanel';
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
@@ -64,45 +57,42 @@ const mainPanelComponents: AutoLayoutDockviewComponents = {
   [PROGRESS_PANEL_ID]: withPanelContainer(GenerationProgressPanel),
 };
 
-const initializeCenterPanelLayout = (tab: TabName, api: DockviewApi) => {
-  const launchpad = api.addPanel<PanelParameters>({
-    id: LAUNCHPAD_PANEL_ID,
-    component: LAUNCHPAD_PANEL_ID,
-    title: 'Launchpad',
-    tabComponent: TAB_WITH_LAUNCHPAD_ICON_ID,
-    params: {
-      tab,
-      focusRegion: 'launchpad',
-    },
-  });
-  navigationApi.registerPanel(tab, LAUNCHPAD_PANEL_ID, launchpad, {
-    isActive: true,
-  });
+const initializeMainPanelLayout = (tab: TabName, api: DockviewApi) => {
+  navigationApi.registerContainer(tab, 'main', api, () => {
+    const launchpad = api.addPanel<PanelParameters>({
+      id: LAUNCHPAD_PANEL_ID,
+      component: LAUNCHPAD_PANEL_ID,
+      title: 'Launchpad',
+      tabComponent: TAB_WITH_LAUNCHPAD_ICON_ID,
+      params: {
+        tab,
+        focusRegion: 'launchpad',
+      },
+    });
 
-  const viewer = api.addPanel<PanelParameters>({
-    id: VIEWER_PANEL_ID,
-    component: VIEWER_PANEL_ID,
-    title: 'Image Viewer',
-    tabComponent: TAB_WITH_PROGRESS_INDICATOR_ID,
-    params: {
-      tab,
-      focusRegion: 'viewer',
-    },
-    position: {
-      direction: 'within',
-      referencePanel: launchpad.id,
-    },
+    api.addPanel<PanelParameters>({
+      id: VIEWER_PANEL_ID,
+      component: VIEWER_PANEL_ID,
+      title: 'Image Viewer',
+      tabComponent: TAB_WITH_PROGRESS_INDICATOR_ID,
+      params: {
+        tab,
+        focusRegion: 'viewer',
+      },
+      position: {
+        direction: 'within',
+        referencePanel: launchpad.id,
+      },
+    });
+    launchpad.api.setActive();
   });
-  navigationApi.registerPanel(tab, VIEWER_PANEL_ID, viewer);
-
-  return { launchpad, viewer } satisfies Record<string, IDockviewPanel>;
 };
 
 const MainPanel = memo(() => {
   const { tab } = useAutoLayoutContext();
   const onReady = useCallback<IDockviewReactProps['onReady']>(
     ({ api }) => {
-      initializeCenterPanelLayout(tab, api);
+      initializeMainPanelLayout(tab, api);
     },
     [tab]
   );
@@ -132,44 +122,35 @@ const rightPanelComponents: AutoLayoutGridviewComponents = {
 };
 
 const initializeRightPanelLayout = (tab: TabName, api: GridviewApi) => {
-  const gallery = api.addPanel<PanelParameters>({
-    id: GALLERY_PANEL_ID,
-    component: GALLERY_PANEL_ID,
-    minimumWidth: RIGHT_PANEL_MIN_SIZE_PX,
-    minimumHeight: GALLERY_PANEL_MIN_HEIGHT_PX,
-    params: {
-      tab,
-      focusRegion: 'gallery',
-    },
-  });
-  navigationApi.registerPanel(tab, GALLERY_PANEL_ID, gallery, {
-    dimensions: {
-      height: GALLERY_PANEL_DEFAULT_HEIGHT_PX,
-      width: RIGHT_PANEL_MIN_SIZE_PX,
-    },
-  });
+  navigationApi.registerContainer(tab, 'right', api, () => {
+    const gallery = api.addPanel<PanelParameters>({
+      id: GALLERY_PANEL_ID,
+      component: GALLERY_PANEL_ID,
+      minimumWidth: RIGHT_PANEL_MIN_SIZE_PX,
+      minimumHeight: GALLERY_PANEL_MIN_HEIGHT_PX,
+      params: {
+        tab,
+        focusRegion: 'gallery',
+      },
+    });
 
-  const boards = api.addPanel<PanelParameters>({
-    id: BOARDS_PANEL_ID,
-    component: BOARDS_PANEL_ID,
-    minimumHeight: BOARD_PANEL_MIN_HEIGHT_PX,
-    params: {
-      tab,
-      focusRegion: 'boards',
-    },
-    position: {
-      direction: 'above',
-      referencePanel: gallery.id,
-    },
-  });
-  navigationApi.registerPanel(tab, BOARDS_PANEL_ID, boards, {
-    dimensions: {
-      height: BOARD_PANEL_DEFAULT_HEIGHT_PX,
-      width: RIGHT_PANEL_MIN_SIZE_PX,
-    },
-  });
+    const boards = api.addPanel<PanelParameters>({
+      id: BOARDS_PANEL_ID,
+      component: BOARDS_PANEL_ID,
+      minimumHeight: BOARD_PANEL_MIN_HEIGHT_PX,
+      params: {
+        tab,
+        focusRegion: 'boards',
+      },
+      position: {
+        direction: 'above',
+        referencePanel: gallery.id,
+      },
+    });
 
-  return { gallery, boards } satisfies Record<string, IGridviewPanel>;
+    gallery.api.setSize({ height: GALLERY_PANEL_DEFAULT_HEIGHT_PX });
+    boards.api.setSize({ height: BOARD_PANEL_DEFAULT_HEIGHT_PX });
+  });
 };
 
 const RightPanel = memo(() => {
@@ -197,17 +178,16 @@ const leftPanelComponents: AutoLayoutGridviewComponents = {
 };
 
 const initializeLeftPanelLayout = (tab: TabName, api: GridviewApi) => {
-  const settings = api.addPanel<PanelParameters>({
-    id: SETTINGS_PANEL_ID,
-    component: SETTINGS_PANEL_ID,
-    params: {
-      tab,
-      focusRegion: 'settings',
-    },
+  navigationApi.registerContainer(tab, 'left', api, () => {
+    api.addPanel<PanelParameters>({
+      id: SETTINGS_PANEL_ID,
+      component: SETTINGS_PANEL_ID,
+      params: {
+        tab,
+        focusRegion: 'settings',
+      },
+    });
   });
-  navigationApi.registerPanel(tab, SETTINGS_PANEL_ID, settings);
-
-  return { settings } satisfies Record<string, IGridviewPanel>;
 };
 
 const LeftPanel = memo(() => {
@@ -238,44 +218,36 @@ const rootPanelComponents: RootLayoutGridviewComponents = {
 };
 
 const initializeRootPanelLayout = (tab: TabName, api: GridviewApi) => {
-  const main = api.addPanel({
-    id: MAIN_PANEL_ID,
-    component: MAIN_PANEL_ID,
-    priority: LayoutPriority.High,
-  });
-  navigationApi.registerPanel(tab, MAIN_PANEL_ID, main);
+  navigationApi.registerContainer(tab, 'root', api, () => {
+    const main = api.addPanel({
+      id: MAIN_PANEL_ID,
+      component: MAIN_PANEL_ID,
+      priority: LayoutPriority.High,
+    });
 
-  const left = api.addPanel({
-    id: LEFT_PANEL_ID,
-    component: LEFT_PANEL_ID,
-    minimumWidth: LEFT_PANEL_MIN_SIZE_PX,
-    position: {
-      direction: 'left',
-      referencePanel: main.id,
-    },
-  });
-  navigationApi.registerPanel(tab, LEFT_PANEL_ID, left, {
-    dimensions: {
-      width: LEFT_PANEL_MIN_SIZE_PX,
-    },
-  });
+    const left = api.addPanel({
+      id: LEFT_PANEL_ID,
+      component: LEFT_PANEL_ID,
+      minimumWidth: LEFT_PANEL_MIN_SIZE_PX,
+      position: {
+        direction: 'left',
+        referencePanel: main.id,
+      },
+    });
 
-  const right = api.addPanel({
-    id: RIGHT_PANEL_ID,
-    component: RIGHT_PANEL_ID,
-    minimumWidth: RIGHT_PANEL_MIN_SIZE_PX,
-    position: {
-      direction: 'right',
-      referencePanel: main.id,
-    },
-  });
-  navigationApi.registerPanel(tab, RIGHT_PANEL_ID, right, {
-    dimensions: {
-      width: RIGHT_PANEL_MIN_SIZE_PX,
-    },
-  });
+    const right = api.addPanel({
+      id: RIGHT_PANEL_ID,
+      component: RIGHT_PANEL_ID,
+      minimumWidth: RIGHT_PANEL_MIN_SIZE_PX,
+      position: {
+        direction: 'right',
+        referencePanel: main.id,
+      },
+    });
 
-  return { main, left, right } satisfies Record<string, IGridviewPanel>;
+    left.api.setSize({ width: LEFT_PANEL_MIN_SIZE_PX });
+    right.api.setSize({ width: RIGHT_PANEL_MIN_SIZE_PX });
+  });
 };
 
 export const UpscalingTabAutoLayout = memo(() => {
