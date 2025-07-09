@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { createDeferredPromise, type Deferred } from 'common/util/createDeferredPromise';
-import { DockviewPanel, GridviewPanel, type IDockviewPanel, type IGridviewPanel } from 'dockview';
+import type { ActiveEvent, IDockviewPanel, IGridviewPanel, PanelDimensionChangeEvent } from 'dockview';
+import { DockviewPanel, GridviewPanel } from 'dockview';
 import { debounce } from 'es-toolkit';
 import type { StoredDockviewPanelState, StoredGridviewPanelState, TabName } from 'features/ui/store/uiTypes';
 import type { Atom } from 'nanostores';
@@ -17,6 +18,12 @@ import {
 const log = logger('system');
 
 type PanelType = IGridviewPanel | IDockviewPanel;
+
+type StateForPanelType<T> = T extends IGridviewPanel
+  ? Omit<StoredGridviewPanelState, 'id' | 'type'>
+  : T extends IDockviewPanel
+    ? Omit<StoredDockviewPanelState, 'id' | 'type'>
+    : never;
 
 /**
  * An object that represents a promise that is waiting for a panel to be registered and ready.
@@ -142,7 +149,11 @@ export class NavigationApi {
    * - If the panel has a stored state, it is restored to those dimensions.
    * - If the stored state has dimensions of 0, it is assumed that the panel was collapsed by the user.
    */
-  _initGridviewPanelStorage = (key: string, panel: IGridviewPanel) => {
+  _initGridviewPanelStorage = (
+    key: string,
+    panel: IGridviewPanel,
+    defaultState?: StateForPanelType<IGridviewPanel>
+  ) => {
     if (!this._app) {
       log.error('App not connected');
       return;
@@ -150,6 +161,16 @@ export class NavigationApi {
     const storedState = this._app.panelStorage.get(key);
     if (!storedState) {
       log.debug('No stored state for panel, setting initial state');
+
+      if (defaultState && defaultState.dimensions) {
+        if (defaultState.dimensions.width === 0) {
+          panel.api.setConstraints({ minimumWidth: 0, maximumWidth: 0 });
+        }
+        if (defaultState.dimensions.height === 0) {
+          panel.api.setConstraints({ minimumHeight: 0, maximumHeight: 0 });
+        }
+        panel.api.setSize(defaultState.dimensions);
+      }
       const { height, width } = panel.api;
       this._app.panelStorage.set(key, {
         id: key,
@@ -183,20 +204,21 @@ export class NavigationApi {
 
       panel.api.setSize(storedState.dimensions);
     }
-    const { dispose } = panel.api.onDidDimensionsChange(
-      debounce(({ width, height }) => {
-        log.debug({ key, width, height }, 'Panel dimensions changed');
-        if (!this._app) {
-          log.error('App not connected');
-          return;
-        }
-        this._app.panelStorage.set(key, {
-          id: key,
-          type: 'gridview-panel',
-          dimensions: { width, height },
-        });
-      }, 1000)
-    );
+
+    const onDidDimensionsChange = ({ width, height }: PanelDimensionChangeEvent) => {
+      log.debug({ key, width, height }, 'Panel dimensions changed');
+      if (!this._app) {
+        log.error('App not connected');
+        return;
+      }
+      this._app.panelStorage.set(key, {
+        id: key,
+        type: 'gridview-panel',
+        dimensions: { width, height },
+      });
+    };
+
+    const { dispose } = panel.api.onDidDimensionsChange(debounce(onDidDimensionsChange, 1000));
 
     return dispose;
   };
@@ -207,13 +229,21 @@ export class NavigationApi {
    * - If the panel has no stored state, it saves its current active state.
    * - If the panel has a stored state, it restores that state.
    */
-  _initDockviewPanelStorage = (key: string, panel: IDockviewPanel) => {
+  _initDockviewPanelStorage = (
+    key: string,
+    panel: IDockviewPanel,
+    defaultState?: StateForPanelType<IDockviewPanel>
+  ) => {
     if (!this._app) {
       log.error('App not connected');
       return;
     }
     const storedState = this._app.panelStorage.get(key);
     if (!storedState) {
+      if (defaultState && defaultState.isActive) {
+        panel.api.setActive();
+      }
+
       const { isActive } = panel.api;
       this._app.panelStorage.set(key, {
         id: key,
@@ -231,19 +261,19 @@ export class NavigationApi {
       }
     }
 
-    const { dispose } = panel.api.onDidActiveChange(
-      debounce(({ isActive }) => {
-        if (!this._app) {
-          log.error('App not connected');
-          return;
-        }
-        this._app.panelStorage.set(key, {
-          id: key,
-          type: 'dockview-panel',
-          isActive,
-        });
-      }, 1000)
-    );
+    const onDidActiveChange = ({ isActive }: ActiveEvent) => {
+      if (!this._app) {
+        log.error('App not connected');
+        return;
+      }
+      this._app.panelStorage.set(key, {
+        id: key,
+        type: 'dockview-panel',
+        isActive,
+      });
+    };
+
+    const { dispose } = panel.api.onDidActiveChange(debounce(onDidActiveChange, 1000));
 
     return dispose;
   };
@@ -251,11 +281,11 @@ export class NavigationApi {
   /**
    * Helper function to initialize storage for a panel based on its type.
    */
-  _initPanelStorage = (key: string, panel: PanelType) => {
+  _initPanelStorage = <T extends PanelType>(key: string, panel: T, defaultState?: StateForPanelType<T>) => {
     if (panel instanceof GridviewPanel) {
-      return this._initGridviewPanelStorage(key, panel);
+      return this._initGridviewPanelStorage(key, panel, defaultState as StateForPanelType<IGridviewPanel>);
     } else if (panel instanceof DockviewPanel) {
-      return this._initDockviewPanelStorage(key, panel);
+      return this._initDockviewPanelStorage(key, panel, defaultState as StateForPanelType<IDockviewPanel>);
     } else {
       log.error(`Unsupported panel type: ${panel.constructor.name}`);
       return;
@@ -270,12 +300,17 @@ export class NavigationApi {
    * @param panel - The panel instance
    * @returns Cleanup function to unregister the panel
    */
-  registerPanel = (tab: TabName, panelId: string, panel: PanelType): (() => void) => {
+  registerPanel = <T extends PanelType>(
+    tab: TabName,
+    panelId: string,
+    panel: T,
+    defaultState?: StateForPanelType<T>
+  ): (() => void) => {
     const key = this._getPanelKey(tab, panelId);
 
     this.panels.set(key, panel);
 
-    const cleanupPanelStorage = this._initPanelStorage(key, panel);
+    const cleanupPanelStorage = this._initPanelStorage(key, panel, defaultState);
 
     // Resolve any pending waiters for this panel, notifying them that the panel is now registered.
     const waiter = this.waiters.get(key);
