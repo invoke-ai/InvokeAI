@@ -195,7 +195,9 @@ export class NavigationApi {
         log.debug({ stored: parseify(stored) }, `Restored view ${key} from storage`);
       } catch (error) {
         log.error({ error: parseify(error) }, `Failed to restore view ${key} from storage`);
+        this._app.storage.delete(key);
         initialize();
+        this._app.storage.set(key, api.toJSON());
       }
     } else {
       initialize();
