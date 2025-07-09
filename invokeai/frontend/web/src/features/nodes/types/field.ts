@@ -189,6 +189,10 @@ const zBriaMainModelFieldType = zFieldTypeBase.extend({
   name: z.literal('BriaMainModelField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zBriaControlNetModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('BriaControlNetModelField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zSDXLRefinerModelFieldType = zFieldTypeBase.extend({
   name: z.literal('SDXLRefinerModelField'),
   originalType: zStatelessFieldType.optional(),
@@ -330,6 +334,7 @@ const zStatefulFieldType = z.union([
   zStringGeneratorFieldType,
   zImageGeneratorFieldType,
   zBriaMainModelFieldType,
+  zBriaControlNetModelFieldType,
 ]);
 export type StatefulFieldType = z.infer<typeof zStatefulFieldType>;
 const statefulFieldTypeNames = zStatefulFieldType.options.map((o) => o.shape.name.value);
@@ -347,6 +352,7 @@ const modelFieldTypeNames = [
   zCogView4MainModelFieldType.shape.name.value,
   zFluxMainModelFieldType.shape.name.value,
   zBriaMainModelFieldType.shape.name.value,
+  zBriaControlNetModelFieldType.shape.name.value,
   zSDXLRefinerModelFieldType.shape.name.value,
   zVAEModelFieldType.shape.name.value,
   zLoRAModelFieldType.shape.name.value,
@@ -912,6 +918,26 @@ export type BriaMainModelFieldInputTemplate = z.infer<typeof zBriaMainModelField
 export const isBriaMainModelFieldInputInstance = buildInstanceTypeGuard(zBriaMainModelFieldInputInstance);
 export const isBriaMainModelFieldInputTemplate =
   buildTemplateTypeGuard<BriaMainModelFieldInputTemplate>('BriaMainModelField');
+// #endregion
+
+// #region BriaControlNetModelField
+const zBriaControlNetModelFieldValue = zMainModelFieldValue; // TODO: Narrow to SDXL models only.
+const zBriaControlNetModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zBriaControlNetModelFieldValue,
+});
+const zBriaControlNetModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zBriaControlNetModelFieldType,
+  originalType: zFieldType.optional(),
+  default: zBriaControlNetModelFieldValue,
+});
+const zBriaControlNetModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zBriaControlNetModelFieldType,
+});
+export type BriaControlNetModelFieldInputInstance = z.infer<typeof zBriaControlNetModelFieldInputInstance>;
+export type BriaControlNetModelFieldInputTemplate = z.infer<typeof zBriaControlNetModelFieldInputTemplate>;
+export const isBriaControlNetModelFieldInputInstance = buildInstanceTypeGuard(zBriaControlNetModelFieldInputInstance);
+export const isBriaControlNetModelFieldInputTemplate =
+  buildTemplateTypeGuard<BriaControlNetModelFieldInputTemplate>('BriaControlNetModelField');
 // #endregion
 
 // #region SDXLRefinerModelField
@@ -1914,6 +1940,7 @@ export const zStatefulFieldValue = z.union([
   zSDXLMainModelFieldValue,
   zFluxMainModelFieldValue,
   zBriaMainModelFieldValue,
+  zBriaControlNetModelFieldValue,
   zSD3MainModelFieldValue,
   zCogView4MainModelFieldValue,
   zSDXLRefinerModelFieldValue,
@@ -1966,6 +1993,7 @@ const zStatefulFieldInputInstance = z.union([
   zMainModelFieldInputInstance,
   zFluxMainModelFieldInputInstance,
   zBriaMainModelFieldInputInstance,
+  zBriaControlNetModelFieldInputInstance,
   zSD3MainModelFieldInputInstance,
   zCogView4MainModelFieldInputInstance,
   zSDXLMainModelFieldInputInstance,
@@ -2009,6 +2037,7 @@ const zStatefulFieldInputTemplate = z.union([
   zMainModelFieldInputTemplate,
   zFluxMainModelFieldInputTemplate,
   zBriaMainModelFieldInputTemplate,
+  zBriaControlNetModelFieldInputTemplate,
   zSD3MainModelFieldInputTemplate,
   zCogView4MainModelFieldInputTemplate,
   zSDXLMainModelFieldInputTemplate,
@@ -2062,6 +2091,7 @@ const zStatefulFieldOutputTemplate = z.union([
   zMainModelFieldOutputTemplate,
   zFluxMainModelFieldOutputTemplate,
   zBriaMainModelFieldOutputTemplate,
+  zBriaControlNetModelFieldOutputTemplate,
   zSD3MainModelFieldOutputTemplate,
   zCogView4MainModelFieldOutputTemplate,
   zSDXLMainModelFieldOutputTemplate,

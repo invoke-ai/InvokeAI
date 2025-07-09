@@ -53,6 +53,7 @@ export const FIELD_COLORS: { [key: string]: string } = {
   MainModelField: 'teal.500',
   FluxMainModelField: 'teal.500',
   BriaMainModelField: 'teal.500',
+  BriaControlNetModelField: 'teal.500',
   SD3MainModelField: 'teal.500',
   CogView4MainModelField: 'teal.500',
   SDXLMainModelField: 'teal.500',
