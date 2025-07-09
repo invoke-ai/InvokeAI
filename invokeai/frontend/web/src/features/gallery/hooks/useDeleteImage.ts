@@ -1,22 +1,16 @@
-import { useIsRegionFocused } from 'common/hooks/focus';
 import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
 import { useCallback, useMemo } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
 export const useDeleteImage = (imageDTO?: ImageDTO | null) => {
   const deleteImageModal = useDeleteImageModalApi();
-  const isGalleryFocused = useIsRegionFocused('gallery');
-  const isViewerFocused = useIsRegionFocused('viewer');
 
   const isEnabled = useMemo(() => {
     if (!imageDTO) {
       return;
     }
-    if (!isGalleryFocused && !isViewerFocused) {
-      return false;
-    }
     return true;
-  }, [imageDTO, isGalleryFocused, isViewerFocused]);
+  }, [imageDTO]);
   const _delete = useCallback(() => {
     if (!imageDTO) {
       return;
