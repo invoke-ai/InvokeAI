@@ -129,6 +129,17 @@ export const selectIPAdapterModels = buildModelsSelector(isIPAdapterModelConfig)
 // export const selectEmbeddingModels = buildModelsSelector(isTIModelConfig);
 // export const selectVAEModels = buildModelsSelector(isVAEModelConfig);
 // export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
+export const selectGlobalRefImageModels = buildModelsSelector(
+  (config) =>
+    isIPAdapterModelConfig(config) ||
+    isFluxReduxModelConfig(config) ||
+    isChatGPT4oModelConfig(config) ||
+    isFluxKontextApiModelConfig(config) ||
+    isFluxKontextModelConfig(config)
+);
+export const selectRegionalRefImageModels = buildModelsSelector(
+  (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config)
+);
 
 export const buildSelectModelConfig = <T extends AnyModelConfig>(
   key: string,
