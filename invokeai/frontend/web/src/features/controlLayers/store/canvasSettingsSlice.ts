@@ -4,7 +4,7 @@ import type { PersistConfig, RootState } from 'app/store/store';
 import { zRgbaColor } from 'features/controlLayers/store/types';
 import { z } from 'zod/v4';
 
-export const zAutoSwitchMode = z.enum(['off', 'switch_on_start', 'switch_on_finish']);
+const zAutoSwitchMode = z.enum(['off', 'switch_on_start', 'switch_on_finish']);
 
 const zCanvasSettingsState = z.object({
   /**
