@@ -1,5 +1,5 @@
 import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
-import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { useAppStore } from 'app/store/storeHooks';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
 import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';
@@ -9,7 +9,6 @@ import { createNewCanvasEntityFromImage } from 'features/imageActions/actions';
 import { toast } from 'features/toast/toast';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
@@ -20,7 +19,6 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
   const store = useAppStore();
   const imageDTO = useImageDTOContext();
   const isBusy = useCanvasIsBusySafe();
-  const activeTab = useAppSelector(selectActiveTab);
 
   const onClickNewRasterLayerFromImage = useCallback(async () => {
     const { dispatch, getState } = store;
@@ -81,10 +79,6 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
       status: 'success',
     });
   }, [imageDTO, store, t]);
-
-  if (activeTab === 'generate') {
-    return null;
-  }
 
   return (
     <MenuItem {...subMenu.parentMenuItemProps} icon={<PiPlusBold />}>

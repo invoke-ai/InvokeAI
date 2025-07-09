@@ -1,21 +1,21 @@
 import { Button, Divider, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppSelector, useAppStore } from 'app/store/storeHooks';
-import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { useAppSelector } from 'app/store/storeHooks';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
-import { useImageActions } from 'features/gallery/hooks/useImageActions';
+import { useDeleteImage } from 'features/gallery/hooks/useDeleteImage';
+import { useEditImage } from 'features/gallery/hooks/useEditImage';
+import { useLoadWorkflow } from 'features/gallery/hooks/useLoadWorkflow';
+import { useRecallAll } from 'features/gallery/hooks/useRecallAll';
+import { useRecallDimensions } from 'features/gallery/hooks/useRecallDimensions';
+import { useRecallPrompts } from 'features/gallery/hooks/useRecallPrompts';
+import { useRecallRemix } from 'features/gallery/hooks/useRecallRemix';
+import { useRecallSeed } from 'features/gallery/hooks/useRecallSeed';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
-import { newCanvasFromImage } from 'features/imageActions/actions';
-import { $hasTemplates } from 'features/nodes/store/nodesSlice';
 import { PostProcessingPopover } from 'features/parameters/components/PostProcessing/PostProcessingPopover';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { toast } from 'features/toast/toast';
-import { navigationApi } from 'features/ui/layouts/navigation-api';
-import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
-import { selectActiveTab, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
-import { memo, useCallback, useMemo } from 'react';
+import { selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiArrowsCounterClockwiseBold,
@@ -40,41 +40,19 @@ export const CurrentImageButtons = memo(() => {
 
   const imageName = useAppSelector(selectLastSelectedImage);
   const imageDTO = useImageDTO(imageName);
-  const hasTemplates = useStore($hasTemplates);
-  const imageActions = useImageActions(imageDTO);
-  const isStaging = useAppSelector(selectIsStaging);
-  const activeTab = useAppSelector(selectActiveTab);
+
   const isUpscalingEnabled = useFeatureStatus('upscaling');
-  const { getState, dispatch } = useAppStore();
-  const canvasManager = useCanvasManagerSafe();
 
-  const isCanvasTabAndStaging = useMemo(() => activeTab === 'canvas' && isStaging, [activeTab, isStaging]);
+  const recallAll = useRecallAll(imageDTO);
+  const recallRemix = useRecallRemix(imageDTO);
+  const recallPrompts = useRecallPrompts(imageDTO);
+  const recallSeed = useRecallSeed(imageDTO);
+  const recallDimensions = useRecallDimensions(imageDTO);
+  const loadWorkflow = useLoadWorkflow(imageDTO);
+  const editImage = useEditImage(imageDTO);
+  const deleteImage = useDeleteImage(imageDTO);
 
-  const handleEdit = useCallback(async () => {
-    if (!imageDTO) {
-      return;
-    }
-
-    await newCanvasFromImage({
-      imageDTO,
-      type: 'raster_layer',
-      withInpaintMask: true,
-      getState,
-      dispatch,
-    });
-    navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
-
-    // Automatically select the brush tool when editing an image
-    if (canvasManager) {
-      canvasManager.tool.$tool.set('brush');
-    }
-
-    toast({
-      id: 'SENT_TO_CANVAS',
-      title: t('toast.sentToCanvas'),
-      status: 'success',
-    });
-  }, [imageDTO, getState, dispatch, t, canvasManager]);
+  console.log(isDisabledOverride, recallSeed.isEnabled);
 
   return (
     <>
@@ -95,8 +73,8 @@ export const CurrentImageButtons = memo(() => {
 
       <Button
         leftIcon={<PiPencilBold />}
-        onClick={handleEdit}
-        isDisabled={isDisabledOverride || !imageDTO}
+        onClick={editImage.edit}
+        isDisabled={isDisabledOverride || !editImage.isEnabled}
         variant="link"
         size="sm"
         alignSelf="stretch"
@@ -111,37 +89,37 @@ export const CurrentImageButtons = memo(() => {
         icon={<PiFlowArrowBold />}
         tooltip={`${t('nodes.loadWorkflow')} (W)`}
         aria-label={`${t('nodes.loadWorkflow')} (W)`}
-        isDisabled={isDisabledOverride || !imageDTO || !imageActions.hasWorkflow || !hasTemplates}
+        isDisabled={isDisabledOverride || !loadWorkflow.isEnabled}
         variant="link"
         alignSelf="stretch"
-        onClick={imageActions.loadWorkflow}
+        onClick={loadWorkflow.load}
       />
       <IconButton
         icon={<PiArrowsCounterClockwiseBold />}
         tooltip={`${t('parameters.remixImage')} (R)`}
         aria-label={`${t('parameters.remixImage')} (R)`}
-        isDisabled={isDisabledOverride || !imageDTO || !imageActions.hasMetadata}
+        isDisabled={isDisabledOverride || !recallRemix.isEnabled}
         variant="link"
         alignSelf="stretch"
-        onClick={imageActions.remix}
+        onClick={recallRemix.recall}
       />
       <IconButton
         icon={<PiQuotesBold />}
         tooltip={`${t('parameters.usePrompt')} (P)`}
         aria-label={`${t('parameters.usePrompt')} (P)`}
-        isDisabled={isDisabledOverride || !imageDTO || !imageActions.hasPrompts}
+        isDisabled={isDisabledOverride || !recallPrompts.isEnabled}
         variant="link"
         alignSelf="stretch"
-        onClick={imageActions.recallPrompts}
+        onClick={recallPrompts.recall}
       />
       <IconButton
         icon={<PiPlantBold />}
         tooltip={`${t('parameters.useSeed')} (S)`}
         aria-label={`${t('parameters.useSeed')} (S)`}
-        isDisabled={isDisabledOverride || !imageDTO || !imageActions.hasSeed}
+        isDisabled={isDisabledOverride || !recallSeed.isEnabled}
         variant="link"
         alignSelf="stretch"
-        onClick={imageActions.recallSeed}
+        onClick={recallSeed.recall}
       />
       <IconButton
         icon={<PiRulerBold />}
@@ -149,24 +127,24 @@ export const CurrentImageButtons = memo(() => {
         aria-label={`${t('parameters.useSize')} (D)`}
         variant="link"
         alignSelf="stretch"
-        onClick={imageActions.recallSize}
-        isDisabled={isDisabledOverride || !imageDTO || isCanvasTabAndStaging}
+        onClick={recallDimensions.recall}
+        isDisabled={isDisabledOverride || !recallDimensions.isEnabled}
       />
       <IconButton
         icon={<PiAsteriskBold />}
         tooltip={`${t('parameters.useAll')} (A)`}
         aria-label={`${t('parameters.useAll')} (A)`}
-        isDisabled={isDisabledOverride || !imageDTO || !imageActions.hasMetadata}
+        isDisabled={isDisabledOverride || !recallAll.isEnabled}
         variant="link"
         alignSelf="stretch"
-        onClick={imageActions.recallAll}
+        onClick={recallAll.recall}
       />
 
       {isUpscalingEnabled && <PostProcessingPopover imageDTO={imageDTO} isDisabled={isDisabledOverride} />}
 
       <Divider orientation="vertical" h={8} mx={2} />
 
-      <DeleteImageButton onClick={imageActions.delete} isDisabled={isDisabledOverride || !imageDTO} />
+      <DeleteImageButton onClick={deleteImage.delete} isDisabled={isDisabledOverride || !deleteImage.isEnabled} />
     </>
   );
 });

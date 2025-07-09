@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react';
 import { adHocPostProcessingRequested } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { useIsRegionFocused } from 'common/hooks/focus';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
 import { MetadataHandlers, MetadataUtils } from 'features/metadata/parsing';
@@ -10,6 +11,7 @@ import {
   activeStylePresetIdChanged,
   selectStylePresetActivePresetId,
 } from 'features/stylePresets/store/stylePresetSlice';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { toast } from 'features/toast/toast';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
@@ -30,6 +32,9 @@ export const useImageActions = (imageDTO: ImageDTO | null) => {
   const [hasPrompts, setHasPrompts] = useState(false);
   const hasTemplates = useStore($hasTemplates);
   const deleteImageModal = useDeleteImageModalApi();
+  const isGalleryFocused = useIsRegionFocused('gallery');
+  const isViewerFocused = useIsRegionFocused('viewer');
+  const isUpscalingEnabled = useFeatureStatus('upscaling');
 
   const isCanvasTabAndStaging = useMemo(() => activeTab === 'canvas' && isStaging, [activeTab, isStaging]);
 
@@ -87,13 +92,12 @@ export const useImageActions = (imageDTO: ImageDTO | null) => {
     if (!metadata) {
       return;
     }
-    MetadataUtils.recallAll(
-      metadata,
-      store,
-      isCanvasTabAndStaging ? [MetadataHandlers.Width, MetadataHandlers.Height] : []
-    );
+
+    // When we are staging and on canvas, the bbox is locked - we cannot recall width and height
+    const skip = activeTab === 'canvas' && isStaging ? [MetadataHandlers.Width, MetadataHandlers.Height] : undefined;
+    MetadataUtils.recallAll(metadata, store, skip);
     clearStylePreset();
-  }, [imageDTO, metadata, store, isCanvasTabAndStaging, clearStylePreset]);
+  }, [imageDTO, metadata, activeTab, isStaging, store, clearStylePreset]);
 
   const remix = useCallback(() => {
     if (!imageDTO) {
@@ -162,56 +166,137 @@ export const useImageActions = (imageDTO: ImageDTO | null) => {
     });
   }, [imageDTO, metadata, store]);
 
+  const isEnabledLoadWorkflow = useMemo(() => {
+    if (!imageDTO) {
+      return false;
+    }
+    if (!imageDTO.has_workflow) {
+      return false;
+    }
+    if (!hasTemplates) {
+      return false;
+    }
+    if (!isGalleryFocused && !isViewerFocused) {
+      return false;
+    }
+    return true;
+  }, [hasTemplates, imageDTO, isGalleryFocused, isViewerFocused]);
   const loadWorkflowWithDialog = useLoadWorkflowWithDialog();
-
-  const loadWorkflowFromImage = useCallback(() => {
+  const loadWorkflow = useCallback(() => {
     if (!imageDTO) {
       return;
     }
-    if (!imageDTO.has_workflow || !hasTemplates) {
+    if (!isEnabledLoadWorkflow) {
       return;
     }
 
     loadWorkflowWithDialog({ type: 'image', data: imageDTO.image_name });
-  }, [hasTemplates, imageDTO, loadWorkflowWithDialog]);
+  }, [imageDTO, isEnabledLoadWorkflow, loadWorkflowWithDialog]);
+
+  const isEnabledRecallSize = useMemo(() => {
+    if (!imageDTO) {
+      return;
+    }
+    if (activeTab === 'canvas' && isStaging) {
+      return false;
+    }
+    if (activeTab !== 'canvas' && activeTab !== 'generate') {
+      return false;
+    }
+    if (!isGalleryFocused && !isViewerFocused) {
+      return false;
+    }
+    return true;
+  }, [imageDTO, activeTab, isStaging, isGalleryFocused, isViewerFocused]);
 
   const recallSize = useCallback(() => {
     if (!imageDTO) {
       return;
     }
-    if (isCanvasTabAndStaging) {
+    if (!isEnabledRecallSize) {
       return;
     }
     MetadataUtils.recallDimensions(imageDTO, store);
-  }, [imageDTO, isCanvasTabAndStaging, store]);
+  }, [imageDTO, isEnabledRecallSize, store]);
+
+  const isEnabledUpscale = useMemo(() => {
+    if (!imageDTO) {
+      return;
+    }
+    if (!isUpscalingEnabled) {
+      return false;
+    }
+    if (activeTab === 'canvas' && isStaging) {
+      return false;
+    }
+    if (!isGalleryFocused && !isViewerFocused) {
+      return false;
+    }
+    return true;
+  }, [imageDTO, isUpscalingEnabled, activeTab, isStaging, isGalleryFocused, isViewerFocused]);
 
   const upscale = useCallback(() => {
     if (!imageDTO) {
       return;
     }
+    if (!isEnabledUpscale) {
+      return;
+    }
     store.dispatch(adHocPostProcessingRequested({ imageDTO }));
-  }, [imageDTO, store]);
+  }, [imageDTO, isEnabledUpscale, store]);
 
+  const isEnabledDelete = useMemo(() => {
+    if (!imageDTO) {
+      return;
+    }
+    if (!isGalleryFocused && !isViewerFocused) {
+      return false;
+    }
+    return true;
+  }, [imageDTO, isGalleryFocused, isViewerFocused]);
   const _delete = useCallback(() => {
     if (!imageDTO) {
       return;
     }
+    if (!isEnabledDelete) {
+      return;
+    }
     deleteImageModal.delete([imageDTO.image_name]);
-  }, [deleteImageModal, imageDTO]);
+  }, [deleteImageModal, imageDTO, isEnabledDelete]);
 
   return {
-    hasMetadata,
-    hasSeed,
-    hasPrompts,
-    recallAll,
-    remix,
-    recallSeed,
-    recallPrompts,
+    recallAll: {
+      run: recallAll,
+      isEnabled: hasMetadata,
+    },
+    remix: {
+      run: remix,
+      isEnabled: hasMetadata,
+    },
+    recallSeed: {
+      run: recallSeed,
+      isEnabled: hasSeed,
+    },
+    recallPrompts: {
+      run: recallPrompts,
+      isEnabled: hasPrompts,
+    },
     createAsPreset,
-    loadWorkflow: loadWorkflowFromImage,
-    hasWorkflow: imageDTO?.has_workflow ?? false,
-    recallSize,
-    upscale,
-    delete: _delete,
+    loadWorkflow: {
+      run: loadWorkflow,
+      isEnabled: imageDTO?.has_workflow ?? false,
+    },
+    recallSize: {
+      run: recallSize,
+      isEnabled: isEnabledRecallSize,
+    },
+    upscale: {
+      run: upscale,
+      isEnabled: isEnabledUpscale,
+    },
+    delete: {
+      run: _delete,
+      isEnabled: isEnabledDelete,
+    },
   };
 };

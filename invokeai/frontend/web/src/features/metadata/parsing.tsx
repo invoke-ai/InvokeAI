@@ -86,7 +86,7 @@ import {
 import { toast } from 'features/toast/toast';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
-import type { ComponentType, ReactNode } from 'react';
+import type { ComponentType } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { modelsApi } from 'services/api/endpoints/models';
@@ -875,7 +875,7 @@ export const MetadataHandlers = {
   // ipAdapterToIPAdapterLayer: parseIPAdapterToIPAdapterLayer,
 } as const;
 
-const successToast = (parameter: ReactNode) => {
+const successToast = (parameter: string) => {
   toast({
     id: 'PARAMETER_SET',
     title: t('toast.parameterSet'),
@@ -884,7 +884,7 @@ const successToast = (parameter: ReactNode) => {
   });
 };
 
-const failedToast = (parameter: ReactNode, message?: ReactNode) => {
+const failedToast = (parameter: string, message?: string) => {
   toast({
     id: 'PARAMETER_NOT_SET',
     title: t('toast.parameterNotSet'),
@@ -1019,6 +1019,28 @@ const recallPrompts = async (metadata: unknown, store: AppStore) => {
   }
 };
 
+const hasMetadataByHandlers = async (arg: {
+  metadata: unknown;
+  handlers: (SingleMetadataHandler<any> | CollectionMetadataHandler<any[]>)[];
+  store: AppStore;
+  require: 'some' | 'all';
+}) => {
+  const { metadata, handlers, store, require } = arg;
+  for (const handler of handlers) {
+    try {
+      await handler.parse(metadata, store);
+      if (require === 'some') {
+        return true;
+      }
+    } catch {
+      if (require === 'all') {
+        return false;
+      }
+    }
+  }
+  return true;
+};
+
 const recallDimensions = async (metadata: unknown, store: AppStore) => {
   const recalled = await recallByHandlers({
     metadata,
@@ -1048,6 +1070,7 @@ const recallAll = async (
 };
 
 export const MetadataUtils = {
+  hasMetadataByHandlers,
   recallByHandler,
   recallByHandlers,
   recallAll,

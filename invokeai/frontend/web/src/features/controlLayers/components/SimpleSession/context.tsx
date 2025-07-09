@@ -1,10 +1,11 @@
 import { useStore } from '@nanostores/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppStore } from 'app/store/storeHooks';
 import { getOutputImageName } from 'features/controlLayers/components/SimpleSession/shared';
 import { selectStagingAreaAutoSwitch } from 'features/controlLayers/store/canvasSettingsSlice';
-import { canvasQueueItemDiscarded, selectDiscardedItems } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import {
+  buildSelectSessionQueueItems,
+  canvasQueueItemDiscarded,
+} from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { ProgressImage } from 'features/nodes/types/common';
 import type { Atom, MapStore, StoreValue, WritableAtom } from 'nanostores';
 import { atom, computed, effect, map, subscribeKeys } from 'nanostores';
@@ -217,25 +218,9 @@ export const CanvasSessionContextProvider = memo(
     )[0];
 
     /**
-     * A redux selector to select all queue items from the RTK Query cache. It's important that this returns stable
-     * references if possible to reduce re-renders. All derivations of the queue items (e.g. filtering out canceled
-     * items) should be done in a nanostores computed.
+     * A redux selector to select all queue items from the RTK Query cache.
      */
-    const selectQueueItems = useMemo(
-      () =>
-        createSelector(
-          [queueApi.endpoints.listAllQueueItems.select({ destination: session.id }), selectDiscardedItems],
-          ({ data }, discardedItems) => {
-            if (!data) {
-              return EMPTY_ARRAY;
-            }
-            return data.filter(
-              ({ status, item_id }) => status !== 'canceled' && status !== 'failed' && !discardedItems.includes(item_id)
-            );
-          }
-        ),
-      [session.id]
-    );
+    const selectQueueItems = useMemo(() => buildSelectSessionQueueItems(session.id), [session.id]);
 
     const discard = useCallback(
       (itemId: number) => {
