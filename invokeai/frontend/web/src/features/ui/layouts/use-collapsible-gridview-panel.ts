@@ -11,9 +11,9 @@ const getIsCollapsed = (
   collapsedSize?: number
 ) => {
   if (orientation === 'vertical') {
-    return panel.height <= (collapsedSize ?? panel.minimumHeight);
+    return panel.height <= (collapsedSize ?? panel.minimumHeight ?? 0);
   }
-  return panel.width <= (collapsedSize ?? panel.minimumWidth);
+  return panel.width <= (collapsedSize ?? panel.minimumWidth ?? 0);
 };
 
 export const useCollapsibleGridviewPanel = (
@@ -36,9 +36,9 @@ export const useCollapsibleGridviewPanel = (
     lastExpandedSizeRef.current = orientation === 'vertical' ? panel.height : panel.width;
 
     if (orientation === 'vertical') {
-      panel.api.setSize({ height: collapsedSize ?? panel.minimumHeight });
+      panel.api.setSize({ height: collapsedSize ?? panel.minimumHeight ?? 0 });
     } else {
-      panel.api.setSize({ width: collapsedSize ?? panel.minimumWidth });
+      panel.api.setSize({ width: collapsedSize ?? panel.minimumWidth ?? 0 });
     }
   }, [collapsedSize, orientation, panelId, tab]);
 

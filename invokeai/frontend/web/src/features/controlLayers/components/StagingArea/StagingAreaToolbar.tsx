@@ -1,4 +1,4 @@
-import { ButtonGroup } from '@invoke-ai/ui-library';
+import { ButtonGroup, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
 import { getQueueItemElementId } from 'features/controlLayers/components/SimpleSession/shared';
@@ -15,6 +15,8 @@ import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerP
 import { memo, useEffect } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 
+import { StagingAreaAutoSwitchButtons } from './StagingAreaAutoSwitchButtons';
+
 export const StagingAreaToolbar = memo(() => {
   const canvasManager = useCanvasManager();
   const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
@@ -24,15 +26,18 @@ export const StagingAreaToolbar = memo(() => {
   useEffect(() => {
     return ctx.$selectedItemId.listen((id) => {
       if (id !== null) {
-        document.getElementById(getQueueItemElementId(id))?.scrollIntoView();
+        document
+          .getElementById(getQueueItemElementId(id))
+          ?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
       }
     });
   }, [ctx.$selectedItemId]);
 
   useHotkeys('meta+left', ctx.selectFirst, { preventDefault: true });
   useHotkeys('meta+right', ctx.selectLast, { preventDefault: true });
+
   return (
-    <>
+    <Flex gap={2}>
       <ButtonGroup borderRadius="base" shadow="dark-lg">
         <StagingAreaToolbarPrevButton isDisabled={!shouldShowStagedImage} />
         <StagingAreaToolbarImageCountButton />
@@ -44,9 +49,14 @@ export const StagingAreaToolbar = memo(() => {
         <StagingAreaToolbarSaveSelectedToGalleryButton />
         <StagingAreaToolbarMenu />
         <StagingAreaToolbarDiscardSelectedButton isDisabled={!shouldShowStagedImage} />
+      </ButtonGroup>
+      <ButtonGroup borderRadius="base" shadow="dark-lg">
+        <StagingAreaAutoSwitchButtons />
+      </ButtonGroup>
+      <ButtonGroup borderRadius="base" shadow="dark-lg">
         <StagingAreaToolbarDiscardAllButton isDisabled={!shouldShowStagedImage} />
       </ButtonGroup>
-    </>
+    </Flex>
   );
 });
 

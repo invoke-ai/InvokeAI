@@ -14,7 +14,7 @@ const ImageOutputPreview = ({ output }: Props) => {
     return null;
   }
 
-  return <DndImage imageDTO={imageDTO} />;
+  return <DndImage imageDTO={imageDTO} borderRadius="base" />;
 };
 
 export default memo(ImageOutputPreview);

@@ -61,7 +61,7 @@ export const RefImageImage = memo(
         )}
         {imageDTO && (
           <>
-            <DndImage imageDTO={imageDTO} borderWidth={1} borderStyle="solid" w="full" />
+            <DndImage imageDTO={imageDTO} borderRadius="base" borderWidth={1} borderStyle="solid" w="full" />
             <Flex position="absolute" flexDir="column" top={2} insetInlineEnd={2} gap={1}>
               <DndImageIcon
                 onClick={handleResetControlImage}

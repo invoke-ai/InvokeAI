@@ -1,25 +1,33 @@
 import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
-import { useImageActions } from 'features/gallery/hooks/useImageActions';
+import { useRecallAll } from 'features/gallery/hooks/useRecallAll';
+import { useRecallDimensions } from 'features/gallery/hooks/useRecallDimensions';
+import { useRecallPrompts } from 'features/gallery/hooks/useRecallPrompts';
+import { useRecallRemix } from 'features/gallery/hooks/useRecallRemix';
+import { useRecallSeed } from 'features/gallery/hooks/useRecallSeed';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiArrowBendUpLeftBold,
   PiArrowsCounterClockwiseBold,
   PiAsteriskBold,
-  PiPaintBrushBold,
   PiPlantBold,
   PiQuotesBold,
+  PiRulerBold,
 } from 'react-icons/pi';
 
 export const ImageMenuItemMetadataRecallActions = memo(() => {
   const { t } = useTranslation();
-  const imageDTO = useImageDTOContext();
   const subMenu = useSubMenu();
 
-  const { recallAll, remix, recallSeed, recallPrompts, hasMetadata, hasSeed, hasPrompts, createAsPreset } =
-    useImageActions(imageDTO);
+  const imageDTO = useImageDTOContext();
+
+  const recallAll = useRecallAll(imageDTO);
+  const recallRemix = useRecallRemix(imageDTO);
+  const recallPrompts = useRecallPrompts(imageDTO);
+  const recallSeed = useRecallSeed(imageDTO);
+  const recallDimensions = useRecallDimensions(imageDTO);
 
   return (
     <MenuItem {...subMenu.parentMenuItemProps} icon={<PiArrowBendUpLeftBold />}>
@@ -28,20 +36,24 @@ export const ImageMenuItemMetadataRecallActions = memo(() => {
           <SubMenuButtonContent label={t('parameters.recallMetadata')} />
         </MenuButton>
         <MenuList {...subMenu.menuListProps}>
-          <MenuItem icon={<PiArrowsCounterClockwiseBold />} onClick={remix} isDisabled={!hasMetadata}>
+          <MenuItem
+            icon={<PiArrowsCounterClockwiseBold />}
+            onClick={recallRemix.recall}
+            isDisabled={!recallRemix.isEnabled}
+          >
             {t('parameters.remixImage')}
           </MenuItem>
-          <MenuItem icon={<PiQuotesBold />} onClick={recallPrompts} isDisabled={!hasPrompts}>
+          <MenuItem icon={<PiQuotesBold />} onClick={recallPrompts.recall} isDisabled={!recallPrompts.isEnabled}>
             {t('parameters.usePrompt')}
           </MenuItem>
-          <MenuItem icon={<PiPlantBold />} onClick={recallSeed} isDisabled={!hasSeed}>
+          <MenuItem icon={<PiPlantBold />} onClick={recallSeed.recall} isDisabled={!recallSeed.isEnabled}>
             {t('parameters.useSeed')}
           </MenuItem>
-          <MenuItem icon={<PiAsteriskBold />} onClick={recallAll} isDisabled={!hasMetadata}>
+          <MenuItem icon={<PiAsteriskBold />} onClick={recallAll.recall} isDisabled={!recallAll.isEnabled}>
             {t('parameters.useAll')}
           </MenuItem>
-          <MenuItem icon={<PiPaintBrushBold />} onClick={createAsPreset} isDisabled={!hasPrompts}>
-            {t('stylePresets.useForTemplate')}
+          <MenuItem icon={<PiRulerBold />} onClick={recallDimensions.recall} isDisabled={!recallDimensions.isEnabled}>
+            {t('parameters.useSize')}
           </MenuItem>
         </MenuList>
       </Menu>
