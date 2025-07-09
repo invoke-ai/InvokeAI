@@ -1,13 +1,14 @@
 import { useAppSelector } from 'app/store/storeHooks';
-import { useIsRegionFocused } from 'common/hooks/focus';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { useImageActions } from 'features/gallery/hooks/useImageActions';
+import { useLoadWorkflow } from 'features/gallery/hooks/useLoadWorkflow';
+import { useRecallAll } from 'features/gallery/hooks/useRecallAll';
+import { useRecallDimensions } from 'features/gallery/hooks/useRecallDimensions';
+import { useRecallPrompts } from 'features/gallery/hooks/useRecallPrompts';
+import { useRecallRemix } from 'features/gallery/hooks/useRecallRemix';
+import { useRecallSeed } from 'features/gallery/hooks/useRecallSeed';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import { memo, useMemo } from 'react';
+import { memo } from 'react';
 import { useImageDTO } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
@@ -26,64 +27,61 @@ export const GlobalImageHotkeys = memo(() => {
 GlobalImageHotkeys.displayName = 'GlobalImageHotkeys';
 
 const GlobalImageHotkeysInternal = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
-  const isGalleryFocused = useIsRegionFocused('gallery');
-  const isViewerFocused = useIsRegionFocused('viewer');
-  const imageActions = useImageActions(imageDTO);
-  const isStaging = useAppSelector(selectIsStaging);
-  const activeTab = useAppSelector(selectActiveTab);
-  const isUpscalingEnabled = useFeatureStatus('upscaling');
-
-  const isCanvasTabAndStaging = useMemo(() => activeTab === 'canvas' && isStaging, [activeTab, isStaging]);
+  const recallAll = useRecallAll(imageDTO);
+  const recallRemix = useRecallRemix(imageDTO);
+  const recallPrompts = useRecallPrompts(imageDTO);
+  const recallSeed = useRecallSeed(imageDTO);
+  const recallDimensions = useRecallDimensions(imageDTO);
+  const loadWorkflow = useLoadWorkflow(imageDTO);
 
   useRegisteredHotkeys({
     id: 'loadWorkflow',
     category: 'viewer',
-    callback: imageActions.loadWorkflow,
-    options: { enabled: isGalleryFocused || isViewerFocused },
-    dependencies: [imageActions.loadWorkflow, isGalleryFocused, isViewerFocused],
+    callback: loadWorkflow.load,
+    options: { enabled: loadWorkflow.isEnabled },
+    dependencies: [loadWorkflow],
   });
+
   useRegisteredHotkeys({
     id: 'recallAll',
     category: 'viewer',
-    callback: imageActions.recallAll,
-    options: { enabled: !isCanvasTabAndStaging && (isGalleryFocused || isViewerFocused) },
-    dependencies: [imageActions.recallAll, isCanvasTabAndStaging, isGalleryFocused, isViewerFocused],
+    callback: recallAll.recall,
+    options: { enabled: recallAll.isEnabled },
+    dependencies: [recallAll],
   });
+
   useRegisteredHotkeys({
     id: 'recallSeed',
     category: 'viewer',
-    callback: imageActions.recallSeed,
-    options: { enabled: isGalleryFocused || isViewerFocused },
-    dependencies: [imageActions.recallSeed, isGalleryFocused, isViewerFocused],
+    callback: recallSeed.recall,
+    options: { enabled: recallSeed.isEnabled },
+    dependencies: [recallSeed],
   });
+
   useRegisteredHotkeys({
     id: 'recallPrompts',
     category: 'viewer',
-    callback: imageActions.recallPrompts,
-    options: { enabled: isGalleryFocused || isViewerFocused },
-    dependencies: [imageActions.recallPrompts, isGalleryFocused, isViewerFocused],
+    callback: recallPrompts.recall,
+    options: { enabled: recallPrompts.isEnabled },
+    dependencies: [recallPrompts],
   });
+
   useRegisteredHotkeys({
     id: 'remix',
     category: 'viewer',
-    callback: imageActions.remix,
-    options: { enabled: isGalleryFocused || isViewerFocused },
-    dependencies: [imageActions.remix, isGalleryFocused, isViewerFocused],
+    callback: recallRemix.recall,
+    options: { enabled: recallRemix.isEnabled },
+    dependencies: [recallRemix],
   });
+
   useRegisteredHotkeys({
     id: 'useSize',
     category: 'viewer',
-    callback: imageActions.recallSize,
-    options: { enabled: !isStaging && (isGalleryFocused || isViewerFocused) },
-    dependencies: [imageActions.recallSize, isStaging, isGalleryFocused, isViewerFocused],
+    callback: recallDimensions.recall,
+    options: { enabled: recallDimensions.isEnabled },
+    dependencies: [recallDimensions],
   });
-  useRegisteredHotkeys({
-    id: 'runPostprocessing',
-    category: 'viewer',
-    callback: imageActions.upscale,
-    options: { enabled: isUpscalingEnabled && isViewerFocused },
-    dependencies: [isUpscalingEnabled, imageDTO, isViewerFocused],
-  });
+
   return null;
 });
 
