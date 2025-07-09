@@ -1,3 +1,4 @@
+import type { DockviewApi, GridviewApi } from 'dockview';
 import { DockviewPanel, GridviewPanel } from 'dockview';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -78,27 +79,27 @@ describe('AppNavigationApi', () => {
   let navigationApi: NavigationApi;
   let mockSetAppTab: ReturnType<typeof vi.fn>;
   let mockGetAppTab: ReturnType<typeof vi.fn>;
-  let mockSetPanelState: ReturnType<typeof vi.fn>;
-  let mockGetPanelState: ReturnType<typeof vi.fn>;
-  let mockDeletePanelState: ReturnType<typeof vi.fn>;
+  let mockSetStorage: ReturnType<typeof vi.fn>;
+  let mockGetStorage: ReturnType<typeof vi.fn>;
+  let mockDeleteStorage: ReturnType<typeof vi.fn>;
   let mockAppApi: NavigationAppApi;
 
   beforeEach(() => {
     navigationApi = new NavigationApi();
     mockSetAppTab = vi.fn();
     mockGetAppTab = vi.fn();
-    mockSetPanelState = vi.fn();
-    mockGetPanelState = vi.fn();
-    mockDeletePanelState = vi.fn();
+    mockSetStorage = vi.fn();
+    mockGetStorage = vi.fn();
+    mockDeleteStorage = vi.fn();
     mockAppApi = {
       activeTab: {
         set: mockSetAppTab,
         get: mockGetAppTab,
       },
       storage: {
-        set: mockSetPanelState,
-        get: mockGetPanelState,
-        delete: mockDeletePanelState,
+        set: mockSetStorage,
+        get: mockGetStorage,
+        delete: mockDeleteStorage,
       },
     };
   });
@@ -118,9 +119,9 @@ describe('AppNavigationApi', () => {
       expect(navigationApi._app).not.toBeNull();
       expect(navigationApi._app?.activeTab.set).toBe(mockSetAppTab);
       expect(navigationApi._app?.activeTab.get).toBe(mockGetAppTab);
-      expect(navigationApi._app?.storage.set).toBe(mockSetPanelState);
-      expect(navigationApi._app?.storage.get).toBe(mockGetPanelState);
-      expect(navigationApi._app?.storage.delete).toBe(mockDeletePanelState);
+      expect(navigationApi._app?.storage.set).toBe(mockSetStorage);
+      expect(navigationApi._app?.storage.get).toBe(mockGetStorage);
+      expect(navigationApi._app?.storage.delete).toBe(mockDeleteStorage);
     });
 
     it('should disconnect from app', () => {
@@ -983,6 +984,124 @@ describe('AppNavigationApi', () => {
 
       const focusResult = await navigationApi.focusPanelInActiveTab('nonexistent');
       expect(focusResult).toBe(false);
+    });
+  });
+
+  describe('registerContainer', () => {
+    const tab = 'generate';
+    const viewId = 'myView';
+    const key = `${tab}:container:${viewId}`;
+
+    beforeEach(() => {
+      navigationApi = new NavigationApi();
+      navigationApi.connectToApp(mockAppApi);
+    });
+
+    it('initializes from scratch when no stored state', () => {
+      mockGetStorage.mockReturnValue(undefined);
+      const initialize = vi.fn();
+      const panel1 = { id: 'p1' };
+      const panel2 = { id: 'p2' };
+      const mockApi = {
+        panels: [panel1, panel2],
+        toJSON: vi.fn(() => ({ foo: 'bar' })),
+        onDidLayoutChange: vi.fn(() => ({ dispose: vi.fn() })),
+      } as unknown as DockviewApi | GridviewApi;
+      navigationApi.registerContainer(tab, viewId, mockApi, initialize);
+
+      expect(initialize).toHaveBeenCalledOnce();
+      expect(mockSetStorage).toHaveBeenCalledOnce();
+      expect(mockSetStorage).toHaveBeenCalledWith(key, { foo: 'bar' });
+      // panels registered
+      expect(navigationApi.isPanelRegistered(tab, 'p1')).toBe(true);
+      expect(navigationApi.isPanelRegistered(tab, 'p2')).toBe(true);
+    });
+
+    it('restores from storage when fromJSON succeeds', () => {
+      const stored = { saved: true };
+      mockGetStorage.mockReturnValue(stored);
+      const initialize = vi.fn();
+      const panel = { id: 'p' };
+      const mockApi = {
+        panels: [panel],
+        fromJSON: vi.fn(),
+        toJSON: vi.fn(),
+        onDidLayoutChange: vi.fn(() => ({ dispose: vi.fn() })),
+      } as unknown as DockviewApi | GridviewApi;
+      navigationApi.registerContainer(tab, viewId, mockApi, initialize);
+
+      expect(mockApi.fromJSON).toHaveBeenCalledWith(stored);
+      expect(initialize).not.toHaveBeenCalled();
+      expect(mockSetStorage).not.toHaveBeenCalled(); // no initial persist
+      expect(navigationApi.isPanelRegistered(tab, 'p')).toBe(true);
+    });
+
+    it('re-initializes when fromJSON throws, deletes then sets', () => {
+      const stored = { saved: true };
+      mockGetStorage.mockReturnValue(stored);
+      const initialize = vi.fn();
+      const panel = { id: 'p' };
+      const mockApi = {
+        panels: [panel],
+        fromJSON: vi.fn(() => {
+          throw new Error('bad');
+        }),
+        toJSON: vi.fn(() => ({ new: 'state' })),
+        onDidLayoutChange: vi.fn(() => ({ dispose: vi.fn() })),
+      } as unknown as DockviewApi | GridviewApi;
+      navigationApi.registerContainer(tab, viewId, mockApi, initialize);
+
+      expect(mockApi.fromJSON).toHaveBeenCalledWith(stored);
+      expect(mockDeleteStorage).toHaveBeenCalledOnce();
+      expect(mockDeleteStorage).toHaveBeenCalledWith(key);
+      expect(initialize).toHaveBeenCalledOnce();
+      expect(mockSetStorage).toHaveBeenCalledOnce();
+      expect(mockSetStorage).toHaveBeenCalledWith(key, { new: 'state' });
+      expect(navigationApi.isPanelRegistered(tab, 'p')).toBe(true);
+    });
+
+    it('persists on layout change after debounce', () => {
+      vi.useFakeTimers();
+      mockGetStorage.mockReturnValue(undefined);
+      const initialize = vi.fn();
+      const panel = { id: 'p' };
+      let layoutCb: () => void = () => {};
+      const mockApi = {
+        panels: [panel],
+        toJSON: vi.fn(() => ({ x: 1 })),
+        onDidLayoutChange: vi.fn((cb) => {
+          layoutCb = cb;
+          return { dispose: vi.fn() };
+        }),
+      } as unknown as DockviewApi | GridviewApi;
+      navigationApi.registerContainer(tab, viewId, mockApi, initialize);
+
+      // first set: initial persistence
+      expect(mockSetStorage).toHaveBeenCalledWith(key, { x: 1 });
+
+      // simulate layout change
+      layoutCb();
+      // advance past debounce (300ms)
+      vi.advanceTimersByTime(300);
+
+      expect(mockSetStorage).toHaveBeenCalledTimes(2);
+      expect(mockSetStorage).toHaveBeenLastCalledWith(key, { x: 1 });
+
+      vi.useRealTimers();
+    });
+
+    it('does nothing if app not connected', () => {
+      navigationApi.disconnectFromApp();
+      const initialize = vi.fn();
+      const mockApi = {
+        panels: [],
+        fromJSON: vi.fn(),
+        toJSON: vi.fn(),
+        onDidLayoutChange: vi.fn(),
+      } as unknown as DockviewApi | GridviewApi;
+      expect(() => navigationApi.registerContainer(tab, viewId, mockApi, initialize)).not.toThrow();
+      expect(mockGetStorage).not.toHaveBeenCalled();
+      expect(initialize).not.toHaveBeenCalled();
     });
   });
 });
