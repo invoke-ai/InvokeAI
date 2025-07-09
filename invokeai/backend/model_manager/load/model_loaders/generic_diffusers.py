@@ -80,7 +80,10 @@ class GenericDiffusersLoader(ModelLoader):
             "transformers",
             "invokeai.backend.quantization.fast_quantized_transformers_model",
             "invokeai.backend.quantization.fast_quantized_diffusion_model",
+            "transformer_bria",
         ]:
+            if module == "transformer_bria":
+                module = "invokeai.backend.bria.transformer_bria"
             res_type = sys.modules[module]
         else:
             res_type = sys.modules["diffusers"].pipelines
