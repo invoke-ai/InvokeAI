@@ -21,6 +21,13 @@ _=$(id ${USER} 2>&1) || useradd -u ${USER_ID} ${USER}
 # ensure the UID is correct
 usermod -u ${USER_ID} ${USER} 1>/dev/null
 
+## ROCM specific configuration
+# render group within the container must match the host render group
+# otherwise the container will not be able to access the host GPU.
+groupmod -g ${RENDER_GROUP_ID:-993} render
+usermod -a -G render ${USER}
+usermod -a -G video ${USER}
+
 ### Set the $PUBLIC_KEY env var to enable SSH access.
 # We do not install openssh-server in the image by default to avoid bloat.
 # but it is useful to have the full SSH server e.g. on Runpod.
@@ -41,6 +48,12 @@ chown --recursive ${USER} "${INVOKEAI_ROOT}" || true
 cd "${INVOKEAI_ROOT}"
 export HF_HOME=${HF_HOME:-$INVOKEAI_ROOT/.cache/huggingface}
 export MPLCONFIGDIR=${MPLCONFIGDIR:-$INVOKEAI_ROOT/.matplotlib}
+
+# echo "Checking ROCM device availability as root..."
+# python -c "import torch; print('GPU available:', torch.cuda.is_available()); print('Number of GPUs:', torch.cuda.device_count())"
+
+# echo "Checking ROCM device availability as ${USER}..."
+# exec gosu ${USER} python -c "import os; print(os.getuid()); print(os.getgroups()); import torch; print('GPU available:', torch.cuda.is_available()); print('Number of GPUs:', torch.cuda.device_count())"
 
 # Run the CMD as the Container User (not root).
 exec gosu ${USER} "$@"
