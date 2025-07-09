@@ -99,7 +99,7 @@ export class NavigationApi {
    * Sets the flag indicating that the navigation is loading and schedules a debounced hide of the loading screen.
    */
   _showFakeLoadingScreen = () => {
-    log.debug('Showing fake loading screen for tab switch');
+    log.trace('Showing fake loading screen for tab switch');
     this._$isLoading.set(true);
     this._hideLoadingScreenDebounced();
   };
@@ -108,7 +108,7 @@ export class NavigationApi {
    * Debounced function to hide the loading screen after a delay.
    */
   _hideLoadingScreenDebounced = debounce(() => {
-    log.debug('Hiding fake loading screen for tab switch');
+    log.trace('Hiding fake loading screen for tab switch');
     this._$isLoading.set(false);
   }, SWITCH_TABS_FAKE_DELAY_MS);
 
@@ -127,11 +127,11 @@ export class NavigationApi {
     }
 
     if (tab === this._app.activeTab.get()) {
-      log.debug(`Already on tab: ${tab}`);
+      log.trace(`Already on tab: ${tab}`);
       return true;
     }
 
-    log.debug(`Switching to tab: ${tab}`);
+    log.trace(`Switching to tab: ${tab}`);
     this._showFakeLoadingScreen();
     this._app.activeTab.set(tab);
     return true;
@@ -160,11 +160,11 @@ export class NavigationApi {
       this.waiters.delete(key);
     }
 
-    log.debug(`Registered panel ${key}`);
+    log.trace(`Registered panel ${key}`);
 
     return () => {
       this.panels.delete(key);
-      log.debug(`Unregistered panel ${key}`);
+      log.trace(`Unregistered panel ${key}`);
     };
   };
 
@@ -192,7 +192,7 @@ export class NavigationApi {
       try {
         /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
         api.fromJSON(stored as any);
-        log.debug({ stored: parseify(stored) }, `Restored view ${key} from storage`);
+        log.trace({ stored: parseify(stored) }, `Restored view ${key} from storage`);
       } catch (error) {
         log.error({ error: parseify(error) }, `Failed to restore view ${key} from storage`);
         this._app.storage.delete(key);
@@ -201,7 +201,7 @@ export class NavigationApi {
       }
     } else {
       initialize();
-      log.debug(`Initialized ${key} from scratch`);
+      log.trace(`Initialized ${key} from scratch`);
       this._app.storage.set(key, api.toJSON());
     }
 
@@ -215,7 +215,7 @@ export class NavigationApi {
       }, 300)
     );
 
-    log.debug(`Registered view ${key}`);
+    log.trace(`Registered view ${key}`);
   };
 
   /**
@@ -337,7 +337,7 @@ export class NavigationApi {
 
       // Dockview uses the term "active", but we use "focused" for consistency.
       panel.api.setActive();
-      log.debug(`Focused panel ${key}`);
+      log.trace(`Focused panel ${key}`);
 
       return true;
     } catch (error) {
@@ -593,7 +593,7 @@ export class NavigationApi {
       this.waiters.delete(key);
     }
 
-    log.debug(`Unregistered all panels for tab ${tab}`);
+    log.trace(`Unregistered all panels for tab ${tab}`);
   };
 }
 
