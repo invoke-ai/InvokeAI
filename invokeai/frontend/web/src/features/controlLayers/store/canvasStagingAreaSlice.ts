@@ -95,6 +95,9 @@ export const buildSelectSessionQueueItems = (sessionId: string) =>
 
 export const selectIsStaging = (state: RootState) => {
   const sessionId = selectCanvasSessionId(state);
+  if (!sessionId) {
+    return false;
+  }
   const { data } = queueApi.endpoints.listAllQueueItems.select({ destination: sessionId })(state);
   if (!data) {
     return false;
