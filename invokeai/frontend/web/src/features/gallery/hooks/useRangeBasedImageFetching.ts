@@ -1,5 +1,5 @@
 import { useAppStore } from 'app/store/storeHooks';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { ListRange } from 'react-virtuoso';
 import { imagesApi, useGetImageDTOsByNamesMutation } from 'services/api/endpoints/images';
 import { useThrottledCallback } from 'use-debounce';
@@ -53,6 +53,7 @@ export const useRangeBasedImageFetching = ({
 }: UseRangeBasedImageFetchingArgs): UseRangeBasedImageFetchingReturn => {
   const store = useAppStore();
   const [getImageDTOsByNames] = useGetImageDTOsByNamesMutation();
+  const lastRangeRef = useRef<ListRange | null>(null);
 
   const fetchImages = useCallback(
     (visibleRange: ListRange) => {
@@ -65,6 +66,7 @@ export const useRangeBasedImageFetching = ({
         return;
       }
       getImageDTOsByNames({ image_names: uncachedNames });
+      lastRangeRef.current = visibleRange;
     },
     [enabled, getImageDTOsByNames, imageNames, store]
   );
@@ -77,6 +79,13 @@ export const useRangeBasedImageFetching = ({
     },
     [throttledFetchImages]
   );
+
+  useEffect(() => {
+    if (!lastRangeRef.current) {
+      return;
+    }
+    throttledFetchImages(lastRangeRef.current);
+  }, [imageNames, throttledFetchImages]);
 
   return {
     onRangeChanged,
