@@ -2,6 +2,7 @@ import { Box, Flex, forwardRef, Grid, GridItem, Spinner, Text } from '@invoke-ai
 import { createSelector } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { getFocusedRegion } from 'common/hooks/focus';
 import { useRangeBasedImageFetching } from 'features/gallery/hooks/useRangeBasedImageFetching';
 import type { selectGetImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import {
@@ -221,6 +222,10 @@ const useKeyboardNavigation = (
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
+      if (getFocusedRegion() !== 'gallery') {
+        // Only handle keyboard navigation when the gallery is focused
+        return;
+      }
       // Only handle arrow keys
       if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
         return;
