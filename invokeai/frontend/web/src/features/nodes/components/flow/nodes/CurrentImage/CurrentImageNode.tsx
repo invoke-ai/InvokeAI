@@ -32,7 +32,7 @@ const CurrentImageNode = (props: NodeProps) => {
   if (imageDTO) {
     return (
       <Wrapper nodeProps={props}>
-        <DndImage imageDTO={imageDTO} />
+        <DndImage imageDTO={imageDTO} borderRadius="base" />
       </Wrapper>
     );
   }

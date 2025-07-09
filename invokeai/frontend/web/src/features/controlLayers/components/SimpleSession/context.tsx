@@ -2,9 +2,8 @@ import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppStore } from 'app/store/storeHooks';
-import { buildZodTypeGuard } from 'common/util/zodUtils';
 import { getOutputImageName } from 'features/controlLayers/components/SimpleSession/shared';
-import { selectDefaultAutoSwitch } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectStagingAreaAutoSwitch } from 'features/controlLayers/store/canvasSettingsSlice';
 import { canvasQueueItemDiscarded, selectDiscardedItems } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { ProgressImage } from 'features/nodes/types/common';
 import type { Atom, MapStore, StoreValue, WritableAtom } from 'nanostores';
@@ -16,11 +15,6 @@ import { queueApi } from 'services/api/endpoints/queue';
 import type { ImageDTO, S } from 'services/api/types';
 import { $socket } from 'services/events/stores';
 import { assert, objectEntries } from 'tsafe';
-import { z } from 'zod/v4';
-
-const zAutoSwitchMode = z.enum(['off', 'switch_on_start', 'switch_on_finish']);
-export const isAutoSwitchMode = buildZodTypeGuard(zAutoSwitchMode);
-type AutoSwitchMode = z.infer<typeof zAutoSwitchMode>;
 
 export type ProgressData = {
   itemId: number;
@@ -100,7 +94,6 @@ type CanvasSessionContextValue = {
   $selectedItem: Atom<S['SessionQueueItem'] | null>;
   $selectedItemIndex: Atom<number | null>;
   $selectedItemOutputImageDTO: Atom<ImageDTO | null>;
-  $autoSwitch: WritableAtom<AutoSwitchMode>;
   selectNext: () => void;
   selectPrev: () => void;
   selectFirst: () => void;
@@ -142,12 +135,6 @@ export const CanvasSessionContextProvider = memo(
      * and kept in sync with it via a redux subscription.
      */
     const $items = useState(() => atom<S['SessionQueueItem'][]>([]))[0];
-
-    /**
-     * Whether auto-switch is enabled.
-     */
-    const defaultAutoSwitch = selectDefaultAutoSwitch(store.getState());
-    const $autoSwitch = useState(() => atom<AutoSwitchMode>(defaultAutoSwitch))[0];
 
     /**
      * An internal flag used to work around race conditions with auto-switch switching to queue items before their
@@ -318,12 +305,15 @@ export const CanvasSessionContextProvider = memo(
             imageLoaded: true,
           });
         }
-        if ($lastCompletedItemId.get() === itemId && $autoSwitch.get() === 'switch_on_finish') {
+        if (
+          $lastCompletedItemId.get() === itemId &&
+          selectStagingAreaAutoSwitch(store.getState()) === 'switch_on_finish'
+        ) {
           $selectedItemId.set(itemId);
           $lastCompletedItemId.set(null);
         }
       },
-      [$autoSwitch, $lastCompletedItemId, $progressData, $selectedItemId]
+      [$lastCompletedItemId, $progressData, $selectedItemId, store]
     );
 
     // Set up socket listeners
@@ -358,7 +348,7 @@ export const CanvasSessionContextProvider = memo(
         socket.off('invocation_progress', onProgress);
         socket.off('queue_item_status_changed', onQueueItemStatusChanged);
       };
-    }, [$autoSwitch, $lastCompletedItemId, $lastStartedItemId, $progressData, $selectedItemId, session.id, socket]);
+    }, [$lastCompletedItemId, $lastStartedItemId, $progressData, $selectedItemId, session.id, socket]);
 
     // Set up state subscriptions and effects
     useEffect(() => {
@@ -388,7 +378,7 @@ export const CanvasSessionContextProvider = memo(
             $selectedItemId.set(items[0]?.item_id ?? null);
             return;
           } else if (
-            $autoSwitch.get() === 'switch_on_start' &&
+            selectStagingAreaAutoSwitch(store.getState()) === 'switch_on_start' &&
             items.findIndex(({ item_id }) => item_id === lastStartedItemId) !== -1
           ) {
             $selectedItemId.set(lastStartedItemId);
@@ -491,7 +481,7 @@ export const CanvasSessionContextProvider = memo(
         if (lastLoadedItemId === null) {
           return;
         }
-        if ($autoSwitch.get() === 'switch_on_finish') {
+        if (selectStagingAreaAutoSwitch(store.getState()) === 'switch_on_finish') {
           $selectedItemId.set(lastLoadedItemId);
         }
         $lastLoadedItemId.set(null);
@@ -516,7 +506,6 @@ export const CanvasSessionContextProvider = memo(
       };
     }, [
       $items,
-      $autoSwitch,
       $lastLoadedItemId,
       $lastStartedItemId,
       $progressData,
@@ -534,7 +523,6 @@ export const CanvasSessionContextProvider = memo(
         $isPending,
         $progressData,
         $selectedItemId,
-        $autoSwitch,
         $selectedItem,
         $selectedItemIndex,
         $selectedItemOutputImageDTO,
@@ -547,7 +535,6 @@ export const CanvasSessionContextProvider = memo(
         discard,
       }),
       [
-        $autoSwitch,
         $items,
         $hasItems,
         $isPending,

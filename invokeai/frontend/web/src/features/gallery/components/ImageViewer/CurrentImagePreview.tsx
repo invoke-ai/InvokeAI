@@ -50,7 +50,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     >
       {imageDTO && (
         <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center">
-          <DndImage imageDTO={imageDTO} onLoad={onLoadImage} />
+          <DndImage imageDTO={imageDTO} onLoad={onLoadImage} borderRadius="base" />
         </Flex>
       )}
       {!imageDTO && <NoContentForViewer />}

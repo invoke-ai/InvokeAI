@@ -1,4 +1,4 @@
-import { ButtonGroup } from '@invoke-ai/ui-library';
+import { ButtonGroup, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
 import { getQueueItemElementId } from 'features/controlLayers/components/SimpleSession/shared';
@@ -14,6 +14,8 @@ import { StagingAreaToolbarToggleShowResultsButton } from 'features/controlLayer
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { memo, useEffect } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+
+import { StagingAreaAutoSwitchButtons } from './StagingAreaAutoSwitchButtons';
 
 export const StagingAreaToolbar = memo(() => {
   const canvasManager = useCanvasManager();
@@ -31,8 +33,9 @@ export const StagingAreaToolbar = memo(() => {
 
   useHotkeys('meta+left', ctx.selectFirst, { preventDefault: true });
   useHotkeys('meta+right', ctx.selectLast, { preventDefault: true });
+
   return (
-    <>
+    <Flex gap={2}>
       <ButtonGroup borderRadius="base" shadow="dark-lg">
         <StagingAreaToolbarPrevButton isDisabled={!shouldShowStagedImage} />
         <StagingAreaToolbarImageCountButton />
@@ -44,9 +47,14 @@ export const StagingAreaToolbar = memo(() => {
         <StagingAreaToolbarSaveSelectedToGalleryButton />
         <StagingAreaToolbarMenu />
         <StagingAreaToolbarDiscardSelectedButton isDisabled={!shouldShowStagedImage} />
+      </ButtonGroup>
+      <ButtonGroup borderRadius="base" shadow="dark-lg">
+        <StagingAreaAutoSwitchButtons />
+      </ButtonGroup>
+      <ButtonGroup borderRadius="base" shadow="dark-lg">
         <StagingAreaToolbarDiscardAllButton isDisabled={!shouldShowStagedImage} />
       </ButtonGroup>
-    </>
+    </Flex>
   );
 });
 

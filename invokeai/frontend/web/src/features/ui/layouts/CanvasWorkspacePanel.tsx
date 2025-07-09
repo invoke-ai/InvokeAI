@@ -13,9 +13,6 @@ import { CanvasHUD } from 'features/controlLayers/components/HUD/CanvasHUD';
 import { InvokeCanvasComponent } from 'features/controlLayers/components/InvokeCanvasComponent';
 import { SelectObject } from 'features/controlLayers/components/SelectObject/SelectObject';
 import { CanvasSessionContextProvider } from 'features/controlLayers/components/SimpleSession/context';
-import { StagingAreaItemsList } from 'features/controlLayers/components/SimpleSession/StagingAreaItemsList';
-import { StagingAreaHasItemsGate } from 'features/controlLayers/components/StagingArea/StagingAreaHasItemsGate';
-import { StagingAreaToolbar } from 'features/controlLayers/components/StagingArea/StagingAreaToolbar';
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
@@ -23,6 +20,8 @@ import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/c
 import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { memo, useCallback } from 'react';
 import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
+
+import { StagingArea } from './StagingArea';
 
 const MenuContent = memo(() => {
   return (
@@ -107,25 +106,7 @@ export const CanvasWorkspacePanel = memo(() => {
       {canvasId !== null && (
         <CanvasManagerProviderGate>
           <CanvasSessionContextProvider type="advanced" id={canvasId}>
-            <StagingAreaHasItemsGate>
-              <Flex
-                position="absolute"
-                flexDir="column"
-                bottom={4}
-                gap={2}
-                align="center"
-                justify="center"
-                left={4}
-                right={4}
-              >
-                <Flex position="relative" maxW="full" w="full" h={108}>
-                  <StagingAreaItemsList />
-                </Flex>
-                <Flex gap={2}>
-                  <StagingAreaToolbar />
-                </Flex>
-              </Flex>
-            </StagingAreaHasItemsGate>
+            <StagingArea />
           </CanvasSessionContextProvider>
         </CanvasManagerProviderGate>
       )}
