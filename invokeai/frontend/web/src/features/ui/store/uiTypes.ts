@@ -26,7 +26,7 @@ export type StoredGridviewPanelState = z.infer<typeof zGridviewPanelState>;
 
 const zUIState = z.object({
   _version: z.literal(3).default(3),
-  activeTab: zTabName.default('canvas'),
+  activeTab: zTabName.default('generate'),
   activeTabCanvasRightPanel: zCanvasRightPanelTabName.default('gallery'),
   shouldShowImageDetails: z.boolean().default(false),
   shouldShowProgressInViewer: z.boolean().default(true),
