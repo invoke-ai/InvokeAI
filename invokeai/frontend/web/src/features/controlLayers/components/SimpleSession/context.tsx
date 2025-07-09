@@ -5,6 +5,7 @@ import { selectStagingAreaAutoSwitch } from 'features/controlLayers/store/canvas
 import {
   buildSelectSessionQueueItems,
   canvasQueueItemDiscarded,
+  canvasSessionReset,
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { ProgressImage } from 'features/nodes/types/common';
 import type { Atom, MapStore, StoreValue, WritableAtom } from 'nanostores';
@@ -101,6 +102,7 @@ type CanvasSessionContextValue = {
   selectLast: () => void;
   onImageLoad: (itemId: number) => void;
   discard: (itemId: number) => void;
+  discardAll: () => void;
 };
 
 const CanvasSessionContext = createContext<CanvasSessionContextValue | null>(null);
@@ -228,6 +230,10 @@ export const CanvasSessionContextProvider = memo(
       },
       [store]
     );
+
+    const discardAll = useCallback(() => {
+      store.dispatch(canvasSessionReset());
+    }, [store]);
 
     const selectNext = useCallback(() => {
       const selectedItemId = $selectedItemId.get();
@@ -478,6 +484,22 @@ export const CanvasSessionContextProvider = memo(
         queueApi.endpoints.listAllQueueItems.initiate({ destination: session.id })
       );
 
+      // const unsubListener = store.dispatch(
+      //   addAppListener({
+      //     matcher: queueApi.endpoints.cancelQueueItem.matchFulfilled,
+      //     effect: ({ payload }, { getState }) => {
+      //       const { item_id } = payload;
+
+      //       const items = selectQueueItems(getState());
+      //       if (items.length === 0) {
+      //         $selectedItemId.set(null);
+      //       } else if ($selectedItemId.get() === null) {
+      //         $selectedItemId.set(items[0].item_id);
+      //       }
+      //     },
+      //   })
+      // );
+
       // Clean up all subscriptions and top-level (i.e. non-computed/derived state)
       return () => {
         unsubHandleAutoSwitch();
@@ -518,6 +540,7 @@ export const CanvasSessionContextProvider = memo(
         selectLast,
         onImageLoad,
         discard,
+        discardAll,
       }),
       [
         $items,
@@ -536,6 +559,7 @@ export const CanvasSessionContextProvider = memo(
         selectLast,
         onImageLoad,
         discard,
+        discardAll,
       ]
     );
 
