@@ -1,11 +1,4 @@
-import type {
-  DockviewApi,
-  GridviewApi,
-  IDockviewPanel,
-  IDockviewReactProps,
-  IGridviewPanel,
-  IGridviewReactProps,
-} from 'dockview';
+import type { DockviewApi, GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
 import { DockviewReact, GridviewReact, LayoutPriority, Orientation } from 'dockview';
 import { CanvasLayersPanel } from 'features/controlLayers/components/CanvasLayersPanelContent';
 import { CanvasLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/CanvasLaunchpadPanel';
@@ -71,53 +64,50 @@ const mainPanelComponents: AutoLayoutDockviewComponents = {
 };
 
 const initializeCenterPanelLayout = (tab: TabName, api: DockviewApi) => {
-  const launchpad = api.addPanel<PanelParameters>({
-    id: LAUNCHPAD_PANEL_ID,
-    component: LAUNCHPAD_PANEL_ID,
-    title: 'Launchpad',
-    tabComponent: TAB_WITH_LAUNCHPAD_ICON_ID,
-    params: {
-      tab,
-      focusRegion: 'launchpad',
-    },
-  });
-  navigationApi.registerPanel(tab, LAUNCHPAD_PANEL_ID, launchpad, {
-    isActive: true,
-  });
+  navigationApi.registerContainer(tab, 'main', api, () => {
+    const launchpad = api.addPanel<PanelParameters>({
+      id: LAUNCHPAD_PANEL_ID,
+      component: LAUNCHPAD_PANEL_ID,
+      title: 'Launchpad',
+      tabComponent: TAB_WITH_LAUNCHPAD_ICON_ID,
+      params: {
+        tab,
+        focusRegion: 'launchpad',
+      },
+    });
 
-  const workspace = api.addPanel<PanelParameters>({
-    id: WORKSPACE_PANEL_ID,
-    component: WORKSPACE_PANEL_ID,
-    title: 'Canvas',
-    tabComponent: DEFAULT_TAB_ID,
-    params: {
-      tab,
-      focusRegion: 'canvas',
-    },
-    position: {
-      direction: 'within',
-      referencePanel: launchpad.id,
-    },
-  });
-  navigationApi.registerPanel(tab, WORKSPACE_PANEL_ID, workspace);
+    api.addPanel<PanelParameters>({
+      id: WORKSPACE_PANEL_ID,
+      component: WORKSPACE_PANEL_ID,
+      title: 'Canvas',
+      tabComponent: DEFAULT_TAB_ID,
+      params: {
+        tab,
+        focusRegion: 'canvas',
+      },
+      position: {
+        direction: 'within',
+        referencePanel: launchpad.id,
+      },
+    });
 
-  const viewer = api.addPanel<PanelParameters>({
-    id: VIEWER_PANEL_ID,
-    component: VIEWER_PANEL_ID,
-    title: 'Image Viewer',
-    tabComponent: DEFAULT_TAB_ID,
-    params: {
-      tab,
-      focusRegion: 'viewer',
-    },
-    position: {
-      direction: 'within',
-      referencePanel: launchpad.id,
-    },
-  });
-  navigationApi.registerPanel(tab, VIEWER_PANEL_ID, viewer);
+    api.addPanel<PanelParameters>({
+      id: VIEWER_PANEL_ID,
+      component: VIEWER_PANEL_ID,
+      title: 'Image Viewer',
+      tabComponent: DEFAULT_TAB_ID,
+      params: {
+        tab,
+        focusRegion: 'viewer',
+      },
+      position: {
+        direction: 'within',
+        referencePanel: launchpad.id,
+      },
+    });
 
-  return { launchpad, workspace, viewer } satisfies Record<string, IDockviewPanel>;
+    launchpad.api.setActive();
+  });
 };
 
 const MainPanel = memo(() => {
@@ -156,59 +146,49 @@ const rightPanelComponents: AutoLayoutGridviewComponents = {
 };
 
 const initializeRightPanelLayout = (tab: TabName, api: GridviewApi) => {
-  const gallery = api.addPanel<PanelParameters>({
-    id: GALLERY_PANEL_ID,
-    component: GALLERY_PANEL_ID,
-    minimumWidth: RIGHT_PANEL_MIN_SIZE_PX,
-    minimumHeight: GALLERY_PANEL_MIN_HEIGHT_PX,
-    params: {
-      tab,
-      focusRegion: 'gallery',
-    },
-  });
-  navigationApi.registerPanel(tab, GALLERY_PANEL_ID, gallery, {
-    dimensions: {
-      height: GALLERY_PANEL_DEFAULT_HEIGHT_PX,
-      width: RIGHT_PANEL_MIN_SIZE_PX,
-    },
-  });
+  navigationApi.registerContainer(tab, 'right', api, () => {
+    const gallery = api.addPanel<PanelParameters>({
+      id: GALLERY_PANEL_ID,
+      component: GALLERY_PANEL_ID,
+      minimumWidth: RIGHT_PANEL_MIN_SIZE_PX,
+      minimumHeight: GALLERY_PANEL_MIN_HEIGHT_PX,
+      params: {
+        tab,
+        focusRegion: 'gallery',
+      },
+    });
 
-  const boards = api.addPanel<PanelParameters>({
-    id: BOARDS_PANEL_ID,
-    component: BOARDS_PANEL_ID,
-    minimumHeight: BOARD_PANEL_MIN_HEIGHT_PX,
-    params: {
-      tab,
-      focusRegion: 'boards',
-    },
-    position: {
-      direction: 'above',
-      referencePanel: gallery.id,
-    },
-  });
-  navigationApi.registerPanel(tab, BOARDS_PANEL_ID, boards, {
-    dimensions: {
-      height: CANVAS_BOARD_PANEL_DEFAULT_HEIGHT_PX,
-      width: RIGHT_PANEL_MIN_SIZE_PX,
-    },
-  });
+    const boards = api.addPanel<PanelParameters>({
+      id: BOARDS_PANEL_ID,
+      component: BOARDS_PANEL_ID,
+      minimumHeight: BOARD_PANEL_MIN_HEIGHT_PX,
+      params: {
+        tab,
+        focusRegion: 'boards',
+      },
+      position: {
+        direction: 'above',
+        referencePanel: gallery.id,
+      },
+    });
 
-  const layers = api.addPanel<PanelParameters>({
-    id: LAYERS_PANEL_ID,
-    component: LAYERS_PANEL_ID,
-    minimumHeight: LAYERS_PANEL_MIN_HEIGHT_PX,
-    params: {
-      tab,
-      focusRegion: 'layers',
-    },
-    position: {
-      direction: 'below',
-      referencePanel: gallery.id,
-    },
-  });
-  navigationApi.registerPanel(tab, LAYERS_PANEL_ID, layers);
+    api.addPanel<PanelParameters>({
+      id: LAYERS_PANEL_ID,
+      component: LAYERS_PANEL_ID,
+      minimumHeight: LAYERS_PANEL_MIN_HEIGHT_PX,
+      params: {
+        tab,
+        focusRegion: 'layers',
+      },
+      position: {
+        direction: 'below',
+        referencePanel: gallery.id,
+      },
+    });
 
-  return { gallery, layers, boards } satisfies Record<string, IGridviewPanel>;
+    gallery.api.setSize({ height: GALLERY_PANEL_DEFAULT_HEIGHT_PX });
+    boards.api.setSize({ height: CANVAS_BOARD_PANEL_DEFAULT_HEIGHT_PX });
+  });
 };
 
 const RightPanel = memo(() => {
@@ -236,17 +216,16 @@ const leftPanelComponents: AutoLayoutGridviewComponents = {
 };
 
 const initializeLeftPanelLayout = (tab: TabName, api: GridviewApi) => {
-  const settings = api.addPanel<PanelParameters>({
-    id: SETTINGS_PANEL_ID,
-    component: SETTINGS_PANEL_ID,
-    params: {
-      tab,
-      focusRegion: 'settings',
-    },
+  navigationApi.registerContainer(tab, 'left', api, () => {
+    api.addPanel<PanelParameters>({
+      id: SETTINGS_PANEL_ID,
+      component: SETTINGS_PANEL_ID,
+      params: {
+        tab,
+        focusRegion: 'settings',
+      },
+    });
   });
-  navigationApi.registerPanel(tab, SETTINGS_PANEL_ID, settings);
-
-  return { settings } satisfies Record<string, IGridviewPanel>;
 };
 
 const LeftPanel = memo(() => {
@@ -276,44 +255,38 @@ const rootPanelComponents: RootLayoutGridviewComponents = {
 };
 
 const initializeRootPanelLayout = (tab: TabName, api: GridviewApi) => {
-  const main = api.addPanel({
-    id: MAIN_PANEL_ID,
-    component: MAIN_PANEL_ID,
-    priority: LayoutPriority.High,
-  });
-  navigationApi.registerPanel(tab, MAIN_PANEL_ID, main);
+  navigationApi.registerContainer(tab, 'root', api, () => {
+    const main = api.addPanel({
+      id: MAIN_PANEL_ID,
+      component: MAIN_PANEL_ID,
+      priority: LayoutPriority.High,
+    });
 
-  const left = api.addPanel({
-    id: LEFT_PANEL_ID,
-    component: LEFT_PANEL_ID,
-    minimumWidth: LEFT_PANEL_MIN_SIZE_PX,
-    position: {
-      direction: 'left',
-      referencePanel: main.id,
-    },
-  });
-  navigationApi.registerPanel(tab, LEFT_PANEL_ID, left, {
-    dimensions: {
-      width: LEFT_PANEL_MIN_SIZE_PX,
-    },
-  });
+    const left = api.addPanel({
+      id: LEFT_PANEL_ID,
+      component: LEFT_PANEL_ID,
+      minimumWidth: LEFT_PANEL_MIN_SIZE_PX,
+      priority: LayoutPriority.Low,
+      position: {
+        direction: 'left',
+        referencePanel: main.id,
+      },
+    });
 
-  const right = api.addPanel({
-    id: RIGHT_PANEL_ID,
-    component: RIGHT_PANEL_ID,
-    minimumWidth: RIGHT_PANEL_MIN_SIZE_PX,
-    position: {
-      direction: 'right',
-      referencePanel: main.id,
-    },
-  });
-  navigationApi.registerPanel(tab, RIGHT_PANEL_ID, right, {
-    dimensions: {
-      width: RIGHT_PANEL_MIN_SIZE_PX,
-    },
-  });
+    const right = api.addPanel({
+      id: RIGHT_PANEL_ID,
+      component: RIGHT_PANEL_ID,
+      minimumWidth: RIGHT_PANEL_MIN_SIZE_PX,
+      priority: LayoutPriority.Low,
+      position: {
+        direction: 'right',
+        referencePanel: main.id,
+      },
+    });
 
-  return { main, left, right } satisfies Record<string, IGridviewPanel>;
+    left.api.setSize({ width: LEFT_PANEL_MIN_SIZE_PX });
+    right.api.setSize({ width: RIGHT_PANEL_MIN_SIZE_PX });
+  });
 };
 
 export const CanvasTabAutoLayout = memo(() => {

@@ -1,8 +1,9 @@
-import type { GridviewApi, IGridviewPanel, IGridviewReactProps } from 'dockview';
+import type { GridviewApi, IGridviewReactProps } from 'dockview';
 import { GridviewReact, LayoutPriority, Orientation } from 'dockview';
 import QueueTab from 'features/ui/components/tabs/QueueTab';
 import type { RootLayoutGridviewComponents } from 'features/ui/layouts/auto-layout-context';
 import { AutoLayoutProvider } from 'features/ui/layouts/auto-layout-context';
+import type { TabName } from 'features/ui/store/uiTypes';
 import { memo, useCallback, useEffect } from 'react';
 
 import { navigationApi } from './navigation-api';
@@ -12,21 +13,19 @@ const rootPanelComponents: RootLayoutGridviewComponents = {
   [QUEUE_PANEL_ID]: QueueTab,
 };
 
-const initializeRootPanelLayout = (layoutApi: GridviewApi) => {
-  const queue = layoutApi.addPanel({
-    id: QUEUE_PANEL_ID,
-    component: QUEUE_PANEL_ID,
-    priority: LayoutPriority.High,
+const initializeRootPanelLayout = (tab: TabName, api: GridviewApi) => {
+  navigationApi.registerContainer(tab, 'root', api, () => {
+    api.addPanel({
+      id: QUEUE_PANEL_ID,
+      component: QUEUE_PANEL_ID,
+      priority: LayoutPriority.High,
+    });
   });
-
-  navigationApi.registerPanel('queue', QUEUE_PANEL_ID, queue);
-
-  return { queue } satisfies Record<string, IGridviewPanel>;
 };
 
 export const QueueTabAutoLayout = memo(() => {
   const onReady = useCallback<IGridviewReactProps['onReady']>(({ api }) => {
-    initializeRootPanelLayout(api);
+    initializeRootPanelLayout('queue', api);
   }, []);
 
   useEffect(
