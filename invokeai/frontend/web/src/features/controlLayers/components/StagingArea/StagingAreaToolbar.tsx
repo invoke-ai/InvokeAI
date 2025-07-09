@@ -26,7 +26,9 @@ export const StagingAreaToolbar = memo(() => {
   useEffect(() => {
     return ctx.$selectedItemId.listen((id) => {
       if (id !== null) {
-        document.getElementById(getQueueItemElementId(id))?.scrollIntoView();
+        document
+          .getElementById(getQueueItemElementId(id))
+          ?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
       }
     });
   }, [ctx.$selectedItemId]);
