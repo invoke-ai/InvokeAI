@@ -40,7 +40,6 @@ export const StagingAreaToolbarDiscardSelectedButton = memo(({ isDisabled }: { i
       icon={<PiXBold />}
       onClick={discardSelected}
       colorScheme="invokeBlue"
-      fontSize={16}
       isDisabled={selectedItemId === null || cancelQueueItem.isDisabled || isDisabled}
       isLoading={cancelQueueItem.isLoading}
     />

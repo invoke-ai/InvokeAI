@@ -37,7 +37,7 @@ export const UpscaleInitialImage = () => {
         {!imageDTO && <UploadImageIconButton w="full" h="full" isError={!imageDTO} onUpload={onUpload} fontSize={36} />}
         {imageDTO && (
           <>
-            <DndImage imageDTO={imageDTO} />
+            <DndImage imageDTO={imageDTO} borderRadius="base" />
             <Flex position="absolute" flexDir="column" top={1} insetInlineEnd={1} gap={1}>
               <DndImageIcon
                 onClick={onReset}
