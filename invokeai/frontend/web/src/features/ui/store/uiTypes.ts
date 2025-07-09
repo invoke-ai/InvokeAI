@@ -11,20 +11,6 @@ const zPartialDimensions = z.object({
   height: z.number().optional(),
 });
 
-const zDockviewPanelState = z.object({
-  id: z.string(),
-  type: z.literal('dockview-panel'),
-  isActive: z.boolean(),
-});
-export type StoredDockviewPanelState = z.infer<typeof zDockviewPanelState>;
-
-const zGridviewPanelState = z.object({
-  id: z.string(),
-  type: z.literal('gridview-panel'),
-  dimensions: zPartialDimensions,
-});
-export type StoredGridviewPanelState = z.infer<typeof zGridviewPanelState>;
-
 const zSerializable = z.any().refine(isPlainObject);
 export type Serializable = z.infer<typeof zSerializable>;
 
