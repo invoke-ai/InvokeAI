@@ -14,6 +14,7 @@ import { InvokeCanvasComponent } from 'features/controlLayers/components/InvokeC
 import { SelectObject } from 'features/controlLayers/components/SelectObject/SelectObject';
 import { CanvasSessionContextProvider } from 'features/controlLayers/components/SimpleSession/context';
 import { StagingAreaItemsList } from 'features/controlLayers/components/SimpleSession/StagingAreaItemsList';
+import { StagingAreaHasItemsGate } from 'features/controlLayers/components/StagingArea/StagingAreaHasItemsGate';
 import { StagingAreaToolbar } from 'features/controlLayers/components/StagingArea/StagingAreaToolbar';
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
@@ -106,23 +107,25 @@ export const CanvasWorkspacePanel = memo(() => {
       {canvasId !== null && (
         <CanvasManagerProviderGate>
           <CanvasSessionContextProvider type="advanced" id={canvasId}>
-            <Flex
-              position="absolute"
-              flexDir="column"
-              bottom={4}
-              gap={2}
-              align="center"
-              justify="center"
-              left={4}
-              right={4}
-            >
-              <Flex position="relative" maxW="full" w="full" h={108}>
-                <StagingAreaItemsList />
+            <StagingAreaHasItemsGate>
+              <Flex
+                position="absolute"
+                flexDir="column"
+                bottom={4}
+                gap={2}
+                align="center"
+                justify="center"
+                left={4}
+                right={4}
+              >
+                <Flex position="relative" maxW="full" w="full" h={108}>
+                  <StagingAreaItemsList />
+                </Flex>
+                <Flex gap={2}>
+                  <StagingAreaToolbar />
+                </Flex>
               </Flex>
-              <Flex gap={2}>
-                <StagingAreaToolbar />
-              </Flex>
-            </Flex>
+            </StagingAreaHasItemsGate>
           </CanvasSessionContextProvider>
         </CanvasManagerProviderGate>
       )}
