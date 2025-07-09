@@ -73,7 +73,7 @@ export const useBoolean = (initialValue: boolean): UseBoolean => {
   };
 };
 
-export type UseDisclosure = {
+type UseDisclosure = {
   isOpen: boolean;
   open: () => void;
   close: () => void;

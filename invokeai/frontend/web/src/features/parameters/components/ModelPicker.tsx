@@ -18,7 +18,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { $onClickGoToModelManager } from 'app/store/nanostores/onClickGoToModelManager';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { Group, PickerContextState } from 'common/components/Picker/Picker';
-import { buildGroup, getRegex, isOption, Picker, usePickerContext } from 'common/components/Picker/Picker';
+import { buildGroup, getRegex, isGroup, Picker, usePickerContext } from 'common/components/Picker/Picker';
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { typedMemo } from 'common/util/typedMemo';
 import { uniq } from 'es-toolkit/compat';
@@ -277,8 +277,19 @@ export const ModelPicker = typedMemo(
       if (!selectedModelConfig) {
         return undefined;
       }
+      let _selectedOption: WithStarred<T> | undefined = undefined;
 
-      return options.filter(isOption).find((o) => o.key === selectedModelConfig.key);
+      for (const optionOrGroup of options) {
+        if (isGroup(optionOrGroup)) {
+          _selectedOption = optionOrGroup.options.find((o) => o.key === selectedModelConfig.key);
+          break;
+        } else if (optionOrGroup.key === selectedModelConfig.key) {
+          _selectedOption = optionOrGroup;
+          break;
+        }
+      }
+
+      return _selectedOption;
     }, [options, selectedModelConfig]);
 
     const onClose = useCallback(() => {
@@ -361,9 +372,19 @@ const optionSx: SystemStyleObject = {
   cursor: 'pointer',
   borderRadius: 'base',
   '&[data-selected="true"]': {
-    bg: 'base.700',
+    bg: 'invokeBlue.300',
+    color: 'base.900',
+    '.extra-info': {
+      color: 'base.700',
+    },
+    '.picker-option': {
+      fontWeight: 'bold',
+      '&[data-is-compact="true"]': {
+        fontWeight: 'semibold',
+      },
+    },
     '&[data-active="true"]': {
-      bg: 'base.650',
+      bg: 'invokeBlue.250',
     },
   },
   '&[data-active="true"]': {
@@ -400,17 +421,31 @@ const PickerOptionComponent = typedMemo(
         <Flex flexDir="column" gap={1} flex={1}>
           <Flex gap={2} alignItems="center">
             {option.starred && <Icon as={PiLinkSimple} color="invokeYellow.500" boxSize={4} />}
-            <Text sx={optionNameSx} data-is-compact={compactView}>
+            <Text className="picker-option" sx={optionNameSx} data-is-compact={compactView}>
               {option.name}
             </Text>
             <Spacer />
             {option.file_size > 0 && (
-              <Text variant="subtext" fontStyle="italic" noOfLines={1} flexShrink={0} overflow="visible">
+              <Text
+                className="extra-info"
+                variant="subtext"
+                fontStyle="italic"
+                noOfLines={1}
+                flexShrink={0}
+                overflow="visible"
+              >
                 {filesize(option.file_size)}
               </Text>
             )}
             {option.usage_info && (
-              <Text variant="subtext" fontStyle="italic" noOfLines={1} flexShrink={0} overflow="visible">
+              <Text
+                className="extra-info"
+                variant="subtext"
+                fontStyle="italic"
+                noOfLines={1}
+                flexShrink={0}
+                overflow="visible"
+              >
                 {option.usage_info}
               </Text>
             )}

@@ -9,7 +9,12 @@ import { GalleryHeader } from 'features/gallery/components/GalleryHeader';
 import { selectBoardSearchText } from 'features/gallery/store/gallerySelectors';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
-import { BOARD_PANEL_DEFAULT_HEIGHT_PX, BOARD_PANEL_MIN_HEIGHT_PX, BOARDS_PANEL_ID } from 'features/ui/layouts/shared';
+import {
+  BOARD_PANEL_DEFAULT_HEIGHT_PX,
+  BOARD_PANEL_MIN_EXPANDED_HEIGHT_PX,
+  BOARD_PANEL_MIN_HEIGHT_PX,
+  BOARDS_PANEL_ID,
+} from 'features/ui/layouts/shared';
 import { useCollapsibleGridviewPanel } from 'features/ui/layouts/use-collapsible-gridview-panel';
 import type { CSSProperties } from 'react';
 import { memo, useCallback } from 'react';
@@ -27,7 +32,8 @@ export const BoardsPanel = memo(() => {
     BOARDS_PANEL_ID,
     'vertical',
     BOARD_PANEL_DEFAULT_HEIGHT_PX,
-    BOARD_PANEL_MIN_HEIGHT_PX
+    BOARD_PANEL_MIN_HEIGHT_PX,
+    BOARD_PANEL_MIN_EXPANDED_HEIGHT_PX
   );
   const isCollapsed = useStore(collapsibleApi.$isCollapsed);
   const { t } = useTranslation();

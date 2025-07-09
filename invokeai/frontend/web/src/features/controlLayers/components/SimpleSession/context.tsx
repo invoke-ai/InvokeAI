@@ -4,6 +4,8 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppStore } from 'app/store/storeHooks';
 import { buildZodTypeGuard } from 'common/util/zodUtils';
 import { getOutputImageName } from 'features/controlLayers/components/SimpleSession/shared';
+import { selectDefaultAutoSwitch } from 'features/controlLayers/store/canvasSettingsSlice';
+import { canvasQueueItemDiscarded, selectDiscardedItems } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { ProgressImage } from 'features/nodes/types/common';
 import type { Atom, MapStore, StoreValue, WritableAtom } from 'nanostores';
 import { atom, computed, effect, map, subscribeKeys } from 'nanostores';
@@ -18,7 +20,7 @@ import { z } from 'zod/v4';
 
 const zAutoSwitchMode = z.enum(['off', 'switch_on_start', 'switch_on_finish']);
 export const isAutoSwitchMode = buildZodTypeGuard(zAutoSwitchMode);
-export type AutoSwitchMode = z.infer<typeof zAutoSwitchMode>;
+type AutoSwitchMode = z.infer<typeof zAutoSwitchMode>;
 
 export type ProgressData = {
   itemId: number;
@@ -104,6 +106,7 @@ type CanvasSessionContextValue = {
   selectFirst: () => void;
   selectLast: () => void;
   onImageLoad: (itemId: number) => void;
+  discard: (itemId: number) => void;
 };
 
 const CanvasSessionContext = createContext<CanvasSessionContextValue | null>(null);
@@ -143,7 +146,8 @@ export const CanvasSessionContextProvider = memo(
     /**
      * Whether auto-switch is enabled.
      */
-    const $autoSwitch = useState(() => atom<AutoSwitchMode>('switch_on_start'))[0];
+    const defaultAutoSwitch = selectDefaultAutoSwitch(store.getState());
+    const $autoSwitch = useState(() => atom<AutoSwitchMode>(defaultAutoSwitch))[0];
 
     /**
      * An internal flag used to work around race conditions with auto-switch switching to queue items before their
@@ -233,10 +237,24 @@ export const CanvasSessionContextProvider = memo(
     const selectQueueItems = useMemo(
       () =>
         createSelector(
-          queueApi.endpoints.listAllQueueItems.select({ destination: session.id }),
-          ({ data }) => data ?? EMPTY_ARRAY
+          [queueApi.endpoints.listAllQueueItems.select({ destination: session.id }), selectDiscardedItems],
+          ({ data }, discardedItems) => {
+            if (!data) {
+              return EMPTY_ARRAY;
+            }
+            return data.filter(
+              ({ status, item_id }) => status !== 'canceled' && status !== 'failed' && !discardedItems.includes(item_id)
+            );
+          }
         ),
       [session.id]
+    );
+
+    const discard = useCallback(
+      (itemId: number) => {
+        store.dispatch(canvasQueueItemDiscarded({ itemId }));
+      },
+      [store]
     );
 
     const selectNext = useCallback(() => {
@@ -362,33 +380,32 @@ export const CanvasSessionContextProvider = memo(
       const unsubEnsureSelectedItemIdExists = effect(
         [$items, $selectedItemId, $lastStartedItemId],
         (items, selectedItemId, lastStartedItemId) => {
-          // If there are no items, cannot have a selected item.
           if (items.length === 0) {
+            // If there are no items, cannot have a selected item.
             $selectedItemId.set(null);
-            return;
-          }
-          // If there is no selected item but there are items, select the first one.
-          if (selectedItemId === null && items.length > 0) {
+          } else if (selectedItemId === null && items.length > 0) {
+            // If there is no selected item but there are items, select the first one.
             $selectedItemId.set(items[0]?.item_id ?? null);
             return;
-          }
-          if (
+          } else if (
             $autoSwitch.get() === 'switch_on_start' &&
             items.findIndex(({ item_id }) => item_id === lastStartedItemId) !== -1
           ) {
             $selectedItemId.set(lastStartedItemId);
             $lastStartedItemId.set(null);
-          }
-          // If an item is selected and it is not in the list of items, un-set it. This effect will run again and we'll
-          // the above case, selecting the first item if there are any.
-          if (selectedItemId !== null && items.findIndex(({ item_id }) => item_id === selectedItemId) === -1) {
+          } else if (selectedItemId !== null && items.findIndex(({ item_id }) => item_id === selectedItemId) === -1) {
+            // If an item is selected and it is not in the list of items, un-set it. This effect will run again and we'll
+            // the above case, selecting the first item if there are any.
             let prevIndex = _prevItems.findIndex(({ item_id }) => item_id === selectedItemId);
             if (prevIndex >= items.length) {
               prevIndex = items.length - 1;
             }
             const nextItem = items[prevIndex];
             $selectedItemId.set(nextItem?.item_id ?? null);
-            return;
+          }
+
+          if (items !== _prevItems) {
+            _prevItems = items;
           }
         }
       );
@@ -409,12 +426,12 @@ export const CanvasSessionContextProvider = memo(
           if (!item) {
             toDelete.push(datum.itemId);
           } else if (item.status === 'canceled' || item.status === 'failed') {
-            toUpdate[datum.itemId] = {
+            toUpdate.push({
               ...datum,
               progressEvent: null,
               progressImage: null,
               imageDTO: null,
-            };
+            });
           }
         }
 
@@ -498,8 +515,8 @@ export const CanvasSessionContextProvider = memo(
         $selectedItemId.set(null);
       };
     }, [
-      $autoSwitch,
       $items,
+      $autoSwitch,
       $lastLoadedItemId,
       $lastStartedItemId,
       $progressData,
@@ -527,6 +544,7 @@ export const CanvasSessionContextProvider = memo(
         selectFirst,
         selectLast,
         onImageLoad,
+        discard,
       }),
       [
         $autoSwitch,
@@ -545,6 +563,7 @@ export const CanvasSessionContextProvider = memo(
         selectFirst,
         selectLast,
         onImageLoad,
+        discard,
       ]
     );
 

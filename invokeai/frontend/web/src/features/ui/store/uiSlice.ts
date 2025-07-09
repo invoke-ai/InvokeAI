@@ -1,9 +1,8 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSelector, createSlice } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { atom } from 'nanostores';
 
-import type { TabName, UIState } from './uiTypes';
+import type { UIState } from './uiTypes';
 import { getInitialUIState } from './uiTypes';
 
 export const uiSlice = createSlice({
@@ -52,14 +51,22 @@ export const uiSlice = createSlice({
       const { id, size } = action.payload;
       state.textAreaSizes[id] = size;
     },
+    panelStateChanged: (
+      state,
+      action: PayloadAction<{
+        id: keyof UIState['panels'];
+        state: UIState['panels'][keyof UIState['panels']] | undefined;
+      }>
+    ) => {
+      const { id, state: panelState } = action.payload;
+      if (panelState) {
+        state.panels[id] = panelState;
+      } else {
+        delete state.panels[id];
+      }
+    },
     shouldShowNotificationChanged: (state, action: PayloadAction<UIState['shouldShowNotificationV2']>) => {
       state.shouldShowNotificationV2 = action.payload;
-    },
-    showGenerateTabSplashScreenChanged: (state, action: PayloadAction<UIState['showGenerateTabSplashScreen']>) => {
-      state.showGenerateTabSplashScreen = action.payload;
-    },
-    showCanvasTabSplashScreenChanged: (state, action: PayloadAction<UIState['showCanvasTabSplashScreen']>) => {
-      state.showCanvasTabSplashScreen = action.payload;
     },
   },
 });
@@ -73,8 +80,7 @@ export const {
   expanderStateChanged,
   shouldShowNotificationChanged,
   textAreaSizesStateChanged,
-  showGenerateTabSplashScreenChanged,
-  showCanvasTabSplashScreenChanged,
+  panelStateChanged,
 } = uiSlice.actions;
 
 export const selectUiSlice = (state: RootState) => state.ui;
@@ -101,13 +107,3 @@ export const uiPersistConfig: PersistConfig<UIState> = {
   migrate: migrateUIState,
   persistDenylist: ['shouldShowImageDetails'],
 };
-
-const TABS_WITH_LEFT_PANEL: TabName[] = ['canvas', 'upscaling', 'workflows', 'generate'] as const;
-export const LEFT_PANEL_MIN_SIZE_PX = 420;
-export const $isLeftPanelOpen = atom(true);
-export const selectWithLeftPanel = createSelector(selectUiSlice, (ui) => TABS_WITH_LEFT_PANEL.includes(ui.activeTab));
-
-const TABS_WITH_RIGHT_PANEL: TabName[] = ['canvas', 'upscaling', 'workflows', 'generate'] as const;
-export const RIGHT_PANEL_MIN_SIZE_PX = 420;
-export const $isRightPanelOpen = atom(true);
-export const selectWithRightPanel = createSelector(selectUiSlice, (ui) => TABS_WITH_RIGHT_PANEL.includes(ui.activeTab));

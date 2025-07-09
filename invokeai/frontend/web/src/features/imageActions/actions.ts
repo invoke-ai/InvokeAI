@@ -85,7 +85,12 @@ export const createNewCanvasEntityFromImage = async (arg: {
 }) => {
   const { type, imageDTO, dispatch, getState, withResize, overrides: _overrides } = arg;
   const state = getState();
-  const { x, y, width, height } = selectBboxRect(state);
+  const { x, y } = selectBboxRect(state);
+
+  const base = selectBboxModelBase(state);
+  const ratio = imageDTO.width / imageDTO.height;
+  const optimalDimension = getOptimalDimension(base);
+  const { width, height } = calculateNewSize(ratio, optimalDimension ** 2, base);
 
   let imageObject: CanvasImageState;
 

@@ -16,13 +16,10 @@ import { addRegions } from 'features/nodes/util/graph/generation/addRegions';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import {
-  getSizes,
-  selectCanvasOutputFields,
-  selectPresetModifiedPrompts,
-} from 'features/nodes/util/graph/graphBuilderUtils';
+import { selectCanvasOutputFields } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
@@ -37,29 +34,16 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   const { generationMode, state, manager } = arg;
   log.debug({ generationMode, manager: manager?.id }, 'Building FLUX graph');
 
+  const model = selectMainModelConfig(state);
+  assert(model, 'No model selected');
+  assert(model.base === 'flux', 'Selected model is not a FLUX model');
+
   const params = selectParamsSlice(state);
   const canvas = selectCanvasSlice(state);
   const refImages = selectRefImagesSlice(state);
 
-  const { bbox } = canvas;
+  const { guidance: baseGuidance, steps, fluxVAE, t5EncoderModel, clipEmbedModel } = params;
 
-  const { originalSize, scaledSize } = getSizes(bbox);
-
-  const model = selectMainModelConfig(state);
-
-  const {
-    guidance: baseGuidance,
-    seed,
-    steps,
-    fluxVAE,
-    t5EncoderModel,
-    clipEmbedModel,
-    img2imgStrength,
-    optimizedDenoisingEnabled,
-  } = params;
-
-  assert(model, 'No model found in state');
-  assert(model.base === 'flux', 'Model is not a FLUX model');
   assert(t5EncoderModel, 'No T5 Encoder model found in state');
   assert(clipEmbedModel, 'No CLIP Embed model found in state');
   assert(fluxVAE, 'No FLUX VAE model found in state');
@@ -94,13 +78,10 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     if (generationMode !== 'txt2img') {
       throw new UnsupportedGenerationModeError(t('toast.fluxKontextIncompatibleGenerationMode'));
     }
-
-    guidance = 30;
   }
 
-  const { positivePrompt } = selectPresetModifiedPrompts(state);
-
   const g = new Graph(getPrefixedId('flux_graph'));
+
   const modelLoader = g.addNode({
     type: 'flux_model_loader',
     id: getPrefixedId('flux_model_loader'),
@@ -110,32 +91,62 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     vae_model: fluxVAE,
   });
 
+  const positivePrompt = g.addNode({
+    id: getPrefixedId('positive_prompt'),
+    type: 'string',
+  });
   const posCond = g.addNode({
     type: 'flux_text_encoder',
     id: getPrefixedId('flux_text_encoder'),
-    prompt: positivePrompt,
   });
   const posCondCollect = g.addNode({
     type: 'collect',
     id: getPrefixedId('pos_cond_collect'),
   });
 
+  const seed = g.addNode({
+    id: getPrefixedId('seed'),
+    type: 'integer',
+  });
   const denoise = g.addNode({
     type: 'flux_denoise',
     id: getPrefixedId('flux_denoise'),
     guidance,
     num_steps: steps,
-    seed,
-    denoising_start: 0,
-    denoising_end: 1,
-    width: scaledSize.width,
-    height: scaledSize.height,
   });
 
   const l2i = g.addNode({
     type: 'flux_vae_decode',
     id: getPrefixedId('flux_vae_decode'),
   });
+
+  g.addEdge(modelLoader, 'transformer', denoise, 'transformer');
+  g.addEdge(modelLoader, 'vae', denoise, 'controlnet_vae');
+  g.addEdge(modelLoader, 'vae', l2i, 'vae');
+
+  g.addEdge(modelLoader, 'clip', posCond, 'clip');
+  g.addEdge(modelLoader, 't5_encoder', posCond, 't5_encoder');
+  g.addEdge(modelLoader, 'max_seq_len', posCond, 't5_max_seq_len');
+
+  g.addEdge(positivePrompt, 'value', posCond, 'prompt');
+  g.addEdge(posCond, 'conditioning', posCondCollect, 'item');
+  g.addEdge(posCondCollect, 'collection', denoise, 'positive_text_conditioning');
+
+  g.addEdge(seed, 'value', denoise, 'seed');
+  g.addEdge(denoise, 'latents', l2i, 'latents');
+
+  addFLUXLoRAs(state, g, denoise, modelLoader, posCond);
+
+  g.upsertMetadata({
+    guidance,
+    model: Graph.getModelMetadataField(model),
+    steps,
+    vae: fluxVAE,
+    t5_encoder: t5EncoderModel,
+    clip_embed_model: clipEmbedModel,
+  });
+  g.addEdgeToMetadata(seed, 'value', 'seed');
+  g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
 
   if (isFluxKontextDev) {
     const validFLUXKontextConfigs = selectRefImagesSlice(state)
@@ -162,107 +173,74 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     }
   }
 
-  g.addEdge(modelLoader, 'transformer', denoise, 'transformer');
-  g.addEdge(modelLoader, 'vae', denoise, 'controlnet_vae');
-  g.addEdge(modelLoader, 'vae', l2i, 'vae');
-
-  g.addEdge(modelLoader, 'clip', posCond, 'clip');
-  g.addEdge(modelLoader, 't5_encoder', posCond, 't5_encoder');
-  g.addEdge(modelLoader, 'max_seq_len', posCond, 't5_max_seq_len');
-  g.addEdge(posCond, 'conditioning', posCondCollect, 'item');
-  g.addEdge(posCondCollect, 'collection', denoise, 'positive_text_conditioning');
-  g.addEdge(denoise, 'latents', l2i, 'latents');
-
-  addFLUXLoRAs(state, g, denoise, modelLoader, posCond);
-
-  g.upsertMetadata({
-    guidance,
-    width: originalSize.width,
-    height: originalSize.height,
-    positive_prompt: positivePrompt,
-    model: Graph.getModelMetadataField(model),
-    seed,
-    steps,
-    vae: fluxVAE,
-    t5_encoder: t5EncoderModel,
-    clip_embed_model: clipEmbedModel,
-  });
-
-  let denoising_start: number;
-  if (optimizedDenoisingEnabled) {
-    // We rescale the img2imgStrength (with exponent 0.2) to effectively use the entire range [0, 1] and make the scale
-    // more user-friendly for FLUX. Without this, most of the 'change' is concentrated in the high denoise strength
-    // range (>0.9).
-    denoising_start = 1 - img2imgStrength ** 0.2;
-  } else {
-    denoising_start = 1 - img2imgStrength;
-  }
-
   let canvasOutput: Invocation<ImageOutputNodes> = l2i;
 
   if (isFLUXFill && (generationMode === 'inpaint' || generationMode === 'outpaint')) {
     assert(manager !== null);
     canvasOutput = await addFLUXFill({
-      state,
       g,
+      state,
       manager,
       l2i,
       denoise,
-      originalSize,
-      scaledSize,
     });
   } else if (generationMode === 'txt2img') {
-    canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
+    canvasOutput = addTextToImage({
+      g,
+      state,
+      denoise,
+      l2i,
+    });
     g.upsertMetadata({ generation_mode: 'flux_txt2img' });
   } else if (generationMode === 'img2img') {
     assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'flux_vae_encode',
+      id: getPrefixedId('flux_vae_encode'),
+    });
     canvasOutput = await addImageToImage({
       g,
+      state,
       manager,
       l2i,
-      i2lNodeType: 'flux_vae_encode',
+      i2l,
       denoise,
       vaeSource: modelLoader,
-      originalSize,
-      scaledSize,
-      bbox,
-      denoising_start,
-      fp32: false,
     });
     g.upsertMetadata({ generation_mode: 'flux_img2img' });
   } else if (generationMode === 'inpaint') {
     assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'flux_vae_encode',
+      id: getPrefixedId('flux_vae_encode'),
+    });
     canvasOutput = await addInpaint({
-      state,
       g,
+      state,
       manager,
       l2i,
-      i2lNodeType: 'flux_vae_encode',
+      i2l,
       denoise,
       vaeSource: modelLoader,
       modelLoader,
-      originalSize,
-      scaledSize,
-      denoising_start,
-      fp32: false,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'flux_inpaint' });
   } else if (generationMode === 'outpaint') {
     assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'flux_vae_encode',
+      id: getPrefixedId('flux_vae_encode'),
+    });
     canvasOutput = await addOutpaint({
-      state,
       g,
+      state,
       manager,
       l2i,
-      i2lNodeType: 'flux_vae_encode',
+      i2l,
       denoise,
       vaeSource: modelLoader,
       modelLoader,
-      originalSize,
-      scaledSize,
-      denoising_start,
-      fp32: false,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'flux_outpaint' });
@@ -365,14 +343,17 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     canvasOutput = addWatermarker(g, canvasOutput);
   }
 
-  g.upsertMetadata(selectCanvasMetadata(state));
-
   g.updateNode(canvasOutput, selectCanvasOutputFields(state));
 
+  if (selectActiveTab(state) === 'canvas') {
+    g.upsertMetadata(selectCanvasMetadata(state));
+  }
+
   g.setMetadataReceivingNode(canvasOutput);
+
   return {
     g,
-    seedFieldIdentifier: { nodeId: denoise.id, fieldName: 'seed' },
-    positivePromptFieldIdentifier: { nodeId: posCond.id, fieldName: 'prompt' },
+    seed,
+    positivePrompt,
   };
 };

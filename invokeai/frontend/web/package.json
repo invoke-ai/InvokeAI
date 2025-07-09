@@ -38,19 +38,6 @@
     "test:ui": "vitest --coverage --ui",
     "test:no-watch": "vitest --no-watch"
   },
-  "madge": {
-    "excludeRegExp": [
-      "^index.ts$"
-    ],
-    "detectiveOptions": {
-      "ts": {
-        "skipTypeImports": true
-      },
-      "tsx": {
-        "skipTypeImports": true
-      }
-    }
-  },
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^1.7.4",
     "@atlaskit/pragmatic-drag-and-drop-auto-scroll": "^2.1.1",
@@ -147,7 +134,7 @@
     "eslint": "^8.57.1",
     "eslint-plugin-i18next": "^6.1.1",
     "eslint-plugin-path": "^1.3.0",
-    "knip": "^5.50.5",
+    "knip": "^5.61.3",
     "openapi-types": "^12.1.3",
     "openapi-typescript": "^7.6.1",
     "prettier": "^3.5.3",
@@ -156,7 +143,7 @@
     "tsafe": "^1.8.5",
     "type-fest": "^4.40.0",
     "typescript": "^5.8.3",
-    "vite": "^6.3.3",
+    "vite": "^7.0.2",
     "vite-plugin-css-injected-by-js": "^3.5.2",
     "vite-plugin-dts": "^4.5.3",
     "vite-plugin-eslint": "^1.8.1",
@@ -164,7 +151,7 @@
     "vitest": "^3.1.2"
   },
   "engines": {
-    "pnpm": "8"
+    "pnpm": "10"
   },
-  "packageManager": "pnpm@8.15.9+sha512.499434c9d8fdd1a2794ebf4552b3b25c0a633abcee5bb15e7b5de90f32f47b513aca98cd5cfd001c31f0db454bc3804edccd578501e4ca293a6816166bbd9f81"
+  "packageManager": "pnpm@10.12.4"
 }

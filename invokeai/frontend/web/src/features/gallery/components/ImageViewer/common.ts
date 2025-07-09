@@ -63,8 +63,4 @@ export const selectComparisonImages = createMemoizedSelector(selectGallerySlice,
   const secondImage = gallerySlice.imageToCompare;
   return { firstImage, secondImage };
 });
-export const selectFirstImage = createSelector(
-  selectGallerySlice,
-  (gallerySlice) => gallerySlice.selection.slice(-1)[0] ?? null
-);
 export const selectImageToCompare = createSelector(selectGallerySlice, (gallerySlice) => gallerySlice.imageToCompare);

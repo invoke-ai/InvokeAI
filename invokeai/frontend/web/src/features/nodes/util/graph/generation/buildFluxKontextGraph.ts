@@ -2,13 +2,15 @@ import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import { isFluxKontextReferenceImageConfig } from 'features/controlLayers/store/types';
+import { isFluxKontextAspectRatioID, isFluxKontextReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import type { ImageField } from 'features/nodes/types/common';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import {
+  getOriginalAndScaledSizesForTextToImage,
+  selectCanvasOutputFields,
+} from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { t } from 'i18next';
@@ -19,22 +21,20 @@ const log = logger('system');
 export const buildFluxKontextGraph = (arg: GraphBuilderArg): GraphBuilderReturn => {
   const { generationMode, state, manager } = arg;
 
+  const model = selectMainModelConfig(state);
+  assert(model, 'No model selected');
+  assert(model.base === 'flux-kontext', 'Selected model is not a FLUX Kontext API model');
+
   if (generationMode !== 'txt2img') {
-    throw new UnsupportedGenerationModeError(t('toast.imagenIncompatibleGenerationMode', { model: 'FLUX Kontext' }));
+    throw new UnsupportedGenerationModeError(t('toast.fluxKontextIncompatibleGenerationMode'));
   }
 
   log.debug({ generationMode, manager: manager?.id }, 'Building FLUX Kontext graph');
 
-  const model = selectMainModelConfig(state);
+  const { originalSize, aspectRatio } = getOriginalAndScaledSizesForTextToImage(state);
+  assert(isFluxKontextAspectRatioID(aspectRatio.id), 'FLUX Kontext does not support this aspect ratio');
 
-  const canvas = selectCanvasSlice(state);
   const refImages = selectRefImagesSlice(state);
-
-  const { bbox } = canvas;
-  const { positivePrompt } = selectPresetModifiedPrompts(state);
-
-  assert(model, 'No model found in state');
-  assert(model.base === 'flux-kontext', 'Model is not a Flux Kontext model');
 
   const validRefImages = refImages.entities
     .filter((entity) => entity.isEnabled)
@@ -54,24 +54,35 @@ export const buildFluxKontextGraph = (arg: GraphBuilderArg): GraphBuilderReturn 
   }
 
   const g = new Graph(getPrefixedId('flux_kontext_txt2img_graph'));
+  const positivePrompt = g.addNode({
+    id: getPrefixedId('positive_prompt'),
+    type: 'string',
+  });
   const fluxKontextImage = g.addNode({
     // @ts-expect-error: These nodes are not available in the OSS application
     type: input_image ? 'flux_kontext_edit_image' : 'flux_kontext_generate_image',
     model: zModelIdentifierField.parse(model),
-    positive_prompt: positivePrompt,
-    aspect_ratio: bbox.aspectRatio.id,
+    aspect_ratio: aspectRatio.id,
     input_image,
     prompt_upsampling: true,
     ...selectCanvasOutputFields(state),
   });
+
+  g.addEdge(
+    positivePrompt,
+    'value',
+    fluxKontextImage,
+    // @ts-expect-error: These nodes are not available in the OSS application
+    'positive_prompt'
+  );
+  g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
   g.upsertMetadata({
-    positive_prompt: positivePrompt,
     model: Graph.getModelMetadataField(model),
-    width: bbox.rect.width,
-    height: bbox.rect.height,
+    width: originalSize.width,
+    height: originalSize.height,
   });
   return {
     g,
-    positivePromptFieldIdentifier: { nodeId: fluxKontextImage.id, fieldName: 'positive_prompt' },
+    positivePrompt,
   };
 };

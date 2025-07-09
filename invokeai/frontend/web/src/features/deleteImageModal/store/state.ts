@@ -11,7 +11,7 @@ import {
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasState, RefImagesState } from 'features/controlLayers/store/types';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
-import { selectListImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { selectGetImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { fieldImageCollectionValueChanged, fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
@@ -80,7 +80,7 @@ const handleDeletions = async (image_names: string[], store: AppStore) => {
   try {
     const { dispatch, getState } = store;
     const state = getState();
-    const { data } = imagesApi.endpoints.getImageNames.select(selectListImageNamesQueryArgs(state))(state);
+    const { data } = imagesApi.endpoints.getImageNames.select(selectGetImageNamesQueryArgs(state))(state);
     const index = data?.image_names.findIndex((name) => name === image_names[0]);
     const { deleted_images } = await dispatch(
       imagesApi.endpoints.deleteImages.initiate({ image_names }, { track: false })

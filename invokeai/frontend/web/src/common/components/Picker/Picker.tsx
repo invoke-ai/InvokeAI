@@ -87,12 +87,8 @@ export const buildGroup = <T extends object>(group: Omit<Group<T>, typeof unique
   [uniqueGroupKey]: true,
 });
 
-const isGroup = <T extends object>(optionOrGroup: OptionOrGroup<T>): optionOrGroup is Group<T> => {
+export const isGroup = <T extends object>(optionOrGroup: OptionOrGroup<T>): optionOrGroup is Group<T> => {
   return uniqueGroupKey in optionOrGroup && optionOrGroup[uniqueGroupKey] === true;
-};
-
-export const isOption = <T extends object>(optionOrGroup: OptionOrGroup<T>): optionOrGroup is T => {
-  return !(uniqueGroupKey in optionOrGroup);
 };
 
 const DefaultOptionComponent = typedMemo(<T extends object>({ option }: { option: T }) => {

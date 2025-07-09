@@ -15,6 +15,7 @@ import { CanvasSettingsBboxOverlaySwitch } from 'features/controlLayers/componen
 import { CanvasSettingsClearCachesButton } from 'features/controlLayers/components/Settings/CanvasSettingsClearCachesButton';
 import { CanvasSettingsClearHistoryButton } from 'features/controlLayers/components/Settings/CanvasSettingsClearHistoryButton';
 import { CanvasSettingsClipToBboxCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsClipToBboxCheckbox';
+import { CanvasSettingsDefaultAutoSwitchSelect } from 'features/controlLayers/components/Settings/CanvasSettingsDefaultAutoSwitchSelect';
 import { CanvasSettingsDynamicGridSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsDynamicGridSwitch';
 import { CanvasSettingsSnapToGridCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsGridSize';
 import { CanvasSettingsInvertScrollCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsInvertScrollCheckbox';
@@ -26,6 +27,7 @@ import { CanvasSettingsPreserveMaskCheckbox } from 'features/controlLayers/compo
 import { CanvasSettingsPressureSensitivityCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsPressureSensitivity';
 import { CanvasSettingsRecalculateRectsButton } from 'features/controlLayers/components/Settings/CanvasSettingsRecalculateRectsButton';
 import { CanvasSettingsRuleOfThirdsSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsRuleOfThirdsGuideSwitch';
+import { CanvasSettingsSaveAllImagesToGalleryCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsSaveAllImagesToGalleryCheckbox';
 import { CanvasSettingsShowHUDSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsShowHUDSwitch';
 import { CanvasSettingsShowProgressOnCanvas } from 'features/controlLayers/components/Settings/CanvasSettingsShowProgressOnCanvasSwitch';
 import { memo } from 'react';
@@ -56,11 +58,13 @@ export const CanvasSettingsPopover = memo(() => {
                   {t('hotkeys.canvas.settings.behavior')}
                 </Text>
               </Flex>
+              <CanvasSettingsDefaultAutoSwitchSelect />
               <CanvasSettingsInvertScrollCheckbox />
               <CanvasSettingsPressureSensitivityCheckbox />
               <CanvasSettingsPreserveMaskCheckbox />
               <CanvasSettingsClipToBboxCheckbox />
               <CanvasSettingsOutputOnlyMaskedRegionsCheckbox />
+              <CanvasSettingsSaveAllImagesToGalleryCheckbox />
             </Flex>
 
             <Divider />

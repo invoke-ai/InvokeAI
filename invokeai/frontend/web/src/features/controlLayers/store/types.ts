@@ -30,7 +30,6 @@ import {
   zParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
-import type { ImageDTO } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 import { z } from 'zod/v4';
 
@@ -383,7 +382,7 @@ const zControlLoRAConfig = z.object({
 });
 export type ControlLoRAConfig = z.infer<typeof zControlLoRAConfig>;
 
-export const zCanvasRasterLayerState = zCanvasEntityBase.extend({
+const zCanvasRasterLayerState = zCanvasEntityBase.extend({
   type: z.literal('raster_layer'),
   position: zCoordinate,
   opacity: zOpacity,
@@ -432,35 +431,57 @@ export type LoRA = {
   weight: number;
 };
 
-export type StagingAreaImage = {
-  type: 'staged';
-  sessionId: string;
-  imageDTO: ImageDTO;
-  offsetX: number;
-  offsetY: number;
-};
-export type StagingAreaProgressImage = {
-  type: 'progress';
-  sessionId: string;
-};
 export type EphemeralProgressImage = { sessionId: string; image: ProgressImage };
 
 export const zAspectRatioID = z.enum(['Free', '21:9', '9:21', '16:9', '3:2', '4:3', '1:1', '3:4', '2:3', '9:16']);
-
-export const zImagen3AspectRatioID = z.enum(['16:9', '4:3', '1:1', '3:4', '9:16']);
-export const isImagenAspectRatioID = (v: unknown): v is z.infer<typeof zImagen3AspectRatioID> =>
-  zImagen3AspectRatioID.safeParse(v).success;
-
-export const zChatGPT4oAspectRatioID = z.enum(['3:2', '1:1', '2:3']);
-export const isChatGPT4oAspectRatioID = (v: unknown): v is z.infer<typeof zChatGPT4oAspectRatioID> =>
-  zChatGPT4oAspectRatioID.safeParse(v).success;
-
-export const zFluxKontextAspectRatioID = z.enum(['21:9', '4:3', '1:1', '3:4', '9:21', '16:9', '9:16']);
-export const isFluxKontextAspectRatioID = (v: unknown): v is z.infer<typeof zFluxKontextAspectRatioID> =>
-  zFluxKontextAspectRatioID.safeParse(v).success;
-
 export type AspectRatioID = z.infer<typeof zAspectRatioID>;
 export const isAspectRatioID = (v: unknown): v is AspectRatioID => zAspectRatioID.safeParse(v).success;
+export const ASPECT_RATIO_MAP: Record<Exclude<AspectRatioID, 'Free'>, { ratio: number; inverseID: AspectRatioID }> = {
+  '21:9': { ratio: 21 / 9, inverseID: '9:21' },
+  '16:9': { ratio: 16 / 9, inverseID: '9:16' },
+  '3:2': { ratio: 3 / 2, inverseID: '2:3' },
+  '4:3': { ratio: 4 / 3, inverseID: '4:3' },
+  '1:1': { ratio: 1, inverseID: '1:1' },
+  '3:4': { ratio: 3 / 4, inverseID: '4:3' },
+  '2:3': { ratio: 2 / 3, inverseID: '3:2' },
+  '9:16': { ratio: 9 / 16, inverseID: '16:9' },
+  '9:21': { ratio: 9 / 21, inverseID: '21:9' },
+};
+
+export const zImagen3AspectRatioID = z.enum(['16:9', '4:3', '1:1', '3:4', '9:16']);
+type ImagenAspectRatio = z.infer<typeof zImagen3AspectRatioID>;
+export const isImagenAspectRatioID = (v: unknown): v is ImagenAspectRatio => zImagen3AspectRatioID.safeParse(v).success;
+export const IMAGEN_ASPECT_RATIOS: Record<ImagenAspectRatio, Dimensions> = {
+  '16:9': { width: 1408, height: 768 },
+  '4:3': { width: 1280, height: 896 },
+  '1:1': { width: 1024, height: 1024 },
+  '3:4': { width: 896, height: 1280 },
+  '9:16': { width: 768, height: 1408 },
+};
+
+export const zChatGPT4oAspectRatioID = z.enum(['3:2', '1:1', '2:3']);
+type ChatGPT4oAspectRatio = z.infer<typeof zChatGPT4oAspectRatioID>;
+export const isChatGPT4oAspectRatioID = (v: unknown): v is ChatGPT4oAspectRatio =>
+  zChatGPT4oAspectRatioID.safeParse(v).success;
+export const CHATGPT_ASPECT_RATIOS: Record<ChatGPT4oAspectRatio, Dimensions> = {
+  '3:2': { width: 1536, height: 1024 },
+  '1:1': { width: 1024, height: 1024 },
+  '2:3': { width: 1024, height: 1536 },
+} as const;
+
+export const zFluxKontextAspectRatioID = z.enum(['21:9', '4:3', '1:1', '3:4', '9:21', '16:9', '9:16']);
+type FluxKontextAspectRatio = z.infer<typeof zFluxKontextAspectRatioID>;
+export const isFluxKontextAspectRatioID = (v: unknown): v is z.infer<typeof zFluxKontextAspectRatioID> =>
+  zFluxKontextAspectRatioID.safeParse(v).success;
+export const FLUX_KONTEXT_ASPECT_RATIOS: Record<FluxKontextAspectRatio, Dimensions> = {
+  '3:4': { width: 880, height: 1184 },
+  '4:3': { width: 1184, height: 880 },
+  '9:16': { width: 752, height: 1392 },
+  '16:9': { width: 1392, height: 752 },
+  '21:9': { width: 1568, height: 672 },
+  '9:21': { width: 672, height: 1568 },
+  '1:1': { width: 1024, height: 1024 },
+};
 
 const zAspectRatioConfig = z.object({
   id: zAspectRatioID,
@@ -489,6 +510,16 @@ const zBboxState = z.object({
   }),
   scaleMethod: zBoundingBoxScaleMethod,
   modelBase: zMainModelBase,
+});
+
+const zDimensionsState = z.object({
+  rect: z.object({
+    x: z.number().int(),
+    y: z.number().int(),
+    width: zParameterImageDimension,
+    height: zParameterImageDimension,
+  }),
+  aspectRatio: zAspectRatioConfig,
 });
 
 const zParamsState = z.object({
@@ -539,6 +570,10 @@ const zParamsState = z.object({
   clipLEmbedModel: zParameterCLIPLEmbedModel.nullable().default(null),
   clipGEmbedModel: zParameterCLIPGEmbedModel.nullable().default(null),
   controlLora: zParameterControlLoRAModel.nullable().default(null),
+  dimensions: zDimensionsState.default({
+    rect: { x: 0, y: 0, width: 512, height: 512 },
+    aspectRatio: DEFAULT_ASPECT_RATIO_CONFIG,
+  }),
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 const INITIAL_PARAMS_STATE = zParamsState.parse({});
@@ -578,7 +613,7 @@ const zCanvasState = z.object({
 });
 export type CanvasState = z.infer<typeof zCanvasState>;
 
-export const zRefImagesState = z.object({
+const zRefImagesState = z.object({
   selectedEntityId: z.string().nullable().default(null),
   isPanelOpen: z.boolean().default(false),
   entities: z.array(zRefImageState).default(() => []),

@@ -59,13 +59,11 @@ export const useDynamicPromptsWatcher = () => {
       return;
     }
 
-    const { positivePrompt } = presetModifiedPrompts;
-
     // Before we execute, imperatively check the dynamic prompts query cache to see if we have already fetched this prompt
     const state = getState();
 
     const cachedPrompts = utilitiesApi.endpoints.dynamicPrompts.select({
-      prompt: positivePrompt,
+      prompt: presetModifiedPrompts.positive,
       max_prompts: maxPrompts,
     })(state).data;
 
@@ -77,8 +75,8 @@ export const useDynamicPromptsWatcher = () => {
     }
 
     // If the prompt is not in the cache, check if we should process it - this is just looking for dynamic prompts syntax
-    if (!getShouldProcessPrompt(positivePrompt)) {
-      dispatch(promptsChanged([positivePrompt]));
+    if (!getShouldProcessPrompt(presetModifiedPrompts.positive)) {
+      dispatch(promptsChanged([presetModifiedPrompts.positive]));
       dispatch(parsingErrorChanged(undefined));
       dispatch(isErrorChanged(false));
       return;
@@ -89,6 +87,6 @@ export const useDynamicPromptsWatcher = () => {
       dispatch(isLoadingChanged(true));
     }
 
-    debouncedUpdateDynamicPrompts(positivePrompt, maxPrompts);
+    debouncedUpdateDynamicPrompts(presetModifiedPrompts.positive, maxPrompts);
   }, [debouncedUpdateDynamicPrompts, dispatch, dynamicPrompting, getState, maxPrompts, presetModifiedPrompts]);
 };

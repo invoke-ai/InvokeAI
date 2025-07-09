@@ -14,8 +14,8 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { toast } from 'features/toast/toast';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
-import { selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
-import { memo, useCallback } from 'react';
+import { selectActiveTab, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiArrowsCounterClockwiseBold,
@@ -43,9 +43,12 @@ export const CurrentImageButtons = memo(() => {
   const hasTemplates = useStore($hasTemplates);
   const imageActions = useImageActions(imageDTO);
   const isStaging = useAppSelector(selectIsStaging);
+  const activeTab = useAppSelector(selectActiveTab);
   const isUpscalingEnabled = useFeatureStatus('upscaling');
   const { getState, dispatch } = useAppStore();
   const canvasManager = useCanvasManagerSafe();
+
+  const isCanvasTabAndStaging = useMemo(() => activeTab === 'canvas' && isStaging, [activeTab, isStaging]);
 
   const handleEdit = useCallback(async () => {
     if (!imageDTO) {
@@ -147,7 +150,7 @@ export const CurrentImageButtons = memo(() => {
         variant="link"
         alignSelf="stretch"
         onClick={imageActions.recallSize}
-        isDisabled={isDisabledOverride || !imageDTO || isStaging}
+        isDisabled={isDisabledOverride || !imageDTO || isCanvasTabAndStaging}
       />
       <IconButton
         icon={<PiAsteriskBold />}

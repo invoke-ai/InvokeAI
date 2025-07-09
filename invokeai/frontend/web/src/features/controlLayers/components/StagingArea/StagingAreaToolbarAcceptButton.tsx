@@ -9,7 +9,7 @@ import { canvasSessionReset } from 'features/controlLayers/store/canvasStagingAr
 import { selectBboxRect, selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageNameToImageObject } from 'features/controlLayers/store/util';
-import { useDeleteQueueItemsByDestination } from 'features/queue/hooks/useDeleteQueueItemsByDestination';
+import { useCancelQueueItemsByDestination } from 'features/queue/hooks/useCancelQueueItemsByDestination';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -24,7 +24,7 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
   const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
   const isCanvasFocused = useIsRegionFocused('canvas');
   const selectedItemImageDTO = useStore(ctx.$selectedItemOutputImageDTO);
-  const deleteQueueItemsByDestination = useDeleteQueueItemsByDestination();
+  const cancelQueueItemsByDestination = useCancelQueueItemsByDestination();
 
   const { t } = useTranslation();
 
@@ -41,13 +41,13 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
 
     dispatch(rasterLayerAdded({ overrides, isSelected: selectedEntityIdentifier?.type === 'raster_layer' }));
     dispatch(canvasSessionReset());
-    deleteQueueItemsByDestination.trigger(ctx.session.id);
+    cancelQueueItemsByDestination.trigger(ctx.session.id, { withToast: false });
   }, [
     selectedItemImageDTO,
     bboxRect,
     dispatch,
     selectedEntityIdentifier?.type,
-    deleteQueueItemsByDestination,
+    cancelQueueItemsByDestination,
     ctx.session.id,
   ]);
 
@@ -68,8 +68,8 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
       icon={<PiCheckBold />}
       onClick={acceptSelected}
       colorScheme="invokeBlue"
-      isDisabled={!selectedItemImageDTO || !shouldShowStagedImage || deleteQueueItemsByDestination.isDisabled}
-      isLoading={deleteQueueItemsByDestination.isLoading}
+      isDisabled={!selectedItemImageDTO || !shouldShowStagedImage || cancelQueueItemsByDestination.isDisabled}
+      isLoading={cancelQueueItemsByDestination.isLoading}
     />
   );
 });

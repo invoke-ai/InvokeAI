@@ -3,7 +3,7 @@ import { Badge, ButtonGroup, Collapse, Flex, IconButton, Text } from '@invoke-ai
 import QueueStatusBadge from 'features/queue/components/common/QueueStatusBadge';
 import { useDestinationText } from 'features/queue/components/QueueList/useDestinationText';
 import { useOriginText } from 'features/queue/components/QueueList/useOriginText';
-import { useDeleteQueueItem } from 'features/queue/hooks/useDeleteQueueItem';
+import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
 import { useRetryQueueItem } from 'features/queue/hooks/useRetryQueueItem';
 import { getSecondsFromTimestamps } from 'features/queue/util/getSecondsFromTimestamps';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
@@ -38,13 +38,13 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
   const handleToggle = useCallback(() => {
     context.toggleQueueItem(item.item_id);
   }, [context, item.item_id]);
-  const deleteQueueItem = useDeleteQueueItem();
-  const onClickDeleteQueueItem = useCallback(
+  const cancelQueueItem = useCancelQueueItem();
+  const onClickCancelQueueItem = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
-      deleteQueueItem.trigger(item.item_id);
+      cancelQueueItem.trigger(item.item_id);
     },
-    [deleteQueueItem, item.item_id]
+    [cancelQueueItem, item.item_id]
   );
   const retryQueueItem = useRetryQueueItem();
   const onClickRetryQueueItem = useCallback(
@@ -135,9 +135,9 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
           <ButtonGroup size="xs" variant="ghost">
             {(!isFailed || !isRetryEnabled || isValidationRun) && (
               <IconButton
-                onClick={onClickDeleteQueueItem}
+                onClick={onClickCancelQueueItem}
                 isDisabled={isCanceled}
-                isLoading={deleteQueueItem.isLoading}
+                isLoading={cancelQueueItem.isLoading}
                 aria-label={t('queue.cancelItem')}
                 icon={<PiXBold />}
               />
