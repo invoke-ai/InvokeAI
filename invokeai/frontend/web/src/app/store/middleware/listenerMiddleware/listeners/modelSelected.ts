@@ -1,63 +1,30 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import type { RootState } from 'app/store/store';
 import { bboxSyncedToOptimalDimension, rgRefImageModelChanged } from 'features/controlLayers/store/canvasSlice';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
 import { modelChanged, syncedToOptimalDimension, vaeSelected } from 'features/controlLayers/store/paramsSlice';
 import { refImageModelChanged, selectReferenceImageEntities } from 'features/controlLayers/store/refImagesSlice';
-import { selectAllEntities, selectBboxModelBase } from 'features/controlLayers/store/selectors';
-import type {
-  CanvasEntityIdentifier,
-  CanvasEntityState,
-  CanvasRegionalGuidanceState,
-  RefImageState,
-} from 'features/controlLayers/store/types';
-import { getEntityIdentifier, isRegionalGuidanceEntityIdentifier } from 'features/controlLayers/store/types';
+import {
+  selectAllEntitiesOfType,
+  selectBboxModelBase,
+  selectCanvasSlice,
+} from 'features/controlLayers/store/selectors';
+import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { modelSelected } from 'features/parameters/store/actions';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
-import type {
-  AnyModelConfig,
-  ChatGPT4oModelConfig,
-  FLUXKontextModelConfig,
-  FLUXReduxModelConfig,
-  IPAdapterModelConfig,
-} from 'services/api/types';
+import { selectGlobalRefImageModels, selectRegionalRefImageModels } from 'services/api/hooks/modelsByType';
+import type { AnyModelConfig } from 'services/api/types';
 import {
   isChatGPT4oModelConfig,
   isFluxKontextApiModelConfig,
   isFluxKontextModelConfig,
   isFluxReduxModelConfig,
-  isIPAdapterModelConfig,
 } from 'services/api/types';
 
 const log = logger('models');
-
-// Selector for global reference image models
-const selectGlobalReferenceImageModels = (state: RootState): AnyModelConfig[] => {
-  const result = selectModelConfigsQuery(state);
-  if (!result.data) {
-    return [];
-  }
-  return modelConfigsAdapterSelectors
-    .selectAll(result.data)
-    .filter(
-      (model: AnyModelConfig) =>
-        isIPAdapterModelConfig(model) ||
-        isFluxReduxModelConfig(model) ||
-        isChatGPT4oModelConfig(model) ||
-        isFluxKontextApiModelConfig(model) ||
-        isFluxKontextModelConfig(model)
-    );
-};
-
-// Type guard to check if entity is a regional guidance entity
-const isRegionalGuidanceEntity = (entity: CanvasEntityState): entity is CanvasRegionalGuidanceState => {
-  return entity.type === 'regional_guidance';
-};
 
 export const addModelSelectedListener = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -72,9 +39,8 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
       }
 
       const newModel = result.data;
-
-      const newBaseModel = newModel.base;
-      const didBaseModelChange = state.params.model?.base !== newBaseModel;
+      const newBase = newModel.base;
+      const didBaseModelChange = state.params.model?.base !== newBase;
 
       if (didBaseModelChange) {
         // we may need to reset some incompatible submodels
@@ -82,7 +48,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
 
         // handle incompatible loras
         state.loras.loras.forEach((lora) => {
-          if (lora.model.base !== newBaseModel) {
+          if (lora.model.base !== newBase) {
             dispatch(loraDeleted({ id: lora.id }));
             modelsCleared += 1;
           }
@@ -90,131 +56,82 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
 
         // handle incompatible vae
         const { vae } = state.params;
-        if (vae && vae.base !== newBaseModel) {
+        if (vae && vae.base !== newBase) {
           dispatch(vaeSelected(null));
           modelsCleared += 1;
         }
 
-        // handle incompatible controlnets
-        // state.canvas.present.controlAdapters.entities.forEach((ca) => {
-        //   if (ca.model?.base !== newBaseModel) {
-        //     modelsCleared += 1;
-        //     if (ca.isEnabled) {
-        //       dispatch(entityIsEnabledToggled({ entityIdentifier: { id: ca.id, type: 'control_adapter' } }));
-        //     }
-        //   }
-        // });
+        // Handle incompatible reference image models - switch to first compatible model, with some smart logic
+        // to choose the best available model based on the new main model.
+        const allRefImageModels = selectGlobalRefImageModels(state).filter(({ base }) => base === newBase);
 
-        // Handle incompatible reference image models - switch to first compatible model
-        const availableRefImageModels = selectGlobalReferenceImageModels(state).filter(
-          (model: AnyModelConfig) => model.base === newBaseModel
-        );
+        let newGlobalRefImageModel = null;
 
-        // Filter to only include models that are compatible with the actions
-        const compatibleIPAdapterModels = availableRefImageModels.filter(isIPAdapterModelConfig);
-        const compatibleFLUXReduxModels = availableRefImageModels.filter(isFluxReduxModelConfig);
-        const compatibleChatGPT4oModels = availableRefImageModels.filter(isChatGPT4oModelConfig);
-        const compatibleFLUXKontextDevModels = availableRefImageModels.filter(isFluxKontextModelConfig);
-        const compatibleFLUXKontextModels = availableRefImageModels.filter(isFluxKontextApiModelConfig);
+        // Certain models require the ref image model to be the same as the main model - others just need a matching
+        // base. Helper to grab the first exact match or the first available model if no exact match is found.
+        const exactMatchOrFirst = <T extends AnyModelConfig>(candidates: T[]): T | null =>
+          candidates.find(({ key }) => key === newModel.key) ?? candidates[0] ?? null;
 
-        // For global reference images, prioritize the same model type as the main model
-        let firstCompatibleGlobalModel = null;
-
-        // If the main model is a Flux Kontext model, prioritize Flux Kontext models
+        // The only way we can differentiate between FLUX and FLUX Kontext is to check for "kontext" in the name
         if (newModel.base === 'flux' && newModel.name.toLowerCase().includes('kontext')) {
-          firstCompatibleGlobalModel = compatibleFLUXKontextDevModels[0] || null;
+          const fluxKontextDevModels = allRefImageModels.filter(isFluxKontextModelConfig);
+          newGlobalRefImageModel = exactMatchOrFirst(fluxKontextDevModels);
         } else if (newModel.base === 'chatgpt-4o') {
-          // If the main model is a ChatGPT4o model, prioritize models that match the exact name
-          const exactMatch = compatibleChatGPT4oModels.find((model) => model.name === newModel.name);
-          firstCompatibleGlobalModel = exactMatch || compatibleChatGPT4oModels[0] || null;
+          const chatGPT4oModels = allRefImageModels.filter(isChatGPT4oModelConfig);
+          newGlobalRefImageModel = exactMatchOrFirst(chatGPT4oModels);
         } else if (newModel.base === 'flux-kontext') {
-          // If the main model is a Flux Kontext API model, prioritize models that match the exact name
-          const exactMatch = compatibleFLUXKontextModels.find((model) => model.name === newModel.name);
-          firstCompatibleGlobalModel = exactMatch || compatibleFLUXKontextModels[0] || null;
+          const fluxKontextApiModels = allRefImageModels.filter(isFluxKontextApiModelConfig);
+          newGlobalRefImageModel = exactMatchOrFirst(fluxKontextApiModels);
         } else if (newModel.base === 'flux') {
-          // If the main model is a FLUX model, prioritize FLUX Redux models
-          firstCompatibleGlobalModel = compatibleFLUXReduxModels[0] || null;
+          const fluxReduxModels = allRefImageModels.filter(isFluxReduxModelConfig);
+          newGlobalRefImageModel = fluxReduxModels[0] ?? null;
         } else {
-          // Otherwise, fall back to the original order
-          firstCompatibleGlobalModel =
-            compatibleIPAdapterModels[0] ||
-            compatibleFLUXReduxModels[0] ||
-            compatibleChatGPT4oModels[0] ||
-            compatibleFLUXKontextDevModels[0] ||
-            compatibleFLUXKontextModels[0] ||
-            null;
+          newGlobalRefImageModel = allRefImageModels[0] ?? null;
         }
 
-        // For regional guidance, we can only use IP adapter or FLUX redux models
-        const firstCompatibleRegionalModel = compatibleIPAdapterModels[0] || compatibleFLUXReduxModels[0] || null;
-
-        // Handle global reference images
+        // All ref image entities are updated to use the same new model
         const refImageEntities = selectReferenceImageEntities(state);
-        refImageEntities.forEach((entity: RefImageState) => {
+        for (const entity of refImageEntities) {
           const shouldUpdateModel =
-            (entity.config.model && entity.config.model.base !== newBaseModel) ||
-            (!entity.config.model && firstCompatibleGlobalModel);
+            (entity.config.model && entity.config.model.base !== newBase) ||
+            (!entity.config.model && newGlobalRefImageModel);
 
           if (shouldUpdateModel) {
             dispatch(
               refImageModelChanged({
                 id: entity.id,
-                modelConfig: firstCompatibleGlobalModel as
-                  | IPAdapterModelConfig
-                  | FLUXReduxModelConfig
-                  | ChatGPT4oModelConfig
-                  | FLUXKontextModelConfig
-                  | null,
+                modelConfig: newGlobalRefImageModel,
               })
             );
-            if (firstCompatibleGlobalModel) {
-              log.debug(
-                { oldModel: entity.config.model, newModel: firstCompatibleGlobalModel },
-                'Switched global reference image model to compatible model'
-              );
-            } else {
-              log.debug(
-                { oldModel: entity.config.model },
-                'Cleared global reference image model - no compatible models available'
+            modelsCleared += 1;
+          }
+        }
+
+        // For regional guidance, there is no smart logic - we just pick the first available model.
+        const newRegionalRefImageModel = selectRegionalRefImageModels(state)[0] ?? null;
+
+        // All regional guidance entities are updated to use the same new model.
+        const canvasState = selectCanvasSlice(state);
+        const canvasRegionalGuidanceEntities = selectAllEntitiesOfType(canvasState, 'regional_guidance');
+        for (const entity of canvasRegionalGuidanceEntities) {
+          for (const refImage of entity.referenceImages) {
+            // Only change the model if the current one is not compatible with the new base model.
+            const shouldUpdateModel =
+              (refImage.config.model && refImage.config.model.base !== newBase) ||
+              (!refImage.config.model && newRegionalRefImageModel);
+
+            if (shouldUpdateModel) {
+              dispatch(
+                rgRefImageModelChanged({
+                  entityIdentifier: getEntityIdentifier(entity),
+                  referenceImageId: refImage.id,
+                  modelConfig: newRegionalRefImageModel,
+                })
               );
               modelsCleared += 1;
             }
           }
-        });
-
-        // Handle regional guidance reference images
-        const canvasEntities = selectAllEntities(state.canvas.present);
-        canvasEntities.forEach((entity: CanvasEntityState) => {
-          if (isRegionalGuidanceEntityIdentifier(getEntityIdentifier(entity)) && isRegionalGuidanceEntity(entity)) {
-            entity.referenceImages.forEach((refImage) => {
-              const shouldUpdateModel =
-                (refImage.config.model && refImage.config.model.base !== newBaseModel) ||
-                (!refImage.config.model && firstCompatibleRegionalModel);
-
-              if (shouldUpdateModel) {
-                dispatch(
-                  rgRefImageModelChanged({
-                    entityIdentifier: getEntityIdentifier(entity) as CanvasEntityIdentifier<'regional_guidance'>, // Type assertion since we've already checked it's regional guidance
-                    referenceImageId: refImage.id,
-                    modelConfig: firstCompatibleRegionalModel,
-                  })
-                );
-                if (firstCompatibleRegionalModel) {
-                  log.debug(
-                    { oldModel: refImage.config.model, newModel: firstCompatibleRegionalModel },
-                    'Switched regional guidance reference image model to compatible model'
-                  );
-                } else {
-                  log.debug(
-                    { oldModel: refImage.config.model },
-                    'Cleared regional guidance reference image model - no compatible models available'
-                  );
-                  modelsCleared += 1;
-                }
-              }
-            });
-          }
-        });
+        }
 
         if (modelsCleared > 0) {
           toast({
