@@ -3,8 +3,9 @@ import { FieldParseError } from 'features/nodes/types/error';
 import type {
   BoardFieldInputTemplate,
   BooleanFieldInputTemplate,
-  ChatGPT4oModelFieldInputTemplate,
+  BriaControlNetModelFieldInputTemplate,
   BriaMainModelFieldInputTemplate,
+  ChatGPT4oModelFieldInputTemplate,
   CLIPEmbedModelFieldInputTemplate,
   CLIPGEmbedModelFieldInputTemplate,
   CLIPLEmbedModelFieldInputTemplate,
@@ -349,6 +350,20 @@ const buildBriaMainModelFieldInputTemplate: FieldInputTemplateBuilder<BriaMainMo
   fieldType,
 }) => {
   const template: BriaMainModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildBriaControlNetModelFieldInputTemplate: FieldInputTemplateBuilder<BriaControlNetModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: BriaControlNetModelFieldInputTemplate = {
     ...baseField,
     type: fieldType,
     default: schemaObject.default ?? undefined,
@@ -850,6 +865,7 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   CogView4MainModelField: buildCogView4MainModelFieldInputTemplate,
   FluxMainModelField: buildFluxMainModelFieldInputTemplate,
   BriaMainModelField: buildBriaMainModelFieldInputTemplate,
+  BriaControlNetModelField: buildBriaControlNetModelFieldInputTemplate,
   SDXLRefinerModelField: buildRefinerModelFieldInputTemplate,
   StringField: buildStringFieldInputTemplate,
   T2IAdapterModelField: buildT2IAdapterModelFieldInputTemplate,

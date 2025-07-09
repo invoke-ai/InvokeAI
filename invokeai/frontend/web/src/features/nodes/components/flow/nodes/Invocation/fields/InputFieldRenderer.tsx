@@ -27,10 +27,12 @@ import {
   isBoardFieldInputTemplate,
   isBooleanFieldInputInstance,
   isBooleanFieldInputTemplate,
-  isChatGPT4oModelFieldInputInstance,
-  isChatGPT4oModelFieldInputTemplate,
+  isBriaControlNetModelFieldInputInstance,
+  isBriaControlNetModelFieldInputTemplate,
   isBriaMainModelFieldInputInstance,
   isBriaMainModelFieldInputTemplate,
+  isChatGPT4oModelFieldInputInstance,
+  isChatGPT4oModelFieldInputTemplate,
   isCLIPEmbedModelFieldInputInstance,
   isCLIPEmbedModelFieldInputTemplate,
   isCLIPGEmbedModelFieldInputInstance,
@@ -119,6 +121,7 @@ import { assert } from 'tsafe';
 
 import BoardFieldInputComponent from './inputs/BoardFieldInputComponent';
 import BooleanFieldInputComponent from './inputs/BooleanFieldInputComponent';
+import BriaControlNetModelFieldInputComponent from './inputs/BriaControlNetModelFieldInputComponent';
 import BriaMainModelFieldInputComponent from './inputs/BriaMainModelFieldInputComponent';
 import CLIPEmbedModelFieldInputComponent from './inputs/CLIPEmbedModelFieldInputComponent';
 import CLIPGEmbedModelFieldInputComponent from './inputs/CLIPGEmbedModelFieldInputComponent';
@@ -456,6 +459,13 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
       return null;
     }
     return <BriaMainModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isBriaControlNetModelFieldInputTemplate(template)) {
+    if (!isBriaControlNetModelFieldInputInstance(field)) {
+      return null;
+    }
+    return <BriaControlNetModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
   }
 
   if (isSD3MainModelFieldInputTemplate(template)) {
