@@ -3,4 +3,9 @@ export type StylePresetState = {
   searchTerm: string;
   viewMode: boolean;
   showPromptPreviews: boolean;
+  collapsedSections: {
+    myTemplates: boolean;
+    sharedTemplates: boolean;
+    defaultTemplates: boolean;
+  };
 };

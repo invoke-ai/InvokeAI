@@ -13,6 +13,11 @@ const initialState: StylePresetState = {
   searchTerm: '',
   viewMode: false,
   showPromptPreviews: false,
+  collapsedSections: {
+    myTemplates: false,
+    sharedTemplates: false,
+    defaultTemplates: false,
+  },
 };
 
 export const stylePresetSlice = createSlice({
@@ -30,6 +35,10 @@ export const stylePresetSlice = createSlice({
     },
     showPromptPreviewsChanged: (state, action: PayloadAction<boolean>) => {
       state.showPromptPreviews = action.payload;
+    },
+    collapsedSectionToggled: (state, action: PayloadAction<keyof StylePresetState['collapsedSections']>) => {
+      const section = action.payload;
+      state.collapsedSections[section] = !state.collapsedSections[section];
     },
   },
   extraReducers(builder) {
@@ -57,8 +66,13 @@ export const stylePresetSlice = createSlice({
   },
 });
 
-export const { activeStylePresetIdChanged, searchTermChanged, viewModeChanged, showPromptPreviewsChanged } =
-  stylePresetSlice.actions;
+export const {
+  activeStylePresetIdChanged,
+  searchTermChanged,
+  viewModeChanged,
+  showPromptPreviewsChanged,
+  collapsedSectionToggled,
+} = stylePresetSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateStylePresetState = (state: any): any => {
@@ -85,6 +99,7 @@ export const selectStylePresetActivePresetId = createStylePresetSelector(
 export const selectStylePresetViewMode = createStylePresetSelector((stylePreset) => stylePreset.viewMode);
 export const selectStylePresetSearchTerm = createStylePresetSelector((stylePreset) => stylePreset.searchTerm);
 export const selectShowPromptPreviews = createStylePresetSelector((stylePreset) => stylePreset.showPromptPreviews);
+export const selectCollapsedSections = createStylePresetSelector((stylePreset) => stylePreset.collapsedSections);
 
 /**
  * Tracks whether or not the style preset menu is open.
