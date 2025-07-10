@@ -25,8 +25,7 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
 
     def get(self, style_preset_id: str) -> StylePresetRecordDTO:
         """Gets a style preset by ID."""
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
                 SELECT *
@@ -42,8 +41,7 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
 
     def create(self, style_preset: StylePresetWithoutId) -> StylePresetRecordDTO:
         style_preset_id = uuid_string()
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
                 INSERT OR IGNORE INTO style_presets (
@@ -65,8 +63,7 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
 
     def create_many(self, style_presets: list[StylePresetWithoutId]) -> None:
         style_preset_ids = []
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             for style_preset in style_presets:
                 style_preset_id = uuid_string()
                 style_preset_ids.append(style_preset_id)
@@ -91,8 +88,7 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
         return None
 
     def update(self, style_preset_id: str, changes: StylePresetChanges) -> StylePresetRecordDTO:
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             # Change the name of a style preset
             if changes.name is not None:
                 cursor.execute(
@@ -118,8 +114,7 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
         return self.get(style_preset_id)
 
     def delete(self, style_preset_id: str) -> None:
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
                 DELETE from style_presets
@@ -130,9 +125,7 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
         return None
 
     def get_many(self, type: PresetType | None = None) -> list[StylePresetRecordDTO]:
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
-
+        with self._db.transaction() as cursor:
             main_query = """
                 SELECT
                     *
@@ -156,9 +149,8 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
 
     def _sync_default_style_presets(self) -> None:
         """Syncs default style presets to the database. Internal use only."""
-        with self._db.conn() as conn:
+        with self._db.transaction() as cursor:
             # First delete all existing default style presets
-            cursor = conn.cursor()
             cursor.execute(
                 """--sql
                 DELETE FROM style_presets

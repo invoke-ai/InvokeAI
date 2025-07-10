@@ -10,28 +10,25 @@ class SqliteModelRelationshipRecordStorage(ModelRelationshipRecordStorageBase):
         self._db = db
 
     def add_model_relationship(self, model_key_1: str, model_key_2: str) -> None:
-        with self._db.conn() as conn:
+        with self._db.transaction() as cursor:
             if model_key_1 == model_key_2:
                 raise ValueError("Cannot relate a model to itself.")
             a, b = sorted([model_key_1, model_key_2])
-            cursor = conn.cursor()
             cursor.execute(
                 "INSERT OR IGNORE INTO model_relationships (model_key_1, model_key_2) VALUES (?, ?)",
                 (a, b),
             )
 
     def remove_model_relationship(self, model_key_1: str, model_key_2: str) -> None:
-        with self._db.conn() as conn:
+        with self._db.transaction() as cursor:
             a, b = sorted([model_key_1, model_key_2])
-            cursor = conn.cursor()
             cursor.execute(
                 "DELETE FROM model_relationships WHERE model_key_1 = ? AND model_key_2 = ?",
                 (a, b),
             )
 
     def get_related_model_keys(self, model_key: str) -> list[str]:
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             cursor.execute(
                 """
                 SELECT model_key_2 FROM model_relationships WHERE model_key_1 = ?
@@ -44,9 +41,7 @@ class SqliteModelRelationshipRecordStorage(ModelRelationshipRecordStorageBase):
         return result
 
     def get_related_model_keys_batch(self, model_keys: list[str]) -> list[str]:
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
-
+        with self._db.transaction() as cursor:
             key_list = ",".join("?" for _ in model_keys)
             cursor.execute(
                 f"""

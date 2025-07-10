@@ -63,7 +63,7 @@ class SqliteDatabase:
         if not self._db_path:
             return
         try:
-            with self.conn() as conn:
+            with self._conn as conn:
                 initial_db_size = Path(self._db_path).stat().st_size
                 conn.execute("VACUUM;")
                 conn.commit()
@@ -76,17 +76,18 @@ class SqliteDatabase:
             raise
 
     @contextmanager
-    def conn(self) -> Generator[sqlite3.Connection]:
+    def transaction(self) -> Generator[sqlite3.Cursor, None, None]:
         """
         Thread-safe context manager for DB work.
-        Acquires the RLock, yields the Connection, then commits or rolls back.
+        Acquires the RLock, yields a Cursor, then commits or rolls back.
         """
-        self._lock.acquire()
-        try:
-            yield self._conn
-            self._conn.commit()
-        except:
-            self._conn.rollback()
-            raise
-        finally:
-            self._lock.release()
+        with self._lock:
+            cursor = self._conn.cursor()
+            try:
+                yield cursor
+                self._conn.commit()
+            except:
+                self._conn.rollback()
+                raise
+            finally:
+                cursor.close()
