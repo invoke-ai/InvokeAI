@@ -528,8 +528,12 @@ export const NewGallery = memo(() => {
 NewGallery.displayName = 'NewGallery';
 
 const scrollSeekConfiguration: ScrollSeekConfiguration = {
-  enter: (velocity) => velocity > 4096,
-  exit: (velocity) => velocity === 0,
+  enter: (velocity) => {
+    return Math.abs(velocity) > 2048;
+  },
+  exit: (velocity) => {
+    return velocity === 0;
+  },
 };
 
 // Styles
