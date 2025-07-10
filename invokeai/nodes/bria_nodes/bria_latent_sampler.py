@@ -9,7 +9,7 @@ from invokeai.app.invocations.primitives import (
     LatentsField,
     OutputField,
 )
-from invokeai.backend.model_manager.config import MainDiffusersConfig
+from invokeai.backend.bria.pipeline_bria_controlnet import prepare_latents
 from invokeai.invocation_api import (
     BaseInvocation,
     Classification,
@@ -50,23 +50,19 @@ class BriaLatentSamplerInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> BriaLatentSamplerInvocationOutput:
         device = torch.device("cuda")
-        transformer_config = context.models.get_config(self.transformer.transformer)
-        if not isinstance(transformer_config, MainDiffusersConfig):
-            raise ValueError("Transformer config is not a MainDiffusersConfig")
-        # TODO: get latent channels from transformer config
-        latent_channels = 16
-        latent_height, latent_width = 128, 128
-        shrunk = latent_channels // 4
-        gen = torch.Generator(device=device).manual_seed(self.seed)
-
-        noise4d = torch.randn((1, shrunk, latent_height, latent_width), device=device, generator=gen)
-        latents = noise4d.view(1, shrunk, latent_height // 2, 2, latent_width // 2, 2).permute(0, 2, 4, 1, 3, 5)
-        latents = latents.reshape(1, (latent_height // 2) * (latent_width // 2), shrunk * 4)
-
-        latent_image_ids = torch.zeros((latent_height // 2, latent_width // 2, 3), device=device, dtype=torch.long)
-        latent_image_ids[..., 1] = torch.arange(latent_height // 2, device=device)[:, None]
-        latent_image_ids[..., 2] = torch.arange(latent_width // 2, device=device)[None, :]
-        latent_image_ids = latent_image_ids.view(-1, 3)
+        height, width = 1024, 1024
+        generator = torch.Generator(device=device).manual_seed(self.seed)
+        
+        num_channels_latents = 4  # due to patch=2, we devide by 4
+        latents, latent_image_ids = prepare_latents(
+            batch_size=1,
+            num_channels_latents=num_channels_latents,
+            height=height,
+            width=width,
+            dtype=torch.float32,
+            device=device,
+            generator=generator,
+            )
 
         saved_latents_tensor = context.tensors.save(latents)
         saved_latent_image_ids_tensor = context.tensors.save(latent_image_ids)

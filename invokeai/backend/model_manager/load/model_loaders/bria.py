@@ -31,14 +31,11 @@ class BriaControlNetDiffusersModel(GenericDiffusersLoader):
         if isinstance(config, ControlNetCheckpointConfig):
             raise NotImplementedError("CheckpointConfigBase is not implemented for Bria models.")
 
-        if submodel_type is None:
-            raise Exception("A submodel type must be provided when loading control net pipelines.")
-
         model_path = Path(config.path)
-        load_class = self.get_hf_load_class(model_path, submodel_type)
+        load_class = self.get_hf_load_class(model_path)
         repo_variant = config.repo_variant if isinstance(config, ControlNetDiffusersConfig) else None
         variant = repo_variant.value if repo_variant else None
-        model_path = model_path / submodel_type.value
+        model_path = model_path
 
         dtype = self._torch_dtype
 
@@ -47,6 +44,7 @@ class BriaControlNetDiffusersModel(GenericDiffusersLoader):
                 model_path,
                 torch_dtype=dtype,
                 variant=variant,
+                use_safetensors=False,
             )
         except OSError as e:
             if variant and "no file named" in str(
