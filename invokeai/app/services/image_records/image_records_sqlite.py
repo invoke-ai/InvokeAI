@@ -27,9 +27,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         self._db = db
 
     def get(self, image_name: str) -> ImageRecord:
-        with self._db.conn() as conn:
+        with self._db.transaction() as cursor:
             try:
-                cursor = conn.cursor()
                 cursor.execute(
                     f"""--sql
                     SELECT {IMAGE_DTO_COLS} FROM images
@@ -48,9 +47,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         return deserialize_image_record(dict(result))
 
     def get_metadata(self, image_name: str) -> Optional[MetadataField]:
-        with self._db.conn() as conn:
+        with self._db.transaction() as cursor:
             try:
-                cursor = conn.cursor()
                 cursor.execute(
                     """--sql
                     SELECT metadata FROM images
@@ -76,9 +74,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         image_name: str,
         changes: ImageRecordChanges,
     ) -> None:
-        with self._db.conn() as conn:
+        with self._db.transaction() as cursor:
             try:
-                cursor = conn.cursor()
                 # Change the category of the image
                 if changes.image_category is not None:
                     cursor.execute(
@@ -138,9 +135,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
     ) -> OffsetPaginatedResults[ImageRecord]:
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
-
+        with self._db.transaction() as cursor:
             # Manually build two queries - one for the count, one for the records
             count_query = """--sql
             SELECT COUNT(*)
@@ -227,20 +222,20 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             # Build the list of images, deserializing each row
             cursor.execute(images_query, images_params)
             result = cast(list[sqlite3.Row], cursor.fetchall())
-        images = [deserialize_image_record(dict(r)) for r in result]
 
-        # Set up and execute the count query, without pagination
-        count_query += query_conditions + ";"
-        count_params = query_params.copy()
-        cursor.execute(count_query, count_params)
-        count = cast(int, cursor.fetchone()[0])
+            images = [deserialize_image_record(dict(r)) for r in result]
+
+            # Set up and execute the count query, without pagination
+            count_query += query_conditions + ";"
+            count_params = query_params.copy()
+            cursor.execute(count_query, count_params)
+            count = cast(int, cursor.fetchone()[0])
 
         return OffsetPaginatedResults(items=images, offset=offset, limit=limit, total=count)
 
     def delete(self, image_name: str) -> None:
-        with self._db.conn() as conn:
+        with self._db.transaction() as cursor:
             try:
-                cursor = conn.cursor()
                 cursor.execute(
                     """--sql
                     DELETE FROM images
@@ -252,10 +247,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 raise ImageRecordDeleteException from e
 
     def delete_many(self, image_names: list[str]) -> None:
-        with self._db.conn() as conn:
+        with self._db.transaction() as cursor:
             try:
-                cursor = conn.cursor()
-
                 placeholders = ",".join("?" for _ in image_names)
 
                 # Construct the SQLite query with the placeholders
@@ -268,8 +261,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 raise ImageRecordDeleteException from e
 
     def get_intermediates_count(self) -> int:
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
                 SELECT COUNT(*) FROM images
@@ -280,9 +272,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         return count
 
     def delete_intermediates(self) -> list[str]:
-        with self._db.conn() as conn:
+        with self._db.transaction() as cursor:
             try:
-                cursor = conn.cursor()
                 cursor.execute(
                     """--sql
                     SELECT image_name FROM images
@@ -315,9 +306,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         node_id: Optional[str] = None,
         metadata: Optional[str] = None,
     ) -> datetime:
-        with self._db.conn() as conn:
+        with self._db.transaction() as cursor:
             try:
-                cursor = conn.cursor()
                 cursor.execute(
                     """--sql
                     INSERT OR IGNORE INTO images (
@@ -366,8 +356,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         return created_at
 
     def get_most_recent_image_for_board(self, board_id: str) -> Optional[ImageRecord]:
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
                 SELECT images.*
@@ -398,9 +387,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
     ) -> ImageNamesResult:
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
-
+        with self._db.transaction() as cursor:
             # Build query conditions (reused for both starred count and image names queries)
             query_conditions = ""
             query_params: list[Union[int, str, bool]] = []

@@ -88,9 +88,8 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         Can raise DuplicateModelException and InvalidModelConfigException exceptions.
         """
-        with self._db.conn() as conn:
+        with self._db.transaction() as cursor:
             try:
-                cursor = conn.cursor()
                 cursor.execute(
                     """--sql
                     INSERT INTO models (
@@ -127,8 +126,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         Can raise an UnknownModelException
         """
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
                 DELETE FROM models
@@ -140,7 +138,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 raise UnknownModelException("model not found")
 
     def update_model(self, key: str, changes: ModelRecordChanges) -> AnyModelConfig:
-        with self._db.conn() as conn:
+        with self._db.transaction() as cursor:
             record = self.get_model(key)
 
             # Model configs use pydantic's `validate_assignment`, so each change is validated by pydantic.
@@ -149,7 +147,6 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
             json_serialized = record.model_dump_json()
 
-            cursor = conn.cursor()
             cursor.execute(
                 """--sql
                 UPDATE models
@@ -172,8 +169,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         Exceptions: UnknownModelException
         """
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
                 SELECT config, strftime('%s',updated_at) FROM models
@@ -188,8 +184,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         return model
 
     def get_model_by_hash(self, hash: str) -> AnyModelConfig:
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
                 SELECT config, strftime('%s',updated_at) FROM models
@@ -209,8 +204,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         :param key: Unique key for the model to be deleted
         """
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
                 select count(*) FROM models
@@ -241,7 +235,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         If none of the optional filters are passed, will return all
         models in the database.
         """
-        with self._db.conn() as conn:
+        with self._db.transaction() as cursor:
             assert isinstance(order_by, ModelRecordOrderBy)
             ordering = {
                 ModelRecordOrderBy.Default: "type, base, name, format",
@@ -267,7 +261,6 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 bindings.append(model_format)
             where = f"WHERE {' AND '.join(where_clause)}" if where_clause else ""
 
-            cursor = conn.cursor()
             cursor.execute(
                 f"""--sql
                 SELECT config, strftime('%s',updated_at)
@@ -299,8 +292,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
     def search_by_path(self, path: Union[str, Path]) -> List[AnyModelConfig]:
         """Return models with the indicated path."""
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
                 SELECT config, strftime('%s',updated_at) FROM models
@@ -313,8 +305,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
     def search_by_hash(self, hash: str) -> List[AnyModelConfig]:
         """Return models with the indicated hash."""
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
                 SELECT config, strftime('%s',updated_at) FROM models
@@ -329,7 +320,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         self, page: int = 0, per_page: int = 10, order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default
     ) -> PaginatedResults[ModelSummary]:
         """Return a paginated summary listing of each model in the database."""
-        with self._db.conn() as conn:
+        with self._db.transaction() as cursor:
             assert isinstance(order_by, ModelRecordOrderBy)
             ordering = {
                 ModelRecordOrderBy.Default: "type, base, name, format",
@@ -338,8 +329,6 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 ModelRecordOrderBy.Name: "name",
                 ModelRecordOrderBy.Format: "format",
             }
-
-            cursor = conn.cursor()
 
             # Lock so that the database isn't updated while we're doing the two queries.
             # query1: get the total number of model configs

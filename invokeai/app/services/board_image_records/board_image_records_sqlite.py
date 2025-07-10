@@ -21,8 +21,8 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
         board_id: str,
         image_name: str,
     ) -> None:
-        with self._db.conn() as conn:
-            conn.execute(
+        with self._db.transaction() as cursor:
+            cursor.execute(
                 """--sql
                 INSERT INTO board_images (board_id, image_name)
                 VALUES (?, ?)
@@ -35,8 +35,8 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
         self,
         image_name: str,
     ) -> None:
-        with self._db.conn() as conn:
-            conn.execute(
+        with self._db.transaction() as cursor:
+            cursor.execute(
                 """--sql
                 DELETE FROM board_images
                 WHERE image_name = ?;
@@ -50,8 +50,7 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
         offset: int = 0,
         limit: int = 10,
     ) -> OffsetPaginatedResults[ImageRecord]:
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
                 SELECT images.*
@@ -80,8 +79,7 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
         categories: list[ImageCategory] | None,
         is_intermediate: bool | None,
     ) -> list[str]:
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             params: list[str | bool] = []
 
             # Base query is a join between images and board_images
@@ -137,8 +135,7 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
         self,
         image_name: str,
     ) -> Optional[str]:
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
                     SELECT board_id
@@ -153,8 +150,7 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
         return cast(str, result[0])
 
     def get_image_count_for_board(self, board_id: str) -> int:
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
                     SELECT COUNT(*)

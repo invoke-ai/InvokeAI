@@ -33,8 +33,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
 
     def get(self, workflow_id: str) -> WorkflowRecordDTO:
         """Gets a workflow by ID. Updates the opened_at column."""
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
                 SELECT workflow_id, workflow, name, created_at, updated_at, opened_at
@@ -52,9 +51,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         if workflow.meta.category is WorkflowCategory.Default:
             raise ValueError("Default workflows cannot be created via this method")
 
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
-
+        with self._db.transaction() as cursor:
             workflow_with_id = Workflow(**workflow.model_dump(), id=uuid_string())
             cursor.execute(
                 """--sql
@@ -72,8 +69,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         if workflow.meta.category is WorkflowCategory.Default:
             raise ValueError("Default workflows cannot be updated")
 
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
                 UPDATE workflow_library
@@ -88,8 +84,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         if self.get(workflow_id).workflow.meta.category is WorkflowCategory.Default:
             raise ValueError("Default workflows cannot be deleted")
 
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
                 DELETE from workflow_library
@@ -111,7 +106,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         has_been_opened: Optional[bool] = None,
         is_published: Optional[bool] = None,
     ) -> PaginatedResults[WorkflowRecordListItemDTO]:
-        with self._db.conn() as conn:
+        with self._db.transaction() as cursor:
             # sanitize!
             assert order_by in WorkflowRecordOrderBy
             assert direction in SQLiteDirection
@@ -207,7 +202,6 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             main_query += ";"
             count_query += ";"
 
-            cursor = conn.cursor()
             cursor.execute(main_query, main_params)
             rows = cursor.fetchall()
             workflows = [WorkflowRecordListItemDTOValidator.validate_python(dict(row)) for row in rows]
@@ -238,8 +232,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         if not tags:
             return {}
 
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             result: dict[str, int] = {}
             # Base conditions for categories and selected tags
             base_conditions: list[str] = []
@@ -288,8 +281,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         has_been_opened: Optional[bool] = None,
         is_published: Optional[bool] = None,
     ) -> dict[str, int]:
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             result: dict[str, int] = {}
             # Base conditions for categories
             base_conditions: list[str] = []
@@ -333,8 +325,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         return result
 
     def update_opened_at(self, workflow_id: str) -> None:
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             cursor.execute(
                 f"""--sql
                 UPDATE workflow_library
@@ -357,8 +348,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         meaningless, as they are overwritten every time the server starts.
         """
 
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             workflows_from_file: list[Workflow] = []
             workflows_to_update: list[Workflow] = []
             workflows_to_add: list[Workflow] = []

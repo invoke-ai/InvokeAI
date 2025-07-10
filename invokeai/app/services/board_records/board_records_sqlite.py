@@ -23,9 +23,8 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         self._db = db
 
     def delete(self, board_id: str) -> None:
-        with self._db.conn() as conn:
+        with self._db.transaction() as cursor:
             try:
-                cursor = conn.cursor()
                 cursor.execute(
                     """--sql
                     DELETE FROM boards
@@ -40,10 +39,9 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         self,
         board_name: str,
     ) -> BoardRecord:
-        with self._db.conn() as conn:
+        with self._db.transaction() as cursor:
             try:
                 board_id = uuid_string()
-                cursor = conn.cursor()
                 cursor.execute(
                     """--sql
                     INSERT OR IGNORE INTO boards (board_id, board_name)
@@ -59,9 +57,8 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         self,
         board_id: str,
     ) -> BoardRecord:
-        with self._db.conn() as conn:
+        with self._db.transaction() as cursor:
             try:
-                cursor = conn.cursor()
                 cursor.execute(
                     """--sql
                     SELECT *
@@ -83,9 +80,8 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         board_id: str,
         changes: BoardChanges,
     ) -> BoardRecord:
-        with self._db.conn() as conn:
+        with self._db.transaction() as cursor:
             try:
-                cursor = conn.cursor()
                 # Change the name of a board
                 if changes.board_name is not None:
                     cursor.execute(
@@ -131,9 +127,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         limit: int = 10,
         include_archived: bool = False,
     ) -> OffsetPaginatedResults[BoardRecord]:
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
-
+        with self._db.transaction() as cursor:
             # Build base query
             base_query = """
                     SELECT *
@@ -179,8 +173,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
     def get_all(
         self, order_by: BoardRecordOrderBy, direction: SQLiteDirection, include_archived: bool = False
     ) -> list[BoardRecord]:
-        with self._db.conn() as conn:
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             if order_by == BoardRecordOrderBy.Name:
                 base_query = """
                         SELECT *
