@@ -9,6 +9,7 @@ from transformers import (
 from invokeai.app.invocations.model import T5EncoderField
 from invokeai.app.invocations.primitives import BaseInvocationOutput, FieldDescriptions, Input, OutputField
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.bria.pipeline_bria_controlnet import encode_prompt
 from invokeai.invocation_api import (
     BaseInvocation,
     Classification,
@@ -46,6 +47,7 @@ class BriaTextEncoderInvocation(BaseInvocation):
     negative_prompt: Optional[str] = InputField(
         title="Negative Prompt",
         description="The negative prompt to encode",
+        default="Logo,Watermark,Text,Ugly,Morbid,Extra fingers,Poorly drawn hands,Mutation,Blurry,Extra limbs,Gross proportions,Missing arms,Mutated hands,Long neck,Duplicate",
     )
     max_length: int = InputField(
         default=128,
@@ -68,17 +70,20 @@ class BriaTextEncoderInvocation(BaseInvocation):
         ):
             assert isinstance(tokenizer, T5TokenizerFast)
             assert isinstance(text_encoder, T5EncoderModel)
-            pos = get_t5_prompt_embeds(tokenizer, text_encoder, self.prompt, 1, self.max_length, text_encoder.device)
-            neg = (
-                torch.zeros_like(pos)
-                if is_ng_none(self.negative_prompt)
-                else get_t5_prompt_embeds(
-                    tokenizer, text_encoder, self.negative_prompt, 1, self.max_length, text_encoder.device
-                )
-            )
-            text_ids = torch.zeros((pos.shape[1], 3), device=text_encoder.device, dtype=torch.long)
-        saved_pos_tensor = context.tensors.save(pos)
-        saved_neg_tensor = context.tensors.save(neg)
+            
+        (prompt_embeds, negative_prompt_embeds, text_ids) = encode_prompt(
+            prompt=self.prompt,
+            tokenizer=tokenizer,
+            text_encoder=text_encoder,
+            negative_prompt=self.negative_prompt,
+            device=text_encoder.device,
+            num_images_per_prompt=1,
+            max_sequence_length=self.max_length,
+            lora_scale=1.0,
+        )
+        
+        saved_pos_tensor = context.tensors.save(prompt_embeds)
+        saved_neg_tensor = context.tensors.save(negative_prompt_embeds)
         saved_text_ids_tensor = context.tensors.save(text_ids)
         pos_embeds_output = LatentsField(latents_name=saved_pos_tensor)
         neg_embeds_output = LatentsField(latents_name=saved_neg_tensor)
