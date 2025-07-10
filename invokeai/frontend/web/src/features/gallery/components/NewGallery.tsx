@@ -511,7 +511,7 @@ export const NewGallery = memo(() => {
         ref={virtuosoRef}
         context={context}
         data={imageNames}
-        increaseViewportBy={2048}
+        increaseViewportBy={4096}
         itemContent={itemContent}
         computeItemKey={computeItemKey}
         components={components}
