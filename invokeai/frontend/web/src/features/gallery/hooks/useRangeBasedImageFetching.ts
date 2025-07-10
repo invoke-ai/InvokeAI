@@ -40,6 +40,7 @@ export const useRangeBasedImageFetching = ({
 }: UseRangeBasedImageFetchingArgs): UseRangeBasedImageFetchingReturn => {
   const store = useAppStore();
   const [getImageDTOsByNames] = useGetImageDTOsByNamesMutation();
+  const [lastRange, setLastRange] = useState<ListRange | null>(null);
   const [pendingRanges, setPendingRanges] = useState<ListRange[]>([]);
 
   const fetchImages = useCallback(
@@ -61,12 +62,14 @@ export const useRangeBasedImageFetching = ({
   const throttledFetchImages = useThrottledCallback(fetchImages, 500);
 
   const onRangeChanged = useCallback((range: ListRange) => {
+    setLastRange(range);
     setPendingRanges((prev) => [...prev, range]);
   }, []);
 
   useEffect(() => {
-    throttledFetchImages(pendingRanges, imageNames);
-  }, [imageNames, pendingRanges, throttledFetchImages]);
+    const combinedRanges = lastRange ? [...pendingRanges, lastRange] : pendingRanges;
+    throttledFetchImages(combinedRanges, imageNames);
+  }, [imageNames, lastRange, pendingRanges, throttledFetchImages]);
 
   return {
     onRangeChanged,
