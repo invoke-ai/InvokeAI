@@ -11,6 +11,7 @@ import { memo, useCallback } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
+import ThemeLocaleProvider from './ThemeLocaleProvider';
 const DEFAULT_CONFIG = {};
 
 interface Props {
@@ -30,12 +31,14 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
 
   return (
     <ErrorBoundary onReset={handleReset} FallbackComponent={AppErrorBoundaryFallback}>
-      <Box id="invoke-app-wrapper" w="100dvw" h="100dvh" position="relative" overflow="hidden">
-        <AppContent />
-        {!didStudioInit && <Loading />}
-      </Box>
-      <GlobalHookIsolator config={config} studioInitAction={studioInitAction} />
-      <GlobalModalIsolator />
+      <ThemeLocaleProvider>
+        <Box id="invoke-app-wrapper" w="100dvw" h="100dvh" position="relative" overflow="hidden">
+          <AppContent />
+          {!didStudioInit && <Loading />}
+        </Box>
+        <GlobalHookIsolator config={config} studioInitAction={studioInitAction} />
+        <GlobalModalIsolator />
+      </ThemeLocaleProvider>
     </ErrorBoundary>
   );
 };
