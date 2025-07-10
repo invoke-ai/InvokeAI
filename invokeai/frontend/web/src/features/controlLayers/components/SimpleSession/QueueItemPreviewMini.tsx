@@ -27,6 +27,7 @@ const sx = {
   alignItems: 'center',
   justifyContent: 'center',
   flexShrink: 0,
+  h: 'full',
   aspectRatio: '1/1',
   borderWidth: 2,
   borderRadius: 'base',
@@ -39,11 +40,11 @@ const sx = {
 
 type Props = {
   item: S['SessionQueueItem'];
-  number: number;
+  index: number;
   isSelected: boolean;
 };
 
-export const QueueItemPreviewMini = memo(({ item, isSelected, number }: Props) => {
+export const QueueItemPreviewMini = memo(({ item, isSelected, index }: Props) => {
   const dispatch = useAppDispatch();
   const ctx = useCanvasSessionContext();
   const { imageLoaded } = useProgressData(ctx.$progressData, item.item_id);
@@ -69,7 +70,7 @@ export const QueueItemPreviewMini = memo(({ item, isSelected, number }: Props) =
 
   return (
     <Flex
-      id={getQueueItemElementId(item.item_id)}
+      id={getQueueItemElementId(index)}
       sx={sx}
       data-selected={isSelected}
       onClick={onClick}
@@ -78,7 +79,7 @@ export const QueueItemPreviewMini = memo(({ item, isSelected, number }: Props) =
       <QueueItemStatusLabel item={item} position="absolute" margin="auto" />
       {imageDTO && <DndImage imageDTO={imageDTO} onLoad={onLoad} asThumbnail />}
       {!imageLoaded && <QueueItemProgressImage itemId={item.item_id} position="absolute" />}
-      <QueueItemNumber number={number} position="absolute" top={0} left={1} />
+      <QueueItemNumber number={index + 1} position="absolute" top={0} left={1} />
       <QueueItemCircularProgress itemId={item.item_id} status={item.status} position="absolute" top={1} right={2} />
     </Flex>
   );
