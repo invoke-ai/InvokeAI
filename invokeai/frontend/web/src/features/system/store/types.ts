@@ -17,20 +17,20 @@ const zLanguage = z.enum([
   'nl',
   'pl',
   'pt',
-  'pt_BR',
+  'pt-BR',
   'ru',
   'sv',
   'tr',
   'ua',
   'vi',
-  'zh_CN',
-  'zh_Hant',
+  'zh-CN',
+  'zh-Hant',
 ]);
 export type Language = z.infer<typeof zLanguage>;
 export const isLanguage = (v: unknown): v is Language => zLanguage.safeParse(v).success;
 
 export interface SystemState {
-  _version: 1;
+  _version: 2;
   shouldConfirmOnDelete: boolean;
   shouldAntialiasProgressImage: boolean;
   shouldConfirmOnNewSession: boolean;

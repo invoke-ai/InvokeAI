@@ -1,8 +1,9 @@
-import type { GridviewApi, IGridviewPanel, IGridviewReactProps } from 'dockview';
+import type { GridviewApi, IGridviewReactProps } from 'dockview';
 import { GridviewReact, LayoutPriority, Orientation } from 'dockview';
 import ModelManagerTab from 'features/ui/components/tabs/ModelManagerTab';
 import type { RootLayoutGridviewComponents } from 'features/ui/layouts/auto-layout-context';
 import { AutoLayoutProvider } from 'features/ui/layouts/auto-layout-context';
+import type { TabName } from 'features/ui/store/uiTypes';
 import { memo, useCallback, useEffect } from 'react';
 
 import { navigationApi } from './navigation-api';
@@ -12,21 +13,19 @@ const rootPanelComponents: RootLayoutGridviewComponents = {
   [MODELS_PANEL_ID]: ModelManagerTab,
 };
 
-const initializeRootPanelLayout = (layoutApi: GridviewApi) => {
-  const models = layoutApi.addPanel({
-    id: MODELS_PANEL_ID,
-    component: MODELS_PANEL_ID,
-    priority: LayoutPriority.High,
+const initializeRootPanelLayout = (tab: TabName, api: GridviewApi) => {
+  navigationApi.registerContainer(tab, 'root', api, () => {
+    api.addPanel({
+      id: MODELS_PANEL_ID,
+      component: MODELS_PANEL_ID,
+      priority: LayoutPriority.High,
+    });
   });
-
-  navigationApi.registerPanel('models', MODELS_PANEL_ID, models);
-
-  return { models } satisfies Record<string, IGridviewPanel>;
 };
 
 export const ModelsTabAutoLayout = memo(() => {
   const onReady = useCallback<IGridviewReactProps['onReady']>(({ api }) => {
-    initializeRootPanelLayout(api);
+    initializeRootPanelLayout('models', api);
   }, []);
 
   useEffect(

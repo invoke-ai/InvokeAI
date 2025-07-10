@@ -144,7 +144,6 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('viewer', 'recallPrompts', ['p']);
     addHotkey('viewer', 'remix', ['r']);
     addHotkey('viewer', 'useSize', ['d']);
-    addHotkey('viewer', 'runPostprocessing', ['shift+u']);
     addHotkey('viewer', 'toggleMetadata', ['i']);
 
     // Gallery

@@ -263,7 +263,6 @@ export const imagesApi = api.injectEndpoints({
           },
         };
       },
-
       invalidatesTags: (result) => {
         if (!result || result.is_intermediate) {
           // Don't add it to anything
@@ -276,6 +275,7 @@ export const imagesApi = api.injectEndpoints({
           ...getTagsToInvalidateForBoardAffectingMutation([boardId]),
           'ImageCollectionCounts',
           { type: 'ImageCollection', id: LIST_TAG },
+          'ImageNameList',
         ];
       },
     }),

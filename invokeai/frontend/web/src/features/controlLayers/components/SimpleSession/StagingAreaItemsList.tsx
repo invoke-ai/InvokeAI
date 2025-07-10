@@ -21,18 +21,20 @@ export const StagingAreaItemsList = memo(() => {
   }, [canvasManager, ctx.$progressData, ctx.$selectedItemId, ctx.$isPending]);
 
   return (
-    <ScrollableContent overflowX="scroll" overflowY="hidden">
-      <Flex gap={2} w="full" h="full" justifyContent="safe center">
-        {items.map((item, i) => (
-          <QueueItemPreviewMini
-            key={`${item.item_id}-mini`}
-            item={item}
-            number={i + 1}
-            isSelected={selectedItemId === item.item_id}
-          />
-        ))}
-      </Flex>
-    </ScrollableContent>
+    <Flex position="relative" maxW="full" w="full" h="72px">
+      <ScrollableContent overflowX="scroll" overflowY="hidden">
+        <Flex gap={2} w="full" h="full" justifyContent="safe center">
+          {items.map((item, i) => (
+            <QueueItemPreviewMini
+              key={`${item.item_id}-mini`}
+              item={item}
+              number={i + 1}
+              isSelected={selectedItemId === item.item_id}
+            />
+          ))}
+        </Flex>
+      </ScrollableContent>
+    </Flex>
   );
 });
 StagingAreaItemsList.displayName = 'StagingAreaItemsList';
