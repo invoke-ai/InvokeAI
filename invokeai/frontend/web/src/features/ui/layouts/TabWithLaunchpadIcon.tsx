@@ -16,6 +16,8 @@ import {
   PiTextAaBold,
 } from 'react-icons/pi';
 
+import { useHackOutDvTabDraggable } from './use-hack-out-dv-tab-draggable';
+
 const TAB_ICONS: Record<TabName, IconType> = {
   generate: PiTextAaBold,
   canvas: PiBoundingBoxBold,
@@ -40,6 +42,8 @@ export const TabWithLaunchpadIcon = memo((props: IDockviewPanelHeaderProps) => {
   const onPointerDown = useCallback(() => {
     setFocusedRegion(props.params.focusRegion);
   }, [props.params.focusRegion]);
+
+  useHackOutDvTabDraggable(ref);
 
   return (
     <Flex ref={ref} alignItems="center" h="full" px={4} gap={3} onPointerDown={onPointerDown}>
