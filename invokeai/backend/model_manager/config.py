@@ -96,6 +96,11 @@ class ControlAdapterDefaultSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class LoRADefaultSettings(BaseModel):
+    weight: float | None = Field(default=None, description="Default weight for this LoRA model")
+    model_config = ConfigDict(extra="forbid")
+
+
 class MatchSpeed(int, Enum):
     """Represents the estimated runtime speed of a config's 'matches' method."""
 
@@ -287,6 +292,9 @@ class LoRAConfigBase(ABC, BaseModel):
 
     type: Literal[ModelType.LoRA] = ModelType.LoRA
     trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
+    default_settings: Optional[LoRADefaultSettings] = Field(
+        description="Default settings for this model", default=None
+    )
 
     @classmethod
     def flux_lora_format(cls, mod: ModelOnDisk):

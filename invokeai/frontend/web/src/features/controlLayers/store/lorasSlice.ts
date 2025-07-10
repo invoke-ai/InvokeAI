@@ -30,7 +30,14 @@ export const lorasSlice = createSlice({
       reducer: (state, action: PayloadAction<{ model: LoRAModelConfig; id: string }>) => {
         const { model, id } = action.payload;
         const parsedModel = zModelIdentifierField.parse(model);
-        state.loras.push({ ...defaultLoRAConfig, model: parsedModel, id });
+        // Use default weight from model configuration if available, otherwise use default
+        const weight = model.default_settings?.weight ?? defaultLoRAConfig.weight;
+        state.loras.push({
+          ...defaultLoRAConfig,
+          weight,
+          model: parsedModel,
+          id,
+        });
       },
       prepare: (payload: { model: LoRAModelConfig }) => ({ payload: { ...payload, id: uuidv4() } }),
     },

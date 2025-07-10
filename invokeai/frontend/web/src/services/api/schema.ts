@@ -4822,6 +4822,11 @@ export type components = {
             /** Preprocessor */
             preprocessor: string | null;
         };
+        /** LoRADefaultSettings */
+        LoRADefaultSettings: {
+            /** Weight */
+            weight: number | null;
+        };
         /** ControlField */
         ControlField: {
             /** @description The control image */
@@ -13783,6 +13788,8 @@ export type components = {
              * @description Usage information for this model
              */
             usage_info?: string | null;
+            /** @description Default settings for this model */
+            default_settings?: components["schemas"]["LoRADefaultSettings"] | null;
             /**
              * Trigger Phrases
              * @description Set of trigger phrases for this model
@@ -13954,6 +13961,8 @@ export type components = {
              * @description Usage information for this model
              */
             usage_info?: string | null;
+            /** @description Default settings for this model */
+            default_settings?: components["schemas"]["LoRADefaultSettings"] | null;
             /**
              * Trigger Phrases
              * @description Set of trigger phrases for this model
@@ -14048,6 +14057,8 @@ export type components = {
              * @description Usage information for this model
              */
             usage_info?: string | null;
+            /** @description Default settings for this model */
+            default_settings?: components["schemas"]["LoRADefaultSettings"] | null;
             /**
              * Trigger Phrases
              * @description Set of trigger phrases for this model

@@ -16,6 +16,7 @@ from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     ControlAdapterDefaultSettings,
     MainModelDefaultSettings,
+    LoRADefaultSettings,
 )
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
@@ -83,7 +84,7 @@ class ModelRecordChanges(BaseModelExcludeNull):
     file_size: Optional[int] = Field(description="Size of model file", default=None)
     format: Optional[str] = Field(description="format of model file", default=None)
     trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
-    default_settings: Optional[MainModelDefaultSettings | ControlAdapterDefaultSettings] = Field(
+    default_settings: Optional[MainModelDefaultSettings | ControlAdapterDefaultSettings | LoRADefaultSettings] = Field(
         description="Default settings for this model", default=None
     )
 
