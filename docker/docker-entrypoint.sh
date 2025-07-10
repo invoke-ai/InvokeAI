@@ -49,11 +49,5 @@ cd "${INVOKEAI_ROOT}"
 export HF_HOME=${HF_HOME:-$INVOKEAI_ROOT/.cache/huggingface}
 export MPLCONFIGDIR=${MPLCONFIGDIR:-$INVOKEAI_ROOT/.matplotlib}
 
-# echo "Checking ROCM device availability as root..."
-# python -c "import torch; print('GPU available:', torch.cuda.is_available()); print('Number of GPUs:', torch.cuda.device_count())"
-
-# echo "Checking ROCM device availability as ${USER}..."
-# exec gosu ${USER} python -c "import os; print(os.getuid()); print(os.getgroups()); import torch; print('GPU available:', torch.cuda.is_available()); print('Number of GPUs:', torch.cuda.device_count())"
-
 # Run the CMD as the Container User (not root).
 exec gosu ${USER} "$@"
