@@ -6,8 +6,8 @@ import type {
   BriaControlNetModelFieldInputTemplate,
 } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
-import { useBriaModels } from 'services/api/hooks/modelsByType';
-import type { MainModelConfig } from 'services/api/types';
+import { useBriaControlNetModels } from 'services/api/hooks/modelsByType';
+import type { ControlNetModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
@@ -16,9 +16,9 @@ type Props = FieldComponentProps<BriaControlNetModelFieldInputInstance, BriaCont
 const BriaControlNetModelFieldInputComponent = (props: Props) => {
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
-  const [modelConfigs, { isLoading }] = useBriaModels();
+  const [modelConfigs, { isLoading }] = useBriaControlNetModels();
   const onChange = useCallback(
-    (value: MainModelConfig | null) => {
+    (value: ControlNetModelConfig | null) => {
       if (!value) {
         return;
       }
