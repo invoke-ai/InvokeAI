@@ -170,7 +170,6 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
         case 'canvas':
           // Go to the canvas tab, open the launchpad
           await navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
-          store.dispatch(canvasReset());
           break;
         case 'workflows':
           // Go to the workflows tab
