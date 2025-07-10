@@ -84,6 +84,9 @@ class GenericDiffusersLoader(ModelLoader):
         ]:
             if module == "transformer_bria":
                 module = "invokeai.backend.bria.transformer_bria"
+            elif class_name == "BriaTransformer2DModel":
+                class_name = "BriaControlNetModel"
+                module = "invokeai.backend.bria.controlnet_bria"
             res_type = sys.modules[module]
         else:
             res_type = sys.modules["diffusers"].pipelines
