@@ -482,11 +482,6 @@ export const NewGallery = memo(() => {
 
   const context = useMemo<GridContext>(() => ({ imageNames, queryArgs }), [imageNames, queryArgs]);
 
-  // Item content function
-  const itemContent: GridItemContent<string, GridContext> = useCallback((index, imageName) => {
-    return <ImageAtPosition index={index} imageName={imageName} />;
-  }, []);
-
   if (isLoading) {
     return (
       <Flex w="full" h="full" alignItems="center" justifyContent="center" gap={4}>
@@ -552,6 +547,10 @@ const ListComponent: GridComponents<GridContext>['List'] = forwardRef(({ context
   return <Grid ref={ref} gridTemplateColumns={gridTemplateColumns} gap={1} {...rest} />;
 });
 ListComponent.displayName = 'ListComponent';
+
+const itemContent: GridItemContent<string, GridContext> = (index, imageName) => {
+  return <ImageAtPosition index={index} imageName={imageName} />;
+};
 
 const ItemComponent: GridComponents<GridContext>['Item'] = forwardRef(({ context: _, ...rest }, ref) => (
   <GridItem ref={ref} aspectRatio="1/1" {...rest} />

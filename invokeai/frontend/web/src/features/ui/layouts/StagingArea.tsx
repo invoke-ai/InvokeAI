@@ -13,7 +13,7 @@ export const StagingArea = memo(() => {
   }
 
   return (
-    <Flex position="absolute" flexDir="column" bottom={4} gap={2} align="center" justify="center" left={4} right={4}>
+    <Flex position="absolute" flexDir="column" bottom={2} gap={2} align="center" justify="center" left={2} right={2}>
       <StagingAreaItemsList />
       <StagingAreaToolbar />
     </Flex>
