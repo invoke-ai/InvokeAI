@@ -94,6 +94,7 @@ const useScrollableStagingArea = (rootRef: RefObject<HTMLDivElement>) => {
         const { viewport } = osInstance.elements();
         viewport.style.overflowX = `var(--os-viewport-overflow-x)`;
         viewport.style.overflowY = `var(--os-viewport-overflow-y)`;
+        viewport.style.textAlign = 'center';
       },
     },
     options: {
