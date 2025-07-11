@@ -2575,63 +2575,6 @@
     "supportVideos": {
         "supportVideos": "Video Hỗ Trợ",
         "gettingStarted": "Bắt Đầu Làm Quen",
-        "studioSessionsDesc1": "Xem thử <StudioSessionsPlaylistLink /> để hiểu rõ Invoke hơn.",
-        "studioSessionsDesc2": "Đến <DiscordLink /> để tham gia vào phiên trực tiếp và hỏi câu hỏi. Các phiên được tải lên danh sách phát vào các tuần.",
-        "videos": {
-            "howDoIDoImageToImageTransformation": {
-                "title": "Làm Sao Để Tôi Dùng Trình Biến Đổi Hình Ảnh Sang Hình Ảnh?",
-                "description": "Hướng dẫn cách thực hiện biến đổi ảnh sang ảnh trong Invoke."
-            },
-            "howDoIUseGlobalIPAdaptersAndReferenceImages": {
-                "description": "Giới thiệu về ảnh mẫu và IP adapter toàn vùng.",
-                "title": "Làm Sao Để Tôi Dùng IP Adapter Toàn Vùng Và Ảnh Mẫu?"
-            },
-            "creatingAndComposingOnInvokesControlCanvas": {
-                "description": "Học cách sáng tạo ảnh bằng trình điều khiển canvas của Invoke.",
-                "title": "Sáng Tạo Trong Trình Kiểm Soát Canvas Của Invoke"
-            },
-            "upscaling": {
-                "description": "Cách upscale ảnh bằng bộ công cụ của Invoke để nâng cấp độ phân giải.",
-                "title": "Upscale (Nâng Cấp Chất Lượng Hình Ảnh)"
-            },
-            "howDoIGenerateAndSaveToTheGallery": {
-                "title": "Làm Sao Để Tôi Tạo Sinh Và Lưu Vào Thư Viện Ảnh?",
-                "description": "Các bước để tạo sinh và lưu ảnh vào thư viện ảnh."
-            },
-            "howDoIEditOnTheCanvas": {
-                "description": "Hướng dẫn chỉnh sửa ảnh trực tiếp trên canvas.",
-                "title": "Làm Sao Để Tôi Chỉnh Sửa Trên Canvas?"
-            },
-            "howDoIUseControlNetsAndControlLayers": {
-                "title": "Làm Sao Để Tôi Dùng ControlNet và Layer Điều Khiển Được?",
-                "description": "Học cách áp dụng layer điều khiển được và controlnet vào ảnh của bạn."
-            },
-            "howDoIUseInpaintMasks": {
-                "title": "Làm Sao Để Tôi Dùng Lớp Phủ Inpaint?",
-                "description": "Cách áp dụng lớp phủ inpaint vào chỉnh sửa và thay đổi ảnh."
-            },
-            "howDoIOutpaint": {
-                "title": "Làm Sao Để Tôi Outpaint?",
-                "description": "Hướng dẫn outpaint bên ngoài viền ảnh gốc."
-            },
-            "creatingYourFirstImage": {
-                "description": "Giới thiệu về cách tạo ảnh từ ban đầu bằng công cụ Invoke.",
-                "title": "Tạo Hình Ảnh Đầu Tiên Của Bạn"
-            },
-            "usingControlLayersAndReferenceGuides": {
-                "description": "Học cách chỉ dẫn ảnh được tạo ra bằng layer điều khiển được và ảnh mẫu.",
-                "title": "Dùng Layer Điều Khiển Được và Chỉ Dẫn Mẫu"
-            },
-            "understandingImageToImageAndDenoising": {
-                "title": "Hiểu Rõ Trình Hình Ảnh Sang Hình Ảnh Và Trình Khử Nhiễu",
-                "description": "Tổng quan về trình biến đổi ảnh sang ảnh và trình khử nhiễu trong Invoke."
-            },
-            "exploringAIModelsAndConceptAdapters": {
-                "title": "Khám Phá Model AI Và Khái Niệm Về Adapter",
-                "description": "Đào sâu vào model AI và cách dùng những adapter để điều khiển một cách sáng tạo."
-            }
-        },
-        "controlCanvas": "Điều Khiển Canvas",
         "watch": "Xem"
     },
     "modelCache": {
