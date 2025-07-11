@@ -1,10 +1,6 @@
 import { GlobalImageHotkeys } from 'app/components/GlobalImageHotkeys';
 import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardModal';
 import { CanvasPasteModal } from 'features/controlLayers/components/CanvasPasteModal';
-import {
-  NewCanvasSessionDialog,
-  NewGallerySessionDialog,
-} from 'features/controlLayers/components/NewSessionConfirmationAlertDialog';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { DeleteImageModal } from 'features/deleteImageModal/components/DeleteImageModal';
 import { FullscreenDropzone } from 'features/dnd/FullscreenDropzone';
@@ -50,8 +46,6 @@ export const GlobalModalIsolator = memo(() => {
       <RefreshAfterResetModal />
       <DeleteBoardModal />
       <GlobalImageHotkeys />
-      <NewGallerySessionDialog />
-      <NewCanvasSessionDialog />
       <ImageContextMenu />
       <FullscreenDropzone />
       <VideosModal />

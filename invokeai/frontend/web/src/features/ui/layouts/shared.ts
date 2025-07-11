@@ -16,9 +16,11 @@ export const SETTINGS_PANEL_ID = 'settings';
 export const MODELS_PANEL_ID = 'models';
 export const QUEUE_PANEL_ID = 'queue';
 
-export const DEFAULT_TAB_ID = 'default-tab';
-export const TAB_WITH_PROGRESS_INDICATOR_ID = 'tab-with-progress-indicator';
-export const TAB_WITH_LAUNCHPAD_ICON_ID = 'tab-with-launchpad-icon';
+export const DOCKVIEW_TAB_ID = 'tab-default';
+export const DOCKVIEW_TAB_PROGRESS_ID = 'tab-progress';
+export const DOCKVIEW_TAB_LAUNCHPAD_ID = 'tab-launchpad';
+export const DOCKVIEW_TAB_CANVAS_VIEWER_ID = 'tab-canvas-viewer';
+export const DOCKVIEW_TAB_CANVAS_WORKSPACE_ID = 'tab-canvas-workspace';
 
 export const LEFT_PANEL_MIN_SIZE_PX = 420;
 export const RIGHT_PANEL_MIN_SIZE_PX = 420;

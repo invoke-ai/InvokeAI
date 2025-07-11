@@ -5,8 +5,9 @@ import type { IDockviewPanelHeaderProps } from 'dockview';
 import { memo, useCallback, useRef } from 'react';
 
 import type { PanelParameters } from './auto-layout-context';
+import { useHackOutDvTabDraggable } from './use-hack-out-dv-tab-draggable';
 
-export const TabWithoutCloseButton = memo((props: IDockviewPanelHeaderProps<PanelParameters>) => {
+export const DockviewTab = memo((props: IDockviewPanelHeaderProps<PanelParameters>) => {
   const ref = useRef<HTMLDivElement>(null);
   const setActive = useCallback(() => {
     if (!props.api.isActive) {
@@ -20,6 +21,8 @@ export const TabWithoutCloseButton = memo((props: IDockviewPanelHeaderProps<Pane
     setFocusedRegion(props.params.focusRegion);
   }, [props.params.focusRegion]);
 
+  useHackOutDvTabDraggable(ref);
+
   return (
     <Flex ref={ref} alignItems="center" h="full" onPointerDown={onPointerDown}>
       <Text userSelect="none" px={4}>
@@ -28,4 +31,4 @@ export const TabWithoutCloseButton = memo((props: IDockviewPanelHeaderProps<Pane
     </Flex>
   );
 });
-TabWithoutCloseButton.displayName = 'TabWithoutCloseButton';
+DockviewTab.displayName = 'DockviewTab';

@@ -2,6 +2,7 @@ import { Box, Flex, forwardRef, Grid, GridItem, Spinner, Text } from '@invoke-ai
 import { createSelector } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { getFocusedRegion } from 'common/hooks/focus';
 import { useRangeBasedImageFetching } from 'features/gallery/hooks/useRangeBasedImageFetching';
 import type { selectGetImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import {
@@ -221,6 +222,10 @@ const useKeyboardNavigation = (
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
+      if (getFocusedRegion() !== 'gallery') {
+        // Only handle keyboard navigation when the gallery is focused
+        return;
+      }
       // Only handle arrow keys
       if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
         return;
@@ -477,11 +482,6 @@ export const NewGallery = memo(() => {
 
   const context = useMemo<GridContext>(() => ({ imageNames, queryArgs }), [imageNames, queryArgs]);
 
-  // Item content function
-  const itemContent: GridItemContent<string, GridContext> = useCallback((index, imageName) => {
-    return <ImageAtPosition index={index} imageName={imageName} />;
-  }, []);
-
   if (isLoading) {
     return (
       <Flex w="full" h="full" alignItems="center" justifyContent="center" gap={4}>
@@ -506,7 +506,7 @@ export const NewGallery = memo(() => {
         ref={virtuosoRef}
         context={context}
         data={imageNames}
-        increaseViewportBy={2048}
+        increaseViewportBy={4096}
         itemContent={itemContent}
         computeItemKey={computeItemKey}
         components={components}
@@ -523,8 +523,12 @@ export const NewGallery = memo(() => {
 NewGallery.displayName = 'NewGallery';
 
 const scrollSeekConfiguration: ScrollSeekConfiguration = {
-  enter: (velocity) => velocity > 4096,
-  exit: (velocity) => velocity === 0,
+  enter: (velocity) => {
+    return Math.abs(velocity) > 2048;
+  },
+  exit: (velocity) => {
+    return velocity === 0;
+  },
 };
 
 // Styles
@@ -543,6 +547,10 @@ const ListComponent: GridComponents<GridContext>['List'] = forwardRef(({ context
   return <Grid ref={ref} gridTemplateColumns={gridTemplateColumns} gap={1} {...rest} />;
 });
 ListComponent.displayName = 'ListComponent';
+
+const itemContent: GridItemContent<string, GridContext> = (index, imageName) => {
+  return <ImageAtPosition index={index} imageName={imageName} />;
+};
 
 const ItemComponent: GridComponents<GridContext>['Item'] = forwardRef(({ context: _, ...rest }, ref) => (
   <GridItem ref={ref} aspectRatio="1/1" {...rest} />

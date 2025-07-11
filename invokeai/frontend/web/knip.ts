@@ -12,6 +12,8 @@ const config: KnipConfig = {
     'src/features/parameters/types/parameterSchemas.ts',
     // TODO(psyche): maybe we can clean up these utils after canvas v2 release
     'src/features/controlLayers/konva/util.ts',
+    // Will be using this
+    'src/common/hooks/useAsyncState.ts',
   ],
   ignoreBinaries: ['only-allow'],
   paths: {

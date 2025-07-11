@@ -277,9 +277,10 @@ const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     reasons.push({ content: i18n.t('parameters.invoke.promptExpansionResultPending') });
   }
 
-  // Flux Kontext only supports 1x Reference Image at a time.
-  const referenceImageCount = refImages.entities.length;
+  const enabledRefImages = refImages.entities.filter(({ isEnabled }) => isEnabled);
+  const referenceImageCount = enabledRefImages.length;
 
+  // Flux Kontext only supports 1x Reference Image at a time.
   if (
     (model?.base === 'flux-kontext' || (model?.base === 'flux' && model?.name?.toLowerCase().includes('kontext'))) &&
     referenceImageCount > 1
@@ -287,7 +288,7 @@ const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     reasons.push({ content: i18n.t('parameters.invoke.fluxKontextMultipleReferenceImages') });
   }
 
-  refImages.entities.forEach((entity, i) => {
+  enabledRefImages.forEach((entity, i) => {
     const layerNumber = i + 1;
     const refImageLiteral = i18n.t(LAYER_TYPE_TO_TKEY['reference_image']);
     const prefix = `${refImageLiteral} #${layerNumber}`;
@@ -634,9 +635,10 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
   });
 
-  // Flux Kontext only supports 1x Reference Image at a time.
-  const referenceImageCount = refImages.entities.filter((entity) => entity.isEnabled).length;
+  const enabledRefImages = refImages.entities.filter(({ isEnabled }) => isEnabled);
+  const referenceImageCount = enabledRefImages.length;
 
+  // Flux Kontext only supports 1x Reference Image at a time.
   if (
     (model?.base === 'flux-kontext' || (model?.base === 'flux' && model?.name?.toLowerCase().includes('kontext'))) &&
     referenceImageCount > 1
@@ -644,7 +646,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     reasons.push({ content: i18n.t('parameters.invoke.fluxKontextMultipleReferenceImages') });
   }
 
-  refImages.entities.forEach((entity, i) => {
+  enabledRefImages.forEach((entity, i) => {
     const layerNumber = i + 1;
     const refImageLiteral = i18n.t(LAYER_TYPE_TO_TKEY['reference_image']);
     const prefix = `${refImageLiteral} #${layerNumber}`;

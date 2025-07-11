@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react';
 import { logger } from 'app/logging/logger';
 import { useAppSelector } from 'app/store/storeHooks';
 import { withResultAsync } from 'common/util/result';
+import { selectSaveAllImagesToGallery } from 'features/controlLayers/store/canvasSettingsSlice';
 import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { useEnqueueWorkflows } from 'features/queue/hooks/useEnqueueWorkflows';
 import { $isReadyToEnqueue } from 'features/queue/store/readiness';
@@ -26,6 +27,7 @@ export const useInvoke = () => {
   const enqueueCanvas = useEnqueueCanvas();
   const enqueueGenerate = useEnqueueGenerate();
   const enqueueUpscaling = useEnqueueUpscaling();
+  const saveAllImagesToGallery = useAppSelector(selectSaveAllImagesToGallery);
 
   const [_, { isLoading }] = useEnqueueBatchMutation({
     ...enqueueMutationFixedCacheKeyOptions,
@@ -62,7 +64,7 @@ export const useInvoke = () => {
 
   const enqueueBack = useCallback(() => {
     enqueue(false, false);
-    if (tabName === 'generate' || tabName === 'upscaling') {
+    if (tabName === 'generate' || tabName === 'upscaling' || (tabName === 'canvas' && saveAllImagesToGallery)) {
       navigationApi.focusPanel(tabName, VIEWER_PANEL_ID);
     } else if (tabName === 'workflows') {
       // Only switch to viewer if the workflow editor is not currently active
@@ -73,11 +75,11 @@ export const useInvoke = () => {
     } else if (tabName === 'canvas') {
       navigationApi.focusPanel(tabName, WORKSPACE_PANEL_ID);
     }
-  }, [enqueue, tabName]);
+  }, [enqueue, saveAllImagesToGallery, tabName]);
 
   const enqueueFront = useCallback(() => {
     enqueue(true, false);
-    if (tabName === 'generate' || tabName === 'upscaling') {
+    if (tabName === 'generate' || tabName === 'upscaling' || (tabName === 'canvas' && saveAllImagesToGallery)) {
       navigationApi.focusPanel(tabName, VIEWER_PANEL_ID);
     } else if (tabName === 'workflows') {
       // Only switch to viewer if the workflow editor is not currently active
@@ -88,7 +90,7 @@ export const useInvoke = () => {
     } else if (tabName === 'canvas') {
       navigationApi.focusPanel(tabName, WORKSPACE_PANEL_ID);
     }
-  }, [enqueue, tabName]);
+  }, [enqueue, saveAllImagesToGallery, tabName]);
 
   return { enqueueBack, enqueueFront, isLoading, isDisabled: !isReady || isLocked, enqueue };
 };

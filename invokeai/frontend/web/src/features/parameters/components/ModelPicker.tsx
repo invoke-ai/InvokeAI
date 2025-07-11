@@ -281,8 +281,11 @@ export const ModelPicker = typedMemo(
 
       for (const optionOrGroup of options) {
         if (isGroup(optionOrGroup)) {
-          _selectedOption = optionOrGroup.options.find((o) => o.key === selectedModelConfig.key);
-          break;
+          const result = optionOrGroup.options.find((o) => o.key === selectedModelConfig.key);
+          if (result) {
+            _selectedOption = result;
+            break;
+          }
         } else if (optionOrGroup.key === selectedModelConfig.key) {
           _selectedOption = optionOrGroup;
           break;
@@ -450,7 +453,11 @@ const PickerOptionComponent = typedMemo(
               </Text>
             )}
           </Flex>
-          {option.description && !compactView && <Text color="base.200">{option.description}</Text>}
+          {option.description && !compactView && (
+            <Text className="extra-info" color="base.200">
+              {option.description}
+            </Text>
+          )}
         </Flex>
       </Flex>
     );

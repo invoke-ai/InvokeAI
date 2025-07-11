@@ -13,15 +13,14 @@ import { CanvasHUD } from 'features/controlLayers/components/HUD/CanvasHUD';
 import { InvokeCanvasComponent } from 'features/controlLayers/components/InvokeCanvasComponent';
 import { SelectObject } from 'features/controlLayers/components/SelectObject/SelectObject';
 import { CanvasSessionContextProvider } from 'features/controlLayers/components/SimpleSession/context';
-import { StagingAreaItemsList } from 'features/controlLayers/components/SimpleSession/StagingAreaItemsList';
-import { StagingAreaToolbar } from 'features/controlLayers/components/StagingArea/StagingAreaToolbar';
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
-import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { memo, useCallback } from 'react';
 import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
+
+import { StagingArea } from './StagingArea';
 
 const MenuContent = memo(() => {
   return (
@@ -50,7 +49,6 @@ const canvasBgSx = {
 export const CanvasWorkspacePanel = memo(() => {
   const dynamicGrid = useAppSelector(selectDynamicGrid);
   const showHUD = useAppSelector(selectShowHUD);
-  const canvasId = useAppSelector(selectCanvasSessionId);
 
   const renderMenu = useCallback(() => {
     return <MenuContent />;
@@ -87,9 +85,9 @@ export const CanvasWorkspacePanel = memo(() => {
                 alignItems="flex-start"
               >
                 {showHUD && <CanvasHUD />}
+                <CanvasAlertsSaveAllImagesToGallery />
                 <CanvasAlertsSelectedEntityStatus />
                 <CanvasAlertsPreserveMask />
-                <CanvasAlertsSaveAllImagesToGallery />
                 <CanvasAlertsInvocationProgress />
               </Flex>
               <Flex position="absolute" top={1} insetInlineEnd={1}>
@@ -103,29 +101,11 @@ export const CanvasWorkspacePanel = memo(() => {
           </Flex>
         )}
       </ContextMenu>
-      {canvasId !== null && (
-        <CanvasManagerProviderGate>
-          <CanvasSessionContextProvider type="advanced" id={canvasId}>
-            <Flex
-              position="absolute"
-              flexDir="column"
-              bottom={4}
-              gap={2}
-              align="center"
-              justify="center"
-              left={4}
-              right={4}
-            >
-              <Flex position="relative" maxW="full" w="full" h={108}>
-                <StagingAreaItemsList />
-              </Flex>
-              <Flex gap={2}>
-                <StagingAreaToolbar />
-              </Flex>
-            </Flex>
-          </CanvasSessionContextProvider>
-        </CanvasManagerProviderGate>
-      )}
+      <CanvasManagerProviderGate>
+        <CanvasSessionContextProvider>
+          <StagingArea />
+        </CanvasSessionContextProvider>
+      </CanvasManagerProviderGate>
       <Flex position="absolute" bottom={4}>
         <CanvasManagerProviderGate>
           <Filter />

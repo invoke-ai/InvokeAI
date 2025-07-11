@@ -1,7 +1,7 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { FlexProps, SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Flex, Icon, Image } from '@invoke-ai/ui-library';
+import { Flex, Icon, Image } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
@@ -23,12 +23,10 @@ import { imageToCompareChanged, selectGallerySlice, selectionChanged } from 'fea
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import type { MouseEvent, MouseEventHandler } from 'react';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PiImageBold } from 'react-icons/pi';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
-
-const GALLERY_IMAGE_CLASS = 'gallery-image';
 
 const galleryImageContainerSX = {
   containerType: 'inline-size',
@@ -42,45 +40,42 @@ const galleryImageContainerSX = {
   '&[data-is-dragging=true]': {
     opacity: 0.3,
   },
-  [`.${GALLERY_IMAGE_CLASS}`]: {
-    touchAction: 'none',
-    userSelect: 'none',
-    webkitUserSelect: 'none',
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-    aspectRatio: '1/1',
-    '::before': {
-      content: '""',
-      display: 'inline-block',
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      pointerEvents: 'none',
-      borderRadius: 'base',
-    },
-    '&[data-selected=true]::before': {
-      boxShadow:
-        'inset 0px 0px 0px 3px var(--invoke-colors-invokeBlue-500), inset 0px 0px 0px 4px var(--invoke-colors-invokeBlue-800)',
-    },
-    '&[data-selected-for-compare=true]::before': {
-      boxShadow:
-        'inset 0px 0px 0px 3px var(--invoke-colors-invokeGreen-300), inset 0px 0px 0px 4px var(--invoke-colors-invokeGreen-800)',
-    },
-    '&:hover::before': {
-      boxShadow:
-        'inset 0px 0px 0px 1px var(--invoke-colors-invokeBlue-300), inset 0px 0px 0px 2px var(--invoke-colors-invokeBlue-800)',
-    },
-    '&:hover[data-selected=true]::before': {
-      boxShadow:
-        'inset 0px 0px 0px 3px var(--invoke-colors-invokeBlue-400), inset 0px 0px 0px 4px var(--invoke-colors-invokeBlue-800)',
-    },
-    '&:hover[data-selected-for-compare=true]::before': {
-      boxShadow:
-        'inset 0px 0px 0px 3px var(--invoke-colors-invokeGreen-200), inset 0px 0px 0px 4px var(--invoke-colors-invokeGreen-800)',
-    },
+  userSelect: 'none',
+  webkitUserSelect: 'none',
+  position: 'relative',
+  justifyContent: 'center',
+  alignItems: 'center',
+  aspectRatio: '1/1',
+  '::before': {
+    content: '""',
+    display: 'inline-block',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    pointerEvents: 'none',
+    borderRadius: 'base',
+  },
+  '&[data-selected=true]::before': {
+    boxShadow:
+      'inset 0px 0px 0px 3px var(--invoke-colors-invokeBlue-500), inset 0px 0px 0px 4px var(--invoke-colors-invokeBlue-800)',
+  },
+  '&[data-selected-for-compare=true]::before': {
+    boxShadow:
+      'inset 0px 0px 0px 3px var(--invoke-colors-invokeGreen-300), inset 0px 0px 0px 4px var(--invoke-colors-invokeGreen-800)',
+  },
+  '&:hover::before': {
+    boxShadow:
+      'inset 0px 0px 0px 1px var(--invoke-colors-invokeBlue-300), inset 0px 0px 0px 2px var(--invoke-colors-invokeBlue-800)',
+  },
+  '&:hover[data-selected=true]::before': {
+    boxShadow:
+      'inset 0px 0px 0px 3px var(--invoke-colors-invokeBlue-400), inset 0px 0px 0px 4px var(--invoke-colors-invokeBlue-800)',
+  },
+  '&:hover[data-selected-for-compare=true]::before': {
+    boxShadow:
+      'inset 0px 0px 0px 3px var(--invoke-colors-invokeGreen-200), inset 0px 0px 0px 4px var(--invoke-colors-invokeGreen-800)',
   },
 } satisfies SystemStyleObject;
 
@@ -142,8 +137,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
   const [dragPreviewState, setDragPreviewState] = useState<
     DndDragPreviewSingleImageState | DndDragPreviewMultipleImageState | null
   >(null);
-  // Must use callback ref - else chakra's Image fallback prop will break the ref & dnd
-  const [element, ref] = useState<HTMLImageElement | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
   const selectIsSelectedForCompare = useMemo(
     () => createSelector(selectGallerySlice, (gallery) => gallery.imageToCompare === imageDTO.image_name),
     [imageDTO.image_name]
@@ -156,6 +150,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
   const isSelected = useAppSelector(selectIsSelected);
 
   useEffect(() => {
+    const element = ref.current;
     if (!element) {
       return;
     }
@@ -221,7 +216,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
         },
       })
     );
-  }, [element, imageDTO, store]);
+  }, [imageDTO, store]);
 
   const [isHovered, setIsHovered] = useState(false);
 
@@ -240,34 +235,35 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
     navigationApi.focusPanelInActiveTab(VIEWER_PANEL_ID);
   }, [store]);
 
-  useImageContextMenu(imageDTO, element);
+  useImageContextMenu(imageDTO, ref);
 
   return (
     <>
-      <Box sx={galleryImageContainerSX} data-is-dragging={isDragging} data-image-name={imageDTO.image_name}>
-        <Flex
-          role="button"
-          className={GALLERY_IMAGE_CLASS}
-          onMouseOver={onMouseOver}
-          onMouseOut={onMouseOut}
-          onClick={onClick}
-          onDoubleClick={onDoubleClick}
-          data-selected={isSelected}
-          data-selected-for-compare={isSelectedForCompare}
-        >
-          <Image
-            ref={ref}
-            src={imageDTO.thumbnail_url}
-            w={imageDTO.width}
-            fallback={<GalleryImagePlaceholder />}
-            objectFit="contain"
-            maxW="full"
-            maxH="full"
-            borderRadius="base"
-          />
-          <GalleryImageHoverIcons imageDTO={imageDTO} isHovered={isHovered} />
-        </Flex>
-      </Box>
+      <Flex
+        ref={ref}
+        sx={galleryImageContainerSX}
+        data-is-dragging={isDragging}
+        data-image-name={imageDTO.image_name}
+        role="button"
+        onMouseOver={onMouseOver}
+        onMouseOut={onMouseOut}
+        onClick={onClick}
+        onDoubleClick={onDoubleClick}
+        data-selected={isSelected}
+        data-selected-for-compare={isSelectedForCompare}
+      >
+        <Image
+          pointerEvents="none"
+          src={imageDTO.thumbnail_url}
+          w={imageDTO.width}
+          fallback={<GalleryImagePlaceholder />}
+          objectFit="contain"
+          maxW="full"
+          maxH="full"
+          borderRadius="base"
+        />
+        <GalleryImageHoverIcons imageDTO={imageDTO} isHovered={isHovered} />
+      </Flex>
       {dragPreviewState?.type === 'multiple-image' ? createMultipleImageDragPreview(dragPreviewState) : null}
       {dragPreviewState?.type === 'single-image' ? createSingleImageDragPreview(dragPreviewState) : null}
     </>

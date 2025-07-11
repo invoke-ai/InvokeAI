@@ -12,9 +12,6 @@ export const uiSlice = createSlice({
     setActiveTab: (state, action: PayloadAction<UIState['activeTab']>) => {
       state.activeTab = action.payload;
     },
-    activeTabCanvasRightPanelChanged: (state, action: PayloadAction<UIState['activeTabCanvasRightPanel']>) => {
-      state.activeTabCanvasRightPanel = action.payload;
-    },
     setShouldShowImageDetails: (state, action: PayloadAction<UIState['shouldShowImageDetails']>) => {
       state.shouldShowImageDetails = action.payload;
     },
@@ -51,7 +48,7 @@ export const uiSlice = createSlice({
       const { id, size } = action.payload;
       state.textAreaSizes[id] = size;
     },
-    panelStateChanged: (
+    dockviewStorageKeyChanged: (
       state,
       action: PayloadAction<{
         id: keyof UIState['panels'];
@@ -73,14 +70,13 @@ export const uiSlice = createSlice({
 
 export const {
   setActiveTab,
-  activeTabCanvasRightPanelChanged,
   setShouldShowImageDetails,
   setShouldShowProgressInViewer,
   accordionStateChanged,
   expanderStateChanged,
   shouldShowNotificationChanged,
   textAreaSizesStateChanged,
-  panelStateChanged,
+  dockviewStorageKeyChanged,
 } = uiSlice.actions;
 
 export const selectUiSlice = (state: RootState) => state.ui;

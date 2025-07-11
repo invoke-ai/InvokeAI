@@ -64,7 +64,7 @@
     "framer-motion": "^11.10.0",
     "i18next": "^25.2.1",
     "i18next-http-backend": "^3.0.2",
-    "idb-keyval": "^6.2.2",
+    "idb-keyval": "6.2.1",
     "jsondiffpatch": "^0.7.3",
     "konva": "^9.3.20",
     "linkify-react": "^4.3.1",

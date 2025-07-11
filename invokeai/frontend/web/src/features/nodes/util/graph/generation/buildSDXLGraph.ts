@@ -78,7 +78,7 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     type: 'sdxl_compel_prompt',
     id: getPrefixedId('neg_cond'),
     prompt: prompts.negative,
-    style: prompts.negativeStyle,
+    style: prompts.useMainPromptsForStyle ? prompts.negative : prompts.negativeStyle,
   });
   const negCondCollect = g.addNode({
     type: 'collect',

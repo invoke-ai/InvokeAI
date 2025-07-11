@@ -142,6 +142,7 @@ export const RefImagePreview = memo(() => {
         role="button"
         onClick={onClick}
         cursor="pointer"
+        overflow="hidden"
       >
         <Image
           src={imageDTO?.thumbnail_url}
@@ -151,7 +152,6 @@ export const RefImagePreview = memo(() => {
           fallback={<Skeleton h="full" aspectRatio="1/1" />}
           maxW="full"
           maxH="full"
-          borderRadius="base"
         />
         {isIPAdapterConfig(entity.config) && (
           <Flex

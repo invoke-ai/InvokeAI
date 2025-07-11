@@ -34,6 +34,17 @@ const ModelImage = ({ image_url }: Props) => {
       minHeight={MODEL_IMAGE_THUMBNAIL_SIZE}
       minWidth={MODEL_IMAGE_THUMBNAIL_SIZE}
       borderRadius="base"
+      fallback={
+        <Flex
+          height={MODEL_IMAGE_THUMBNAIL_SIZE}
+          minWidth={MODEL_IMAGE_THUMBNAIL_SIZE}
+          borderRadius="base"
+          alignItems="center"
+          justifyContent="center"
+        >
+          <Icon color="base.500" as={PiImage} boxSize={FALLBACK_ICON_SIZE} />
+        </Flex>
+      }
     />
   );
 };

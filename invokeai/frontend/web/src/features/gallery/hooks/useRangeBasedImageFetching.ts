@@ -1,5 +1,5 @@
 import { useAppStore } from 'app/store/storeHooks';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ListRange } from 'react-virtuoso';
 import { imagesApi, useGetImageDTOsByNamesMutation } from 'services/api/endpoints/images';
 import { useThrottledCallback } from 'use-debounce';
@@ -13,33 +13,20 @@ interface UseRangeBasedImageFetchingReturn {
   onRangeChanged: (range: ListRange) => void;
 }
 
-const getUncachedNames = (imageNames: string[], cachedImageNames: string[], range: ListRange): string[] => {
-  if (range.startIndex === range.endIndex) {
-    // If the start and end indices are the same, no range to fetch
-    return [];
-  }
+const getUncachedNames = (imageNames: string[], cachedImageNames: string[], ranges: ListRange[]): string[] => {
+  const uncachedNamesSet = new Set<string>();
+  const cachedImageNamesSet = new Set(cachedImageNames);
 
-  if (imageNames.length === 0) {
-    return [];
-  }
-
-  const start = Math.max(0, range.startIndex);
-  const end = Math.min(imageNames.length - 1, range.endIndex);
-
-  if (cachedImageNames.length === 0) {
-    return imageNames.slice(start, end + 1);
-  }
-
-  const uncachedNames: string[] = [];
-
-  for (let i = start; i <= end; i++) {
-    const imageName = imageNames[i]!;
-    if (!cachedImageNames.includes(imageName)) {
-      uncachedNames.push(imageName);
+  for (const range of ranges) {
+    for (let i = range.startIndex; i <= range.endIndex; i++) {
+      const n = imageNames[i]!;
+      if (n && !cachedImageNamesSet.has(n)) {
+        uncachedNamesSet.add(n);
+      }
     }
   }
 
-  return uncachedNames;
+  return Array.from(uncachedNamesSet);
 };
 
 /**
@@ -53,30 +40,36 @@ export const useRangeBasedImageFetching = ({
 }: UseRangeBasedImageFetchingArgs): UseRangeBasedImageFetchingReturn => {
   const store = useAppStore();
   const [getImageDTOsByNames] = useGetImageDTOsByNamesMutation();
+  const [lastRange, setLastRange] = useState<ListRange | null>(null);
+  const [pendingRanges, setPendingRanges] = useState<ListRange[]>([]);
 
   const fetchImages = useCallback(
-    (visibleRange: ListRange) => {
+    (ranges: ListRange[], imageNames: string[]) => {
       if (!enabled) {
         return;
       }
       const cachedImageNames = imagesApi.util.selectCachedArgsForQuery(store.getState(), 'getImageDTO');
-      const uncachedNames = getUncachedNames(imageNames, cachedImageNames, visibleRange);
+      const uncachedNames = getUncachedNames(imageNames, cachedImageNames, ranges);
       if (uncachedNames.length === 0) {
         return;
       }
       getImageDTOsByNames({ image_names: uncachedNames });
+      setPendingRanges([]);
     },
-    [enabled, getImageDTOsByNames, imageNames, store]
+    [enabled, getImageDTOsByNames, store]
   );
 
-  const throttledFetchImages = useThrottledCallback(fetchImages, 100);
+  const throttledFetchImages = useThrottledCallback(fetchImages, 500);
 
-  const onRangeChanged = useCallback(
-    (range: ListRange) => {
-      throttledFetchImages(range);
-    },
-    [throttledFetchImages]
-  );
+  const onRangeChanged = useCallback((range: ListRange) => {
+    setLastRange(range);
+    setPendingRanges((prev) => [...prev, range]);
+  }, []);
+
+  useEffect(() => {
+    const combinedRanges = lastRange ? [...pendingRanges, lastRange] : pendingRanges;
+    throttledFetchImages(combinedRanges, imageNames);
+  }, [imageNames, lastRange, pendingRanges, throttledFetchImages]);
 
   return {
     onRangeChanged,
