@@ -2,7 +2,6 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import { SelectionMode } from '@xyflow/react';
 import type { PersistConfig, RootState } from 'app/store/store';
-import type { Selector } from 'react-redux';
 
 export type NodePlacementStrategy = 'NETWORK_SIMPLEX' | 'BRANDES_KOEPF' | 'LINEAR_SEGMENTS' | 'SIMPLE';
 
@@ -122,7 +121,7 @@ export const workflowSettingsPersistConfig: PersistConfig<WorkflowSettingsState>
 };
 
 export const selectWorkflowSettingsSlice = (state: RootState) => state.workflowSettings;
-const createWorkflowSettingsSelector = <T>(selector: Selector<WorkflowSettingsState, T>) =>
+const createWorkflowSettingsSelector = <T>(selector: (state: WorkflowSettingsState) => T) =>
   createSelector(selectWorkflowSettingsSlice, selector);
 export const selectShouldSnapToGrid = createWorkflowSettingsSelector((s) => s.shouldSnapToGrid);
 export const selectSelectionMode = createWorkflowSettingsSelector((s) => s.selectionMode);
