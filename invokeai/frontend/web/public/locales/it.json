@@ -152,7 +152,7 @@
         "image": "immagine",
         "drop": "Rilascia",
         "unstarImage": "Rimuovi contrassegno immagine",
-        "dropOrUpload": "$t(gallery.drop) o carica",
+        "dropOrUpload": "Rilascia o carica",
         "starImage": "Contrassegna l'immagine",
         "dropToUpload": "$t(gallery.drop) per aggiornare",
         "bulkDownloadRequested": "Preparazione del download",
@@ -197,7 +197,8 @@
         "boardsSettings": "Impostazioni Bacheche",
         "imagesSettings": "Impostazioni Immagini Galleria",
         "assets": "Risorse",
-        "images": "Immagini"
+        "images": "Immagini",
+        "useForPromptGeneration": "Usa per generare il prompt"
     },
     "hotkeys": {
         "searchHotkeys": "Cerca tasti di scelta rapida",
@@ -379,6 +380,15 @@
             "applyTransform": {
                 "title": "Applica trasformazione",
                 "desc": "Applica la trasformazione in sospeso al livello selezionato."
+            },
+            "toggleNonRasterLayers": {
+                "desc": "Mostra o nascondi tutte le categorie di livelli non raster (Livelli di controllo, Maschere di Inpaint, Guida regionale).",
+                "title": "Attiva/disattiva livelli non raster"
+            },
+            "settings": {
+                "behavior": "Comportamento",
+                "display": "Mostra",
+                "grid": "Griglia"
             }
         },
         "workflows": {
@@ -623,7 +633,7 @@
         "installingXModels_one": "Installazione di {{count}} modello",
         "installingXModels_many": "Installazione di {{count}} modelli",
         "installingXModels_other": "Installazione di {{count}} modelli",
-        "includesNModels": "Include {{n}} modelli e le loro dipendenze",
+        "includesNModels": "Include {{n}} modelli e le loro dipendenze.",
         "starterBundleHelpText": "Installa facilmente tutti i modelli necessari per iniziare con un modello base, tra cui un modello principale, controlnet, adattatori IP e altro. Selezionando un pacchetto salterai tutti i modelli che hai già installato.",
         "noDefaultSettings": "Nessuna impostazione predefinita configurata per questo modello. Visita Gestione Modelli per aggiungere impostazioni predefinite.",
         "defaultSettingsOutOfSync": "Alcune impostazioni non corrispondono a quelle predefinite del modello:",
@@ -656,7 +666,27 @@
         "manageModels": "Gestione modelli",
         "hfTokenReset": "Ripristino del gettone HF",
         "relatedModels": "Modelli correlati",
-        "showOnlyRelatedModels": "Correlati"
+        "showOnlyRelatedModels": "Correlati",
+        "installedModelsCount": "{{installed}} di {{total}} modelli installati.",
+        "allNModelsInstalled": "Tutti i {{count}} modelli installati",
+        "nToInstall": "{{count}} da installare",
+        "nAlreadyInstalled": "{{count}} già installati",
+        "bundleAlreadyInstalled": "Pacchetto già installato",
+        "bundleAlreadyInstalledDesc": "Tutti i modelli nel pacchetto {{bundleName}} sono già installati.",
+        "launchpad": {
+            "description": "Per utilizzare la maggior parte delle funzionalità della piattaforma, Invoke richiede l'installazione di modelli. Scegli tra le opzioni di installazione manuale o esplora i modelli di avvio selezionati.",
+            "manualInstall": "Installazione manuale",
+            "urlDescription": "Installa i modelli da un URL o da un percorso file locale. Perfetto per modelli specifici che desideri aggiungere.",
+            "huggingFaceDescription": "Esplora e installa i modelli direttamente dai repository di HuggingFace.",
+            "scanFolderDescription": "Esegui la scansione di una cartella locale per rilevare e installare automaticamente i modelli.",
+            "recommendedModels": "Modelli consigliati",
+            "exploreStarter": "Oppure sfoglia tutti i modelli iniziali disponibili",
+            "welcome": "Benvenuti in Gestione Modelli",
+            "quickStart": "Pacchetti di avvio rapido",
+            "bundleDescription": "Ogni pacchetto include modelli essenziali per ogni famiglia di modelli e modelli base selezionati per iniziare.",
+            "browseAll": "Oppure scopri tutti i modelli disponibili:"
+        },
+        "launchpadTab": "Rampa di lancio"
     },
     "parameters": {
         "images": "Immagini",
@@ -742,7 +772,10 @@
             "modelIncompatibleBboxHeight": "L'altezza del riquadro è {{height}} ma {{model}} richiede multipli di {{multiple}}",
             "modelIncompatibleScaledBboxWidth": "La larghezza scalata del riquadro è {{width}} ma {{model}} richiede multipli di {{multiple}}",
             "modelIncompatibleScaledBboxHeight": "L'altezza scalata del riquadro è {{height}} ma {{model}} richiede multipli di {{multiple}}",
-            "modelDisabledForTrial": "La generazione con {{modelName}} non è disponibile per gli account di prova. Accedi alle impostazioni del tuo account per effettuare l'upgrade."
+            "modelDisabledForTrial": "La generazione con {{modelName}} non è disponibile per gli account di prova. Accedi alle impostazioni del tuo account per effettuare l'upgrade.",
+            "fluxKontextMultipleReferenceImages": "È possibile utilizzare solo 1 immagine di riferimento alla volta con Flux Kontext",
+            "promptExpansionResultPending": "Accetta o ignora il risultato dell'espansione del prompt",
+            "promptExpansionPending": "Espansione del prompt in corso"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -884,7 +917,26 @@
         "problemUnpublishingWorkflowDescription": "Si è verificato un problema durante l'annullamento della pubblicazione del flusso di lavoro. Riprova.",
         "workflowUnpublished": "Flusso di lavoro non pubblicato",
         "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4o supporta solo la conversione da testo a immagine e da immagine a immagine. Utilizza altri modelli per le attività di Inpainting e Outpainting.",
-        "imagenIncompatibleGenerationMode": "Google {{model}} supporta solo la generazione da testo a immagine. Utilizza altri modelli per le attività di conversione da immagine a immagine, inpainting e outpainting."
+        "imagenIncompatibleGenerationMode": "Google {{model}} supporta solo la generazione da testo a immagine. Utilizza altri modelli per le attività di conversione da immagine a immagine, inpainting e outpainting.",
+        "noRasterLayers": "Nessun livello raster trovato",
+        "noRasterLayersDesc": "Crea almeno un livello raster da esportare in PSD",
+        "noActiveRasterLayers": "Nessun livello raster attivo",
+        "noActiveRasterLayersDesc": "Abilitare almeno un livello raster da esportare in PSD",
+        "noVisibleRasterLayers": "Nessun livello raster visibile",
+        "noVisibleRasterLayersDesc": "Abilitare almeno un livello raster da esportare in PSD",
+        "invalidCanvasDimensions": "Dimensioni della tela non valide",
+        "canvasTooLarge": "Tela troppo grande",
+        "canvasTooLargeDesc": "Le dimensioni della tela superano le dimensioni massime consentite per l'esportazione in formato PSD. Riduci la larghezza e l'altezza totali della tela e riprova.",
+        "failedToProcessLayers": "Impossibile elaborare i livelli",
+        "psdExportSuccess": "Esportazione PSD completata",
+        "psdExportSuccessDesc": "Esportazione riuscita di {{count}} livelli nel file PSD",
+        "problemExportingPSD": "Problema durante l'esportazione PSD",
+        "noValidLayerAdapters": "Nessun adattatore di livello valido trovato",
+        "fluxKontextIncompatibleGenerationMode": "Flux Kontext supporta solo la conversione da testo a immagine. Utilizza altri modelli per le attività di conversione da immagine a immagine, inpainting e outpainting.",
+        "canvasManagerNotAvailable": "Gestione tela non disponibile",
+        "promptExpansionFailed": "Espansione del prompt non riuscita",
+        "uploadAndPromptGenerationFailed": "Impossibile caricare l'immagine e generare il prompt",
+        "promptGenerationStarted": "Generazione del prompt avviata"
     },
     "accessibility": {
         "invokeProgressBar": "Barra di avanzamento generazione",
@@ -1225,7 +1277,8 @@
         "addLora": "Aggiungi LoRA",
         "defaultVAE": "VAE predefinito",
         "concepts": "Concetti",
-        "lora": "LoRA"
+        "lora": "LoRA",
+        "noCompatibleLoRAs": "Nessun LoRA compatibile"
     },
     "invocationCache": {
         "disable": "Disabilita",
@@ -1730,7 +1783,7 @@
         "parameterSet": "Parametro {{parameter}} impostato",
         "parsingFailed": "Analisi non riuscita",
         "recallParameter": "Richiama {{label}}",
-        "canvasV2Metadata": "Tela",
+        "canvasV2Metadata": "Livelli Tela",
         "guidance": "Guida",
         "seamlessXAxis": "Asse X senza giunte",
         "seamlessYAxis": "Asse Y senza giunte",
@@ -1901,7 +1954,16 @@
     "prompt": {
         "compatibleEmbeddings": "Incorporamenti compatibili",
         "addPromptTrigger": "Aggiungi Trigger nel prompt",
-        "noMatchingTriggers": "Nessun Trigger corrispondente"
+        "noMatchingTriggers": "Nessun Trigger corrispondente",
+        "discard": "Scarta",
+        "insert": "Inserisci",
+        "replace": "Sostituisci",
+        "resultSubtitle": "Scegli come gestire il prompt espanso:",
+        "resultTitle": "Espansione del prompt completata",
+        "expandingPrompt": "Espansione del prompt...",
+        "uploadImageForPromptGeneration": "Carica l'immagine per la generazione del prompt",
+        "expandCurrentPrompt": "Espandi il prompt corrente",
+        "generateFromImage": "Genera prompt dall'immagine"
     },
     "controlLayers": {
         "addLayer": "Aggiungi Livello",
@@ -2302,7 +2364,7 @@
         "controlLayerEmptyState": "<UploadButton>Carica un'immagine</UploadButton>, trascina un'immagine dalla <GalleryButton>galleria</GalleryButton> su questo livello, <PullBboxButton>trascina il riquadro di delimitazione in questo livello</PullBboxButton> oppure disegna sulla tela per iniziare.",
         "useImage": "Usa immagine",
         "resetGenerationSettings": "Ripristina impostazioni di generazione",
-        "referenceImageEmptyState": "Per iniziare, <UploadButton>carica un'immagine</UploadButton>, trascina un'immagine dalla <GalleryButton>galleria</GalleryButton>, oppure <PullBboxButton>trascina il riquadro di delimitazione in questo livello</PullBboxButton> su questo livello.",
+        "referenceImageEmptyState": "Per iniziare, <UploadButton>carica un'immagine</UploadButton> oppure trascina un'immagine dalla <GalleryButton>galleria</GalleryButton> su questa Immagine di riferimento.",
         "asRasterLayer": "Come $t(controlLayers.rasterLayer)",
         "asRasterLayerResize": "Come $t(controlLayers.rasterLayer) (Ridimensiona)",
         "asControlLayer": "Come $t(controlLayers.controlLayer)",
@@ -2352,7 +2414,13 @@
         "denoiseLimit": "Limite di riduzione del rumore",
         "addImageNoise": "Aggiungi $t(controlLayers.imageNoise)",
         "addDenoiseLimit": "Aggiungi $t(controlLayers.denoiseLimit)",
-        "imageNoise": "Rumore dell'immagine"
+        "imageNoise": "Rumore dell'immagine",
+        "exportCanvasToPSD": "Esporta la tela in PSD",
+        "ruleOfThirds": "Mostra la regola dei terzi",
+        "showNonRasterLayers": "Mostra livelli non raster (Shift+H)",
+        "hideNonRasterLayers": "Nascondi livelli non raster (Shift+H)",
+        "referenceImageEmptyStateWithCanvasOptions": "<UploadButton>Carica un'immagine</UploadButton>, trascina un'immagine dalla <GalleryButton>galleria</GalleryButton> su questa immagine di riferimento o <PullBboxButton>trascina il riquadro di delimitazione in questa immagine di riferimento</PullBboxButton> per iniziare.",
+        "uploadOrDragAnImage": "Trascina un'immagine dalla galleria o <UploadButton>carica un'immagine</UploadButton>."
     },
     "ui": {
         "tabs": {
@@ -2366,6 +2434,55 @@
             "upscaling": "Amplia",
             "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)",
             "gallery": "Galleria"
+        },
+        "launchpad": {
+            "workflowsTitle": "Approfondisci i flussi di lavoro.",
+            "upscalingTitle": "Amplia e aggiungi dettagli.",
+            "canvasTitle": "Modifica e perfeziona sulla tela.",
+            "generateTitle": "Genera immagini da prompt testuali.",
+            "modelGuideText": "Vuoi scoprire quali prompt funzionano meglio per ciascun modello?",
+            "modelGuideLink": "Consulta la nostra guida ai modelli.",
+            "workflows": {
+                "description": "I flussi di lavoro sono modelli riutilizzabili che automatizzano le attività di generazione delle immagini, consentendo di eseguire rapidamente operazioni complesse e di ottenere risultati coerenti.",
+                "learnMoreLink": "Scopri di più sulla creazione di flussi di lavoro",
+                "browseTemplates": {
+                    "title": "Sfoglia i modelli di flusso di lavoro",
+                    "description": "Scegli tra flussi di lavoro predefiniti per le attività comuni"
+                },
+                "createNew": {
+                    "title": "Crea un nuovo flusso di lavoro",
+                    "description": "Avvia un nuovo flusso di lavoro da zero"
+                },
+                "loadFromFile": {
+                    "title": "Carica flusso di lavoro da file",
+                    "description": "Carica un flusso di lavoro per iniziare con una configurazione esistente"
+                }
+            },
+            "upscaling": {
+                "uploadImage": {
+                    "title": "Carica l'immagine da ampliare",
+                    "description": "Fai clic o trascina un'immagine per ingrandirla (JPG, PNG, WebP fino a 100 MB)"
+                },
+                "replaceImage": {
+                    "title": "Sostituisci l'immagine corrente",
+                    "description": "Fai clic o trascina una nuova immagine per sostituire quella corrente"
+                },
+                "imageReady": {
+                    "title": "Immagine pronta",
+                    "description": "Premere Invoke per iniziare l'ampliamento"
+                },
+                "readyToUpscale": {
+                    "title": "Pronto per ampliare!",
+                    "description": "Configura le impostazioni qui sotto, quindi fai clic sul pulsante Invoke per iniziare ad ampliare l'immagine."
+                },
+                "upscaleModel": "Modello per l'ampliamento",
+                "model": "Modello",
+                "scale": "Scala",
+                "helpText": {
+                    "promptAdvice": "Durante l'ampliamento, utilizza un prompt che descriva il mezzo e lo stile. Evita di descrivere dettagli specifici del contenuto dell'immagine.",
+                    "styleAdvice": "L'ampliamento funziona meglio con lo stile generale dell'immagine."
+                }
+            }
         }
     },
     "upscaling": {
@@ -2436,7 +2553,8 @@
         "positivePromptColumn": "'prompt' o 'positive_prompt'",
         "noTemplates": "Nessun modello",
         "acceptedColumnsKeys": "Colonne/chiavi accettate:",
-        "promptTemplateCleared": "Modello di prompt cancellato"
+        "promptTemplateCleared": "Modello di prompt cancellato",
+        "togglePromptPreviews": "Attiva/disattiva le anteprime dei prompt"
     },
     "newUserExperience": {
         "gettingStartedSeries": "Desideri maggiori informazioni? Consulta la nostra <LinkComponent>Getting Started Series</LinkComponent> per suggerimenti su come sfruttare appieno il potenziale di Invoke Studio.",
