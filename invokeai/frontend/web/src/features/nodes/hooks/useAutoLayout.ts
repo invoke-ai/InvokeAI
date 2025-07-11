@@ -1,7 +1,8 @@
 import { useStore } from '@nanostores/react';
 import type { NodeChange } from '@xyflow/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import ELK, { type ElkEdge, type ElkNode } from 'elkjs/lib/elk.bundled.js';
+import type { ELK as ELKType,ElkExtendedEdge, ElkNode } from 'elkjs';
+import * as ElkModule from 'elkjs/lib/elk.bundled.js';
 import { $templates, nodesChanged } from 'features/nodes/store/nodesSlice';
 import { selectEdges, selectNodes } from 'features/nodes/store/selectors';
 import {
@@ -15,8 +16,14 @@ import { NODE_WIDTH } from 'features/nodes/types/constants';
 import type { AnyNode } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { useCallback } from 'react';
-
-const elk = new ELK();
+ 
+// This is a workaround for a common issue with how ELKjs is packaged. The bundled script doesn't have a
+// clean ES module export, so we import the module namespace and then extract the constructor, which may
+// be on the `default` property or be the module itself.
+const ElkConstructor = ((ElkModule as unknown as { default: unknown }).default ?? ElkModule) as new (
+  options?: Record<string, unknown>
+) => ELKType;
+const elk: ELKType = new ElkConstructor();
 
 // These are estimates for node dimensions, used as a fallback when the node has not yet been rendered.
 const ESTIMATED_NODE_HEADER_HEIGHT = 40;
@@ -24,7 +31,7 @@ const ESTIMATED_NODE_FOOTER_HEIGHT = 20;
 const ESTIMATED_FIELD_HEIGHT = 36;
 const ESTIMATED_NOTES_NODE_HEIGHT = 200;
 
-export const useAutoLayout = () => {
+export const useAutoLayout = (): (() => Promise<void>) => {
   const dispatch = useAppDispatch();
   const nodes = useAppSelector(selectNodes);
   const edges = useAppSelector(selectEdges);
@@ -45,13 +52,29 @@ export const useAutoLayout = () => {
     const nodeIdsToLayout = new Set(nodesToLayout.map((n) => n.id));
     const edgesToLayout = edges.filter((e) => nodeIdsToLayout.has(e.source) && nodeIdsToLayout.has(e.target));
 
-    const elkNodes: ElkNode[] = nodesToLayout.map((node) => {
-      let height = node.height;
+    // Get all node elements from the DOM at once for performance, then create a map for fast lookups.
+    const nodeElements = document.querySelectorAll<HTMLDivElement>('.react-flow__node');
+    const nodeElementMap = new Map<string, HTMLDivElement>();
+    nodeElements.forEach((el) => {
+      const id = el.dataset.id;
+      if (id) {
+        nodeElementMap.set(id, el);
+      }
+    });
 
-      // If the node has no height, we need to estimate it.
-      if (!height) {
+    const elkNodes: ElkNode[] = nodesToLayout.map((node) => {
+      // First, try to get the live height from the DOM element. This is the most accurate.
+      let height = nodeElementMap.get(node.id)?.offsetHeight;
+
+      // If the DOM element isn't available or its height is too small (e.g. not fully rendered),
+      // fall back to the height from the node state.
+      if (!height || height < ESTIMATED_NODE_HEADER_HEIGHT) {
+        height = node.height;
+      }
+
+      // If we still don't have a valid height, estimate it based on the node's template.
+      if (!height || height < ESTIMATED_NODE_HEADER_HEIGHT) {
         if (isInvocationNode(node)) {
-          // This is an invocation node. We can estimate its height based on the number of fields.
           const template = templates[node.data.type];
           if (template) {
             const numInputs = Object.keys(template.inputs).length;
@@ -62,7 +85,6 @@ export const useAutoLayout = () => {
               ESTIMATED_NODE_FOOTER_HEIGHT;
           }
         } else if (node.type === 'notes') {
-          // This is a notes node. They have a fixed default size.
           height = ESTIMATED_NOTES_NODE_HEIGHT;
         }
       }
@@ -70,7 +92,8 @@ export const useAutoLayout = () => {
       const elkNode: ElkNode = {
         id: node.id,
         width: node.width || NODE_WIDTH,
-        height: height || 200, // A final fallback just in case.
+        // Final fallback to a default height if all else fails.
+        height: height && height >= ESTIMATED_NODE_HEADER_HEIGHT ? height : 200,
       };
 
       // If we are layouting a selection, we must provide the positions of all unselected nodes to
@@ -83,30 +106,25 @@ export const useAutoLayout = () => {
       return elkNode;
     });
 
-    const elkEdges: ElkEdge[] = edgesToLayout.map((edge) => ({
+    const elkEdges: ElkExtendedEdge[] = edgesToLayout.map((edge) => ({
       id: edge.id,
       sources: [edge.source],
       targets: [edge.target],
     }));
 
+    const layoutOptions: ElkNode['layoutOptions'] = {
+      'elk.algorithm': 'layered',
+      'elk.spacing.nodeNode': String(nodeSpacing),
+      'elk.direction': layoutDirection,
+      'elk.layered.spacing.nodeNodeBetweenLayers': String(layerSpacing),
+      'elk.spacing.edgeNode': '50',
+      'elk.layered.nodePlacement.strategy': nodePlacementStrategy,
+      'elk.layered.layering.strategy': layeringStrategy,
+    };
+
     const graph: ElkNode = {
       id: 'root',
-      width: 0,
-      height: 0,
-      layoutOptions: {
-        'elk.algorithm': 'layered',
-        'elk.direction': layoutDirection,
-        // Spacing between nodes in the same layer (vertical)
-        'elk.spacing.nodeNode': String(nodeSpacing),
-        // Spacing between nodes in adjacent layers (horizontal)
-        'elk.layered.spacing.nodeNodeBetweenLayers': String(layerSpacing),
-        // Spacing between an edge and a node
-        'elk.spacing.edgeNode': '50',
-        // layout strategy for node placement
-        'elk.layered.nodePlacement.strategy': nodePlacementStrategy,
-        // layering strategy
-        'elk.layered.layering.strategy': layeringStrategy,
-      },
+      layoutOptions,
       children: elkNodes,
       edges: elkEdges,
     };

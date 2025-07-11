@@ -4,16 +4,22 @@ import {
   CompositeSlider,
   Divider,
   Flex,
+  FormControl,
+  FormLabel,
+  Grid,
   IconButton,
+  NumberDecrementStepper,
+  NumberIncrementStepper,
+  NumberInput,
+  NumberInputField,
+  NumberInputStepper,
   Popover,
   PopoverArrow,
   PopoverBody,
   PopoverContent,
   PopoverFooter,
   PopoverTrigger,
-  Radio,
-  RadioGroup,
-  Text,
+  Select,
 } from '@invoke-ai/ui-library';
 import { useReactFlow } from '@xyflow/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -36,7 +42,7 @@ import {
   selectShouldShowMinimapPanel,
   shouldShowMinimapPanelChanged,
 } from 'features/nodes/store/workflowSettingsSlice';
-import { memo, useCallback } from 'react';
+import { type ChangeEvent, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiFrameCornersBold,
@@ -78,36 +84,50 @@ const ViewportControls = () => {
   }, [shouldShowMinimapPanel, dispatch]);
 
   const handleStrategyChanged = useCallback(
-    (value: NodePlacementStrategy) => {
-      dispatch(nodePlacementStrategyChanged(value));
+    (e: ChangeEvent<HTMLSelectElement>) => {
+      dispatch(nodePlacementStrategyChanged(e.target.value as NodePlacementStrategy));
     },
     [dispatch]
   );
 
   const handleLayeringStrategyChanged = useCallback(
-    (value: LayeringStrategy) => {
-      dispatch(layeringStrategyChanged(value));
+    (e: ChangeEvent<HTMLSelectElement>) => {
+      dispatch(layeringStrategyChanged(e.target.value as LayeringStrategy));
     },
     [dispatch]
   );
 
-  const handleNodeSpacingChanged = useCallback(
+  const handleNodeSpacingSliderChange = useCallback(
     (v: number) => {
       dispatch(nodeSpacingChanged(v));
     },
     [dispatch]
   );
 
-  const handleLayerSpacingChanged = useCallback(
+  const handleNodeSpacingInputChange = useCallback(
+    (_: string, v: number) => {
+      dispatch(nodeSpacingChanged(v));
+    },
+    [dispatch]
+  );
+
+  const handleLayerSpacingSliderChange = useCallback(
     (v: number) => {
       dispatch(layerSpacingChanged(v));
     },
     [dispatch]
   );
 
+  const handleLayerSpacingInputChange = useCallback(
+    (_: string, v: number) => {
+      dispatch(layerSpacingChanged(v));
+    },
+    [dispatch]
+  );
+
   const handleLayoutDirectionChanged = useCallback(
-    (value: LayoutDirection) => {
-      dispatch(layoutDirectionChanged(value));
+    (e: ChangeEvent<HTMLSelectElement>) => {
+      dispatch(layoutDirectionChanged(e.target.value as LayoutDirection));
     },
     [dispatch]
   );
@@ -150,44 +170,84 @@ const ViewportControls = () => {
         <PopoverContent>
           <PopoverArrow />
           <PopoverBody>
-            <Flex direction="column" gap={4}>
-              <Text fontWeight="semibold">{t('nodes.layout.nodePlacementStrategy')}</Text>
-              <RadioGroup value={nodePlacementStrategy} onChange={handleStrategyChanged}>
-                <Flex direction="column" gap={2}>
-                  <Radio value="NETWORK_SIMPLEX">{t('nodes.layout.networkSimplex')}</Radio>
-                  <Radio value="BRANDES_KOEPF">{t('nodes.layout.brandesKoepf')}</Radio>
-                  <Radio value="LINEAR_SEGMENTS">{t('nodes.layout.linearSegments')}</Radio>
-                  <Radio value="SIMPLE">{t('nodes.layout.simplePlacement')}</Radio>
-                </Flex>
-              </RadioGroup>
+            <Flex direction="column" gap={2}>
+              <FormControl>
+                <FormLabel>{t('nodes.layout.layoutDirection')}</FormLabel>
+                <Select value={layoutDirection} onChange={handleLayoutDirectionChanged}>
+                  <option value="RIGHT">{t('nodes.layout.layoutDirectionRight')}</option>
+                  <option value="DOWN">{t('nodes.layout.layoutDirectionDown')}</option>
+                </Select>
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('nodes.layout.layeringStrategy')}</FormLabel>
+                <Select value={layeringStrategy} onChange={handleLayeringStrategyChanged}>
+                  <option value="NETWORK_SIMPLEX">{t('nodes.layout.networkSimplex')}</option>
+                  <option value="LONGEST_PATH">{t('nodes.layout.longestPath')}</option>
+                  <option value="COFFMAN_GRAHAM">{t('nodes.layout.coffmanGraham')}</option>
+                </Select>
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('nodes.layout.nodePlacementStrategy')}</FormLabel>
+                <Select value={nodePlacementStrategy} onChange={handleStrategyChanged}>
+                  <option value="NETWORK_SIMPLEX">{t('nodes.layout.networkSimplex')}</option>
+                  <option value="BRANDES_KOEPF">{t('nodes.layout.brandesKoepf')}</option>
+                  <option value="LINEAR_SEGMENTS">{t('nodes.layout.linearSegments')}</option>
+                  <option value="SIMPLE">{t('nodes.layout.simplePlacement')}</option>
+                </Select>
+              </FormControl>
               <Divider />
-              <Text fontWeight="semibold">{t('nodes.layout.layeringStrategy')}</Text>
-              <RadioGroup value={layeringStrategy} onChange={handleLayeringStrategyChanged}>
-                <Flex direction="column" gap={2}>
-                  <Radio value="NETWORK_SIMPLEX">{t('nodes.layout.networkSimplex')}</Radio>
-                  <Radio value="LONGEST_PATH">{t('nodes.layout.longestPath')}</Radio>
-                  <Radio value="COFFMAN_GRAHAM">{t('nodes.layout.coffmanGraham')}</Radio>
-                </Flex>
-              </RadioGroup>
-              <Divider />
-              <Text fontWeight="semibold">{t('nodes.layout.layoutDirection')}</Text>
-              <RadioGroup value={layoutDirection} onChange={handleLayoutDirectionChanged}>
-                <Flex direction="column" gap={2}>
-                  <Radio value="RIGHT">{t('nodes.layout.layoutDirectionRight')}</Radio>
-                  <Radio value="DOWN">{t('nodes.layout.layoutDirectionDown')}</Radio>
-                </Flex>
-              </RadioGroup>
-              <Divider />
-              <Flex justifyContent="space-between" alignItems="center">
-                <Text fontWeight="semibold">{t('nodes.layout.nodeSpacing')}</Text>
-                <Text variant="subtext">{nodeSpacing}</Text>
-              </Flex>
-              <CompositeSlider min={0} max={200} value={nodeSpacing} onChange={handleNodeSpacingChanged} marks />
-              <Flex justifyContent="space-between" alignItems="center">
-                <Text fontWeight="semibold">{t('nodes.layout.layerSpacing')}</Text>
-                <Text variant="subtext">{layerSpacing}</Text>
-              </Flex>
-              <CompositeSlider min={0} max={200} value={layerSpacing} onChange={handleLayerSpacingChanged} marks />
+              <FormControl>
+                <FormLabel>{t('nodes.layout.nodeSpacing')}</FormLabel>
+                <Grid w="full" gap={2} templateColumns="1fr auto">
+                  <CompositeSlider
+                    min={0}
+                    max={200}
+                    value={nodeSpacing}
+                    onChange={handleNodeSpacingSliderChange}
+                    marks
+                  />
+                  <NumberInput
+                    size="sm"
+                    value={nodeSpacing}
+                    min={0}
+                    max={200}
+                    onChange={handleNodeSpacingInputChange}
+                    w={24}
+                  >
+                    <NumberInputField />
+                    <NumberInputStepper>
+                      <NumberIncrementStepper />
+                      <NumberDecrementStepper />
+                    </NumberInputStepper>
+                  </NumberInput>
+                </Grid>
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('nodes.layout.layerSpacing')}</FormLabel>
+                <Grid w="full" gap={2} templateColumns="1fr auto">
+                  <CompositeSlider
+                    min={0}
+                    max={200}
+                    value={layerSpacing}
+                    onChange={handleLayerSpacingSliderChange}
+                    marks
+                  />
+                  <NumberInput
+                    size="sm"
+                    value={layerSpacing}
+                    min={0}
+                    max={200}
+                    onChange={handleLayerSpacingInputChange}
+                    w={24}
+                  >
+                    <NumberInputField />
+                    <NumberInputStepper>
+                      <NumberIncrementStepper />
+                      <NumberDecrementStepper />
+                    </NumberInputStepper>
+                  </NumberInput>
+                </Grid>
+              </FormControl>
             </Flex>
           </PopoverBody>
           <PopoverFooter>
