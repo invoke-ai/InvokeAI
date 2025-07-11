@@ -13,11 +13,14 @@ import { useCanvasDeleteLayerHotkey } from 'features/controlLayers/hooks/useCanv
 import { useCanvasEntityQuickSwitchHotkey } from 'features/controlLayers/hooks/useCanvasEntityQuickSwitchHotkey';
 import { useCanvasFilterHotkey } from 'features/controlLayers/hooks/useCanvasFilterHotkey';
 import { useCanvasResetLayerHotkey } from 'features/controlLayers/hooks/useCanvasResetLayerHotkey';
+import { useCanvasSnapToGridHotkey } from 'features/controlLayers/hooks/useCanvasSnapToGridHotkey';
 import { useCanvasToggleNonRasterLayersHotkey } from 'features/controlLayers/hooks/useCanvasToggleNonRasterLayersHotkey';
 import { useCanvasTransformHotkey } from 'features/controlLayers/hooks/useCanvasTransformHotkey';
 import { useCanvasUndoRedoHotkeys } from 'features/controlLayers/hooks/useCanvasUndoRedoHotkeys';
 import { useNextPrevEntityHotkeys } from 'features/controlLayers/hooks/useNextPrevEntity';
 import { memo } from 'react';
+
+import { CanvasToolbarSnappingToolButton } from './CanvasToolbarSnappingToolButton';
 
 export const CanvasToolbar = memo(() => {
   useCanvasResetLayerHotkey();
@@ -28,6 +31,7 @@ export const CanvasToolbar = memo(() => {
   useCanvasTransformHotkey();
   useCanvasFilterHotkey();
   useCanvasToggleNonRasterLayersHotkey();
+  useCanvasSnapToGridHotkey();
 
   return (
     <Flex w="full" gap={2} alignItems="center" px={2}>
@@ -37,6 +41,7 @@ export const CanvasToolbar = memo(() => {
         <CanvasToolbarScale />
         <CanvasToolbarResetViewButton />
         <CanvasToolbarFitBboxToLayersButton />
+        <CanvasToolbarSnappingToolButton />
       </Flex>
       <Divider orientation="vertical" />
       <Flex alignItems="center" h="full">
