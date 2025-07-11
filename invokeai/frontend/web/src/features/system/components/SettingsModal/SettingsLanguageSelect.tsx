@@ -26,14 +26,14 @@ const optionsObject: Record<Language, string> = {
   nl: 'Nederlands',
   pl: 'Polski',
   pt: 'Português',
-  pt_BR: 'Português do Brasil',
+  'pt-BR': 'Português do Brasil',
   ru: 'Русский',
   sv: 'Svenska',
   tr: 'Türkçe',
   ua: 'Украї́нська',
   vi: 'Tiếng Việt',
-  zh_CN: '简体中文',
-  zh_Hant: '漢語',
+  'zh-CN': '简体中文',
+  'zh-Hant': '漢語',
 };
 
 const options = map(optionsObject, (label, value) => ({ label, value }));

@@ -51,7 +51,7 @@ export const uiSlice = createSlice({
       const { id, size } = action.payload;
       state.textAreaSizes[id] = size;
     },
-    panelStateChanged: (
+    dockviewStorageKeyChanged: (
       state,
       action: PayloadAction<{
         id: keyof UIState['panels'];
@@ -80,7 +80,7 @@ export const {
   expanderStateChanged,
   shouldShowNotificationChanged,
   textAreaSizesStateChanged,
-  panelStateChanged,
+  dockviewStorageKeyChanged,
 } = uiSlice.actions;
 
 export const selectUiSlice = (state: RootState) => state.ui;

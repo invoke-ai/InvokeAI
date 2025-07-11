@@ -287,17 +287,19 @@ const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     reasons.push({ content: i18n.t('parameters.invoke.fluxKontextMultipleReferenceImages') });
   }
 
-  refImages.entities.forEach((entity, i) => {
-    const layerNumber = i + 1;
-    const refImageLiteral = i18n.t(LAYER_TYPE_TO_TKEY['reference_image']);
-    const prefix = `${refImageLiteral} #${layerNumber}`;
-    const problems = getGlobalReferenceImageWarnings(entity, model);
+  refImages.entities
+    .filter(({ isEnabled }) => isEnabled)
+    .forEach((entity, i) => {
+      const layerNumber = i + 1;
+      const refImageLiteral = i18n.t(LAYER_TYPE_TO_TKEY['reference_image']);
+      const prefix = `${refImageLiteral} #${layerNumber}`;
+      const problems = getGlobalReferenceImageWarnings(entity, model);
 
-    if (problems.length) {
-      const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
-      reasons.push({ prefix, content });
-    }
-  });
+      if (problems.length) {
+        const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
+        reasons.push({ prefix, content });
+      }
+    });
 
   return reasons;
 };

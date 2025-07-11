@@ -2355,8 +2355,7 @@
             "isolatedLayerPreview": "Isolated Layer Preview",
             "isolatedLayerPreviewDesc": "Whether to show only this layer when performing operations like filtering or transforming.",
             "invertBrushSizeScrollDirection": "Invert Scroll for Brush Size",
-            "pressureSensitivity": "Pressure Sensitivity",
-            "defaultAutoSwitch": "Default Auto-Switch Mode"
+            "pressureSensitivity": "Pressure Sensitivity"
         },
         "HUD": {
             "bbox": "Bbox",

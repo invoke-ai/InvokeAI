@@ -30,10 +30,13 @@ export const addFLUXFill = async ({
   denoise.denoising_start = denoising_start;
   denoise.denoising_end = denoising_end;
 
+  const { originalSize, scaledSize, rect } = getOriginalAndScaledSizesForOtherModes(state);
+
+  denoise.width = scaledSize.width;
+  denoise.height = scaledSize.height;
+
   const params = selectParamsSlice(state);
   const canvasSettings = selectCanvasSettingsSlice(state);
-
-  const { originalSize, scaledSize, rect } = getOriginalAndScaledSizesForOtherModes(state);
 
   const rasterAdapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
   const initialImage = await manager.compositor.getCompositeImageDTO(rasterAdapters, rect, {

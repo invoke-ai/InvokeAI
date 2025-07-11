@@ -76,7 +76,7 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
       )}
       {imageDTO && (
         <>
-          <Flex borderRadius="base" borderWidth={1} borderStyle="solid">
+          <Flex borderRadius="base" borderWidth={1} borderStyle="solid" overflow="hidden">
             <DndImage imageDTO={imageDTO} asThumbnail />
           </Flex>
           <Text

@@ -15,7 +15,6 @@ const sx = {
   objectFit: 'contain',
   maxW: 'full',
   maxH: 'full',
-  borderRadius: 'base',
   cursor: 'grab',
   '&[data-is-dragging=true]': {
     opacity: 0.3,

@@ -86,7 +86,7 @@ import {
 import { toast } from 'features/toast/toast';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
-import type { ComponentType, ReactNode } from 'react';
+import type { ComponentType } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { modelsApi } from 'services/api/endpoints/models';
@@ -173,7 +173,8 @@ export type SingleMetadataHandler<T> = {
   type: string;
   parse: (metadata: unknown, store: AppStore) => Promise<T>;
   recall: (value: T, store: AppStore) => void;
-  LabelComponent: ComponentType;
+  i18nKey: string;
+  LabelComponent: ComponentType<{ i18nKey: string }>;
   ValueComponent: ComponentType<SingleMetadataValueProps<T>>;
 };
 
@@ -187,7 +188,8 @@ export type CollectionMetadataHandler<T extends any[]> = {
   parse: (metadata: unknown, store: AppStore) => Promise<T>;
   recall: (values: T, store: AppStore) => void;
   recallOne: (value: T[number], store: AppStore) => void;
-  LabelComponent: ComponentType;
+  i18nKey: string;
+  LabelComponent: ComponentType<{ i18nKey: string }>;
   ValueComponent: ComponentType<CollectionMetadataValueProps<T>>;
 };
 
@@ -199,7 +201,8 @@ export type UnrecallableMetadataHandler<T> = {
   [UnrecallableMetadataKey]: true;
   type: string;
   parse: (metadata: unknown, store: AppStore) => Promise<T>;
-  LabelComponent: ComponentType;
+  i18nKey: string;
+  LabelComponent: ComponentType<{ i18nKey: string }>;
   ValueComponent: ComponentType<UnrecallableMetadataValueProps<T>>;
 };
 
@@ -224,7 +227,8 @@ const CreatedBy: UnrecallableMetadataHandler<string> = {
     const parsed = z.string().parse(raw);
     return Promise.resolve(parsed);
   },
-  LabelComponent: () => <MetadataLabel i18nKey="metadata.createdBy" />,
+  i18nKey: 'metadata.createdBy',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: UnrecallableMetadataValueProps<string>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion Created By
@@ -238,7 +242,8 @@ const GenerationMode: UnrecallableMetadataHandler<string> = {
     const parsed = z.string().parse(raw);
     return Promise.resolve(parsed);
   },
-  LabelComponent: () => <MetadataLabel i18nKey="metadata.generationMode" />,
+  i18nKey: 'metadata.generationMode',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: UnrecallableMetadataValueProps<string>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion Generation Mode
@@ -255,7 +260,8 @@ const PositivePrompt: SingleMetadataHandler<ParameterPositivePrompt> = {
   recall: (value, store) => {
     store.dispatch(positivePromptChanged(value));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="metadata.positivePrompt" />,
+  i18nKey: 'metadata.positivePrompt',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterPositivePrompt>) => (
     <MetadataPrimitiveValue value={value} />
   ),
@@ -274,7 +280,8 @@ const NegativePrompt: SingleMetadataHandler<ParameterNegativePrompt> = {
   recall: (value, store) => {
     store.dispatch(negativePromptChanged(value || null));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="metadata.negativePrompt" />,
+  i18nKey: 'metadata.negativePrompt',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterNegativePrompt>) => (
     <MetadataPrimitiveValue value={value} />
   ),
@@ -293,7 +300,8 @@ const PositiveStylePrompt: SingleMetadataHandler<ParameterPositiveStylePromptSDX
   recall: (value, store) => {
     store.dispatch(positivePrompt2Changed(value));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="sdxl.posStylePrompt" />,
+  i18nKey: 'sdxl.posStylePrompt',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterPositiveStylePromptSDXL>) => (
     <MetadataPrimitiveValue value={value} />
   ),
@@ -312,7 +320,8 @@ const NegativeStylePrompt: SingleMetadataHandler<ParameterPositiveStylePromptSDX
   recall: (value, store) => {
     store.dispatch(negativePrompt2Changed(value));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="sdxl.negStylePrompt" />,
+  i18nKey: 'sdxl.negStylePrompt',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterPositiveStylePromptSDXL>) => (
     <MetadataPrimitiveValue value={value} />
   ),
@@ -331,7 +340,8 @@ const CFGScale: SingleMetadataHandler<ParameterCFGScale> = {
   recall: (value, store) => {
     store.dispatch(setCfgScale(value));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="metadata.cfgScale" />,
+  i18nKey: 'metadata.cfgScale',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterCFGScale>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion CFG Scale
@@ -348,7 +358,8 @@ const CFGRescaleMultiplier: SingleMetadataHandler<ParameterCFGRescaleMultiplier>
   recall: (value, store) => {
     store.dispatch(setCfgRescaleMultiplier(value));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="metadata.cfgRescaleMultiplier" />,
+  i18nKey: 'metadata.cfgRescaleMultiplier',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterCFGRescaleMultiplier>) => (
     <MetadataPrimitiveValue value={value} />
   ),
@@ -367,7 +378,8 @@ const Guidance: SingleMetadataHandler<ParameterGuidance> = {
   recall: (value, store) => {
     store.dispatch(setGuidance(value));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="metadata.guidance" />,
+  i18nKey: 'metadata.guidance',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterGuidance>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion Guidance
@@ -384,7 +396,8 @@ const Scheduler: SingleMetadataHandler<ParameterScheduler> = {
   recall: (value, store) => {
     store.dispatch(setScheduler(value));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="metadata.scheduler" />,
+  i18nKey: 'metadata.scheduler',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterScheduler>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion Scheduler
@@ -406,7 +419,8 @@ const Width: SingleMetadataHandler<ParameterWidth> = {
       store.dispatch(widthChanged({ width: value, updateAspectRatio: true, clamp: true }));
     }
   },
-  LabelComponent: () => <MetadataLabel i18nKey="metadata.width" />,
+  i18nKey: 'metadata.width',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterWidth>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion Width
@@ -428,7 +442,8 @@ const Height: SingleMetadataHandler<ParameterHeight> = {
       store.dispatch(heightChanged({ height: value, updateAspectRatio: true, clamp: true }));
     }
   },
-  LabelComponent: () => <MetadataLabel i18nKey="metadata.height" />,
+  i18nKey: 'metadata.height',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterHeight>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion Height
@@ -445,7 +460,8 @@ const Seed: SingleMetadataHandler<ParameterSeed> = {
   recall: (value, store) => {
     store.dispatch(setSeed(value));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="metadata.seed" />,
+  i18nKey: 'metadata.seed',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterSeed>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion Seed
@@ -462,7 +478,8 @@ const Steps: SingleMetadataHandler<ParameterSteps> = {
   recall: (value, store) => {
     store.dispatch(setSteps(value));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="metadata.steps" />,
+  i18nKey: 'metadata.steps',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterSteps>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion Steps
@@ -479,7 +496,8 @@ const DenoisingStrength: SingleMetadataHandler<ParameterStrength> = {
   recall: (value, store) => {
     store.dispatch(setImg2imgStrength(value));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="metadata.strength" />,
+  i18nKey: 'metadata.strength',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterStrength>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion DenoisingStrength
@@ -496,7 +514,8 @@ const SeamlessX: SingleMetadataHandler<ParameterSeamlessX> = {
   recall: (value, store) => {
     store.dispatch(setSeamlessXAxis(value));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="metadata.seamlessXAxis" />,
+  i18nKey: 'metadata.seamlessXAxis',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterSeamlessX>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion SeamlessX
@@ -513,7 +532,8 @@ const SeamlessY: SingleMetadataHandler<ParameterSeamlessY> = {
   recall: (value, store) => {
     store.dispatch(setSeamlessYAxis(value));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="metadata.seamlessYAxis" />,
+  i18nKey: 'metadata.seamlessYAxis',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterSeamlessY>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion SeamlessY
@@ -533,7 +553,8 @@ const RefinerModel: SingleMetadataHandler<ParameterSDXLRefinerModel> = {
   recall: (value, store) => {
     store.dispatch(refinerModelChanged(value));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="sdxl.refinermodel" />,
+  i18nKey: 'sdxl.refinermodel',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterSDXLRefinerModel>) => (
     <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
   ),
@@ -552,7 +573,8 @@ const RefinerSteps: SingleMetadataHandler<ParameterSteps> = {
   recall: (value, store) => {
     store.dispatch(setRefinerSteps(value));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="sdxl.refinerSteps" />,
+  i18nKey: 'sdxl.refinerSteps',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterSteps>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion RefinerSteps
@@ -569,7 +591,8 @@ const RefinerCFGScale: SingleMetadataHandler<ParameterCFGScale> = {
   recall: (value, store) => {
     store.dispatch(setRefinerCFGScale(value));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="sdxl.cfgScale" />,
+  i18nKey: 'sdxl.cfgScale',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterCFGScale>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion RefinerCFGScale
@@ -586,7 +609,8 @@ const RefinerScheduler: SingleMetadataHandler<ParameterScheduler> = {
   recall: (value, store) => {
     store.dispatch(setRefinerScheduler(value));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="sdxl.scheduler" />,
+  i18nKey: 'sdxl.scheduler',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterScheduler>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion RefinerScheduler
@@ -603,7 +627,8 @@ const RefinerPositiveAestheticScore: SingleMetadataHandler<ParameterSDXLRefinerP
   recall: (value, store) => {
     store.dispatch(setRefinerPositiveAestheticScore(value));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="sdxl.posAestheticScore" />,
+  i18nKey: 'sdxl.posAestheticScore',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterSDXLRefinerPositiveAestheticScore>) => (
     <MetadataPrimitiveValue value={value} />
   ),
@@ -622,7 +647,8 @@ const RefinerNegativeAestheticScore: SingleMetadataHandler<ParameterSDXLRefinerN
   recall: (value, store) => {
     store.dispatch(setRefinerNegativeAestheticScore(value));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="sdxl.negAestheticScore" />,
+  i18nKey: 'sdxl.negAestheticScore',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterSDXLRefinerNegativeAestheticScore>) => (
     <MetadataPrimitiveValue value={value} />
   ),
@@ -641,7 +667,8 @@ const RefinerDenoisingStart: SingleMetadataHandler<ParameterSDXLRefinerStart> = 
   recall: (value, store) => {
     store.dispatch(setRefinerStart(value));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="sdxl.refinerStart" />,
+  i18nKey: 'sdxl.refinerStart',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterSDXLRefinerStart>) => (
     <MetadataPrimitiveValue value={value} />
   ),
@@ -661,7 +688,8 @@ const MainModel: SingleMetadataHandler<ParameterModel> = {
   recall: (value, store) => {
     store.dispatch(modelSelected(value));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="metadata.model" />,
+  i18nKey: 'metadata.model',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterModel>) => (
     <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
   ),
@@ -682,7 +710,8 @@ const VAEModel: SingleMetadataHandler<ParameterVAEModel> = {
   recall: (value, store) => {
     store.dispatch(vaeSelected(value));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="metadata.vae" />,
+  i18nKey: 'metadata.vae',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterVAEModel>) => (
     <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
   ),
@@ -746,7 +775,8 @@ const LoRAs: CollectionMetadataHandler<LoRA[]> = {
       store.dispatch(loraRecalled({ lora }));
     }
   },
-  LabelComponent: () => <MetadataLabel i18nKey="models.lora" />,
+  i18nKey: 'models.lora',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: CollectionMetadataValueProps<LoRA[]>) => (
     <MetadataPrimitiveValue value={`${value.model.name} (${value.model.base.toUpperCase()}) - ${value.weight}`} />
   ),
@@ -776,7 +806,8 @@ const CanvasLayers: SingleMetadataHandler<CanvasMetadata> = {
     }
     store.dispatch(canvasMetadataRecalled(value));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="metadata.canvasV2Metadata" />,
+  i18nKey: 'metadata.canvasV2Metadata',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<CanvasMetadata>) => {
     const { t } = useTranslation();
     const count =
@@ -823,7 +854,8 @@ const RefImages: CollectionMetadataHandler<RefImageState[]> = {
     const entities = [{ ...data, id: getPrefixedId('reference_image') }];
     store.dispatch(refImagesRecalled({ entities, replace: false }));
   },
-  LabelComponent: () => <MetadataLabel i18nKey="controlLayers.referenceImage" />,
+  i18nKey: 'controlLayers.referenceImage',
+  LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: CollectionMetadataValueProps<RefImageState[]>) => {
     if (value.config.model) {
       return <MetadataPrimitiveValue value={value.config.model.name} />;
@@ -875,7 +907,7 @@ export const MetadataHandlers = {
   // ipAdapterToIPAdapterLayer: parseIPAdapterToIPAdapterLayer,
 } as const;
 
-const successToast = (parameter: ReactNode) => {
+const successToast = (parameter: string) => {
   toast({
     id: 'PARAMETER_SET',
     title: t('toast.parameterSet'),
@@ -884,7 +916,7 @@ const successToast = (parameter: ReactNode) => {
   });
 };
 
-const failedToast = (parameter: ReactNode, message?: ReactNode) => {
+const failedToast = (parameter: string, message?: string) => {
   toast({
     id: 'PARAMETER_NOT_SET',
     title: t('toast.parameterNotSet'),
@@ -915,9 +947,9 @@ const recallByHandler = async (arg: {
 
   if (!silent) {
     if (didRecall) {
-      successToast(<handler.LabelComponent />);
+      successToast(t(handler.i18nKey));
     } else {
-      failedToast(<handler.LabelComponent />);
+      failedToast(t(handler.i18nKey));
     }
   }
 
@@ -1019,6 +1051,28 @@ const recallPrompts = async (metadata: unknown, store: AppStore) => {
   }
 };
 
+const hasMetadataByHandlers = async (arg: {
+  metadata: unknown;
+  handlers: (SingleMetadataHandler<any> | CollectionMetadataHandler<any[]>)[];
+  store: AppStore;
+  require: 'some' | 'all';
+}) => {
+  const { metadata, handlers, store, require } = arg;
+  for (const handler of handlers) {
+    try {
+      await handler.parse(metadata, store);
+      if (require === 'some') {
+        return true;
+      }
+    } catch {
+      if (require === 'all') {
+        return false;
+      }
+    }
+  }
+  return true;
+};
+
 const recallDimensions = async (metadata: unknown, store: AppStore) => {
   const recalled = await recallByHandlers({
     metadata,
@@ -1048,6 +1102,7 @@ const recallAll = async (
 };
 
 export const MetadataUtils = {
+  hasMetadataByHandlers,
   recallByHandler,
   recallByHandlers,
   recallAll,
