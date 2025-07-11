@@ -187,7 +187,7 @@ class ModelConfigBase(ABC, BaseModel):
             else:
                 return config_cls.from_model_on_disk(mod, **overrides)
 
-        raise InvalidModelConfigException("No valid config found")
+        raise InvalidModelConfigException("Unable to determine model type")
 
     @classmethod
     def get_tag(cls) -> Tag:
