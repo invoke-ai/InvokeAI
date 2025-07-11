@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react';
 import type { NodeChange } from '@xyflow/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import type { ELK as ELKType,ElkExtendedEdge, ElkNode } from 'elkjs';
+import type { ELK as ELKType, ElkExtendedEdge, ElkNode } from 'elkjs';
 import * as ElkModule from 'elkjs/lib/elk.bundled.js';
 import { $templates, nodesChanged } from 'features/nodes/store/nodesSlice';
 import { selectEdges, selectNodes } from 'features/nodes/store/selectors';
@@ -16,7 +16,7 @@ import { NODE_WIDTH } from 'features/nodes/types/constants';
 import type { AnyNode } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { useCallback } from 'react';
- 
+
 // This is a workaround for a common issue with how ELKjs is packaged. The bundled script doesn't have a
 // clean ES module export, so we import the module namespace and then extract the constructor, which may
 // be on the `default` property or be the module itself.
