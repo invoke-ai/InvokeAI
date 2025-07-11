@@ -143,7 +143,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
     DndDragPreviewSingleImageState | DndDragPreviewMultipleImageState | null
   >(null);
   // Must use callback ref - else chakra's Image fallback prop will break the ref & dnd
-  const [element, ref] = useState<HTMLImageElement | null>(null);
+  const [element, ref] = useState<HTMLDivElement | null>(null);
   const selectIsSelectedForCompare = useMemo(
     () => createSelector(selectGallerySlice, (gallery) => gallery.imageToCompare === imageDTO.image_name),
     [imageDTO.image_name]
@@ -246,6 +246,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
     <>
       <Box sx={galleryImageContainerSX} data-is-dragging={isDragging} data-image-name={imageDTO.image_name}>
         <Flex
+          ref={ref}
           role="button"
           className={GALLERY_IMAGE_CLASS}
           onMouseOver={onMouseOver}
@@ -256,7 +257,6 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
           data-selected-for-compare={isSelectedForCompare}
         >
           <Image
-            ref={ref}
             src={imageDTO.thumbnail_url}
             w={imageDTO.width}
             fallback={<GalleryImagePlaceholder />}
