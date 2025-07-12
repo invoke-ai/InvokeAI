@@ -55,9 +55,7 @@ export const ModelInstallQueue = memo(() => {
       <Box layerStyle="first" p={3} borderRadius="base" w="full" h="full">
         <ScrollableContent>
           <Flex flexDir="column-reverse" gap="2" w="full">
-            {data?.map((model) => (
-              <ModelInstallQueueItem key={model.id} installJob={model} />
-            ))}
+            {data?.map((model) => <ModelInstallQueueItem key={model.id} installJob={model} />)}
           </Flex>
         </ScrollableContent>
       </Box>

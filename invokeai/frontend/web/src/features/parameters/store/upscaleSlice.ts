@@ -13,6 +13,8 @@ export interface UpscaleState {
   tileControlnetModel: ControlNetModelConfig | null;
   scale: number;
   postProcessingModel: ParameterSpandrelImageToImageModel | null;
+  tileSize: number;
+  tileOverlap: number;
 }
 
 const initialUpscaleState: UpscaleState = {
@@ -24,6 +26,8 @@ const initialUpscaleState: UpscaleState = {
   tileControlnetModel: null,
   scale: 4,
   postProcessingModel: null,
+  tileSize: 1024,
+  tileOverlap: 128,
 };
 
 export const upscaleSlice = createSlice({
@@ -51,6 +55,12 @@ export const upscaleSlice = createSlice({
     postProcessingModelChanged: (state, action: PayloadAction<ParameterSpandrelImageToImageModel | null>) => {
       state.postProcessingModel = action.payload;
     },
+    tileSizeChanged: (state, action: PayloadAction<number>) => {
+      state.tileSize = action.payload;
+    },
+    tileOverlapChanged: (state, action: PayloadAction<number>) => {
+      state.tileOverlap = action.payload;
+    },
   },
 });
 
@@ -62,6 +72,8 @@ export const {
   tileControlnetModelChanged,
   scaleChanged,
   postProcessingModelChanged,
+  tileSizeChanged,
+  tileOverlapChanged,
 } = upscaleSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -88,3 +100,5 @@ export const selectTileControlNetModel = createUpscaleSelector((upscale) => upsc
 export const selectStructure = createUpscaleSelector((upscale) => upscale.structure);
 export const selectUpscaleInitialImage = createUpscaleSelector((upscale) => upscale.upscaleInitialImage);
 export const selectUpscaleScale = createUpscaleSelector((upscale) => upscale.scale);
+export const selectTileSize = createUpscaleSelector((upscale) => upscale.tileSize);
+export const selectTileOverlap = createUpscaleSelector((upscale) => upscale.tileOverlap);

@@ -67,6 +67,8 @@ export type Feature =
   | 'scale'
   | 'creativity'
   | 'structure'
+  | 'tileSize'
+  | 'tileOverlap'
   | 'optimizedDenoising'
   | 'fluxDevLicense';
 
