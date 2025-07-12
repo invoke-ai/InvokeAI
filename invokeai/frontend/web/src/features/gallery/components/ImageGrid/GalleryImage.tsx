@@ -1,7 +1,7 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { FlexProps, SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Flex, Icon, Image } from '@invoke-ai/ui-library';
+import { Flex, Icon, Image } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
@@ -27,8 +27,6 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PiImageBold } from 'react-icons/pi';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
-
-const GALLERY_IMAGE_CLASS = 'gallery-image';
 
 const galleryImageContainerSX = {
   containerType: 'inline-size',
@@ -255,7 +253,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
         data-selected-for-compare={isSelectedForCompare}
       >
         <Image
-          pointerEvents={'none'}
+          pointerEvents="none"
           src={imageDTO.thumbnail_url}
           w={imageDTO.width}
           fallback={<GalleryImagePlaceholder />}
