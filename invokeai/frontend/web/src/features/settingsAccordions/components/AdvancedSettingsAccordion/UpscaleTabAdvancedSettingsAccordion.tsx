@@ -10,8 +10,6 @@ import ParamTileSize from 'features/parameters/components/Upscale/ParamTileSize'
 import ParamFLUXVAEModelSelect from 'features/parameters/components/VAEModel/ParamFLUXVAEModelSelect';
 import ParamVAEModelSelect from 'features/parameters/components/VAEModel/ParamVAEModelSelect';
 import ParamVAEPrecision from 'features/parameters/components/VAEModel/ParamVAEPrecision';
-import ParamTileOverlap from 'features/parameters/components/Upscale/ParamTileOverlap';
-import ParamTileSize from 'features/parameters/components/Upscale/ParamTileSize';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
