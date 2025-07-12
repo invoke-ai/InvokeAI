@@ -57,6 +57,7 @@
     "cmdk": "^1.1.1",
     "compare-versions": "^6.1.1",
     "dockview": "^4.4.0",
+    "elkjs": "^0.10.0",
     "es-toolkit": "^1.39.5",
     "filesize": "^10.1.6",
     "fracturedjsonjs": "^4.1.0",

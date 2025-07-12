@@ -62,6 +62,9 @@ importers:
       dockview:
         specifier: ^4.4.0
         version: 4.4.0(react@18.3.1)
+      elkjs:
+        specifier: ^0.10.0
+        version: 0.10.0
       es-toolkit:
         specifier: ^1.39.5
         version: 1.39.6
@@ -2428,6 +2431,9 @@ packages:
 
   electron-to-chromium@1.5.179:
     resolution: {integrity: sha512-UWKi/EbBopgfFsc5k61wFpV7WrnnSlSzW/e2XcBmS6qKYTivZlLtoll5/rdqRTxGglGHkmkW0j0pFNJG10EUIQ==}
+
+  elkjs@0.10.0:
+    resolution: {integrity: sha512-v/3r+3Bl2NMrWmVoRTMBtHtWvRISTix/s9EfnsfEWApNrsmNjqgqJOispCGg46BPwIFdkag3N/HYSxJczvCm6w==}
 
   emoji-regex@8.0.0:
     resolution: {integrity: sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==}
@@ -7078,6 +7084,8 @@ snapshots:
   eastasianwidth@0.2.0: {}
 
   electron-to-chromium@1.5.179: {}
+
+  elkjs@0.10.0: {}
 
   emoji-regex@8.0.0: {}
 

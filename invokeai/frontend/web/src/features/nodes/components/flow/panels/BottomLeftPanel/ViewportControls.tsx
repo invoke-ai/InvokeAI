@@ -1,24 +1,71 @@
-import { ButtonGroup, IconButton } from '@invoke-ai/ui-library';
+import {
+  Button,
+  ButtonGroup,
+  CompositeSlider,
+  Divider,
+  Flex,
+  FormControl,
+  FormLabel,
+  Grid,
+  IconButton,
+  NumberDecrementStepper,
+  NumberIncrementStepper,
+  NumberInput,
+  NumberInputField,
+  NumberInputStepper,
+  Popover,
+  PopoverArrow,
+  PopoverBody,
+  PopoverContent,
+  PopoverFooter,
+  PopoverTrigger,
+  Select,
+} from '@invoke-ai/ui-library';
 import { useReactFlow } from '@xyflow/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { buildUseBoolean } from 'common/hooks/useBoolean';
+import { useAutoLayout } from 'features/nodes/hooks/useAutoLayout';
 import {
+  type LayeringStrategy,
+  layeringStrategyChanged,
+  layerSpacingChanged,
+  type LayoutDirection,
+  layoutDirectionChanged,
+  type NodePlacementStrategy,
+  nodePlacementStrategyChanged,
+  nodeSpacingChanged,
+  selectLayeringStrategy,
+  selectLayerSpacing,
+  selectLayoutDirection,
+  selectNodePlacementStrategy,
+  selectNodeSpacing,
   selectShouldShowMinimapPanel,
   shouldShowMinimapPanelChanged,
 } from 'features/nodes/store/workflowSettingsSlice';
-import { memo, useCallback } from 'react';
+import { type ChangeEvent, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiFrameCornersBold,
+  PiGitDiffBold,
   PiMagnifyingGlassMinusBold,
   PiMagnifyingGlassPlusBold,
   PiMapPinBold,
 } from 'react-icons/pi';
 
+const [useLayoutSettingsPopover] = buildUseBoolean(false);
+
 const ViewportControls = () => {
   const { t } = useTranslation();
   const { zoomIn, zoomOut, fitView } = useReactFlow();
+  const autoLayout = useAutoLayout();
   const dispatch = useAppDispatch();
+  const popover = useLayoutSettingsPopover();
   const shouldShowMinimapPanel = useAppSelector(selectShouldShowMinimapPanel);
+  const nodePlacementStrategy = useAppSelector(selectNodePlacementStrategy);
+  const layeringStrategy = useAppSelector(selectLayeringStrategy);
+  const nodeSpacing = useAppSelector(selectNodeSpacing);
+  const layerSpacing = useAppSelector(selectLayerSpacing);
+  const layoutDirection = useAppSelector(selectLayoutDirection);
 
   const handleClickedZoomIn = useCallback(() => {
     zoomIn({ duration: 300 });
@@ -35,6 +82,61 @@ const ViewportControls = () => {
   const handleClickedToggleMiniMapPanel = useCallback(() => {
     dispatch(shouldShowMinimapPanelChanged(!shouldShowMinimapPanel));
   }, [shouldShowMinimapPanel, dispatch]);
+
+  const handleStrategyChanged = useCallback(
+    (e: ChangeEvent<HTMLSelectElement>) => {
+      dispatch(nodePlacementStrategyChanged(e.target.value as NodePlacementStrategy));
+    },
+    [dispatch]
+  );
+
+  const handleLayeringStrategyChanged = useCallback(
+    (e: ChangeEvent<HTMLSelectElement>) => {
+      dispatch(layeringStrategyChanged(e.target.value as LayeringStrategy));
+    },
+    [dispatch]
+  );
+
+  const handleNodeSpacingSliderChange = useCallback(
+    (v: number) => {
+      dispatch(nodeSpacingChanged(v));
+    },
+    [dispatch]
+  );
+
+  const handleNodeSpacingInputChange = useCallback(
+    (_: string, v: number) => {
+      dispatch(nodeSpacingChanged(v));
+    },
+    [dispatch]
+  );
+
+  const handleLayerSpacingSliderChange = useCallback(
+    (v: number) => {
+      dispatch(layerSpacingChanged(v));
+    },
+    [dispatch]
+  );
+
+  const handleLayerSpacingInputChange = useCallback(
+    (_: string, v: number) => {
+      dispatch(layerSpacingChanged(v));
+    },
+    [dispatch]
+  );
+
+  const handleLayoutDirectionChanged = useCallback(
+    (e: ChangeEvent<HTMLSelectElement>) => {
+      dispatch(layoutDirectionChanged(e.target.value as LayoutDirection));
+    },
+    [dispatch]
+  );
+
+  const handleApplyAutoLayout = useCallback(async () => {
+    await autoLayout();
+    fitView({ duration: 300 });
+    popover.setFalse();
+  }, [autoLayout, fitView, popover]);
 
   return (
     <ButtonGroup orientation="vertical">
@@ -56,6 +158,105 @@ const ViewportControls = () => {
         onClick={handleClickedFitView}
         icon={<PiFrameCornersBold />}
       />
+      <Popover isOpen={popover.isTrue} onClose={popover.setFalse} placement="top">
+        <PopoverTrigger>
+          <IconButton
+            tooltip={t('nodes.layout.autoLayout')}
+            aria-label={t('nodes.layout.autoLayout')}
+            icon={<PiGitDiffBold />}
+            onClick={popover.toggle}
+          />
+        </PopoverTrigger>
+        <PopoverContent>
+          <PopoverArrow />
+          <PopoverBody>
+            <Flex direction="column" gap={2}>
+              <FormControl>
+                <FormLabel>{t('nodes.layout.layoutDirection')}</FormLabel>
+                <Select value={layoutDirection} onChange={handleLayoutDirectionChanged}>
+                  <option value="RIGHT">{t('nodes.layout.layoutDirectionRight')}</option>
+                  <option value="DOWN">{t('nodes.layout.layoutDirectionDown')}</option>
+                </Select>
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('nodes.layout.layeringStrategy')}</FormLabel>
+                <Select value={layeringStrategy} onChange={handleLayeringStrategyChanged}>
+                  <option value="NETWORK_SIMPLEX">{t('nodes.layout.networkSimplex')}</option>
+                  <option value="LONGEST_PATH">{t('nodes.layout.longestPath')}</option>
+                  <option value="COFFMAN_GRAHAM">{t('nodes.layout.coffmanGraham')}</option>
+                </Select>
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('nodes.layout.nodePlacementStrategy')}</FormLabel>
+                <Select value={nodePlacementStrategy} onChange={handleStrategyChanged}>
+                  <option value="NETWORK_SIMPLEX">{t('nodes.layout.networkSimplex')}</option>
+                  <option value="BRANDES_KOEPF">{t('nodes.layout.brandesKoepf')}</option>
+                  <option value="LINEAR_SEGMENTS">{t('nodes.layout.linearSegments')}</option>
+                  <option value="SIMPLE">{t('nodes.layout.simplePlacement')}</option>
+                </Select>
+              </FormControl>
+              <Divider />
+              <FormControl>
+                <FormLabel>{t('nodes.layout.nodeSpacing')}</FormLabel>
+                <Grid w="full" gap={2} templateColumns="1fr auto">
+                  <CompositeSlider
+                    min={0}
+                    max={200}
+                    value={nodeSpacing}
+                    onChange={handleNodeSpacingSliderChange}
+                    marks
+                  />
+                  <NumberInput
+                    size="sm"
+                    value={nodeSpacing}
+                    min={0}
+                    max={200}
+                    onChange={handleNodeSpacingInputChange}
+                    w={24}
+                  >
+                    <NumberInputField />
+                    <NumberInputStepper>
+                      <NumberIncrementStepper />
+                      <NumberDecrementStepper />
+                    </NumberInputStepper>
+                  </NumberInput>
+                </Grid>
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('nodes.layout.layerSpacing')}</FormLabel>
+                <Grid w="full" gap={2} templateColumns="1fr auto">
+                  <CompositeSlider
+                    min={0}
+                    max={200}
+                    value={layerSpacing}
+                    onChange={handleLayerSpacingSliderChange}
+                    marks
+                  />
+                  <NumberInput
+                    size="sm"
+                    value={layerSpacing}
+                    min={0}
+                    max={200}
+                    onChange={handleLayerSpacingInputChange}
+                    w={24}
+                  >
+                    <NumberInputField />
+                    <NumberInputStepper>
+                      <NumberIncrementStepper />
+                      <NumberDecrementStepper />
+                    </NumberInputStepper>
+                  </NumberInput>
+                </Grid>
+              </FormControl>
+            </Flex>
+          </PopoverBody>
+          <PopoverFooter>
+            <Button w="full" onClick={handleApplyAutoLayout}>
+              {t('common.apply')}
+            </Button>
+          </PopoverFooter>
+        </PopoverContent>
+      </Popover>
       {/* <Tooltip
         label={
           shouldShowFieldTypeLegend
