@@ -1775,6 +1775,20 @@
                 "Structure controls how closely the output image will keep to the layout of the original. Low structure allows major changes, while high structure strictly maintains the original composition and layout."
             ]
         },
+        "tileSize": {
+            "heading": "Tile Size",
+            "paragraphs": [
+                "Controls the size of tiles used during the upscaling process. Larger tiles use more memory but may produce better results.",
+                "SD1.5 models default to 768, while SDXL models default to 1024. Reduce tile size if you encounter memory issues."
+            ]
+        },
+        "tileOverlap": {
+            "heading": "Tile Overlap",
+            "paragraphs": [
+                "Controls the overlap between adjacent tiles during upscaling. Higher overlap values help reduce visible seams between tiles but use more memory.",
+                "The default value of 128 works well for most cases, but you can adjust based on your specific needs and memory constraints."
+            ]
+        },
         "fluxDevLicense": {
             "heading": "Non-Commercial License",
             "paragraphs": [
@@ -2397,6 +2411,8 @@
         "postProcessingModel": "Post-Processing Model",
         "scale": "Scale",
         "tileControl": "Tile Control",
+        "tileSize": "Tile Size",
+        "tileOverlap": "Tile Overlap",
         "postProcessingMissingModelWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install a post-processing (image to image) model.",
         "missingModelsWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install the required models:",
         "mainModelDesc": "Main model (SD1.5 or SDXL architecture)",
