@@ -32,7 +32,7 @@ class SqliteMigrator:
 
     def __init__(self, db: SqliteDatabase) -> None:
         self._db = db
-        self._logger = db.logger
+        self._logger = db._logger
         self._migration_set = MigrationSet()
         self._backup_path: Optional[Path] = None
 
@@ -45,7 +45,7 @@ class SqliteMigrator:
         """Migrates the database to the latest version."""
         # This throws if there is a problem.
         self._migration_set.validate_migration_chain()
-        cursor = self._db.conn.cursor()
+        cursor = self._db._conn.cursor()
         self._create_migrations_table(cursor=cursor)
 
         if self._migration_set.count == 0:
@@ -59,13 +59,13 @@ class SqliteMigrator:
         self._logger.info("Database update needed")
 
         # Make a backup of the db if it needs to be updated and is a file db
-        if self._db.db_path is not None:
+        if self._db._db_path is not None:
             timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-            self._backup_path = self._db.db_path.parent / f"{self._db.db_path.stem}_backup_{timestamp}.db"
+            self._backup_path = self._db._db_path.parent / f"{self._db._db_path.stem}_backup_{timestamp}.db"
             self._logger.info(f"Backing up database to {str(self._backup_path)}")
             # Use SQLite to do the backup
             with closing(sqlite3.connect(self._backup_path)) as backup_conn:
-                self._db.conn.backup(backup_conn)
+                self._db._conn.backup(backup_conn)
         else:
             self._logger.info("Using in-memory database, no backup needed")
 
@@ -81,7 +81,7 @@ class SqliteMigrator:
         try:
             # Using sqlite3.Connection as a context manager commits a the transaction on exit, or rolls it back if an
             # exception is raised.
-            with self._db.conn as conn:
+            with self._db._conn as conn:
                 cursor = conn.cursor()
                 if self._get_current_version(cursor) != migration.from_version:
                     raise MigrationError(

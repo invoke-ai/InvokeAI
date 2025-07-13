@@ -1,4 +1,7 @@
 import sqlite3
+import threading
+from collections.abc import Generator
+from contextlib import contextmanager
 from logging import Logger
 from pathlib import Path
 
@@ -26,46 +29,65 @@ class SqliteDatabase:
 
     def __init__(self, db_path: Path | None, logger: Logger, verbose: bool = False) -> None:
         """Initializes the database. This is used internally by the class constructor."""
-        self.logger = logger
-        self.db_path = db_path
-        self.verbose = verbose
+        self._logger = logger
+        self._db_path = db_path
+        self._verbose = verbose
+        self._lock = threading.RLock()
 
-        if not self.db_path:
+        if not self._db_path:
             logger.info("Initializing in-memory database")
         else:
-            self.db_path.parent.mkdir(parents=True, exist_ok=True)
-            self.logger.info(f"Initializing database at {self.db_path}")
+            self._db_path.parent.mkdir(parents=True, exist_ok=True)
+            self._logger.info(f"Initializing database at {self._db_path}")
 
-        self.conn = sqlite3.connect(database=self.db_path or sqlite_memory, check_same_thread=False)
-        self.conn.row_factory = sqlite3.Row
+        self._conn = sqlite3.connect(database=self._db_path or sqlite_memory, check_same_thread=False)
+        self._conn.row_factory = sqlite3.Row
 
-        if self.verbose:
-            self.conn.set_trace_callback(self.logger.debug)
+        if self._verbose:
+            self._conn.set_trace_callback(self._logger.debug)
 
         # Enable foreign key constraints
-        self.conn.execute("PRAGMA foreign_keys = ON;")
+        self._conn.execute("PRAGMA foreign_keys = ON;")
 
         # Enable Write-Ahead Logging (WAL) mode for better concurrency
-        self.conn.execute("PRAGMA journal_mode = WAL;")
+        self._conn.execute("PRAGMA journal_mode = WAL;")
 
         # Set a busy timeout to prevent database lockups during writes
-        self.conn.execute("PRAGMA busy_timeout = 5000;")  # 5 seconds
+        self._conn.execute("PRAGMA busy_timeout = 5000;")  # 5 seconds
 
     def clean(self) -> None:
         """
         Cleans the database by running the VACUUM command, reporting on the freed space.
         """
         # No need to clean in-memory database
-        if not self.db_path:
+        if not self._db_path:
             return
         try:
-            initial_db_size = Path(self.db_path).stat().st_size
-            self.conn.execute("VACUUM;")
-            self.conn.commit()
-            final_db_size = Path(self.db_path).stat().st_size
-            freed_space_in_mb = round((initial_db_size - final_db_size) / 1024 / 1024, 2)
-            if freed_space_in_mb > 0:
-                self.logger.info(f"Cleaned database (freed {freed_space_in_mb}MB)")
+            with self._conn as conn:
+                initial_db_size = Path(self._db_path).stat().st_size
+                conn.execute("VACUUM;")
+                conn.commit()
+                final_db_size = Path(self._db_path).stat().st_size
+                freed_space_in_mb = round((initial_db_size - final_db_size) / 1024 / 1024, 2)
+                if freed_space_in_mb > 0:
+                    self._logger.info(f"Cleaned database (freed {freed_space_in_mb}MB)")
         except Exception as e:
-            self.logger.error(f"Error cleaning database: {e}")
+            self._logger.error(f"Error cleaning database: {e}")
             raise
+
+    @contextmanager
+    def transaction(self) -> Generator[sqlite3.Cursor, None, None]:
+        """
+        Thread-safe context manager for DB work.
+        Acquires the RLock, yields a Cursor, then commits or rolls back.
+        """
+        with self._lock:
+            cursor = self._conn.cursor()
+            try:
+                yield cursor
+                self._conn.commit()
+            except:
+                self._conn.rollback()
+                raise
+            finally:
+                cursor.close()
