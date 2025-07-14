@@ -36,7 +36,7 @@ class BriaControlNetOutput(BaseInvocationOutput):
 
 @invocation(
     "bria_controlnet",
-    title="Bria ControlNet",
+    title="ControlNet - Bria",
     tags=["controlnet", "bria"],
     category="controlnet",
     version="1.0.0",
