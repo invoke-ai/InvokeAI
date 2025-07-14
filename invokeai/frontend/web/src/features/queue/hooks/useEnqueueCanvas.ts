@@ -7,8 +7,7 @@ import { extractMessageFromAssertionError } from 'common/util/extractMessageFrom
 import { withResult, withResultAsync } from 'common/util/result';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { canvasSessionIdChanged, selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildChatGPT4oGraph } from 'features/nodes/util/graph/generation/buildChatGPT4oGraph';
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
@@ -37,11 +36,7 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
 
   const state = getState();
 
-  let destination = selectCanvasSessionId(state);
-  if (destination === null) {
-    destination = getPrefixedId('canvas');
-    dispatch(canvasSessionIdChanged({ id: destination }));
-  }
+  const destination = selectCanvasSessionId(state);
 
   const buildGraphResult = await withResultAsync(async () => {
     const model = state.params.model;

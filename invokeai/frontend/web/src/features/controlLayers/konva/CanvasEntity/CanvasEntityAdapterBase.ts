@@ -16,7 +16,6 @@ import {
   selectIsolatedLayerPreview,
   selectIsolatedStagingPreview,
 } from 'features/controlLayers/store/canvasSettingsSlice';
-import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   buildSelectIsSelected,
   getSelectIsTypeHidden,
@@ -283,7 +282,7 @@ export abstract class CanvasEntityAdapterBase<T extends CanvasEntityState, U ext
     this.subscriptions.add(
       this.manager.stateApi.createStoreSubscription(selectIsolatedStagingPreview, this.syncVisibility)
     );
-    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectIsStaging, this.syncVisibility));
+    this.subscriptions.add(this.manager.stagingArea.$isStaging.listen(this.syncVisibility));
     this.subscriptions.add(this.manager.stateApi.$filteringAdapter.listen(this.syncVisibility));
     this.subscriptions.add(this.manager.stateApi.$transformingAdapter.listen(this.syncVisibility));
     this.subscriptions.add(this.manager.stateApi.$segmentingAdapter.listen(this.syncVisibility));
@@ -462,7 +461,7 @@ export abstract class CanvasEntityAdapterBase<T extends CanvasEntityState, U ext
        * This allows the user to easily see how the new generation fits in with the rest of the canvas without the
        * other layer types getting in the way.
        */
-      const isStaging = this.manager.stateApi.runSelector(selectIsStaging);
+      const isStaging = this.manager.stagingArea.$isStaging.get();
       const isRasterLayer = isRasterLayerEntityIdentifier(this.entityIdentifier);
       if (isStaging && !isRasterLayer) {
         this.setVisibility(false);

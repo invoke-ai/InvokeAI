@@ -21,7 +21,6 @@ import { $isStylePresetsMenuOpen, activeStylePresetIdChanged } from 'features/st
 import { toast } from 'features/toast/toast';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { LAUNCHPAD_PANEL_ID, WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
-import { activeTabCanvasRightPanelChanged } from 'features/ui/store/uiSlice';
 import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import { atom } from 'nanostores';
 import { useCallback, useEffect } from 'react';
@@ -165,7 +164,6 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
           // Go to the generate tab, open the launchpad
           await navigationApi.focusPanel('generate', LAUNCHPAD_PANEL_ID);
           store.dispatch(paramsReset());
-          store.dispatch(activeTabCanvasRightPanelChanged('gallery'));
           break;
         case 'canvas':
           // Go to the canvas tab, open the launchpad
