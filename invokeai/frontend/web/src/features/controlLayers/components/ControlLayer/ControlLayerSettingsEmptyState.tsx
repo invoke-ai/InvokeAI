@@ -5,7 +5,6 @@ import { useEntityIdentifierContext } from 'features/controlLayers/contexts/Enti
 import { usePullBboxIntoLayer } from 'features/controlLayers/hooks/saveCanvasHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { replaceCanvasEntityObjectsWithImage } from 'features/imageActions/actions';
-import { activeTabCanvasRightPanelChanged } from 'features/ui/store/uiSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { Trans } from 'react-i18next';
 import type { ImageDTO } from 'services/api/types';
@@ -21,9 +20,6 @@ export const ControlLayerSettingsEmptyState = memo(() => {
     [dispatch, entityIdentifier, getState]
   );
   const uploadApi = useImageUploadButton({ onUpload, allowMultiple: false });
-  const onClickGalleryButton = useCallback(() => {
-    dispatch(activeTabCanvasRightPanelChanged('gallery'));
-  }, [dispatch]);
   const pullBboxIntoLayer = usePullBboxIntoLayer(entityIdentifier);
 
   const components = useMemo(
@@ -31,14 +27,11 @@ export const ControlLayerSettingsEmptyState = memo(() => {
       UploadButton: (
         <Button isDisabled={isBusy} size="sm" variant="link" color="base.300" {...uploadApi.getUploadButtonProps()} />
       ),
-      GalleryButton: (
-        <Button onClick={onClickGalleryButton} isDisabled={isBusy} size="sm" variant="link" color="base.300" />
-      ),
       PullBboxButton: (
         <Button onClick={pullBboxIntoLayer} isDisabled={isBusy} size="sm" variant="link" color="base.300" />
       ),
     }),
-    [isBusy, onClickGalleryButton, pullBboxIntoLayer, uploadApi]
+    [isBusy, pullBboxIntoLayer, uploadApi]
   );
 
   return (

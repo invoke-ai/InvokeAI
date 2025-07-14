@@ -9,7 +9,6 @@ import type { SetRegionalGuidanceReferenceImageDndTargetData } from 'features/dn
 import { setRegionalGuidanceReferenceImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { setRegionalGuidanceReferenceImage } from 'features/imageActions/actions';
-import { activeTabCanvasRightPanelChanged } from 'features/ui/store/uiSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
@@ -31,9 +30,6 @@ export const RegionalGuidanceIPAdapterSettingsEmptyState = memo(({ referenceImag
     [dispatch, entityIdentifier, referenceImageId]
   );
   const uploadApi = useImageUploadButton({ onUpload, allowMultiple: false });
-  const onClickGalleryButton = useCallback(() => {
-    dispatch(activeTabCanvasRightPanelChanged('gallery'));
-  }, [dispatch]);
   const onDeleteIPAdapter = useCallback(() => {
     dispatch(rgRefImageDeleted({ entityIdentifier, referenceImageId }));
   }, [dispatch, entityIdentifier, referenceImageId]);
@@ -53,14 +49,11 @@ export const RegionalGuidanceIPAdapterSettingsEmptyState = memo(({ referenceImag
       UploadButton: (
         <Button isDisabled={isBusy} size="sm" variant="link" color="base.300" {...uploadApi.getUploadButtonProps()} />
       ),
-      GalleryButton: (
-        <Button onClick={onClickGalleryButton} isDisabled={isBusy} size="sm" variant="link" color="base.300" />
-      ),
       PullBboxButton: (
         <Button onClick={pullBboxIntoIPAdapter} isDisabled={isBusy} size="sm" variant="link" color="base.300" />
       ),
     }),
-    [isBusy, onClickGalleryButton, pullBboxIntoIPAdapter, uploadApi]
+    [isBusy, pullBboxIntoIPAdapter, uploadApi]
   );
 
   return (

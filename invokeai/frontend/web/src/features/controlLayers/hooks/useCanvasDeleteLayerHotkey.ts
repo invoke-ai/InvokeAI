@@ -1,10 +1,10 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { getFocusedRegion } from 'common/hooks/focus';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { entityDeleted } from 'features/controlLayers/store/canvasSlice';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { selectActiveTabCanvasRightPanel } from 'features/ui/store/uiSelectors';
 import { useCallback } from 'react';
 
 export function useCanvasDeleteLayerHotkey() {
@@ -12,14 +12,13 @@ export function useCanvasDeleteLayerHotkey() {
   const dispatch = useAppDispatch();
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const isBusy = useCanvasIsBusy();
-  const canvasRightPanelTab = useAppSelector(selectActiveTabCanvasRightPanel);
 
   const deleteSelectedLayer = useCallback(() => {
-    if (selectedEntityIdentifier === null || isBusy || canvasRightPanelTab !== 'layers') {
+    if (selectedEntityIdentifier === null || isBusy || getFocusedRegion() !== 'layers') {
       return;
     }
     dispatch(entityDeleted({ entityIdentifier: selectedEntityIdentifier }));
-  }, [canvasRightPanelTab, dispatch, isBusy, selectedEntityIdentifier]);
+  }, [dispatch, isBusy, selectedEntityIdentifier]);
 
   useRegisteredHotkeys({
     id: 'deleteSelected',

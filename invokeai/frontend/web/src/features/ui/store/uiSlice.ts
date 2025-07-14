@@ -12,9 +12,6 @@ export const uiSlice = createSlice({
     setActiveTab: (state, action: PayloadAction<UIState['activeTab']>) => {
       state.activeTab = action.payload;
     },
-    activeTabCanvasRightPanelChanged: (state, action: PayloadAction<UIState['activeTabCanvasRightPanel']>) => {
-      state.activeTabCanvasRightPanel = action.payload;
-    },
     setShouldShowImageDetails: (state, action: PayloadAction<UIState['shouldShowImageDetails']>) => {
       state.shouldShowImageDetails = action.payload;
     },
@@ -73,7 +70,6 @@ export const uiSlice = createSlice({
 
 export const {
   setActiveTab,
-  activeTabCanvasRightPanelChanged,
   setShouldShowImageDetails,
   setShouldShowProgressInViewer,
   accordionStateChanged,
