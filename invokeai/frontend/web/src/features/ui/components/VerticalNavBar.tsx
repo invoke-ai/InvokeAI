@@ -27,6 +27,7 @@ import {
 
 import { Notifications } from './Notifications';
 import { TabButton } from './TabButton';
+import { $isPendingPersist } from 'app/store/store';
 
 export const VerticalNavBar = memo(() => {
   const { t } = useTranslation();
@@ -37,6 +38,7 @@ export const VerticalNavBar = memo(() => {
   const withWorkflowsTab = useAppSelector(selectWithWorkflowsTab);
   const withModelsTab = useAppSelector(selectWithModelsTab);
   const withQueueTab = useAppSelector(selectWithQueueTab);
+  const isPendingPersist = useStore($isPendingPersist);
 
   return (
     <Flex flexDir="column" alignItems="center" py={6} ps={4} pe={2} gap={4} minW={0} flexShrink={0}>
@@ -48,6 +50,7 @@ export const VerticalNavBar = memo(() => {
         {withWorkflowsTab && <TabButton tab="workflows" icon={<PiFlowArrowBold />} label={t('ui.tabs.workflows')} />}
         {withModelsTab && <TabButton tab="models" icon={<PiCubeBold />} label={t('ui.tabs.models')} />}
         {withQueueTab && <TabButton tab="queue" icon={<PiQueueBold />} label={t('ui.tabs.queue')} />}
+        {isPendingPersist && <Flex w={4} h={4} bg="red" />}
       </Flex>
       <Spacer />
       <StatusIndicator />

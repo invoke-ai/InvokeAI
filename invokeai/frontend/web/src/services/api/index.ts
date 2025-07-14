@@ -57,13 +57,18 @@ const tagTypes = [
   // This is invalidated on reconnect. It should be used for queries that have changing data,
   // especially related to the queue and generation.
   'FetchOnReconnect',
+  'ClientState',
 ] as const;
 export type ApiTagDescription = TagDescription<(typeof tagTypes)[number]>;
 export const LIST_TAG = 'LIST';
 export const LIST_ALL_TAG = 'LIST_ALL';
 
-const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = (args, api, extraOptions) => {
+export const getBaseUrl = (): string => {
   const baseUrl = $baseUrl.get();
+  return baseUrl || window.location.href.replace(/\/$/, '');
+};
+
+const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = (args, api, extraOptions) => {
   const authToken = $authToken.get();
   const projectId = $projectId.get();
   const isOpenAPIRequest =
@@ -71,7 +76,7 @@ const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryE
     (typeof args === 'string' && args.includes('openapi.json'));
 
   const fetchBaseQueryArgs: FetchBaseQueryArgs = {
-    baseUrl: baseUrl || window.location.href.replace(/\/$/, ''),
+    baseUrl: getBaseUrl(),
   };
 
   // When fetching the openapi.json, we need to remove circular references from the JSON.

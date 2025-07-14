@@ -1,7 +1,15 @@
-import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
-import { autoBatchEnhancer, combineReducers, configureStore } from '@reduxjs/toolkit';
+import type { StoreEnhancer, ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
+import {
+  autoBatchEnhancer,
+  combineReducers,
+  configureStore,
+  createAction,
+  isAction,
+  isAnyOf,
+  Tuple,
+} from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
-import { idbKeyValDriver } from 'app/store/enhancers/reduxRemember/driver';
+import { idbKeyValDriver, serverBackedDriver } from 'app/store/enhancers/reduxRemember/driver';
 import { errorHandler } from 'app/store/enhancers/reduxRemember/errors';
 import { deepClone } from 'common/util/deepClone';
 import { keys, mergeWith, omit, pick } from 'es-toolkit/compat';
@@ -30,7 +38,7 @@ import { uiPersistConfig, uiSlice } from 'features/ui/store/uiSlice';
 import { diff } from 'jsondiffpatch';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
 import type { SerializeFunction, UnserializeFunction } from 'redux-remember';
-import { rememberEnhancer, rememberReducer } from 'redux-remember';
+import { REMEMBER_PERSISTED, rememberEnhancer, rememberReducer } from 'redux-remember';
 import undoable from 'redux-undo';
 import { serializeError } from 'serialize-error';
 import { api } from 'services/api';
@@ -42,6 +50,7 @@ import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { listenerMiddleware } from './middleware/listenerMiddleware';
+import { getDebugLoggerMiddleware } from './middleware/debugLoggerMiddleware';
 
 const log = logger('system');
 
@@ -94,7 +103,7 @@ export type PersistConfig<T = any> = {
   persistDenylist: (keyof T)[];
 };
 
-const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
+export const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [galleryPersistConfig.name]: galleryPersistConfig,
   [nodesPersistConfig.name]: nodesPersistConfig,
   [systemPersistConfig.name]: systemPersistConfig,
@@ -111,6 +120,47 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [lorasPersistConfig.name]: lorasPersistConfig,
   [workflowLibraryPersistConfig.name]: workflowLibraryPersistConfig,
   [refImagesSlice.name]: refImagesPersistConfig,
+};
+
+import type { Middleware, MiddlewareAPI } from '@reduxjs/toolkit';
+import { atom } from 'nanostores';
+
+export const $isPendingPersist = atom(false);
+export const persistenceTrackerMiddleware: Middleware = (api: MiddlewareAPI) => (next) => (action) => {
+  console.log(action);
+  if (isAction(action) && action.type === REMEMBER_PERSISTED) {
+    // If the action is a REMEMBER_PERSISTED action, we can reset the pending state
+    console.log('persisted');
+    $isPendingPersist.set(false);
+    return next(action);
+  }
+  const originalState = api.getState();
+  const result = next(action);
+  const nextState = api.getState();
+
+  try {
+    let done = false;
+    for (const persistConfig of Object.values(persistConfigs)) {
+      const originalSlice = originalState[persistConfig.name];
+      const nextSlice = nextState[persistConfig.name];
+      const allKeys = Object.keys(nextSlice);
+      const persistedKeys = allKeys.filter((k) => !persistConfig.persistDenylist.includes(k));
+      for (const key of persistedKeys) {
+        if (nextSlice[key] !== originalSlice[key]) {
+          console.log('changed');
+
+          $isPendingPersist.set(true);
+          done = true;
+          break;
+        }
+      }
+      if (done === true) {
+        break;
+      }
+    }
+  } finally {
+    return result;
+  }
 };
 
 const unserialize: UnserializeFunction = (data, key) => {
@@ -167,28 +217,36 @@ export const createStore = (uniqueStoreKey?: string, persist = true) =>
     reducer: rememberedRootReducer,
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({
-        serializableCheck: import.meta.env.MODE === 'development',
-        immutableCheck: import.meta.env.MODE === 'development',
+        serializableCheck: false,
+        immutableCheck: false,
+        // serializableCheck: import.meta.env.MODE === 'development',
+        // immutableCheck: import.meta.env.MODE === 'development',
       })
         .concat(api.middleware)
         .concat(dynamicMiddlewares)
         .concat(authToastMiddleware)
-        // .concat(getDebugLoggerMiddleware())
+        .concat(getDebugLoggerMiddleware())
+        // .concat(persistenceTrackerMiddleware)
         .prepend(listenerMiddleware.middleware),
     enhancers: (getDefaultEnhancers) => {
-      const _enhancers = getDefaultEnhancers().concat(autoBatchEnhancer());
+      const enhancers = getDefaultEnhancers();
       if (persist) {
-        _enhancers.push(
-          rememberEnhancer(idbKeyValDriver, keys(persistConfigs), {
-            persistDebounce: 300,
+        const res = enhancers.prepend(
+          rememberEnhancer(serverBackedDriver, keys(persistConfigs), {
+            persistDebounce: 3000,
             serialize,
             unserialize,
-            prefix: uniqueStoreKey ? `${STORAGE_PREFIX}${uniqueStoreKey}-` : STORAGE_PREFIX,
+            prefix: '',
             errorHandler,
           })
         );
+        console.log('persistence added');
+        console.log(res);
+        return res;
+      } else {
+        console.log(enhancers);
+        return enhancers;
       }
-      return _enhancers;
     },
     devTools: {
       actionSanitizer,
