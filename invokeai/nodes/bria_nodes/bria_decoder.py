@@ -10,19 +10,19 @@ from invokeai.invocation_api import BaseInvocation, Classification, ImageOutput,
 
 @invocation(
     "bria_decoder",
-    title="Bria Decoder",
+    title="Decoder - Bria",
     tags=["image", "bria"],
     category="image",
     version="1.0.0",
     classification=Classification.Prototype,
 )
 class BriaDecoderInvocation(BaseInvocation):
-    latents: LatentsField = InputField(
-        description=FieldDescriptions.latents,
-        input=Input.Connection,
-    )
     vae: VAEField = InputField(
         description=FieldDescriptions.vae,
+        input=Input.Connection,
+    )
+    latents: LatentsField = InputField(
+        description=FieldDescriptions.latents,
         input=Input.Connection,
     )
 
