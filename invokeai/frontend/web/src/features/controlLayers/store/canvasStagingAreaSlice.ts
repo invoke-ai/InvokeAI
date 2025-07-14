@@ -87,11 +87,6 @@ export const buildSelectCanvasQueueItems = (sessionId: string) =>
       );
     }
   );
-export const useCanvasQueueItems = () => {
-  const sessionId = useAppSelector(selectCanvasSessionId);
-  const selector = useMemo(() => buildSelectCanvasQueueItems(sessionId), [sessionId]);
-  return useAppSelector(selector);
-};
 
 export const buildSelectIsStaging = (sessionId: string) =>
   createSelector([buildSelectCanvasQueueItems(sessionId)], (queueItems) => {

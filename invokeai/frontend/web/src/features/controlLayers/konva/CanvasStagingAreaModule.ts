@@ -256,7 +256,6 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
       }
 
       this.konva.group.visible(shouldShowStagedImage && this.$isStaging.get());
-      console.log({ isPending, isStaging: this.$isStaging.get(), shouldShowStagedImage, imageSrc });
     } finally {
       release();
     }

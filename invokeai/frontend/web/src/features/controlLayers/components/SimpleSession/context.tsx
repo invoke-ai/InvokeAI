@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { getOutputImageName } from 'features/controlLayers/components/SimpleSession/shared';
+import { loadImage } from 'features/controlLayers/konva/util';
 import { selectStagingAreaAutoSwitch } from 'features/controlLayers/store/canvasSettingsSlice';
 import {
   buildSelectCanvasQueueItems,
@@ -99,7 +100,6 @@ type CanvasSessionContextValue = {
   selectPrev: () => void;
   selectFirst: () => void;
   selectLast: () => void;
-  onImageLoad: (itemId: number) => void;
   discard: (itemId: number) => void;
   discardAll: () => void;
 };
@@ -128,21 +128,10 @@ export const CanvasSessionContextProvider = memo(({ children }: PropsWithChildre
   const $lastCompletedItemId = useState(() => atom<number | null>(null))[0];
 
   /**
-   * Track the last started item. Used to implement autoswitch.
-   */
-  const $lastStartedItemId = useState(() => atom<number | null>(null))[0];
-
-  /**
    * Manually-synced atom containing queue items for the current session. This is populated from the RTK Query cache
    * and kept in sync with it via a redux subscription.
    */
   const $items = useState(() => atom<S['SessionQueueItem'][]>([]))[0];
-
-  /**
-   * An internal flag used to work around race conditions with auto-switch switching to queue items before their
-   * output images have fully loaded.
-   */
-  const $lastLoadedItemId = useState(() => atom<number | null>(null))[0];
 
   /**
    * An ephemeral store of progress events and images for all items in the current session.
@@ -282,30 +271,6 @@ export const CanvasSessionContextProvider = memo(({ children }: PropsWithChildre
     $selectedItemId.set(last.item_id);
   }, [$items, $selectedItemId]);
 
-  const onImageLoad = useCallback(
-    (itemId: number) => {
-      const progressData = $progressData.get();
-      const current = progressData[itemId];
-      if (current) {
-        const next = { ...current, imageLoaded: true };
-        $progressData.setKey(itemId, next);
-      } else {
-        $progressData.setKey(itemId, {
-          ...getInitialProgressData(itemId),
-          imageLoaded: true,
-        });
-      }
-      if (
-        $lastCompletedItemId.get() === itemId &&
-        selectStagingAreaAutoSwitch(store.getState()) === 'switch_on_finish'
-      ) {
-        $selectedItemId.set(itemId);
-        $lastCompletedItemId.set(null);
-      }
-    },
-    [$lastCompletedItemId, $progressData, $selectedItemId, store]
-  );
-
   // Set up socket listeners
   useEffect(() => {
     if (!socket) {
@@ -324,10 +289,19 @@ export const CanvasSessionContextProvider = memo(({ children }: PropsWithChildre
         return;
       }
       if (data.status === 'completed') {
+        /**
+         * There is an unpleasant bit of indirection here. When an item is completed, and auto-switch is set to
+         * switch_on_finish, we want to load the image and switch to it. In this socket handler, we don't have
+         * access to the full queue item, which we need to get the output image and load it. We get the full
+         * queue items as part of the list query, so it's rather inefficient to fetch it again here.
+         *
+         * To reduce the number of extra network requests, we instead store this item as the last completed item.
+         * Then in the progress data sync effect, we process the queue item load its image.
+         */
         $lastCompletedItemId.set(data.item_id);
       }
-      if (data.status === 'in_progress') {
-        $lastStartedItemId.set(data.item_id);
+      if (data.status === 'in_progress' && selectStagingAreaAutoSwitch(store.getState()) === 'switch_on_start') {
+        $selectedItemId.set(data.item_id);
       }
     };
 
@@ -338,7 +312,7 @@ export const CanvasSessionContextProvider = memo(({ children }: PropsWithChildre
       socket.off('invocation_progress', onProgress);
       socket.off('queue_item_status_changed', onQueueItemStatusChanged);
     };
-  }, [$lastCompletedItemId, $lastStartedItemId, $progressData, $selectedItemId, sessionId, socket]);
+  }, [$progressData, $selectedItemId, sessionId, socket, $lastCompletedItemId, store]);
 
   // Set up state subscriptions and effects
   useEffect(() => {
@@ -357,41 +331,32 @@ export const CanvasSessionContextProvider = memo(({ children }: PropsWithChildre
     });
 
     // Handle cases that could result in a nonexistent queue item being selected.
-    const unsubEnsureSelectedItemIdExists = effect(
-      [$items, $selectedItemId, $lastStartedItemId],
-      (items, selectedItemId, lastStartedItemId) => {
-        if (items.length === 0) {
-          // If there are no items, cannot have a selected item.
-          $selectedItemId.set(null);
-        } else if (selectedItemId === null && items.length > 0) {
-          // If there is no selected item but there are items, select the first one.
-          $selectedItemId.set(items[0]?.item_id ?? null);
-          return;
-        } else if (
-          selectStagingAreaAutoSwitch(store.getState()) === 'switch_on_start' &&
-          items.findIndex(({ item_id }) => item_id === lastStartedItemId) !== -1
-        ) {
-          $selectedItemId.set(lastStartedItemId);
-          $lastStartedItemId.set(null);
-        } else if (selectedItemId !== null && items.findIndex(({ item_id }) => item_id === selectedItemId) === -1) {
-          // If an item is selected and it is not in the list of items, un-set it. This effect will run again and we'll
-          // the above case, selecting the first item if there are any.
-          let prevIndex = _prevItems.findIndex(({ item_id }) => item_id === selectedItemId);
-          if (prevIndex >= items.length) {
-            prevIndex = items.length - 1;
-          }
-          const nextItem = items[prevIndex];
-          $selectedItemId.set(nextItem?.item_id ?? null);
+    const unsubEnsureSelectedItemIdExists = effect([$items, $selectedItemId], (items, selectedItemId) => {
+      if (items.length === 0) {
+        // If there are no items, cannot have a selected item.
+        $selectedItemId.set(null);
+      } else if (selectedItemId === null && items.length > 0) {
+        // If there is no selected item but there are items, select the first one.
+        $selectedItemId.set(items[0]?.item_id ?? null);
+        return;
+      } else if (selectedItemId !== null && items.findIndex(({ item_id }) => item_id === selectedItemId) === -1) {
+        // If an item is selected and it is not in the list of items, un-set it. This effect will run again and we'll
+        // the above case, selecting the first item if there are any.
+        let prevIndex = _prevItems.findIndex(({ item_id }) => item_id === selectedItemId);
+        if (prevIndex >= items.length) {
+          prevIndex = items.length - 1;
         }
-
-        if (items !== _prevItems) {
-          _prevItems = items;
-        }
+        const nextItem = items[prevIndex];
+        $selectedItemId.set(nextItem?.item_id ?? null);
       }
-    );
 
-    // Clean up the progress data when a queue item is discarded.
-    const unsubCleanUpProgressData = $items.subscribe(async (items) => {
+      if (items !== _prevItems) {
+        _prevItems = items;
+      }
+    });
+
+    // Sync progress data - remove canceled/failed items, update progress data with new images, and load images
+    const unsubSyncProgressData = $items.subscribe(async (items) => {
       const progressData = $progressData.get();
 
       const toDelete: number[] = [];
@@ -418,36 +383,34 @@ export const CanvasSessionContextProvider = memo(({ children }: PropsWithChildre
       for (const item of items) {
         const datum = progressData[item.item_id];
 
-        if (datum) {
-          if (datum.imageDTO) {
-            continue;
-          }
-          const outputImageName = getOutputImageName(item);
-          if (!outputImageName) {
-            continue;
-          }
-          const imageDTO = await getImageDTOSafe(outputImageName);
-          if (!imageDTO) {
-            continue;
-          }
-          toUpdate.push({
-            ...datum,
-            imageDTO,
-          });
-        } else {
-          const outputImageName = getOutputImageName(item);
-          if (!outputImageName) {
-            continue;
-          }
-          const imageDTO = await getImageDTOSafe(outputImageName);
-          if (!imageDTO) {
-            continue;
-          }
-          toUpdate.push({
-            ...getInitialProgressData(item.item_id),
-            imageDTO,
+        if (datum?.imageDTO) {
+          continue;
+        }
+        const outputImageName = getOutputImageName(item);
+        if (!outputImageName) {
+          continue;
+        }
+        const imageDTO = await getImageDTOSafe(outputImageName);
+        if (!imageDTO) {
+          continue;
+        }
+
+        // This is the load logic mentioned in the comment in the QueueItemStatusChangedEvent handler above.
+        if (
+          $lastCompletedItemId.get() === item.item_id &&
+          selectStagingAreaAutoSwitch(store.getState()) === 'switch_on_finish'
+        ) {
+          loadImage(imageDTO.image_url, true).then(() => {
+            $selectedItemId.set(item.item_id);
+            $lastCompletedItemId.set(null);
           });
         }
+
+        toUpdate.push({
+          ...getInitialProgressData(item.item_id),
+          ...datum,
+          imageDTO,
+        });
       }
 
       for (const itemId of toDelete) {
@@ -459,24 +422,6 @@ export const CanvasSessionContextProvider = memo(({ children }: PropsWithChildre
       }
     });
 
-    // We only want to auto-switch to completed queue items once their images have fully loaded to prevent flashes
-    // of fallback content and/or progress images. The only surefire way to determine when images have fully loaded
-    // is via the image elements' `onLoad` callback. Images set `$lastLoadedItemId` to their queue item ID in their
-    // `onLoad` handler, and we listen for that here. If auto-switch is enabled, we then switch the to the item.
-    //
-    // TODO: This isn't perfect... we set $lastLoadedItemId in the mini preview component, but the full view
-    // component still needs to retrieve the image from the browser cache... can result in a flash of the progress
-    // image...
-    const unsubHandleAutoSwitch = $lastLoadedItemId.listen((lastLoadedItemId) => {
-      if (lastLoadedItemId === null) {
-        return;
-      }
-      if (selectStagingAreaAutoSwitch(store.getState()) === 'switch_on_finish') {
-        $selectedItemId.set(lastLoadedItemId);
-      }
-      $lastLoadedItemId.set(null);
-    });
-
     // Create an RTK Query subscription. Without this, the query cache selector will never return anything bc RTK
     // doesn't know we care about it.
     const { unsubscribe: unsubQueueItemsQuery } = store.dispatch(
@@ -485,25 +430,15 @@ export const CanvasSessionContextProvider = memo(({ children }: PropsWithChildre
 
     // Clean up all subscriptions and top-level (i.e. non-computed/derived state)
     return () => {
-      unsubHandleAutoSwitch();
       unsubQueueItemsQuery();
       unsubReduxSyncToItemsAtom();
       unsubEnsureSelectedItemIdExists();
-      unsubCleanUpProgressData();
+      unsubSyncProgressData();
       $items.set([]);
       $progressData.set({});
       $selectedItemId.set(null);
     };
-  }, [
-    $items,
-    $lastLoadedItemId,
-    $lastStartedItemId,
-    $progressData,
-    $selectedItemId,
-    selectQueueItems,
-    sessionId,
-    store,
-  ]);
+  }, [$items, $progressData, $selectedItemId, selectQueueItems, sessionId, store, $lastCompletedItemId]);
 
   const value = useMemo<CanvasSessionContextValue>(
     () => ({
@@ -520,7 +455,6 @@ export const CanvasSessionContextProvider = memo(({ children }: PropsWithChildre
       selectPrev,
       selectFirst,
       selectLast,
-      onImageLoad,
       discard,
       discardAll,
     }),
@@ -538,7 +472,6 @@ export const CanvasSessionContextProvider = memo(({ children }: PropsWithChildre
       selectPrev,
       selectFirst,
       selectLast,
-      onImageLoad,
       discard,
       discardAll,
     ]
