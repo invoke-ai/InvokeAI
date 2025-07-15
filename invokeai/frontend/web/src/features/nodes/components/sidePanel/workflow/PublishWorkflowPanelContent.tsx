@@ -13,7 +13,7 @@ import {
 import { useStore } from '@nanostores/react';
 import { logger } from 'app/logging/logger';
 import { $projectUrl } from 'app/store/nanostores/projectId';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { withResultAsync } from 'common/util/result';
 import { parseify } from 'common/util/serialize';
@@ -40,6 +40,7 @@ import { useOutputFieldTemplate } from 'features/nodes/hooks/useOutputFieldTempl
 import { useZoomToNode } from 'features/nodes/hooks/useZoomToNode';
 import { useEnqueueWorkflows } from 'features/queue/hooks/useEnqueueWorkflows';
 import { $isReadyToEnqueue } from 'features/queue/store/readiness';
+import { trackErrorDetails } from 'features/system/store/actions';
 import { selectAllowPublishWorkflows } from 'features/system/store/configSlice';
 import { toast } from 'features/toast/toast';
 import type { PropsWithChildren } from 'react';
@@ -209,6 +210,7 @@ const PublishWorkflowButton = memo(() => {
   const isSelectingOutputNode = useStore($isSelectingOutputNode);
   const inputs = usePublishInputs();
   const allowPublishWorkflows = useAppSelector(selectAllowPublishWorkflows);
+  const dispatch = useAppDispatch();
 
   const projectUrl = useStore($projectUrl);
 
@@ -217,6 +219,9 @@ const PublishWorkflowButton = memo(() => {
     $isPublishing.set(true);
     const result = await withResultAsync(() => enqueue(true, true));
     if (result.isErr()) {
+      dispatch(
+        trackErrorDetails({ title: 'Failed to enqueue batch', errorMessage: result.error.message, description: null })
+      );
       toast({
         id: 'TOAST_PUBLISH_FAILED',
         status: 'error',
@@ -225,6 +230,13 @@ const PublishWorkflowButton = memo(() => {
         duration: null,
       });
       log.error({ error: serializeError(result.error) }, 'Failed to enqueue batch');
+      dispatch(
+        trackErrorDetails({
+          title: 'Failed to enqueue batch',
+          errorMessage: serializeError(result.error).message,
+          description: serializeError(result.error).stack?.toString() ?? null,
+        })
+      );
     } else {
       toast({
         id: 'TOAST_PUBLISH_SUCCESSFUL',
@@ -249,7 +261,7 @@ const PublishWorkflowButton = memo(() => {
       log.debug(parseify(result.value), 'Enqueued batch');
     }
     $isPublishing.set(false);
-  }, [enqueue, projectUrl, t]);
+  }, [enqueue, projectUrl, t, dispatch]);
 
   const isDisabled = useMemo(() => {
     return (

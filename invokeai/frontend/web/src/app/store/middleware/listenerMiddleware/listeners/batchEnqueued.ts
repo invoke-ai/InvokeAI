@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { truncate } from 'es-toolkit/compat';
+import { trackErrorDetails } from 'features/system/store/actions';
 import { zPydanticValidationError } from 'features/system/store/zodSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
@@ -34,7 +35,7 @@ export const addBatchEnqueuedListener = (startAppListening: AppStartListening) =
   // error
   startAppListening({
     matcher: queueApi.endpoints.enqueueBatch.matchRejected,
-    effect: (action) => {
+    effect: (action, { dispatch }) => {
       const response = action.payload;
       const batchConfig = action.meta.arg.originalArgs;
 
@@ -46,6 +47,13 @@ export const addBatchEnqueuedListener = (startAppListening: AppStartListening) =
           description: t('common.unknownError'),
         });
         log.error({ batchConfig } as JsonObject, t('queue.batchFailedToQueue'));
+        dispatch(
+          trackErrorDetails({
+            title: 'Enqueue Batch Rejected',
+            errorMessage: t('common.unknownError'),
+            description: null,
+          })
+        );
         return;
       }
 
@@ -59,6 +67,9 @@ export const addBatchEnqueuedListener = (startAppListening: AppStartListening) =
             status: 'error',
             description,
           });
+          dispatch(
+            trackErrorDetails({ title: 'Enqueue Batch Rejected', errorMessage: e.msg, description: description })
+          );
         });
       } else if (response.status !== 403) {
         toast({
@@ -69,6 +80,13 @@ export const addBatchEnqueuedListener = (startAppListening: AppStartListening) =
         });
       }
       log.error({ batchConfig, error: serializeError(response) } as JsonObject, t('queue.batchFailedToQueue'));
+      dispatch(
+        trackErrorDetails({
+          title: 'Enqueue Batch Rejected',
+          errorMessage: t('common.unknownError'),
+          description: null,
+        })
+      );
     },
   });
 };

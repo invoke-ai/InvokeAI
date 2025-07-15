@@ -19,6 +19,7 @@ import { buildSD3Graph } from 'features/nodes/util/graph/generation/buildSD3Grap
 import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
 import type { GraphBuilderArg } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
+import { trackErrorDetails } from 'features/system/store/actions';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import { serializeError } from 'serialize-error';
@@ -86,6 +87,7 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
       status = 'warning';
     }
     const error = serializeError(buildGraphResult.error);
+    dispatch(trackErrorDetails({ title, errorMessage: error.message, description }));
     log.error({ error }, 'Failed to build graph');
     toast({
       status,

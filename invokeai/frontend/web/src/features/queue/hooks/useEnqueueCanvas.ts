@@ -21,6 +21,7 @@ import { buildSD3Graph } from 'features/nodes/util/graph/generation/buildSD3Grap
 import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
 import type { GraphBuilderArg } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
+import { trackErrorDetails } from 'features/system/store/actions';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import { serializeError } from 'serialize-error';
@@ -89,6 +90,7 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
     }
     const error = serializeError(buildGraphResult.error);
     log.error({ error }, 'Failed to build graph');
+    dispatch(trackErrorDetails({ title, errorMessage: error.message, description }));
     toast({
       status,
       title,
