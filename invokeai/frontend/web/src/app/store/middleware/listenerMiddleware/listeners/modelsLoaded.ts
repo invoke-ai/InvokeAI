@@ -34,7 +34,6 @@ import {
   isLoRAModelConfig,
   isNonFluxVAEModelConfig,
   isNonRefinerMainModelConfig,
-  isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
   isT5EncoderModelConfig,
 } from 'services/api/types';
@@ -66,6 +65,7 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
 
       handleMainModels(models, state, dispatch, log);
       handleRefinerModels(models, state, dispatch, log);
+
       handleVAEModels(models, state, dispatch, log);
       handleLoRAModels(models, state, dispatch, log);
       handleControlAdapterModels(models, state, dispatch, log);
@@ -137,12 +137,11 @@ const handleRefinerModels: ModelHandler = (models, state, dispatch, log) => {
   }
 
   // We have a refiner model selected, need to check if it is available
-
-  // Grab just the refiner models
-  const allRefinerModels = models.filter(isRefinerMainModelModelConfig);
+  // Now we check against any SDXL model, not just refiner models
+  const allSDXLModels = models.filter((m) => m.type === 'main' && m.base === 'sdxl');
 
   // If the current refiner model is available, we don't need to do anything
-  if (allRefinerModels.some((m) => m.key === selectedRefinerModel.key)) {
+  if (allSDXLModels.some((m) => m.key === selectedRefinerModel.key)) {
     return;
   }
 

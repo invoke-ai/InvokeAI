@@ -337,46 +337,7 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
         )
 
 
-@invocation(
-    "sdxl_refiner_compel_prompt",
-    title="Prompt - SDXL Refiner",
-    tags=["sdxl", "compel", "prompt"],
-    category="conditioning",
-    version="1.1.2",
-)
-class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
-    """Parse prompt using compel package to conditioning."""
 
-    style: str = InputField(
-        default="",
-        description=FieldDescriptions.compel_prompt,
-        ui_component=UIComponent.Textarea,
-    )  # TODO: ?
-    original_width: int = InputField(default=1024, description="")
-    original_height: int = InputField(default=1024, description="")
-    crop_top: int = InputField(default=0, description="")
-    crop_left: int = InputField(default=0, description="")
-    aesthetic_score: float = InputField(default=6.0, description=FieldDescriptions.sdxl_aesthetic)
-    clip2: CLIPField = InputField(description=FieldDescriptions.clip, input=Input.Connection)
-
-    @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> ConditioningOutput:
-        # TODO: if there will appear lora for refiner - write proper prefix
-        c2, c2_pooled = self.run_clip_compel(context, self.clip2, self.style, True, "<NONE>", zero_on_empty=False)
-
-        original_size = (self.original_height, self.original_width)
-        crop_coords = (self.crop_top, self.crop_left)
-
-        add_time_ids = torch.tensor([original_size + crop_coords + (self.aesthetic_score,)])
-
-        assert c2_pooled is not None
-        conditioning_data = ConditioningFieldData(
-            conditionings=[SDXLConditioningInfo(embeds=c2, pooled_embeds=c2_pooled, add_time_ids=add_time_ids)]
-        )
-
-        conditioning_name = context.conditioning.save(conditioning_data)
-
-        return ConditioningOutput.build(conditioning_name)
 
 
 @invocation_output("clip_skip_output")

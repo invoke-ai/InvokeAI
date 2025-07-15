@@ -7,16 +7,16 @@ import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
-import { useRefinerModels } from 'services/api/hooks/modelsByType';
+import { useMainModels } from 'services/api/hooks/modelsByType';
 import type { MainModelConfig } from 'services/api/types';
 
-const optionsFilter = (model: MainModelConfig) => model.base === 'sdxl-refiner';
+const optionsFilter = (model: MainModelConfig) => model.base === 'sdxl';
 
 const ParamSDXLRefinerModelSelect = () => {
   const dispatch = useAppDispatch();
   const model = useAppSelector(selectRefinerModel);
   const { t } = useTranslation();
-  const [modelConfigs, { isLoading }] = useRefinerModels();
+  const [modelConfigs, { isLoading }] = useMainModels();
   const _onChange = useCallback(
     (model: MainModelConfig | null) => {
       if (!model) {

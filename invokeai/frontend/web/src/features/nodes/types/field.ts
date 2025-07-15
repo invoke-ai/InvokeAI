@@ -890,7 +890,7 @@ export const isFluxMainModelFieldInputTemplate =
 
 // #region SDXLRefinerModelField
 /** @alias */ // tells knip to ignore this duplicate export
-export const zSDXLRefinerModelFieldValue = zMainModelFieldValue; // TODO: Narrow to SDXL Refiner models only.
+export const zSDXLRefinerModelFieldValue = zMainModelFieldValue; // Now works with any SDXL model
 const zSDXLRefinerModelFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zSDXLRefinerModelFieldValue,
 });

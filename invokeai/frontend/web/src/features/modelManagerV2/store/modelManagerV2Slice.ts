@@ -3,7 +3,7 @@ import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import type { ModelType } from 'services/api/types';
 
-export type FilterableModelType = Exclude<ModelType, 'onnx'> | 'refiner';
+export type FilterableModelType = Exclude<ModelType, 'onnx'>;
 
 type ModelManagerState = {
   _version: 1;

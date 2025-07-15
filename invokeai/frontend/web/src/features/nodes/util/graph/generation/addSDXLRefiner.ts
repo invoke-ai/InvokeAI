@@ -3,7 +3,7 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { Invocation } from 'services/api/types';
-import { isRefinerMainModelModelConfig } from 'services/api/types';
+import { isMainModelModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 export const addSDXLRefiner = async (
@@ -27,7 +27,7 @@ export const addSDXLRefiner = async (
 
   assert(refinerModel, 'No refiner model found in state');
 
-  const modelConfig = await fetchModelConfigWithTypeGuard(refinerModel.key, isRefinerMainModelModelConfig);
+  const modelConfig = await fetchModelConfigWithTypeGuard(refinerModel.key, isMainModelModelConfig);
 
   // We need to re-route latents to the refiner
   g.deleteEdgesFrom(denoise, ['latents']);
@@ -35,18 +35,18 @@ export const addSDXLRefiner = async (
   g.deleteEdgesTo(l2i, ['latents']);
 
   const refinerModelLoader = g.addNode({
-    type: 'sdxl_refiner_model_loader',
+    type: 'sdxl_model_loader',
     id: getPrefixedId('refiner_model_loader'),
     model: refinerModel,
   });
   const refinerPosCond = g.addNode({
-    type: 'sdxl_refiner_compel_prompt',
+    type: 'sdxl_compel_prompt',
     id: getPrefixedId('refiner_pos_cond'),
     style: posCond.style,
     aesthetic_score: refinerPositiveAestheticScore,
   });
   const refinerNegCond = g.addNode({
-    type: 'sdxl_refiner_compel_prompt',
+    type: 'sdxl_compel_prompt',
     id: getPrefixedId('refiner_neg_cond'),
     style: negCond.style,
     aesthetic_score: refinerNegativeAestheticScore,

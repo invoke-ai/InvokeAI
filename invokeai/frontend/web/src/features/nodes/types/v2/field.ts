@@ -207,7 +207,7 @@ const zSDXLMainModelFieldOutputInstance = zFieldOutputInstanceBase.extend({
 const zSDXLRefinerModelFieldType = zFieldTypeBase.extend({
   name: z.literal('SDXLRefinerModelField'),
 });
-const zSDXLRefinerModelFieldValue = zMainModelFieldValue; // TODO: Narrow to SDXL Refiner models only.
+const zSDXLRefinerModelFieldValue = zMainModelFieldValue; // Now works with any SDXL model
 const zSDXLRefinerModelFieldInputInstance = zFieldInputInstanceBase.extend({
   type: zSDXLRefinerModelFieldType,
   value: zSDXLRefinerModelFieldValue,

@@ -28,7 +28,6 @@ import {
   isLoRAModelConfig,
   isNonRefinerMainModelConfig,
   isNonSDXLMainModelConfig,
-  isRefinerMainModelModelConfig,
   isSD3MainModelModelConfig,
   isSDXLMainModelModelConfig,
   isSigLipModelConfig,
@@ -63,7 +62,7 @@ const buildModelsHook =
   };
 export const useMainModels = buildModelsHook(isNonRefinerMainModelConfig);
 export const useNonSDXLMainModels = buildModelsHook(isNonSDXLMainModelConfig);
-export const useRefinerModels = buildModelsHook(isRefinerMainModelModelConfig);
+
 export const useFluxModels = buildModelsHook(isFluxMainModelModelConfig);
 export const useSD3Models = buildModelsHook(isSD3MainModelModelConfig);
 export const useCogView4Models = buildModelsHook(isCogView4MainModelModelConfig);

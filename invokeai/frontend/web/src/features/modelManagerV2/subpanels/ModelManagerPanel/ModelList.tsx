@@ -19,7 +19,6 @@ import {
   useLLaVAModels,
   useLoRAModels,
   useMainModels,
-  useRefinerModels,
   useSigLipModels,
   useSpandrelImageToImageModels,
   useT2IAdapterModels,
@@ -40,12 +39,6 @@ const ModelList = () => {
   const filteredMainModels = useMemo(
     () => modelsFilter(mainModels, searchTerm, filteredModelType),
     [mainModels, searchTerm, filteredModelType]
-  );
-
-  const [refinerModels, { isLoading: isLoadingRefinerModels }] = useRefinerModels();
-  const filteredRefinerModels = useMemo(
-    () => modelsFilter(refinerModels, searchTerm, filteredModelType),
-    [refinerModels, searchTerm, filteredModelType]
   );
 
   const [loraModels, { isLoading: isLoadingLoRAModels }] = useLoRAModels();
@@ -136,7 +129,6 @@ const ModelList = () => {
   const totalFilteredModels = useMemo(() => {
     return (
       filteredMainModels.length +
-      filteredRefinerModels.length +
       filteredLoRAModels.length +
       filteredEmbeddingModels.length +
       filteredControlNetModels.length +
@@ -158,7 +150,7 @@ const ModelList = () => {
     filteredCLIPVisionModels.length,
     filteredLoRAModels.length,
     filteredMainModels.length,
-    filteredRefinerModels.length,
+
     filteredT2IAdapterModels.length,
     filteredVAEModels.length,
     filteredSpandrelImageToImageModels.length,
@@ -177,11 +169,7 @@ const ModelList = () => {
         {!isLoadingMainModels && filteredMainModels.length > 0 && (
           <ModelListWrapper title={t('modelManager.main')} modelList={filteredMainModels} key="main" />
         )}
-        {/* Refiner Model List */}
-        {isLoadingRefinerModels && <FetchingModelsLoader loadingMessage="Loading Refiner Models..." />}
-        {!isLoadingRefinerModels && filteredRefinerModels.length > 0 && (
-          <ModelListWrapper title={t('sdxl.refiner')} modelList={filteredRefinerModels} key="refiner" />
-        )}
+
         {/* LoRAs List */}
         {isLoadingLoRAModels && <FetchingModelsLoader loadingMessage="Loading LoRAs..." />}
         {!isLoadingLoRAModels && filteredLoRAModels.length > 0 && (
@@ -301,13 +289,5 @@ const modelsFilter = <T extends AnyModelConfig>(
 };
 
 const getMatchesType = (modelConfig: AnyModelConfig, filteredModelType: FilterableModelType | null): boolean => {
-  if (filteredModelType === 'refiner') {
-    return modelConfig.base === 'sdxl-refiner';
-  }
-
-  if (filteredModelType === 'main' && modelConfig.base === 'sdxl-refiner') {
-    return false;
-  }
-
   return filteredModelType ? modelConfig.type === filteredModelType : true;
 };

@@ -15,15 +15,6 @@ class SDXLModelLoaderOutput(BaseInvocationOutput):
     vae: VAEField = OutputField(description=FieldDescriptions.vae, title="VAE")
 
 
-@invocation_output("sdxl_refiner_model_loader_output")
-class SDXLRefinerModelLoaderOutput(BaseInvocationOutput):
-    """SDXL refiner model loader output"""
-
-    unet: UNetField = OutputField(description=FieldDescriptions.unet, title="UNet")
-    clip2: CLIPField = OutputField(description=FieldDescriptions.clip, title="CLIP 2")
-    vae: VAEField = OutputField(description=FieldDescriptions.vae, title="VAE")
-
-
 @invocation("sdxl_model_loader", title="Main Model - SDXL", tags=["model", "sdxl"], category="model", version="1.0.4")
 class SDXLModelLoaderInvocation(BaseInvocation):
     """Loads an sdxl base model, outputting its submodels."""
@@ -51,41 +42,6 @@ class SDXLModelLoaderInvocation(BaseInvocation):
         return SDXLModelLoaderOutput(
             unet=UNetField(unet=unet, scheduler=scheduler, loras=[]),
             clip=CLIPField(tokenizer=tokenizer, text_encoder=text_encoder, loras=[], skipped_layers=0),
-            clip2=CLIPField(tokenizer=tokenizer2, text_encoder=text_encoder2, loras=[], skipped_layers=0),
-            vae=VAEField(vae=vae),
-        )
-
-
-@invocation(
-    "sdxl_refiner_model_loader",
-    title="Refiner Model - SDXL",
-    tags=["model", "sdxl", "refiner"],
-    category="model",
-    version="1.0.4",
-)
-class SDXLRefinerModelLoaderInvocation(BaseInvocation):
-    """Loads an sdxl refiner model, outputting its submodels."""
-
-    model: ModelIdentifierField = InputField(
-        description=FieldDescriptions.sdxl_refiner_model, ui_type=UIType.SDXLRefinerModel
-    )
-    # TODO: precision?
-
-    def invoke(self, context: InvocationContext) -> SDXLRefinerModelLoaderOutput:
-        model_key = self.model.key
-
-        # TODO: not found exceptions
-        if not context.models.exists(model_key):
-            raise Exception(f"Unknown model: {model_key}")
-
-        unet = self.model.model_copy(update={"submodel_type": SubModelType.UNet})
-        scheduler = self.model.model_copy(update={"submodel_type": SubModelType.Scheduler})
-        tokenizer2 = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer2})
-        text_encoder2 = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder2})
-        vae = self.model.model_copy(update={"submodel_type": SubModelType.VAE})
-
-        return SDXLRefinerModelLoaderOutput(
-            unet=UNetField(unet=unet, scheduler=scheduler, loras=[]),
             clip2=CLIPField(tokenizer=tokenizer2, text_encoder=text_encoder2, loras=[], skipped_layers=0),
             vae=VAEField(vae=vae),
         )
