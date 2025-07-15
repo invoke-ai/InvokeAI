@@ -48,7 +48,7 @@ InputFieldDescriptionPopover.displayName = 'InputFieldDescriptionPopover';
 const Content = memo(({ nodeId, fieldName }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const description = useInputFieldUserDescriptionSafe(nodeId, fieldName);
+  const description = useInputFieldUserDescriptionSafe(fieldName);
   const onChange = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>) => {
       dispatch(fieldDescriptionChanged({ nodeId, fieldName, val: e.target.value }));

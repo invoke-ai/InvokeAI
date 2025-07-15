@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 
 const UseCacheCheckbox = ({ nodeId }: { nodeId: string }) => {
   const dispatch = useAppDispatch();
-  const useCache = useUseCache(nodeId);
+  const useCache = useUseCache();
   const handleChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(

@@ -11,8 +11,8 @@ import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow'
 import { toast } from 'features/toast/toast';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID, WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
+import { t } from 'i18next';
 import { useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 import { serializeError } from 'serialize-error';
 import { checkBoardAccess, checkImageAccess, checkModelAccess } from 'services/api/hooks/accessChecks';
 import { z } from 'zod/v4';
@@ -36,7 +36,6 @@ const log = logger('workflows');
  * ...each of which internally uses hook.
  */
 export const useValidateAndLoadWorkflow = () => {
-  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const validateAndLoadWorkflow = useCallback(
     /**
@@ -144,7 +143,7 @@ export const useValidateAndLoadWorkflow = () => {
         return null;
       }
     },
-    [dispatch, t]
+    [dispatch]
   );
 
   return validateAndLoadWorkflow;

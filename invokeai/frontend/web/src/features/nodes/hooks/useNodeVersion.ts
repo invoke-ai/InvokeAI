@@ -1,18 +1,10 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectInvocationNode, selectNodesSlice } from 'features/nodes/store/selectors';
+import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { useMemo } from 'react';
 
-export const useNodeVersion = (nodeId: string) => {
-  const selector = useMemo(
-    () =>
-      createSelector(selectNodesSlice, (nodesSlice) => {
-        const node = selectInvocationNode(nodesSlice, nodeId);
-        return node.data.version;
-      }),
-    [nodeId]
-  );
-
-  const version = useAppSelector(selector);
-  return version;
+export const useNodeVersion = () => {
+  const ctx = useInvocationNodeContext();
+  const selector = useMemo(() => createSelector(ctx.selectNodeDataOrThrow, (data) => data.version), [ctx]);
+  return useAppSelector(selector);
 };

@@ -10,7 +10,7 @@ interface Props {
 }
 
 const InvocationNodeClassificationIcon = ({ nodeId }: Props) => {
-  const classification = useNodeClassification(nodeId);
+  const classification = useNodeClassification();
 
   if (!classification || classification === 'stable') {
     return null;

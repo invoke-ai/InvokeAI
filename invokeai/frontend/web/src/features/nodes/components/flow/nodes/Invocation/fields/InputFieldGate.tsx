@@ -15,8 +15,8 @@ type Props = PropsWithChildren<{
 }>;
 
 export const InputFieldGate = memo(({ nodeId, fieldName, children, fallback, formatLabel }: Props) => {
-  const hasInstance = useInputFieldInstanceExists(nodeId, fieldName);
-  const hasTemplate = useInputFieldTemplateExists(nodeId, fieldName);
+  const hasInstance = useInputFieldInstanceExists(fieldName);
+  const hasTemplate = useInputFieldTemplateExists(fieldName);
 
   if (!hasTemplate || !hasInstance) {
     // fallback may be null, indicating we should render nothing at all - must check for undefined explicitly
@@ -54,7 +54,7 @@ const Fallback = memo(
     hasInstance: boolean;
   }) => {
     const { t } = useTranslation();
-    const name = useInputFieldNameSafe(nodeId, fieldName);
+    const name = useInputFieldNameSafe(fieldName);
     const label = useMemo(() => {
       if (formatLabel) {
         return formatLabel(name);

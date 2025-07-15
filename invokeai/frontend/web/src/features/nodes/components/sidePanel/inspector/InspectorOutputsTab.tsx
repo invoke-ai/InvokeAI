@@ -37,7 +37,7 @@ const getKey = (result: AnyInvocationOutput, i: number) => `${result.type}-${i}`
 
 const Content = memo(({ nodeId }: { nodeId: string }) => {
   const { t } = useTranslation();
-  const template = useNodeTemplateOrThrow(nodeId);
+  const template = useNodeTemplateOrThrow();
   const nes = useNodeExecutionState(nodeId);
 
   if (!nes || nes.outputs.length === 0) {

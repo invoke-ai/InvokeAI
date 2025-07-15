@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectFieldInputInstanceSafe, selectNodesSlice } from 'features/nodes/store/selectors';
+import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { useMemo } from 'react';
 
 /**
@@ -8,19 +8,13 @@ import { useMemo } from 'react';
  *
  * If the node doesn't exist or is not an invocation node, an empty string is returned.
  *
- * @param nodeId The ID of the node
  * @param fieldName The name of the field
  */
-export const useInputFieldUserDescriptionSafe = (nodeId: string, fieldName: string) => {
+export const useInputFieldUserDescriptionSafe = (fieldName: string) => {
+  const ctx = useInvocationNodeContext();
   const selector = useMemo(
-    () =>
-      createSelector(
-        selectNodesSlice,
-        (nodes) => selectFieldInputInstanceSafe(nodes, nodeId, fieldName)?.description ?? ''
-      ),
-    [fieldName, nodeId]
+    () => createSelector(ctx.buildSelectInputFieldSafe(fieldName), (field) => field?.description ?? ''),
+    [ctx, fieldName]
   );
-
-  const description = useAppSelector(selector);
-  return description;
+  return useAppSelector(selector);
 };

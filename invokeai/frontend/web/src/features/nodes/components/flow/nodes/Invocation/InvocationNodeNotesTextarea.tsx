@@ -13,7 +13,7 @@ type Props = {
 export const InvocationNodeNotesTextarea = memo(({ nodeId }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const notes = useInvocationNodeNotes(nodeId);
+  const notes = useInvocationNodeNotes();
   const handleNotesChanged = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>) => {
       dispatch(nodeNotesChanged({ nodeId, notes: e.target.value }));

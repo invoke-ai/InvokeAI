@@ -96,7 +96,7 @@ const OutputFields = memo(() => {
 OutputFields.displayName = 'OutputFields';
 
 const OutputFieldsContent = memo(({ outputNodeId }: { outputNodeId: string }) => {
-  const outputFieldNames = useOutputFieldNames(outputNodeId);
+  const outputFieldNames = useOutputFieldNames();
 
   return (
     <>
@@ -291,10 +291,10 @@ PublishWorkflowButton.displayName = 'DoValidationRunButton';
 
 const NodeInputFieldPreview = memo(({ nodeId, fieldName }: { nodeId: string; fieldName: string }) => {
   const mouseOverFormField = useMouseOverFormField(nodeId);
-  const nodeUserTitle = useNodeUserTitleOrThrow(nodeId);
-  const nodeTemplateTitle = useNodeTemplateTitleOrThrow(nodeId);
-  const fieldUserTitle = useInputFieldUserTitleOrThrow(nodeId, fieldName);
-  const fieldTemplateTitle = useInputFieldTemplateTitleOrThrow(nodeId, fieldName);
+  const nodeUserTitle = useNodeUserTitleOrThrow();
+  const nodeTemplateTitle = useNodeTemplateTitleOrThrow();
+  const fieldUserTitle = useInputFieldUserTitleOrThrow(fieldName);
+  const fieldTemplateTitle = useInputFieldTemplateTitleOrThrow(fieldName);
   const zoomToNode = useZoomToNode(nodeId);
 
   return (
@@ -317,9 +317,9 @@ NodeInputFieldPreview.displayName = 'NodeInputFieldPreview';
 
 const NodeOutputFieldPreview = memo(({ nodeId, fieldName }: { nodeId: string; fieldName: string }) => {
   const mouseOverFormField = useMouseOverFormField(nodeId);
-  const nodeUserTitle = useNodeUserTitleOrThrow(nodeId);
-  const nodeTemplateTitle = useNodeTemplateTitleOrThrow(nodeId);
-  const fieldTemplate = useOutputFieldTemplate(nodeId, fieldName);
+  const nodeUserTitle = useNodeUserTitleOrThrow();
+  const nodeTemplateTitle = useNodeTemplateTitleOrThrow();
+  const fieldTemplate = useOutputFieldTemplate(fieldName);
   const zoomToNode = useZoomToNode(nodeId);
 
   return (

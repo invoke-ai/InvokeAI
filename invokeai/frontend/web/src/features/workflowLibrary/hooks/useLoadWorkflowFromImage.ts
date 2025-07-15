@@ -2,8 +2,8 @@ import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { graphToWorkflow } from 'features/nodes/util/workflow/graphToWorkflow';
 import { toast } from 'features/toast/toast';
 import { useValidateAndLoadWorkflow } from 'features/workflowLibrary/hooks/useValidateAndLoadWorkflow';
+import { t } from 'i18next';
 import { useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useLazyGetImageWorkflowQuery } from 'services/api/endpoints/images';
 import type { NonNullableGraph } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -15,7 +15,6 @@ import { assert } from 'tsafe';
  * and handles the loading process.
  */
 export const useLoadWorkflowFromImage = () => {
-  const { t } = useTranslation();
   const [getWorkflowAndGraphFromImage] = useLazyGetImageWorkflowQuery();
   const validateAndLoadWorkflow = useValidateAndLoadWorkflow();
   const loadWorkflowFromImage = useCallback(
@@ -63,7 +62,7 @@ export const useLoadWorkflowFromImage = () => {
         onCompleted?.();
       }
     },
-    [getWorkflowAndGraphFromImage, validateAndLoadWorkflow, t]
+    [getWorkflowAndGraphFromImage, validateAndLoadWorkflow]
   );
 
   return loadWorkflowFromImage;

@@ -1,21 +1,10 @@
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectNodesSlice } from 'features/nodes/store/selectors';
+import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { useMemo } from 'react';
 
-export const useInputFieldIsConnected = (nodeId: string, fieldName: string) => {
-  const selector = useMemo(
-    () =>
-      createSelector(selectNodesSlice, (nodes) => {
-        const firstConnectedEdge = nodes.edges.find((edge) => {
-          return edge.target === nodeId && edge.targetHandle === fieldName;
-        });
-        return firstConnectedEdge !== undefined;
-      }),
-    [fieldName, nodeId]
-  );
+export const useInputFieldIsConnected = (fieldName: string) => {
+  const ctx = useInvocationNodeContext();
+  const selector = useMemo(() => ctx.buildSelectIsInputFieldConnected(fieldName), [fieldName, ctx]);
 
-  const isConnected = useAppSelector(selector);
-
-  return isConnected;
+  return useAppSelector(selector);
 };
