@@ -37,7 +37,6 @@ import {
 } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { simplifyFlatNumbersArray } from 'features/controlLayers/util/simplify';
 import { isMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
-import { ASPECT_RATIO_MAP } from 'features/parameters/components/Bbox/constants';
 import { API_BASE_MODELS } from 'features/parameters/types/constants';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
@@ -74,9 +73,13 @@ import type {
   T2IAdapterConfig,
 } from './types';
 import {
+  ASPECT_RATIO_MAP,
+  CHATGPT_ASPECT_RATIOS,
   DEFAULT_ASPECT_RATIO_CONFIG,
+  FLUX_KONTEXT_ASPECT_RATIOS,
   getEntityIdentifier,
   getInitialCanvasState,
+  IMAGEN_ASPECT_RATIOS,
   isChatGPT4oAspectRatioID,
   isFluxKontextAspectRatioID,
   isFLUXReduxConfig,
@@ -1253,62 +1256,21 @@ export const canvasSlice = createSlice({
         (state.bbox.modelBase === 'imagen3' || state.bbox.modelBase === 'imagen4') &&
         isImagenAspectRatioID(id)
       ) {
-        // Imagen3 has specific output sizes that are not exactly the same as the aspect ratio. Need special handling.
-        if (id === '16:9') {
-          state.bbox.rect.width = 1408;
-          state.bbox.rect.height = 768;
-        } else if (id === '4:3') {
-          state.bbox.rect.width = 1280;
-          state.bbox.rect.height = 896;
-        } else if (id === '1:1') {
-          state.bbox.rect.width = 1024;
-          state.bbox.rect.height = 1024;
-        } else if (id === '3:4') {
-          state.bbox.rect.width = 896;
-          state.bbox.rect.height = 1280;
-        } else if (id === '9:16') {
-          state.bbox.rect.width = 768;
-          state.bbox.rect.height = 1408;
-        }
+        const { width, height } = IMAGEN_ASPECT_RATIOS[id];
+        state.bbox.rect.width = width;
+        state.bbox.rect.height = height;
         state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
         state.bbox.aspectRatio.isLocked = true;
       } else if (state.bbox.modelBase === 'chatgpt-4o' && isChatGPT4oAspectRatioID(id)) {
-        // gpt-image has specific output sizes that are not exactly the same as the aspect ratio. Need special handling.
-        if (id === '3:2') {
-          state.bbox.rect.width = 1536;
-          state.bbox.rect.height = 1024;
-        } else if (id === '1:1') {
-          state.bbox.rect.width = 1024;
-          state.bbox.rect.height = 1024;
-        } else if (id === '2:3') {
-          state.bbox.rect.width = 1024;
-          state.bbox.rect.height = 1536;
-        }
+        const { width, height } = CHATGPT_ASPECT_RATIOS[id];
+        state.bbox.rect.width = width;
+        state.bbox.rect.height = height;
         state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
         state.bbox.aspectRatio.isLocked = true;
       } else if (state.bbox.modelBase === 'flux-kontext' && isFluxKontextAspectRatioID(id)) {
-        if (id === '3:4') {
-          state.bbox.rect.width = 880;
-          state.bbox.rect.height = 1184;
-        } else if (id === '4:3') {
-          state.bbox.rect.width = 1184;
-          state.bbox.rect.height = 880;
-        } else if (id === '9:16') {
-          state.bbox.rect.width = 752;
-          state.bbox.rect.height = 1392;
-        } else if (id === '16:9') {
-          state.bbox.rect.width = 1392;
-          state.bbox.rect.height = 752;
-        } else if (id === '21:9') {
-          state.bbox.rect.width = 1568;
-          state.bbox.rect.height = 672;
-        } else if (id === '9:21') {
-          state.bbox.rect.width = 672;
-          state.bbox.rect.height = 1568;
-        } else if (id === '1:1') {
-          state.bbox.rect.width = 1024;
-          state.bbox.rect.height = 1024;
-        }
+        const { width, height } = FLUX_KONTEXT_ASPECT_RATIOS[id];
+        state.bbox.rect.width = width;
+        state.bbox.rect.height = height;
         state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
         state.bbox.aspectRatio.isLocked = true;
       } else {

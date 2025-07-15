@@ -6,18 +6,18 @@ import { PiXCircle } from 'react-icons/pi';
 
 export const CancelAllExceptCurrentIconButton = memo(() => {
   const { t } = useTranslation();
-  const cancelAllExceptCurrent = useCancelAllExceptCurrentQueueItemDialog();
+  const api = useCancelAllExceptCurrentQueueItemDialog();
 
   return (
     <IconButton
       size="lg"
-      isDisabled={cancelAllExceptCurrent.isDisabled}
-      isLoading={cancelAllExceptCurrent.isLoading}
+      isDisabled={api.isDisabled}
+      isLoading={api.isLoading}
       aria-label={t('queue.clear')}
       tooltip={t('queue.cancelAllExceptCurrentTooltip')}
       icon={<PiXCircle />}
       colorScheme="error"
-      onClick={cancelAllExceptCurrent.openDialog}
+      onClick={api.openDialog}
     />
   );
 });

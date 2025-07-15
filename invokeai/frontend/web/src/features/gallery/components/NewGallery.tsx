@@ -2,8 +2,9 @@ import { Box, Flex, forwardRef, Grid, GridItem, Spinner, Text } from '@invoke-ai
 import { createSelector } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { getFocusedRegion } from 'common/hooks/focus';
 import { useRangeBasedImageFetching } from 'features/gallery/hooks/useRangeBasedImageFetching';
-import type { selectListImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
+import type { selectGetImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import {
   selectGalleryImageMinimumWidth,
   selectImageToCompare,
@@ -32,7 +33,7 @@ import { useGalleryImageNames } from './use-gallery-image-names';
 
 const log = logger('gallery');
 
-type ListImageNamesQueryArgs = ReturnType<typeof selectListImageNamesQueryArgs>;
+type ListImageNamesQueryArgs = ReturnType<typeof selectGetImageNamesQueryArgs>;
 
 type GridContext = {
   queryArgs: ListImageNamesQueryArgs;
@@ -128,60 +129,69 @@ const getImagesPerRow = (rootEl: HTMLDivElement): number => {
  * Scroll the item at the given index into view if it is not currently visible.
  */
 const scrollIntoView = (
-  index: number,
+  targetImageName: string,
+  imageNames: string[],
   rootEl: HTMLDivElement,
   virtuosoGridHandle: VirtuosoGridHandle,
   range: ListRange
 ) => {
   if (range.endIndex === 0) {
+    // No range is rendered; no need to scroll to anything.
     return;
   }
 
-  // First get the virtuoso grid list root element
-  const gridList = rootEl.querySelector('.virtuoso-grid-list') as HTMLElement;
+  const targetIndex = imageNames.findIndex((name) => name === targetImageName);
 
-  if (!gridList) {
-    // No grid - cannot scroll!
+  if (targetIndex === -1) {
+    // The image isn't in the currently rendered list.
     return;
   }
 
-  // Then find the specific item within the grid list
-  const targetItem = gridList.querySelector(`.virtuoso-grid-item[data-index="${index}"]`) as HTMLElement;
+  const targetItem = rootEl.querySelector(
+    `.virtuoso-grid-item:has([data-image-name="${targetImageName}"])`
+  ) as HTMLElement;
 
   if (!targetItem) {
-    if (index > range.endIndex) {
+    if (targetIndex > range.endIndex) {
       virtuosoGridHandle.scrollToIndex({
-        index,
+        index: targetIndex,
         behavior: 'auto',
         align: 'start',
       });
-    } else if (index < range.startIndex) {
+    } else if (targetIndex < range.startIndex) {
       virtuosoGridHandle.scrollToIndex({
-        index,
+        index: targetIndex,
         behavior: 'auto',
         align: 'end',
       });
     } else {
-      log.warn(`Unable to find item index ${index} but it is in range ${range.startIndex}-${range.endIndex}`);
+      log.debug(
+        `Unable to find image ${targetImageName} at index ${targetIndex} but it is in the rendered range ${range.startIndex}-${range.endIndex}`
+      );
     }
     return;
   }
+
+  // We found the image in the DOM, but it might be in the overscan range - rendered but not in the visible viewport.
+  // Check if it is in the viewport and scroll if necessary.
 
   const itemRect = targetItem.getBoundingClientRect();
   const rootRect = rootEl.getBoundingClientRect();
 
   if (itemRect.top < rootRect.top) {
     virtuosoGridHandle.scrollToIndex({
-      index,
+      index: targetIndex,
       behavior: 'auto',
       align: 'start',
     });
   } else if (itemRect.bottom > rootRect.bottom) {
     virtuosoGridHandle.scrollToIndex({
-      index,
+      index: targetIndex,
       behavior: 'auto',
       align: 'end',
     });
+  } else {
+    // Image is already in view
   }
 
   return;
@@ -212,6 +222,10 @@ const useKeyboardNavigation = (
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
+      if (getFocusedRegion() !== 'gallery') {
+        // Only handle keyboard navigation when the gallery is focused
+        return;
+      }
       // Only handle arrow keys
       if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
         return;
@@ -377,22 +391,18 @@ const useKeepSelectedImageInView = (
   rootRef: React.RefObject<HTMLDivElement>,
   rangeRef: MutableRefObject<ListRange>
 ) => {
-  const imageName = useAppSelector(selectLastSelectedImage);
+  const targetImageName = useAppSelector(selectLastSelectedImage);
 
   useEffect(() => {
     const virtuosoGridHandle = virtuosoRef.current;
     const rootEl = rootRef.current;
     const range = rangeRef.current;
 
-    if (!virtuosoGridHandle || !rootEl || !imageNames || imageNames.length === 0) {
+    if (!virtuosoGridHandle || !rootEl || !targetImageName || !imageNames || imageNames.length === 0) {
       return;
     }
-    const index = imageName ? imageNames.indexOf(imageName) : 0;
-    if (index === -1) {
-      return;
-    }
-    scrollIntoView(index, rootEl, virtuosoGridHandle, range);
-  }, [imageName, imageNames, rangeRef, rootRef, virtuosoRef]);
+    scrollIntoView(targetImageName, imageNames, rootEl, virtuosoGridHandle, range);
+  }, [targetImageName, imageNames, rangeRef, rootRef, virtuosoRef]);
 };
 
 /**
@@ -472,11 +482,6 @@ export const NewGallery = memo(() => {
 
   const context = useMemo<GridContext>(() => ({ imageNames, queryArgs }), [imageNames, queryArgs]);
 
-  // Item content function
-  const itemContent: GridItemContent<string, GridContext> = useCallback((index, imageName) => {
-    return <ImageAtPosition index={index} imageName={imageName} />;
-  }, []);
-
   if (isLoading) {
     return (
       <Flex w="full" h="full" alignItems="center" justifyContent="center" gap={4}>
@@ -501,7 +506,7 @@ export const NewGallery = memo(() => {
         ref={virtuosoRef}
         context={context}
         data={imageNames}
-        increaseViewportBy={2048}
+        increaseViewportBy={4096}
         itemContent={itemContent}
         computeItemKey={computeItemKey}
         components={components}
@@ -518,8 +523,12 @@ export const NewGallery = memo(() => {
 NewGallery.displayName = 'NewGallery';
 
 const scrollSeekConfiguration: ScrollSeekConfiguration = {
-  enter: (velocity) => velocity > 4096,
-  exit: (velocity) => velocity === 0,
+  enter: (velocity) => {
+    return Math.abs(velocity) > 2048;
+  },
+  exit: (velocity) => {
+    return velocity === 0;
+  },
 };
 
 // Styles
@@ -538,6 +547,10 @@ const ListComponent: GridComponents<GridContext>['List'] = forwardRef(({ context
   return <Grid ref={ref} gridTemplateColumns={gridTemplateColumns} gap={1} {...rest} />;
 });
 ListComponent.displayName = 'ListComponent';
+
+const itemContent: GridItemContent<string, GridContext> = (index, imageName) => {
+  return <ImageAtPosition index={index} imageName={imageName} />;
+};
 
 const ItemComponent: GridComponents<GridContext>['Item'] = forwardRef(({ context: _, ...rest }, ref) => (
   <GridItem ref={ref} aspectRatio="1/1" {...rest} />

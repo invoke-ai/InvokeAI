@@ -16,7 +16,6 @@ import {
   rgRefImageAdded,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectBase, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
-import { refImageAdded } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityIdentifier,
@@ -88,7 +87,7 @@ export const getDefaultRefImageConfig = (
     return config;
   }
 
-  if (base === 'flux-kontext') {
+  if (base === 'flux-kontext' || (base === 'flux' && mainModelConfig?.name?.toLowerCase().includes('kontext'))) {
     const config = deepClone(initialFluxKontextReferenceImage);
     config.model = zModelIdentifierField.parse(mainModelConfig);
     return config;
@@ -181,17 +180,6 @@ export const useAddNewRegionalGuidanceWithARefImage = () => {
       referenceImages: [{ id: getPrefixedId('regional_guidance_reference_image'), config }],
     };
     dispatch(rgAdded({ isSelected: true, overrides }));
-  }, [dispatch, getState]);
-
-  return func;
-};
-
-export const useAddGlobalReferenceImage = () => {
-  const { dispatch, getState } = useAppStore();
-  const func = useCallback(() => {
-    const config = getDefaultRefImageConfig(getState);
-    const overrides = { config };
-    dispatch(refImageAdded({ overrides }));
   }, [dispatch, getState]);
 
   return func;

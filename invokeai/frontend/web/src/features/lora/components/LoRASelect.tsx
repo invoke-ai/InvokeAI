@@ -1,6 +1,6 @@
 import { FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import type { GroupStatusMap } from 'common/components/Picker/Picker';
@@ -13,13 +13,15 @@ import { useTranslation } from 'react-i18next';
 import { useLoRAModels } from 'services/api/hooks/modelsByType';
 import type { LoRAModelConfig } from 'services/api/types';
 
-const selectLoRAs = createSelector(selectLoRAsSlice, (loras) => loras.loras);
+const selectLoRAModelKeys = createMemoizedSelector(selectLoRAsSlice, ({ loras }) =>
+  loras.map(({ model }) => model.key)
+);
 
 const LoRASelect = () => {
   const dispatch = useAppDispatch();
   const [modelConfigs, { isLoading }] = useLoRAModels();
   const { t } = useTranslation();
-  const addedLoRAs = useAppSelector(selectLoRAs);
+  const addedLoRAModelKeys = useAppSelector(selectLoRAModelKeys);
 
   const currentBaseModel = useAppSelector(selectBase);
 
@@ -33,10 +35,10 @@ const LoRASelect = () => {
 
   const getIsDisabled = useCallback(
     (model: LoRAModelConfig): boolean => {
-      const isAdded = Boolean(addedLoRAs.find((lora) => lora.model.key === model.key));
+      const isAdded = addedLoRAModelKeys.includes(model.key);
       return isAdded;
     },
-    [addedLoRAs]
+    [addedLoRAModelKeys]
   );
 
   const onChange = useCallback(
@@ -55,7 +57,7 @@ const LoRASelect = () => {
     }
 
     if (compatibleLoRAs.length === 0) {
-      return currentBaseModel ? t('models.noCompatibleLoRAs') : t('models.selectModelFirst');
+      return currentBaseModel ? t('models.noCompatibleLoRAs') : t('models.selectModel');
     }
 
     return t('models.addLora');
@@ -88,7 +90,7 @@ const LoRASelect = () => {
         placeholder={placeholder}
         getIsOptionDisabled={getIsDisabled}
         initialGroupStates={initialGroupStates}
-        noOptionsText={currentBaseModel ? t('models.noCompatibleLoRAs') : t('models.selectModelFirst')}
+        noOptionsText={currentBaseModel ? t('models.noCompatibleLoRAs') : t('models.selectModel')}
       />
     </FormControl>
   );

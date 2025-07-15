@@ -19,6 +19,7 @@ import type {
   RgbColor,
   T2IAdapterConfig,
 } from 'features/controlLayers/store/types';
+import type { ImageField } from 'features/nodes/types/common';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 import type { PartialDeep } from 'type-fest';
@@ -58,6 +59,8 @@ export const imageDTOToImageWithDims = ({ image_name, width, height }: ImageDTO)
   width,
   height,
 });
+
+export const imageDTOToImageField = ({ image_name }: ImageDTO): ImageField => ({ image_name });
 
 const DEFAULT_RG_MASK_FILL_COLORS: RgbColor[] = [
   { r: 121, g: 157, b: 219 }, // rgb(121, 157, 219)
@@ -129,6 +132,7 @@ export const initialControlLoRA: ControlLoRAConfig = {
 export const getReferenceImageState = (id: string, overrides?: PartialDeep<RefImageState>): RefImageState => {
   const entityState: RefImageState = {
     id,
+    isEnabled: true,
     config: deepClone(initialIPAdapter),
   };
   merge(entityState, overrides);

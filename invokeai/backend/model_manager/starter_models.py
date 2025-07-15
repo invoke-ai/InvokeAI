@@ -143,10 +143,18 @@ flux_dev = StarterModel(
 flux_kontext = StarterModel(
     name="FLUX.1 Kontext dev",
     base=BaseModelType.Flux,
-    source="black-forest-labs/FLUX.1-Kontext-dev::flux1-kontext-dev.safetensors",
+    source="https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev/resolve/main/flux1-kontext-dev.safetensors",
     description="FLUX.1 Kontext dev transformer in bfloat16. Total size with dependencies: ~33GB",
     type=ModelType.Main,
     dependencies=[t5_base_encoder, flux_vae, clip_l_encoder],
+)
+flux_kontext_quantized = StarterModel(
+    name="FLUX.1 Kontext dev (Quantized)",
+    base=BaseModelType.Flux,
+    source="https://huggingface.co/unsloth/FLUX.1-Kontext-dev-GGUF/resolve/main/flux1-kontext-dev-Q4_K_M.gguf",
+    description="FLUX.1 Kontext dev quantized (q4_k_m). Total size with dependencies: ~14GB",
+    type=ModelType.Main,
+    dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
 )
 sd35_medium = StarterModel(
     name="SD3.5 Medium",
@@ -664,7 +672,7 @@ flux_fill = StarterModel(
 # List of starter models, displayed on the frontend.
 # The order/sort of this list is not changed by the frontend - set it how you want it here.
 STARTER_MODELS: list[StarterModel] = [
-    flux_kontext,
+    flux_kontext_quantized,
     flux_schnell_quantized,
     flux_dev_quantized,
     flux_schnell,
@@ -785,7 +793,7 @@ flux_bundle: list[StarterModel] = [
     flux_depth_control_lora,
     flux_redux,
     flux_fill,
-    flux_kontext,
+    flux_kontext_quantized,
 ]
 
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {

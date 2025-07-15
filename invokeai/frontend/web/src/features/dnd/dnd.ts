@@ -22,6 +22,8 @@ import {
 import { fieldImageCollectionValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectFieldInputInstanceSafe, selectNodesSlice } from 'features/nodes/store/selectors';
 import { type FieldIdentifier, isImageFieldCollectionInputInstance } from 'features/nodes/types/field';
+import { expandPrompt } from 'features/prompt/PromptExpansion/expand';
+import { promptExpansionApi } from 'features/prompt/PromptExpansion/state';
 import type { ImageDTO } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
@@ -157,7 +159,7 @@ export const setGlobalReferenceImageDndTarget: DndTarget<
 
 //#region Add Global Reference Image
 const _addGlobalReferenceImage = buildTypeAndKey('add-global-reference-image');
-export type AddGlobalReferenceImageDndTargetData = DndData<
+type AddGlobalReferenceImageDndTargetData = DndData<
   typeof _addGlobalReferenceImage.type,
   typeof _addGlobalReferenceImage.key
 >;
@@ -350,7 +352,10 @@ const _newCanvasEntity = buildTypeAndKey('new-canvas-entity-from-image');
 type NewCanvasEntityFromImageDndTargetData = DndData<
   typeof _newCanvasEntity.type,
   typeof _newCanvasEntity.key,
-  { type: CanvasEntityType | 'regional_guidance_with_reference_image' }
+  {
+    type: CanvasEntityType | 'regional_guidance_with_reference_image';
+    withResize?: boolean;
+  }
 >;
 export const newCanvasEntityFromImageDndTarget: DndTarget<
   NewCanvasEntityFromImageDndTargetData,
@@ -366,20 +371,20 @@ export const newCanvasEntityFromImageDndTarget: DndTarget<
     return true;
   },
   handler: ({ sourceData, targetData, dispatch, getState }) => {
-    const { type } = targetData.payload;
+    const { type, withResize } = targetData.payload;
     const { imageDTO } = sourceData.payload;
-    createNewCanvasEntityFromImage({ type, imageDTO, dispatch, getState });
+    createNewCanvasEntityFromImage({ type, imageDTO, withResize, dispatch, getState });
   },
 };
 //#endregion
 
 //#region New Canvas from Image
-const _newCanvas = buildTypeAndKey('new-canvas-entity-from-image');
+const _newCanvas = buildTypeAndKey('new-canvas-from-image');
 type NewCanvasFromImageDndTargetData = DndData<
   typeof _newCanvas.type,
   typeof _newCanvas.key,
   {
-    type: CanvasEntityType | 'regional_guidance_with_reference_image' | 'reference_image';
+    type: CanvasEntityType | 'regional_guidance_with_reference_image';
     withResize?: boolean;
     withInpaintMask?: boolean;
   }
@@ -515,23 +520,48 @@ export const removeImageFromBoardDndTarget: DndTarget<
 
 //#endregion
 
+//#region Prompt Generation From Image
+const _promptGenerationFromImage = buildTypeAndKey('prompt-generation-from-image');
+type PromptGenerationFromImageDndTargetData = DndData<
+  typeof _promptGenerationFromImage.type,
+  typeof _promptGenerationFromImage.key,
+  void
+>;
+export const promptGenerationFromImageDndTarget: DndTarget<
+  PromptGenerationFromImageDndTargetData,
+  SingleImageDndSourceData
+> = {
+  ..._promptGenerationFromImage,
+  typeGuard: buildTypeGuard(_promptGenerationFromImage.key),
+  getData: buildGetData(_promptGenerationFromImage.key, _promptGenerationFromImage.type),
+  isValid: ({ sourceData }) => {
+    if (singleImageDndSource.typeGuard(sourceData)) {
+      return true;
+    }
+    return false;
+  },
+  handler: ({ sourceData, dispatch, getState }) => {
+    const { imageDTO } = sourceData.payload;
+    promptExpansionApi.setPending(imageDTO);
+    expandPrompt({ dispatch, getState, imageDTO });
+  },
+};
+//#endregion
+
 export const dndTargets = [
-  // Single Image
   setGlobalReferenceImageDndTarget,
+  addGlobalReferenceImageDndTarget,
   setRegionalGuidanceReferenceImageDndTarget,
   setUpscaleInitialImageDndTarget,
   setNodeImageFieldImageDndTarget,
+  addImagesToNodeImageFieldCollectionDndTarget,
   setComparisonImageDndTarget,
   newCanvasEntityFromImageDndTarget,
+  newCanvasFromImageDndTarget,
   replaceCanvasEntityObjectsWithImageDndTarget,
   addImageToBoardDndTarget,
   removeImageFromBoardDndTarget,
-  newCanvasFromImageDndTarget,
-  addGlobalReferenceImageDndTarget,
-  // Single or Multiple Image
-  addImageToBoardDndTarget,
-  removeImageFromBoardDndTarget,
-  addImagesToNodeImageFieldCollectionDndTarget,
+  promptGenerationFromImageDndTarget,
 ] as const;
 
 export type AnyDndTarget = (typeof dndTargets)[number];

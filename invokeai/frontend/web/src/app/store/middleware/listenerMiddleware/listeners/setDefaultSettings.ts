@@ -1,7 +1,9 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { isNil } from 'es-toolkit';
 import { bboxHeightChanged, bboxWidthChanged } from 'features/controlLayers/store/canvasSlice';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
+  heightChanged,
   setCfgRescaleMultiplier,
   setCfgScale,
   setGuidance,
@@ -9,6 +11,7 @@ import {
   setSteps,
   vaePrecisionChanged,
   vaeSelected,
+  widthChanged,
 } from 'features/controlLayers/store/paramsSlice';
 import { setDefaultSettings } from 'features/parameters/store/actions';
 import {
@@ -23,6 +26,7 @@ import {
   zParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
@@ -86,10 +90,16 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
           }
         }
 
-        if (cfg_rescale_multiplier) {
+        if (!isNil(cfg_rescale_multiplier)) {
           if (isParameterCFGRescaleMultiplier(cfg_rescale_multiplier)) {
             dispatch(setCfgRescaleMultiplier(cfg_rescale_multiplier));
           }
+        } else {
+          // Set this to 0 if it doesn't have a default. This value is
+          // easy to miss in the UI when users are resetting defaults
+          // and leaving it non-zero could lead to detrimental
+          // effects.
+          dispatch(setCfgRescaleMultiplier(0));
         }
 
         if (steps) {
@@ -106,15 +116,24 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
         const setSizeOptions = { updateAspectRatio: true, clamp: true };
 
         const isStaging = selectIsStaging(getState());
-        if (!isStaging && width) {
+        const activeTab = selectActiveTab(getState());
+        if (activeTab === 'generate') {
           if (isParameterWidth(width)) {
-            dispatch(bboxWidthChanged({ width, ...setSizeOptions }));
+            dispatch(widthChanged({ width, ...setSizeOptions }));
+          }
+          if (isParameterHeight(height)) {
+            dispatch(heightChanged({ height, ...setSizeOptions }));
           }
         }
 
-        if (!isStaging && height) {
-          if (isParameterHeight(height)) {
-            dispatch(bboxHeightChanged({ height, ...setSizeOptions }));
+        if (activeTab === 'canvas') {
+          if (!isStaging) {
+            if (isParameterWidth(width)) {
+              dispatch(bboxWidthChanged({ width, ...setSizeOptions }));
+            }
+            if (isParameterHeight(height)) {
+              dispatch(bboxHeightChanged({ height, ...setSizeOptions }));
+            }
           }
         }
 

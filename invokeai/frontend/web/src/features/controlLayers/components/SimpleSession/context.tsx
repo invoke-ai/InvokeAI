@@ -1,9 +1,12 @@
 import { useStore } from '@nanostores/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppStore } from 'app/store/storeHooks';
-import { buildZodTypeGuard } from 'common/util/zodUtils';
 import { getOutputImageName } from 'features/controlLayers/components/SimpleSession/shared';
+import { selectStagingAreaAutoSwitch } from 'features/controlLayers/store/canvasSettingsSlice';
+import {
+  buildSelectSessionQueueItems,
+  canvasQueueItemDiscarded,
+  canvasSessionReset,
+} from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { ProgressImage } from 'features/nodes/types/common';
 import type { Atom, MapStore, StoreValue, WritableAtom } from 'nanostores';
 import { atom, computed, effect, map, subscribeKeys } from 'nanostores';
@@ -14,11 +17,6 @@ import { queueApi } from 'services/api/endpoints/queue';
 import type { ImageDTO, S } from 'services/api/types';
 import { $socket } from 'services/events/stores';
 import { assert, objectEntries } from 'tsafe';
-import { z } from 'zod/v4';
-
-const zAutoSwitchMode = z.enum(['off', 'switch_on_start', 'switch_on_finish']);
-export const isAutoSwitchMode = buildZodTypeGuard(zAutoSwitchMode);
-export type AutoSwitchMode = z.infer<typeof zAutoSwitchMode>;
 
 export type ProgressData = {
   itemId: number;
@@ -92,17 +90,19 @@ type CanvasSessionContextValue = {
   $items: Atom<S['SessionQueueItem'][]>;
   $itemCount: Atom<number>;
   $hasItems: Atom<boolean>;
+  $isPending: Atom<boolean>;
   $progressData: ProgressDataMap;
   $selectedItemId: WritableAtom<number | null>;
   $selectedItem: Atom<S['SessionQueueItem'] | null>;
   $selectedItemIndex: Atom<number | null>;
   $selectedItemOutputImageDTO: Atom<ImageDTO | null>;
-  $autoSwitch: WritableAtom<AutoSwitchMode>;
   selectNext: () => void;
   selectPrev: () => void;
   selectFirst: () => void;
   selectLast: () => void;
   onImageLoad: (itemId: number) => void;
+  discard: (itemId: number) => void;
+  discardAll: () => void;
 };
 
 const CanvasSessionContext = createContext<CanvasSessionContextValue | null>(null);
@@ -140,11 +140,6 @@ export const CanvasSessionContextProvider = memo(
     const $items = useState(() => atom<S['SessionQueueItem'][]>([]))[0];
 
     /**
-     * Whether auto-switch is enabled.
-     */
-    const $autoSwitch = useState(() => atom<AutoSwitchMode>('switch_on_start'))[0];
-
-    /**
      * An internal flag used to work around race conditions with auto-switch switching to queue items before their
      * output images have fully loaded.
      */
@@ -169,6 +164,13 @@ export const CanvasSessionContextProvider = memo(
      * Whether there are any items. Computed from the queue items array.
      */
     const $hasItems = useState(() => computed([$items], (items) => items.length > 0))[0];
+
+    /**
+     * Whether there are any pending or in-progress items. Computed from the queue items array.
+     */
+    const $isPending = useState(() =>
+      computed([$items], (items) => items.some((item) => item.status === 'pending' || item.status === 'in_progress'))
+    )[0];
 
     /**
      * The currently selected queue item, or null if one is not selected.
@@ -218,18 +220,20 @@ export const CanvasSessionContextProvider = memo(
     )[0];
 
     /**
-     * A redux selector to select all queue items from the RTK Query cache. It's important that this returns stable
-     * references if possible to reduce re-renders. All derivations of the queue items (e.g. filtering out canceled
-     * items) should be done in a nanostores computed.
+     * A redux selector to select all queue items from the RTK Query cache.
      */
-    const selectQueueItems = useMemo(
-      () =>
-        createSelector(
-          queueApi.endpoints.listAllQueueItems.select({ destination: session.id }),
-          ({ data }) => data ?? EMPTY_ARRAY
-        ),
-      [session.id]
+    const selectQueueItems = useMemo(() => buildSelectSessionQueueItems(session.id), [session.id]);
+
+    const discard = useCallback(
+      (itemId: number) => {
+        store.dispatch(canvasQueueItemDiscarded({ itemId }));
+      },
+      [store]
     );
+
+    const discardAll = useCallback(() => {
+      store.dispatch(canvasSessionReset());
+    }, [store]);
 
     const selectNext = useCallback(() => {
       const selectedItemId = $selectedItemId.get();
@@ -292,12 +296,15 @@ export const CanvasSessionContextProvider = memo(
             imageLoaded: true,
           });
         }
-        if ($lastCompletedItemId.get() === itemId && $autoSwitch.get() === 'switch_on_finish') {
+        if (
+          $lastCompletedItemId.get() === itemId &&
+          selectStagingAreaAutoSwitch(store.getState()) === 'switch_on_finish'
+        ) {
           $selectedItemId.set(itemId);
           $lastCompletedItemId.set(null);
         }
       },
-      [$autoSwitch, $lastCompletedItemId, $progressData, $selectedItemId]
+      [$lastCompletedItemId, $progressData, $selectedItemId, store]
     );
 
     // Set up socket listeners
@@ -332,7 +339,7 @@ export const CanvasSessionContextProvider = memo(
         socket.off('invocation_progress', onProgress);
         socket.off('queue_item_status_changed', onQueueItemStatusChanged);
       };
-    }, [$autoSwitch, $lastCompletedItemId, $lastStartedItemId, $progressData, $selectedItemId, session.id, socket]);
+    }, [$lastCompletedItemId, $lastStartedItemId, $progressData, $selectedItemId, session.id, socket]);
 
     // Set up state subscriptions and effects
     useEffect(() => {
@@ -354,33 +361,32 @@ export const CanvasSessionContextProvider = memo(
       const unsubEnsureSelectedItemIdExists = effect(
         [$items, $selectedItemId, $lastStartedItemId],
         (items, selectedItemId, lastStartedItemId) => {
-          // If there are no items, cannot have a selected item.
           if (items.length === 0) {
+            // If there are no items, cannot have a selected item.
             $selectedItemId.set(null);
-            return;
-          }
-          // If there is no selected item but there are items, select the first one.
-          if (selectedItemId === null && items.length > 0) {
+          } else if (selectedItemId === null && items.length > 0) {
+            // If there is no selected item but there are items, select the first one.
             $selectedItemId.set(items[0]?.item_id ?? null);
             return;
-          }
-          if (
-            $autoSwitch.get() === 'switch_on_start' &&
+          } else if (
+            selectStagingAreaAutoSwitch(store.getState()) === 'switch_on_start' &&
             items.findIndex(({ item_id }) => item_id === lastStartedItemId) !== -1
           ) {
             $selectedItemId.set(lastStartedItemId);
             $lastStartedItemId.set(null);
-          }
-          // If an item is selected and it is not in the list of items, un-set it. This effect will run again and we'll
-          // the above case, selecting the first item if there are any.
-          if (selectedItemId !== null && items.findIndex(({ item_id }) => item_id === selectedItemId) === -1) {
+          } else if (selectedItemId !== null && items.findIndex(({ item_id }) => item_id === selectedItemId) === -1) {
+            // If an item is selected and it is not in the list of items, un-set it. This effect will run again and we'll
+            // the above case, selecting the first item if there are any.
             let prevIndex = _prevItems.findIndex(({ item_id }) => item_id === selectedItemId);
             if (prevIndex >= items.length) {
               prevIndex = items.length - 1;
             }
             const nextItem = items[prevIndex];
             $selectedItemId.set(nextItem?.item_id ?? null);
-            return;
+          }
+
+          if (items !== _prevItems) {
+            _prevItems = items;
           }
         }
       );
@@ -401,12 +407,12 @@ export const CanvasSessionContextProvider = memo(
           if (!item) {
             toDelete.push(datum.itemId);
           } else if (item.status === 'canceled' || item.status === 'failed') {
-            toUpdate[datum.itemId] = {
+            toUpdate.push({
               ...datum,
               progressEvent: null,
               progressImage: null,
               imageDTO: null,
-            };
+            });
           }
         }
 
@@ -466,7 +472,7 @@ export const CanvasSessionContextProvider = memo(
         if (lastLoadedItemId === null) {
           return;
         }
-        if ($autoSwitch.get() === 'switch_on_finish') {
+        if (selectStagingAreaAutoSwitch(store.getState()) === 'switch_on_finish') {
           $selectedItemId.set(lastLoadedItemId);
         }
         $lastLoadedItemId.set(null);
@@ -477,6 +483,22 @@ export const CanvasSessionContextProvider = memo(
       const { unsubscribe: unsubQueueItemsQuery } = store.dispatch(
         queueApi.endpoints.listAllQueueItems.initiate({ destination: session.id })
       );
+
+      // const unsubListener = store.dispatch(
+      //   addAppListener({
+      //     matcher: queueApi.endpoints.cancelQueueItem.matchFulfilled,
+      //     effect: ({ payload }, { getState }) => {
+      //       const { item_id } = payload;
+
+      //       const items = selectQueueItems(getState());
+      //       if (items.length === 0) {
+      //         $selectedItemId.set(null);
+      //       } else if ($selectedItemId.get() === null) {
+      //         $selectedItemId.set(items[0].item_id);
+      //       }
+      //     },
+      //   })
+      // );
 
       // Clean up all subscriptions and top-level (i.e. non-computed/derived state)
       return () => {
@@ -490,7 +512,6 @@ export const CanvasSessionContextProvider = memo(
         $selectedItemId.set(null);
       };
     }, [
-      $autoSwitch,
       $items,
       $lastLoadedItemId,
       $lastStartedItemId,
@@ -506,9 +527,9 @@ export const CanvasSessionContextProvider = memo(
         session,
         $items,
         $hasItems,
+        $isPending,
         $progressData,
         $selectedItemId,
-        $autoSwitch,
         $selectedItem,
         $selectedItemIndex,
         $selectedItemOutputImageDTO,
@@ -518,11 +539,13 @@ export const CanvasSessionContextProvider = memo(
         selectFirst,
         selectLast,
         onImageLoad,
+        discard,
+        discardAll,
       }),
       [
-        $autoSwitch,
         $items,
         $hasItems,
+        $isPending,
         $progressData,
         $selectedItem,
         $selectedItemId,
@@ -535,6 +558,8 @@ export const CanvasSessionContextProvider = memo(
         selectFirst,
         selectLast,
         onImageLoad,
+        discard,
+        discardAll,
       ]
     );
 

@@ -28,7 +28,7 @@ import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endp
 import { assert, AssertionError } from 'tsafe';
 
 const log = logger('generation');
-export const enqueueRequestedCanvas = createAction('app/enqueueRequestedCanvas');
+const enqueueRequestedCanvas = createAction('app/enqueueRequestedCanvas');
 
 const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prepend: boolean) => {
   const { dispatch, getState } = store;
@@ -49,7 +49,7 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
     const base = model.base;
 
     const generationMode = await canvasManager.compositor.getGenerationMode();
-    const graphBuilderArg: GraphBuilderArg = { generationMode, state, canvasManager };
+    const graphBuilderArg: GraphBuilderArg = { generationMode, state, manager: canvasManager };
 
     switch (base) {
       case 'sdxl':
@@ -97,15 +97,15 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
     return;
   }
 
-  const { g, seedFieldIdentifier, positivePromptFieldIdentifier } = buildGraphResult.value;
+  const { g, seed, positivePrompt } = buildGraphResult.value;
 
   const prepareBatchResult = withResult(() =>
     prepareLinearUIBatch({
       state,
       g,
       prepend,
-      seedFieldIdentifier,
-      positivePromptFieldIdentifier,
+      seedNode: seed,
+      positivePromptNode: positivePrompt,
       origin: 'canvas',
       destination,
     })

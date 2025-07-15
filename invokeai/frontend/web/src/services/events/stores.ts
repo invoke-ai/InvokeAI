@@ -16,7 +16,6 @@ export const $lastUpscalingProgressEvent = atom<S['InvocationProgressEvent'] | n
 export const $lastUpscalingProgressImage = atom<EphemeralProgressImage | null>(null);
 
 export const $lastProgressImage = computed($lastProgressEvent, (val) => val?.image ?? null);
-export const $hasLastProgressImage = computed($lastProgressEvent, (val) => Boolean(val?.image));
 export const $lastProgressMessage = computed($lastProgressEvent, (val) => {
   if (!val) {
     return null;

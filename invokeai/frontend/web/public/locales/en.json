@@ -225,7 +225,16 @@
     "prompt": {
         "addPromptTrigger": "Add Prompt Trigger",
         "compatibleEmbeddings": "Compatible Embeddings",
-        "noMatchingTriggers": "No matching triggers"
+        "noMatchingTriggers": "No matching triggers",
+        "generateFromImage": "Generate prompt from image",
+        "expandCurrentPrompt": "Expand Current Prompt",
+        "uploadImageForPromptGeneration": "Upload Image for Prompt Generation",
+        "expandingPrompt": "Expanding prompt...",
+        "resultTitle": "Prompt Expansion Complete",
+        "resultSubtitle": "Choose how to handle the expanded prompt:",
+        "replace": "Replace",
+        "insert": "Insert",
+        "discard": "Discard"
     },
     "queue": {
         "queue": "Queue",
@@ -342,7 +351,7 @@
         "copy": "Copy",
         "currentlyInUse": "This image is currently in use in the following features:",
         "drop": "Drop",
-        "dropOrUpload": "$t(gallery.drop) or Upload",
+        "dropOrUpload": "Drop or Upload",
         "dropToUpload": "$t(gallery.drop) to Upload",
         "deleteImage_one": "Delete Image",
         "deleteImage_other": "Delete {{count}} Images",
@@ -396,7 +405,8 @@
         "compareHelp4": "Press <Kbd>Z</Kbd> or <Kbd>Esc</Kbd> to exit.",
         "openViewer": "Open Viewer",
         "closeViewer": "Close Viewer",
-        "move": "Move"
+        "move": "Move",
+        "useForPromptGeneration": "Use for Prompt Generation"
     },
     "hotkeys": {
         "hotkeys": "Hotkeys",
@@ -760,7 +770,7 @@
         "vae": "VAE",
         "width": "Width",
         "workflow": "Workflow",
-        "canvasV2Metadata": "Canvas"
+        "canvasV2Metadata": "Canvas Layers"
     },
     "modelManager": {
         "active": "active",
@@ -946,7 +956,8 @@
         "selectModel": "Select a Model",
         "noLoRAsInstalled": "No LoRAs installed",
         "noRefinerModelsInstalled": "No SDXL Refiner models installed",
-        "defaultVAE": "Default VAE"
+        "defaultVAE": "Default VAE",
+        "noCompatibleLoRAs": "No Compatible LoRAs"
     },
     "nodes": {
         "arithmeticSequence": "Arithmetic Sequence",
@@ -1196,7 +1207,9 @@
             "canvasIsSelectingObject": "Canvas is busy (selecting object)",
             "noPrompts": "No prompts generated",
             "noNodesInGraph": "No nodes in graph",
-            "systemDisconnected": "System disconnected"
+            "systemDisconnected": "System disconnected",
+            "promptExpansionPending": "Prompt expansion in progress",
+            "promptExpansionResultPending": "Please accept or discard your prompt expansion result"
         },
         "maskBlur": "Mask Blur",
         "negativePromptPlaceholder": "Negative Prompt",
@@ -1394,10 +1407,15 @@
         "fluxFillIncompatibleWithT2IAndI2I": "FLUX Fill is not compatible with Text to Image or Image to Image. Use other FLUX models for these tasks.",
         "imagenIncompatibleGenerationMode": "Google {{model}} supports Text to Image only. Use other models for Image to Image, Inpainting and Outpainting tasks.",
         "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4o supports Text to Image and Image to Image only. Use other models Inpainting and Outpainting tasks.",
-        "fluxKontextIncompatibleGenerationMode": "Flux Kontext supports Text to Image only. Use other models for Image to Image, Inpainting and Outpainting tasks.",
+        "fluxKontextIncompatibleGenerationMode": "FLUX Kontext does not support generation from images placed on the canvas. Re-try using the Reference Image section and disable any Raster Layers.",
         "problemUnpublishingWorkflow": "Problem Unpublishing Workflow",
         "problemUnpublishingWorkflowDescription": "There was a problem unpublishing the workflow. Please try again.",
-        "workflowUnpublished": "Workflow Unpublished"
+        "workflowUnpublished": "Workflow Unpublished",
+        "sentToCanvas": "Sent to Canvas",
+        "sentToUpscale": "Sent to Upscale",
+        "promptGenerationStarted": "Prompt generation started",
+        "uploadAndPromptGenerationFailed": "Failed to upload image and generate prompt",
+        "promptExpansionFailed": "We ran into an issue. Please try prompt expansion again."
     },
     "popovers": {
         "clipSkip": {
@@ -1952,6 +1970,7 @@
         "recalculateRects": "Recalculate Rects",
         "clipToBbox": "Clip Strokes to Bbox",
         "outputOnlyMaskedRegions": "Output Only Generated Regions",
+        "saveAllImagesToGallery": "Save All Images to Gallery",
         "addLayer": "Add Layer",
         "duplicate": "Duplicate",
         "moveToFront": "Move to Front",
@@ -2322,6 +2341,9 @@
                 "label": "Preserve Masked Region",
                 "alert": "Preserving Masked Region"
             },
+            "saveAllImagesToGallery": {
+                "alert": "Saving All Images to Gallery"
+            },
             "isolatedStagingPreview": "Isolated Staging Preview",
             "isolatedPreview": "Isolated Preview",
             "isolatedLayerPreview": "Isolated Layer Preview",
@@ -2350,6 +2372,7 @@
             "newGlobalReferenceImage": "New Global Reference Image",
             "newRegionalReferenceImage": "New Regional Reference Image",
             "newControlLayer": "New Control Layer",
+            "newResizedControlLayer": "New Resized Control Layer",
             "newRasterLayer": "New Raster Layer",
             "newInpaintMask": "New Inpaint Mask",
             "newRegionalGuidance": "New Regional Guidance",
@@ -2367,6 +2390,11 @@
             "saveToGallery": "Save To Gallery",
             "showResultsOn": "Showing Results",
             "showResultsOff": "Hiding Results"
+        },
+        "autoSwitch": {
+            "off": "Off",
+            "switchOnStart": "On Start",
+            "switchOnFinish": "On Finish"
         }
     },
     "upscaling": {
@@ -2542,8 +2570,9 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "Inpainting: Per-mask noise levels and denoise limits.",
-            "Canvas: Smarter aspect ratios for SDXL and improved scroll-to-zoom."
+            "Generate images faster with new Launchpads and a simplified Generate tab.",
+            "Edit with prompts using Flux Kontext Dev.",
+            "Export to PSD, bulk-hide overlays, organize models & images — all in a reimagined interface built for control."
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
@@ -2552,62 +2581,16 @@
     "supportVideos": {
         "supportVideos": "Support Videos",
         "gettingStarted": "Getting Started",
-        "controlCanvas": "Control Canvas",
         "watch": "Watch",
-        "studioSessionsDesc1": "Check out the <StudioSessionsPlaylistLink /> for Invoke deep dives.",
-        "studioSessionsDesc2": "Join our <DiscordLink /> to participate in the live sessions and ask questions. Sessions are uploaded to the playlist the following week.",
+        "studioSessionsDesc": "Join our <DiscordLink /> to participate in the live sessions and ask questions. Sessions are uploaded to the playlist the following week.",
         "videos": {
-            "creatingYourFirstImage": {
-                "title": "Creating Your First Image",
-                "description": "Introduction to creating an image from scratch using Invoke's tools."
+            "gettingStarted": {
+                "title": "Getting Started with Invoke",
+                "description": "Complete video series covering everything you need to know to get started with Invoke, from creating your first image to advanced techniques."
             },
-            "usingControlLayersAndReferenceGuides": {
-                "title": "Using Control Layers and Reference Guides",
-                "description": "Learn how to guide your image creation with control layers and reference images."
-            },
-            "understandingImageToImageAndDenoising": {
-                "title": "Understanding Image-to-Image and Denoising",
-                "description": "Overview of image-to-image transformations and denoising in Invoke."
-            },
-            "exploringAIModelsAndConceptAdapters": {
-                "title": "Exploring AI Models and Concept Adapters",
-                "description": "Dive into AI models and how to use concept adapters for creative control."
-            },
-            "creatingAndComposingOnInvokesControlCanvas": {
-                "title": "Creating and Composing on Invoke's Control Canvas",
-                "description": "Learn to compose images using Invoke's control canvas."
-            },
-            "upscaling": {
-                "title": "Upscaling",
-                "description": "How to upscale images with Invoke's tools to enhance resolution."
-            },
-            "howDoIGenerateAndSaveToTheGallery": {
-                "title": "How Do I Generate and Save to the Gallery?",
-                "description": "Steps to generate and save images to the gallery."
-            },
-            "howDoIEditOnTheCanvas": {
-                "title": "How Do I Edit on the Canvas?",
-                "description": "Guide to editing images directly on the canvas."
-            },
-            "howDoIDoImageToImageTransformation": {
-                "title": "How Do I Do Image-to-Image Transformation?",
-                "description": "Tutorial on performing image-to-image transformations in Invoke."
-            },
-            "howDoIUseControlNetsAndControlLayers": {
-                "title": "How Do I Use Control Nets and Control Layers?",
-                "description": "Learn to apply control layers and controlnets to your images."
-            },
-            "howDoIUseGlobalIPAdaptersAndReferenceImages": {
-                "title": "How Do I Use Global IP Adapters and Reference Images?",
-                "description": "Introduction to adding reference images and global IP adapters."
-            },
-            "howDoIUseInpaintMasks": {
-                "title": "How Do I Use Inpaint Masks?",
-                "description": "How to apply inpaint masks for image correction and variation."
-            },
-            "howDoIOutpaint": {
-                "title": "How Do I Outpaint?",
-                "description": "Guide to outpainting beyond the original image borders."
+            "studioSessions": {
+                "title": "Studio Sessions",
+                "description": "Deep dive sessions exploring advanced Invoke features, creative workflows, and community discussions."
             }
         }
     }

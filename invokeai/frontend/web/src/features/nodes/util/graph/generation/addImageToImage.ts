@@ -1,8 +1,12 @@
 import { objectEquals } from '@observ33r/object-equals';
+import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type { CanvasState, Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import {
+  getDenoisingStartAndEnd,
+  getOriginalAndScaledSizesForOtherModes,
+} from 'features/nodes/util/graph/graphBuilderUtils';
 import type {
   DenoiseLatentsNodes,
   LatentToImageNodes,
@@ -10,37 +14,47 @@ import type {
   VaeSourceNodes,
 } from 'features/nodes/util/graph/types';
 import type { Invocation } from 'services/api/types';
+import { assert } from 'tsafe';
 
 type AddImageToImageArg = {
   g: Graph;
+  state: RootState;
   manager: CanvasManager;
   l2i: Invocation<LatentToImageNodes>;
-  i2lNodeType: 'i2l' | 'flux_vae_encode' | 'sd3_i2l' | 'cogview4_i2l';
+  i2l: Invocation<'i2l' | 'flux_vae_encode' | 'sd3_i2l' | 'cogview4_i2l'>;
+  noise?: Invocation<'noise'>;
   denoise: Invocation<DenoiseLatentsNodes>;
   vaeSource: Invocation<VaeSourceNodes | MainModelLoaderNodes>;
-  originalSize: Dimensions;
-  scaledSize: Dimensions;
-  bbox: CanvasState['bbox'];
-  denoising_start: number;
-  fp32: boolean;
 };
 
 export const addImageToImage = async ({
   g,
+  state,
   manager,
   l2i,
-  i2lNodeType,
+  i2l,
+  noise,
   denoise,
   vaeSource,
-  originalSize,
-  scaledSize,
-  bbox,
-  denoising_start,
-  fp32,
 }: AddImageToImageArg): Promise<Invocation<'img_resize' | 'l2i' | 'flux_vae_decode' | 'sd3_l2i' | 'cogview4_l2i'>> => {
+  const { denoising_start, denoising_end } = getDenoisingStartAndEnd(state);
   denoise.denoising_start = denoising_start;
+  denoise.denoising_end = denoising_end;
+
+  const { originalSize, scaledSize, rect } = getOriginalAndScaledSizesForOtherModes(state);
+
+  if (denoise.type === 'cogview4_denoise' || denoise.type === 'flux_denoise' || denoise.type === 'sd3_denoise') {
+    denoise.width = scaledSize.width;
+    denoise.height = scaledSize.height;
+  } else {
+    assert(denoise.type === 'denoise_latents');
+    assert(noise, 'SD1.5/SD2/SDXL graphs require a noise node to be passed in');
+    noise.width = scaledSize.width;
+    noise.height = scaledSize.height;
+  }
+
   const adapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
-  const { image_name } = await manager.compositor.getCompositeImageDTO(adapters, bbox.rect, {
+  const { image_name } = await manager.compositor.getCompositeImageDTO(adapters, rect, {
     is_intermediate: true,
     silent: true,
   });
@@ -52,13 +66,6 @@ export const addImageToImage = async ({
       id: getPrefixedId('initial_image_resize_in'),
       image: { image_name },
       ...scaledSize,
-    });
-
-    const i2l = g.addNode({
-      id: i2lNodeType,
-      type: i2lNodeType,
-      image: image_name ? { image_name } : undefined,
-      ...(i2lNodeType === 'i2l' ? { fp32 } : {}),
     });
 
     const resizeImageToOriginalSize = g.addNode({
@@ -76,12 +83,7 @@ export const addImageToImage = async ({
     return resizeImageToOriginalSize;
   } else {
     // No need to resize, just decode
-    const i2l = g.addNode({
-      id: i2lNodeType,
-      type: i2lNodeType,
-      image: image_name ? { image_name } : undefined,
-      ...(i2lNodeType === 'i2l' ? { fp32 } : {}),
-    });
+    i2l.image = { image_name };
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
     g.addEdge(i2l, 'latents', denoise, 'latents');
     return l2i;

@@ -2,7 +2,6 @@ import type { Selector } from '@reduxjs/toolkit';
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
-import { selectReferenceImageEntities } from 'features/controlLayers/store/refImagesSlice';
 import type {
   CanvasControlLayerState,
   CanvasEntityIdentifier,
@@ -23,8 +22,7 @@ import { assert } from 'tsafe';
  */
 export const selectCanvasSlice = (state: RootState) => state.canvas.present;
 
-export const createCanvasSelector = <T>(selector: Selector<CanvasState, T>) =>
-  createSelector(selectCanvasSlice, selector);
+const createCanvasSelector = <T>(selector: Selector<CanvasState, T>) => createSelector(selectCanvasSlice, selector);
 
 /**
  * Selects the total canvas entity count:
@@ -65,36 +63,6 @@ export const selectActiveInpaintMaskEntities = createSelector(selectInpaintMaskE
 export const selectRegionalGuidanceEntities = createCanvasSelector((canvas) => canvas.regionalGuidance.entities);
 export const selectActiveRegionalGuidanceEntities = createSelector(selectRegionalGuidanceEntities, (entities) =>
   entities.filter(isVisibleEntity)
-);
-
-/**
- * Selects the total _active_ canvas entity count:
- * - Regions
- * - IP adapters
- * - Raster layers
- * - Control layers
- * - Inpaint masks
- *
- * Active entities are those that are enabled and have at least one object.
- */
-export const selectEntityCountActive = createSelector(
-  selectActiveRasterLayerEntities,
-  selectActiveControlLayerEntities,
-  selectActiveInpaintMaskEntities,
-  selectActiveRegionalGuidanceEntities,
-  (
-    activeRasterLayerEntities,
-    activeControlLayerEntities,
-    activeInpaintMaskEntities,
-    activeRegionalGuidanceEntities
-  ) => {
-    return (
-      activeRasterLayerEntities.length +
-      activeControlLayerEntities.length +
-      activeInpaintMaskEntities.length +
-      activeRegionalGuidanceEntities.length
-    );
-  }
 );
 
 /**
@@ -377,33 +345,14 @@ export const selectBboxModelBase = createSelector(selectBbox, (bbox) => bbox.mod
 
 export const selectCanvasMetadata = createSelector(
   selectCanvasSlice,
-  selectReferenceImageEntities,
-  (canvas, refImageEntities): { canvas_v2_metadata: CanvasMetadata } => {
+  (canvas): { canvas_v2_metadata: CanvasMetadata } => {
     const canvas_v2_metadata: CanvasMetadata = {
-      referenceImages: refImageEntities,
       controlLayers: selectAllEntitiesOfType(canvas, 'control_layer'),
       inpaintMasks: selectAllEntitiesOfType(canvas, 'inpaint_mask'),
       rasterLayers: selectAllEntitiesOfType(canvas, 'raster_layer'),
       regionalGuidance: selectAllEntitiesOfType(canvas, 'regional_guidance'),
     };
     return { canvas_v2_metadata };
-  }
-);
-
-export const selectIsCanvasEmpty = createCanvasSelector(
-  ({ controlLayers, inpaintMasks, rasterLayers, regionalGuidance }) => {
-    // Check it all manually - could use lodash isEqual, but this selector will be called very often!
-    // Also note - we do not care about ref images, as they are technically not part of canvas
-    return (
-      controlLayers.entities.length === 0 &&
-      controlLayers.isHidden === false &&
-      inpaintMasks.entities.length === 0 &&
-      inpaintMasks.isHidden === false &&
-      rasterLayers.entities.length === 0 &&
-      rasterLayers.isHidden === false &&
-      regionalGuidance.entities.length === 0 &&
-      regionalGuidance.isHidden === false
-    );
   }
 );
 

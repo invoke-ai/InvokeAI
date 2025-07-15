@@ -1,8 +1,7 @@
 import { Button, Text, useToast } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
 import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { setActiveTab } from 'features/ui/store/uiSlice';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMainModels } from 'services/api/hooks/modelsByType';
@@ -40,14 +39,13 @@ export const useStarterModelsToast = () => {
 
 const ToastDescription = () => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
   const toast = useToast();
 
   const onClick = useCallback(() => {
-    dispatch(setActiveTab('models'));
+    navigationApi.switchToTab('models');
     setInstallModelsTabByName('launchpad');
     toast.close(TOAST_ID);
-  }, [dispatch, toast]);
+  }, [toast]);
 
   return (
     <Text fontSize="md">

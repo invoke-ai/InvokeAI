@@ -1,22 +1,21 @@
 import type { FocusRegionName } from 'common/hooks/focus';
 import type { IDockviewPanelProps, IGridviewPanelProps } from 'dockview';
 import type { TabName } from 'features/ui/store/uiTypes';
-import type { FunctionComponent, PropsWithChildren, RefObject } from 'react';
+import type { FunctionComponent, PropsWithChildren } from 'react';
 import { createContext, memo, useContext, useMemo } from 'react';
 
 import { AutoLayoutPanelContainer } from './AutoLayoutPanelContainer';
 
 type AutoLayoutContextValue = {
   tab: TabName;
-  rootRef: RefObject<HTMLDivElement>;
 };
 
 const AutoLayoutContext = createContext<AutoLayoutContextValue | null>(null);
 
 export const AutoLayoutProvider = (props: PropsWithChildren<AutoLayoutContextValue>) => {
-  const { tab, rootRef, children } = props;
+  const { tab, children } = props;
 
-  const value = useMemo<AutoLayoutContextValue>(() => ({ tab, rootRef }), [tab, rootRef]);
+  const value = useMemo<AutoLayoutContextValue>(() => ({ tab }), [tab]);
   return <AutoLayoutContext.Provider value={value}>{children}</AutoLayoutContext.Provider>;
 };
 
@@ -28,11 +27,6 @@ export const useAutoLayoutContext = () => {
   return value;
 };
 
-export const useAutoLayoutContextSafe = () => {
-  const value = useContext(AutoLayoutContext);
-  return value;
-};
-
 export type PanelParameters = {
   tab: TabName;
   focusRegion: FocusRegionName;
@@ -41,7 +35,7 @@ export type PanelParameters = {
 export type AutoLayoutGridviewComponents = Record<string, FunctionComponent<IGridviewPanelProps<PanelParameters>>>;
 export type AutoLayoutDockviewComponents = Record<string, FunctionComponent<IDockviewPanelProps<PanelParameters>>>;
 export type RootLayoutGridviewComponents = Record<string, FunctionComponent<IGridviewPanelProps<PanelParameters>>>;
-export type PanelProps = IDockviewPanelProps<PanelParameters> | IGridviewPanelProps<PanelParameters>;
+type PanelProps = IDockviewPanelProps<PanelParameters> | IGridviewPanelProps<PanelParameters>;
 
 export const withPanelContainer = (Component: FunctionComponent) =>
   memo((props: PanelProps) => {

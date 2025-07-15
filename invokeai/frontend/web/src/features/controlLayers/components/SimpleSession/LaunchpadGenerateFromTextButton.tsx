@@ -1,11 +1,10 @@
 import { Flex, Heading, Icon, Text } from '@invoke-ai/ui-library';
 import { LaunchpadButton } from 'features/controlLayers/components/SimpleSession/LaunchpadButton';
-import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
 import { memo, useCallback } from 'react';
 import { PiCursorTextBold, PiTextAaBold } from 'react-icons/pi';
 
-const focusOnPrompt = (el: HTMLElement) => {
-  const promptElement = el.querySelector('.positive-prompt-textarea');
+const focusOnPrompt = () => {
+  const promptElement = document.querySelector('.positive-prompt-textarea');
   if (promptElement instanceof HTMLTextAreaElement) {
     promptElement.focus();
     promptElement.select();
@@ -13,15 +12,10 @@ const focusOnPrompt = (el: HTMLElement) => {
 };
 
 export const LaunchpadGenerateFromTextButton = memo((props: { extraAction?: () => void }) => {
-  const { rootRef } = useAutoLayoutContext();
   const onClick = useCallback(() => {
-    const el = rootRef.current;
-    if (!el) {
-      return;
-    }
-    focusOnPrompt(el);
+    focusOnPrompt();
     props.extraAction?.();
-  }, [props, rootRef]);
+  }, [props]);
   return (
     <LaunchpadButton onClick={onClick} position="relative" gap={8}>
       <Icon as={PiTextAaBold} boxSize={8} color="base.500" />

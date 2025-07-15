@@ -15,14 +15,14 @@ const enqueueUpscaling = async (store: AppStore, prepend: boolean) => {
 
   const state = getState();
 
-  const { g, seedFieldIdentifier, positivePromptFieldIdentifier } = await buildMultidiffusionUpscaleGraph(state);
+  const { g, seed, positivePrompt } = await buildMultidiffusionUpscaleGraph(state);
 
   const batchConfig = prepareLinearUIBatch({
     state,
     g,
     prepend,
-    seedFieldIdentifier,
-    positivePromptFieldIdentifier,
+    seedNode: seed,
+    positivePromptNode: positivePrompt,
     origin: 'upscaling',
     destination: 'gallery',
   });

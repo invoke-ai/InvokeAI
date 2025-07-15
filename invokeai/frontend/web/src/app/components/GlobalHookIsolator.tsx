@@ -1,4 +1,5 @@
 import { useGlobalModifiersInit } from '@invoke-ai/ui-library';
+import { setupListeners } from '@reduxjs/toolkit/query';
 import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
 import { useStudioInitAction } from 'app/hooks/useStudioInitAction';
 import { useSyncQueueStatus } from 'app/hooks/useSyncQueueStatus';
@@ -10,6 +11,7 @@ import type { PartialAppConfig } from 'app/types/invokeai';
 import { useFocusRegionWatcher } from 'common/hooks/focus';
 import { useCloseChakraTooltipsOnDragFix } from 'common/hooks/useCloseChakraTooltipsOnDragFix';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
+import { useDndMonitor } from 'features/dnd/useDndMonitor';
 import { useDynamicPromptsWatcher } from 'features/dynamicPrompts/hooks/useDynamicPromptsWatcher';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
 import { useWorkflowBuilderWatcher } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
@@ -44,6 +46,7 @@ export const GlobalHookIsolator = memo(
     useSyncLoggingConfig();
     useCloseChakraTooltipsOnDragFix();
     useNavigationApi();
+    useDndMonitor();
 
     // Persistent subscription to the queue counts query - canvas relies on this to know if there are pending
     // and/or in progress canvas sessions.
@@ -60,6 +63,10 @@ export const GlobalHookIsolator = memo(
 
     useEffect(() => {
       dispatch(appStarted());
+    }, [dispatch]);
+
+    useEffect(() => {
+      return setupListeners(dispatch);
     }, [dispatch]);
 
     useStudioInitAction(studioInitAction);

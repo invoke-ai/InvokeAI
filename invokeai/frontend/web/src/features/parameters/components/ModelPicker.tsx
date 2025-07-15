@@ -16,9 +16,9 @@ import { useStore } from '@nanostores/react';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { $onClickGoToModelManager } from 'app/store/nanostores/onClickGoToModelManager';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import type { Group, PickerContextState } from 'common/components/Picker/Picker';
-import { buildGroup, getRegex, isOption, Picker, usePickerContext } from 'common/components/Picker/Picker';
+import { buildGroup, getRegex, isGroup, Picker, usePickerContext } from 'common/components/Picker/Picker';
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { typedMemo } from 'common/util/typedMemo';
 import { uniq } from 'es-toolkit/compat';
@@ -29,8 +29,9 @@ import { BASE_COLOR_MAP } from 'features/modelManagerV2/subpanels/ModelManagerPa
 import ModelImage from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelImage';
 import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import { API_BASE_MODELS, MODEL_TYPE_MAP, MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectIsModelsTabDisabled } from 'features/system/store/configSlice';
-import { setActiveTab } from 'features/ui/store/uiSlice';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { filesize } from 'filesize';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
@@ -71,11 +72,10 @@ const getOptionId = <T extends AnyModelConfig>(modelConfig: WithStarred<T>) => m
 
 const ModelManagerLink = memo((props: ButtonProps) => {
   const onClickGoToModelManager = useStore($onClickGoToModelManager);
-  const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
-    dispatch(setActiveTab('models'));
+    navigationApi.switchToTab('models');
     setInstallModelsTabByName('launchpad');
-  }, [dispatch]);
+  }, []);
 
   return (
     <Button
@@ -192,8 +192,12 @@ export const ModelPicker = typedMemo(
   }) => {
     const { t } = useTranslation();
     const selectedKeys = useAppSelector(selectSelectedModelKeys);
+    const isModelRelationshipsEnabled = useFeatureStatus('modelRelationships');
 
-    const { relatedModelKeys } = useGetRelatedModelIdsBatchQuery(selectedKeys, relatedModelKeysQueryOptions);
+    const { relatedModelKeys } = useGetRelatedModelIdsBatchQuery(selectedKeys, {
+      ...relatedModelKeysQueryOptions,
+      skip: !isModelRelationshipsEnabled,
+    });
 
     const options = useMemo<WithStarred<T>[] | Group<WithStarred<T>>[]>(() => {
       if (!grouped) {
@@ -273,8 +277,22 @@ export const ModelPicker = typedMemo(
       if (!selectedModelConfig) {
         return undefined;
       }
+      let _selectedOption: WithStarred<T> | undefined = undefined;
 
-      return options.filter(isOption).find((o) => o.key === selectedModelConfig.key);
+      for (const optionOrGroup of options) {
+        if (isGroup(optionOrGroup)) {
+          const result = optionOrGroup.options.find((o) => o.key === selectedModelConfig.key);
+          if (result) {
+            _selectedOption = result;
+            break;
+          }
+        } else if (optionOrGroup.key === selectedModelConfig.key) {
+          _selectedOption = optionOrGroup;
+          break;
+        }
+      }
+
+      return _selectedOption;
     }, [options, selectedModelConfig]);
 
     const onClose = useCallback(() => {
@@ -357,9 +375,19 @@ const optionSx: SystemStyleObject = {
   cursor: 'pointer',
   borderRadius: 'base',
   '&[data-selected="true"]': {
-    bg: 'base.700',
+    bg: 'invokeBlue.300',
+    color: 'base.900',
+    '.extra-info': {
+      color: 'base.700',
+    },
+    '.picker-option': {
+      fontWeight: 'bold',
+      '&[data-is-compact="true"]': {
+        fontWeight: 'semibold',
+      },
+    },
     '&[data-active="true"]': {
-      bg: 'base.650',
+      bg: 'invokeBlue.250',
     },
   },
   '&[data-active="true"]': {
@@ -396,17 +424,31 @@ const PickerOptionComponent = typedMemo(
         <Flex flexDir="column" gap={1} flex={1}>
           <Flex gap={2} alignItems="center">
             {option.starred && <Icon as={PiLinkSimple} color="invokeYellow.500" boxSize={4} />}
-            <Text sx={optionNameSx} data-is-compact={compactView}>
+            <Text className="picker-option" sx={optionNameSx} data-is-compact={compactView}>
               {option.name}
             </Text>
             <Spacer />
             {option.file_size > 0 && (
-              <Text variant="subtext" fontStyle="italic" noOfLines={1} flexShrink={0} overflow="visible">
+              <Text
+                className="extra-info"
+                variant="subtext"
+                fontStyle="italic"
+                noOfLines={1}
+                flexShrink={0}
+                overflow="visible"
+              >
                 {filesize(option.file_size)}
               </Text>
             )}
             {option.usage_info && (
-              <Text variant="subtext" fontStyle="italic" noOfLines={1} flexShrink={0} overflow="visible">
+              <Text
+                className="extra-info"
+                variant="subtext"
+                fontStyle="italic"
+                noOfLines={1}
+                flexShrink={0}
+                overflow="visible"
+              >
                 {option.usage_info}
               </Text>
             )}

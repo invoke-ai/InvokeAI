@@ -11,6 +11,7 @@ import {
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasState, RefImagesState } from 'features/controlLayers/store/types';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
+import { selectGetImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { fieldImageCollectionValueChanged, fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
@@ -79,11 +80,18 @@ const handleDeletions = async (image_names: string[], store: AppStore) => {
   try {
     const { dispatch, getState } = store;
     const state = getState();
-    await dispatch(imagesApi.endpoints.deleteImages.initiate({ image_names }, { track: false })).unwrap();
+    const { data } = imagesApi.endpoints.getImageNames.select(selectGetImageNamesQueryArgs(state))(state);
+    const index = data?.image_names.findIndex((name) => name === image_names[0]);
+    const { deleted_images } = await dispatch(
+      imagesApi.endpoints.deleteImages.initiate({ image_names }, { track: false })
+    ).unwrap();
+
+    const newImageNames = data?.image_names.filter((name) => !deleted_images.includes(name)) || [];
+    const newSelectedImage = newImageNames[index ?? 0] || null;
 
     if (intersection(state.gallery.selection, image_names).length > 0) {
       // Some selected images were deleted, clear selection
-      dispatch(imageSelected(null));
+      dispatch(imageSelected(newSelectedImage));
     }
 
     // We need to reset the features where the image is in use - none of these work if their image(s) don't exist

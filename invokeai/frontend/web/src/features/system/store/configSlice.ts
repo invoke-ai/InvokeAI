@@ -3,8 +3,6 @@ import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { AppConfig, NumericalParameterConfig, PartialAppConfig } from 'app/types/invokeai';
 import { merge } from 'es-toolkit/compat';
-import type { TabName } from 'features/ui/store/uiTypes';
-import { ALL_TABS } from 'features/ui/store/uiTypes';
 
 const baseDimensionConfig: NumericalParameterConfig = {
   initial: 512, // determined by model selection, unused in practice
@@ -25,6 +23,7 @@ const initialConfigState: AppConfig & { didLoad: boolean } = {
   allowPrivateStylePresets: false,
   allowClientSideUpload: false,
   allowPublishWorkflows: false,
+  allowPromptExpansion: false,
   shouldShowCredits: false,
   disabledTabs: [],
   disabledFeatures: ['lightbox', 'faceRestore', 'batches'],
@@ -228,17 +227,9 @@ export const selectMetadataFetchDebounce = createConfigSelector((config) => conf
 export const selectIsModelsTabDisabled = createConfigSelector((config) => config.disabledTabs.includes('models'));
 export const selectIsClientSideUploadEnabled = createConfigSelector((config) => config.allowClientSideUpload);
 export const selectAllowPublishWorkflows = createConfigSelector((config) => config.allowPublishWorkflows);
+export const selectAllowPromptExpansion = createConfigSelector((config) => config.allowPromptExpansion);
 export const selectIsLocal = createSelector(selectConfigSlice, (config) => config.isLocal);
 export const selectShouldShowCredits = createConfigSelector((config) => config.shouldShowCredits);
-export const selectEnabledTabs = createConfigSelector((config) => {
-  const enabledTabs: TabName[] = [];
-  for (const tab of ALL_TABS) {
-    if (!config.disabledTabs.includes(tab)) {
-      enabledTabs.push(tab);
-    }
-  }
-  return enabledTabs;
-});
 const selectDisabledTabs = createConfigSelector((config) => config.disabledTabs);
 const selectDidLoad = createConfigSelector((config) => config.didLoad);
 export const selectWithGenerateTab = createSelector(selectDidLoad, selectDisabledTabs, (didLoad, disabledTabs) =>

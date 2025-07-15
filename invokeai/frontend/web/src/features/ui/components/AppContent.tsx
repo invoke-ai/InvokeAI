@@ -1,9 +1,10 @@
 import 'dockview/dist/styles/dockview.css';
 import 'features/ui/styles/dockview-theme-invoke.css';
 
-import { TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
+import { Flex } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useDndMonitor } from 'features/dnd/useDndMonitor';
+import Loading from 'common/components/Loading/Loading';
 import {
   selectWithCanvasTab,
   selectWithGenerateTab,
@@ -15,17 +16,26 @@ import {
 import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
 import { CanvasTabAutoLayout } from 'features/ui/layouts/canvas-tab-auto-layout';
 import { GenerateTabAutoLayout } from 'features/ui/layouts/generate-tab-auto-layout';
+import { ModelsTabAutoLayout } from 'features/ui/layouts/models-tab-auto-layout';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
+import { QueueTabAutoLayout } from 'features/ui/layouts/queue-tab-auto-layout';
 import { UpscalingTabAutoLayout } from 'features/ui/layouts/upscaling-tab-auto-layout';
 import { WorkflowsTabAutoLayout } from 'features/ui/layouts/workflows-tab-auto-layout';
-import { selectActiveTabIndex } from 'features/ui/store/uiSelectors';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 
-import ModelManagerTab from './tabs/ModelManagerTab';
-import QueueTab from './tabs/QueueTab';
-
 export const AppContent = memo(() => {
-  useDndMonitor();
-  const tabIndex = useAppSelector(selectActiveTabIndex);
+  return (
+    <Flex position="relative" w="full" h="full" overflow="hidden">
+      <VerticalNavBar />
+      <TabContent />
+    </Flex>
+  );
+});
+AppContent.displayName = 'AppContent';
+
+const TabContent = memo(() => {
+  const tab = useAppSelector(selectActiveTab);
   const withGenerateTab = useAppSelector(selectWithGenerateTab);
   const withCanvasTab = useAppSelector(selectWithCanvasTab);
   const withUpscalingTab = useAppSelector(selectWithUpscalingTab);
@@ -34,41 +44,26 @@ export const AppContent = memo(() => {
   const withQueueTab = useAppSelector(selectWithQueueTab);
 
   return (
-    <Tabs index={tabIndex} display="flex" w="full" h="full" p={0} overflow="hidden">
-      <VerticalNavBar />
-      <TabPanels w="full" h="full" p={0}>
-        {withGenerateTab && (
-          <TabPanel w="full" h="full" p={0}>
-            <GenerateTabAutoLayout />
-          </TabPanel>
-        )}
-        {withCanvasTab && (
-          <TabPanel w="full" h="full" p={0}>
-            <CanvasTabAutoLayout />
-          </TabPanel>
-        )}
-        {withUpscalingTab && (
-          <TabPanel w="full" h="full" p={0}>
-            <UpscalingTabAutoLayout />
-          </TabPanel>
-        )}
-        {withWorkflowsTab && (
-          <TabPanel w="full" h="full" p={0}>
-            <WorkflowsTabAutoLayout />
-          </TabPanel>
-        )}
-        {withModelsTab && (
-          <TabPanel w="full" h="full" p={0}>
-            <ModelManagerTab />
-          </TabPanel>
-        )}
-        {withQueueTab && (
-          <TabPanel w="full" h="full" p={0}>
-            <QueueTab />
-          </TabPanel>
-        )}
-      </TabPanels>
-    </Tabs>
+    <Flex position="relative" w="full" h="full" overflow="hidden">
+      {withGenerateTab && tab === 'generate' && <GenerateTabAutoLayout />}
+      {withCanvasTab && tab === 'canvas' && <CanvasTabAutoLayout />}
+      {withUpscalingTab && tab === 'upscaling' && <UpscalingTabAutoLayout />}
+      {withWorkflowsTab && tab === 'workflows' && <WorkflowsTabAutoLayout />}
+      {withModelsTab && tab === 'models' && <ModelsTabAutoLayout />}
+      {withQueueTab && tab === 'queue' && <QueueTabAutoLayout />}
+      <SwitchingTabsLoader />
+    </Flex>
   );
 });
-AppContent.displayName = 'AppContent';
+TabContent.displayName = 'TabContent';
+
+const SwitchingTabsLoader = memo(() => {
+  const isSwitchingTabs = useStore(navigationApi.$isLoading);
+
+  if (isSwitchingTabs) {
+    return <Loading />;
+  }
+
+  return null;
+});
+SwitchingTabsLoader.displayName = 'SwitchingTabsLoader';

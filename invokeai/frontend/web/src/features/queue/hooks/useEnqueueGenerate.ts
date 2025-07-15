@@ -27,7 +27,7 @@ import { assert, AssertionError } from 'tsafe';
 
 const log = logger('generation');
 
-export const enqueueRequestedGenerate = createAction('app/enqueueRequestedGenerate');
+const enqueueRequestedGenerate = createAction('app/enqueueRequestedGenerate');
 
 const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
   const { dispatch, getState } = store;
@@ -47,7 +47,7 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
     assert(model, 'No model found in state');
     const base = model.base;
 
-    const graphBuilderArg: GraphBuilderArg = { generationMode: 'txt2img', state };
+    const graphBuilderArg: GraphBuilderArg = { generationMode: 'txt2img', state, manager: null };
 
     switch (base) {
       case 'sdxl':
@@ -95,15 +95,15 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
     return;
   }
 
-  const { g, seedFieldIdentifier, positivePromptFieldIdentifier } = buildGraphResult.value;
+  const { g, seed, positivePrompt } = buildGraphResult.value;
 
   const prepareBatchResult = withResult(() =>
     prepareLinearUIBatch({
       state,
       g,
       prepend,
-      seedFieldIdentifier,
-      positivePromptFieldIdentifier,
+      seedNode: seed,
+      positivePromptNode: positivePrompt,
       origin: 'canvas',
       destination,
     })

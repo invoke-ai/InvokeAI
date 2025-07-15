@@ -8,7 +8,7 @@ import { paramsReset } from 'features/controlLayers/store/paramsSlice';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { sentImageToCanvas } from 'features/gallery/store/actions';
-import { parseAndRecallAllMetadata } from 'features/metadata/util/handlers';
+import { MetadataUtils } from 'features/metadata/parsing';
 import { $hasTemplates } from 'features/nodes/store/nodesSlice';
 import { $isWorkflowLibraryModalOpen } from 'features/nodes/store/workflowLibraryModal';
 import {
@@ -19,7 +19,9 @@ import {
 } from 'features/nodes/store/workflowLibrarySlice';
 import { $isStylePresetsMenuOpen, activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
 import { toast } from 'features/toast/toast';
-import { activeTabCanvasRightPanelChanged, setActiveTab } from 'features/ui/store/uiSlice';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
+import { LAUNCHPAD_PANEL_ID, WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
+import { activeTabCanvasRightPanelChanged } from 'features/ui/store/uiSlice';
 import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import { atom } from 'nanostores';
 import { useCallback, useEffect } from 'react';
@@ -90,6 +92,7 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
       const overrides: Partial<CanvasRasterLayerState> = {
         objects: [imageObject],
       };
+      await navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
       store.dispatch(canvasReset());
       store.dispatch(rasterLayerAdded({ overrides, isSelected: true }));
       store.dispatch(sentImageToCanvas());
@@ -116,23 +119,23 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
       const metadata = getImageMetadataResult.value;
       store.dispatch(canvasReset());
       // This shows a toast
-      await parseAndRecallAllMetadata(metadata, true);
+      await MetadataUtils.recallAll(metadata, store);
     },
     [store, t]
   );
 
   const handleLoadWorkflow = useCallback(
-    async (workflowId: string) => {
+    (workflowId: string) => {
       // This shows a toast
-      await loadWorkflowWithDialog({
+      loadWorkflowWithDialog({
         type: 'library',
         data: workflowId,
         onSuccess: () => {
-          store.dispatch(setActiveTab('workflows'));
+          navigationApi.switchToTab('workflows');
         },
       });
     },
-    [loadWorkflowWithDialog, store]
+    [loadWorkflowWithDialog]
   );
 
   const handleSelectStylePreset = useCallback(
@@ -146,7 +149,7 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
         return;
       }
       store.dispatch(activeStylePresetIdChanged(stylePresetId));
-      store.dispatch(setActiveTab('canvas'));
+      navigationApi.switchToTab('canvas');
       toast({
         title: t('toast.stylePresetLoaded'),
         status: 'info',
@@ -156,33 +159,34 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
   );
 
   const handleGoToDestination = useCallback(
-    (destination: StudioDestinationAction['data']['destination']) => {
+    async (destination: StudioDestinationAction['data']['destination']) => {
       switch (destination) {
         case 'generation':
-          // Go to the canvas tab, open the image viewer, and enable send-to-gallery mode
+          // Go to the generate tab, open the launchpad
+          await navigationApi.focusPanel('generate', LAUNCHPAD_PANEL_ID);
           store.dispatch(paramsReset());
           store.dispatch(activeTabCanvasRightPanelChanged('gallery'));
           break;
         case 'canvas':
-          // Go to the canvas tab, close the image viewer, and disable send-to-gallery mode
-          store.dispatch(canvasReset());
+          // Go to the canvas tab, open the launchpad
+          await navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
           break;
         case 'workflows':
           // Go to the workflows tab
-          store.dispatch(setActiveTab('workflows'));
+          navigationApi.switchToTab('workflows');
           break;
         case 'upscaling':
           // Go to the upscaling tab
-          store.dispatch(setActiveTab('upscaling'));
+          navigationApi.switchToTab('upscaling');
           break;
         case 'viewAllWorkflows':
           // Go to the workflows tab and open the workflow library modal
-          store.dispatch(setActiveTab('workflows'));
+          navigationApi.switchToTab('workflows');
           $isWorkflowLibraryModalOpen.set(true);
           break;
         case 'viewAllWorkflowsRecommended':
           // Go to the workflows tab and open the workflow library modal with the recommended workflows view
-          store.dispatch(setActiveTab('workflows'));
+          navigationApi.switchToTab('workflows');
           $isWorkflowLibraryModalOpen.set(true);
           store.dispatch(workflowLibraryViewChanged('defaults'));
           store.dispatch(workflowLibraryTagsReset());
@@ -194,7 +198,7 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
           break;
         case 'viewAllStylePresets':
           // Go to the canvas tab and open the style presets menu
-          store.dispatch(setActiveTab('canvas'));
+          navigationApi.switchToTab('canvas');
           $isStylePresetsMenuOpen.set(true);
           break;
       }

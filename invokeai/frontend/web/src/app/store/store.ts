@@ -17,7 +17,6 @@ import { paramsPersistConfig, paramsSlice } from 'features/controlLayers/store/p
 import { refImagesPersistConfig, refImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { dynamicPromptsPersistConfig, dynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { galleryPersistConfig, gallerySlice } from 'features/gallery/store/gallerySlice';
-import { hrfPersistConfig, hrfSlice } from 'features/hrf/store/hrfSlice';
 import { modelManagerV2PersistConfig, modelManagerV2Slice } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { nodesPersistConfig, nodesSlice, nodesUndoableConfig } from 'features/nodes/store/nodesSlice';
 import { workflowLibraryPersistConfig, workflowLibrarySlice } from 'features/nodes/store/workflowLibrarySlice';
@@ -57,7 +56,6 @@ const allReducers = {
   [changeBoardModalSlice.name]: changeBoardModalSlice.reducer,
   [modelManagerV2Slice.name]: modelManagerV2Slice.reducer,
   [queueSlice.name]: queueSlice.reducer,
-  [hrfSlice.name]: hrfSlice.reducer,
   [canvasSlice.name]: undoable(canvasSlice.reducer, canvasUndoableConfig),
   [workflowSettingsSlice.name]: workflowSettingsSlice.reducer,
   [upscaleSlice.name]: upscaleSlice.reducer,
@@ -103,7 +101,6 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [uiPersistConfig.name]: uiPersistConfig,
   [dynamicPromptsPersistConfig.name]: dynamicPromptsPersistConfig,
   [modelManagerV2PersistConfig.name]: modelManagerV2PersistConfig,
-  [hrfPersistConfig.name]: hrfPersistConfig,
   [canvasPersistConfig.name]: canvasPersistConfig,
   [workflowSettingsPersistConfig.name]: workflowSettingsPersistConfig,
   [upscalePersistConfig.name]: upscalePersistConfig,

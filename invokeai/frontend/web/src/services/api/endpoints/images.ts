@@ -4,18 +4,17 @@ import { getStore } from 'app/store/nanostores/store';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import type { components, paths } from 'services/api/schema';
 import type {
+  GetImageNamesArgs,
+  GetImageNamesResult,
   GraphAndWorkflowResponse,
-  ImageCategory,
   ImageDTO,
-  ImageNamesResult,
   ImageUploadEntryRequest,
   ImageUploadEntryResponse,
   ListImagesArgs,
   ListImagesResponse,
-  SQLiteDirection,
   UploadImageArg,
 } from 'services/api/types';
-import { getCategories, getListImagesUrl } from 'services/api/util';
+import { getListImagesUrl } from 'services/api/util';
 import stableHash from 'stable-hash';
 import type { Param0 } from 'tsafe';
 import type { JsonObject } from 'type-fest';
@@ -264,31 +263,19 @@ export const imagesApi = api.injectEndpoints({
           },
         };
       },
-
       invalidatesTags: (result) => {
         if (!result || result.is_intermediate) {
           // Don't add it to anything
           return [];
         }
-        const categories = getCategories(result);
         const boardId = result.board_id ?? 'none';
 
         return [
-          {
-            type: 'ImageList',
-            id: getListImagesUrl({
-              board_id: boardId,
-              categories,
-            }),
-          },
-          {
-            type: 'Board',
-            id: boardId,
-          },
-          {
-            type: 'BoardImagesTotal',
-            id: boardId,
-          },
+          ...getTagsToInvalidateForImageMutation([result.image_name]),
+          ...getTagsToInvalidateForBoardAffectingMutation([boardId]),
+          'ImageCollectionCounts',
+          { type: 'ImageCollection', id: LIST_TAG },
+          'ImageNameList',
         ];
       },
     }),
@@ -431,16 +418,7 @@ export const imagesApi = api.injectEndpoints({
     /**
      * Get ordered list of image names for selection operations
      */
-    getImageNames: build.query<
-      ImageNamesResult,
-      {
-        categories?: ImageCategory[] | null;
-        is_intermediate?: boolean | null;
-        board_id?: string | null;
-        search_term?: string | null;
-        order_dir?: SQLiteDirection;
-      }
-    >({
+    getImageNames: build.query<GetImageNamesResult, GetImageNamesArgs>({
       query: (queryArgs) => ({
         url: buildImagesUrl('names', queryArgs),
         method: 'GET',
@@ -613,7 +591,7 @@ export const useImageDTO = (imageName: string | null | undefined) => {
   return imageDTO ?? null;
 };
 
-export const getTagsToInvalidateForImageMutation = (image_names: string[]): ApiTagDescription[] => {
+const getTagsToInvalidateForImageMutation = (image_names: string[]): ApiTagDescription[] => {
   const tags: ApiTagDescription[] = [];
 
   for (const image_name of image_names) {
@@ -634,7 +612,7 @@ export const getTagsToInvalidateForImageMutation = (image_names: string[]): ApiT
   return tags;
 };
 
-export const getTagsToInvalidateForBoardAffectingMutation = (affected_boards: string[]): ApiTagDescription[] => {
+const getTagsToInvalidateForBoardAffectingMutation = (affected_boards: string[]): ApiTagDescription[] => {
   const tags: ApiTagDescription[] = ['ImageNameList'];
 
   for (const board_id of affected_boards) {

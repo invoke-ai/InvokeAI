@@ -9,7 +9,7 @@ import { uniq } from 'es-toolkit/compat';
 import type { Language, SystemState } from './types';
 
 const initialSystemState: SystemState = {
-  _version: 1,
+  _version: 2,
   shouldConfirmOnDelete: true,
   shouldAntialiasProgressImage: false,
   shouldConfirmOnNewSession: true,
@@ -95,6 +95,10 @@ export const {
 const migrateSystemState = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
+  }
+  if (state._version === 1) {
+    state.language = (state as SystemState).language.replace('_', '-');
+    state._version = 2;
   }
   return state;
 };

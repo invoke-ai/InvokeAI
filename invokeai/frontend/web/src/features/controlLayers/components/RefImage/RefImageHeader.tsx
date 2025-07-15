@@ -4,9 +4,17 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useRefImageEntity } from 'features/controlLayers/components/RefImage/useRefImageEntity';
 import { useRefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
-import { refImageDeleted, selectRefImageEntityIds } from 'features/controlLayers/store/refImagesSlice';
+import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
+import {
+  refImageDeleted,
+  refImageIsEnabledToggled,
+  selectRefImageEntityIds,
+} from 'features/controlLayers/store/refImagesSlice';
+import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { memo, useCallback, useMemo } from 'react';
-import { PiTrashBold } from 'react-icons/pi';
+import { PiCircleBold, PiCircleFill, PiTrashBold, PiWarningBold } from 'react-icons/pi';
+
+import { RefImageWarningTooltipContent } from './RefImageWarningTooltipContent';
 
 const textSx: SystemStyleObject = {
   color: 'base.300',
@@ -24,8 +32,18 @@ export const RefImageHeader = memo(() => {
   );
   const refImageNumber = useAppSelector(selectRefImageNumber);
   const entity = useRefImageEntity(id);
+  const mainModelConfig = useAppSelector(selectMainModelConfig);
+
+  const warnings = useMemo(() => {
+    return getGlobalReferenceImageWarnings(entity, mainModelConfig);
+  }, [entity, mainModelConfig]);
+
   const deleteRefImage = useCallback(() => {
     dispatch(refImageDeleted({ id }));
+  }, [dispatch, id]);
+
+  const toggleIsEnabled = useCallback(() => {
+    dispatch(refImageIsEnabledToggled({ id }));
   }, [dispatch, id]);
 
   return (
@@ -33,16 +51,44 @@ export const RefImageHeader = memo(() => {
       <Text fontWeight="semibold" sx={textSx} data-is-error={!entity.config.image}>
         Reference Image #{refImageNumber}
       </Text>
-      <IconButton
-        tooltip="Delete Reference Image"
-        size="xs"
-        variant="link"
-        alignSelf="stretch"
-        aria-label="Delete ref image"
-        onClick={deleteRefImage}
-        icon={<PiTrashBold />}
-        colorScheme="error"
-      />
+      <Flex alignItems="center" gap={1}>
+        {warnings.length > 0 && (
+          <IconButton
+            as="span"
+            size="sm"
+            variant="link"
+            alignSelf="stretch"
+            aria-label="warnings"
+            tooltip={<RefImageWarningTooltipContent warnings={warnings} />}
+            icon={<PiWarningBold />}
+            colorScheme="warning"
+          />
+        )}
+        {!entity.isEnabled && (
+          <Text fontSize="xs" fontStyle="italic" color="base.400">
+            Disabled
+          </Text>
+        )}
+        <IconButton
+          tooltip={entity.isEnabled ? 'Disable Reference Image' : 'Enable Reference Image'}
+          size="xs"
+          variant="link"
+          alignSelf="stretch"
+          aria-label={entity.isEnabled ? 'Disable ref image' : 'Enable ref image'}
+          onClick={toggleIsEnabled}
+          icon={entity.isEnabled ? <PiCircleFill /> : <PiCircleBold />}
+        />
+        <IconButton
+          tooltip="Delete Reference Image"
+          size="xs"
+          variant="link"
+          alignSelf="stretch"
+          aria-label="Delete ref image"
+          onClick={deleteRefImage}
+          icon={<PiTrashBold />}
+          colorScheme="error"
+        />
+      </Flex>
     </Flex>
   );
 });

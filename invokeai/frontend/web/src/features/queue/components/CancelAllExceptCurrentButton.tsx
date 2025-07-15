@@ -5,27 +5,23 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXCircle } from 'react-icons/pi';
 
-type Props = ButtonProps;
-
-export const CancelAllExceptCurrentButton = memo((props: Props) => {
+export const CancelAllExceptCurrentButton = memo((props: ButtonProps) => {
   const { t } = useTranslation();
-  const cancelAllExceptCurrent = useCancelAllExceptCurrentQueueItemDialog();
+  const api = useCancelAllExceptCurrentQueueItemDialog();
 
   return (
-    <>
-      <Button
-        onClick={cancelAllExceptCurrent.openDialog}
-        isLoading={cancelAllExceptCurrent.isLoading}
-        isDisabled={cancelAllExceptCurrent.isDisabled}
-        tooltip={t('queue.cancelAllExceptCurrentTooltip')}
-        leftIcon={<PiXCircle />}
-        colorScheme="error"
-        data-testid={t('queue.clear')}
-        {...props}
-      >
-        {t('queue.clear')}
-      </Button>
-    </>
+    <Button
+      isDisabled={api.isDisabled}
+      isLoading={api.isLoading}
+      aria-label={t('queue.clear')}
+      tooltip={t('queue.cancelAllExceptCurrentTooltip')}
+      leftIcon={<PiXCircle />}
+      colorScheme="error"
+      onClick={api.openDialog}
+      {...props}
+    >
+      {t('queue.clear')}
+    </Button>
   );
 });
 

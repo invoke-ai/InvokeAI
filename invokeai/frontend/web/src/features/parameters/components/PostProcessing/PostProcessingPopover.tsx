@@ -15,7 +15,7 @@ import { setInstallModelsTabByName } from 'features/modelManagerV2/store/install
 import ParamPostProcessingModel from 'features/parameters/components/PostProcessing/ParamPostProcessingModel';
 import { selectPostProcessingModel } from 'features/parameters/store/upscaleSlice';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
-import { setActiveTab } from 'features/ui/store/uiSlice';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { memo, useCallback } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiFrameCornersBold } from 'react-icons/pi';
@@ -74,12 +74,10 @@ export const PostProcessingPopover = memo((props: Props) => {
 PostProcessingPopover.displayName = 'PostProcessingPopover';
 
 const MissingModelWarning = () => {
-  const dispatch = useAppDispatch();
-
   const handleGoToModelManager = useCallback(() => {
-    dispatch(setActiveTab('models'));
+    navigationApi.switchToTab('models');
     setInstallModelsTabByName('launchpad');
-  }, [dispatch]);
+  }, []);
 
   return (
     <Flex bg="error.500" borderRadius="base" padding={4} direction="column" fontSize="sm" gap={2}>

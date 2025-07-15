@@ -1,3 +1,4 @@
+import type { SpinnerProps } from '@invoke-ai/ui-library';
 import { Spinner } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
@@ -5,7 +6,7 @@ import { useAllEntityAdapters } from 'features/controlLayers/contexts/EntityAdap
 import { computed } from 'nanostores';
 import { memo, useMemo } from 'react';
 
-export const CanvasBusySpinner = memo(() => {
+export const CanvasBusySpinner = memo((props: SpinnerProps) => {
   const canvasManager = useCanvasManager();
   const allEntityAdapters = useAllEntityAdapters();
   const $isPendingRectCalculation = useMemo(
@@ -21,7 +22,7 @@ export const CanvasBusySpinner = memo(() => {
   const isCompositing = useStore(canvasManager.compositor.$isBusy);
 
   if (isRasterizing || isCompositing || isPendingRectCalculation) {
-    return <Spinner opacity={0.3} />;
+    return <Spinner opacity={0.3} {...props} />;
   }
   return null;
 });

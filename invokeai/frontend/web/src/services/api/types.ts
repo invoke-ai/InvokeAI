@@ -7,12 +7,11 @@ export type S = components['schemas'];
 export type ListImagesArgs = NonNullable<paths['/api/v1/images/']['get']['parameters']['query']>;
 export type ListImagesResponse = paths['/api/v1/images/']['get']['responses']['200']['content']['application/json'];
 
-export type ImageNamesResult = S['ImageNamesResult'];
+export type GetImageNamesResult =
+  paths['/api/v1/images/names']['get']['responses']['200']['content']['application/json'];
+export type GetImageNamesArgs = NonNullable<paths['/api/v1/images/names']['get']['parameters']['query']>;
 
 export type ListBoardsArgs = NonNullable<paths['/api/v1/boards/']['get']['parameters']['query']>;
-
-export type DeleteBoardResult =
-  paths['/api/v1/boards/{board_id}']['delete']['responses']['200']['content']['application/json'];
 
 export type CreateBoardArg = paths['/api/v1/boards/']['post']['parameters']['query'];
 
@@ -69,6 +68,8 @@ export type SigLipModelConfig = S['SigLIPConfig'];
 export type FLUXReduxModelConfig = S['FluxReduxConfig'];
 export type ApiModelConfig = S['ApiModelConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig | ApiModelConfig;
+export type FLUXKontextModelConfig = MainModelConfig;
+export type ChatGPT4oModelConfig = ApiModelConfig;
 export type AnyModelConfig =
   | ControlLoRAModelConfig
   | LoRAModelConfig
@@ -230,7 +231,7 @@ export const isFluxReduxModelConfig = (config: AnyModelConfig): config is FLUXRe
   return config.type === 'flux_redux';
 };
 
-export const isChatGPT4oModelConfig = (config: AnyModelConfig): config is ApiModelConfig => {
+export const isChatGPT4oModelConfig = (config: AnyModelConfig): config is ChatGPT4oModelConfig => {
   return config.type === 'main' && config.base === 'chatgpt-4o';
 };
 
@@ -242,8 +243,12 @@ export const isImagen4ModelConfig = (config: AnyModelConfig): config is ApiModel
   return config.type === 'main' && config.base === 'imagen4';
 };
 
-export const isFluxKontextModelConfig = (config: AnyModelConfig): config is ApiModelConfig => {
+export const isFluxKontextApiModelConfig = (config: AnyModelConfig): config is ApiModelConfig => {
   return config.type === 'main' && config.base === 'flux-kontext';
+};
+
+export const isFluxKontextModelConfig = (config: AnyModelConfig): config is FLUXKontextModelConfig => {
+  return config.type === 'main' && config.base === 'flux' && config.name.toLowerCase().includes('kontext');
 };
 
 export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
@@ -315,6 +320,15 @@ export type Invocation<T extends InvocationType> = Extract<AnyInvocation, { type
 type NonInputFields = 'id' | 'type' | 'is_intermediate' | 'use_cache' | 'board' | 'metadata';
 export type AnyInvocationInputField = Exclude<KeysOfUnion<Required<AnyInvocation>>, NonInputFields>;
 export type InputFields<T extends AnyInvocation> = Extract<keyof T, AnyInvocationInputField>;
+
+type ExcludeIndexSignature<T> = {
+  [K in keyof T as string extends K ? never : K]: T[K];
+};
+
+export type CoreMetadataFields = Exclude<
+  keyof ExcludeIndexSignature<components['schemas']['CoreMetadataInvocation']>,
+  NonInputFields
+>;
 
 type NonOutputFields = 'type';
 export type AnyInvocationOutputField = Exclude<KeysOfUnion<Required<AnyInvocationOutput>>, NonOutputFields>;

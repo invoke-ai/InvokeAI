@@ -1,8 +1,8 @@
 import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { GenerationMode } from 'features/controlLayers/store/types';
-import type { FieldIdentifier } from 'features/nodes/types/field';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import type { Invocation } from 'services/api/types';
 
 export type ImageOutputNodes =
   | 'l2i'
@@ -30,21 +30,16 @@ export type MainModelLoaderNodes =
 
 export type VaeSourceNodes = 'seamless' | 'vae_loader';
 
-export type GraphBuilderArg =
-  | {
-      generationMode: Extract<GenerationMode, 'txt2img'>;
-      state: RootState;
-    }
-  | {
-      generationMode: Exclude<GenerationMode, 'txt2img'>;
-      state: RootState;
-      canvasManager: CanvasManager;
-    };
+export type GraphBuilderArg = {
+  generationMode: GenerationMode;
+  state: RootState;
+  manager: CanvasManager | null;
+};
 
 export type GraphBuilderReturn = {
   g: Graph;
-  seedFieldIdentifier?: FieldIdentifier;
-  positivePromptFieldIdentifier: FieldIdentifier;
+  seed?: Invocation<'integer'>;
+  positivePrompt: Invocation<'string'>;
 };
 
 export class UnsupportedGenerationModeError extends Error {

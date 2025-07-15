@@ -9,22 +9,38 @@ import {
   Switch,
   Text,
 } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { createSelector } from '@reduxjs/toolkit';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { loraDeleted, loraIsEnabledChanged, loraWeightChanged } from 'features/controlLayers/store/lorasSlice';
+import {
+  loraDeleted,
+  loraIsEnabledChanged,
+  loraWeightChanged,
+  selectLoRAsSlice,
+} from 'features/controlLayers/store/lorasSlice';
 import type { LoRA } from 'features/controlLayers/store/types';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
 
-type LoRACardProps = {
-  lora: LoRA;
-};
-
 const marks = [-1, 0, 1, 2];
 
-export const LoRACard = memo((props: LoRACardProps) => {
-  const { lora } = props;
+export const LoRACard = memo((props: { id: string }) => {
+  const selectLoRA = useMemo(
+    () => createSelector(selectLoRAsSlice, ({ loras }) => loras.find(({ id }) => id === props.id)),
+    [props.id]
+  );
+  const lora = useAppSelector(selectLoRA);
+
+  if (!lora) {
+    return null;
+  }
+  return <LoRAContent lora={lora} />;
+});
+
+LoRACard.displayName = 'LoRACard';
+
+const LoRAContent = memo(({ lora }: { lora: LoRA }) => {
   const dispatch = useAppDispatch();
   const { data: loraConfig } = useGetModelConfigQuery(lora.model.key);
 
@@ -91,4 +107,4 @@ export const LoRACard = memo((props: LoRACardProps) => {
   );
 });
 
-LoRACard.displayName = 'LoRACard';
+LoRAContent.displayName = 'LoRAContent';

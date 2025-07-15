@@ -292,7 +292,7 @@ async def get_hugging_face_models(
 )
 async def update_model_record(
     key: Annotated[str, Path(description="Unique key of model")],
-    changes: Annotated[ModelRecordChanges, Body(description="Model config", example=example_model_input)],
+    changes: Annotated[ModelRecordChanges, Body(description="Model config", examples=[example_model_input])],
 ) -> AnyModelConfig:
     """Update a model's config."""
     logger = ApiDependencies.invoker.services.logger
@@ -450,7 +450,7 @@ async def install_model(
     access_token: Optional[str] = Query(description="access token for the remote resource", default=None),
     config: ModelRecordChanges = Body(
         description="Object containing fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
-        example={"name": "string", "description": "string"},
+        examples=[{"name": "string", "description": "string"}],
     ),
 ) -> ModelInstallJob:
     """Install a model using a string identifier.

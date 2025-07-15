@@ -18,6 +18,29 @@ class ModelSpec:
     repo_ae: str | None
 
 
+# Preferred resolutions for Kontext models to avoid tiling artifacts
+# These are the specific resolutions the model was trained on
+PREFERED_KONTEXT_RESOLUTIONS = [
+    (672, 1568),
+    (688, 1504),
+    (720, 1456),
+    (752, 1392),
+    (800, 1328),
+    (832, 1248),
+    (880, 1184),
+    (944, 1104),
+    (1024, 1024),
+    (1104, 944),
+    (1184, 880),
+    (1248, 832),
+    (1328, 800),
+    (1392, 752),
+    (1456, 720),
+    (1504, 688),
+    (1568, 672),
+]
+
+
 max_seq_lengths: Dict[str, Literal[256, 512]] = {
     "flux-dev": 512,
     "flux-dev-fill": 512,

@@ -1,4 +1,5 @@
 import { MenuDivider } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
 import { IconMenuItemGroup } from 'common/components/IconMenuItem';
 import { ImageMenuItemChangeBoard } from 'features/gallery/components/ImageContextMenu/ImageMenuItemChangeBoard';
 import { ImageMenuItemCopy } from 'features/gallery/components/ImageContextMenu/ImageMenuItemCopy';
@@ -14,15 +15,21 @@ import { ImageMenuItemSelectForCompare } from 'features/gallery/components/Image
 import { ImageMenuItemSendToUpscale } from 'features/gallery/components/ImageContextMenu/ImageMenuItemSendToUpscale';
 import { ImageMenuItemStarUnstar } from 'features/gallery/components/ImageContextMenu/ImageMenuItemStarUnstar';
 import { ImageMenuItemUseAsRefImage } from 'features/gallery/components/ImageContextMenu/ImageMenuItemUseAsRefImage';
+import { ImageMenuItemUseForPromptGeneration } from 'features/gallery/components/ImageContextMenu/ImageMenuItemUseForPromptGeneration';
 import { ImageDTOContextProvider } from 'features/gallery/contexts/ImageDTOContext';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 import type { ImageDTO } from 'services/api/types';
+
+import { ImageMenuItemUseAsPromptTemplate } from './ImageMenuItemUseAsPromptTemplate';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
 };
 
 const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) => {
+  const tab = useAppSelector(selectActiveTab);
+
   return (
     <ImageDTOContextProvider value={imageDTO}>
       <IconMenuItemGroup>
@@ -35,12 +42,14 @@ const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) =
       </IconMenuItemGroup>
       <MenuDivider />
       <ImageMenuItemLoadWorkflow />
-      <ImageMenuItemMetadataRecallActions />
+      {(tab === 'canvas' || tab === 'generate') && <ImageMenuItemMetadataRecallActions />}
       <MenuDivider />
       <ImageMenuItemSendToUpscale />
-      <ImageMenuItemUseAsRefImage />
+      <ImageMenuItemUseForPromptGeneration />
+      {(tab === 'canvas' || tab === 'generate') && <ImageMenuItemUseAsRefImage />}
+      <ImageMenuItemUseAsPromptTemplate />
       <ImageMenuItemNewCanvasFromImageSubMenu />
-      <ImageMenuItemNewLayerFromImageSubMenu />
+      {tab === 'canvas' && <ImageMenuItemNewLayerFromImageSubMenu />}
       <MenuDivider />
       <ImageMenuItemChangeBoard />
       <ImageMenuItemStarUnstar />

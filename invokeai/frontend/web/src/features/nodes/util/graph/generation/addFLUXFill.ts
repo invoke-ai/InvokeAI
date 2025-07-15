@@ -4,9 +4,11 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import type { Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import {
+  getDenoisingStartAndEnd,
+  getOriginalAndScaledSizesForOtherModes,
+} from 'features/nodes/util/graph/graphBuilderUtils';
 import type { Invocation } from 'services/api/types';
 
 type AddFLUXFillArg = {
@@ -15,8 +17,6 @@ type AddFLUXFillArg = {
   manager: CanvasManager;
   l2i: Invocation<'flux_vae_decode'>;
   denoise: Invocation<'flux_denoise'>;
-  originalSize: Dimensions;
-  scaledSize: Dimensions;
 };
 
 export const addFLUXFill = async ({
@@ -25,27 +25,27 @@ export const addFLUXFill = async ({
   manager,
   l2i,
   denoise,
-  originalSize,
-  scaledSize,
 }: AddFLUXFillArg): Promise<Invocation<'invokeai_img_blend' | 'apply_mask_to_image'>> => {
-  // FLUX Fill always fully denoises
-  denoise.denoising_start = 0;
-  denoise.denoising_end = 1;
+  const { denoising_start, denoising_end } = getDenoisingStartAndEnd(state);
+  denoise.denoising_start = denoising_start;
+  denoise.denoising_end = denoising_end;
+
+  const { originalSize, scaledSize, rect } = getOriginalAndScaledSizesForOtherModes(state);
+
+  denoise.width = scaledSize.width;
+  denoise.height = scaledSize.height;
 
   const params = selectParamsSlice(state);
   const canvasSettings = selectCanvasSettingsSlice(state);
-  const canvas = selectCanvasSlice(state);
-
-  const { bbox } = canvas;
 
   const rasterAdapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
-  const initialImage = await manager.compositor.getCompositeImageDTO(rasterAdapters, bbox.rect, {
+  const initialImage = await manager.compositor.getCompositeImageDTO(rasterAdapters, rect, {
     is_intermediate: true,
     silent: true,
   });
 
   const inpaintMaskAdapters = manager.compositor.getVisibleAdaptersOfType('inpaint_mask');
-  const maskImage = await manager.compositor.getCompositeImageDTO(inpaintMaskAdapters, bbox.rect, {
+  const maskImage = await manager.compositor.getCompositeImageDTO(inpaintMaskAdapters, rect, {
     is_intermediate: true,
     silent: true,
   });

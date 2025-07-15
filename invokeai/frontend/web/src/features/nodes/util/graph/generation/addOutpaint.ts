@@ -4,10 +4,13 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import type { Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { getInfill, isMainModelWithoutUnet } from 'features/nodes/util/graph/graphBuilderUtils';
+import {
+  getDenoisingStartAndEnd,
+  getInfill,
+  getOriginalAndScaledSizesForOtherModes,
+  isMainModelWithoutUnet,
+} from 'features/nodes/util/graph/graphBuilderUtils';
 import type {
   DenoiseLatentsNodes,
   ImageToLatentsNodes,
@@ -16,55 +19,59 @@ import type {
   VaeSourceNodes,
 } from 'features/nodes/util/graph/types';
 import type { ImageDTO, Invocation } from 'services/api/types';
+import { assert } from 'tsafe';
 
 type AddOutpaintArg = {
-  state: RootState;
   g: Graph;
+  state: RootState;
   manager: CanvasManager;
   l2i: Invocation<LatentToImageNodes>;
-  i2lNodeType: ImageToLatentsNodes;
+  i2l: Invocation<ImageToLatentsNodes>;
+  noise?: Invocation<'noise'>;
   denoise: Invocation<DenoiseLatentsNodes>;
   vaeSource: Invocation<VaeSourceNodes | MainModelLoaderNodes>;
   modelLoader: Invocation<MainModelLoaderNodes>;
-  originalSize: Dimensions;
-  scaledSize: Dimensions;
-  denoising_start: number;
-  fp32: boolean;
-  seed: number;
+  seed: Invocation<'integer'>;
 };
 
 export const addOutpaint = async ({
-  state,
   g,
+  state,
   manager,
   l2i,
-  i2lNodeType,
+  i2l,
+  noise,
   denoise,
   vaeSource,
   modelLoader,
-  originalSize,
-  scaledSize,
-  denoising_start,
-  fp32,
   seed,
 }: AddOutpaintArg): Promise<Invocation<'invokeai_img_blend' | 'apply_mask_to_image'>> => {
+  const { denoising_start, denoising_end } = getDenoisingStartAndEnd(state);
   denoise.denoising_start = denoising_start;
+  denoise.denoising_end = denoising_end;
 
   const params = selectParamsSlice(state);
   const canvasSettings = selectCanvasSettingsSlice(state);
-  const canvas = selectCanvasSlice(state);
 
-  const { bbox } = canvas;
+  const { originalSize, scaledSize, rect } = getOriginalAndScaledSizesForOtherModes(state);
+
+  if (denoise.type === 'cogview4_denoise' || denoise.type === 'flux_denoise' || denoise.type === 'sd3_denoise') {
+    denoise.width = scaledSize.width;
+    denoise.height = scaledSize.height;
+  } else {
+    assert(denoise.type === 'denoise_latents');
+    assert(noise, 'SD1.5/SD2/SDXL graphs require a noise node to be passed in');
+    noise.width = scaledSize.width;
+    noise.height = scaledSize.height;
+  }
 
   const rasterAdapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
-  const initialImage = await manager.compositor.getCompositeImageDTO(rasterAdapters, bbox.rect, {
+  const initialImage = await manager.compositor.getCompositeImageDTO(rasterAdapters, rect, {
     is_intermediate: true,
     silent: true,
   });
 
   const inpaintMaskAdapters = manager.compositor.getVisibleAdaptersOfType('inpaint_mask');
-
-  const { rect } = canvas.bbox;
 
   // Get inpaint mask adapters that have noise settings
   const noiseMaskAdapters = inpaintMaskAdapters.filter((adapter) => adapter.state.noiseLevel !== undefined);
@@ -138,7 +145,7 @@ export const addOutpaint = async ({
       coherence_mode: params.canvasCoherenceMode,
       minimum_denoise: params.canvasCoherenceMinDenoise,
       edge_radius: params.canvasCoherenceEdgeSize,
-      fp32,
+      fp32: i2l.type === 'i2l' ? i2l.fp32 : false,
     });
     g.addEdge(infill, 'image', createGradientMask, 'image');
     g.addEdge(resizeInputMaskToScaledSize, 'image', createGradientMask, 'mask');
@@ -148,13 +155,6 @@ export const addOutpaint = async ({
     }
 
     g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');
-
-    // Decode infilled image and connect to denoise
-    const i2l = g.addNode({
-      id: i2lNodeType,
-      type: i2lNodeType,
-      ...(i2lNodeType === 'i2l' ? { fp32 } : {}),
-    });
 
     // If we have a noise mask, apply it to the input image before i2l conversion
     if (noiseMaskImage) {
@@ -173,9 +173,9 @@ export const addOutpaint = async ({
         noise_type: 'gaussian',
         amount: 1.0, // the mask controls the actual intensity
         noise_color: true,
-        seed: seed,
       });
 
+      g.addEdge(seed, 'value', noiseNode, 'seed');
       g.addEdge(resizeNoiseMaskToScaledSize, 'image', noiseNode, 'mask');
       g.addEdge(infill, 'image', noiseNode, 'image');
       g.addEdge(noiseNode, 'image', i2l, 'image');
@@ -232,11 +232,6 @@ export const addOutpaint = async ({
   } else {
     infill.image = { image_name: initialImage.image_name };
     // No scale before processing, much simpler
-    const i2l = g.addNode({
-      id: i2lNodeType,
-      type: i2lNodeType,
-      ...(i2lNodeType === 'i2l' ? { fp32 } : {}),
-    });
     const initialImageAlphaToMask = g.addNode({
       id: getPrefixedId('image_alpha_to_mask'),
       type: 'tomask',
@@ -253,7 +248,7 @@ export const addOutpaint = async ({
       coherence_mode: params.canvasCoherenceMode,
       minimum_denoise: params.canvasCoherenceMinDenoise,
       edge_radius: params.canvasCoherenceEdgeSize,
-      fp32,
+      fp32: i2l.type === 'i2l' ? i2l.fp32 : false,
       image: { image_name: initialImage.image_name },
     });
     g.addEdge(initialImageAlphaToMask, 'image', maskCombine, 'mask2');
@@ -269,10 +264,10 @@ export const addOutpaint = async ({
         noise_type: 'gaussian',
         amount: 1.0, // the mask controls the actual intensity
         noise_color: true,
-        seed: seed,
         mask: { image_name: noiseMaskImage.image_name },
       });
 
+      g.addEdge(seed, 'value', noiseNode, 'seed');
       g.addEdge(infill, 'image', noiseNode, 'image');
       g.addEdge(noiseNode, 'image', i2l, 'image');
     } else {

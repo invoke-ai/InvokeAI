@@ -62,19 +62,31 @@ export const useInvoke = () => {
 
   const enqueueBack = useCallback(() => {
     enqueue(false, false);
-    if (tabName === 'generate' || tabName === 'workflows' || tabName === 'upscaling') {
-      navigationApi.focusPanelInTab(tabName, VIEWER_PANEL_ID);
+    if (tabName === 'generate' || tabName === 'upscaling') {
+      navigationApi.focusPanel(tabName, VIEWER_PANEL_ID);
+    } else if (tabName === 'workflows') {
+      // Only switch to viewer if the workflow editor is not currently active
+      const workspace = navigationApi.getPanel('workflows', WORKSPACE_PANEL_ID);
+      if (!workspace?.api.isActive) {
+        navigationApi.focusPanel(tabName, VIEWER_PANEL_ID);
+      }
     } else if (tabName === 'canvas') {
-      navigationApi.focusPanelInTab(tabName, WORKSPACE_PANEL_ID);
+      navigationApi.focusPanel(tabName, WORKSPACE_PANEL_ID);
     }
   }, [enqueue, tabName]);
 
   const enqueueFront = useCallback(() => {
     enqueue(true, false);
-    if (tabName === 'generate' || tabName === 'workflows' || tabName === 'upscaling') {
-      navigationApi.focusPanelInTab(tabName, VIEWER_PANEL_ID);
+    if (tabName === 'generate' || tabName === 'upscaling') {
+      navigationApi.focusPanel(tabName, VIEWER_PANEL_ID);
+    } else if (tabName === 'workflows') {
+      // Only switch to viewer if the workflow editor is not currently active
+      const workspace = navigationApi.getPanel('workflows', WORKSPACE_PANEL_ID);
+      if (!workspace?.api.isActive) {
+        navigationApi.focusPanel(tabName, VIEWER_PANEL_ID);
+      }
     } else if (tabName === 'canvas') {
-      navigationApi.focusPanelInTab(tabName, WORKSPACE_PANEL_ID);
+      navigationApi.focusPanel(tabName, WORKSPACE_PANEL_ID);
     }
   }, [enqueue, tabName]);
 

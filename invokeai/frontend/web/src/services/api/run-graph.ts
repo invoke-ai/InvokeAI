@@ -1,6 +1,8 @@
 import { logger } from 'app/logging/logger';
-import type { AppStore } from 'app/store/store';
+import type { AppDispatch } from 'app/store/store';
 import { Mutex } from 'async-mutex';
+import type { Deferred } from 'common/util/createDeferredPromise';
+import { createDeferredPromise } from 'common/util/createDeferredPromise';
 import { withResultAsync, WrappedError } from 'common/util/result';
 import { parseify } from 'common/util/serialize';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
@@ -14,27 +16,6 @@ import { enqueueMutationFixedCacheKeyOptions, queueApi } from './endpoints/queue
 import type { EnqueueBatchArg } from './types';
 
 const log = logger('system');
-
-type Deferred<T> = {
-  promise: Promise<T>;
-  resolve: (value: T) => void;
-  reject: (error: Error) => void;
-};
-
-/**
- * Create a promise and expose its resolve and reject callbacks.
- */
-const createDeferredPromise = <T>(): Deferred<T> => {
-  let resolve!: (value: T) => void;
-  let reject!: (error: Error) => void;
-
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-
-  return { promise, resolve, reject };
-};
 
 type QueueStatusEventHandler = {
   subscribe: (handler: (event: S['QueueItemStatusChangedEvent']) => void) => void;
@@ -135,7 +116,7 @@ export const runGraph = (arg: RunGraphArg): Promise<RunGraphReturn> => {
  * Creates production dependencies for runGraph using Redux store and socket.
  */
 export const buildRunGraphDependencies = (
-  store: AppStore,
+  dispatch: AppDispatch,
   socket: {
     on: (event: 'queue_item_status_changed', handler: (event: S['QueueItemStatusChangedEvent']) => void) => void;
     off: (event: 'queue_item_status_changed', handler: (event: S['QueueItemStatusChangedEvent']) => void) => void;
@@ -143,17 +124,15 @@ export const buildRunGraphDependencies = (
 ): GraphRunnerDependencies => ({
   executor: {
     enqueueBatch: (batch) =>
-      store
-        .dispatch(
-          queueApi.endpoints.enqueueBatch.initiate(batch, {
-            ...enqueueMutationFixedCacheKeyOptions,
-            track: false,
-          })
-        )
-        .unwrap(),
-    getQueueItem: (id) => store.dispatch(queueApi.endpoints.getQueueItem.initiate(id, { subscribe: false })).unwrap(),
+      dispatch(
+        queueApi.endpoints.enqueueBatch.initiate(batch, {
+          ...enqueueMutationFixedCacheKeyOptions,
+          track: false,
+        })
+      ).unwrap(),
+    getQueueItem: (id) => dispatch(queueApi.endpoints.getQueueItem.initiate(id, { subscribe: false })).unwrap(),
     cancelQueueItem: (id) =>
-      store.dispatch(queueApi.endpoints.cancelQueueItem.initiate({ item_id: id }, { track: false })).unwrap(),
+      dispatch(queueApi.endpoints.cancelQueueItem.initiate({ item_id: id }, { track: false })).unwrap(),
   },
   eventHandler: {
     subscribe: (handler) => socket.on('queue_item_status_changed', handler),
@@ -351,7 +330,9 @@ const _runGraph = async (
       const { status, session, error_type, error_message, error_traceback } = queueItem;
 
       // We are confident that the queue item is not pending or in progress, at this time.
-      assert(status !== 'pending' && status !== 'in_progress');
+      if (status === 'pending' || status === 'in_progress') {
+        throw new UnexpectedStatusError(event.item_id, session, status);
+      }
 
       if (status === 'completed') {
         const output = getOutputFromSession(queueItemId, session, outputNodeId);
@@ -456,7 +437,7 @@ class BaseSessionError extends BaseQueueItemError {
   }
 }
 
-export class UnexpectedStatusError extends BaseSessionError {
+class UnexpectedStatusError extends BaseSessionError {
   public readonly status: S['SessionQueueItem']['status'];
 
   constructor(
@@ -465,7 +446,7 @@ export class UnexpectedStatusError extends BaseSessionError {
     status: S['SessionQueueItem']['status']
   ) {
     super(queueItemId, session, `Session has unexpected status ${status}.`);
-    this.name = this.constructor.name;
+    this.name = 'UnexpectedStatusError';
     this.status = status;
   }
 }
@@ -475,7 +456,7 @@ export class OutputNodeNotFoundInCompletedSessionError extends BaseSessionError 
 
   constructor(queueItemId: number | null, session: S['SessionQueueItem']['session'], nodeId: string) {
     super(queueItemId, session, `Node '${nodeId}' not found in session.`);
-    this.name = this.constructor.name;
+    this.name = 'OutputNodeNotFoundInCompletedSessionError';
     this.nodeId = nodeId;
   }
 }
@@ -485,7 +466,7 @@ export class ResultNotFoundInCompletedSessionError extends BaseSessionError {
 
   constructor(queueItemId: number | null, session: S['SessionQueueItem']['session'], nodeId: string) {
     super(queueItemId, session, `Result for node '${nodeId}' not found in session.`);
-    this.name = this.constructor.name;
+    this.name = 'ResultNotFoundInCompletedSessionError';
     this.nodeId = nodeId;
   }
 }
@@ -503,7 +484,7 @@ export class SessionFailedError extends BaseSessionError {
     error_traceback?: string | null
   ) {
     super(queueItemId, session, 'Session execution failed');
-    this.name = this.constructor.name;
+    this.name = 'SessionFailedError';
     this.error_type = error_type;
     this.error_traceback = error_traceback;
     this.error_message = error_message;
@@ -513,7 +494,7 @@ export class SessionFailedError extends BaseSessionError {
 export class SessionCanceledError extends BaseSessionError {
   constructor(queueItemId: number | null, session: S['SessionQueueItem']['session']) {
     super(queueItemId, session, 'Session execution was canceled');
-    this.name = this.constructor.name;
+    this.name = 'SessionCanceledError';
   }
 }
 
@@ -526,7 +507,7 @@ export class SessionAbortedError extends BaseQueueItemError {
       ? 'Session execution was aborted via signal and cancellation failed'
       : 'Session execution was aborted via signal';
     super(queueItemId, message);
-    this.name = this.constructor.name;
+    this.name = 'SessionAbortedError';
     this.cancellationFailed = cancellationFailed;
     this.cancellationError = cancellationError;
   }
@@ -541,7 +522,7 @@ export class SessionTimeoutError extends BaseQueueItemError {
       ? 'Session execution timed out and cancellation failed'
       : 'Session execution timed out';
     super(queueItemId, message);
-    this.name = this.constructor.name;
+    this.name = 'SessionTimeoutError';
     this.cancellationFailed = cancellationFailed;
     this.cancellationError = cancellationError;
   }

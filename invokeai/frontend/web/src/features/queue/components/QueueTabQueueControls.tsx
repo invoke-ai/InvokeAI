@@ -1,8 +1,8 @@
 import { ButtonGroup, Flex } from '@invoke-ai/ui-library';
-import { DeleteAllExceptCurrentButton } from 'features/queue/components/DeleteAllExceptCurrentButton';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 
+import { CancelAllExceptCurrentButton } from './CancelAllExceptCurrentButton';
 import ClearModelCacheButton from './ClearModelCacheButton';
 import PauseProcessorButton from './PauseProcessorButton';
 import PruneQueueButton from './PruneQueueButton';
@@ -23,7 +23,7 @@ const QueueTabQueueControls = () => {
         )}
         <ButtonGroup w={28} orientation="vertical" size="sm">
           <PruneQueueButton />
-          <DeleteAllExceptCurrentButton />
+          <CancelAllExceptCurrentButton />
         </ButtonGroup>
       </Flex>
       <ClearModelCacheButton />

@@ -3,6 +3,8 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { isFluxKontextReferenceImageConfig } from 'features/controlLayers/store/types';
+import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { addFLUXFill } from 'features/nodes/util/graph/generation/addFLUXFill';
 import { addFLUXLoRAs } from 'features/nodes/util/graph/generation/addFLUXLoRAs';
 import { addFLUXReduxes } from 'features/nodes/util/graph/generation/addFLUXRedux';
@@ -14,13 +16,10 @@ import { addRegions } from 'features/nodes/util/graph/generation/addRegions';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import {
-  getSizes,
-  selectCanvasOutputFields,
-  selectPresetModifiedPrompts,
-} from 'features/nodes/util/graph/graphBuilderUtils';
+import { selectCanvasOutputFields } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
@@ -32,32 +31,19 @@ import { addIPAdapters } from './addIPAdapters';
 const log = logger('system');
 
 export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
-  const { generationMode, state } = arg;
-  log.debug({ generationMode }, 'Building FLUX graph');
+  const { generationMode, state, manager } = arg;
+  log.debug({ generationMode, manager: manager?.id }, 'Building FLUX graph');
+
+  const model = selectMainModelConfig(state);
+  assert(model, 'No model selected');
+  assert(model.base === 'flux', 'Selected model is not a FLUX model');
 
   const params = selectParamsSlice(state);
   const canvas = selectCanvasSlice(state);
   const refImages = selectRefImagesSlice(state);
 
-  const { bbox } = canvas;
+  const { guidance: baseGuidance, steps, fluxVAE, t5EncoderModel, clipEmbedModel } = params;
 
-  const { originalSize, scaledSize } = getSizes(bbox);
-
-  const model = selectMainModelConfig(state);
-
-  const {
-    guidance: baseGuidance,
-    seed,
-    steps,
-    fluxVAE,
-    t5EncoderModel,
-    clipEmbedModel,
-    img2imgStrength,
-    optimizedDenoisingEnabled,
-  } = params;
-
-  assert(model, 'No model found in state');
-  assert(model.base === 'flux', 'Model is not a FLUX model');
   assert(t5EncoderModel, 'No T5 Encoder model found in state');
   assert(clipEmbedModel, 'No CLIP Embed model found in state');
   assert(fluxVAE, 'No FLUX VAE model found in state');
@@ -87,9 +73,15 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     guidance = 30;
   }
 
-  const { positivePrompt } = selectPresetModifiedPrompts(state);
+  const isFluxKontextDev = model.name?.toLowerCase().includes('kontext');
+  if (isFluxKontextDev) {
+    if (generationMode !== 'txt2img') {
+      throw new UnsupportedGenerationModeError(t('toast.fluxKontextIncompatibleGenerationMode'));
+    }
+  }
 
   const g = new Graph(getPrefixedId('flux_graph'));
+
   const modelLoader = g.addNode({
     type: 'flux_model_loader',
     id: getPrefixedId('flux_model_loader'),
@@ -99,25 +91,28 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     vae_model: fluxVAE,
   });
 
+  const positivePrompt = g.addNode({
+    id: getPrefixedId('positive_prompt'),
+    type: 'string',
+  });
   const posCond = g.addNode({
     type: 'flux_text_encoder',
     id: getPrefixedId('flux_text_encoder'),
-    prompt: positivePrompt,
   });
   const posCondCollect = g.addNode({
     type: 'collect',
     id: getPrefixedId('pos_cond_collect'),
+  });
+
+  const seed = g.addNode({
+    id: getPrefixedId('seed'),
+    type: 'integer',
   });
   const denoise = g.addNode({
     type: 'flux_denoise',
     id: getPrefixedId('flux_denoise'),
     guidance,
     num_steps: steps,
-    seed,
-    denoising_start: 0,
-    denoising_end: 1,
-    width: scaledSize.width,
-    height: scaledSize.height,
   });
 
   const l2i = g.addNode({
@@ -132,96 +127,120 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   g.addEdge(modelLoader, 'clip', posCond, 'clip');
   g.addEdge(modelLoader, 't5_encoder', posCond, 't5_encoder');
   g.addEdge(modelLoader, 'max_seq_len', posCond, 't5_max_seq_len');
+
+  g.addEdge(positivePrompt, 'value', posCond, 'prompt');
   g.addEdge(posCond, 'conditioning', posCondCollect, 'item');
   g.addEdge(posCondCollect, 'collection', denoise, 'positive_text_conditioning');
+
+  g.addEdge(seed, 'value', denoise, 'seed');
   g.addEdge(denoise, 'latents', l2i, 'latents');
 
   addFLUXLoRAs(state, g, denoise, modelLoader, posCond);
 
   g.upsertMetadata({
     guidance,
-    width: originalSize.width,
-    height: originalSize.height,
-    positive_prompt: positivePrompt,
     model: Graph.getModelMetadataField(model),
-    seed,
     steps,
     vae: fluxVAE,
     t5_encoder: t5EncoderModel,
     clip_embed_model: clipEmbedModel,
   });
+  g.addEdgeToMetadata(seed, 'value', 'seed');
+  g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
 
-  let denoising_start: number;
-  if (optimizedDenoisingEnabled) {
-    // We rescale the img2imgStrength (with exponent 0.2) to effectively use the entire range [0, 1] and make the scale
-    // more user-friendly for FLUX. Without this, most of the 'change' is concentrated in the high denoise strength
-    // range (>0.9).
-    denoising_start = 1 - img2imgStrength ** 0.2;
-  } else {
-    denoising_start = 1 - img2imgStrength;
+  if (isFluxKontextDev) {
+    const validFLUXKontextConfigs = selectRefImagesSlice(state)
+      .entities.filter((entity) => entity.isEnabled)
+      .filter((entity) => isFluxKontextReferenceImageConfig(entity.config))
+      .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0);
+
+    // FLUX Kontext supports only a single conditioning image - we'll just take the first one.
+    // In the future, we can explore concatenating multiple conditioning images in image or latent space.
+    const firstValidFLUXKontextConfig = validFLUXKontextConfigs[0];
+
+    if (firstValidFLUXKontextConfig) {
+      const { image } = firstValidFLUXKontextConfig.config;
+
+      assert(image, 'getGlobalReferenceImageWarnings checks if the image is there, this should never raise');
+
+      const kontextConditioning = g.addNode({
+        type: 'flux_kontext',
+        id: getPrefixedId('flux_kontext'),
+        image,
+      });
+      g.addEdge(kontextConditioning, 'kontext_cond', denoise, 'kontext_conditioning');
+      g.upsertMetadata({ ref_images: [firstValidFLUXKontextConfig] }, 'merge');
+    }
   }
 
   let canvasOutput: Invocation<ImageOutputNodes> = l2i;
 
   if (isFLUXFill && (generationMode === 'inpaint' || generationMode === 'outpaint')) {
+    assert(manager !== null);
     canvasOutput = await addFLUXFill({
-      state,
       g,
-      manager: arg.canvasManager,
+      state,
+      manager,
       l2i,
       denoise,
-      originalSize,
-      scaledSize,
     });
   } else if (generationMode === 'txt2img') {
-    canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
+    canvasOutput = addTextToImage({
+      g,
+      state,
+      denoise,
+      l2i,
+    });
     g.upsertMetadata({ generation_mode: 'flux_txt2img' });
   } else if (generationMode === 'img2img') {
+    assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'flux_vae_encode',
+      id: getPrefixedId('flux_vae_encode'),
+    });
     canvasOutput = await addImageToImage({
       g,
-      manager: arg.canvasManager,
+      state,
+      manager,
       l2i,
-      i2lNodeType: 'flux_vae_encode',
+      i2l,
       denoise,
       vaeSource: modelLoader,
-      originalSize,
-      scaledSize,
-      bbox,
-      denoising_start,
-      fp32: false,
     });
     g.upsertMetadata({ generation_mode: 'flux_img2img' });
   } else if (generationMode === 'inpaint') {
+    assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'flux_vae_encode',
+      id: getPrefixedId('flux_vae_encode'),
+    });
     canvasOutput = await addInpaint({
-      state,
       g,
-      manager: arg.canvasManager,
+      state,
+      manager,
       l2i,
-      i2lNodeType: 'flux_vae_encode',
+      i2l,
       denoise,
       vaeSource: modelLoader,
       modelLoader,
-      originalSize,
-      scaledSize,
-      denoising_start,
-      fp32: false,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'flux_inpaint' });
   } else if (generationMode === 'outpaint') {
+    assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'flux_vae_encode',
+      id: getPrefixedId('flux_vae_encode'),
+    });
     canvasOutput = await addOutpaint({
-      state,
       g,
-      manager: arg.canvasManager,
+      state,
+      manager,
       l2i,
-      i2lNodeType: 'flux_vae_encode',
+      i2l,
       denoise,
       vaeSource: modelLoader,
       modelLoader,
-      originalSize,
-      scaledSize,
-      denoising_start,
-      fp32: false,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'flux_outpaint' });
@@ -229,13 +248,13 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     assert<Equals<typeof generationMode, never>>(false);
   }
 
-  if (generationMode === 'img2img' || generationMode === 'inpaint' || generationMode === 'outpaint') {
+  if (manager !== null) {
     const controlNetCollector = g.addNode({
       type: 'collect',
       id: getPrefixedId('control_net_collector'),
     });
     const controlNetResult = await addControlNets({
-      manager: arg.canvasManager,
+      manager,
       entities: canvas.controlLayers.entities,
       g,
       rect: canvas.bbox.rect,
@@ -249,7 +268,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     }
 
     await addControlLoRA({
-      manager: arg.canvasManager,
+      manager,
       entities: canvas.controlLayers.entities,
       g,
       rect: canvas.bbox.rect,
@@ -283,9 +302,9 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   });
   let totalReduxesAdded = fluxReduxResult.addedFLUXReduxes;
 
-  if (generationMode === 'img2img' || generationMode === 'inpaint' || generationMode === 'outpaint') {
+  if (manager !== null) {
     const regionsResult = await addRegions({
-      manager: arg.canvasManager,
+      manager,
       regions: canvas.regionalGuidance.entities,
       g,
       bbox: canvas.bbox.rect,
@@ -324,14 +343,17 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     canvasOutput = addWatermarker(g, canvasOutput);
   }
 
-  g.upsertMetadata(selectCanvasMetadata(state));
-
   g.updateNode(canvasOutput, selectCanvasOutputFields(state));
 
+  if (selectActiveTab(state) === 'canvas') {
+    g.upsertMetadata(selectCanvasMetadata(state));
+  }
+
   g.setMetadataReceivingNode(canvasOutput);
+
   return {
     g,
-    seedFieldIdentifier: { nodeId: denoise.id, fieldName: 'seed' },
-    positivePromptFieldIdentifier: { nodeId: posCond.id, fieldName: 'prompt' },
+    seed,
+    positivePrompt,
   };
 };

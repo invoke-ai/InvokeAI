@@ -10,6 +10,7 @@ import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
 import {
   GALLERY_PANEL_DEFAULT_HEIGHT_PX,
   GALLERY_PANEL_ID,
+  GALLERY_PANEL_MIN_EXPANDED_HEIGHT_PX,
   GALLERY_PANEL_MIN_HEIGHT_PX,
 } from 'features/ui/layouts/shared';
 import { useCollapsibleGridviewPanel } from 'features/ui/layouts/use-collapsible-gridview-panel';
@@ -35,11 +36,11 @@ export const GalleryPanel = memo(() => {
   const { tab } = useAutoLayoutContext();
   const collapsibleApi = useCollapsibleGridviewPanel(
     tab,
-    'right',
     GALLERY_PANEL_ID,
     'vertical',
     GALLERY_PANEL_DEFAULT_HEIGHT_PX,
-    GALLERY_PANEL_MIN_HEIGHT_PX
+    GALLERY_PANEL_MIN_HEIGHT_PX,
+    GALLERY_PANEL_MIN_EXPANDED_HEIGHT_PX
   );
   const isCollapsed = useStore(collapsibleApi.$isCollapsed);
 

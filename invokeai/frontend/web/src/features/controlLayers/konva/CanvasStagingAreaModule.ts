@@ -59,6 +59,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
 
   $shouldShowStagedImage = atom<boolean>(true);
   $isStaging = atom<boolean>(false);
+  $isPending = atom<boolean>(false);
 
   constructor(manager: CanvasManager) {
     super();
@@ -152,7 +153,11 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     this.$isStaging.set(this.manager.stateApi.runSelector(selectIsStaging));
   };
 
-  connectToSession = ($selectedItemId: Atom<number | null>, $progressData: ProgressDataMap) => {
+  connectToSession = (
+    $selectedItemId: Atom<number | null>,
+    $progressData: ProgressDataMap,
+    $isPending: Atom<boolean>
+  ) => {
     const cb = (selectedItemId: number | null, progressData: Record<number, ProgressData | undefined>) => {
       if (!selectedItemId) {
         this.$imageSrc.set(null);
@@ -176,7 +181,17 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     cb($selectedItemId.get(), $progressData.get());
     this.render();
 
-    return effect([$selectedItemId, $progressData], cb);
+    // Sync the $isPending flag with the computed
+    const unsubIsPending = effect([$isPending], (isPending) => {
+      this.$isPending.set(isPending);
+    });
+
+    const unsubImageSrc = effect([$selectedItemId, $progressData], cb);
+
+    return () => {
+      unsubIsPending();
+      unsubImageSrc();
+    };
   };
 
   private _getImageFromSrc = (
@@ -206,6 +221,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
 
       const { x, y, width, height } = this.manager.stateApi.getBbox().rect;
       const shouldShowStagedImage = this.$shouldShowStagedImage.get();
+      const isPending = this.$isPending.get();
 
       this.konva.group.position({ x, y });
 
@@ -226,7 +242,8 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
       } else {
         this.image?.destroy();
         this.image = null;
-        this.konva.placeholder.group.visible(true);
+        // Only show placeholder if there are pending items, otherwise show nothing
+        this.konva.placeholder.group.visible(isPending);
       }
 
       this.konva.group.visible(shouldShowStagedImage && this.$isStaging.get());

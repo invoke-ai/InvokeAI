@@ -1,8 +1,5 @@
 import { z } from 'zod/v4';
 
-import type { ModelIdentifier as ModelIdentifierV2 } from './v2/common';
-import { zModelIdentifier as zModelIdentifierV2 } from './v2/common';
-
 // #region Field data schemas
 export const zImageField = z.object({
   image_name: z.string().trim().min(1),
@@ -137,15 +134,11 @@ export const zModelIdentifierField = z.object({
   type: zModelType,
   submodel_type: zSubModelType.nullish(),
 });
-export const isModelIdentifier = (field: unknown): field is ModelIdentifierField =>
-  zModelIdentifierField.safeParse(field).success;
-export const isModelIdentifierV2 = (field: unknown): field is ModelIdentifierV2 =>
-  zModelIdentifierV2.safeParse(field).success;
 export type ModelIdentifierField = z.infer<typeof zModelIdentifierField>;
 // #endregion
 
 // #region Control Adapters
-export const zControlField = z.object({
+const zControlField = z.object({
   image: zImageField,
   control_model: zModelIdentifierField,
   control_weight: z.union([z.number(), z.array(z.number())]).optional(),
@@ -156,7 +149,7 @@ export const zControlField = z.object({
 });
 export type ControlField = z.infer<typeof zControlField>;
 
-export const zIPAdapterField = z.object({
+const zIPAdapterField = z.object({
   image: zImageField,
   ip_adapter_model: zModelIdentifierField,
   weight: z.number(),
@@ -166,7 +159,7 @@ export const zIPAdapterField = z.object({
 });
 export type IPAdapterField = z.infer<typeof zIPAdapterField>;
 
-export const zT2IAdapterField = z.object({
+const zT2IAdapterField = z.object({
   image: zImageField,
   t2i_adapter_model: zModelIdentifierField,
   weight: z.union([z.number(), z.array(z.number())]).optional(),

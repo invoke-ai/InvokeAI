@@ -1,14 +1,28 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { bboxSyncedToOptimalDimension } from 'features/controlLayers/store/canvasSlice';
+import { bboxSyncedToOptimalDimension, rgRefImageModelChanged } from 'features/controlLayers/store/canvasSlice';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
-import { modelChanged, vaeSelected } from 'features/controlLayers/store/paramsSlice';
-import { selectBboxModelBase } from 'features/controlLayers/store/selectors';
+import { modelChanged, syncedToOptimalDimension, vaeSelected } from 'features/controlLayers/store/paramsSlice';
+import { refImageModelChanged, selectReferenceImageEntities } from 'features/controlLayers/store/refImagesSlice';
+import {
+  selectAllEntitiesOfType,
+  selectBboxModelBase,
+  selectCanvasSlice,
+} from 'features/controlLayers/store/selectors';
+import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { modelSelected } from 'features/parameters/store/actions';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
+import { selectGlobalRefImageModels, selectRegionalRefImageModels } from 'services/api/hooks/modelsByType';
+import type { AnyModelConfig } from 'services/api/types';
+import {
+  isChatGPT4oModelConfig,
+  isFluxKontextApiModelConfig,
+  isFluxKontextModelConfig,
+  isFluxReduxModelConfig,
+} from 'services/api/types';
 
 const log = logger('models');
 
@@ -25,9 +39,8 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
       }
 
       const newModel = result.data;
-
-      const newBaseModel = newModel.base;
-      const didBaseModelChange = state.params.model?.base !== newBaseModel;
+      const newBase = newModel.base;
+      const didBaseModelChange = state.params.model?.base !== newBase;
 
       if (didBaseModelChange) {
         // we may need to reset some incompatible submodels
@@ -35,7 +48,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
 
         // handle incompatible loras
         state.loras.loras.forEach((lora) => {
-          if (lora.model.base !== newBaseModel) {
+          if (lora.model.base !== newBase) {
             dispatch(loraDeleted({ id: lora.id }));
             modelsCleared += 1;
           }
@@ -43,20 +56,82 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
 
         // handle incompatible vae
         const { vae } = state.params;
-        if (vae && vae.base !== newBaseModel) {
+        if (vae && vae.base !== newBase) {
           dispatch(vaeSelected(null));
           modelsCleared += 1;
         }
 
-        // handle incompatible controlnets
-        // state.canvas.present.controlAdapters.entities.forEach((ca) => {
-        //   if (ca.model?.base !== newBaseModel) {
-        //     modelsCleared += 1;
-        //     if (ca.isEnabled) {
-        //       dispatch(entityIsEnabledToggled({ entityIdentifier: { id: ca.id, type: 'control_adapter' } }));
-        //     }
-        //   }
-        // });
+        // Handle incompatible reference image models - switch to first compatible model, with some smart logic
+        // to choose the best available model based on the new main model.
+        const allRefImageModels = selectGlobalRefImageModels(state).filter(({ base }) => base === newBase);
+
+        let newGlobalRefImageModel = null;
+
+        // Certain models require the ref image model to be the same as the main model - others just need a matching
+        // base. Helper to grab the first exact match or the first available model if no exact match is found.
+        const exactMatchOrFirst = <T extends AnyModelConfig>(candidates: T[]): T | null =>
+          candidates.find(({ key }) => key === newModel.key) ?? candidates[0] ?? null;
+
+        // The only way we can differentiate between FLUX and FLUX Kontext is to check for "kontext" in the name
+        if (newModel.base === 'flux' && newModel.name.toLowerCase().includes('kontext')) {
+          const fluxKontextDevModels = allRefImageModels.filter(isFluxKontextModelConfig);
+          newGlobalRefImageModel = exactMatchOrFirst(fluxKontextDevModels);
+        } else if (newModel.base === 'chatgpt-4o') {
+          const chatGPT4oModels = allRefImageModels.filter(isChatGPT4oModelConfig);
+          newGlobalRefImageModel = exactMatchOrFirst(chatGPT4oModels);
+        } else if (newModel.base === 'flux-kontext') {
+          const fluxKontextApiModels = allRefImageModels.filter(isFluxKontextApiModelConfig);
+          newGlobalRefImageModel = exactMatchOrFirst(fluxKontextApiModels);
+        } else if (newModel.base === 'flux') {
+          const fluxReduxModels = allRefImageModels.filter(isFluxReduxModelConfig);
+          newGlobalRefImageModel = fluxReduxModels[0] ?? null;
+        } else {
+          newGlobalRefImageModel = allRefImageModels[0] ?? null;
+        }
+
+        // All ref image entities are updated to use the same new model
+        const refImageEntities = selectReferenceImageEntities(state);
+        for (const entity of refImageEntities) {
+          const shouldUpdateModel =
+            (entity.config.model && entity.config.model.base !== newBase) ||
+            (!entity.config.model && newGlobalRefImageModel);
+
+          if (shouldUpdateModel) {
+            dispatch(
+              refImageModelChanged({
+                id: entity.id,
+                modelConfig: newGlobalRefImageModel,
+              })
+            );
+            modelsCleared += 1;
+          }
+        }
+
+        // For regional guidance, there is no smart logic - we just pick the first available model.
+        const newRegionalRefImageModel = selectRegionalRefImageModels(state)[0] ?? null;
+
+        // All regional guidance entities are updated to use the same new model.
+        const canvasState = selectCanvasSlice(state);
+        const canvasRegionalGuidanceEntities = selectAllEntitiesOfType(canvasState, 'regional_guidance');
+        for (const entity of canvasRegionalGuidanceEntities) {
+          for (const refImage of entity.referenceImages) {
+            // Only change the model if the current one is not compatible with the new base model.
+            const shouldUpdateModel =
+              (refImage.config.model && refImage.config.model.base !== newBase) ||
+              (!refImage.config.model && newRegionalRefImageModel);
+
+            if (shouldUpdateModel) {
+              dispatch(
+                rgRefImageModelChanged({
+                  entityIdentifier: getEntityIdentifier(entity),
+                  referenceImageId: refImage.id,
+                  modelConfig: newRegionalRefImageModel,
+                })
+              );
+              modelsCleared += 1;
+            }
+          }
+        }
 
         if (modelsCleared > 0) {
           toast({
@@ -71,9 +146,16 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
       }
 
       dispatch(modelChanged({ model: newModel, previousModel: state.params.model }));
+
       const modelBase = selectBboxModelBase(state);
-      if (!selectIsStaging(state) && modelBase !== state.params.model?.base) {
-        dispatch(bboxSyncedToOptimalDimension());
+
+      if (modelBase !== state.params.model?.base) {
+        // Sync generate tab settings whenever the model base changes
+        dispatch(syncedToOptimalDimension());
+        if (!selectIsStaging(state)) {
+          // Canvas tab only syncs if not staging
+          dispatch(bboxSyncedToOptimalDimension());
+        }
       }
     },
   });

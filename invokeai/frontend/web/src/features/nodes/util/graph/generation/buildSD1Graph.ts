@@ -15,12 +15,9 @@ import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import {
-  getSizes,
-  selectCanvasOutputFields,
-  selectPresetModifiedPrompts,
-} from 'features/nodes/util/graph/graphBuilderUtils';
+import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
@@ -30,15 +27,17 @@ import { addRegions } from './addRegions';
 const log = logger('system');
 
 export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
-  const { generationMode, state } = arg;
-  log.debug({ generationMode }, 'Building SD1/SD2 graph');
+  const { generationMode, state, manager } = arg;
+
+  log.debug({ generationMode, manager: manager?.id }, 'Building SD1/SD2 graph');
+
+  const model = selectMainModelConfig(state);
+  assert(model, 'No model selected');
+  assert(model.base === 'sd-1' || model.base === 'sd-2', 'Selected model is not a SDXL model');
 
   const params = selectParamsSlice(state);
   const canvas = selectCanvasSlice(state);
   const refImages = selectRefImagesSlice(state);
-
-  const { bbox } = canvas;
-  const model = selectMainModelConfig(state);
 
   const {
     cfgScale: cfg_scale,
@@ -48,17 +47,21 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     clipSkip: skipped_layers,
     shouldUseCpuNoise,
     vaePrecision,
-    seed,
     vae,
   } = params;
 
-  assert(model, 'No model found in state');
-
   const fp32 = vaePrecision === 'fp32';
-  const { positivePrompt, negativePrompt } = selectPresetModifiedPrompts(state);
-  const { originalSize, scaledSize } = getSizes(bbox);
+  const prompts = selectPresetModifiedPrompts(state);
 
   const g = new Graph(getPrefixedId('sd1_graph'));
+  const seed = g.addNode({
+    id: getPrefixedId('seed'),
+    type: 'integer',
+  });
+  const positivePrompt = g.addNode({
+    id: getPrefixedId('positive_prompt'),
+    type: 'string',
+  });
   const modelLoader = g.addNode({
     type: 'main_model_loader',
     id: getPrefixedId('sd1_model_loader'),
@@ -72,7 +75,6 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   const posCond = g.addNode({
     type: 'compel',
     id: getPrefixedId('pos_cond'),
-    prompt: positivePrompt,
   });
   const posCondCollect = g.addNode({
     type: 'collect',
@@ -81,7 +83,7 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   const negCond = g.addNode({
     type: 'compel',
     id: getPrefixedId('neg_cond'),
-    prompt: negativePrompt,
+    prompt: prompts.negative,
   });
   const negCondCollect = g.addNode({
     type: 'collect',
@@ -90,9 +92,6 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   const noise = g.addNode({
     type: 'noise',
     id: getPrefixedId('noise'),
-    seed,
-    width: scaledSize.width,
-    height: scaledSize.height,
     use_cpu: shouldUseCpuNoise,
   });
   const denoise = g.addNode({
@@ -123,30 +122,31 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   g.addEdge(modelLoader, 'clip', clipSkip, 'clip');
   g.addEdge(clipSkip, 'clip', posCond, 'clip');
   g.addEdge(clipSkip, 'clip', negCond, 'clip');
+
+  g.addEdge(positivePrompt, 'value', posCond, 'prompt');
   g.addEdge(posCond, 'conditioning', posCondCollect, 'item');
-  g.addEdge(negCond, 'conditioning', negCondCollect, 'item');
   g.addEdge(posCondCollect, 'collection', denoise, 'positive_conditioning');
+
+  g.addEdge(negCond, 'conditioning', negCondCollect, 'item');
   g.addEdge(negCondCollect, 'collection', denoise, 'negative_conditioning');
+
+  g.addEdge(seed, 'value', noise, 'seed');
   g.addEdge(noise, 'noise', denoise, 'noise');
   g.addEdge(denoise, 'latents', l2i, 'latents');
-
-  assert(model.base === 'sd-1' || model.base === 'sd-2');
 
   g.upsertMetadata({
     cfg_scale,
     cfg_rescale_multiplier,
-    width: originalSize.width,
-    height: originalSize.height,
-    positive_prompt: positivePrompt,
-    negative_prompt: negativePrompt,
+    negative_prompt: prompts.negative,
     model: Graph.getModelMetadataField(model),
-    seed,
     steps,
     rand_device: shouldUseCpuNoise ? 'cpu' : 'cuda',
     scheduler,
     clip_skip: skipped_layers,
     vae: vae ?? undefined,
   });
+  g.addEdgeToMetadata(seed, 'value', 'seed');
+  g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
 
   const seamless = addSeamless(state, g, denoise, modelLoader, vaeLoader);
 
@@ -158,59 +158,72 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   > = seamless ?? vaeLoader ?? modelLoader;
   g.addEdge(vaeSource, 'vae', l2i, 'vae');
 
-  const denoising_start = 1 - params.img2imgStrength;
-
   let canvasOutput: Invocation<ImageOutputNodes> = l2i;
 
   if (generationMode === 'txt2img') {
-    canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
+    canvasOutput = addTextToImage({
+      g,
+      state,
+      noise,
+      denoise,
+      l2i,
+    });
     g.upsertMetadata({ generation_mode: 'txt2img' });
   } else if (generationMode === 'img2img') {
+    assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'i2l',
+      id: getPrefixedId('i2l'),
+      fp32,
+    });
     canvasOutput = await addImageToImage({
       g,
-      manager: arg.canvasManager,
+      state,
+      manager,
       l2i,
-      i2lNodeType: 'i2l',
+      i2l,
+      noise,
       denoise,
       vaeSource,
-      originalSize,
-      scaledSize,
-      bbox,
-      denoising_start,
-      fp32: vaePrecision === 'fp32',
     });
     g.upsertMetadata({ generation_mode: 'img2img' });
   } else if (generationMode === 'inpaint') {
+    assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'i2l',
+      id: getPrefixedId('i2l'),
+      fp32,
+    });
     canvasOutput = await addInpaint({
-      state,
       g,
-      manager: arg.canvasManager,
+      state,
+      manager,
       l2i,
-      i2lNodeType: 'i2l',
+      i2l,
+      noise,
       denoise,
       vaeSource,
       modelLoader,
-      originalSize,
-      scaledSize,
-      denoising_start,
-      fp32: vaePrecision === 'fp32',
       seed,
     });
     g.upsertMetadata({ generation_mode: 'inpaint' });
   } else if (generationMode === 'outpaint') {
+    assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'i2l',
+      id: getPrefixedId('i2l'),
+      fp32,
+    });
     canvasOutput = await addOutpaint({
-      state,
       g,
-      manager: arg.canvasManager,
+      state,
+      manager,
       l2i,
-      i2lNodeType: 'i2l',
+      i2l,
+      noise,
       denoise,
       vaeSource,
       modelLoader,
-      originalSize,
-      scaledSize,
-      denoising_start,
-      fp32,
       seed,
     });
     g.upsertMetadata({ generation_mode: 'outpaint' });
@@ -218,13 +231,13 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     assert<Equals<typeof generationMode, never>>(false);
   }
 
-  if (generationMode === 'img2img' || generationMode === 'inpaint' || generationMode === 'outpaint') {
+  if (manager !== null) {
     const controlNetCollector = g.addNode({
       type: 'collect',
       id: getPrefixedId('control_net_collector'),
     });
     const controlNetResult = await addControlNets({
-      manager: arg.canvasManager,
+      manager,
       entities: canvas.controlLayers.entities,
       g,
       rect: canvas.bbox.rect,
@@ -242,7 +255,7 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
       id: getPrefixedId('t2i_adapter_collector'),
     });
     const t2iAdapterResult = await addT2IAdapters({
-      manager: arg.canvasManager,
+      manager,
       entities: canvas.controlLayers.entities,
       g,
       rect: canvas.bbox.rect,
@@ -268,9 +281,9 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   });
   let totalIPAdaptersAdded = ipAdapterResult.addedIPAdapters;
 
-  if (generationMode === 'img2img' || generationMode === 'inpaint' || generationMode === 'outpaint') {
+  if (manager !== null) {
     const regionsResult = await addRegions({
-      manager: arg.canvasManager,
+      manager,
       regions: canvas.regionalGuidance.entities,
       g,
       bbox: canvas.bbox.rect,
@@ -300,14 +313,17 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     canvasOutput = addWatermarker(g, canvasOutput);
   }
 
-  g.upsertMetadata(selectCanvasMetadata(state));
-
   g.updateNode(canvasOutput, selectCanvasOutputFields(state));
 
+  if (selectActiveTab(state) === 'canvas') {
+    g.upsertMetadata(selectCanvasMetadata(state));
+  }
+
   g.setMetadataReceivingNode(canvasOutput);
+
   return {
     g,
-    seedFieldIdentifier: { nodeId: noise.id, fieldName: 'seed' },
-    positivePromptFieldIdentifier: { nodeId: posCond.id, fieldName: 'prompt' },
+    seed,
+    positivePrompt,
   };
 };

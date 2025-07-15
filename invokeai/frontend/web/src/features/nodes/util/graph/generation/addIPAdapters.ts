@@ -17,6 +17,7 @@ type AddIPAdaptersArg = {
 
 export const addIPAdapters = ({ entities, g, collector, model }: AddIPAdaptersArg): AddIPAdaptersResult => {
   const validIPAdapters = entities
+    .filter((entity) => entity.isEnabled)
     .filter((entity) => isIPAdapterConfig(entity.config))
     .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0);
 
@@ -30,6 +31,8 @@ export const addIPAdapters = ({ entities, g, collector, model }: AddIPAdaptersAr
 
     addIPAdapter(id, config, g, collector);
   }
+
+  g.upsertMetadata({ ref_images: validIPAdapters }, 'merge');
 
   return result;
 };
