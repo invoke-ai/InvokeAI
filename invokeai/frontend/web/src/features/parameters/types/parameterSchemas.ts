@@ -170,8 +170,6 @@ export const [zParameterHRFEnabled, isParameterHRFEnabled] = buildParameter(z.bo
 export type ParameterHRFEnabled = z.infer<typeof zParameterHRFEnabled>;
 // #endregion
 
-
-
 // #region SDXL Refiner Start
 export const [zParameterSDXLRefinerStart, isParameterSDXLRefinerStart] = buildParameter(z.number().min(0).max(1));
 export type ParameterSDXLRefinerStart = z.infer<typeof zParameterSDXLRefinerStart>;

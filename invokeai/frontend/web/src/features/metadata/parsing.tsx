@@ -20,7 +20,6 @@ import {
   setGuidance,
   setImg2imgStrength,
   setRefinerCFGScale,
-
   setRefinerScheduler,
   setRefinerStart,
   setRefinerSteps,
@@ -51,7 +50,6 @@ import type {
   ParameterPositiveStylePromptSDXL,
   ParameterScheduler,
   ParameterSDXLRefinerModel,
-
   ParameterSDXLRefinerStart,
   ParameterSeamlessX,
   ParameterSeamlessY,
@@ -72,7 +70,6 @@ import {
   zParameterPositivePrompt,
   zParameterPositiveStylePromptSDXL,
   zParameterScheduler,
-
   zParameterSDXLRefinerStart,
   zParameterSeamlessX,
   zParameterSeamlessY,
@@ -611,8 +608,6 @@ const RefinerScheduler: SingleMetadataHandler<ParameterScheduler> = {
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterScheduler>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion RefinerScheduler
-
-
 
 //#region RefinerDenoisingStart
 const RefinerDenoisingStart: SingleMetadataHandler<ParameterSDXLRefinerStart> = {

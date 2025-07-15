@@ -165,6 +165,9 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
 
   // Add Refiner if enabled
   if (refinerModel) {
+    // Set the main denoise node's denoising_end to refinerStart
+    denoise.denoising_start = 0;
+    denoise.denoising_end = params.refinerStart;
     await addSDXLRefiner(state, g, denoise, seamless, posCond, negCond, l2i);
   }
 

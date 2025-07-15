@@ -22,8 +22,13 @@ export const addTextToImage = ({
   denoise,
   l2i,
 }: AddTextToImageArg): Invocation<'img_resize' | 'l2i' | 'flux_vae_decode' | 'sd3_l2i' | 'cogview4_l2i'> => {
-  denoise.denoising_start = 0;
-  denoise.denoising_end = 1;
+  // Only set denoising values if they haven't been set already (e.g., by refiner)
+  if (denoise.denoising_start === undefined) {
+    denoise.denoising_start = 0;
+  }
+  if (denoise.denoising_end === undefined) {
+    denoise.denoising_end = 1;
+  }
 
   const { originalSize, scaledSize } = getOriginalAndScaledSizesForTextToImage(state);
 

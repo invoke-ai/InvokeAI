@@ -6,7 +6,7 @@ import type {
   SDXLRefinerModelFieldInputTemplate,
 } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
-import { useRefinerModels } from 'services/api/hooks/modelsByType';
+import { useSDXLModels } from 'services/api/hooks/modelsByType';
 import type { MainModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
@@ -16,7 +16,7 @@ type Props = FieldComponentProps<SDXLRefinerModelFieldInputInstance, SDXLRefiner
 const RefinerModelFieldInputComponent = (props: Props) => {
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
-  const [modelConfigs, { isLoading }] = useRefinerModels();
+  const [modelConfigs, { isLoading }] = useSDXLModels();
   const onChange = useCallback(
     (value: MainModelConfig | null) => {
       if (!value) {

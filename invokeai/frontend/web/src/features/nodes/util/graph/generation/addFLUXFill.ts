@@ -26,9 +26,12 @@ export const addFLUXFill = async ({
   l2i,
   denoise,
 }: AddFLUXFillArg): Promise<Invocation<'invokeai_img_blend' | 'apply_mask_to_image'>> => {
-  const { denoising_start, denoising_end } = getDenoisingStartAndEnd(state);
-  denoise.denoising_start = denoising_start;
-  denoise.denoising_end = denoising_end;
+  // Only set denoising values if they haven't been set already (e.g., by refiner)
+  if (denoise.denoising_start === undefined) {
+    const { denoising_start, denoising_end } = getDenoisingStartAndEnd(state);
+    denoise.denoising_start = denoising_start;
+    denoise.denoising_end = denoising_end;
+  }
 
   const { originalSize, scaledSize, rect } = getOriginalAndScaledSizesForOtherModes(state);
 

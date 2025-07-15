@@ -64,7 +64,9 @@ export const addSDXLRefiner = async (
     g.addEdge(refinerModelLoader, 'unet', refinerDenoise, 'unet');
   }
 
+  g.addEdge(refinerModelLoader, 'clip', refinerPosCond, 'clip');
   g.addEdge(refinerModelLoader, 'clip2', refinerPosCond, 'clip2');
+  g.addEdge(refinerModelLoader, 'clip', refinerNegCond, 'clip');
   g.addEdge(refinerModelLoader, 'clip2', refinerNegCond, 'clip2');
   g.addEdge(refinerPosCond, 'conditioning', refinerDenoise, 'positive_conditioning');
   g.addEdge(refinerNegCond, 'conditioning', refinerDenoise, 'negative_conditioning');

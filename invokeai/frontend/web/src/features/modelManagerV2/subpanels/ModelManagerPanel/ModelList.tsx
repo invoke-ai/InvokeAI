@@ -19,7 +19,7 @@ import {
   useLLaVAModels,
   useLoRAModels,
   useMainModels,
-  useRefinerModels,
+  useSDXLModels,
   useSigLipModels,
   useSpandrelImageToImageModels,
   useT2IAdapterModels,
@@ -42,7 +42,7 @@ const ModelList = () => {
     [mainModels, searchTerm, filteredModelType]
   );
 
-  const [refinerModels, { isLoading: isLoadingRefinerModels }] = useRefinerModels();
+  const [refinerModels, { isLoading: isLoadingRefinerModels }] = useSDXLModels();
   const filteredRefinerModels = useMemo(
     () => modelsFilter(refinerModels, searchTerm, filteredModelType),
     [refinerModels, searchTerm, filteredModelType]

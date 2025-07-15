@@ -1,7 +1,7 @@
-import { useRefinerModels } from 'services/api/hooks/modelsByType';
+import { useSDXLModels } from 'services/api/hooks/modelsByType';
 
 export const useIsRefinerAvailable = () => {
-  const [refinerModels] = useRefinerModels();
+  const [sdxlModels] = useSDXLModels();
 
-  return Boolean(refinerModels.length);
+  return Boolean(sdxlModels.length);
 };
