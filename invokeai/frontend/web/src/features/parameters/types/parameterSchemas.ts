@@ -170,17 +170,7 @@ export const [zParameterHRFEnabled, isParameterHRFEnabled] = buildParameter(z.bo
 export type ParameterHRFEnabled = z.infer<typeof zParameterHRFEnabled>;
 // #endregion
 
-// #region SDXL Refiner Positive Aesthetic Score
-export const [zParameterSDXLRefinerPositiveAestheticScore, isParameterSDXLRefinerPositiveAestheticScore] =
-  buildParameter(z.number().min(1).max(10));
-export type ParameterSDXLRefinerPositiveAestheticScore = z.infer<typeof zParameterSDXLRefinerPositiveAestheticScore>;
-// #endregion
 
-// #region SDXL Refiner Negative Aesthetic Score
-export const [zParameterSDXLRefinerNegativeAestheticScore, isParameterSDXLRefinerNegativeAestheticScore] =
-  buildParameter(zParameterSDXLRefinerPositiveAestheticScore);
-export type ParameterSDXLRefinerNegativeAestheticScore = z.infer<typeof zParameterSDXLRefinerNegativeAestheticScore>;
-// #endregion
 
 // #region SDXL Refiner Start
 export const [zParameterSDXLRefinerStart, isParameterSDXLRefinerStart] = buildParameter(z.number().min(0).max(1));

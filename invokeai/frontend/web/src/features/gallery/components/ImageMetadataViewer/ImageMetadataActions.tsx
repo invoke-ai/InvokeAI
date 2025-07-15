@@ -50,8 +50,7 @@ const ImageMetadataActions = (props: Props) => {
       <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.SeamlessY} />
       <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerModel} />
       <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerCFGScale} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerPositiveAestheticScore} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerNegativeAestheticScore} />
+
       <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerScheduler} />
       <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerDenoisingStart} />
       <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerSteps} />

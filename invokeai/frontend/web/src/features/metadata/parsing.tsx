@@ -20,8 +20,7 @@ import {
   setGuidance,
   setImg2imgStrength,
   setRefinerCFGScale,
-  setRefinerNegativeAestheticScore,
-  setRefinerPositiveAestheticScore,
+
   setRefinerScheduler,
   setRefinerStart,
   setRefinerSteps,
@@ -52,8 +51,7 @@ import type {
   ParameterPositiveStylePromptSDXL,
   ParameterScheduler,
   ParameterSDXLRefinerModel,
-  ParameterSDXLRefinerNegativeAestheticScore,
-  ParameterSDXLRefinerPositiveAestheticScore,
+
   ParameterSDXLRefinerStart,
   ParameterSeamlessX,
   ParameterSeamlessY,
@@ -74,8 +72,7 @@ import {
   zParameterPositivePrompt,
   zParameterPositiveStylePromptSDXL,
   zParameterScheduler,
-  zParameterSDXLRefinerNegativeAestheticScore,
-  zParameterSDXLRefinerPositiveAestheticScore,
+
   zParameterSDXLRefinerStart,
   zParameterSeamlessX,
   zParameterSeamlessY,
@@ -615,45 +612,7 @@ const RefinerScheduler: SingleMetadataHandler<ParameterScheduler> = {
 };
 //#endregion RefinerScheduler
 
-//#region RefinerPositiveAestheticScore
-const RefinerPositiveAestheticScore: SingleMetadataHandler<ParameterSDXLRefinerPositiveAestheticScore> = {
-  [SingleMetadataKey]: true,
-  type: 'RefinerPositiveAestheticScore',
-  parse: (metadata, _store) => {
-    const raw = getProperty(metadata, 'refiner_positive_aesthetic_score');
-    const parsed = zParameterSDXLRefinerPositiveAestheticScore.parse(raw);
-    return Promise.resolve(parsed);
-  },
-  recall: (value, store) => {
-    store.dispatch(setRefinerPositiveAestheticScore(value));
-  },
-  i18nKey: 'sdxl.posAestheticScore',
-  LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<ParameterSDXLRefinerPositiveAestheticScore>) => (
-    <MetadataPrimitiveValue value={value} />
-  ),
-};
-//#endregion RefinerPositiveAestheticScore
 
-//#region RefinerNegativeAestheticScore
-const RefinerNegativeAestheticScore: SingleMetadataHandler<ParameterSDXLRefinerNegativeAestheticScore> = {
-  [SingleMetadataKey]: true,
-  type: 'RefinerNegativeAestheticScore',
-  parse: (metadata, _store) => {
-    const raw = getProperty(metadata, 'refiner_negative_aesthetic_score');
-    const parsed = zParameterSDXLRefinerNegativeAestheticScore.parse(raw);
-    return Promise.resolve(parsed);
-  },
-  recall: (value, store) => {
-    store.dispatch(setRefinerNegativeAestheticScore(value));
-  },
-  i18nKey: 'sdxl.negAestheticScore',
-  LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<ParameterSDXLRefinerNegativeAestheticScore>) => (
-    <MetadataPrimitiveValue value={value} />
-  ),
-};
-//#endregion RefinerNegativeAestheticScore
 
 //#region RefinerDenoisingStart
 const RefinerDenoisingStart: SingleMetadataHandler<ParameterSDXLRefinerStart> = {
@@ -887,8 +846,7 @@ export const MetadataHandlers = {
   RefinerSteps,
   RefinerCFGScale,
   RefinerScheduler,
-  RefinerPositiveAestheticScore,
-  RefinerNegativeAestheticScore,
+
   RefinerDenoisingStart,
   MainModel,
   VAEModel,

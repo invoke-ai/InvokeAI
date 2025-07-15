@@ -51,8 +51,7 @@ export type Feature =
   | 'patchmatchDownScaleSize'
   | 'rasterLayer'
   | 'refinerModel'
-  | 'refinerNegativeAestheticScore'
-  | 'refinerPositiveAestheticScore'
+
   | 'refinerScheduler'
   | 'refinerStart'
   | 'refinerSteps'
@@ -191,12 +190,8 @@ export const POPOVER_DATA: { [key in Feature]?: PopoverData } = {
   refinerModel: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000178333-using-the-refiner',
   },
-  refinerNegativeAestheticScore: {
-    href: 'https://support.invoke.ai/support/solutions/articles/151000178333-using-the-refiner',
-  },
-  refinerPositiveAestheticScore: {
-    href: 'https://support.invoke.ai/support/solutions/articles/151000178333-using-the-refiner',
-  },
+
+
   refinerScheduler: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000178333-using-the-refiner',
   },

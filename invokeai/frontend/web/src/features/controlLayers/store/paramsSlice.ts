@@ -167,12 +167,7 @@ export const paramsSlice = createSlice({
     setRefinerScheduler: (state, action: PayloadAction<ParameterScheduler>) => {
       state.refinerScheduler = action.payload;
     },
-    setRefinerPositiveAestheticScore: (state, action: PayloadAction<number>) => {
-      state.refinerPositiveAestheticScore = action.payload;
-    },
-    setRefinerNegativeAestheticScore: (state, action: PayloadAction<number>) => {
-      state.refinerNegativeAestheticScore = action.payload;
-    },
+
     setRefinerStart: (state, action: PayloadAction<number>) => {
       state.refinerStart = action.payload;
     },
@@ -382,8 +377,7 @@ export const {
   setRefinerSteps,
   setRefinerCFGScale,
   setRefinerScheduler,
-  setRefinerPositiveAestheticScore,
-  setRefinerNegativeAestheticScore,
+
   setRefinerStart,
   modelChanged,
 
@@ -488,12 +482,7 @@ export const selectUpscaleCfgScale = createParamsSelector((params) => params.ups
 export const selectRefinerCFGScale = createParamsSelector((params) => params.refinerCFGScale);
 export const selectRefinerModel = createParamsSelector((params) => params.refinerModel);
 export const selectIsRefinerModelSelected = createParamsSelector((params) => Boolean(params.refinerModel));
-export const selectRefinerPositiveAestheticScore = createParamsSelector(
-  (params) => params.refinerPositiveAestheticScore
-);
-export const selectRefinerNegativeAestheticScore = createParamsSelector(
-  (params) => params.refinerNegativeAestheticScore
-);
+
 export const selectRefinerScheduler = createParamsSelector((params) => params.refinerScheduler);
 export const selectRefinerStart = createParamsSelector((params) => params.refinerStart);
 export const selectRefinerSteps = createParamsSelector((params) => params.refinerSteps);

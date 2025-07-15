@@ -562,8 +562,7 @@ const zParamsState = z.object({
   refinerSteps: z.number().default(20),
   refinerCFGScale: z.number().default(7.5),
   refinerScheduler: zParameterScheduler.default('euler'),
-  refinerPositiveAestheticScore: z.number().default(6),
-  refinerNegativeAestheticScore: z.number().default(2.5),
+
   refinerStart: z.number().default(0.8),
   t5EncoderModel: zParameterT5EncoderModel.nullable().default(null),
   clipEmbedModel: zParameterCLIPEmbedModel.nullable().default(null),

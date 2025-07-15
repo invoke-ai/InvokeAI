@@ -3,7 +3,7 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { Invocation } from 'services/api/types';
-import { isMainModelModelConfig } from 'services/api/types';
+import { isSDXLMainModelModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 export const addSDXLRefiner = async (
@@ -15,19 +15,11 @@ export const addSDXLRefiner = async (
   negCond: Invocation<'sdxl_compel_prompt'>,
   l2i: Invocation<'l2i'>
 ): Promise<void> => {
-  const {
-    refinerModel,
-    refinerPositiveAestheticScore,
-    refinerNegativeAestheticScore,
-    refinerSteps,
-    refinerScheduler,
-    refinerCFGScale,
-    refinerStart,
-  } = state.params;
+  const { refinerModel, refinerSteps, refinerScheduler, refinerCFGScale, refinerStart } = state.params;
 
   assert(refinerModel, 'No refiner model found in state');
 
-  const modelConfig = await fetchModelConfigWithTypeGuard(refinerModel.key, isMainModelModelConfig);
+  const modelConfig = await fetchModelConfigWithTypeGuard(refinerModel.key, isSDXLMainModelModelConfig);
 
   // We need to re-route latents to the refiner
   g.deleteEdgesFrom(denoise, ['latents']);
@@ -43,13 +35,11 @@ export const addSDXLRefiner = async (
     type: 'sdxl_compel_prompt',
     id: getPrefixedId('refiner_pos_cond'),
     style: posCond.style,
-    aesthetic_score: refinerPositiveAestheticScore,
   });
   const refinerNegCond = g.addNode({
     type: 'sdxl_compel_prompt',
     id: getPrefixedId('refiner_neg_cond'),
     style: negCond.style,
-    aesthetic_score: refinerNegativeAestheticScore,
   });
   const refinerDenoise = g.addNode({
     type: 'denoise_latents',
@@ -83,8 +73,6 @@ export const addSDXLRefiner = async (
 
   g.upsertMetadata({
     refiner_model: Graph.getModelMetadataField(modelConfig),
-    refiner_positive_aesthetic_score: refinerPositiveAestheticScore,
-    refiner_negative_aesthetic_score: refinerNegativeAestheticScore,
     refiner_cfg_scale: refinerCFGScale,
     refiner_scheduler: refinerScheduler,
     refiner_start: refinerStart,
