@@ -40,7 +40,7 @@ export const FloatFieldCollectionInputComponent = memo(
     const store = useAppStore();
     const { t } = useTranslation();
 
-    const isInvalid = useInputFieldIsInvalid(nodeId, field.name);
+    const isInvalid = useInputFieldIsInvalid(field.name);
 
     const onChangeValue = useCallback(
       (value: FloatFieldCollectionInputInstance['value']) => {

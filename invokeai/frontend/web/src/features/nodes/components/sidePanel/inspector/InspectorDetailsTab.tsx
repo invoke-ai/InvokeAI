@@ -35,9 +35,9 @@ export default memo(InspectorDetailsTab);
 
 const Content = memo(({ nodeId }: { nodeId: string }) => {
   const { t } = useTranslation();
-  const version = useNodeVersion(nodeId);
-  const template = useNodeTemplateOrThrow(nodeId);
-  const needsUpdate = useNodeNeedsUpdate(nodeId);
+  const version = useNodeVersion();
+  const template = useNodeTemplateOrThrow();
+  const needsUpdate = useNodeNeedsUpdate();
 
   return (
     <Box position="relative" w="full" h="full">

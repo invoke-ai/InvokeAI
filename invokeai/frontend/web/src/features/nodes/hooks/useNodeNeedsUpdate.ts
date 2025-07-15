@@ -4,10 +4,10 @@ import { useMemo } from 'react';
 
 import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';
 
-export const useNodeNeedsUpdate = (nodeId: string) => {
-  const type = useNodeType(nodeId);
-  const version = useNodeVersion(nodeId);
-  const template = useNodeTemplateOrThrow(nodeId);
+export const useNodeNeedsUpdate = () => {
+  const type = useNodeType();
+  const version = useNodeVersion();
+  const template = useNodeTemplateOrThrow();
   const needsUpdate = useMemo(() => {
     if (type !== template.type) {
       return true;

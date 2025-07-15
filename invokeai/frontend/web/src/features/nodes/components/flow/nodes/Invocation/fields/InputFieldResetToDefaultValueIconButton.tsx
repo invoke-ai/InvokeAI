@@ -11,7 +11,7 @@ type Props = {
 
 export const InputFieldResetToDefaultValueIconButton = memo(({ nodeId, fieldName }: Props) => {
   const { t } = useTranslation();
-  const { isValueChanged, resetToDefaultValue } = useInputFieldDefaultValue(nodeId, fieldName);
+  const { isValueChanged, resetToDefaultValue } = useInputFieldDefaultValue(fieldName);
 
   return (
     <IconButton

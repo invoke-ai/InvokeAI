@@ -1,3 +1,9 @@
+import { useStore } from '@nanostores/react';
+import { EMPTY_ARRAY } from 'app/store/constants';
+import { useAppSelector } from 'app/store/storeHooks';
+import { debounce } from 'es-toolkit';
+import { $templates } from 'features/nodes/store/nodesSlice';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState, Templates } from 'features/nodes/store/types';
 import type {
   FieldInputInstance,
@@ -32,6 +38,8 @@ import {
 } from 'features/nodes/types/field';
 import { type InvocationNode, type InvocationTemplate, isInvocationNode } from 'features/nodes/types/invocation';
 import { t } from 'i18next';
+import { map } from 'nanostores';
+import { useEffect } from 'react';
 import { assert } from 'tsafe';
 
 type FieldValidationFunc<TValue extends StatefulFieldValue, TTemplate extends FieldInputTemplate> = (
@@ -164,13 +172,13 @@ const validateNumberFieldValue: FieldValidationFunc<
   return reasons;
 };
 
-type NodeError = {
+export type NodeError = {
   type: 'node-error';
   nodeId: string;
   issue: string;
 };
 
-type FieldError = {
+export type FieldError = {
   type: 'field-error';
   nodeId: string;
   fieldName: string;
@@ -223,7 +231,7 @@ export const getFieldErrors = (
       nodeId,
       fieldName,
       prefix,
-      issue: t('parameters.invoke.missingInputForField'),
+      issue: 'parameters.invoke.missingInputForField',
     });
   } else if (isConnected) {
     // Connected fields have no value to validate - they are OK
@@ -274,5 +282,57 @@ export const getInvocationNodeErrors = (
     errors.push(...getFieldErrors(node, nodeTemplate, field, fieldTemplate, nodesState));
   }
 
+  if (errors.length === 0) {
+    return EMPTY_ARRAY;
+  }
+
   return errors;
+};
+
+export const $nodeErrors = map<Record<string, (NodeError | FieldError)[]>>({});
+
+export const syncNodeErrors = (nodesState: NodesState, templates: Templates) => {
+  for (const node of nodesState.nodes) {
+    const errors: (NodeError | FieldError)[] = [];
+    if (!isInvocationNode(node)) {
+      continue;
+    }
+
+    const nodeTemplate = templates[node.data.type];
+
+    if (!nodeTemplate) {
+      errors.push({ type: 'node-error', nodeId: node.id, issue: t('parameters.invoke.missingNodeTemplate') });
+      $nodeErrors.setKey(node.id, errors);
+      continue;
+    }
+
+    for (const [fieldName, field] of Object.entries(node.data.inputs)) {
+      const fieldTemplate = nodeTemplate.inputs[fieldName];
+
+      if (!fieldTemplate) {
+        errors.push({ type: 'node-error', nodeId: node.id, issue: t('parameters.invoke.missingFieldTemplate') });
+        $nodeErrors.setKey(node.id, errors);
+        continue;
+      }
+
+      errors.push(...getFieldErrors(node, nodeTemplate, field, fieldTemplate, nodesState));
+    }
+
+    if (errors.length === 0) {
+      $nodeErrors.setKey(node.id, EMPTY_ARRAY);
+      continue;
+    }
+
+    $nodeErrors.setKey(node.id, errors);
+  }
+};
+
+const debouncedSyncNodeErrors = debounce(syncNodeErrors, 300);
+
+export const useSyncNodeErrors = () => {
+  const nodesState = useAppSelector(selectNodesSlice);
+  const templates = useStore($templates);
+  useEffect(() => {
+    debouncedSyncNodeErrors(nodesState, templates);
+  }, [nodesState, templates]);
 };

@@ -1,17 +1,16 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectNodeData, selectNodesSlice } from 'features/nodes/store/selectors';
+import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { useMemo } from 'react';
 
-export const useNodeIsIntermediate = (nodeId: string): boolean => {
+export const useNodeIsIntermediate = (): boolean => {
+  const ctx = useInvocationNodeContext();
   const selector = useMemo(
     () =>
-      createSelector(selectNodesSlice, (nodes) => {
-        return selectNodeData(nodes, nodeId)?.isIntermediate ?? false;
+      createSelector(ctx.selectNodeDataSafe, (data) => {
+        return data?.isIntermediate ?? false;
       }),
-    [nodeId]
+    [ctx]
   );
-
-  const isIntermediate = useAppSelector(selector);
-  return isIntermediate;
+  return useAppSelector(selector);
 };

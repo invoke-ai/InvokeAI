@@ -29,7 +29,7 @@ export default memo(NodeTemplateInspector);
 
 const Content = memo(({ nodeId }: { nodeId: string }) => {
   const { t } = useTranslation();
-  const template = useNodeTemplateOrThrow(nodeId);
+  const template = useNodeTemplateOrThrow();
 
   return <DataViewer data={template} label={t('nodes.nodeTemplate')} bg="base.850" color="base.200" />;
 });

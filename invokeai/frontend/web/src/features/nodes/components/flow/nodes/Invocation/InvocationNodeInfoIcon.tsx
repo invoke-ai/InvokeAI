@@ -14,7 +14,7 @@ interface Props {
 }
 
 export const InvocationNodeInfoIcon = memo(({ nodeId }: Props) => {
-  const needsUpdate = useNodeNeedsUpdate(nodeId);
+  const needsUpdate = useNodeNeedsUpdate();
 
   return (
     <Tooltip label={<TooltipContent nodeId={nodeId} />} placement="top" shouldWrapChildren>
@@ -26,10 +26,10 @@ export const InvocationNodeInfoIcon = memo(({ nodeId }: Props) => {
 InvocationNodeInfoIcon.displayName = 'InvocationNodeInfoIcon';
 
 const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
-  const notes = useInvocationNodeNotes(nodeId);
-  const label = useNodeUserTitleSafe(nodeId);
-  const version = useNodeVersion(nodeId);
-  const nodeTemplate = useNodeTemplateOrThrow(nodeId);
+  const notes = useInvocationNodeNotes();
+  const label = useNodeUserTitleSafe();
+  const version = useNodeVersion();
+  const nodeTemplate = useNodeTemplateOrThrow();
   const { t } = useTranslation();
 
   const title = useMemo(() => {

@@ -10,7 +10,7 @@ interface Props {
 }
 
 export const OutputFieldTooltipContent = memo(({ nodeId, fieldName }: Props) => {
-  const fieldTemplate = useOutputFieldTemplate(nodeId, fieldName);
+  const fieldTemplate = useOutputFieldTemplate(fieldName);
   const fieldTypeName = useFieldTypeName(fieldTemplate.type);
   const { t } = useTranslation();
 

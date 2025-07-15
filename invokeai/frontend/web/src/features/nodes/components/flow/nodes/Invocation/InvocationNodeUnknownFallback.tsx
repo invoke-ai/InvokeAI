@@ -14,7 +14,7 @@ type Props = {
 
 const InvocationNodeUnknownFallback = ({ nodeId, isOpen, label, type }: Props) => {
   const { t } = useTranslation();
-  const nodePack = useNodePack(nodeId);
+  const nodePack = useNodePack();
   return (
     <>
       <Flex

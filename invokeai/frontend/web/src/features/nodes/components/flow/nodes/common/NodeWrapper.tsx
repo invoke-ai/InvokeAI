@@ -1,6 +1,7 @@
 import type { ChakraProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, useGlobalMenuClose } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { InvocationNodeContextProvider } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { useMouseOverFormField, useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
@@ -137,24 +138,26 @@ const NodeWrapper = (props: NodeWrapperProps) => {
   );
 
   return (
-    <Box
-      onClick={globalMenu.onCloseGlobal}
-      onDoubleClick={onDoubleClick}
-      onMouseOver={mouseOverNode.handleMouseOver}
-      onMouseOut={mouseOverNode.handleMouseOut}
-      className={DRAG_HANDLE_CLASSNAME}
-      sx={containerSx}
-      width={width || NODE_WIDTH}
-      opacity={opacity}
-      data-is-editor-locked={isLocked}
-      data-is-selected={selected}
-      data-is-mouse-over-form-field={mouseOverFormField.isMouseOverFormField}
-    >
-      <Box sx={shadowsSx} />
-      <Box sx={inProgressSx} data-is-in-progress={isInProgress} />
-      {children}
-      <Box className="node-selection-overlay" />
-    </Box>
+    <InvocationNodeContextProvider nodeId={nodeId}>
+      <Box
+        onClick={globalMenu.onCloseGlobal}
+        onDoubleClick={onDoubleClick}
+        onMouseOver={mouseOverNode.handleMouseOver}
+        onMouseOut={mouseOverNode.handleMouseOut}
+        className={DRAG_HANDLE_CLASSNAME}
+        sx={containerSx}
+        width={width || NODE_WIDTH}
+        opacity={opacity}
+        data-is-editor-locked={isLocked}
+        data-is-selected={selected}
+        data-is-mouse-over-form-field={mouseOverFormField.isMouseOverFormField}
+      >
+        <Box sx={shadowsSx} />
+        <Box sx={inProgressSx} data-is-in-progress={isInProgress} />
+        {children}
+        <Box className="node-selection-overlay" />
+      </Box>
+    </InvocationNodeContextProvider>
   );
 };
 

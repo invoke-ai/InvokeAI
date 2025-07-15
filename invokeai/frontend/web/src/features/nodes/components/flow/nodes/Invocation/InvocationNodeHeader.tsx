@@ -32,7 +32,7 @@ const sx: SystemStyleObject = {
 };
 
 const InvocationNodeHeader = ({ nodeId, isOpen }: Props) => {
-  const isInvalid = useNodeIsInvalid(nodeId);
+  const isInvalid = useNodeIsInvalid();
 
   return (
     <Flex layerStyle="nodeHeader" sx={sx} data-is-open={isOpen} data-is-invalid={isInvalid}>

@@ -223,63 +223,75 @@ export const nodesSlice = createSlice({
       //
       // But we don't have immer as an explicit dependency so we'll just cast.
       state.nodes = applyNodeChanges(action.payload, state.nodes) as typeof state.nodes;
-      // Remove edges that are no longer valid, due to a removed or otherwise changed node
-      const edgeChanges: EdgeChange<AnyEdge>[] = [];
-      state.edges.forEach((e) => {
-        const sourceExists = state.nodes.some((n) => n.id === e.source);
-        const targetExists = state.nodes.some((n) => n.id === e.target);
-        if (!(sourceExists && targetExists)) {
-          edgeChanges.push({ type: 'remove', id: e.id });
-        }
-      });
-      state.edges = applyEdgeChanges<AnyEdge>(edgeChanges, state.edges);
 
-      // If a node was removed, we should remove any form fields that were associated with it. However, node changes
-      // may remove and then add the same node back. For example, when updating a workflow, we replace old nodes with
-      // updated nodes. In this case, we should not remove the form fields. To handle this, we find the last remove
-      // and add changes for each exposed field. If the remove change comes after the add change, we remove the exposed
-      // field.
-      for (const el of Object.values(state.form.elements)) {
-        if (!isNodeFieldElement(el)) {
-          continue;
+      // Remove edges that are no longer valid, due to a removed or otherwise changed node
+      const didNodesChange = action.payload.some(
+        (change) => change.type === 'add' || change.type === 'remove' || change.type === 'replace'
+      );
+
+      if (didNodesChange) {
+        const edgeChanges: EdgeChange<AnyEdge>[] = [];
+        for (const e of state.edges) {
+          const sourceExists = state.nodes.some((n) => n.id === e.source);
+          const targetExists = state.nodes.some((n) => n.id === e.target);
+          if (!(sourceExists && targetExists)) {
+            edgeChanges.push({ type: 'remove', id: e.id });
+          }
         }
-        const { nodeId } = el.data.fieldIdentifier;
-        const removeIndex = action.payload.findLastIndex((change) => change.type === 'remove' && change.id === nodeId);
-        const addIndex = action.payload.findLastIndex((change) => change.type === 'add' && change.item.id === nodeId);
-        if (removeIndex > addIndex) {
-          removeElement({ form: state.form, id: el.id });
+        if (edgeChanges.length > 0) {
+          state.edges = applyEdgeChanges<AnyEdge>(edgeChanges, state.edges);
+        }
+      }
+
+      const wereNodesRemoved = action.payload.some((change) => change.type === 'remove' || change.type === 'replace');
+
+      if (wereNodesRemoved) {
+        // If a node was removed, we should remove any form fields that were associated with it. However, node changes
+        // may remove and then add the same node back. For example, when updating a workflow, we replace old nodes with
+        // updated nodes. In this case, we should not remove the form fields. To handle this, we find the last remove
+        // and add changes for each exposed field. If the remove change comes after the add change, we remove the exposed
+        // field.
+        for (const el of Object.values(state.form.elements)) {
+          if (!isNodeFieldElement(el)) {
+            continue;
+          }
+          const { nodeId } = el.data.fieldIdentifier;
+          const removeIndex = action.payload.findLastIndex(
+            (change) => change.type === 'remove' && change.id === nodeId
+          );
+          const addIndex = action.payload.findLastIndex((change) => change.type === 'add' && change.item.id === nodeId);
+          if (removeIndex > addIndex) {
+            removeElement({ form: state.form, id: el.id });
+          }
         }
       }
     },
     edgesChanged: (state, action: PayloadAction<EdgeChange<AnyEdge>[]>) => {
       const changes: EdgeChange<AnyEdge>[] = [];
       // We may need to massage the edge changes or otherwise handle them
-      action.payload.forEach((change) => {
+      for (const change of action.payload) {
         if (change.type === 'remove' || change.type === 'select') {
           const edge = state.edges.find((e) => e.id === change.id);
           // If we deleted or selected a collapsed edge, we need to find its "hidden" edges and do the same to them
           if (edge && edge.type === 'collapsed') {
             const hiddenEdges = state.edges.filter((e) => e.source === edge.source && e.target === edge.target);
-            if (change.type === 'remove') {
-              hiddenEdges.forEach(({ id }) => {
+            for (const { id } of hiddenEdges) {
+              if (change.type === 'remove') {
                 changes.push({ type: 'remove', id });
-              });
-            }
-            if (change.type === 'select') {
-              hiddenEdges.forEach(({ id }) => {
+              }
+              if (change.type === 'select') {
                 changes.push({ type: 'select', id, selected: change.selected });
-              });
+              }
             }
           }
-        }
-        if (change.type === 'add') {
+        } else if (change.type === 'add') {
           if (!change.item.type) {
             // We must add the edge type!
             change.item.type = 'default';
           }
         }
         changes.push(change);
-      });
+      }
       state.edges = applyEdgeChanges(changes, state.edges);
     },
     fieldLabelChanged: (

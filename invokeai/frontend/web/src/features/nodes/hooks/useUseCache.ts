@@ -1,17 +1,16 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectNodeData, selectNodesSlice } from 'features/nodes/store/selectors';
+import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { useMemo } from 'react';
 
-export const useUseCache = (nodeId: string) => {
+export const useUseCache = () => {
+  const ctx = useInvocationNodeContext();
   const selector = useMemo(
     () =>
-      createSelector(selectNodesSlice, (nodes) => {
-        return selectNodeData(nodes, nodeId)?.useCache ?? false;
+      createSelector(ctx.selectNodeDataSafe, (data) => {
+        return data?.useCache ?? false;
       }),
-    [nodeId]
+    [ctx]
   );
-
-  const useCache = useAppSelector(selector);
-  return useCache;
+  return useAppSelector(selector);
 };
