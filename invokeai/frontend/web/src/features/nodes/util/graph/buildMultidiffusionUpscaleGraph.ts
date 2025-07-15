@@ -67,13 +67,11 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
   g.addEdge(unsharpMask, 'width', noise, 'width');
   g.addEdge(unsharpMask, 'height', noise, 'height');
 
-  const effectiveTileSize = tileSize;
-
   const i2l = g.addNode({
     type: 'i2l',
     id: getPrefixedId('i2l'),
     fp32: vaePrecision === 'fp32',
-    tile_size: effectiveTileSize,
+    tile_size: tileSize,
     tiled: true,
   });
 
@@ -83,7 +81,7 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
     type: 'l2i',
     id: getPrefixedId('l2i'),
     fp32: vaePrecision === 'fp32',
-    tile_size: effectiveTileSize,
+    tile_size: tileSize,
     tiled: true,
     board: getBoardField(state),
     is_intermediate: false,
@@ -92,8 +90,8 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
   const tiledMultidiffusion = g.addNode({
     type: 'tiled_multi_diffusion_denoise_latents',
     id: getPrefixedId('tiled_multidiffusion_denoise_latents'),
-    tile_height: effectiveTileSize,
-    tile_width: effectiveTileSize,
+    tile_height: tileSize,
+    tile_width: tileSize,
     tile_overlap: tileOverlap || 128,
     steps,
     cfg_scale,
@@ -195,7 +193,7 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
     upscale_model: Graph.getModelMetadataField(upscaleModelConfig),
     creativity,
     structure,
-    tile_size: effectiveTileSize,
+    tile_size: tileSize,
     tile_overlap: tileOverlap || 128,
     upscale_initial_image: {
       image_name: upscaleInitialImage.image_name,

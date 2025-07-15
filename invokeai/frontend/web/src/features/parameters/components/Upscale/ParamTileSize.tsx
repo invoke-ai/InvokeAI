@@ -10,7 +10,7 @@ const sliderMax = 1536;
 const numberInputMin = 512;
 const numberInputMax = 1536;
 const coarseStep = 64;
-const fineStep = 32;
+const fineStep = 64;
 const marks = [sliderMin, 1024, sliderMax];
 
 const ParamTileSize = () => {
