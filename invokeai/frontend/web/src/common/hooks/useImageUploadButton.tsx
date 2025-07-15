@@ -1,9 +1,11 @@
 import type { ButtonProps, IconButtonProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Button, IconButton } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
+import { trackErrorDetails } from 'features/system/store/actions';
 import { selectIsClientSideUploadEnabled } from 'features/system/store/configSlice';
+import { zPydanticValidationErrorWithDetail } from 'features/system/store/zodSchemas';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
 import type { FileRejection } from 'react-dropzone';
@@ -65,6 +67,7 @@ export const useImageUploadButton = ({
   const [uploadImage, request] = useUploadImageMutation();
   const clientSideUpload = useClientSideUpload();
   const { t } = useTranslation();
+  const dispatch = useAppDispatch();
 
   const onDropAccepted = useCallback(
     async (files: File[]) => {
@@ -116,6 +119,11 @@ export const useImageUploadButton = ({
         }
       } catch (error) {
         onError?.(error);
+        const parsedError = zPydanticValidationErrorWithDetail.safeParse(error);
+        const errorMessage = parsedError.success ? parsedError.data.data.detail : undefined;
+
+        dispatch(trackErrorDetails({ title: 'Failed to upload image', errorMessage, description: null }));
+
         toast({
           id: 'UPLOAD_FAILED',
           title: t('toast.imageUploadFailed'),
@@ -133,6 +141,7 @@ export const useImageUploadButton = ({
       clientSideUpload,
       onError,
       t,
+      dispatch,
     ]
   );
 

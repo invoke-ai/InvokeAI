@@ -1,10 +1,11 @@
 import { useStore } from '@nanostores/react';
 import { logger } from 'app/logging/logger';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { withResultAsync } from 'common/util/result';
 import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { useEnqueueWorkflows } from 'features/queue/hooks/useEnqueueWorkflows';
 import { $isReadyToEnqueue } from 'features/queue/store/readiness';
+import { trackErrorDetails } from 'features/system/store/actions';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID, WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -26,6 +27,7 @@ export const useInvoke = () => {
   const enqueueCanvas = useEnqueueCanvas();
   const enqueueGenerate = useEnqueueGenerate();
   const enqueueUpscaling = useEnqueueUpscaling();
+  const dispatch = useAppDispatch();
 
   const [_, { isLoading }] = useEnqueueBatchMutation({
     ...enqueueMutationFixedCacheKeyOptions,
@@ -55,9 +57,16 @@ export const useInvoke = () => {
 
       if (result.isErr()) {
         log.error({ error: serializeError(result.error) }, 'Failed to enqueue batch');
+        dispatch(
+          trackErrorDetails({
+            title: 'Failed to enqueue batch',
+            errorMessage: serializeError(result.error).message,
+            description: serializeError(result.error).stack?.toString() ?? null,
+          })
+        );
       }
     },
-    [enqueueCanvas, enqueueGenerate, enqueueUpscaling, enqueueWorkflows, isReady, tabName]
+    [enqueueCanvas, enqueueGenerate, enqueueUpscaling, enqueueWorkflows, isReady, tabName, dispatch]
   );
 
   const enqueueBack = useCallback(() => {

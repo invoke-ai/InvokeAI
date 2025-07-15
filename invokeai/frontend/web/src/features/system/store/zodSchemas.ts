@@ -12,3 +12,9 @@ export const zPydanticValidationError = z.object({
     ),
   }),
 });
+
+export const zPydanticValidationErrorWithDetail = z.object({
+  data: z.object({
+    detail: z.string(),
+  }),
+});

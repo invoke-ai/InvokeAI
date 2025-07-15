@@ -6,6 +6,8 @@ import { omit } from 'es-toolkit/compat';
 import { imageUploadedClientSide } from 'features/gallery/store/actions';
 import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { boardIdSelected, galleryViewChanged } from 'features/gallery/store/gallerySlice';
+import { trackErrorDetails } from 'features/system/store/actions';
+import { zPydanticValidationErrorWithDetail } from 'features/system/store/zodSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { boardsApi } from 'services/api/endpoints/boards';
@@ -130,7 +132,7 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
 
   startAppListening({
     matcher: imagesApi.endpoints.uploadImage.matchRejected,
-    effect: (action) => {
+    effect: (action, { dispatch }) => {
       const sanitizedData = {
         arg: {
           ...omit(action.meta.arg.originalArgs, ['file', 'postUploadAction']),
@@ -138,9 +140,15 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         },
       };
       log.error({ ...sanitizedData }, 'Image upload failed');
+
+      const parsedError = zPydanticValidationErrorWithDetail.safeParse(action.payload);
+      const errorMessage = parsedError.success ? parsedError.data.data.detail : action.error.message;
+
+      dispatch(trackErrorDetails({ title: 'Image Upload Rejected', errorMessage, description: null }));
+
       toast({
         title: t('toast.imageUploadFailed'),
-        description: action.error.message,
+        description: errorMessage,
         status: 'error',
       });
     },
