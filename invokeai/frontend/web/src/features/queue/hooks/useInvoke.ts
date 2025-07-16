@@ -15,6 +15,7 @@ import { enqueueMutationFixedCacheKeyOptions, useEnqueueBatchMutation } from 'se
 import { useEnqueueCanvas } from './useEnqueueCanvas';
 import { useEnqueueGenerate } from './useEnqueueGenerate';
 import { useEnqueueUpscaling } from './useEnqueueUpscaling';
+import { selectSaveAllImagesToGallery } from 'features/controlLayers/store/canvasSettingsSlice';
 
 const log = logger('generation');
 
@@ -26,6 +27,7 @@ export const useInvoke = () => {
   const enqueueCanvas = useEnqueueCanvas();
   const enqueueGenerate = useEnqueueGenerate();
   const enqueueUpscaling = useEnqueueUpscaling();
+  const saveAllImagesToGallery = useAppSelector(selectSaveAllImagesToGallery);
 
   const [_, { isLoading }] = useEnqueueBatchMutation({
     ...enqueueMutationFixedCacheKeyOptions,
@@ -62,7 +64,7 @@ export const useInvoke = () => {
 
   const enqueueBack = useCallback(() => {
     enqueue(false, false);
-    if (tabName === 'generate' || tabName === 'upscaling') {
+    if (tabName === 'generate' || tabName === 'upscaling' || (tabName === 'canvas' && saveAllImagesToGallery)) {
       navigationApi.focusPanel(tabName, VIEWER_PANEL_ID);
     } else if (tabName === 'workflows') {
       // Only switch to viewer if the workflow editor is not currently active
@@ -77,7 +79,7 @@ export const useInvoke = () => {
 
   const enqueueFront = useCallback(() => {
     enqueue(true, false);
-    if (tabName === 'generate' || tabName === 'upscaling') {
+    if (tabName === 'generate' || tabName === 'upscaling' || (tabName === 'canvas' && saveAllImagesToGallery)) {
       navigationApi.focusPanel(tabName, VIEWER_PANEL_ID);
     } else if (tabName === 'workflows') {
       // Only switch to viewer if the workflow editor is not currently active
