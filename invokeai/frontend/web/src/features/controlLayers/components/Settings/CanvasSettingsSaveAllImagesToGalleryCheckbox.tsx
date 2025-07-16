@@ -16,7 +16,7 @@ export const CanvasSettingsSaveAllImagesToGalleryCheckbox = memo(() => {
   }, [dispatch]);
   return (
     <FormControl w="full">
-      <FormLabel flexGrow={1}>{t('controlLayers.saveAllImagesToGallery')}</FormLabel>
+      <FormLabel flexGrow={1}>{t('controlLayers.settings.saveAllImagesToGallery.label')}</FormLabel>
       <Checkbox isChecked={saveAllImagesToGallery} onChange={onChange} />
     </FormControl>
   );
