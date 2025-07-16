@@ -413,12 +413,6 @@ const optionNameSx: SystemStyleObject = {
   },
 };
 
-const optionDescriptionSx: SystemStyleObject = {
-  '&[data-is-compact="true"]': {
-    color: 'base.800',
-  },
-};
-
 const PickerOptionComponent = typedMemo(
   <T extends AnyModelConfig>({ option, ...rest }: { option: WithStarred<T> } & BoxProps) => {
     const { $compactView } = usePickerContext<WithStarred<T>>();
@@ -460,7 +454,7 @@ const PickerOptionComponent = typedMemo(
             )}
           </Flex>
           {option.description && !compactView && (
-            <Text sx={optionDescriptionSx} data-is-compact={compactView}>
+            <Text className="extra-info" color="base.200">
               {option.description}
             </Text>
           )}
