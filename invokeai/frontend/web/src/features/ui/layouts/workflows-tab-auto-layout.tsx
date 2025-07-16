@@ -16,18 +16,22 @@ import type {
   RootLayoutGridviewComponents,
 } from 'features/ui/layouts/auto-layout-context';
 import { AutoLayoutProvider, useAutoLayoutContext, withPanelContainer } from 'features/ui/layouts/auto-layout-context';
-import { TabWithoutCloseButton } from 'features/ui/layouts/TabWithoutCloseButton';
+import { DockviewTab } from 'features/ui/layouts/DockviewTab';
 import type { TabName } from 'features/ui/store/uiTypes';
 import { dockviewTheme } from 'features/ui/styles/theme';
 import { memo, useCallback, useEffect } from 'react';
 
+import { DockviewTabLaunchpad } from './DockviewTabLaunchpad';
+import { DockviewTabProgress } from './DockviewTabProgress';
 import { navigationApi } from './navigation-api';
 import { PanelHotkeysLogical } from './PanelHotkeysLogical';
 import {
   BOARD_PANEL_DEFAULT_HEIGHT_PX,
   BOARD_PANEL_MIN_HEIGHT_PX,
   BOARDS_PANEL_ID,
-  DEFAULT_TAB_ID,
+  DOCKVIEW_TAB_ID,
+  DOCKVIEW_TAB_LAUNCHPAD_ID,
+  DOCKVIEW_TAB_PROGRESS_ID,
   GALLERY_PANEL_DEFAULT_HEIGHT_PX,
   GALLERY_PANEL_ID,
   GALLERY_PANEL_MIN_HEIGHT_PX,
@@ -39,18 +43,14 @@ import {
   RIGHT_PANEL_ID,
   RIGHT_PANEL_MIN_SIZE_PX,
   SETTINGS_PANEL_ID,
-  TAB_WITH_LAUNCHPAD_ICON_ID,
-  TAB_WITH_PROGRESS_INDICATOR_ID,
   VIEWER_PANEL_ID,
   WORKSPACE_PANEL_ID,
 } from './shared';
-import { TabWithLaunchpadIcon } from './TabWithLaunchpadIcon';
-import { TabWithoutCloseButtonAndWithProgressIndicator } from './TabWithoutCloseButtonAndWithProgressIndicator';
 
 const tabComponents = {
-  [DEFAULT_TAB_ID]: TabWithoutCloseButton,
-  [TAB_WITH_PROGRESS_INDICATOR_ID]: TabWithoutCloseButtonAndWithProgressIndicator,
-  [TAB_WITH_LAUNCHPAD_ICON_ID]: TabWithLaunchpadIcon,
+  [DOCKVIEW_TAB_ID]: DockviewTab,
+  [DOCKVIEW_TAB_PROGRESS_ID]: DockviewTabProgress,
+  [DOCKVIEW_TAB_LAUNCHPAD_ID]: DockviewTabLaunchpad,
 };
 
 const mainPanelComponents: AutoLayoutDockviewComponents = {
@@ -66,7 +66,7 @@ const initializeMainPanelLayout = (tab: TabName, api: DockviewApi) => {
       id: LAUNCHPAD_PANEL_ID,
       component: LAUNCHPAD_PANEL_ID,
       title: 'Launchpad',
-      tabComponent: TAB_WITH_LAUNCHPAD_ICON_ID,
+      tabComponent: DOCKVIEW_TAB_LAUNCHPAD_ID,
       params: {
         tab,
         focusRegion: 'launchpad',
@@ -77,7 +77,7 @@ const initializeMainPanelLayout = (tab: TabName, api: DockviewApi) => {
       id: WORKSPACE_PANEL_ID,
       component: WORKSPACE_PANEL_ID,
       title: 'Workflow Editor',
-      tabComponent: DEFAULT_TAB_ID,
+      tabComponent: DOCKVIEW_TAB_ID,
       params: {
         tab,
         focusRegion: 'workflows',
@@ -92,7 +92,7 @@ const initializeMainPanelLayout = (tab: TabName, api: DockviewApi) => {
       id: VIEWER_PANEL_ID,
       component: VIEWER_PANEL_ID,
       title: 'Image Viewer',
-      tabComponent: TAB_WITH_PROGRESS_INDICATOR_ID,
+      tabComponent: DOCKVIEW_TAB_PROGRESS_ID,
       params: {
         tab,
         focusRegion: 'viewer',

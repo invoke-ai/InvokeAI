@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react';
 import { logger } from 'app/logging/logger';
 import { useAppSelector } from 'app/store/storeHooks';
 import { withResultAsync } from 'common/util/result';
+import { selectSaveAllImagesToGallery } from 'features/controlLayers/store/canvasSettingsSlice';
 import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { useEnqueueWorkflows } from 'features/queue/hooks/useEnqueueWorkflows';
 import { $isReadyToEnqueue } from 'features/queue/store/readiness';
@@ -15,7 +16,6 @@ import { enqueueMutationFixedCacheKeyOptions, useEnqueueBatchMutation } from 'se
 import { useEnqueueCanvas } from './useEnqueueCanvas';
 import { useEnqueueGenerate } from './useEnqueueGenerate';
 import { useEnqueueUpscaling } from './useEnqueueUpscaling';
-import { selectSaveAllImagesToGallery } from 'features/controlLayers/store/canvasSettingsSlice';
 
 const log = logger('generation');
 
@@ -75,7 +75,7 @@ export const useInvoke = () => {
     } else if (tabName === 'canvas') {
       navigationApi.focusPanel(tabName, WORKSPACE_PANEL_ID);
     }
-  }, [enqueue, tabName]);
+  }, [enqueue, saveAllImagesToGallery, tabName]);
 
   const enqueueFront = useCallback(() => {
     enqueue(true, false);
@@ -90,7 +90,7 @@ export const useInvoke = () => {
     } else if (tabName === 'canvas') {
       navigationApi.focusPanel(tabName, WORKSPACE_PANEL_ID);
     }
-  }, [enqueue, tabName]);
+  }, [enqueue, saveAllImagesToGallery, tabName]);
 
   return { enqueueBack, enqueueFront, isLoading, isDisabled: !isReady || isLocked, enqueue };
 };
