@@ -85,9 +85,9 @@ export const CanvasWorkspacePanel = memo(() => {
                 alignItems="flex-start"
               >
                 {showHUD && <CanvasHUD />}
+                <CanvasAlertsSaveAllImagesToGallery />
                 <CanvasAlertsSelectedEntityStatus />
                 <CanvasAlertsPreserveMask />
-                <CanvasAlertsSaveAllImagesToGallery />
                 <CanvasAlertsInvocationProgress />
               </Flex>
               <Flex position="absolute" top={1} insetInlineEnd={1}>

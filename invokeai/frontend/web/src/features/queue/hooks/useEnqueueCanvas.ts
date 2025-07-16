@@ -7,7 +7,6 @@ import { extractMessageFromAssertionError } from 'common/util/extractMessageFrom
 import { withResult, withResultAsync } from 'common/util/result';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildChatGPT4oGraph } from 'features/nodes/util/graph/generation/buildChatGPT4oGraph';
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
@@ -18,6 +17,7 @@ import { buildImagen4Graph } from 'features/nodes/util/graph/generation/buildIma
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSD3Graph } from 'features/nodes/util/graph/generation/buildSD3Graph';
 import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
+import { selectCanvasDestination } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { toast } from 'features/toast/toast';
@@ -36,7 +36,7 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
 
   const state = getState();
 
-  const destination = selectCanvasSessionId(state);
+  const destination = selectCanvasDestination(state);
 
   const buildGraphResult = await withResultAsync(async () => {
     const model = state.params.model;

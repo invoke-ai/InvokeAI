@@ -2332,7 +2332,7 @@
                 "alert": "Preserving Masked Region"
             },
             "saveAllImagesToGallery": {
-                "alert": "Saving All Images to Gallery"
+                "alert": "Sending images to Gallery, bypassing Canvas"
             },
             "isolatedStagingPreview": "Isolated Staging Preview",
             "isolatedPreview": "Isolated Preview",
