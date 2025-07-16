@@ -25,7 +25,7 @@ export const InvocationNodeInfoIcon = memo(({ nodeId }: Props) => {
 
 InvocationNodeInfoIcon.displayName = 'InvocationNodeInfoIcon';
 
-const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
+const TooltipContent = memo((_: { nodeId: string }) => {
   const notes = useInvocationNodeNotes();
   const label = useNodeUserTitleSafe();
   const version = useNodeVersion();

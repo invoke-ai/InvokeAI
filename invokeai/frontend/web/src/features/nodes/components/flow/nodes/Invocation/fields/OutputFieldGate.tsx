@@ -23,7 +23,7 @@ export const OutputFieldGate = memo(({ nodeId, fieldName, children }: Props) => 
 
 OutputFieldGate.displayName = 'OutputFieldGate';
 
-const Fallback = memo(({ nodeId, fieldName }: Props) => {
+const Fallback = memo(({ fieldName }: Props) => {
   const { t } = useTranslation();
   const name = useOutputFieldName(fieldName);
 
