@@ -27,7 +27,7 @@ import { assert, AssertionError } from 'tsafe';
 
 const log = logger('generation');
 
-const enqueueRequestedGenerate = createAction('app/enqueueRequestedGenerate');
+export const enqueueRequestedGenerate = createAction('app/enqueueRequestedGenerate');
 
 const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
   const { dispatch, getState } = store;
