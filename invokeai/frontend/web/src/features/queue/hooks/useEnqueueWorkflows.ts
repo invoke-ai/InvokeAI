@@ -19,7 +19,7 @@ import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endp
 import type { Batch, EnqueueBatchArg, S } from 'services/api/types';
 import { assert } from 'tsafe';
 
-const enqueueRequestedWorkflows = createAction('app/enqueueRequestedWorkflows');
+export const enqueueRequestedWorkflows = createAction('app/enqueueRequestedWorkflows');
 
 const getBatchDataForWorkflowGeneration = async (state: RootState, dispatch: AppDispatch): Promise<Batch['data']> => {
   const nodesState = selectNodesSlice(state);
