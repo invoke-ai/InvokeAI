@@ -9,7 +9,7 @@ type Props = {
   fieldName: string;
 };
 
-export const InputFieldResetToDefaultValueIconButton = memo(({ nodeId, fieldName }: Props) => {
+export const InputFieldResetToDefaultValueIconButton = memo(({ fieldName }: Props) => {
   const { t } = useTranslation();
   const { isValueChanged, resetToDefaultValue } = useInputFieldDefaultValue(fieldName);
 

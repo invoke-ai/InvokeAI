@@ -41,7 +41,6 @@ InputFieldGate.displayName = 'InputFieldGate';
 
 const Fallback = memo(
   ({
-    nodeId,
     fieldName,
     formatLabel,
     hasTemplate,

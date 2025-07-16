@@ -27,7 +27,7 @@ const NodeTemplateInspector = () => {
 
 export default memo(NodeTemplateInspector);
 
-const Content = memo(({ nodeId }: { nodeId: string }) => {
+const Content = memo((_: { nodeId: string }) => {
   const { t } = useTranslation();
   const template = useNodeTemplateOrThrow();
 
