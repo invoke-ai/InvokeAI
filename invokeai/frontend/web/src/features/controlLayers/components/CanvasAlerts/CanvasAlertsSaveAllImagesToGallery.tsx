@@ -13,7 +13,7 @@ export const CanvasAlertsSaveAllImagesToGallery = memo(() => {
   }
 
   return (
-    <Alert status="info" borderRadius="base" fontSize="sm" shadow="md" w="fit-content">
+    <Alert status="warning" borderRadius="base" fontSize="sm" shadow="md" w="fit-content">
       <AlertIcon />
       <AlertTitle>{t('controlLayers.settings.saveAllImagesToGallery.alert')}</AlertTitle>
     </Alert>
