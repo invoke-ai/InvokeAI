@@ -21,7 +21,7 @@ import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 import { describe, test } from 'vitest';
-import type { z } from 'zod/v4';
+import type { z } from 'zod';
 
 import type {
   CanvasEntityIdentifier,
