@@ -35,7 +35,6 @@ export const AdvancedSettingsAccordion = memo(() => {
   const { currentData: vaeConfig } = useGetModelConfigQuery(vaeKey ?? skipToken);
   const isFLUX = useAppSelector(selectIsFLUX);
   const isSD3 = useAppSelector(selectIsSD3);
-  const activeTab = useAppSelector(selectActiveTab);
 
   const selectBadges = useMemo(
     () =>
@@ -115,7 +114,6 @@ export const AdvancedSettingsAccordion = memo(() => {
             <ParamCLIPGEmbedModelSelect />
           </FormControlGroup>
         )}
-        {activeTab === 'upscaling' && <ParamTileControlNetModel />}
       </Flex>
     </StandaloneAccordion>
   );
