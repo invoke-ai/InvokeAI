@@ -92,7 +92,7 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
     id: getPrefixedId('tiled_multidiffusion_denoise_latents'),
     tile_height: tileSize,
     tile_width: tileSize,
-    tile_overlap: tileOverlap || 128,
+    tile_overlap: tileOverlap,
     steps,
     cfg_scale,
     scheduler,
@@ -194,7 +194,7 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
     creativity,
     structure,
     tile_size: tileSize,
-    tile_overlap: tileOverlap || 128,
+    tile_overlap: tileOverlap,
     upscale_initial_image: {
       image_name: upscaleInitialImage.image_name,
       width: upscaleInitialImage.width,
