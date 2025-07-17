@@ -612,14 +612,14 @@ def encode_prompt(
 
 
 def prepare_latents(
-    batch_size,
-    num_channels_latents,
-    height,
-    width,
-    dtype,
-    device,
-    generator,
-    latents=None,
+    batch_size: int,
+    num_channels_latents: int,
+    height: int,
+    width: int,
+    dtype: torch.dtype,
+    device: torch.device,
+    generator: torch.Generator,
+    latents: Optional[torch.FloatTensor] = None,
 ):
     # VAE applies 8x compression on images but we must also account for packing which requires
     # latent height and width to be divisible by 2.
