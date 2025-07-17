@@ -1,8 +1,8 @@
 import { useStore } from '@nanostores/react';
 import type { NodeChange } from '@xyflow/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import type { ELK as ELKType, ElkExtendedEdge, ElkNode } from 'elkjs';
-import * as ElkModule from 'elkjs/lib/elk.bundled.js';
+import type { ElkExtendedEdge, ElkNode } from 'elkjs/lib/elk.bundled.js';
+import ELK from 'elkjs/lib/elk.bundled.js';
 import { $templates, nodesChanged } from 'features/nodes/store/nodesSlice';
 import { selectEdges, selectNodes } from 'features/nodes/store/selectors';
 import {
@@ -17,13 +17,7 @@ import type { AnyNode } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { useCallback } from 'react';
 
-// This is a workaround for a common issue with how ELKjs is packaged. The bundled script doesn't have a
-// clean ES module export, so we import the module namespace and then extract the constructor, which may
-// be on the `default` property or be the module itself.
-const ElkConstructor = ((ElkModule as unknown as { default: unknown }).default ?? ElkModule) as new (
-  options?: Record<string, unknown>
-) => ELKType;
-const elk: ELKType = new ElkConstructor();
+const elk = new ELK();
 
 // These are estimates for node dimensions, used as a fallback when the node has not yet been rendered.
 const ESTIMATED_NODE_HEADER_HEIGHT = 40;

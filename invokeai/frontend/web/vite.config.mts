@@ -72,9 +72,6 @@ export default defineConfig(({ mode }) => {
       tsconfigPaths(),
       visualizer() as unknown as PluginOption,
     ],
-    optimizeDeps: {
-      include: ['elkjs/lib/elk.bundled.js'],
-    },
     build: {
       chunkSizeWarningLimit: 1500,
     },
