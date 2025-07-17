@@ -8,6 +8,7 @@ import time
 import traceback
 from pathlib import Path
 from queue import Empty, PriorityQueue
+from shutil import disk_usage
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Set
 
 import requests
@@ -334,6 +335,14 @@ class DownloadQueueService(DownloadQueueServiceBase):
             job.download_path = job.dest
 
         assert job.download_path
+
+        free_space = disk_usage(job.download_path.parent).free
+        GB = 2**30
+        self._logger.debug(f"Download is {job.total_bytes / GB:.2f} GB of {free_space / GB:.2f} GB free.")
+        if free_space < job.total_bytes:
+            raise RuntimeError(
+                f"Free disk space {free_space / GB:.2f} GB is not enough for download of {job.total_bytes / GB:.2f} GB."
+            )
 
         # Don't clobber an existing file. See commit 82c2c85202f88c6d24ff84710f297cfc6ae174af
         # for code that instead resumes an interrupted download.

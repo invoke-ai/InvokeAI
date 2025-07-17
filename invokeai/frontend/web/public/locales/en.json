@@ -1791,6 +1791,20 @@
                 "Structure controls how closely the output image will keep to the layout of the original. Low structure allows major changes, while high structure strictly maintains the original composition and layout."
             ]
         },
+        "tileSize": {
+            "heading": "Tile Size",
+            "paragraphs": [
+                "Controls the size of tiles used during the upscaling process. Larger tiles use more memory but may produce better results.",
+                "SD1.5 models default to 768, while SDXL models default to 1024. Reduce tile size if you encounter memory issues."
+            ]
+        },
+        "tileOverlap": {
+            "heading": "Tile Overlap",
+            "paragraphs": [
+                "Controls the overlap between adjacent tiles during upscaling. Higher overlap values help reduce visible seams between tiles but use more memory.",
+                "The default value of 128 works well for most cases, but you can adjust based on your specific needs and memory constraints."
+            ]
+        },
         "fluxDevLicense": {
             "heading": "Non-Commercial License",
             "paragraphs": [
@@ -1978,7 +1992,6 @@
         "recalculateRects": "Recalculate Rects",
         "clipToBbox": "Clip Strokes to Bbox",
         "outputOnlyMaskedRegions": "Output Only Generated Regions",
-        "saveAllImagesToGallery": "Save All Images to Gallery",
         "addLayer": "Add Layer",
         "duplicate": "Duplicate",
         "moveToFront": "Move to Front",
@@ -2103,9 +2116,9 @@
         "resetCanvasLayers": "Reset Canvas Layers",
         "resetGenerationSettings": "Reset Generation Settings",
         "replaceCurrent": "Replace Current",
-        "controlLayerEmptyState": "<UploadButton>Upload an image</UploadButton>, drag an image from the <GalleryButton>gallery</GalleryButton> onto this layer, <PullBboxButton>pull the bounding box into this layer</PullBboxButton>, or draw on the canvas to get started.",
-        "referenceImageEmptyStateWithCanvasOptions": "<UploadButton>Upload an image</UploadButton>, drag an image from the <GalleryButton>gallery</GalleryButton> onto this Reference Image or <PullBboxButton>pull the bounding box into this Reference Image</PullBboxButton> to get started.",
-        "referenceImageEmptyState": "<UploadButton>Upload an image</UploadButton> or drag an image from the <GalleryButton>gallery</GalleryButton> onto this Reference Image to get started.",
+        "controlLayerEmptyState": "<UploadButton>Upload an image</UploadButton>, drag an image from the gallery onto this layer, <PullBboxButton>pull the bounding box into this layer</PullBboxButton>, or draw on the canvas to get started.",
+        "referenceImageEmptyStateWithCanvasOptions": "<UploadButton>Upload an image</UploadButton>, drag an image from the gallery onto this Reference Image or <PullBboxButton>pull the bounding box into this Reference Image</PullBboxButton> to get started.",
+        "referenceImageEmptyState": "<UploadButton>Upload an image</UploadButton> or drag an image from the gallery onto this Reference Image to get started.",
         "uploadOrDragAnImage": "Drag an image from the gallery or <UploadButton>upload an image</UploadButton>.",
         "imageNoise": "Image Noise",
         "denoiseLimit": "Denoise Limit",
@@ -2348,7 +2361,8 @@
                 "alert": "Preserving Masked Region"
             },
             "saveAllImagesToGallery": {
-                "alert": "Saving All Images to Gallery"
+                "label": "Send New Generations to Gallery",
+                "alert": "Sending new generations to Gallery, bypassing Canvas"
             },
             "isolatedStagingPreview": "Isolated Staging Preview",
             "isolatedPreview": "Isolated Preview",
@@ -2412,6 +2426,9 @@
         "upscaleModel": "Upscale Model",
         "postProcessingModel": "Post-Processing Model",
         "scale": "Scale",
+        "tileControl": "Tile Control",
+        "tileSize": "Tile Size",
+        "tileOverlap": "Tile Overlap",
         "postProcessingMissingModelWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install a post-processing (image to image) model.",
         "missingModelsWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install the required models:",
         "mainModelDesc": "Main model (SD1.5 or SDXL architecture)",

@@ -1,8 +1,8 @@
 import { useStore } from '@nanostores/react';
 import type { NodeChange } from '@xyflow/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import type { ELK as ELKType, ElkExtendedEdge, ElkNode } from 'elkjs';
-import * as ElkModule from 'elkjs/lib/elk.bundled.js';
+import type { ElkExtendedEdge, ElkNode } from 'elkjs/lib/elk.bundled.js';
+import ELK from 'elkjs/lib/elk.bundled.js';
 import { $templates, nodesChanged } from 'features/nodes/store/nodesSlice';
 import { selectEdges, selectNodes } from 'features/nodes/store/selectors';
 import {

@@ -94,6 +94,7 @@ const useScrollableStagingArea = (rootRef: RefObject<HTMLDivElement>) => {
         const { viewport } = osInstance.elements();
         viewport.style.overflowX = `var(--os-viewport-overflow-x)`;
         viewport.style.overflowY = `var(--os-viewport-overflow-y)`;
+        viewport.style.textAlign = 'center';
       },
     },
     options: {
@@ -148,8 +149,8 @@ export const StagingAreaItemsList = memo(() => {
       return;
     }
 
-    return canvasManager.stagingArea.connectToSession(ctx.$selectedItemId, ctx.$progressData, ctx.$isPending);
-  }, [canvasManager, ctx.$progressData, ctx.$selectedItemId, ctx.$isPending]);
+    return canvasManager.stagingArea.connectToSession(ctx.$items, ctx.$selectedItemId, ctx.$progressData);
+  }, [canvasManager, ctx.$progressData, ctx.$selectedItemId, ctx.$items]);
 
   useEffect(() => {
     return ctx.$selectedItemIndex.listen((index) => {

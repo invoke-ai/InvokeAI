@@ -1,12 +1,11 @@
 import { Flex } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
 import { StagingAreaItemsList } from 'features/controlLayers/components/SimpleSession/StagingAreaItemsList';
 import { StagingAreaToolbar } from 'features/controlLayers/components/StagingArea/StagingAreaToolbar';
-import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { useCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { memo } from 'react';
 
 export const StagingArea = memo(() => {
-  const isStaging = useAppSelector(selectIsStaging);
+  const isStaging = useCanvasIsStaging();
 
   if (!isStaging) {
     return null;

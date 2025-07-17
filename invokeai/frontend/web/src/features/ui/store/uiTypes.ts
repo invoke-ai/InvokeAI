@@ -4,7 +4,6 @@ import { z } from 'zod/v4';
 
 const zTabName = z.enum(['generate', 'canvas', 'upscaling', 'workflows', 'models', 'queue']);
 export type TabName = z.infer<typeof zTabName>;
-const zCanvasRightPanelTabName = z.enum(['layers', 'gallery']);
 
 const zPartialDimensions = z.object({
   width: z.number().optional(),
@@ -17,7 +16,6 @@ export type Serializable = z.infer<typeof zSerializable>;
 const zUIState = z.object({
   _version: z.literal(3).default(3),
   activeTab: zTabName.default('generate'),
-  activeTabCanvasRightPanel: zCanvasRightPanelTabName.default('gallery'),
   shouldShowImageDetails: z.boolean().default(false),
   shouldShowProgressInViewer: z.boolean().default(true),
   accordions: z.record(z.string(), z.boolean()).default(() => ({})),
