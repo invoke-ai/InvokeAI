@@ -360,7 +360,7 @@ const handleTileControlNetModel: ModelHandler = (models, state, dispatch, log) =
     return;
   }
 
-  // Find a model with "Tile" in the name, case-insensitive
+  // The only way we have to identify a model as a tile model is by its name containing 'tile' :)
   const tileModel = controlNetModels.find((m) => m.name.toLowerCase().includes('tile'));
 
   // If we have a tile model, select it
