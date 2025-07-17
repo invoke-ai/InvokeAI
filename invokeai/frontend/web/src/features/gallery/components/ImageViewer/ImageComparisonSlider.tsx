@@ -5,7 +5,7 @@ import { TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL } from 'features/control
 import type { Dimensions } from 'features/controlLayers/store/types';
 import { ImageComparisonLabel } from 'features/gallery/components/ImageViewer/ImageComparisonLabel';
 import { selectComparisonFit } from 'features/gallery/store/gallerySelectors';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
 
 import type { ComparisonProps } from './common';

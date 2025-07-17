@@ -10,7 +10,7 @@ import {
   TagLabel,
 } from '@invoke-ai/ui-library';
 import type { ChangeEvent } from 'react';
-import { memo, useCallback, useMemo, useState } from 'react';
+import React, { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 import { useUpdateModelMutation } from 'services/api/endpoints/models';

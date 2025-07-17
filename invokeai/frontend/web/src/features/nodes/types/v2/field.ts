@@ -328,7 +328,7 @@ const zStatelessFieldOutputInstance = zFieldOutputInstanceBase.extend({
 
 // #endregion
 
-const zStatefulFieldType = z.union([
+const _zStatefulFieldType = z.union([
   zIntegerFieldType,
   zFloatFieldType,
   zStringFieldType,
@@ -347,7 +347,7 @@ const zStatefulFieldType = z.union([
   zColorFieldType,
   zSchedulerFieldType,
 ]);
-export type StatefulFieldType = z.infer<typeof zStatefulFieldType>;
+export type StatefulFieldType = z.infer<typeof _zStatefulFieldType>;
 
 /**
  * Here we define the main field unions:

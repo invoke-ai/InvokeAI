@@ -82,8 +82,8 @@ const zIPMethodV2 = z.enum(['full', 'style', 'composition', 'style_strong', 'sty
 export type IPMethodV2 = z.infer<typeof zIPMethodV2>;
 export const isIPMethodV2 = (v: unknown): v is IPMethodV2 => zIPMethodV2.safeParse(v).success;
 
-const zTool = z.enum(['brush', 'eraser', 'move', 'rect', 'view', 'bbox', 'colorPicker']);
-export type Tool = z.infer<typeof zTool>;
+const _zTool = z.enum(['brush', 'eraser', 'move', 'rect', 'view', 'bbox', 'colorPicker']);
+export type Tool = z.infer<typeof _zTool>;
 
 const zPoints = z.array(z.number()).refine((points) => points.length % 2 === 0, {
   message: 'Must have an even number of coordinate components',
@@ -106,23 +106,23 @@ export const RGBA_BLACK: RgbaColor = { r: 0, g: 0, b: 0, a: 1 };
 
 const zOpacity = z.number().gte(0).lte(1);
 
-const zDimensions = z.object({
+const _zDimensions = z.object({
   width: z.number().int().positive(),
   height: z.number().int().positive(),
 });
-export type Dimensions = z.infer<typeof zDimensions>;
+export type Dimensions = z.infer<typeof _zDimensions>;
 
 const zCoordinate = z.object({
   x: z.number(),
   y: z.number(),
 });
 export type Coordinate = z.infer<typeof zCoordinate>;
-const zCoordinateWithPressure = z.object({
+const _zCoordinateWithPressure = z.object({
   x: z.number(),
   y: z.number(),
   pressure: z.number(),
 });
-export type CoordinateWithPressure = z.infer<typeof zCoordinateWithPressure>;
+export type CoordinateWithPressure = z.infer<typeof _zCoordinateWithPressure>;
 
 const SAM_POINT_LABELS = {
   background: -1,
@@ -154,12 +154,12 @@ export const SAM_POINT_LABEL_STRING_TO_NUMBER: Record<SAMPointLabelString, SAMPo
   foreground: 1,
 };
 
-const zSAMPoint = z.object({
+const _zSAMPoint = z.object({
   x: z.number().int().gte(0),
   y: z.number().int().gte(0),
   label: zSAMPointLabel,
 });
-type SAMPoint = z.infer<typeof zSAMPoint>;
+type SAMPoint = z.infer<typeof _zSAMPoint>;
 export type SAMPointWithId = SAMPoint & { id: string };
 
 const zRect = z.object({
@@ -170,10 +170,10 @@ const zRect = z.object({
 });
 export type Rect = z.infer<typeof zRect>;
 
-const zRectWithRotation = zRect.extend({
+const _zRectWithRotation = zRect.extend({
   rotation: z.number(),
 });
-export type RectWithRotation = z.infer<typeof zRectWithRotation>;
+export type RectWithRotation = z.infer<typeof _zRectWithRotation>;
 
 const zCanvasBrushLineState = z.object({
   id: zId,
@@ -402,13 +402,13 @@ export type BoundingBoxScaleMethod = z.infer<typeof zBoundingBoxScaleMethod>;
 export const isBoundingBoxScaleMethod = (v: unknown): v is BoundingBoxScaleMethod =>
   zBoundingBoxScaleMethod.safeParse(v).success;
 
-const zCanvasEntityState = z.discriminatedUnion('type', [
+const _zCanvasEntityState = z.discriminatedUnion('type', [
   zCanvasRasterLayerState,
   zCanvasControlLayerState,
   zCanvasRegionalGuidanceState,
   zCanvasInpaintMaskState,
 ]);
-export type CanvasEntityState = z.infer<typeof zCanvasEntityState>;
+export type CanvasEntityState = z.infer<typeof _zCanvasEntityState>;
 
 const zCanvasEntityType = z.union([
   zCanvasRasterLayerState.shape.type,

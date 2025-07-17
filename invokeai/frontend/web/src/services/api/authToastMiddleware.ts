@@ -72,7 +72,7 @@ export const authToastMiddleware: Middleware = () => (next) => (action) => {
           description: customMessage,
         });
       }
-    } catch (error) {
+    } catch {
       // no-op
     }
   }

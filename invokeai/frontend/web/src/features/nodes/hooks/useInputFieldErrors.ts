@@ -22,7 +22,7 @@ export const useInputFieldErrors = (fieldName: string): FieldError[] => {
           return EMPTY_ARRAY;
         }
         const errors = thisNodeErrors.filter((error) => {
-          error.type === 'field-error' && error.fieldName === fieldName;
+          return error.type === 'field-error' && error.fieldName === fieldName;
         });
         if (errors.length === 0) {
           return EMPTY_ARRAY;
