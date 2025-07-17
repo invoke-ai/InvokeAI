@@ -112,7 +112,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.31.0",
-    "@invoke-ai/prettier-config-react": "^0.0.7",
     "@storybook/addon-docs": "^9.0.17",
     "@storybook/addon-links": "^9.0.17",
     "@storybook/react-vite": "^9.0.17",
