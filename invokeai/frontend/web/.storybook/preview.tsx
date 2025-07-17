@@ -47,7 +47,7 @@ const preview: Preview = {
   parameters: {
     docs: {
       theme: themes.dark,
-      codePanel: true
+      codePanel: true,
     },
   },
 };
