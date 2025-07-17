@@ -39,7 +39,7 @@ const selectBadges = createMemoizedSelector([selectCanvasSlice, selectParamsSlic
     return EMPTY_ARRAY;
   }
 
-  badges;
+  return badges;
 });
 
 const scalingLabelProps: FormLabelProps = {

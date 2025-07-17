@@ -138,7 +138,7 @@ export type ModelIdentifierField = z.infer<typeof zModelIdentifierField>;
 // #endregion
 
 // #region Control Adapters
-const zControlField = z.object({
+const _zControlField = z.object({
   image: zImageField,
   control_model: zModelIdentifierField,
   control_weight: z.union([z.number(), z.array(z.number())]).optional(),
@@ -147,9 +147,9 @@ const zControlField = z.object({
   control_mode: z.enum(['balanced', 'more_prompt', 'more_control', 'unbalanced']).optional(),
   resize_mode: z.enum(['just_resize', 'crop_resize', 'fill_resize', 'just_resize_simple']).optional(),
 });
-export type ControlField = z.infer<typeof zControlField>;
+export type ControlField = z.infer<typeof _zControlField>;
 
-const zIPAdapterField = z.object({
+const _zIPAdapterField = z.object({
   image: zImageField,
   ip_adapter_model: zModelIdentifierField,
   weight: z.number(),
@@ -157,9 +157,9 @@ const zIPAdapterField = z.object({
   begin_step_percent: z.number().optional(),
   end_step_percent: z.number().optional(),
 });
-export type IPAdapterField = z.infer<typeof zIPAdapterField>;
+export type IPAdapterField = z.infer<typeof _zIPAdapterField>;
 
-const zT2IAdapterField = z.object({
+const _zT2IAdapterField = z.object({
   image: zImageField,
   t2i_adapter_model: zModelIdentifierField,
   weight: z.union([z.number(), z.array(z.number())]).optional(),
@@ -167,7 +167,7 @@ const zT2IAdapterField = z.object({
   end_step_percent: z.number().optional(),
   resize_mode: z.enum(['just_resize', 'crop_resize', 'fill_resize', 'just_resize_simple']).optional(),
 });
-export type T2IAdapterField = z.infer<typeof zT2IAdapterField>;
+export type T2IAdapterField = z.infer<typeof _zT2IAdapterField>;
 // #endregion
 
 // #region ProgressImage

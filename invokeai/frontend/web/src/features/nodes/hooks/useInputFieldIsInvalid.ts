@@ -22,7 +22,7 @@ export const useInputFieldIsInvalid = (fieldName: string) => {
           return false;
         }
         const isFieldInvalid = thisNodeErrors.some((error) => {
-          error.type === 'field-error' && error.fieldName === fieldName;
+          return error.type === 'field-error' && error.fieldName === fieldName;
         });
         return isFieldInvalid;
       }),

@@ -131,8 +131,8 @@ export type ParameterCLIPGEmbedModel = z.infer<typeof zParameterCLIPGEmbedModel>
 // #endregion
 
 // #region LoRA Model
-const zParameterLoRAModel = zModelIdentifierField;
-export type ParameterLoRAModel = z.infer<typeof zParameterLoRAModel>;
+const _zParameterLoRAModel = zModelIdentifierField;
+export type ParameterLoRAModel = z.infer<typeof _zParameterLoRAModel>;
 // #endregion
 
 // #region VAE Model

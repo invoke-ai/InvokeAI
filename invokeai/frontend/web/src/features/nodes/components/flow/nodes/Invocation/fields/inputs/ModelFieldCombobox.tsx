@@ -14,7 +14,7 @@ type Props<T extends AnyModelConfig> = {
   groupByType?: boolean;
 };
 
-const _ModelFieldCombobox = <T extends AnyModelConfig>({
+const ModelFieldComboboxInternal = <T extends AnyModelConfig>({
   value: _value,
   modelConfigs,
   isLoadingConfigs,
@@ -48,4 +48,4 @@ const _ModelFieldCombobox = <T extends AnyModelConfig>({
   );
 };
 
-export const ModelFieldCombobox = typedMemo(_ModelFieldCombobox);
+export const ModelFieldCombobox = typedMemo(ModelFieldComboboxInternal);

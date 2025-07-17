@@ -1918,8 +1918,8 @@ export const zStatefulFieldValue = z.union([
 ]);
 export type StatefulFieldValue = z.infer<typeof zStatefulFieldValue>;
 
-const zFieldValue = z.union([zStatefulFieldValue, zStatelessFieldValue]);
-export type FieldValue = z.infer<typeof zFieldValue>;
+const _zFieldValue = z.union([zStatefulFieldValue, zStatelessFieldValue]);
+export type FieldValue = z.infer<typeof _zFieldValue>;
 // #endregion
 
 // #region StatefulFieldInputInstance & FieldInputInstance

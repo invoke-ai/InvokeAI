@@ -14,7 +14,7 @@ import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useOverlayScrollbars } from 'overlayscrollbars-react';
 import type { MutableRefObject, RefObject } from 'react';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   GridComponents,
   GridComputeItemKey,

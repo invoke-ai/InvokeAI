@@ -63,8 +63,8 @@ describe('workflow builder form manipulation', () => {
     });
 
     it('should narrow the type of the element if a type guard is provided and the element matches', () => {
-      const element = getElement(form, form.rootElementId, isContainerElement);
-      assert<Equals<typeof element, ContainerElement>>();
+      const _element = getElement(form, form.rootElementId, isContainerElement);
+      assert<Equals<typeof _element, ContainerElement>>();
     });
   });
 

@@ -220,6 +220,7 @@ export const InvocationNodeContextProvider = memo(({ nodeId, children }: PropsWi
 
   return <InvocationNodeContext.Provider value={value}>{children}</InvocationNodeContext.Provider>;
 });
+InvocationNodeContextProvider.displayName = 'InvocationNodeContextProvider';
 
 export const useInvocationNodeContext = () => {
   const context = useContext(InvocationNodeContext);

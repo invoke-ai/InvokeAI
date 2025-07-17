@@ -17,8 +17,6 @@ export default [
 
   {
     languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
       parser: typescriptParser,
       parserOptions: {
         ecmaFeatures: {
@@ -27,8 +25,9 @@ export default [
       },
       globals: {
         ...globals.browser,
-        ...globals.es2021,
         ...globals.node,
+        GlobalCompositeOperation: 'readonly',
+        RequestInit: 'readonly',
       },
     },
 
@@ -41,7 +40,7 @@ export default [
       import: pluginImport,
       'unused-imports': pluginUnusedImports,
       'simple-import-sort': pluginSimpleImportSort,
-      'react-refresh': pluginReactRefresh,
+      'react-refresh': pluginReactRefresh.configs.vite,
       path: pluginPath,
       i18next: pluginI18Next,
       storybook: pluginStorybook,
@@ -70,13 +69,6 @@ export default [
       ],
 
       'react-hooks/exhaustive-deps': 'error',
-
-      'react-refresh/only-export-components': [
-        'warn',
-        {
-          allowConstantExport: true,
-        },
-      ],
 
       curly: 'error',
       'no-var': 'error',
@@ -143,9 +135,9 @@ export default [
       '@typescript-eslint/no-import-type-side-effects': 'error',
 
       '@typescript-eslint/consistent-type-assertions': [
-        'warn',
+        'error',
         {
-          assertionStyle: 'never',
+          assertionStyle: 'as',
         },
       ],
 
@@ -183,6 +175,9 @@ export default [
             'The Clipboard API is not available by default in Firefox. Use the `useClipboard` hook instead, which wraps clipboard access to prevent errors.',
         },
       ],
+
+      // Typescript handles this for us: https://eslint.org/docs/latest/rules/no-redeclare#handled_by_typescript
+      'no-redeclare': 'off',
 
       'no-restricted-imports': [
         'error',
@@ -241,13 +236,7 @@ export default [
       '**/*.scss',
       'src/services/api/schema.ts',
       '.prettierrc.js',
+      '.storybook',
     ],
-  },
-
-  {
-    files: ['**/*.test.ts', '**/*.test.tsx'],
-    rules: {
-      '@typescript-eslint/consistent-type-assertions': 'off',
-    },
   },
 ];

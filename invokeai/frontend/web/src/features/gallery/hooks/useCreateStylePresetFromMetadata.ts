@@ -52,12 +52,12 @@ export const useCreateStylePresetFromMetadata = (imageDTO?: ImageDTO | null) => 
 
     try {
       positivePrompt = await MetadataHandlers.PositivePrompt.parse(metadata, store);
-    } catch (error) {
+    } catch {
       positivePrompt = '';
     }
     try {
       negativePrompt = (await MetadataHandlers.NegativePrompt.parse(metadata, store)) ?? '';
-    } catch (error) {
+    } catch {
       negativePrompt = '';
     }
 

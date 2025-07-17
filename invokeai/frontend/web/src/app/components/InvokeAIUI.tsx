@@ -317,7 +317,7 @@ const InvokeAIUI = ({
     if (import.meta.env.MODE === 'development') {
       window.$store = $store;
     }
-    () => {
+    return () => {
       $store.set(undefined);
       if (import.meta.env.MODE === 'development') {
         window.$store = undefined;
