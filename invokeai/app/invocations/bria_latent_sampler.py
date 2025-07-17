@@ -48,18 +48,22 @@ class BriaLatentSamplerInvocation(BaseInvocation):
         title="Transformer",
     )
 
+    @torch.no_grad()
     def invoke(self, context: InvocationContext) -> BriaLatentSamplerInvocationOutput:
-        device = torch.device("cuda")
+        with context.models.load(self.transformer.transformer) as transformer:
+            device = transformer.device
+            dtype = transformer.dtype
+
         height, width = 1024, 1024
         generator = torch.Generator(device=device).manual_seed(self.seed)
         
-        num_channels_latents = 4  # due to patch=2, we devide by 4
+        num_channels_latents = 4
         latents, latent_image_ids = prepare_latents(
             batch_size=1,
             num_channels_latents=num_channels_latents,
             height=height,
             width=width,
-            dtype=torch.float32,
+            dtype=dtype,
             device=device,
             generator=generator,
             )

@@ -3,7 +3,7 @@ from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 from invokeai.backend.bria.controlnet_bria import BriaControlModes, BriaMultiControlNetModel
 from invokeai.backend.bria.controlnet_utils import prepare_control_images
 from invokeai.backend.bria.pipeline_bria_controlnet import BriaControlNetPipeline
-from invokeai.nodes.bria_nodes.bria_controlnet import BriaControlNetField
+from invokeai.app.invocations.bria_controlnet import BriaControlNetField
 
 import torch
 from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
@@ -12,7 +12,7 @@ from invokeai.app.invocations.fields import Input, InputField, LatentsField, Out
 from invokeai.app.invocations.model import SubModelType, T5EncoderField, TransformerField, VAEField
 from invokeai.app.invocations.primitives import BaseInvocationOutput, FieldDescriptions
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.invocation_api import BaseInvocation, Classification, InputField, invocation, invocation_output
+from invokeai.invocation_api import BaseInvocation, Classification, invocation, invocation_output
 from invokeai.backend.bria.transformer_bria import BriaTransformer2DModel
 
 @invocation_output("bria_denoise_output")
