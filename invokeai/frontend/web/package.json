@@ -115,14 +115,8 @@
     "@eslint/eslintrc": "^3.3.1",
     "@eslint/js": "^9.31.0",
     "@invoke-ai/prettier-config-react": "^0.0.7",
-    "@storybook/addon-essentials": "^8.6.12",
-    "@storybook/addon-interactions": "^8.6.12",
     "@storybook/addon-links": "^9.0.17",
-    "@storybook/addon-storysource": "^8.6.12",
-    "@storybook/manager-api": "^8.6.12",
-    "@storybook/react": "^9.0.17",
     "@storybook/react-vite": "^9.0.17",
-    "@storybook/theming": "^8.6.12",
     "@types/node": "^22.15.1",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.0",
@@ -161,7 +155,8 @@
     "vite-plugin-dts": "^4.5.3",
     "vite-plugin-eslint": "^1.8.1",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^3.1.2"
+    "vitest": "^3.1.2",
+    "@storybook/addon-docs": "^9.0.17"
   },
   "engines": {
     "pnpm": "10"

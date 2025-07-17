@@ -1,5 +1,5 @@
-import type { Preview } from '@storybook/react';
-import { themes } from '@storybook/theming';
+import type { Preview } from '@storybook/react-vite';
+import { themes } from 'storybook/theming';
 import { $store } from 'app/store/nanostores/store';
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
@@ -47,6 +47,7 @@ const preview: Preview = {
   parameters: {
     docs: {
       theme: themes.dark,
+      codePanel: true
     },
   },
 };
