@@ -5,6 +5,7 @@ import type { RootState } from 'app/store/store';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectEdges, selectNodes } from 'features/nodes/store/selectors';
 import type { InvocationNode, InvocationTemplate } from 'features/nodes/types/invocation';
+import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
 import type { PropsWithChildren } from 'react';
 import { createContext, memo, useContext, useMemo } from 'react';
 
@@ -42,21 +43,18 @@ type InvocationNodeContextValue = {
   ) => Selector<RootState, InvocationTemplate['outputs'][string]>;
 
   buildSelectIsInputFieldConnected: (fieldName: string) => Selector<RootState, boolean>;
+  selectNodeNeedsUpdate: Selector<RootState, boolean>;
 };
 
 const InvocationNodeContext = createContext<InvocationNodeContextValue | null>(null);
 
-const getSelectorFromCache = <T,>(
-  cache: Map<string, Selector<RootState, T>>,
-  key: string,
-  fallback: () => Selector<RootState, T>
-): Selector<RootState, T> => {
+const getSelectorFromCache = <T extends Selector>(cache: Map<string, Selector>, key: string, fallback: () => T): T => {
   let selector = cache.get(key);
   if (!selector) {
     selector = fallback();
     cache.set(key, selector);
   }
-  return selector;
+  return selector as T;
 };
 
 export const InvocationNodeContextProvider = memo(({ nodeId, children }: PropsWithChildren<{ nodeId: string }>) => {
@@ -183,6 +181,15 @@ export const InvocationNodeContextProvider = memo(({ nodeId, children }: PropsWi
         })
       );
 
+    const selectNodeNeedsUpdate = getSelectorFromCache(cache, 'selectNodeNeedsUpdate', () =>
+      createSelector([selectNodeDataSafe, selectNodeTemplateSafe], (data, template) => {
+        if (!data || !template) {
+          return false; // If there's no data or template, no update is possible
+        }
+        return getNeedsUpdate(data, template);
+      })
+    );
+
     return {
       nodeId,
 
@@ -207,6 +214,7 @@ export const InvocationNodeContextProvider = memo(({ nodeId, children }: PropsWi
       buildSelectOutputFieldTemplateOrThrow,
 
       buildSelectIsInputFieldConnected,
+      selectNodeNeedsUpdate,
     } satisfies InvocationNodeContextValue;
   }, [nodeId, templates]);
 

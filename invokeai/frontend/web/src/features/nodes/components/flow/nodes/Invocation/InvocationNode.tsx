@@ -15,6 +15,8 @@ import { memo } from 'react';
 import { InputFieldEditModeNodes } from './fields/InputFieldEditModeNodes';
 import InvocationNodeFooter from './InvocationNodeFooter';
 import InvocationNodeHeader from './InvocationNodeHeader';
+import { useInvocationNodeContext } from './context';
+import { useAppSelector } from 'app/store/storeHooks';
 
 type Props = {
   nodeId: string;
@@ -37,7 +39,9 @@ const sx: SystemStyleObject = {
 };
 
 const InvocationNode = ({ nodeId, isOpen }: Props) => {
+  const ctx = useInvocationNodeContext();
   const withFooter = useWithFooter();
+  const needsUpdate = useAppSelector(ctx.selectNodeNeedsUpdate);
 
   return (
     <>
