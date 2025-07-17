@@ -1128,19 +1128,19 @@
         "integerRangeGenerator": "Integer Range Generator",
         "layout": {
             "autoLayout": "Auto Layout",
-            "nodePlacementStrategy": "Node Placement Strategy",
-            "networkSimplex": "Network Simplex",
-            "brandesKoepf": "Brandes-Koepf",
-            "linearSegments": "Linear Segments",
-            "simplePlacement": "Simple Placement",
             "layeringStrategy": "Layering Strategy",
+            "networkSimplex": "Network Simplex",
             "longestPath": "Longest Path",
-            "coffmanGraham": "Coffman-Graham",
             "nodeSpacing": "Node Spacing",
             "layerSpacing": "Layer Spacing",
             "layoutDirection": "Layout Direction",
             "layoutDirectionRight": "Right",
-            "layoutDirectionDown": "Down"
+            "layoutDirectionDown": "Down",
+            "alignment": "Node Alignment",
+            "alignmentUL": "Top Left",
+            "alignmentDL": "Bottom Left",
+            "alignmentUR": "Top Right",
+            "alignmentDR": "Bottom Right"
         }
     },
     "parameters": {

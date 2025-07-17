@@ -2,23 +2,22 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import { SelectionMode } from '@xyflow/react';
 import type { PersistConfig, RootState } from 'app/store/store';
+import type { Selector } from 'react-redux';
 
-export type NodePlacementStrategy = 'NETWORK_SIMPLEX' | 'BRANDES_KOEPF' | 'LINEAR_SEGMENTS' | 'SIMPLE';
-
-export type LayeringStrategy = 'NETWORK_SIMPLEX' | 'LONGEST_PATH' | 'COFFMAN_GRAHAM';
-
-export type LayoutDirection = 'DOWN' | 'RIGHT';
+export type LayeringStrategy = 'network-simplex' | 'longest-path';
+export type LayoutDirection = 'TB' | 'LR';
+export type NodeAlignment = 'UL' | 'UR' | 'DL' | 'DR';
 
 export type WorkflowSettingsState = {
   _version: 1;
   shouldShowMinimapPanel: boolean;
-  nodePlacementStrategy: NodePlacementStrategy;
   layeringStrategy: LayeringStrategy;
   nodeSpacing: number;
   layerSpacing: number;
   layoutDirection: LayoutDirection;
   shouldValidateGraph: boolean;
   shouldAnimateEdges: boolean;
+  nodeAlignment: NodeAlignment;
   nodeOpacity: number;
   shouldSnapToGrid: boolean;
   shouldColorEdges: boolean;
@@ -29,11 +28,11 @@ export type WorkflowSettingsState = {
 const initialState: WorkflowSettingsState = {
   _version: 1,
   shouldShowMinimapPanel: true,
-  nodePlacementStrategy: 'NETWORK_SIMPLEX',
-  layeringStrategy: 'NETWORK_SIMPLEX',
-  nodeSpacing: 50,
-  layerSpacing: 50,
-  layoutDirection: 'RIGHT',
+  layeringStrategy: 'network-simplex',
+  nodeSpacing: 32,
+  layerSpacing: 32,
+  layoutDirection: 'LR',
+  nodeAlignment: 'UL',
   shouldValidateGraph: true,
   shouldAnimateEdges: true,
   shouldSnapToGrid: false,
@@ -49,9 +48,6 @@ export const workflowSettingsSlice = createSlice({
   reducers: {
     shouldShowMinimapPanelChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldShowMinimapPanel = action.payload;
-    },
-    nodePlacementStrategyChanged: (state, action: PayloadAction<NodePlacementStrategy>) => {
-      state.nodePlacementStrategy = action.payload;
     },
     layeringStrategyChanged: (state, action: PayloadAction<LayeringStrategy>) => {
       state.layeringStrategy = action.payload;
@@ -83,6 +79,9 @@ export const workflowSettingsSlice = createSlice({
     nodeOpacityChanged: (state, action: PayloadAction<number>) => {
       state.nodeOpacity = action.payload;
     },
+    nodeAlignmentChanged: (state, action: PayloadAction<NodeAlignment>) => {
+      state.nodeAlignment = action.payload;
+    },
     selectionModeChanged: (state, action: PayloadAction<boolean>) => {
       state.selectionMode = action.payload ? SelectionMode.Full : SelectionMode.Partial;
     },
@@ -93,17 +92,18 @@ export const {
   shouldAnimateEdgesChanged,
   shouldColorEdgesChanged,
   shouldShowMinimapPanelChanged,
-  nodePlacementStrategyChanged,
   layeringStrategyChanged,
   nodeSpacingChanged,
   layerSpacingChanged,
   layoutDirectionChanged,
   shouldShowEdgeLabelsChanged,
   shouldSnapToGridChanged,
+  nodeAlignmentChanged,
   shouldValidateGraphChanged,
   nodeOpacityChanged,
   selectionModeChanged,
 } = workflowSettingsSlice.actions;
+export const { reducer } = workflowSettingsSlice;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateWorkflowSettingsState = (state: any): any => {
@@ -121,7 +121,7 @@ export const workflowSettingsPersistConfig: PersistConfig<WorkflowSettingsState>
 };
 
 export const selectWorkflowSettingsSlice = (state: RootState) => state.workflowSettings;
-const createWorkflowSettingsSelector = <T>(selector: (state: WorkflowSettingsState) => T) =>
+const createWorkflowSettingsSelector = <T>(selector: Selector<WorkflowSettingsState, T>) =>
   createSelector(selectWorkflowSettingsSlice, selector);
 export const selectShouldSnapToGrid = createWorkflowSettingsSelector((s) => s.shouldSnapToGrid);
 export const selectSelectionMode = createWorkflowSettingsSelector((s) => s.selectionMode);
@@ -132,8 +132,8 @@ export const selectNodeOpacity = createWorkflowSettingsSelector((s) => s.nodeOpa
 export const selectShouldShowMinimapPanel = createWorkflowSettingsSelector((s) => s.shouldShowMinimapPanel);
 export const selectShouldShouldValidateGraph = createWorkflowSettingsSelector((s) => s.shouldValidateGraph);
 
-export const selectNodePlacementStrategy = createWorkflowSettingsSelector((s) => s.nodePlacementStrategy);
 export const selectLayeringStrategy = createWorkflowSettingsSelector((s) => s.layeringStrategy);
 export const selectNodeSpacing = createWorkflowSettingsSelector((s) => s.nodeSpacing);
 export const selectLayerSpacing = createWorkflowSettingsSelector((s) => s.layerSpacing);
 export const selectLayoutDirection = createWorkflowSettingsSelector((s) => s.layoutDirection);
+export const selectNodeAlignment = createWorkflowSettingsSelector((s) => s.nodeAlignment);

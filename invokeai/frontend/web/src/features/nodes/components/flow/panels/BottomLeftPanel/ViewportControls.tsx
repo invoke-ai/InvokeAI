@@ -31,13 +31,12 @@ import {
   layerSpacingChanged,
   type LayoutDirection,
   layoutDirectionChanged,
-  type NodePlacementStrategy,
-  nodePlacementStrategyChanged,
+  nodeAlignmentChanged,
   nodeSpacingChanged,
   selectLayeringStrategy,
   selectLayerSpacing,
   selectLayoutDirection,
-  selectNodePlacementStrategy,
+  selectNodeAlignment,
   selectNodeSpacing,
   selectShouldShowMinimapPanel,
   shouldShowMinimapPanelChanged,
@@ -61,11 +60,11 @@ const ViewportControls = () => {
   const dispatch = useAppDispatch();
   const popover = useLayoutSettingsPopover();
   const shouldShowMinimapPanel = useAppSelector(selectShouldShowMinimapPanel);
-  const nodePlacementStrategy = useAppSelector(selectNodePlacementStrategy);
   const layeringStrategy = useAppSelector(selectLayeringStrategy);
   const nodeSpacing = useAppSelector(selectNodeSpacing);
   const layerSpacing = useAppSelector(selectLayerSpacing);
   const layoutDirection = useAppSelector(selectLayoutDirection);
+  const nodeAlignment = useAppSelector(selectNodeAlignment);
 
   const handleClickedZoomIn = useCallback(() => {
     zoomIn({ duration: 300 });
@@ -82,13 +81,6 @@ const ViewportControls = () => {
   const handleClickedToggleMiniMapPanel = useCallback(() => {
     dispatch(shouldShowMinimapPanelChanged(!shouldShowMinimapPanel));
   }, [shouldShowMinimapPanel, dispatch]);
-
-  const handleStrategyChanged = useCallback(
-    (e: ChangeEvent<HTMLSelectElement>) => {
-      dispatch(nodePlacementStrategyChanged(e.target.value as NodePlacementStrategy));
-    },
-    [dispatch]
-  );
 
   const handleLayeringStrategyChanged = useCallback(
     (e: ChangeEvent<HTMLSelectElement>) => {
@@ -132,6 +124,14 @@ const ViewportControls = () => {
     [dispatch]
   );
 
+  const handleNodeAlignmentChanged = useCallback(
+    (e: ChangeEvent<HTMLSelectElement>) => {
+      const value = e.target.value as NodeAlignment;
+      dispatch(nodeAlignmentChanged(value));
+    },
+    [dispatch]
+  );
+
   const handleApplyAutoLayout = useCallback(async () => {
     await autoLayout();
     fitView({ duration: 300 });
@@ -169,30 +169,30 @@ const ViewportControls = () => {
         </PopoverTrigger>
         <PopoverContent>
           <PopoverArrow />
+
           <PopoverBody>
             <Flex direction="column" gap={2}>
               <FormControl>
                 <FormLabel>{t('nodes.layout.layoutDirection')}</FormLabel>
                 <Select value={layoutDirection} onChange={handleLayoutDirectionChanged}>
-                  <option value="RIGHT">{t('nodes.layout.layoutDirectionRight')}</option>
-                  <option value="DOWN">{t('nodes.layout.layoutDirectionDown')}</option>
+                  <option value="LR">{t('nodes.layout.layoutDirectionRight')}</option>
+                  <option value="TB">{t('nodes.layout.layoutDirectionDown')}</option>
                 </Select>
               </FormControl>
               <FormControl>
                 <FormLabel>{t('nodes.layout.layeringStrategy')}</FormLabel>
                 <Select value={layeringStrategy} onChange={handleLayeringStrategyChanged}>
-                  <option value="NETWORK_SIMPLEX">{t('nodes.layout.networkSimplex')}</option>
-                  <option value="LONGEST_PATH">{t('nodes.layout.longestPath')}</option>
-                  <option value="COFFMAN_GRAHAM">{t('nodes.layout.coffmanGraham')}</option>
+                  <option value="network-simplex">{t('nodes.layout.networkSimplex')}</option>
+                  <option value="longest-path">{t('nodes.layout.longestPath')}</option>
                 </Select>
               </FormControl>
               <FormControl>
-                <FormLabel>{t('nodes.layout.nodePlacementStrategy')}</FormLabel>
-                <Select value={nodePlacementStrategy} onChange={handleStrategyChanged}>
-                  <option value="NETWORK_SIMPLEX">{t('nodes.layout.networkSimplex')}</option>
-                  <option value="BRANDES_KOEPF">{t('nodes.layout.brandesKoepf')}</option>
-                  <option value="LINEAR_SEGMENTS">{t('nodes.layout.linearSegments')}</option>
-                  <option value="SIMPLE">{t('nodes.layout.simplePlacement')}</option>
+                <FormLabel>{t('nodes.layout.alignment')}</FormLabel>
+                <Select value={nodeAlignment} onChange={handleNodeAlignmentChanged}>
+                  <option value="UL">{t('nodes.layout.alignmentUL')}</option>
+                  <option value="DL">{t('nodes.layout.alignmentDL')}</option>
+                  <option value="UR">{t('nodes.layout.alignmentUR')}</option>
+                  <option value="DR">{t('nodes.layout.alignmentDR')}</option>
                 </Select>
               </FormControl>
               <Divider />
