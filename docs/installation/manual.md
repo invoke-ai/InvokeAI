@@ -69,7 +69,7 @@ The following commands vary depending on the version of Invoke being installed a
     - If you have an Nvidia 20xx series GPU or older, use `invokeai[xformers]`.
     - If you have an Nvidia 30xx series GPU or newer, or do not have an Nvidia GPU, use `invokeai`.
 
-7. Determine the torch backend to use for installation, if any. This is necessary to get the right version of torch installed. This is acheived by using (UV's built in torch support.)[https://docs.astral.sh/uv/guides/integration/pytorch/#automatic-backend-selection]
+7. Determine the torch backend to use for installation, if any. This is necessary to get the right version of torch installed. This is acheived by using [UV's built in torch support.](https://docs.astral.sh/uv/guides/integration/pytorch/#automatic-backend-selection)
 
     === "Invoke v5.12 and later"
 
