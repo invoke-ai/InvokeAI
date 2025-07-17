@@ -14,8 +14,6 @@ set -e -o pipefail
 #   docker run --rm -it -v /some/path:/invokeai -e CONTAINER_UID=$(id -u) <this image>
 # Default UID: 1000 chosen due to popularity on Linux systems. Possibly 501 on MacOS.
 
-printenv
-
 USER_ID=${CONTAINER_UID:-1000}
 USER=ubuntu
 # if the user does not exist, create it. It is expected to be present on ubuntu >=24.x
