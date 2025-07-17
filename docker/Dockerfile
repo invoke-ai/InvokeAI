@@ -5,8 +5,7 @@
 FROM docker.io/node:22-slim AS web-builder
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack use pnpm@8.x
-RUN corepack enable
+RUN corepack use pnpm@10.x && corepack enable
 
 WORKDIR /build
 COPY invokeai/frontend/web/ ./

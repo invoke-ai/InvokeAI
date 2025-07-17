@@ -2,6 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectSaveAllImagesToGallery } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   selectImg2imgStrength,
   selectMainModelConfig,
@@ -42,9 +43,8 @@ export const getBoardField = (state: RootState): BoardField | undefined => {
  * - board
  */
 export const selectCanvasOutputFields = (state: RootState) => {
-  // Advanced session means working on canvas - images are not saved to gallery or added to a board.
-  // Simple session means working in YOLO mode - images are saved to gallery & board.
   const tab = selectActiveTab(state);
+  // This flag also has an effect on the canvas destination - see selectCanvasDestination below.
   const saveAllImagesToGallery = selectSaveAllImagesToGallery(state);
 
   // If we're on canvas and the save all images setting is enabled, save to gallery
@@ -57,6 +57,23 @@ export const selectCanvasOutputFields = (state: RootState) => {
     use_cache: false,
     id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
   };
+};
+
+/**
+ * Select the destination to use for canvas queue items.
+ *
+ */
+export const selectCanvasDestination = (state: RootState) => {
+  // The canvas will stage images that have its session ID as the destination. When the user has enabled saving all
+  // images to gallery, we want to bypass the staging area. So we use 'canvas' as a generic destination. Images will
+  // go directly to the gallery.
+  //
+  // This flag also has an effect on the canvas output fields - see selectCanvasOutputFields above.
+  const saveAllImagesToGallery = selectSaveAllImagesToGallery(state);
+  if (saveAllImagesToGallery) {
+    return 'canvas';
+  }
+  return selectCanvasSessionId(state);
 };
 
 /**

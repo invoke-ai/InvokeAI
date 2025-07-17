@@ -453,7 +453,11 @@ const PickerOptionComponent = typedMemo(
               </Text>
             )}
           </Flex>
-          {option.description && !compactView && <Text color="base.200">{option.description}</Text>}
+          {option.description && !compactView && (
+            <Text className="extra-info" color="base.200">
+              {option.description}
+            </Text>
+          )}
         </Flex>
       </Flex>
     );

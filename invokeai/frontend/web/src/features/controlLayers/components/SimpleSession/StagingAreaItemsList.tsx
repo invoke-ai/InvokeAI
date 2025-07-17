@@ -149,8 +149,8 @@ export const StagingAreaItemsList = memo(() => {
       return;
     }
 
-    return canvasManager.stagingArea.connectToSession(ctx.$selectedItemId, ctx.$progressData, ctx.$isPending);
-  }, [canvasManager, ctx.$progressData, ctx.$selectedItemId, ctx.$isPending]);
+    return canvasManager.stagingArea.connectToSession(ctx.$items, ctx.$selectedItemId, ctx.$progressData);
+  }, [canvasManager, ctx.$progressData, ctx.$selectedItemId, ctx.$items]);
 
   useEffect(() => {
     return ctx.$selectedItemIndex.listen((index) => {

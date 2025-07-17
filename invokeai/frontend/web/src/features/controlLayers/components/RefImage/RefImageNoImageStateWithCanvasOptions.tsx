@@ -8,7 +8,6 @@ import type { SetGlobalReferenceImageDndTargetData } from 'features/dnd/dnd';
 import { setGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { setGlobalReferenceImage } from 'features/imageActions/actions';
-import { activeTabCanvasRightPanelChanged } from 'features/ui/store/uiSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import type { ImageDTO } from 'services/api/types';
@@ -25,9 +24,6 @@ export const RefImageNoImageStateWithCanvasOptions = memo(() => {
     [dispatch, id]
   );
   const uploadApi = useImageUploadButton({ onUpload, allowMultiple: false });
-  const onClickGalleryButton = useCallback(() => {
-    dispatch(activeTabCanvasRightPanelChanged('gallery'));
-  }, [dispatch]);
   const pullBboxIntoIPAdapter = usePullBboxIntoGlobalReferenceImage(id);
 
   const dndTargetData = useMemo<SetGlobalReferenceImageDndTargetData>(
@@ -40,14 +36,11 @@ export const RefImageNoImageStateWithCanvasOptions = memo(() => {
       UploadButton: (
         <Button isDisabled={isBusy} size="sm" variant="link" color="base.300" {...uploadApi.getUploadButtonProps()} />
       ),
-      GalleryButton: (
-        <Button onClick={onClickGalleryButton} isDisabled={isBusy} size="sm" variant="link" color="base.300" />
-      ),
       PullBboxButton: (
         <Button onClick={pullBboxIntoIPAdapter} isDisabled={isBusy} size="sm" variant="link" color="base.300" />
       ),
     }),
-    [isBusy, onClickGalleryButton, pullBboxIntoIPAdapter, uploadApi]
+    [isBusy, pullBboxIntoIPAdapter, uploadApi]
   );
 
   return (

@@ -6,7 +6,7 @@ import { buildMultidiffusionUpscaleGraph } from 'features/nodes/util/graph/build
 import { useCallback } from 'react';
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
 
-const enqueueRequestedUpscaling = createAction('app/enqueueRequestedUpscaling');
+export const enqueueRequestedUpscaling = createAction('app/enqueueRequestedUpscaling');
 
 const enqueueUpscaling = async (store: AppStore, prepend: boolean) => {
   const { dispatch, getState } = store;

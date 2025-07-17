@@ -41,7 +41,7 @@ If you just want to use Invoke, you should use the [launcher][launcher link].
      With the modifications made, the install command should look something like this:
 
       ```sh
-      uv pip install -e ".[dev,test,docs,xformers]" --python 3.12 --python-preference only-managed --index=https://download.pytorch.org/whl/cu126 --reinstall
+      uv pip install -e ".[dev,test,docs,xformers]" --python 3.12 --python-preference only-managed --index=https://download.pytorch.org/whl/cu128 --reinstall
       ```
 
 6. At this point, you should have Invoke installed, a venv set up and activated, and the server running. But you will see a warning in the terminal that no UI was found. If you go to the URL for the server, you won't get a UI.
@@ -50,11 +50,11 @@ If you just want to use Invoke, you should use the [launcher][launcher link].
 
       If you only want to edit the docs, you can stop here and skip to the **Documentation** section below.
 
-7. Install the frontend dev toolchain:
+7. Install the frontend dev toolchain, paying attention to versions:
 
-      - [`nodejs`](https://nodejs.org/) (v20+)
+      - [`nodejs`](https://nodejs.org/) (tested on LTS, v22)
 
-      - [`pnpm`](https://pnpm.io/8.x/installation) (must be v8 - not v9!)
+      - [`pnpm`](https://pnpm.io/installation) (tested on v10)
 
 8. Do a production build of the frontend:
 

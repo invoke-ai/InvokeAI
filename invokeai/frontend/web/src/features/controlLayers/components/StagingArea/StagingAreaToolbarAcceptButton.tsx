@@ -5,7 +5,7 @@ import { useIsRegionFocused } from 'common/hooks/focus';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
-import { canvasSessionReset } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { canvasSessionReset, selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectBboxRect, selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageNameToImageObject } from 'features/controlLayers/store/util';
@@ -19,6 +19,7 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
   const ctx = useCanvasSessionContext();
   const dispatch = useAppDispatch();
   const canvasManager = useCanvasManager();
+  const canvasSessionId = useAppSelector(selectCanvasSessionId);
   const bboxRect = useAppSelector(selectBboxRect);
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
@@ -41,14 +42,14 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
 
     dispatch(rasterLayerAdded({ overrides, isSelected: selectedEntityIdentifier?.type === 'raster_layer' }));
     dispatch(canvasSessionReset());
-    cancelQueueItemsByDestination.trigger(ctx.session.id, { withToast: false });
+    cancelQueueItemsByDestination.trigger(canvasSessionId, { withToast: false });
   }, [
     selectedItemImageDTO,
     bboxRect,
     dispatch,
     selectedEntityIdentifier?.type,
     cancelQueueItemsByDestination,
-    ctx.session.id,
+    canvasSessionId,
   ]);
 
   useHotkeys(

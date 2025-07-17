@@ -17,7 +17,6 @@ import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasT
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
-import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { memo, useCallback } from 'react';
 import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
 
@@ -50,7 +49,6 @@ const canvasBgSx = {
 export const CanvasWorkspacePanel = memo(() => {
   const dynamicGrid = useAppSelector(selectDynamicGrid);
   const showHUD = useAppSelector(selectShowHUD);
-  const canvasId = useAppSelector(selectCanvasSessionId);
 
   const renderMenu = useCallback(() => {
     return <MenuContent />;
@@ -87,9 +85,9 @@ export const CanvasWorkspacePanel = memo(() => {
                 alignItems="flex-start"
               >
                 {showHUD && <CanvasHUD />}
+                <CanvasAlertsSaveAllImagesToGallery />
                 <CanvasAlertsSelectedEntityStatus />
                 <CanvasAlertsPreserveMask />
-                <CanvasAlertsSaveAllImagesToGallery />
                 <CanvasAlertsInvocationProgress />
               </Flex>
               <Flex position="absolute" top={1} insetInlineEnd={1}>
@@ -103,13 +101,11 @@ export const CanvasWorkspacePanel = memo(() => {
           </Flex>
         )}
       </ContextMenu>
-      {canvasId !== null && (
-        <CanvasManagerProviderGate>
-          <CanvasSessionContextProvider type="advanced" id={canvasId}>
-            <StagingArea />
-          </CanvasSessionContextProvider>
-        </CanvasManagerProviderGate>
-      )}
+      <CanvasManagerProviderGate>
+        <CanvasSessionContextProvider>
+          <StagingArea />
+        </CanvasSessionContextProvider>
+      </CanvasManagerProviderGate>
       <Flex position="absolute" bottom={4}>
         <CanvasManagerProviderGate>
           <Filter />

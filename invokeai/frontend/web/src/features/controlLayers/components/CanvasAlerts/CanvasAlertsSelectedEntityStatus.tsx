@@ -57,21 +57,21 @@ const CanvasAlertsSelectedEntityStatusContent = memo(({ entityIdentifier, adapte
   const alert = useMemo<AlertData | null>(() => {
     if (isFiltering) {
       return {
-        status: 'info',
+        status: 'warning',
         title: t('controlLayers.HUD.entityStatus.isFiltering', { title }),
       };
     }
 
     if (isTransforming) {
       return {
-        status: 'info',
+        status: 'warning',
         title: t('controlLayers.HUD.entityStatus.isTransforming', { title }),
       };
     }
 
     if (isEmpty) {
       return {
-        status: 'info',
+        status: 'warning',
         title: t('controlLayers.HUD.entityStatus.isEmpty', { title }),
       };
     }
