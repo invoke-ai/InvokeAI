@@ -4,6 +4,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectIsFLUX, selectIsSD3, selectParamsSlice, selectVAEKey } from 'features/controlLayers/store/paramsSlice';
 import { ParamSeed } from 'features/parameters/components/Seed/ParamSeed';
+import ParamTileControlNetModel from 'features/parameters/components/Upscale/ParamTileControlNetModel';
 import ParamFLUXVAEModelSelect from 'features/parameters/components/VAEModel/ParamFLUXVAEModelSelect';
 import ParamVAEModelSelect from 'features/parameters/components/VAEModel/ParamVAEModelSelect';
 import ParamVAEPrecision from 'features/parameters/components/VAEModel/ParamVAEPrecision';
@@ -73,6 +74,7 @@ export const UpscaleTabAdvancedSettingsAccordion = memo(() => {
           {!isFLUX && !isSD3 && <ParamVAEPrecision />}
         </Flex>
         <ParamSeed />
+        <ParamTileControlNetModel />
       </Flex>
     </StandaloneAccordion>
   );
