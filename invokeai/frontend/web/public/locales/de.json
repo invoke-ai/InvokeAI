@@ -711,7 +711,8 @@
         "gaussianBlur": "Gaußsche Unschärfe",
         "sendToUpscale": "An Hochskalieren senden",
         "useCpuNoise": "CPU-Rauschen verwenden",
-        "sendToCanvas": "An Leinwand senden"
+        "sendToCanvas": "An Leinwand senden",
+        "disabledNoRasterContent": "Deaktiviert (kein Rasterinhalt)"
     },
     "settings": {
         "displayInProgress": "Zwischenbilder anzeigen",
@@ -789,7 +790,10 @@
         "pasteSuccess": "Eingefügt in {{destination}}",
         "pasteFailed": "Einfügen fehlgeschlagen",
         "unableToCopy": "Kopieren nicht möglich",
-        "unableToCopyDesc_theseSteps": "diese Schritte"
+        "unableToCopyDesc_theseSteps": "diese Schritte",
+        "noRasterLayers": "Keine Rasterebenen gefunden",
+        "noActiveRasterLayers": "Keine aktiven Rasterebenen",
+        "noVisibleRasterLayers": "Keine sichtbaren Rasterebenen"
     },
     "accessibility": {
         "uploadImage": "Bild hochladen",
@@ -847,7 +851,10 @@
         "assetsWithCount_one": "{{count}} in der Sammlung",
         "assetsWithCount_other": "{{count}} in der Sammlung",
         "deletedBoardsCannotbeRestored": "Gelöschte Ordner können nicht wiederhergestellt werden. Die Auswahl von \"Nur Ordner löschen\" verschiebt Bilder in einen unkategorisierten Zustand.",
-        "updateBoardError": "Fehler beim Aktualisieren des Ordners"
+        "updateBoardError": "Fehler beim Aktualisieren des Ordners",
+        "uncategorizedImages": "Nicht kategorisierte Bilder",
+        "deleteAllUncategorizedImages": "Alle nicht kategorisierten Bilder löschen",
+        "deletedImagesCannotBeRestored": "Gelöschte Bilder können nicht wiederhergestellt werden."
     },
     "queue": {
         "status": "Status",
@@ -1194,6 +1201,9 @@
                 "Die Kantengröße des Kohärenzdurchlaufs."
             ],
             "heading": "Kantengröße"
+        },
+        "rasterLayer": {
+            "heading": "Rasterebene"
         }
     },
     "invocationCache": {
@@ -1431,7 +1441,10 @@
         "autoLayout": "Auto Layout",
         "copyShareLink": "Teilen-Link kopieren",
         "download": "Herunterladen",
-        "convertGraph": "Graph konvertieren"
+        "convertGraph": "Graph konvertieren",
+        "filterByTags": "Nach Tags filtern",
+        "yourWorkflows": "Ihre Arbeitsabläufe",
+        "recentlyOpened": "Kürzlich geöffnet"
     },
     "sdxl": {
         "concatPromptStyle": "Verknüpfen von Prompt & Stil",
@@ -1444,7 +1457,15 @@
     "prompt": {
         "noMatchingTriggers": "Keine passenden Trigger",
         "addPromptTrigger": "Prompt-Trigger hinzufügen",
-        "compatibleEmbeddings": "Kompatible Einbettungen"
+        "compatibleEmbeddings": "Kompatible Einbettungen",
+        "replace": "Ersetzen",
+        "insert": "Einfügen",
+        "discard": "Verwerfen",
+        "generateFromImage": "Prompt aus Bild generieren",
+        "expandCurrentPrompt": "Aktuelle Prompt erweitern",
+        "uploadImageForPromptGeneration": "Bild zur Prompt-Generierung hochladen",
+        "expandingPrompt": "Prompt wird erweitert...",
+        "resultTitle": "Prompt-Erweiterung abgeschlossen"
     },
     "ui": {
         "tabs": {
@@ -1573,30 +1594,30 @@
             "newGlobalReferenceImage": "Neues globales Referenzbild",
             "newRegionalReferenceImage": "Neues regionales Referenzbild",
             "newControlLayer": "Neue Kontroll-Ebene",
-            "newRasterLayer": "Neue Raster-Ebene"
+            "newRasterLayer": "Neue Rasterebene"
         },
         "rectangle": "Rechteck",
         "saveCanvasToGallery": "Leinwand in Galerie speichern",
-        "newRasterLayerError": "Problem beim Erstellen einer Raster-Ebene",
+        "newRasterLayerError": "Problem beim Erstellen einer Rasterebene",
         "saveLayerToAssets": "Ebene in Galerie speichern",
         "deleteReferenceImage": "Referenzbild löschen",
         "referenceImage": "Referenzbild",
         "opacity": "Opazität",
         "removeBookmark": "Lesezeichen entfernen",
-        "rasterLayer": "Raster-Ebene",
-        "rasterLayers_withCount_visible": "Raster-Ebenen ({{count}})",
+        "rasterLayer": "Rasterebene",
+        "rasterLayers_withCount_visible": "Rasterebenen ({{count}})",
         "controlLayers_withCount_visible": "Kontroll-Ebenen ({{count}})",
         "deleteSelected": "Ausgewählte löschen",
         "newRegionalReferenceImageError": "Problem beim Erstellen eines regionalen Referenzbilds",
         "newControlLayerOk": "Kontroll-Ebene erstellt",
         "newControlLayerError": "Problem beim Erstellen einer Kontroll-Ebene",
-        "newRasterLayerOk": "Raster-Layer erstellt",
+        "newRasterLayerOk": "Rasterebene erstellt",
         "moveToFront": "Nach vorne bringen",
         "copyToClipboard": "In die Zwischenablage kopieren",
         "controlLayers_withCount_hidden": "Kontroll-Ebenen ({{count}} ausgeblendet)",
         "clearCaches": "Cache leeren",
         "controlLayer": "Kontroll-Ebene",
-        "rasterLayers_withCount_hidden": "Raster-Ebenen ({{count}} ausgeblendet)",
+        "rasterLayers_withCount_hidden": "Rasterebenen ({{count}} ausgeblendet)",
         "transparency": "Transparenz",
         "canvas": "Leinwand",
         "global": "Global",
@@ -1682,7 +1703,14 @@
             "filterType": "Filtertyp",
             "filter": "Filter"
         },
-        "bookmark": "Lesezeichen für Schnell-Umschalten"
+        "bookmark": "Lesezeichen für Schnell-Umschalten",
+        "asRasterLayer": "Als $t(controlLayers.rasterLayer)",
+        "asRasterLayerResize": "Als $t(controlLayers.rasterLayer) (Größe anpassen)",
+        "rasterLayer_withCount_one": "$t(controlLayers.rasterLayer)",
+        "rasterLayer_withCount_other": "Rasterebenen",
+        "newRasterLayer": "Neue $t(controlLayers.rasterLayer)",
+        "showNonRasterLayers": "Nicht-Rasterebenen anzeigen (Umschalt+H)",
+        "hideNonRasterLayers": "Nicht-Rasterebenen ausblenden (Umschalt+H)"
     },
     "upsell": {
         "shareAccess": "Zugang teilen",
