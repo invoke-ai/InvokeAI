@@ -14,11 +14,9 @@ interface Props {
 }
 
 export const InvocationNodeInfoIcon = memo(({ nodeId }: Props) => {
-  const needsUpdate = useNodeNeedsUpdate();
-
   return (
     <Tooltip label={<TooltipContent nodeId={nodeId} />} placement="top" shouldWrapChildren>
-      <Icon as={PiInfoBold} display="block" boxSize={4} w={8} color={needsUpdate ? 'error.400' : 'base.400'} />
+      <Icon as={PiInfoBold} display="block" boxSize={4} w={8} />
     </Tooltip>
   );
 });

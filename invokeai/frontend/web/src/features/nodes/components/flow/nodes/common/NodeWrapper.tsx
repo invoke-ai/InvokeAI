@@ -1,7 +1,10 @@
 import type { ChakraProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, useGlobalMenuClose } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvocationNodeContextProvider } from 'features/nodes/components/flow/nodes/Invocation/context';
+import {
+  InvocationNodeContextProvider,
+  useInvocationNodeContext,
+} from 'features/nodes/components/flow/nodes/Invocation/context';
 import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { useMouseOverFormField, useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
@@ -16,6 +19,7 @@ type NodeWrapperProps = PropsWithChildren & {
   nodeId: string;
   selected: boolean;
   width?: ChakraProps['w'];
+  isMissingTemplate?: boolean;
 };
 
 // Certain CSS transitions are disabled as a performance optimization - they can cause massive slowdowns in large
@@ -27,6 +31,19 @@ const containerSx: SystemStyleObject = {
   borderRadius: 'base',
   transitionProperty: 'none',
   cursor: 'grab',
+  '--border-color': 'var(--invoke-colors-base-500)',
+  '--border-color-selected': 'var(--invoke-colors-blue-300)',
+  '--header-bg-color': 'var(--invoke-colors-base-900)',
+  '&[data-status="warning"]': {
+    '--border-color': 'var(--invoke-colors-warning-500)',
+    '--border-color-selected': 'var(--invoke-colors-warning-500)',
+    '--header-bg-color': 'var(--invoke-colors-warning-700)',
+  },
+  '&[data-status="error"]': {
+    '--border-color': 'var(--invoke-colors-error-500)',
+    '--border-color-selected': 'var(--invoke-colors-error-500)',
+    '--header-bg-color': 'var(--invoke-colors-error-700)',
+  },
   // The action buttons are hidden by default and shown on hover
   '& .node-selection-overlay': {
     display: 'block',
@@ -38,7 +55,7 @@ const containerSx: SystemStyleObject = {
     borderRadius: 'base',
     transitionProperty: 'none',
     pointerEvents: 'none',
-    shadow: '0 0 0 1px var(--invoke-colors-base-500)',
+    shadow: '0 0 0 1px var(--border-color)',
   },
   '&[data-is-mouse-over-node="true"] .node-selection-overlay': {
     display: 'block',
@@ -50,16 +67,16 @@ const containerSx: SystemStyleObject = {
   _hover: {
     '& .node-selection-overlay': {
       display: 'block',
-      shadow: '0 0 0 1px var(--invoke-colors-blue-300)',
+      shadow: '0 0 0 1px var(--border-color-selected)',
     },
     '&[data-is-selected="true"] .node-selection-overlay': {
       display: 'block',
-      shadow: '0 0 0 2px var(--invoke-colors-blue-300)',
+      shadow: '0 0 0 2px var(--border-color-selected)',
     },
   },
   '&[data-is-selected="true"] .node-selection-overlay': {
     display: 'block',
-    shadow: '0 0 0 2px var(--invoke-colors-blue-300)',
+    shadow: '0 0 0 2px var(--border-color-selected)',
   },
   '&[data-is-editor-locked="true"]': {
     '& *': {
@@ -100,7 +117,9 @@ const inProgressSx: SystemStyleObject = {
 };
 
 const NodeWrapper = (props: NodeWrapperProps) => {
-  const { nodeId, width, children, selected } = props;
+  const { nodeId, width, children, isMissingTemplate, selected } = props;
+  const ctx = useInvocationNodeContext();
+  const needsUpdate = useAppSelector(ctx.selectNodeNeedsUpdate);
   const mouseOverNode = useMouseOverNode(nodeId);
   const mouseOverFormField = useMouseOverFormField(nodeId);
   const zoomToNode = useZoomToNode(nodeId);
@@ -138,26 +157,25 @@ const NodeWrapper = (props: NodeWrapperProps) => {
   );
 
   return (
-    <InvocationNodeContextProvider nodeId={nodeId}>
-      <Box
-        onClick={globalMenu.onCloseGlobal}
-        onDoubleClick={onDoubleClick}
-        onMouseOver={mouseOverNode.handleMouseOver}
-        onMouseOut={mouseOverNode.handleMouseOut}
-        className={DRAG_HANDLE_CLASSNAME}
-        sx={containerSx}
-        width={width || NODE_WIDTH}
-        opacity={opacity}
-        data-is-editor-locked={isLocked}
-        data-is-selected={selected}
-        data-is-mouse-over-form-field={mouseOverFormField.isMouseOverFormField}
-      >
-        <Box sx={shadowsSx} />
-        <Box sx={inProgressSx} data-is-in-progress={isInProgress} />
-        {children}
-        <Box className="node-selection-overlay" />
-      </Box>
-    </InvocationNodeContextProvider>
+    <Box
+      onClick={globalMenu.onCloseGlobal}
+      onDoubleClick={onDoubleClick}
+      onMouseOver={mouseOverNode.handleMouseOver}
+      onMouseOut={mouseOverNode.handleMouseOut}
+      className={DRAG_HANDLE_CLASSNAME}
+      sx={containerSx}
+      width={width || NODE_WIDTH}
+      opacity={opacity}
+      data-is-editor-locked={isLocked}
+      data-is-selected={selected}
+      data-is-mouse-over-form-field={mouseOverFormField.isMouseOverFormField}
+      data-status={isMissingTemplate ? 'error' : needsUpdate ? 'warning' : undefined}
+    >
+      <Box sx={shadowsSx} />
+      <Box sx={inProgressSx} data-is-in-progress={isInProgress} />
+      {children}
+      <Box className="node-selection-overlay" />
+    </Box>
   );
 };
 

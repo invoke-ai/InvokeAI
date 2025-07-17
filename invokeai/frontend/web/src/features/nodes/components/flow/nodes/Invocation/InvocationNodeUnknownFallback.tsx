@@ -26,9 +26,10 @@ const InvocationNodeUnknownFallback = ({ nodeId, isOpen, label, type }: Props) =
         h={8}
         fontWeight="semibold"
         fontSize="sm"
+        bg="error.700"
       >
         <NodeCollapseButton nodeId={nodeId} isOpen={isOpen} />
-        <Text w="full" textAlign="center" pe={8} color="error.300">
+        <Text w="full" textAlign="center" pe={8}>
           {label ? `${label} (${type})` : type}
         </Text>
       </Flex>
