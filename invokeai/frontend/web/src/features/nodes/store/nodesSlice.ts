@@ -127,7 +127,7 @@ import {
 import { atom, computed } from 'nanostores';
 import type { MouseEvent } from 'react';
 import type { UndoableOptions } from 'redux-undo';
-import type { z } from 'zod/v4';
+import type { z } from 'zod';
 
 import type { PendingConnection, Templates } from './types';
 

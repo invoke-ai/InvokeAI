@@ -3,7 +3,7 @@ import { isRejectedWithValue } from '@reduxjs/toolkit';
 import { $toastMap } from 'app/store/nanostores/toastMap';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 const trialUsageErrorSubstring = 'usage allotment for the free trial';
 const trialUsageErrorCode = 'USAGE_LIMIT_TRIAL';

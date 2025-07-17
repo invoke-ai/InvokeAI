@@ -2,7 +2,7 @@ import { NUMPY_RAND_MAX } from 'app/constants';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { buildZodTypeGuard } from 'common/util/zodUtils';
 import { zModelIdentifierField, zSchedulerField } from 'features/nodes/types/common';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 /**
  * Schemas, types and type guards for parameters.

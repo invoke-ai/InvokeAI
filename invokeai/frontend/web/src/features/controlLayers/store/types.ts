@@ -31,7 +31,7 @@ import {
 } from 'features/parameters/types/parameterSchemas';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
 import type { JsonObject } from 'type-fest';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 const zId = z.string().min(1);
 const zName = z.string().min(1).nullable();

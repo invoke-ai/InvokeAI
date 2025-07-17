@@ -4,7 +4,7 @@ import { zModelIdentifierField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { ControlLoRAModelConfig, ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 const zAjustImageChannels = z.enum([
   'Red (RGBA)',

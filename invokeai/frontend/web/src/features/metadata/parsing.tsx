@@ -92,7 +92,7 @@ import { useTranslation } from 'react-i18next';
 import { modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig, ModelType } from 'services/api/types';
 import { assert } from 'tsafe';
-import z from 'zod/v4';
+import z from 'zod';
 
 const MetadataLabel = ({ i18nKey }: { i18nKey: string }) => {
   const { t } = useTranslation();

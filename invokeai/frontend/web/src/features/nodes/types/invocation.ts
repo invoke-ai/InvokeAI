@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 import { zClassification, zProgressImage } from './common';
 import { zFieldInputInstance, zFieldInputTemplate, zFieldOutputTemplate } from './field';
