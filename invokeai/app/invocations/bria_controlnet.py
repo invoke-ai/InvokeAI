@@ -1,13 +1,13 @@
 from invokeai.backend.bria.controlnet_bria import BRIA_CONTROL_MODES
 from pydantic import BaseModel, Field
-from invokeai.invocation_api import ImageOutput
+from invokeai.invocation_api import ImageOutput, Classification
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import FieldDescriptions, ImageField, InputField, OutputField, UIType
+from invokeai.app.invocations.fields import FieldDescriptions, ImageField, InputField, OutputField, UIType, WithBoard, WithMetadata
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 import numpy as np
@@ -26,9 +26,9 @@ class BriaControlNetField(BaseModel):
     mode: BRIA_CONTROL_MODES = Field(description="The mode of the ControlNet")
     conditioning_scale: float = Field(description="The weight given to the ControlNet")
 
-@invocation_output("flux_controlnet_output")
+@invocation_output("bria_controlnet_output")
 class BriaControlNetOutput(BaseInvocationOutput):
-    """FLUX ControlNet info"""
+    """Bria ControlNet info"""
 
     control: BriaControlNetField = OutputField(description=FieldDescriptions.control)
     preprocessed_images: ImageField = OutputField(description="The preprocessed control image")
@@ -40,8 +40,9 @@ class BriaControlNetOutput(BaseInvocationOutput):
     tags=["controlnet", "bria"],
     category="controlnet",
     version="1.0.0",
+    classification=Classification.Prototype,
 )
-class BriaControlNetInvocation(BaseInvocation):
+class BriaControlNetInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Collect Bria ControlNet info to pass to denoiser node."""
 
     control_image: ImageField = InputField(description="The control image")
