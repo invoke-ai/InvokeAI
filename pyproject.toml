@@ -76,11 +76,6 @@ dependencies = [
   "semver~=3.0.1",
 ]
 
-[dependency-groups]
-cpu = ["torch==2.7.1+cpu", "torchvision==0.22.1+cpu"]
-cuda = ["torch==2.7.1+cu128", "torchvision==0.22.1+cu128"]
-rocm = ["torch==2.7.1+rocm6.3", "torchvision==0.22.1+rocm6.3"]
-
 [project.optional-dependencies]
 "xformers" = [
   # Core generation dependencies, pinned for reproducible builds.
@@ -88,16 +83,13 @@ rocm = ["torch==2.7.1+rocm6.3", "torchvision==0.22.1+rocm6.3"]
   # torch 2.4+cu carries its own triton dependency
 ]
 
-# These enable the usage of installing the package with specific support.
-# uv pip install .[rocm] --python 3.12 --python-preference only-managed --force-reinstall --index-strategy unsafe-best-match
-# Problem is that these break `uv lock --index-strategy unsafe-best-match`
-# This does work though, as the pyproject.toml has the indexes defined.
-# uv pip install . torch==2.7.1+rocm6.3 --force-reinstall --index-strategy unsafe-best-match
-# Maybe we update the docs to show these instead of the --index way?
-
-# cpu = ["torch==2.7.1+cpu"]
-# cuda = ["torch==2.7.1+cu128"]
-# rocm = ["torch==2.7.1+rocm6.3"]
+"cpu" = ["torch==2.7.1+cpu", "torchvision==0.22.1+cpu"]
+"cuda" = ["torch==2.7.1+cu128", "torchvision==0.22.1+cu128"]
+"rocm" = [
+  "torch==2.7.1+rocm6.3",
+  "torchvision==0.22.1+rocm6.3",
+  "pytorch-triton-rocm",
+]
 
 "onnx" = ["onnxruntime"]
 "onnx-cuda" = ["onnxruntime-gpu"]
@@ -129,25 +121,38 @@ rocm = ["torch==2.7.1+rocm6.3", "torchvision==0.22.1+rocm6.3"]
 # Prevent opencv-python from ever being chosen during dependency resolution.
 # This prevents conflicts with opencv-contrib-python, which Invoke requires.
 override-dependencies = ["opencv-python; sys_platform=='never'"]
-conflicts = [[{ group = "cpu" }, { group = "cuda" }, { group = "rocm" }]]
+conflicts = [[{ extra = "cpu" }, { extra = "cuda" }, { extra = "rocm" }]]
+index-strategy = "unsafe-best-match"
 
-# This will cause: `uv lock --index-strategy unsafe-best-match` to be needed for future locks
-# If you are updating these, make sure to update the docker/Dockerfile as well.
+[tool.uv.sources]
+torch = [
+  { index = "torch-cpu", extra = "cpu" },
+  { index = "torch-cuda", extra = "cuda" },
+  { index = "torch-rocm", extra = "rocm" },
+]
+torchvision = [
+  { index = "torch-cpu", extra = "cpu" },
+  { index = "torch-cuda", extra = "cuda" },
+  { index = "torch-rocm", extra = "rocm" },
+]
+pytorch-triton-rocm = [
+  { index = "torch-rocm", extra = "rocm", marker = "sys_platform == 'linux'" },
+]
+
 [[tool.uv.index]]
 name = "torch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
-group = "cpu"
+explicit = true
 
 [[tool.uv.index]]
 name = "torch-cuda"
 url = "https://download.pytorch.org/whl/cu128"
-group = "cuda"
+explicit = true
 
 [[tool.uv.index]]
 name = "torch-rocm"
 url = "https://download.pytorch.org/whl/rocm6.3"
-group = "rocm"
-
+explicit = true
 
 [project.scripts]
 "invokeai-web" = "invokeai.app.run_app:run_app"

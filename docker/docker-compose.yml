@@ -48,11 +48,8 @@ services:
   invokeai-rocm:
     <<: *invokeai
     environment:
-      # if set, CONTAINER_INVOKEAI_ROOT will override the Invoke runtime directory location *inside* the container
-      - INVOKEAI_ROOT=${CONTAINER_INVOKEAI_ROOT:-/invokeai}
-      - HF_HOME
       - AMD_VISIBLE_DEVICES=all
-      - RENDER_GROUP_ID=993
+      - RENDER_GROUP_ID=${RENDER_GROUP_ID}
     runtime: amd
     profiles:
       - rocm

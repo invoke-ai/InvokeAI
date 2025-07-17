@@ -14,6 +14,8 @@ set -e -o pipefail
 #   docker run --rm -it -v /some/path:/invokeai -e CONTAINER_UID=$(id -u) <this image>
 # Default UID: 1000 chosen due to popularity on Linux systems. Possibly 501 on MacOS.
 
+printenv
+
 USER_ID=${CONTAINER_UID:-1000}
 USER=ubuntu
 # if the user does not exist, create it. It is expected to be present on ubuntu >=24.x
@@ -24,9 +26,13 @@ usermod -u ${USER_ID} ${USER} 1>/dev/null
 ## ROCM specific configuration
 # render group within the container must match the host render group
 # otherwise the container will not be able to access the host GPU.
-groupmod -g ${RENDER_GROUP_ID:-993} render
-usermod -a -G render ${USER}
-usermod -a -G video ${USER}
+if [[ -v "RENDER_GROUP_ID" ]] && [[ ! -z "${RENDER_GROUP_ID}" ]]; then
+  # ensure the render group exists
+  groupmod -g ${RENDER_GROUP_ID} render
+  usermod -a -G render ${USER}
+  usermod -a -G video ${USER}
+fi
+
 
 ### Set the $PUBLIC_KEY env var to enable SSH access.
 # We do not install openssh-server in the image by default to avoid bloat.

@@ -74,7 +74,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     # this is just to get the package manager to recognize that the project exists, without making changes to the docker layer
     --mount=type=bind,source=invokeai/version,target=invokeai/version \
     ulimit -n 30000 && \
-    uv sync --group $GPU_DRIVER --frozen
+    uv sync --extra $GPU_DRIVER --frozen
 
 # Link amdgpu.ids for ROCm builds
 # contributed by https://github.com/Rubonnek
