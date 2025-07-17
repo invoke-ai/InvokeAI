@@ -172,7 +172,7 @@ const validateNumberFieldValue: FieldValidationFunc<
   return reasons;
 };
 
-export type NodeError = {
+type NodeError = {
   type: 'node-error';
   nodeId: string;
   issue: string;
@@ -205,7 +205,7 @@ const getIssuesToFieldErrorsMapFunc =
     issue,
   });
 
-export const getFieldErrors = (
+const getFieldErrors = (
   node: InvocationNode,
   nodeTemplate: InvocationTemplate,
   field: FieldInputInstance,
@@ -291,7 +291,7 @@ export const getInvocationNodeErrors = (
 
 export const $nodeErrors = map<Record<string, (NodeError | FieldError)[]>>({});
 
-export const syncNodeErrors = (nodesState: NodesState, templates: Templates) => {
+const syncNodeErrors = (nodesState: NodesState, templates: Templates) => {
   for (const node of nodesState.nodes) {
     const errors: (NodeError | FieldError)[] = [];
     if (!isInvocationNode(node)) {

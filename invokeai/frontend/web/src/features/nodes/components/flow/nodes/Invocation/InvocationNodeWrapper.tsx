@@ -9,8 +9,8 @@ import { selectNodes } from 'features/nodes/store/selectors';
 import type { InvocationNodeData } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
 
-import InvocationNodeUnknownFallback from './InvocationNodeUnknownFallback';
 import { InvocationNodeContextProvider } from './context';
+import InvocationNodeUnknownFallback from './InvocationNodeUnknownFallback';
 
 const InvocationNodeWrapper = (props: NodeProps<Node<InvocationNodeData>>) => {
   const { data, selected } = props;

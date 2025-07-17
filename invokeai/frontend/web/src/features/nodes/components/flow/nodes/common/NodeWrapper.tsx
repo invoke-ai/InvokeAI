@@ -1,10 +1,7 @@
 import type { ChakraProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, useGlobalMenuClose } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import {
-  InvocationNodeContextProvider,
-  useInvocationNodeContext,
-} from 'features/nodes/components/flow/nodes/Invocation/context';
+import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { useMouseOverFormField, useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
