@@ -18,5 +18,3 @@ export const getSelectorsOptions = {
     argsMemoize: lruMemoize,
   }),
 };
-
-export const createLruSelector = createSelectorCreator(lruMemoize);
