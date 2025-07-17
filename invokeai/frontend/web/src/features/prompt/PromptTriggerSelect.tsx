@@ -1,5 +1,5 @@
 import type { ChakraProps, ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
-import { Combobox, FormControl, Icon } from '@invoke-ai/ui-library';
+import { Combobox, Flex, FormControl, Icon } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { GroupBase } from 'chakra-react-select';
@@ -18,7 +18,7 @@ import { isNonRefinerMainModelConfig } from 'services/api/types';
 
 const noOptionsMessage = () => t('prompt.noMatchingTriggers');
 
-type RelatedEmbedding = ComboboxOption & { starred?: boolean };
+type ComboboxOptionWithStarred = ComboboxOption & { starred?: boolean };
 
 export const PromptTriggerSelect = memo(({ onSelect, onClose }: PromptTriggerSelectProps) => {
   const { t } = useTranslation();
@@ -65,7 +65,7 @@ export const PromptTriggerSelect = memo(({ onSelect, onClose }: PromptTriggerSel
   );
 
   const options = useMemo(() => {
-    const _options: GroupBase<ComboboxOption>[] = [];
+    const _options: GroupBase<ComboboxOptionWithStarred>[] = [];
 
     if (loraModels) {
       const triggerPhraseOptions = loraModels
@@ -88,7 +88,7 @@ export const PromptTriggerSelect = memo(({ onSelect, onClose }: PromptTriggerSel
 
     if (tiModels) {
       // Create embedding options with starred property for related models
-      const embeddingOptions: RelatedEmbedding[] = tiModels
+      const embeddingOptions: ComboboxOptionWithStarred[] = tiModels
         .filter((ti) => ti.base === mainModelConfig?.base)
         .map((model) => ({
           label: model.name,
@@ -128,27 +128,26 @@ export const PromptTriggerSelect = memo(({ onSelect, onClose }: PromptTriggerSel
     return _options;
   }, [tiModels, loraModels, mainModelConfig, t, addedLoRAs, relatedModelKeys]);
 
-  const formatOptionLabel = useCallback((option: ComboboxOption) => {
-    const embeddingOption = option as RelatedEmbedding;
-    if (embeddingOption.starred) {
-      return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Icon as={PiLinkSimple} color="invokeYellow.500" boxSize={3} />
-          {option.label}
-        </div>
-      );
-    }
-    return option.label;
+  const formatOptionLabel = useCallback((option: ComboboxOptionWithStarred) => {
+    return (
+      <Flex alignItems="center" gap={2}>
+        {option.starred && <Icon as={PiLinkSimple} color="invokeYellow.500" boxSize={4} />}
+        {option.label}
+      </Flex>
+    );
   }, []);
+
+  const placeholder = useMemo(() => {
+    if (isLoadingLoRAs || isLoadingTIs || isLoadingMainModelConfig) {
+      return t('common.loading');
+    }
+    return t('prompt.addPromptTrigger');
+  }, [t, isLoadingLoRAs, isLoadingTIs, isLoadingMainModelConfig]);
 
   return (
     <FormControl>
       <Combobox
-        placeholder={
-          isLoadingLoRAs || isLoadingTIs || isLoadingMainModelConfig
-            ? t('common.loading')
-            : t('prompt.addPromptTrigger')
-        }
+        placeholder={placeholder}
         defaultMenuIsOpen
         autoFocus
         value={null}
