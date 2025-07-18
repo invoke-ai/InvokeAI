@@ -1,12 +1,12 @@
 import { Flex, Heading, Icon, Text } from '@invoke-ai/ui-library';
 import { useAppStore } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
-import { LaunchpadButton } from 'features/controlLayers/components/SimpleSession/LaunchpadButton';
 import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { refImageAdded } from 'features/controlLayers/store/refImagesSlice';
 import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
 import { addGlobalReferenceImageDndTarget, newCanvasFromImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
+import { LaunchpadButton } from 'features/ui/layouts/LaunchpadButton';
 import { memo, useMemo } from 'react';
 import { PiUploadBold, PiUserCircleGearBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
