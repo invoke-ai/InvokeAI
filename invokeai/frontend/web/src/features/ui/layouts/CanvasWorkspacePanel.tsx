@@ -12,7 +12,6 @@ import { Filter } from 'features/controlLayers/components/Filters/Filter';
 import { CanvasHUD } from 'features/controlLayers/components/HUD/CanvasHUD';
 import { InvokeCanvasComponent } from 'features/controlLayers/components/InvokeCanvasComponent';
 import { SelectObject } from 'features/controlLayers/components/SelectObject/SelectObject';
-import { CanvasSessionContextProvider } from 'features/controlLayers/components/SimpleSession/context';
 import { StagingAreaContextProvider } from 'features/controlLayers/components/SimpleSession/context2';
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
@@ -106,9 +105,7 @@ export const CanvasWorkspacePanel = memo(() => {
           )}
         </ContextMenu>
         <CanvasManagerProviderGate>
-          <CanvasSessionContextProvider>
-            <StagingArea />
-          </CanvasSessionContextProvider>
+          <StagingArea />
         </CanvasManagerProviderGate>
         <Flex position="absolute" bottom={4}>
           <CanvasManagerProviderGate>
