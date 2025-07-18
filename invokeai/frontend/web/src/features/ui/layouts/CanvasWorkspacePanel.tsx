@@ -13,10 +13,12 @@ import { CanvasHUD } from 'features/controlLayers/components/HUD/CanvasHUD';
 import { InvokeCanvasComponent } from 'features/controlLayers/components/InvokeCanvasComponent';
 import { SelectObject } from 'features/controlLayers/components/SelectObject/SelectObject';
 import { CanvasSessionContextProvider } from 'features/controlLayers/components/SimpleSession/context';
+import { StagingAreaContextProvider } from 'features/controlLayers/components/SimpleSession/context2';
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { memo, useCallback } from 'react';
 import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
 
@@ -49,74 +51,77 @@ const canvasBgSx = {
 export const CanvasWorkspacePanel = memo(() => {
   const dynamicGrid = useAppSelector(selectDynamicGrid);
   const showHUD = useAppSelector(selectShowHUD);
+  const sessionId = useAppSelector(selectCanvasSessionId);
 
   const renderMenu = useCallback(() => {
     return <MenuContent />;
   }, []);
 
   return (
-    <Flex
-      borderRadius="base"
-      position="relative"
-      flexDirection="column"
-      height="full"
-      width="full"
-      gap={2}
-      alignItems="center"
-      justifyContent="center"
-      overflow="hidden"
-    >
-      <CanvasManagerProviderGate>
-        <CanvasToolbar />
-      </CanvasManagerProviderGate>
-      <Divider />
-      <ContextMenu<HTMLDivElement> renderMenu={renderMenu} withLongPress={false}>
-        {(ref) => (
-          <Flex ref={ref} sx={canvasBgSx} data-dynamic-grid={dynamicGrid}>
-            <InvokeCanvasComponent />
-            <CanvasManagerProviderGate>
-              <Flex
-                position="absolute"
-                flexDir="column"
-                top={1}
-                insetInlineStart={1}
-                pointerEvents="none"
-                gap={2}
-                alignItems="flex-start"
-              >
-                {showHUD && <CanvasHUD />}
-                <CanvasAlertsSaveAllImagesToGallery />
-                <CanvasAlertsSelectedEntityStatus />
-                <CanvasAlertsPreserveMask />
-                <CanvasAlertsInvocationProgress />
-              </Flex>
-              <Flex position="absolute" top={1} insetInlineEnd={1}>
-                <Menu>
-                  <MenuButton as={IconButton} icon={<PiDotsThreeOutlineVerticalFill />} colorScheme="base" />
-                  <MenuContent />
-                </Menu>
-              </Flex>
-              <CanvasBusySpinner position="absolute" insetInlineEnd={2} bottom={2} />
-            </CanvasManagerProviderGate>
-          </Flex>
-        )}
-      </ContextMenu>
-      <CanvasManagerProviderGate>
-        <CanvasSessionContextProvider>
-          <StagingArea />
-        </CanvasSessionContextProvider>
-      </CanvasManagerProviderGate>
-      <Flex position="absolute" bottom={4}>
+    <StagingAreaContextProvider sessionId={sessionId}>
+      <Flex
+        borderRadius="base"
+        position="relative"
+        flexDirection="column"
+        height="full"
+        width="full"
+        gap={2}
+        alignItems="center"
+        justifyContent="center"
+        overflow="hidden"
+      >
         <CanvasManagerProviderGate>
-          <Filter />
-          <Transform />
-          <SelectObject />
+          <CanvasToolbar />
+        </CanvasManagerProviderGate>
+        <Divider />
+        <ContextMenu<HTMLDivElement> renderMenu={renderMenu} withLongPress={false}>
+          {(ref) => (
+            <Flex ref={ref} sx={canvasBgSx} data-dynamic-grid={dynamicGrid}>
+              <InvokeCanvasComponent />
+              <CanvasManagerProviderGate>
+                <Flex
+                  position="absolute"
+                  flexDir="column"
+                  top={1}
+                  insetInlineStart={1}
+                  pointerEvents="none"
+                  gap={2}
+                  alignItems="flex-start"
+                >
+                  {showHUD && <CanvasHUD />}
+                  <CanvasAlertsSaveAllImagesToGallery />
+                  <CanvasAlertsSelectedEntityStatus />
+                  <CanvasAlertsPreserveMask />
+                  <CanvasAlertsInvocationProgress />
+                </Flex>
+                <Flex position="absolute" top={1} insetInlineEnd={1}>
+                  <Menu>
+                    <MenuButton as={IconButton} icon={<PiDotsThreeOutlineVerticalFill />} colorScheme="base" />
+                    <MenuContent />
+                  </Menu>
+                </Flex>
+                <CanvasBusySpinner position="absolute" insetInlineEnd={2} bottom={2} />
+              </CanvasManagerProviderGate>
+            </Flex>
+          )}
+        </ContextMenu>
+        <CanvasManagerProviderGate>
+          <CanvasSessionContextProvider>
+            <StagingArea />
+          </CanvasSessionContextProvider>
+        </CanvasManagerProviderGate>
+        <Flex position="absolute" bottom={4}>
+          <CanvasManagerProviderGate>
+            <Filter />
+            <Transform />
+            <SelectObject />
+          </CanvasManagerProviderGate>
+        </Flex>
+        <CanvasManagerProviderGate>
+          <CanvasDropArea />
         </CanvasManagerProviderGate>
       </Flex>
-      <CanvasManagerProviderGate>
-        <CanvasDropArea />
-      </CanvasManagerProviderGate>
-    </Flex>
+    </StagingAreaContextProvider>
   );
 });
 CanvasWorkspacePanel.displayName = 'CanvasWorkspacePanel';
