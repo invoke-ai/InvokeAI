@@ -1,6 +1,5 @@
 import type { DockviewApi, GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
 import { DockviewReact, GridviewReact, LayoutPriority, Orientation } from 'dockview';
-import { UpscalingLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/UpscalingLaunchpadPanel';
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
 import { GalleryPanel } from 'features/gallery/components/Gallery';
 import { GenerationProgressPanel } from 'features/gallery/components/ImageViewer/GenerationProgressPanel';
@@ -43,6 +42,7 @@ import {
   SETTINGS_PANEL_ID,
   VIEWER_PANEL_ID,
 } from './shared';
+import { UpscalingLaunchpadPanel } from './UpscalingLaunchpadPanel';
 import { UpscalingTabLeftPanel } from './UpscalingTabLeftPanel';
 
 const tabComponents = {

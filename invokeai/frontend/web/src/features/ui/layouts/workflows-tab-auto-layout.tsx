@@ -1,6 +1,5 @@
 import type { DockviewApi, GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
 import { DockviewReact, GridviewReact, LayoutPriority, Orientation } from 'dockview';
-import { WorkflowsLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/WorkflowsLaunchpadPanel';
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
 import { GalleryPanel } from 'features/gallery/components/Gallery';
 import { GenerationProgressPanel } from 'features/gallery/components/ImageViewer/GenerationProgressPanel';
@@ -46,6 +45,7 @@ import {
   VIEWER_PANEL_ID,
   WORKSPACE_PANEL_ID,
 } from './shared';
+import { WorkflowsLaunchpadPanel } from './WorkflowsLaunchpadPanel';
 
 const tabComponents = {
   [DOCKVIEW_TAB_ID]: DockviewTab,
