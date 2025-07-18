@@ -8,6 +8,10 @@ import { objectEntries } from 'tsafe';
 
 import { getOutputImageName } from './shared';
 
+/**
+ * Interface for the app-level API that the StagingAreaApi depends on.
+ * This provides the connection between the staging area and the rest of the application.
+ */
 export type StagingAreaAppApi = {
   onDiscard?: (item: S['SessionQueueItem']) => void;
   onDiscardAll?: () => void;
@@ -26,6 +30,7 @@ export type StagingAreaAppApi = {
   onInvocationProgress: (handler: (data: S['InvocationProgressEvent']) => Promise<void> | void) => () => void;
 };
 
+/** Progress data for a single queue item */
 export type ProgressData = {
   itemId: number;
   progressEvent: S['InvocationProgressEvent'] | null;
@@ -33,12 +38,14 @@ export type ProgressData = {
   imageDTO: ImageDTO | null;
 };
 
+/** Combined data for the currently selected item */
 export type SelectedItemData = {
   item: S['SessionQueueItem'];
   index: number;
   progressData: ProgressData;
 };
 
+/** Creates initial progress data for a queue item */
 export const getInitialProgressData = (itemId: number): ProgressData => ({
   itemId,
   progressEvent: null,
@@ -47,6 +54,12 @@ export const getInitialProgressData = (itemId: number): ProgressData => ({
 });
 type ProgressDataMap = Record<number, ProgressData | undefined>;
 
+/**
+ * API for managing the Canvas Staging Area - a view of the image generation queue.
+ * Provides reactive state management for pending, in-progress, and completed images.
+ * Users can accept images to place on canvas, discard them, navigate between items,
+ * and configure auto-switching behavior.
+ */
 export class StagingAreaApi {
   sessionId: string;
   _app: StagingAreaAppApi;
@@ -61,52 +74,33 @@ export class StagingAreaApi {
     this._subscriptions.add(this._app.onInvocationProgress(this.onInvocationProgressEvent));
   }
 
-  /**
-   * Track the last started item. Used to implement autoswitch.
-   */
+  /** Item ID of the last started item. Used for auto-switch on start. */
   $lastStartedItemId = atom<number | null>(null);
 
-  /**
-   * Track the last completed item. Used to implement autoswitch.
-   */
+  /** Item ID of the last completed item. Used for auto-switch on completion. */
   $lastCompletedItemId = atom<number | null>(null);
 
-  /**
-   * Manually-synced atom containing queue items for the current session. This is populated from the RTK Query cache
-   * and kept in sync with it via a redux subscription.
-   */
+  /** All queue items for the current session. */
   $items = atom<S['SessionQueueItem'][]>([]);
 
-  /**
-   * An ephemeral store of progress events and images for all items in the current session.
-   */
+  /** Progress data for all items including events, images, and ImageDTOs. */
   $progressData = map<ProgressDataMap>({});
 
-  /**
-   * The currently selected queue item's ID, or null if one is not selected.
-   */
+  /** ID of the currently selected queue item, or null if none selected. */
   $selectedItemId = atom<number | null>(null);
 
-  /**
-   * The number of items. Computed from the queue items array.
-   */
+  /** Total number of items in the queue. */
   $itemCount = computed([this.$items], (items) => items.length);
 
-  /**
-   * Whether there are any items. Computed from the queue items array.
-   */
+  /** Whether there are any items in the queue. */
   $hasItems = computed([this.$items], (items) => items.length > 0);
 
-  /**
-   * Whether there are any pending or in-progress items. Computed from the queue items array.
-   */
+  /** Whether there are any pending or in-progress items. */
   $isPending = computed([this.$items], (items) =>
     items.some((item) => item.status === 'pending' || item.status === 'in_progress')
   );
 
-  /**
-   * The currently selected queue item, its index and progress data - or null, if one is not selected.
-   */
+  /** The currently selected queue item with its index and progress data, or null if none selected. */
   $selectedItem = computed(
     [this.$items, this.$selectedItemId, this.$progressData],
     (items, selectedItemId, progressData) => {
@@ -129,19 +123,23 @@ export class StagingAreaApi {
     }
   );
 
+  /** The ImageDTO of the currently selected item, or null if none available. */
   $selectedItemImageDTO = computed([this.$selectedItem], (selectedItem) => {
     return selectedItem?.progressData.imageDTO ?? null;
   });
 
+  /** The index of the currently selected item, or null if none selected. */
   $selectedItemIndex = computed([this.$selectedItem], (selectedItem) => {
     return selectedItem?.index ?? null;
   });
 
+  /** Selects a queue item by ID. */
   select = (itemId: number) => {
     this.$selectedItemId.set(itemId);
     this._app.onSelect?.(itemId);
   };
 
+  /** Selects the next item in the queue, wrapping to the first item if at the end. */
   selectNext = () => {
     const selectedItem = this.$selectedItem.get();
     if (selectedItem === null) {
@@ -157,6 +155,7 @@ export class StagingAreaApi {
     this._app.onSelectNext?.();
   };
 
+  /** Selects the previous item in the queue, wrapping to the last item if at the beginning. */
   selectPrev = () => {
     const selectedItem = this.$selectedItem.get();
     if (selectedItem === null) {
@@ -172,6 +171,7 @@ export class StagingAreaApi {
     this._app.onSelectPrev?.();
   };
 
+  /** Selects the first item in the queue. */
   selectFirst = () => {
     const items = this.$items.get();
     const first = items.at(0);
@@ -182,6 +182,7 @@ export class StagingAreaApi {
     this._app.onSelectFirst?.();
   };
 
+  /** Selects the last item in the queue. */
   selectLast = () => {
     const items = this.$items.get();
     const last = items.at(-1);
@@ -192,6 +193,7 @@ export class StagingAreaApi {
     this._app.onSelectLast?.();
   };
 
+  /** Discards the currently selected item and selects the next available item. */
   discardSelected = () => {
     const selectedItem = this.$selectedItem.get();
     if (selectedItem === null) {
@@ -207,6 +209,8 @@ export class StagingAreaApi {
     }
     this._app.onDiscard?.(selectedItem.item);
   };
+
+  /** Whether the discard selected action is enabled. */
   $discardSelectedIsEnabled = computed([this.$selectedItem], (selectedItem) => {
     if (selectedItem === null) {
       return false;
@@ -214,11 +218,13 @@ export class StagingAreaApi {
     return true;
   });
 
+  /** Discards all items in the queue. */
   discardAll = () => {
     this.$selectedItemId.set(null);
     this._app.onDiscardAll?.();
   };
 
+  /** Accepts the currently selected item if an image is available. */
   acceptSelected = () => {
     const selectedItem = this.$selectedItem.get();
     if (selectedItem === null) {
@@ -231,6 +237,8 @@ export class StagingAreaApi {
     }
     this._app.onAccept?.(selectedItem.item, datum.imageDTO);
   };
+
+  /** Whether the accept selected action is enabled. */
   $acceptSelectedIsEnabled = computed([this.$selectedItem, this.$progressData], (selectedItem, progressData) => {
     if (selectedItem === null) {
       return false;
@@ -239,10 +247,12 @@ export class StagingAreaApi {
     return !!datum && !!datum.imageDTO;
   });
 
+  /** Sets the auto-switch mode. */
   setAutoSwitch = (mode: AutoSwitchMode) => {
     this._app.onAutoSwitchChange?.(mode);
   };
 
+  /** Handles invocation progress events from the WebSocket. */
   onInvocationProgressEvent = (data: S['InvocationProgressEvent']) => {
     if (data.destination !== this.sessionId) {
       return;
@@ -250,6 +260,7 @@ export class StagingAreaApi {
     setProgress(this.$progressData, data);
   };
 
+  /** Handles queue item status change events from the WebSocket. */
   onQueueItemStatusChangedEvent = (data: S['QueueItemStatusChangedEvent']) => {
     if (data.destination !== this.sessionId) {
       return;
@@ -271,6 +282,10 @@ export class StagingAreaApi {
     }
   };
 
+  /**
+   * Handles queue items changed events. Updates items, manages progress data,
+   * handles auto-selection, and implements auto-switch behavior.
+   */
   onItemsChangedEvent = async (items: S['SessionQueueItem'][]) => {
     const oldItems = this.$items.get();
 
@@ -355,12 +370,14 @@ export class StagingAreaApi {
     this.$items.set(items);
   };
 
+  /** Creates a computed value that returns true if the given item ID is selected. */
   buildIsSelectedComputed = (itemId: number) => {
     return computed([this.$selectedItemId], (selectedItemId) => {
       return selectedItemId === itemId;
     });
   };
 
+  /** Cleans up all state and unsubscribes from all events. */
   cleanup = () => {
     this.$lastStartedItemId.set(null);
     this.$lastCompletedItemId.set(null);
@@ -372,6 +389,7 @@ export class StagingAreaApi {
   };
 }
 
+/** Updates progress data for a queue item with the latest progress event. */
 const setProgress = ($progressData: MapStore<ProgressDataMap>, data: S['InvocationProgressEvent']) => {
   const progressData = $progressData.get();
   const current = progressData[data.item_id];
