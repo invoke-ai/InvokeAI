@@ -12,7 +12,7 @@ import { Filter } from 'features/controlLayers/components/Filters/Filter';
 import { CanvasHUD } from 'features/controlLayers/components/HUD/CanvasHUD';
 import { InvokeCanvasComponent } from 'features/controlLayers/components/InvokeCanvasComponent';
 import { SelectObject } from 'features/controlLayers/components/SelectObject/SelectObject';
-import { StagingAreaContextProvider } from 'features/controlLayers/components/SimpleSession/context2';
+import { StagingAreaContextProvider } from 'features/controlLayers/components/SimpleSession/context';
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';

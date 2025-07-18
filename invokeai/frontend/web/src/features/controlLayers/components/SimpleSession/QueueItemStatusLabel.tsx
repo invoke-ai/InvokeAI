@@ -3,7 +3,7 @@ import { Text } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import type { S } from 'services/api/types';
 
-import { useProgressDatum } from './context2';
+import { useProgressDatum } from './context';
 
 type Props = { item: S['SessionQueueItem'] } & TextProps;
 

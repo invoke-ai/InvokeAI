@@ -10,7 +10,7 @@ import type { Components, ComputeItemKey, ItemContent, ListRange, VirtuosoHandle
 import { Virtuoso } from 'react-virtuoso';
 import type { S } from 'services/api/types';
 
-import { useStagingAreaContext } from './context2';
+import { useStagingAreaContext } from './context';
 import { getQueueItemElementId } from './shared';
 
 const log = logger('system');

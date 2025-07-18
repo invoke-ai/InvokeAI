@@ -16,7 +16,7 @@ import { toast } from 'features/toast/toast';
 import { memo, useCallback, useMemo } from 'react';
 import type { S } from 'services/api/types';
 
-import { useOutputImageDTO, useStagingAreaContext } from './context2';
+import { useOutputImageDTO, useStagingAreaContext } from './context';
 
 const sx = {
   cursor: 'pointer',
