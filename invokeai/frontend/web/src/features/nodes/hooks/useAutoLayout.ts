@@ -17,7 +17,6 @@ import { useCallback } from 'react';
 
 const ESTIMATED_NOTES_NODE_HEIGHT = 200;
 const DEFAULT_NODE_HEIGHT = NODE_WIDTH;
-const NODE_PADDING = 0;//40; // Padding to add to the node height
 
 export const useAutoLayout = (): (() => void) => {
   const dispatch = useAppDispatch();
@@ -44,32 +43,25 @@ export const useAutoLayout = (): (() => void) => {
 
     const selectedNodes = nodes.filter((n) => n.selected);
     const isLayoutSelection = selectedNodes.length > 0 && nodes.length > selectedNodes.length;
-
     const nodesToLayout = isLayoutSelection ? selectedNodes : nodes;
 
-    // Get the top-left position of the selection's bounding box before layout
-    const selectionBBox = {
+    //Anchor of the selected nodes
+    const selectionAnchor = {
       minX: Infinity,
       minY: Infinity,
     };
 
-    if (isLayoutSelection) {
-      for (const node of selectedNodes) {
-        selectionBBox.minX = Math.min(selectionBBox.minX, node.position.x);
-        selectionBBox.minY = Math.min(selectionBBox.minY, node.position.y);
-      }
-    }
-
     nodesToLayout.forEach((node) => {
-      let height: number;
-
-      // Check if a measured height is available and valid
-      if (node.measured?.height !== null && node.measured?.height !== undefined) {
-        height = node.measured.height + NODE_PADDING; // Add padding to the measured height
-      } else {
-        // If not available, determine the fallback height
-        height = isNotesNode(node) ? ESTIMATED_NOTES_NODE_HEIGHT : DEFAULT_NODE_HEIGHT;
+      // If we're laying out a selection, adjust the anchor to the top-left of the selection
+      if (isLayoutSelection) {
+        selectionAnchor.minX = Math.min(selectionAnchor.minX, node.position.x);
+        selectionAnchor.minY = Math.min(selectionAnchor.minY, node.position.y);
       }
+      // update the Height based on the node's measured height or use a default value
+      const measuredHeight = node.measured?.height;
+      const height = typeof measuredHeight === 'number'
+        ? measuredHeight
+        : isNotesNode(node) ? ESTIMATED_NOTES_NODE_HEIGHT : DEFAULT_NODE_HEIGHT;
 
       g.setNode(node.id, {
         width: node.width ?? NODE_WIDTH,
@@ -77,12 +69,14 @@ export const useAutoLayout = (): (() => void) => {
       });
     });
 
-    const edgesToLayout: Edge[] = isLayoutSelection
-      ? edges.filter(
-          (edge) =>
-            nodesToLayout.some((n) => n.id === edge.source) && nodesToLayout.some((n) => n.id === edge.target)
-        )
-      : edges;
+    let edgesToLayout: Edge[] = edges;
+    if (isLayoutSelection) {
+      const nodesToLayoutIds = new Set(nodesToLayout.map((n) => n.id));
+      edgesToLayout = edges.filter(
+        (edge) =>
+          nodesToLayoutIds.has(edge.source) && nodesToLayoutIds.has(edge.target)
+      );
+    }
 
     edgesToLayout.forEach((edge) => {
       g.setEdge(edge.source, edge.target);
@@ -90,7 +84,8 @@ export const useAutoLayout = (): (() => void) => {
 
     layout(g);
 
-    const layoutBBox = {
+    // anchor for the new layout
+    const layoutAnchor = {
       minX: Infinity,
       minY: Infinity,
     };
@@ -98,21 +93,27 @@ export const useAutoLayout = (): (() => void) => {
     let offsetY = 0;
 
     if (isLayoutSelection) {
-      // Get the top-left position of the new layout's bounding box
+      // Get the top-left position of the new layout
       nodesToLayout.forEach((node) => {
-        const { x, y } = g.node(node.id);
-        layoutBBox.minX = Math.min(layoutBBox.minX, x);
-        layoutBBox.minY = Math.min(layoutBBox.minY, y);
+        const nodeInfo = g.node(node.id);
+        // Convert from center to top-left
+        const topLeftX = nodeInfo.x - nodeInfo.width / 2;
+        const topLeftY = nodeInfo.y - nodeInfo.height / 2;
+        // Use the top-left coordinates to find the bounding box
+        layoutAnchor.minX = Math.min(layoutAnchor.minX, topLeftX);
+        layoutAnchor.minY = Math.min(layoutAnchor.minY, topLeftY);
       });
-
       // Calculate the offset needed to move the new layout to the original position
-      offsetX = selectionBBox.minX - layoutBBox.minX;
-      offsetY = selectionBBox.minY - layoutBBox.minY;
+      offsetX = selectionAnchor.minX - layoutAnchor.minX;
+      offsetY = selectionAnchor.minY - layoutAnchor.minY;
     }
 
+    // Create position changes for each node based on the new layout
     const positionChanges: NodeChange<AnyNode>[] = nodesToLayout.map((node) => {
-      const { x, y } = g.node(node.id);
-      // For selected layouts, apply the calculated offset. Otherwise, use the new position directly.
+      const nodeInfo = g.node(node.id);
+      // Convert from center-based position to top-left-based position
+      const x = nodeInfo.x - nodeInfo.width / 2;
+      const y = nodeInfo.y - nodeInfo.height / 2;
       const newPosition = {
         x: isLayoutSelection ? x + offsetX : x,
         y: isLayoutSelection ? y + offsetY : y,
