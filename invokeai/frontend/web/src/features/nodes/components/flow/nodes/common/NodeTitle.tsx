@@ -17,10 +17,10 @@ type Props = {
 
 const NodeTitle = ({ nodeId, title }: Props) => {
   const dispatch = useAppDispatch();
-  const label = useNodeUserTitleSafe(nodeId);
+  const label = useNodeUserTitleSafe();
   const batchGroupId = useBatchGroupId(nodeId);
   const batchGroupColorToken = useBatchGroupColorToken(batchGroupId);
-  const templateTitle = useNodeTemplateTitleSafe(nodeId);
+  const templateTitle = useNodeTemplateTitleSafe();
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
 

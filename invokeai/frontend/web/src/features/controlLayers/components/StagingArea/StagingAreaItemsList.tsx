@@ -1,16 +1,16 @@
 import { Box, Flex, forwardRef } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { logger } from 'app/logging/logger';
-import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
-import { QueueItemPreviewMini } from 'features/controlLayers/components/SimpleSession/QueueItemPreviewMini';
-import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { QueueItemPreviewMini } from 'features/controlLayers/components/StagingArea/QueueItemPreviewMini';
+import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useOverlayScrollbars } from 'overlayscrollbars-react';
 import type { CSSProperties, RefObject } from 'react';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Components, ItemContent, ListRange, VirtuosoHandle, VirtuosoProps } from 'react-virtuoso';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import type { Components, ComputeItemKey, ItemContent, ListRange, VirtuosoHandle, VirtuosoProps } from 'react-virtuoso';
 import { Virtuoso } from 'react-virtuoso';
 import type { S } from 'services/api/types';
 
+import { useStagingAreaContext } from './context';
 import { getQueueItemElementId } from './shared';
 
 const log = logger('system');
@@ -19,8 +19,6 @@ const virtuosoStyles = {
   width: '100%',
   height: '72px',
 } satisfies CSSProperties;
-
-type VirtuosoContext = { selectedItemId: number | null };
 
 /**
  * Scroll the item at the given index into view if it is not currently visible.
@@ -132,28 +130,26 @@ const useScrollableStagingArea = (rootRef: RefObject<HTMLDivElement>) => {
 };
 
 export const StagingAreaItemsList = memo(() => {
-  const canvasManager = useCanvasManagerSafe();
-  const ctx = useCanvasSessionContext();
+  const canvasManager = useCanvasManager();
+
+  const ctx = useStagingAreaContext();
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
   const rootRef = useRef<HTMLDivElement>(null);
 
   const items = useStore(ctx.$items);
-  const selectedItemId = useStore(ctx.$selectedItemId);
 
-  const context = useMemo(() => ({ selectedItemId }), [selectedItemId]);
   const scrollerRef = useScrollableStagingArea(rootRef);
 
   useEffect(() => {
-    if (!canvasManager) {
-      return;
-    }
-
-    return canvasManager.stagingArea.connectToSession(ctx.$items, ctx.$selectedItemId, ctx.$progressData);
-  }, [canvasManager, ctx.$progressData, ctx.$selectedItemId, ctx.$items]);
+    return canvasManager.stagingArea.connectToSession(ctx.$items, ctx.$selectedItem);
+  }, [canvasManager, ctx.$progressData, ctx.$items, ctx.$selectedItem]);
 
   useEffect(() => {
-    return ctx.$selectedItemIndex.listen((index) => {
+    return ctx.$selectedItemIndex.listen((selectedItemIndex) => {
+      if (selectedItemIndex === null) {
+        return;
+      }
       if (!virtuosoRef.current) {
         return;
       }
@@ -162,11 +158,7 @@ export const StagingAreaItemsList = memo(() => {
         return;
       }
 
-      if (index === null) {
-        return;
-      }
-
-      scrollIntoView(index, rootRef.current, virtuosoRef.current, rangeRef.current);
+      scrollIntoView(selectedItemIndex, rootRef.current, virtuosoRef.current, rangeRef.current);
     });
   }, [ctx.$selectedItemIndex]);
 
@@ -176,40 +168,46 @@ export const StagingAreaItemsList = memo(() => {
 
   return (
     <Box data-overlayscrollbars-initialize="" ref={rootRef} position="relative" w="full" h="full">
-      <Virtuoso<S['SessionQueueItem'], VirtuosoContext>
+      <Virtuoso<S['SessionQueueItem']>
         ref={virtuosoRef}
-        context={context}
         data={items}
         horizontalDirection
         style={virtuosoStyles}
+        computeItemKey={computeItemKey}
+        increaseViewportBy={2048}
         itemContent={itemContent}
         components={components}
         rangeChanged={onRangeChanged}
         // Virtuoso expects the ref to be of HTMLElement | null | Window, but overlayscrollbars doesn't allow Window
-        scrollerRef={scrollerRef as VirtuosoProps<S['SessionQueueItem'], VirtuosoContext>['scrollerRef']}
+        scrollerRef={scrollerRef as VirtuosoProps<S['SessionQueueItem'], void>['scrollerRef']}
       />
     </Box>
   );
 });
 StagingAreaItemsList.displayName = 'StagingAreaItemsList';
 
-const itemContent: ItemContent<S['SessionQueueItem'], VirtuosoContext> = (index, item, { selectedItemId }) => (
-  <QueueItemPreviewMini
-    key={`${item.item_id}-mini`}
-    item={item}
-    index={index}
-    isSelected={selectedItemId === item.item_id}
-  />
+const computeItemKey: ComputeItemKey<S['SessionQueueItem'], void> = (_, item: S['SessionQueueItem']) => {
+  return item.item_id;
+};
+
+const itemContent: ItemContent<S['SessionQueueItem'], void> = (index, item) => (
+  <QueueItemPreviewMini key={`${item.item_id}-mini`} item={item} index={index} />
 );
 
 const listSx = {
   '& > * + *': {
     pl: 2,
   },
+  '&[data-disabled="true"]': {
+    filter: 'grayscale(1) opacity(0.5)',
+  },
 };
 
-const components: Components<S['SessionQueueItem'], VirtuosoContext> = {
+const components: Components<S['SessionQueueItem']> = {
   List: forwardRef(({ context: _, ...rest }, ref) => {
-    return <Flex ref={ref} sx={listSx} {...rest} />;
+    const canvasManager = useCanvasManager();
+    const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
+
+    return <Flex ref={ref} sx={listSx} data-disabled={!shouldShowStagedImage} {...rest} />;
   }),
 };

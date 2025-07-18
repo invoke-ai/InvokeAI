@@ -1,23 +1,16 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectInvocationNodeSafe, selectNodesSlice } from 'features/nodes/store/selectors';
+import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { useMemo } from 'react';
 
-export const useInputFieldInstanceExists = (nodeId: string, fieldName: string) => {
+export const useInputFieldInstanceExists = (fieldName: string): boolean => {
+  const ctx = useInvocationNodeContext();
   const selector = useMemo(
     () =>
-      createSelector(selectNodesSlice, (nodesSlice) => {
-        const node = selectInvocationNodeSafe(nodesSlice, nodeId);
-        if (!node) {
-          return false;
-        }
-        const instance = node.data.inputs[fieldName];
-        return Boolean(instance);
+      createSelector(ctx.buildSelectInputFieldSafe(fieldName), (field) => {
+        return !!field;
       }),
-    [fieldName, nodeId]
+    [ctx, fieldName]
   );
-
-  const exists = useAppSelector(selector);
-
-  return exists;
+  return useAppSelector(selector);
 };

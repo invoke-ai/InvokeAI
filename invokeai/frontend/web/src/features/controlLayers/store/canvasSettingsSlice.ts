@@ -2,9 +2,10 @@ import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { zRgbaColor } from 'features/controlLayers/store/types';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 const zAutoSwitchMode = z.enum(['off', 'switch_on_start', 'switch_on_finish']);
+export type AutoSwitchMode = z.infer<typeof zAutoSwitchMode>;
 
 const zCanvasSettingsState = z.object({
   /**

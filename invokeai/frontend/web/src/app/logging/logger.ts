@@ -2,7 +2,7 @@ import { createLogWriter } from '@roarr/browser-log-writer';
 import { atom } from 'nanostores';
 import type { Logger, MessageSerializer } from 'roarr';
 import { ROARR, Roarr } from 'roarr';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 const serializeMessage: MessageSerializer = (message) => {
   return JSON.stringify(message);

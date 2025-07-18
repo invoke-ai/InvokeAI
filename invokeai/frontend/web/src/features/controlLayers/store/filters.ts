@@ -4,7 +4,7 @@ import { zModelIdentifierField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { ControlLoRAModelConfig, ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 const zAjustImageChannels = z.enum([
   'Red (RGBA)',
@@ -146,7 +146,7 @@ const zNoiseFilterConfig = z.object({
 });
 export type NoiseFilterConfig = z.infer<typeof zNoiseFilterConfig>;
 
-const zFilterConfig = z.discriminatedUnion('type', [
+const _zFilterConfig = z.discriminatedUnion('type', [
   zAdjustImageFilterConfig,
   zCannyEdgeDetectionFilterConfig,
   zColorMapFilterConfig,
@@ -164,7 +164,7 @@ const zFilterConfig = z.discriminatedUnion('type', [
   zBlurFilterConfig,
   zNoiseFilterConfig,
 ]);
-export type FilterConfig = z.infer<typeof zFilterConfig>;
+export type FilterConfig = z.infer<typeof _zFilterConfig>;
 
 const zFilterType = z.enum([
   'adjust_image',

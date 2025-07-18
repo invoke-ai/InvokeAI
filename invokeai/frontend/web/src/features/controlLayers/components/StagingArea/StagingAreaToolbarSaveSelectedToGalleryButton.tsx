@@ -2,7 +2,7 @@ import { IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { withResultAsync } from 'common/util/result';
-import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
+import { useStagingAreaContext } from 'features/controlLayers/components/StagingArea/context';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { toast } from 'features/toast/toast';
@@ -16,14 +16,14 @@ const TOAST_ID = 'SAVE_STAGING_AREA_IMAGE_TO_GALLERY';
 export const StagingAreaToolbarSaveSelectedToGalleryButton = memo(() => {
   const canvasManager = useCanvasManager();
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
-  const ctx = useCanvasSessionContext();
-  const selectedItemOutputImageDTO = useStore(ctx.$selectedItemOutputImageDTO);
+  const ctx = useStagingAreaContext();
+  const selectedItemImageDTO = useStore(ctx.$selectedItemImageDTO);
   const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
 
   const { t } = useTranslation();
 
   const saveSelectedImageToGallery = useCallback(async () => {
-    if (!selectedItemOutputImageDTO) {
+    if (!selectedItemImageDTO) {
       return;
     }
 
@@ -31,7 +31,7 @@ export const StagingAreaToolbarSaveSelectedToGalleryButton = memo(() => {
     // the gallery without borking the canvas, which may need this image to exist.
     const result = await withResultAsync(async () => {
       // Create a new file with the same name, which we will upload
-      await copyImage(selectedItemOutputImageDTO.image_name, {
+      await copyImage(selectedItemImageDTO.image_name, {
         // Image should show up in the Images tab
         image_category: 'general',
         is_intermediate: false,
@@ -55,7 +55,7 @@ export const StagingAreaToolbarSaveSelectedToGalleryButton = memo(() => {
         status: 'error',
       });
     }
-  }, [autoAddBoardId, selectedItemOutputImageDTO, t]);
+  }, [autoAddBoardId, selectedItemImageDTO, t]);
 
   return (
     <IconButton
@@ -64,7 +64,7 @@ export const StagingAreaToolbarSaveSelectedToGalleryButton = memo(() => {
       icon={<PiFloppyDiskBold />}
       onClick={saveSelectedImageToGallery}
       colorScheme="invokeBlue"
-      isDisabled={!selectedItemOutputImageDTO || !shouldShowStagedImage}
+      isDisabled={!selectedItemImageDTO || !shouldShowStagedImage}
     />
   );
 });

@@ -1,31 +1,28 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
-import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
-import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { useStore } from '@nanostores/react';
+import { useStagingAreaContext } from 'features/controlLayers/components/StagingArea/context';
+import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useCancelQueueItemsByDestination } from 'features/queue/hooks/useCancelQueueItemsByDestination';
-import { memo, useCallback } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 
-export const StagingAreaToolbarDiscardAllButton = memo(({ isDisabled }: { isDisabled?: boolean }) => {
-  const ctx = useCanvasSessionContext();
+export const StagingAreaToolbarDiscardAllButton = memo(() => {
+  const canvasManager = useCanvasManager();
+  const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
+
+  const ctx = useStagingAreaContext();
   const { t } = useTranslation();
   const cancelQueueItemsByDestination = useCancelQueueItemsByDestination();
-  const canvasSessionId = useAppSelector(selectCanvasSessionId);
-
-  const discardAll = useCallback(() => {
-    ctx.discardAll();
-    cancelQueueItemsByDestination.trigger(canvasSessionId, { withToast: false });
-  }, [cancelQueueItemsByDestination, ctx, canvasSessionId]);
 
   return (
     <IconButton
       tooltip={`${t('controlLayers.stagingArea.discardAll')} (Esc)`}
       aria-label={t('controlLayers.stagingArea.discardAll')}
       icon={<PiTrashSimpleBold />}
-      onClick={discardAll}
+      onClick={ctx.discardAll}
       colorScheme="error"
-      isDisabled={isDisabled || cancelQueueItemsByDestination.isDisabled}
+      isDisabled={cancelQueueItemsByDestination.isDisabled || !shouldShowStagedImage}
       isLoading={cancelQueueItemsByDestination.isLoading}
     />
   );

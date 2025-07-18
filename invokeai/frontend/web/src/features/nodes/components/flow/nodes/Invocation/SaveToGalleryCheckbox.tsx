@@ -11,8 +11,8 @@ import { useTranslation } from 'react-i18next';
 const SaveToGalleryCheckbox = ({ nodeId }: { nodeId: string }) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const hasImageOutput = useNodeHasImageOutput(nodeId);
-  const isIntermediate = useNodeIsIntermediate(nodeId);
+  const hasImageOutput = useNodeHasImageOutput();
+  const isIntermediate = useNodeIsIntermediate();
   const handleChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(

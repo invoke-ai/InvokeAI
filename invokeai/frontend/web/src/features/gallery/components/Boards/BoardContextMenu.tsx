@@ -51,7 +51,7 @@ const BoardContextMenu = ({ board, children }: Props) => {
         board_id: board.board_id,
         changes: { archived: true },
       }).unwrap();
-    } catch (error) {
+    } catch {
       toast({
         status: 'error',
         title: 'Unable to archive board',

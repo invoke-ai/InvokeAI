@@ -37,7 +37,7 @@ const sx: SystemStyleObject = {
 };
 
 const InvocationNode = ({ nodeId, isOpen }: Props) => {
-  const withFooter = useWithFooter(nodeId);
+  const withFooter = useWithFooter();
 
   return (
     <>
@@ -64,7 +64,7 @@ const InvocationNode = ({ nodeId, isOpen }: Props) => {
 export default memo(InvocationNode);
 
 const ConnectionFields = memo(({ nodeId }: { nodeId: string }) => {
-  const fieldNames = useInputFieldNamesConnection(nodeId);
+  const fieldNames = useInputFieldNamesConnection();
   return (
     <>
       {fieldNames.map((fieldName, i) => (
@@ -80,7 +80,7 @@ const ConnectionFields = memo(({ nodeId }: { nodeId: string }) => {
 ConnectionFields.displayName = 'ConnectionFields';
 
 const AnyOrDirectFields = memo(({ nodeId }: { nodeId: string }) => {
-  const fieldNames = useInputFieldNamesAnyOrDirect(nodeId);
+  const fieldNames = useInputFieldNamesAnyOrDirect();
   return (
     <>
       {fieldNames.map((fieldName) => (
@@ -94,7 +94,7 @@ const AnyOrDirectFields = memo(({ nodeId }: { nodeId: string }) => {
 AnyOrDirectFields.displayName = 'AnyOrDirectFields';
 
 const MissingFields = memo(({ nodeId }: { nodeId: string }) => {
-  const fieldNames = useInputFieldNamesMissing(nodeId);
+  const fieldNames = useInputFieldNamesMissing();
   return (
     <>
       {fieldNames.map((fieldName) => (
@@ -108,7 +108,7 @@ const MissingFields = memo(({ nodeId }: { nodeId: string }) => {
 MissingFields.displayName = 'MissingFields';
 
 const OutputFields = memo(({ nodeId }: { nodeId: string }) => {
-  const fieldNames = useOutputFieldNames(nodeId);
+  const fieldNames = useOutputFieldNames();
   return (
     <>
       {fieldNames.map((fieldName, i) => (

@@ -1,6 +1,5 @@
 import type { DockviewApi, GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
 import { DockviewReact, GridviewReact, LayoutPriority, Orientation } from 'dockview';
-import { GenerateLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/GenerateLaunchpadPanel';
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
 import { GalleryPanel } from 'features/gallery/components/Gallery';
 import { GenerationProgressPanel } from 'features/gallery/components/ImageViewer/GenerationProgressPanel';
@@ -21,6 +20,7 @@ import { memo, useCallback, useEffect } from 'react';
 import { DockviewTab } from './DockviewTab';
 import { DockviewTabLaunchpad } from './DockviewTabLaunchpad';
 import { DockviewTabProgress } from './DockviewTabProgress';
+import { GenerateLaunchpadPanel } from './GenerateLaunchpadPanel';
 import { GenerateTabLeftPanel } from './GenerateTabLeftPanel';
 import { navigationApi } from './navigation-api';
 import { PanelHotkeysLogical } from './PanelHotkeysLogical';

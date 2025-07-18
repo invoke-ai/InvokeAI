@@ -17,7 +17,7 @@ const ClearModelCacheButton = () => {
         status: 'success',
         title: t('modelCache.clearSucceeded'),
       });
-    } catch (error) {
+    } catch {
       toast({
         status: 'error',
         title: t('modelCache.clearFailed'),

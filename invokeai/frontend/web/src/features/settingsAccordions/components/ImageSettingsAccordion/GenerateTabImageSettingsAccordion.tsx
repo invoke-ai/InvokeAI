@@ -36,7 +36,7 @@ const selectBadges = createMemoizedSelector(
       return EMPTY_ARRAY;
     }
 
-    badges;
+    return badges;
   }
 );
 

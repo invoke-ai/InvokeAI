@@ -22,7 +22,7 @@ export const PublishedWorkflowPanelContent = memo(() => {
           title: t('toast.workflowUnpublished'),
           status: 'success',
         });
-      } catch (error) {
+      } catch {
         toast({
           title: t('toast.problemUnpublishingWorkflow'),
           description: t('toast.problemUnpublishingWorkflowDescription'),

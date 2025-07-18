@@ -1,5 +1,5 @@
 import { Flex, Heading, Icon, Text } from '@invoke-ai/ui-library';
-import { LaunchpadButton } from 'features/controlLayers/components/SimpleSession/LaunchpadButton';
+import { LaunchpadButton } from 'features/ui/layouts/LaunchpadButton';
 import { memo, useCallback } from 'react';
 import { PiCursorTextBold, PiTextAaBold } from 'react-icons/pi';
 

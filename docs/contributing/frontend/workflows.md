@@ -297,7 +297,7 @@ Migration logic is in [migrations.ts].
 <!-- links -->
 
 [pydantic]: https://github.com/pydantic/pydantic 'pydantic'
-[zod]: https://github.com/colinhacks/zod 'zod/v4'
+[zod]: https://github.com/colinhacks/zod 'zod'
 [openapi-types]: https://github.com/kogosoftwarellc/open-api/tree/main/packages/openapi-types 'openapi-types'
 [reactflow]: https://github.com/xyflow/xyflow 'reactflow'
 [reactflow-concepts]: https://reactflow.dev/learn/concepts/terms-and-definitions

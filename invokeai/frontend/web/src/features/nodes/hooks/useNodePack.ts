@@ -1,17 +1,16 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectNodeData, selectNodesSlice } from 'features/nodes/store/selectors';
+import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { useMemo } from 'react';
 
-export const useNodePack = (nodeId: string): string | null => {
+export const useNodePack = (): string | null => {
+  const ctx = useInvocationNodeContext();
   const selector = useMemo(
     () =>
-      createSelector(selectNodesSlice, (nodes) => {
-        return selectNodeData(nodes, nodeId)?.nodePack ?? null;
+      createSelector(ctx.selectNodeDataSafe, (data) => {
+        return data?.nodePack ?? null;
       }),
-    [nodeId]
+    [ctx]
   );
-
-  const nodePack = useAppSelector(selector);
-  return nodePack;
+  return useAppSelector(selector);
 };

@@ -1,6 +1,6 @@
 import { deepClone } from 'common/util/deepClone';
 import { isPlainObject } from 'es-toolkit';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 const zTabName = z.enum(['generate', 'canvas', 'upscaling', 'workflows', 'models', 'queue']);
 export type TabName = z.infer<typeof zTabName>;

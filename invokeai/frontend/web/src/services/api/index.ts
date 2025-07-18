@@ -98,7 +98,10 @@ const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryE
   return rawBaseQuery(args, api, extraOptions);
 };
 
-const createLruSelector = createSelectorCreator(lruMemoize);
+const createLruSelector = createSelectorCreator({
+  memoize: lruMemoize,
+  argsMemoize: lruMemoize,
+});
 
 const customCreateApi = buildCreateApi(
   coreModule({ createSelector: createLruSelector }),

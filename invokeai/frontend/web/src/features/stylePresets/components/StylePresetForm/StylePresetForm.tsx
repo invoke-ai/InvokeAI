@@ -68,7 +68,7 @@ export const StylePresetForm = ({
         } else {
           await createStylePreset(payload).unwrap();
         }
-      } catch (error) {
+      } catch {
         toast({
           status: 'error',
           title: 'Failed to save style preset',

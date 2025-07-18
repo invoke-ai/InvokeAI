@@ -1,28 +1,16 @@
-import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { $templates } from 'features/nodes/store/nodesSlice';
-import { selectInvocationNodeSafe, selectNodesSlice } from 'features/nodes/store/selectors';
+import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { useMemo } from 'react';
 
-export const useOutputFieldTemplateExists = (nodeId: string, fieldName: string) => {
-  const templates = useStore($templates);
-
+export const useOutputFieldTemplateExists = (fieldName: string) => {
+  const ctx = useInvocationNodeContext();
   const selector = useMemo(
     () =>
-      createSelector(selectNodesSlice, (nodesSlice) => {
-        const node = selectInvocationNodeSafe(nodesSlice, nodeId);
-        if (!node) {
-          return false;
-        }
-        const nodeTemplate = templates[node.data.type];
-        const fieldTemplate = nodeTemplate?.outputs[fieldName];
-        return Boolean(fieldTemplate);
+      createSelector(ctx.buildSelectOutputFieldTemplateSafe(fieldName), (fieldTemplate) => {
+        return !!fieldTemplate;
       }),
-    [fieldName, nodeId, templates]
+    [ctx, fieldName]
   );
-
-  const exists = useAppSelector(selector);
-
-  return exists;
+  return useAppSelector(selector);
 };

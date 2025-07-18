@@ -16,8 +16,8 @@ type Props = {
 const props: ChakraProps = { w: 'unset' };
 
 const InvocationNodeFooter = ({ nodeId }: Props) => {
-  const hasImageOutput = useNodeHasImageOutput(nodeId);
-  const isExecutableNode = useIsExecutableNode(nodeId);
+  const hasImageOutput = useNodeHasImageOutput();
+  const isExecutableNode = useIsExecutableNode();
   const isCacheEnabled = useFeatureStatus('invocationCache');
   return (
     <Flex

@@ -7,7 +7,7 @@ import { useEntityAdapter } from 'features/controlLayers/contexts/EntityAdapterC
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
 import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
-import { memo, useEffect, useMemo, useRef } from 'react';
+import React, { memo, useEffect, useMemo, useRef } from 'react';
 import { useSelector } from 'react-redux';
 
 const ChakraCanvas = chakra.canvas;

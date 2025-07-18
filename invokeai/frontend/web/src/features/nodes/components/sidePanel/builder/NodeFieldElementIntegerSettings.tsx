@@ -68,7 +68,7 @@ SettingComponent.displayName = 'SettingComponent';
 const SettingMin = memo(({ id, settings, nodeId, fieldName, fieldTemplate }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const field = useInputFieldInstance<IntegerFieldInputInstance>(nodeId, fieldName);
+  const field = useInputFieldInstance<IntegerFieldInputInstance>(fieldName);
 
   const integerField = useIntegerField(nodeId, fieldName, fieldTemplate);
 
@@ -131,7 +131,7 @@ SettingMin.displayName = 'SettingMin';
 const SettingMax = memo(({ id, settings, nodeId, fieldName, fieldTemplate }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const field = useInputFieldInstance<IntegerFieldInputInstance>(nodeId, fieldName);
+  const field = useInputFieldInstance<IntegerFieldInputInstance>(fieldName);
 
   const integerField = useIntegerField(nodeId, fieldName, fieldTemplate);
 

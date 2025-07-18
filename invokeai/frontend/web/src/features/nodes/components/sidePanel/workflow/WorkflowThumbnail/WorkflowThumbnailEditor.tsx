@@ -42,7 +42,7 @@ export const WorkflowThumbnailEditor = ({
 
       setCanSaveChanges(false);
       toast({ status: 'success', title: 'Workflow thumbnail updated' });
-    } catch (error) {
+    } catch {
       toast({ status: 'error', title: 'Failed to update thumbnail' });
     }
   }, [deleteThumbnail, setThumbnail, workflowId, localThumbnailUrl]);

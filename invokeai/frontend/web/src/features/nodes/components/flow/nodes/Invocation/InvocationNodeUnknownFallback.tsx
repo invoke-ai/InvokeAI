@@ -14,7 +14,7 @@ type Props = {
 
 const InvocationNodeUnknownFallback = ({ nodeId, isOpen, label, type }: Props) => {
   const { t } = useTranslation();
-  const nodePack = useNodePack(nodeId);
+  const nodePack = useNodePack();
   return (
     <>
       <Flex
@@ -26,9 +26,10 @@ const InvocationNodeUnknownFallback = ({ nodeId, isOpen, label, type }: Props) =
         h={8}
         fontWeight="semibold"
         fontSize="sm"
+        bg="error.700"
       >
         <NodeCollapseButton nodeId={nodeId} isOpen={isOpen} />
-        <Text w="full" textAlign="center" pe={8} color="error.300">
+        <Text w="full" textAlign="center" pe={8}>
           {label ? `${label} (${type})` : type}
         </Text>
       </Flex>

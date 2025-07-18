@@ -6,8 +6,8 @@ import { memo } from 'react';
 // easier to handle cases where we are missing a node template in the inspector.
 
 export const TemplateGate = memo(
-  ({ nodeId, fallback, children }: PropsWithChildren<{ nodeId: string; fallback: ReactNode }>) => {
-    const template = useNodeTemplateSafe(nodeId);
+  ({ fallback, children }: PropsWithChildren<{ nodeId: string; fallback: ReactNode }>) => {
+    const template = useNodeTemplateSafe();
 
     if (!template) {
       return fallback;

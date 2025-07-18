@@ -1,10 +1,10 @@
 import { some } from 'es-toolkit/compat';
 import { useMemo } from 'react';
 
-import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';
+import { useNodeTemplateSafe } from './useNodeTemplateSafe';
 
-export const useNodeHasImageOutput = (nodeId: string): boolean => {
-  const template = useNodeTemplateOrThrow(nodeId);
+export const useNodeHasImageOutput = (): boolean => {
+  const template = useNodeTemplateSafe();
   const hasImageOutput = useMemo(
     () =>
       some(

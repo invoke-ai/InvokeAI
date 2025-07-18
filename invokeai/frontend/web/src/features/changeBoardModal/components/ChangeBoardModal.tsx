@@ -1,7 +1,6 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, ConfirmationAlertDialog, Flex, FormControl, Text } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import {
@@ -14,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import { useAddImagesToBoardMutation, useRemoveImagesFromBoardMutation } from 'services/api/endpoints/images';
 
-const selectImagesToChange = createMemoizedSelector(
+const selectImagesToChange = createSelector(
   selectChangeBoardModalSlice,
   (changeBoardModal) => changeBoardModal.image_names
 );

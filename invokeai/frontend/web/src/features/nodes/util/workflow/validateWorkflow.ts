@@ -82,7 +82,7 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
       try {
         const updatedNode = updateNode(node, template);
         node.data = updatedNode.data;
-      } catch (e) {
+      } catch {
         const message = t('nodes.unableToUpdateNode', {
           node: node.id,
           type: node.data.type,

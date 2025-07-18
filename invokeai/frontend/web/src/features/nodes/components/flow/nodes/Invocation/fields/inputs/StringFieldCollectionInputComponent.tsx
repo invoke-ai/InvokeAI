@@ -33,7 +33,7 @@ export const StringFieldCollectionInputComponent = memo(
     const { t } = useTranslation();
     const store = useAppStore();
 
-    const isInvalid = useInputFieldIsInvalid(nodeId, field.name);
+    const isInvalid = useInputFieldIsInvalid(field.name);
 
     const onRemoveString = useCallback(
       (index: number) => {

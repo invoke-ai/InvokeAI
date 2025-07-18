@@ -55,7 +55,7 @@ export const useSaveLibraryWorkflow = (): UseSaveLibraryWorkflowReturn => {
           duration: 1000,
           isClosable: true,
         });
-      } catch (e) {
+      } catch {
         if (!toast.isActive(`auth-error-toast-${workflowsApi.endpoints.updateWorkflow.name}`)) {
           toast.update(toastRef.current, {
             title: t('workflows.problemSavingWorkflow'),

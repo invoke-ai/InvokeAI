@@ -1,10 +1,10 @@
-import { useNodeData } from 'features/nodes/hooks/useNodeData';
+import { createSelector } from '@reduxjs/toolkit';
+import { useAppSelector } from 'app/store/storeHooks';
+import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import type { FieldInputTemplate } from 'features/nodes/types/field';
 import { isSingleOrCollection } from 'features/nodes/types/field';
 import { TEMPLATE_BUILDER_MAP } from 'features/nodes/util/schema/buildFieldInputTemplate';
 import { useMemo } from 'react';
-
-import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';
 
 const isConnectionInputField = (field: FieldInputTemplate) => {
   return (
@@ -19,41 +19,52 @@ const isAnyOrDirectInputField = (field: FieldInputTemplate) => {
   );
 };
 
-export const useInputFieldNamesMissing = (nodeId: string) => {
-  const template = useNodeTemplateOrThrow(nodeId);
-  const node = useNodeData(nodeId);
-  const fieldNames = useMemo(() => {
-    const instanceFields = new Set(Object.keys(node.inputs));
-    const allTemplateFields = new Set(Object.keys(template.inputs));
-    return Array.from(instanceFields.difference(allTemplateFields));
-  }, [node.inputs, template.inputs]);
-  return fieldNames;
+export const useInputFieldNamesMissing = () => {
+  const ctx = useInvocationNodeContext();
+  const selector = useMemo(
+    () =>
+      createSelector([ctx.selectNodeInputsOrThrow, ctx.selectNodeTemplateSafe], (inputs, template) => {
+        const instanceFieldNames = new Set(Object.keys(inputs));
+        const templateFieldNames = new Set(Object.keys(template?.inputs ?? {}));
+        return Array.from(instanceFieldNames.difference(templateFieldNames));
+      }),
+    [ctx]
+  );
+  return useAppSelector(selector);
 };
 
-export const useInputFieldNamesAnyOrDirect = (nodeId: string) => {
-  const template = useNodeTemplateOrThrow(nodeId);
-  const fieldNames = useMemo(() => {
-    const anyOrDirectFields: string[] = [];
-    for (const [fieldName, fieldTemplate] of Object.entries(template.inputs)) {
-      if (isAnyOrDirectInputField(fieldTemplate)) {
-        anyOrDirectFields.push(fieldName);
-      }
-    }
-    return anyOrDirectFields;
-  }, [template.inputs]);
-  return fieldNames;
+export const useInputFieldNamesAnyOrDirect = () => {
+  const ctx = useInvocationNodeContext();
+  const selector = useMemo(
+    () =>
+      createSelector([ctx.selectNodeTemplateSafe], (template) => {
+        const fieldNames: string[] = [];
+        for (const [fieldName, fieldTemplate] of Object.entries(template?.inputs ?? {})) {
+          if (isAnyOrDirectInputField(fieldTemplate)) {
+            fieldNames.push(fieldName);
+          }
+        }
+        return fieldNames;
+      }),
+    [ctx]
+  );
+  return useAppSelector(selector);
 };
 
-export const useInputFieldNamesConnection = (nodeId: string) => {
-  const template = useNodeTemplateOrThrow(nodeId);
-  const fieldNames = useMemo(() => {
-    const connectionFields: string[] = [];
-    for (const [fieldName, fieldTemplate] of Object.entries(template.inputs)) {
-      if (isConnectionInputField(fieldTemplate)) {
-        connectionFields.push(fieldName);
-      }
-    }
-    return connectionFields;
-  }, [template.inputs]);
-  return fieldNames;
+export const useInputFieldNamesConnection = () => {
+  const ctx = useInvocationNodeContext();
+  const selector = useMemo(
+    () =>
+      createSelector([ctx.selectNodeTemplateSafe], (template) => {
+        const fieldNames: string[] = [];
+        for (const [fieldName, fieldTemplate] of Object.entries(template?.inputs ?? {})) {
+          if (isConnectionInputField(fieldTemplate)) {
+            fieldNames.push(fieldName);
+          }
+        }
+        return fieldNames;
+      }),
+    [ctx]
+  );
+  return useAppSelector(selector);
 };

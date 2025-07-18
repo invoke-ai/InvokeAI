@@ -27,8 +27,8 @@ type Props = {
 };
 
 export const OutputFieldTitle = memo(({ nodeId, fieldName }: Props) => {
-  const fieldTemplate = useOutputFieldTemplate(nodeId, fieldName);
-  const isConnected = useInputFieldIsConnected(nodeId, fieldName);
+  const fieldTemplate = useOutputFieldTemplate(fieldName);
+  const isConnected = useInputFieldIsConnected(fieldName);
   const isConnectionStartField = useIsConnectionStartField(nodeId, fieldName, 'source');
   const isConnectionInProgress = useIsConnectionInProgress();
   const connectionErrorTKey = useConnectionErrorTKey(nodeId, fieldName, 'source');

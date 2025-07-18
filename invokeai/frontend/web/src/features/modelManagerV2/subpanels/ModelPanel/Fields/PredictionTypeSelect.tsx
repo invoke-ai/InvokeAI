@@ -22,7 +22,11 @@ const PredictionTypeSelect = ({ control }: Props) => {
   const value = useMemo(() => options.find((o) => o.value === field.value), [field.value]);
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {
-      v?.value === 'none' ? field.onChange(undefined) : field.onChange(v?.value);
+      if (v?.value === 'none') {
+        field.onChange(undefined);
+      } else {
+        field.onChange(v?.value);
+      }
     },
     [field]
   );

@@ -1,9 +1,9 @@
 import { Alert, Button, Flex, Grid, Text } from '@invoke-ai/ui-library';
-import { InitialStateMainModelPicker } from 'features/controlLayers/components/SimpleSession/InitialStateMainModelPicker';
-import { LaunchpadAddStyleReference } from 'features/controlLayers/components/SimpleSession/LaunchpadAddStyleReference';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { memo, useCallback } from 'react';
 
+import { InitialStateMainModelPicker } from './InitialStateMainModelPicker';
+import { LaunchpadAddStyleReference } from './LaunchpadAddStyleReference';
 import { LaunchpadContainer } from './LaunchpadContainer';
 import { LaunchpadGenerateFromTextButton } from './LaunchpadGenerateFromTextButton';
 

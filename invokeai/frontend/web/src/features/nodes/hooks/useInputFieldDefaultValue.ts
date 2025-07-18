@@ -1,33 +1,34 @@
 import { objectEquals } from '@observ33r/object-equals';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
+import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { fieldValueReset } from 'features/nodes/store/nodesSlice';
-import { selectNodesSlice } from 'features/nodes/store/selectors';
-import { isInvocationNode } from 'features/nodes/types/invocation';
 import { useCallback, useMemo } from 'react';
 
-export const useInputFieldDefaultValue = (nodeId: string, fieldName: string) => {
+export const useInputFieldDefaultValue = (fieldName: string) => {
   const dispatch = useAppDispatch();
+  const ctx = useInvocationNodeContext();
+  const selectDefaultValue = useMemo(
+    () => createSelector(ctx.buildSelectInputFieldTemplateOrThrow(fieldName), (fieldTemplate) => fieldTemplate.default),
+    [ctx, fieldName]
+  );
+  const defaultValue = useAppSelector(selectDefaultValue);
 
-  const fieldTemplate = useInputFieldTemplateOrThrow(nodeId, fieldName);
   const selectIsChanged = useMemo(
     () =>
-      createSelector(selectNodesSlice, (nodes) => {
-        const node = nodes.nodes.find((node) => node.id === nodeId);
-        if (!isInvocationNode(node)) {
-          return;
+      createSelector(
+        [ctx.buildSelectInputFieldOrThrow(fieldName), selectDefaultValue],
+        (fieldInstance, defaultValue) => {
+          return !objectEquals(fieldInstance.value, defaultValue);
         }
-        const value = node.data.inputs[fieldName]?.value;
-        return !objectEquals(value, fieldTemplate.default);
-      }),
-    [fieldName, fieldTemplate.default, nodeId]
+      ),
+    [fieldName, selectDefaultValue, ctx]
   );
   const isValueChanged = useAppSelector(selectIsChanged);
 
   const resetToDefaultValue = useCallback(() => {
-    dispatch(fieldValueReset({ nodeId, fieldName, value: fieldTemplate.default }));
-  }, [dispatch, fieldName, fieldTemplate.default, nodeId]);
+    dispatch(fieldValueReset({ nodeId: ctx.nodeId, fieldName, value: defaultValue }));
+  }, [dispatch, fieldName, defaultValue, ctx.nodeId]);
 
-  return { defaultValue: fieldTemplate.default, isValueChanged, resetToDefaultValue };
+  return { defaultValue, isValueChanged, resetToDefaultValue };
 };

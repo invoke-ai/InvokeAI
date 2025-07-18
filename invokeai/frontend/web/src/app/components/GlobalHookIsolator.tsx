@@ -2,6 +2,7 @@ import { useGlobalModifiersInit } from '@invoke-ai/ui-library';
 import { setupListeners } from '@reduxjs/toolkit/query';
 import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
 import { useStudioInitAction } from 'app/hooks/useStudioInitAction';
+import { useSyncLangDirection } from 'app/hooks/useSyncLangDirection';
 import { useSyncQueueStatus } from 'app/hooks/useSyncQueueStatus';
 import { useLogger } from 'app/logging/useLogger';
 import { useSyncLoggingConfig } from 'app/logging/useSyncLoggingConfig';
@@ -15,6 +16,8 @@ import { useDndMonitor } from 'features/dnd/useDndMonitor';
 import { useDynamicPromptsWatcher } from 'features/dynamicPrompts/hooks/useDynamicPromptsWatcher';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
 import { useWorkflowBuilderWatcher } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
+import { useSyncExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
+import { useSyncNodeErrors } from 'features/nodes/store/util/fieldValidators';
 import { useReadinessWatcher } from 'features/queue/store/readiness';
 import { configChanged } from 'features/system/store/configSlice';
 import { selectLanguage } from 'features/system/store/systemSelectors';
@@ -47,10 +50,13 @@ export const GlobalHookIsolator = memo(
     useCloseChakraTooltipsOnDragFix();
     useNavigationApi();
     useDndMonitor();
+    useSyncNodeErrors();
+    useSyncLangDirection();
 
     // Persistent subscription to the queue counts query - canvas relies on this to know if there are pending
     // and/or in progress canvas sessions.
     useGetQueueCountsByDestinationQuery(queueCountArg);
+    useSyncExecutionState();
 
     useEffect(() => {
       i18n.changeLanguage(language);

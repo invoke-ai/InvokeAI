@@ -12,13 +12,13 @@ interface Props {
   fieldName: string;
 }
 
-export const InputFieldTooltipContent = memo(({ nodeId, fieldName }: Props) => {
+export const InputFieldTooltipContent = memo(({ fieldName }: Props) => {
   const { t } = useTranslation();
 
-  const fieldInstance = useInputFieldInstance(nodeId, fieldName);
-  const fieldTemplate = useInputFieldTemplateOrThrow(nodeId, fieldName);
+  const fieldInstance = useInputFieldInstance(fieldName);
+  const fieldTemplate = useInputFieldTemplateOrThrow(fieldName);
   const fieldTypeName = useFieldTypeName(fieldTemplate.type);
-  const fieldErrors = useInputFieldErrors(nodeId, fieldName);
+  const fieldErrors = useInputFieldErrors(fieldName);
 
   const fieldTitle = useMemo(() => {
     if (fieldInstance.label && fieldTemplate.title) {

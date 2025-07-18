@@ -1,12 +1,8 @@
-import { useStore } from '@nanostores/react';
-import { useNodeType } from 'features/nodes/hooks/useNodeType';
-import { $templates } from 'features/nodes/store/nodesSlice';
+import { useAppSelector } from 'app/store/storeHooks';
+import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import type { InvocationTemplate } from 'features/nodes/types/invocation';
-import { useMemo } from 'react';
 
-export const useNodeTemplateSafe = (nodeId: string): InvocationTemplate | null => {
-  const templates = useStore($templates);
-  const type = useNodeType(nodeId);
-  const template = useMemo(() => templates[type] ?? null, [templates, type]);
-  return template;
+export const useNodeTemplateSafe = (): InvocationTemplate | null => {
+  const ctx = useInvocationNodeContext();
+  return useAppSelector(ctx.selectNodeTemplateSafe);
 };

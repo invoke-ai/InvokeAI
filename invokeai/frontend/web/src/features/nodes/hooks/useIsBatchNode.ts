@@ -3,8 +3,8 @@ import { useMemo } from 'react';
 
 import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';
 
-export const useIsExecutableNode = (nodeId: string) => {
-  const template = useNodeTemplateOrThrow(nodeId);
+export const useIsExecutableNode = () => {
+  const template = useNodeTemplateOrThrow();
   const isExecutableNode = useMemo(
     () => !isBatchNodeType(template.type) && !isGeneratorNodeType(template.type),
     [template]

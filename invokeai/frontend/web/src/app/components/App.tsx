@@ -30,16 +30,16 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
   }, [clearStorage]);
 
   return (
-    <ErrorBoundary onReset={handleReset} FallbackComponent={AppErrorBoundaryFallback}>
-      <ThemeLocaleProvider>
+    <ThemeLocaleProvider>
+      <ErrorBoundary onReset={handleReset} FallbackComponent={AppErrorBoundaryFallback}>
         <Box id="invoke-app-wrapper" w="100dvw" h="100dvh" position="relative" overflow="hidden">
           <AppContent />
           {!didStudioInit && <Loading />}
         </Box>
         <GlobalHookIsolator config={config} studioInitAction={studioInitAction} />
         <GlobalModalIsolator />
-      </ThemeLocaleProvider>
-    </ErrorBoundary>
+      </ErrorBoundary>
+    </ThemeLocaleProvider>
   );
 };
 

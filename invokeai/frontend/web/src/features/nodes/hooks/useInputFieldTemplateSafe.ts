@@ -1,4 +1,5 @@
-import { useNodeTemplateSafe } from 'features/nodes/hooks/useNodeTemplateSafe';
+import { useAppSelector } from 'app/store/storeHooks';
+import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import type { FieldInputTemplate } from 'features/nodes/types/field';
 import { useMemo } from 'react';
 
@@ -10,8 +11,8 @@ import { useMemo } from 'react';
  * @param nodeId - The ID of the node.
  * @param fieldName - The name of the input field.
  */
-export const useInputFieldTemplateSafe = (nodeId: string, fieldName: string): FieldInputTemplate | null => {
-  const template = useNodeTemplateSafe(nodeId);
-  const fieldTemplate = useMemo(() => template?.inputs[fieldName] ?? null, [fieldName, template?.inputs]);
-  return fieldTemplate;
+export const useInputFieldTemplateSafe = (fieldName: string): FieldInputTemplate | null => {
+  const ctx = useInvocationNodeContext();
+  const selector = useMemo(() => ctx.buildSelectInputFieldTemplateSafe(fieldName), [ctx, fieldName]);
+  return useAppSelector(selector);
 };

@@ -63,7 +63,7 @@ const handleStyles = {
 } satisfies CSSProperties;
 
 export const InputFieldHandle = memo(({ nodeId, fieldName }: Props) => {
-  const fieldTemplate = useInputFieldTemplateOrThrow(nodeId, fieldName);
+  const fieldTemplate = useInputFieldTemplateOrThrow(fieldName);
   const fieldTypeName = useFieldTypeName(fieldTemplate.type);
   const fieldColor = useMemo(() => getFieldColor(fieldTemplate.type), [fieldTemplate.type]);
   const isModelField = useMemo(() => isModelFieldType(fieldTemplate.type), [fieldTemplate.type]);

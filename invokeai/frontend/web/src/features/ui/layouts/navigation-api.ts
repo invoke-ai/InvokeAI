@@ -340,7 +340,7 @@ export class NavigationApi {
       log.trace(`Focused panel ${key}`);
 
       return true;
-    } catch (error) {
+    } catch {
       log.error(`Failed to focus panel ${panelId} in tab ${tab}`);
       return false;
     }

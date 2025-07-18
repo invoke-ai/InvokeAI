@@ -3,8 +3,8 @@ import { useMemo } from 'react';
 
 import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';
 
-export const useNodeClassification = (nodeId: string): Classification => {
-  const template = useNodeTemplateOrThrow(nodeId);
+export const useNodeClassification = (): Classification => {
+  const template = useNodeTemplateOrThrow();
   const classification = useMemo(() => template.classification, [template]);
   return classification;
 };

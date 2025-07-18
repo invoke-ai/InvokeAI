@@ -14,6 +14,7 @@ const config: KnipConfig = {
     'src/features/controlLayers/konva/util.ts',
     // Will be using this
     'src/common/hooks/useAsyncState.ts',
+    'src/app/store/use-debounced-app-selector.ts',
   ],
   ignoreBinaries: ['only-allow'],
   paths: {

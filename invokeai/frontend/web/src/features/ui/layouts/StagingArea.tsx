@@ -1,5 +1,5 @@
 import { Flex } from '@invoke-ai/ui-library';
-import { StagingAreaItemsList } from 'features/controlLayers/components/SimpleSession/StagingAreaItemsList';
+import { StagingAreaItemsList } from 'features/controlLayers/components/StagingArea/StagingAreaItemsList';
 import { StagingAreaToolbar } from 'features/controlLayers/components/StagingArea/StagingAreaToolbar';
 import { useCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { memo } from 'react';

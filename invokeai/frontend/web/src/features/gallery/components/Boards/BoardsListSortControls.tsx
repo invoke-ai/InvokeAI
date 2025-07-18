@@ -5,7 +5,7 @@ import { selectBoardsListOrderBy, selectBoardsListOrderDir } from 'features/gall
 import { boardsListOrderByChanged, boardsListOrderDirChanged } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 const zOrderBy = z.enum(['created_at', 'board_name']);
 type OrderBy = z.infer<typeof zOrderBy>;

@@ -4,6 +4,7 @@ import { ToolBrushButton } from 'features/controlLayers/components/Tool/ToolBrus
 import { ToolColorPickerButton } from 'features/controlLayers/components/Tool/ToolColorPickerButton';
 import { ToolMoveButton } from 'features/controlLayers/components/Tool/ToolMoveButton';
 import { ToolRectButton } from 'features/controlLayers/components/Tool/ToolRectButton';
+import React from 'react';
 
 import { ToolEraserButton } from './ToolEraserButton';
 import { ToolViewButton } from './ToolViewButton';

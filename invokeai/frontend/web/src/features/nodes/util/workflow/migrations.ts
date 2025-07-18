@@ -13,7 +13,7 @@ import { zWorkflowV2 } from 'features/nodes/types/v2/workflow';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { zWorkflowV3 } from 'features/nodes/types/workflow';
 import { t } from 'i18next';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 /**
  * Helper schema to extract the version from a workflow.

@@ -12,8 +12,8 @@ export const NodeFieldElementLabelEditable = memo(({ el }: { el: NodeFieldElemen
   const { data } = el;
   const { fieldIdentifier } = data;
   const dispatch = useAppDispatch();
-  const label = useInputFieldUserTitleSafe(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
-  const fieldTemplate = useInputFieldTemplateOrThrow(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
+  const label = useInputFieldUserTitleSafe(fieldIdentifier.fieldName);
+  const fieldTemplate = useInputFieldTemplateOrThrow(fieldIdentifier.fieldName);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const onChange = useCallback(

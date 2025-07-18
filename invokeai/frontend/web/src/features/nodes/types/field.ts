@@ -6,7 +6,7 @@ import MersenneTwister from 'mtwist';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { utilitiesApi } from 'services/api/endpoints/utilities';
 import { assert } from 'tsafe';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 import type { ImageField } from './common';
 import { zBoardField, zColorField, zImageField, zModelIdentifierField, zSchedulerField } from './common';
@@ -1918,8 +1918,8 @@ export const zStatefulFieldValue = z.union([
 ]);
 export type StatefulFieldValue = z.infer<typeof zStatefulFieldValue>;
 
-const zFieldValue = z.union([zStatefulFieldValue, zStatelessFieldValue]);
-export type FieldValue = z.infer<typeof zFieldValue>;
+const _zFieldValue = z.union([zStatefulFieldValue, zStatelessFieldValue]);
+export type FieldValue = z.infer<typeof _zFieldValue>;
 // #endregion
 
 // #region StatefulFieldInputInstance & FieldInputInstance

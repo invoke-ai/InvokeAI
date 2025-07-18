@@ -8,8 +8,8 @@ import { memo, useMemo } from 'react';
 export const NodeFieldElementLabel = memo(({ el }: { el: NodeFieldElement }) => {
   const { data } = el;
   const { fieldIdentifier } = data;
-  const label = useInputFieldUserTitleSafe(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
-  const fieldTemplate = useInputFieldTemplateOrThrow(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
+  const label = useInputFieldUserTitleSafe(fieldIdentifier.fieldName);
+  const fieldTemplate = useInputFieldTemplateOrThrow(fieldIdentifier.fieldName);
 
   const _label = useMemo(() => label || fieldTemplate.title, [label, fieldTemplate.title]);
 

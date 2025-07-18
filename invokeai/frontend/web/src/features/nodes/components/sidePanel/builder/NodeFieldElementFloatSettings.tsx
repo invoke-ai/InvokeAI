@@ -67,7 +67,7 @@ SettingComponent.displayName = 'SettingComponent';
 const SettingMin = memo(({ id, settings, nodeId, fieldName, fieldTemplate }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const field = useInputFieldInstance<FloatFieldInputInstance>(nodeId, fieldName);
+  const field = useInputFieldInstance<FloatFieldInputInstance>(fieldName);
 
   const floatField = useFloatField(nodeId, fieldName, fieldTemplate);
 
@@ -129,7 +129,7 @@ SettingMin.displayName = 'SettingMin';
 const SettingMax = memo(({ id, settings, nodeId, fieldName, fieldTemplate }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const field = useInputFieldInstance<FloatFieldInputInstance>(nodeId, fieldName);
+  const field = useInputFieldInstance<FloatFieldInputInstance>(fieldName);
 
   const floatField = useFloatField(nodeId, fieldName, fieldTemplate);
 
