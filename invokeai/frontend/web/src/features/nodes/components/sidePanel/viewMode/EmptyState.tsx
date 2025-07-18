@@ -1,9 +1,9 @@
 import { Flex, Heading, Icon, Link, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { LaunchpadButton } from 'features/controlLayers/components/SimpleSession/LaunchpadButton';
 import { useIsWorkflowUntouched } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
 import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
 import { workflowModeChanged } from 'features/nodes/store/workflowLibrarySlice';
+import { LaunchpadButton } from 'features/ui/layouts/LaunchpadButton';
 import { useCallback } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiFolderOpenBold, PiPlusBold } from 'react-icons/pi';
