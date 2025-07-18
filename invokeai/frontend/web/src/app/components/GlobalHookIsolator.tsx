@@ -2,6 +2,7 @@ import { useGlobalModifiersInit } from '@invoke-ai/ui-library';
 import { setupListeners } from '@reduxjs/toolkit/query';
 import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
 import { useStudioInitAction } from 'app/hooks/useStudioInitAction';
+import { useSyncLangDirection } from 'app/hooks/useSyncLangDirection';
 import { useSyncQueueStatus } from 'app/hooks/useSyncQueueStatus';
 import { useLogger } from 'app/logging/useLogger';
 import { useSyncLoggingConfig } from 'app/logging/useSyncLoggingConfig';
@@ -50,6 +51,7 @@ export const GlobalHookIsolator = memo(
     useNavigationApi();
     useDndMonitor();
     useSyncNodeErrors();
+    useSyncLangDirection();
 
     // Persistent subscription to the queue counts query - canvas relies on this to know if there are pending
     // and/or in progress canvas sessions.
