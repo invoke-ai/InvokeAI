@@ -45,7 +45,7 @@ export const getInitialProgressData = (itemId: number): ProgressData => ({
   progressImage: null,
   imageDTO: null,
 });
-export type ProgressDataMap = Record<number, ProgressData | undefined>;
+type ProgressDataMap = Record<number, ProgressData | undefined>;
 
 export class StagingAreaApi {
   sessionId: string;
