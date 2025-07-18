@@ -56,6 +56,7 @@ const ParamTileControlNetModel = () => {
         <FormLabel m={0}>{t('upscaling.tileControl')}</FormLabel>
       </InformationalPopover>
       <ModelPicker
+        pickerId="tile-controlnet-model"
         modelConfigs={filteredModelConfigs}
         selectedModelConfig={tileControlNetModel ?? undefined}
         onChange={_onChange}

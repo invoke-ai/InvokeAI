@@ -65,6 +65,9 @@ export const uiSlice = createSlice({
     shouldShowNotificationChanged: (state, action: PayloadAction<UIState['shouldShowNotificationV2']>) => {
       state.shouldShowNotificationV2 = action.payload;
     },
+    setModelPickerCompactView: (state, action: PayloadAction<{ pickerId: string; isCompact: boolean }>) => {
+      state.modelPickerCompactViewStates[action.payload.pickerId] = action.payload.isCompact;
+    },
   },
 });
 
@@ -77,9 +80,12 @@ export const {
   shouldShowNotificationChanged,
   textAreaSizesStateChanged,
   dockviewStorageKeyChanged,
+  setModelPickerCompactView,
 } = uiSlice.actions;
 
 export const selectUiSlice = (state: RootState) => state.ui;
+
+export const selectModelPickerCompactViewStates = (state: RootState) => state.ui.modelPickerCompactViewStates;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateUIState = (state: any): any => {

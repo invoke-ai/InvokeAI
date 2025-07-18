@@ -82,6 +82,7 @@ const LoRASelect = () => {
         <FormLabel>{t('models.concepts')} </FormLabel>
       </InformationalPopover>
       <ModelPicker
+        pickerId="lora-select"
         modelConfigs={compatibleLoRAs}
         onChange={onChange}
         grouped={false}
