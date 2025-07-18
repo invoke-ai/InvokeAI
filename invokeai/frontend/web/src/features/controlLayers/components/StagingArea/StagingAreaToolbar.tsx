@@ -1,5 +1,5 @@
 import { ButtonGroup, Flex } from '@invoke-ai/ui-library';
-import { useStagingAreaContext } from 'features/controlLayers/components/SimpleSession/context';
+import { useStagingAreaContext } from 'features/controlLayers/components/StagingArea/context';
 import { StagingAreaToolbarAcceptButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarAcceptButton';
 import { StagingAreaToolbarDiscardAllButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarDiscardAllButton';
 import { StagingAreaToolbarDiscardSelectedButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarDiscardSelectedButton';

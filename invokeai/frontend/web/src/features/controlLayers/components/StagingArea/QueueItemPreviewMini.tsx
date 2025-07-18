@@ -2,11 +2,10 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { QueueItemCircularProgress } from 'features/controlLayers/components/SimpleSession/QueueItemCircularProgress';
-import { QueueItemNumber } from 'features/controlLayers/components/SimpleSession/QueueItemNumber';
-import { QueueItemProgressImage } from 'features/controlLayers/components/SimpleSession/QueueItemProgressImage';
-import { QueueItemStatusLabel } from 'features/controlLayers/components/SimpleSession/QueueItemStatusLabel';
-import { getQueueItemElementId } from 'features/controlLayers/components/SimpleSession/shared';
+import { QueueItemCircularProgress } from 'features/controlLayers/components/StagingArea/QueueItemCircularProgress';
+import { QueueItemProgressImage } from 'features/controlLayers/components/StagingArea/QueueItemProgressImage';
+import { QueueItemStatusLabel } from 'features/controlLayers/components/StagingArea/QueueItemStatusLabel';
+import { getQueueItemElementId } from 'features/controlLayers/components/StagingArea/shared';
 import {
   selectStagingAreaAutoSwitch,
   settingsStagingAreaAutoSwitchChanged,
@@ -17,6 +16,7 @@ import { memo, useCallback, useMemo } from 'react';
 import type { S } from 'services/api/types';
 
 import { useOutputImageDTO, useStagingAreaContext } from './context';
+import { QueueItemNumber } from './QueueItemNumber';
 
 const sx = {
   cursor: 'pointer',
