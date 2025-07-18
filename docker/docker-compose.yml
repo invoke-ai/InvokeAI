@@ -47,8 +47,9 @@ services:
 
   invokeai-rocm:
     <<: *invokeai
-    devices:
-      - /dev/kfd:/dev/kfd
-      - /dev/dri:/dev/dri
+    environment:
+      - AMD_VISIBLE_DEVICES=all
+      - RENDER_GROUP_ID=${RENDER_GROUP_ID}
+    runtime: amd
     profiles:
       - rocm
