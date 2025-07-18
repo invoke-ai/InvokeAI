@@ -1,5 +1,6 @@
 import { useStore } from '@nanostores/react';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { clamp } from 'es-toolkit/compat';
 import { getOutputImageName } from 'features/controlLayers/components/SimpleSession/shared';
 import { loadImage } from 'features/controlLayers/konva/util';
 import { selectStagingAreaAutoSwitch } from 'features/controlLayers/store/canvasSettingsSlice';
@@ -11,7 +12,7 @@ import {
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { ProgressImage } from 'features/nodes/types/common';
 import type { Atom, MapStore, StoreValue, WritableAtom } from 'nanostores';
-import { atom, computed, effect, map, subscribeKeys } from 'nanostores';
+import { atom, computed, map, subscribeKeys } from 'nanostores';
 import type { PropsWithChildren } from 'react';
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
@@ -123,6 +124,11 @@ export const CanvasSessionContextProvider = memo(({ children }: PropsWithChildre
   const socket = useStore($socket);
 
   /**
+   * Track the last started item. Used to implement autoswitch.
+   */
+  const $lastStartedItemId = useState(() => atom<number | null>(null))[0];
+
+  /**
    * Track the last completed item. Used to implement autoswitch.
    */
   const $lastCompletedItemId = useState(() => atom<number | null>(null))[0];
@@ -186,7 +192,13 @@ export const CanvasSessionContextProvider = memo(({ children }: PropsWithChildre
       if (selectedItemId === null) {
         return null;
       }
-      return items.findIndex(({ item_id }) => item_id === selectedItemId) ?? null;
+      const selectedItemIndex = items.findIndex(({ item_id }) => item_id === selectedItemId);
+
+      if (selectedItemIndex === -1) {
+        return null;
+      }
+
+      return selectedItemIndex;
     })
   )[0];
 
@@ -211,17 +223,6 @@ export const CanvasSessionContextProvider = memo(({ children }: PropsWithChildre
    * A redux selector to select all queue items from the RTK Query cache.
    */
   const selectQueueItems = useMemo(() => buildSelectCanvasQueueItems(sessionId), [sessionId]);
-
-  const discard = useCallback(
-    (itemId: number) => {
-      store.dispatch(canvasQueueItemDiscarded({ itemId }));
-    },
-    [store]
-  );
-
-  const discardAll = useCallback(() => {
-    store.dispatch(canvasSessionReset());
-  }, [store]);
 
   const selectNext = useCallback(() => {
     const selectedItemId = $selectedItemId.get();
@@ -271,6 +272,28 @@ export const CanvasSessionContextProvider = memo(({ children }: PropsWithChildre
     $selectedItemId.set(last.item_id);
   }, [$items, $selectedItemId]);
 
+  const discard = useCallback(
+    (itemId: number) => {
+      const selectedItemId = $selectedItemId.get();
+      const items = $items.get();
+      const currentIndex = items.findIndex((item) => item.item_id === selectedItemId);
+      const nextIndex = clamp(currentIndex + 1, 0, items.length - 1);
+      const nextItem = items[nextIndex];
+      if (nextItem) {
+        $selectedItemId.set(nextItem.item_id);
+      } else {
+        $selectedItemId.set(null);
+      }
+      store.dispatch(canvasQueueItemDiscarded({ itemId }));
+    },
+    [$items, $selectedItemId, store]
+  );
+
+  const discardAll = useCallback(() => {
+    store.dispatch(canvasSessionReset());
+    $selectedItemId.set(null);
+  }, [$selectedItemId, store]);
+
   // Set up socket listeners
   useEffect(() => {
     if (!socket) {
@@ -301,7 +324,7 @@ export const CanvasSessionContextProvider = memo(({ children }: PropsWithChildre
         $lastCompletedItemId.set(data.item_id);
       }
       if (data.status === 'in_progress' && selectStagingAreaAutoSwitch(store.getState()) === 'switch_on_start') {
-        $selectedItemId.set(data.item_id);
+        $lastStartedItemId.set(data.item_id);
       }
     };
 
@@ -312,7 +335,7 @@ export const CanvasSessionContextProvider = memo(({ children }: PropsWithChildre
       socket.off('invocation_progress', onProgress);
       socket.off('queue_item_status_changed', onQueueItemStatusChanged);
     };
-  }, [$progressData, $selectedItemId, sessionId, socket, $lastCompletedItemId, store]);
+  }, [$progressData, $selectedItemId, sessionId, socket, $lastCompletedItemId, store, $lastStartedItemId]);
 
   // Set up state subscriptions and effects
   useEffect(() => {
@@ -322,38 +345,54 @@ export const CanvasSessionContextProvider = memo(({ children }: PropsWithChildre
 
     // Manually keep the $items atom in sync as the query cache is updated
     const unsubReduxSyncToItemsAtom = store.subscribe(() => {
-      const prevItems = $items.get();
-      const items = selectQueueItems(store.getState());
-      if (items !== prevItems) {
-        _prevItems = prevItems;
-        $items.set(items);
+      const oldItems = $items.get();
+      const newItems = selectQueueItems(store.getState());
+      if (newItems !== oldItems) {
+        // _prevItems = prevItems;
+        // const selectedItemId = $selectedItemId.get();
+        if (newItems.length === 0) {
+          // If there are no items, cannot have a selected item.
+          $selectedItemId.set(null);
+        } else if ($selectedItemId.get() === null && newItems.length > 0) {
+          // If there is no selected item but there are items, select the first one.
+          $selectedItemId.set(newItems[0]?.item_id ?? null);
+          return;
+        }
+        // } else if (selectedItemId !== null && items.findIndex(({ item_id }) => item_id === selectedItemId) === -1) {
+        //   // If an item is selected and it is not in the list of items, un-set it. This effect will run again and we'll
+        //   // the above case, selecting the first item if there are any.
+        //   let prevIndex = _prevItems.findIndex(({ item_id }) => item_id === selectedItemId);
+        //   prevIndex = clamp(prevIndex + 1, 0, items.length - 1);
+        //   const nextItem = items[prevIndex];
+        //   $selectedItemId.set(nextItem?.item_id ?? null);
+        // }
+        $items.set(newItems);
       }
     });
 
     // Handle cases that could result in a nonexistent queue item being selected.
-    const unsubEnsureSelectedItemIdExists = effect([$items, $selectedItemId], (items, selectedItemId) => {
-      if (items.length === 0) {
-        // If there are no items, cannot have a selected item.
-        $selectedItemId.set(null);
-      } else if (selectedItemId === null && items.length > 0) {
-        // If there is no selected item but there are items, select the first one.
-        $selectedItemId.set(items[0]?.item_id ?? null);
-        return;
-      } else if (selectedItemId !== null && items.findIndex(({ item_id }) => item_id === selectedItemId) === -1) {
-        // If an item is selected and it is not in the list of items, un-set it. This effect will run again and we'll
-        // the above case, selecting the first item if there are any.
-        let prevIndex = _prevItems.findIndex(({ item_id }) => item_id === selectedItemId);
-        if (prevIndex >= items.length) {
-          prevIndex = items.length - 1;
-        }
-        const nextItem = items[prevIndex];
-        $selectedItemId.set(nextItem?.item_id ?? null);
-      }
-
-      if (items !== _prevItems) {
-        _prevItems = items;
-      }
-    });
+    // const unsubEnsureSelectedItemIdExists = effect([$items, $selectedItemId], (items, selectedItemId) => {
+    //   if (items.length === 0) {
+    //     // If there are no items, cannot have a selected item.
+    //     $selectedItemId.set(null);
+    //   } else if (selectedItemId === null && items.length > 0) {
+    //     // If there is no selected item but there are items, select the first one.
+    //     $selectedItemId.set(items[0]?.item_id ?? null);
+    //     return;
+    //   } else if (selectedItemId !== null && items.findIndex(({ item_id }) => item_id === selectedItemId) === -1) {
+    //     // If an item is selected and it is not in the list of items, un-set it. This effect will run again and we'll
+    //     // the above case, selecting the first item if there are any.
+    //     let prevIndex = _prevItems.findIndex(({ item_id }) => item_id === selectedItemId);
+    //     prevIndex = clamp(prevIndex + 1, 0, items.length - 1);
+    //     // console.log('first', prevIndex);
+    //     // if (prevIndex !== -1) {
+    //     //   console.log('inner', prevIndex);
+    //     // }
+    //     const nextItem = items[prevIndex];
+    //     console.log('final', prevIndex, nextItem);
+    //     $selectedItemId.set(nextItem?.item_id ?? null);
+    //   }
+    // });
 
     // Sync progress data - remove canceled/failed items, update progress data with new images, and load images
     const unsubSyncProgressData = $items.subscribe(async (items) => {
@@ -382,6 +421,14 @@ export const CanvasSessionContextProvider = memo(({ children }: PropsWithChildre
 
       for (const item of items) {
         const datum = progressData[item.item_id];
+
+        if (
+          $lastStartedItemId.get() === item.item_id &&
+          selectStagingAreaAutoSwitch(store.getState()) === 'switch_on_start'
+        ) {
+          $selectedItemId.set(item.item_id);
+          $lastStartedItemId.set(null);
+        }
 
         if (datum?.imageDTO) {
           continue;
@@ -432,13 +479,22 @@ export const CanvasSessionContextProvider = memo(({ children }: PropsWithChildre
     return () => {
       unsubQueueItemsQuery();
       unsubReduxSyncToItemsAtom();
-      unsubEnsureSelectedItemIdExists();
+      // unsubEnsureSelectedItemIdExists();
       unsubSyncProgressData();
       $items.set([]);
       $progressData.set({});
       $selectedItemId.set(null);
     };
-  }, [$items, $progressData, $selectedItemId, selectQueueItems, sessionId, store, $lastCompletedItemId]);
+  }, [
+    $items,
+    $progressData,
+    $selectedItemId,
+    selectQueueItems,
+    sessionId,
+    store,
+    $lastCompletedItemId,
+    $lastStartedItemId,
+  ]);
 
   const value = useMemo<CanvasSessionContextValue>(
     () => ({
