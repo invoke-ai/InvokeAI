@@ -941,7 +941,6 @@ const listSx = {
 
 const PickerList = typedMemo(<T extends object>() => {
   const { getOptionId, isCompactView, $filteredOptions } = usePickerContext<T>();
-  const compactView = isCompactView;
   const filteredOptions = useStore($filteredOptions);
 
   if (filteredOptions.length === 0) {
@@ -950,10 +949,10 @@ const PickerList = typedMemo(<T extends object>() => {
 
   return (
     <ScrollableContent>
-      <Flex sx={listSx} data-is-compact={compactView}>
+      <Flex sx={listSx} data-is-compact={isCompactView}>
         {filteredOptions.map((optionOrGroup, i) => {
           if (isGroup(optionOrGroup)) {
-            const withDivider = !compactView && i < filteredOptions.length - 1;
+            const withDivider = !isCompactView && i < filteredOptions.length - 1;
             return (
               <React.Fragment key={optionOrGroup.id}>
                 <PickerGroup group={optionOrGroup} />
@@ -1096,13 +1095,12 @@ const groupHeaderSx = {
 const PickerGroupHeader = typedMemo(<T extends object>({ group }: { group: Group<T> }) => {
   const { t } = useTranslation();
   const { isCompactView } = usePickerContext<T>();
-  const compactView = isCompactView;
   const color = getGroupColor(group);
   const name = getGroupName(group);
   const count = getGroupCount(group, t);
 
   return (
-    <Flex sx={groupHeaderSx} data-is-compact={compactView}>
+    <Flex sx={groupHeaderSx} data-is-compact={isCompactView}>
       <Flex gap={2} alignItems="center">
         <Text fontSize="sm" fontWeight="semibold" color={color} noOfLines={1}>
           {name}
