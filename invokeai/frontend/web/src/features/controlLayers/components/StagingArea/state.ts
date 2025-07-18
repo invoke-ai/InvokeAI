@@ -61,18 +61,14 @@ type ProgressDataMap = Record<number, ProgressData | undefined>;
  * and configure auto-switching behavior.
  */
 export class StagingAreaApi {
-  sessionId: string;
-  _app: StagingAreaAppApi;
+  /** The current session ID. */
+  _sessionId: string | null = null;
+
+  /** The app API */
+  _app: StagingAreaAppApi | null = null;
+
+  /** A set of subscriptions to be cleaned up when we are finished with a session */
   _subscriptions = new Set<() => void>();
-
-  constructor(sessionId: string, app: StagingAreaAppApi) {
-    this.sessionId = sessionId;
-    this._app = app;
-
-    this._subscriptions.add(this._app.onItemsChanged(this.onItemsChangedEvent));
-    this._subscriptions.add(this._app.onQueueItemStatusChanged(this.onQueueItemStatusChangedEvent));
-    this._subscriptions.add(this._app.onInvocationProgress(this.onInvocationProgressEvent));
-  }
 
   /** Item ID of the last started item. Used for auto-switch on start. */
   $lastStartedItemId = atom<number | null>(null);
@@ -136,7 +132,7 @@ export class StagingAreaApi {
   /** Selects a queue item by ID. */
   select = (itemId: number) => {
     this.$selectedItemId.set(itemId);
-    this._app.onSelect?.(itemId);
+    this._app?.onSelect?.(itemId);
   };
 
   /** Selects the next item in the queue, wrapping to the first item if at the end. */
@@ -152,7 +148,7 @@ export class StagingAreaApi {
       return;
     }
     this.$selectedItemId.set(nextItem.item_id);
-    this._app.onSelectNext?.();
+    this._app?.onSelectNext?.();
   };
 
   /** Selects the previous item in the queue, wrapping to the last item if at the beginning. */
@@ -168,7 +164,7 @@ export class StagingAreaApi {
       return;
     }
     this.$selectedItemId.set(prevItem.item_id);
-    this._app.onSelectPrev?.();
+    this._app?.onSelectPrev?.();
   };
 
   /** Selects the first item in the queue. */
@@ -179,7 +175,7 @@ export class StagingAreaApi {
       return;
     }
     this.$selectedItemId.set(first.item_id);
-    this._app.onSelectFirst?.();
+    this._app?.onSelectFirst?.();
   };
 
   /** Selects the last item in the queue. */
@@ -190,7 +186,7 @@ export class StagingAreaApi {
       return;
     }
     this.$selectedItemId.set(last.item_id);
-    this._app.onSelectLast?.();
+    this._app?.onSelectLast?.();
   };
 
   /** Discards the currently selected item and selects the next available item. */
@@ -207,7 +203,7 @@ export class StagingAreaApi {
     } else {
       this.$selectedItemId.set(null);
     }
-    this._app.onDiscard?.(selectedItem.item);
+    this._app?.onDiscard?.(selectedItem.item);
   };
 
   /** Whether the discard selected action is enabled. */
@@ -218,10 +214,23 @@ export class StagingAreaApi {
     return true;
   });
 
+  /** Connects to the app, registering listeners and such */
+  connectToApp = (sessionId: string, app: StagingAreaAppApi) => {
+    if (this._sessionId !== sessionId) {
+      this.cleanup();
+      this._sessionId = sessionId;
+    }
+    this._app = app;
+
+    this._subscriptions.add(this._app.onItemsChanged(this.onItemsChangedEvent));
+    this._subscriptions.add(this._app.onQueueItemStatusChanged(this.onQueueItemStatusChangedEvent));
+    this._subscriptions.add(this._app.onInvocationProgress(this.onInvocationProgressEvent));
+  };
+
   /** Discards all items in the queue. */
   discardAll = () => {
     this.$selectedItemId.set(null);
-    this._app.onDiscardAll?.();
+    this._app?.onDiscardAll?.();
   };
 
   /** Accepts the currently selected item if an image is available. */
@@ -235,7 +244,7 @@ export class StagingAreaApi {
     if (!datum || !datum.imageDTO) {
       return;
     }
-    this._app.onAccept?.(selectedItem.item, datum.imageDTO);
+    this._app?.onAccept?.(selectedItem.item, datum.imageDTO);
   };
 
   /** Whether the accept selected action is enabled. */
@@ -249,12 +258,12 @@ export class StagingAreaApi {
 
   /** Sets the auto-switch mode. */
   setAutoSwitch = (mode: AutoSwitchMode) => {
-    this._app.onAutoSwitchChange?.(mode);
+    this._app?.onAutoSwitchChange?.(mode);
   };
 
   /** Handles invocation progress events from the WebSocket. */
   onInvocationProgressEvent = (data: S['InvocationProgressEvent']) => {
-    if (data.destination !== this.sessionId) {
+    if (data.destination !== this._sessionId) {
       return;
     }
     setProgress(this.$progressData, data);
@@ -262,7 +271,7 @@ export class StagingAreaApi {
 
   /** Handles queue item status change events from the WebSocket. */
   onQueueItemStatusChangedEvent = (data: S['QueueItemStatusChangedEvent']) => {
-    if (data.destination !== this.sessionId) {
+    if (data.destination !== this._sessionId) {
       return;
     }
     if (data.status === 'completed') {
@@ -277,7 +286,7 @@ export class StagingAreaApi {
        */
       this.$lastCompletedItemId.set(data.item_id);
     }
-    if (data.status === 'in_progress' && this._app.getAutoSwitch() === 'switch_on_start') {
+    if (data.status === 'in_progress' && this._app?.getAutoSwitch() === 'switch_on_start') {
       this.$lastStartedItemId.set(data.item_id);
     }
   };
@@ -327,7 +336,7 @@ export class StagingAreaApi {
     for (const item of items) {
       const datum = progressData[item.item_id];
 
-      if (this.$lastStartedItemId.get() === item.item_id && this._app.getAutoSwitch() === 'switch_on_start') {
+      if (this.$lastStartedItemId.get() === item.item_id && this._app?.getAutoSwitch() === 'switch_on_start') {
         this.$selectedItemId.set(item.item_id);
         this.$lastStartedItemId.set(null);
       }
@@ -339,13 +348,13 @@ export class StagingAreaApi {
       if (!outputImageName) {
         continue;
       }
-      const imageDTO = await this._app.getImageDTO(outputImageName);
+      const imageDTO = await this._app?.getImageDTO(outputImageName);
       if (!imageDTO) {
         continue;
       }
 
       // This is the load logic mentioned in the comment in the QueueItemStatusChangedEvent handler above.
-      if (this.$lastCompletedItemId.get() === item.item_id && this._app.getAutoSwitch() === 'switch_on_finish') {
+      if (this.$lastCompletedItemId.get() === item.item_id && this._app?.getAutoSwitch() === 'switch_on_finish') {
         this._app.loadImage(imageDTO.image_url).then(() => {
           this.$selectedItemId.set(item.item_id);
           this.$lastCompletedItemId.set(null);
