@@ -17,7 +17,7 @@ export default defineConfig(({ mode }) => {
         react(),
         eslint(),
         tsconfigPaths(),
-        visualizer() as unknown as PluginOption,
+        visualizer(),
         dts({
           insertTypesEntry: true,
         }),
@@ -70,7 +70,7 @@ export default defineConfig(({ mode }) => {
       react(),
       mode !== 'test' && eslint({ failOnError: mode === 'production', failOnWarning: mode === 'production' }),
       tsconfigPaths(),
-      visualizer() as unknown as PluginOption,
+      visualizer(),
     ],
     build: {
       chunkSizeWarningLimit: 1500,

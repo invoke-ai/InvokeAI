@@ -1,6 +1,6 @@
 import { deepClone } from 'common/util/deepClone';
 import { isPlainObject } from 'es-toolkit';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 const zTabName = z.enum(['generate', 'canvas', 'upscaling', 'workflows', 'models', 'queue']);
 export type TabName = z.infer<typeof zTabName>;
@@ -23,6 +23,7 @@ const zUIState = z.object({
   textAreaSizes: z.record(z.string(), zPartialDimensions).default({}),
   panels: z.record(z.string(), zSerializable).default({}),
   shouldShowNotificationV2: z.boolean().default(true),
+  pickerCompactViewStates: z.record(z.string(), z.boolean()).default(() => ({})),
 });
 const INITIAL_STATE = zUIState.parse({});
 export type UIState = z.infer<typeof zUIState>;

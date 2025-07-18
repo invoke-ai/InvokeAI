@@ -35,7 +35,7 @@ export const DeleteStylePresetDialog = memo(() => {
         status: 'success',
         title: t('stylePresets.templateDeleted'),
       });
-    } catch (error) {
+    } catch {
       toast({
         status: 'error',
         title: t('stylePresets.unableToDeleteTemplate'),

@@ -1,12 +1,12 @@
 import type { Edge, Node } from '@xyflow/react';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 import { zClassification, zProgressImage } from './common';
 import { zFieldInputInstance, zFieldInputTemplate, zFieldOutputTemplate } from './field';
 import { zSemVer } from './semver';
 
 // #region InvocationTemplate
-const zInvocationTemplate = z.object({
+const _zInvocationTemplate = z.object({
   type: z.string(),
   title: z.string(),
   description: z.string(),
@@ -19,7 +19,7 @@ const zInvocationTemplate = z.object({
   nodePack: z.string().min(1).default('invokeai'),
   classification: zClassification,
 });
-export type InvocationTemplate = z.infer<typeof zInvocationTemplate>;
+export type InvocationTemplate = z.infer<typeof _zInvocationTemplate>;
 // #endregion
 
 // #region NodeData
@@ -43,7 +43,7 @@ export const zNotesNodeData = z.object({
   isOpen: z.boolean(),
   notes: z.string(),
 });
-const zCurrentImageNodeData = z.object({
+const _zCurrentImageNodeData = z.object({
   id: z.string().trim().min(1),
   type: z.literal('current_image'),
   label: z.string(),
@@ -52,7 +52,7 @@ const zCurrentImageNodeData = z.object({
 
 export type NotesNodeData = z.infer<typeof zNotesNodeData>;
 export type InvocationNodeData = z.infer<typeof zInvocationNodeData>;
-type CurrentImageNodeData = z.infer<typeof zCurrentImageNodeData>;
+type CurrentImageNodeData = z.infer<typeof _zCurrentImageNodeData>;
 
 export type InvocationNode = Node<InvocationNodeData, 'invocation'>;
 export type NotesNode = Node<NotesNodeData, 'notes'>;
@@ -71,7 +71,7 @@ const zNodeError = z.object({
   error_message: z.string(),
   error_traceback: z.string(),
 });
-const zNodeExecutionState = z.object({
+const _zNodeExecutionState = z.object({
   nodeId: z.string().trim().min(1),
   status: zNodeStatus,
   progress: z.number().nullable(),
@@ -79,14 +79,14 @@ const zNodeExecutionState = z.object({
   outputs: z.array(z.any()),
   error: zNodeError.nullable(),
 });
-export type NodeExecutionState = z.infer<typeof zNodeExecutionState>;
+export type NodeExecutionState = z.infer<typeof _zNodeExecutionState>;
 // #endregion
 
 // #region Edges
-const zInvocationNodeEdgeCollapsedData = z.object({
+const _zInvocationNodeEdgeCollapsedData = z.object({
   count: z.number().int().min(1),
 });
-type InvocationNodeEdgeCollapsedData = z.infer<typeof zInvocationNodeEdgeCollapsedData>;
+type InvocationNodeEdgeCollapsedData = z.infer<typeof _zInvocationNodeEdgeCollapsedData>;
 export type DefaultInvocationNodeEdge = Edge<Record<string, never>, 'default'>;
 export type CollapsedInvocationNodeEdge = Edge<InvocationNodeEdgeCollapsedData, 'collapsed'>;
 export type AnyEdge = DefaultInvocationNodeEdge | CollapsedInvocationNodeEdge;

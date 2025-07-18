@@ -37,8 +37,8 @@ const useFormatFallbackLabel = () => {
 export const NodeFieldElementViewMode = memo(({ el }: { el: NodeFieldElement }) => {
   const { id, data } = el;
   const { fieldIdentifier, showDescription } = data;
-  const description = useInputFieldUserDescriptionSafe(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
-  const fieldTemplate = useInputFieldTemplateSafe(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
+  const description = useInputFieldUserDescriptionSafe(fieldIdentifier.fieldName);
+  const fieldTemplate = useInputFieldTemplateSafe(fieldIdentifier.fieldName);
   const containerCtx = useContainerContext();
   const formatFallbackLabel = useFormatFallbackLabel();
 
@@ -70,8 +70,8 @@ NodeFieldElementViewMode.displayName = 'NodeFieldElementViewMode';
 const NodeFieldElementViewModeContent = memo(({ el }: { el: NodeFieldElement }) => {
   const { data } = el;
   const { fieldIdentifier, showDescription } = data;
-  const description = useInputFieldUserDescriptionSafe(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
-  const fieldTemplate = useInputFieldTemplateOrThrow(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
+  const description = useInputFieldUserDescriptionSafe(fieldIdentifier.fieldName);
+  const fieldTemplate = useInputFieldTemplateOrThrow(fieldIdentifier.fieldName);
 
   const _description = useMemo(
     () => description || fieldTemplate.description,

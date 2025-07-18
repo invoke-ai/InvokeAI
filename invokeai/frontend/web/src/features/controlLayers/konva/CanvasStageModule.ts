@@ -339,7 +339,9 @@ export class CanvasStageModule extends CanvasModuleBase {
 
   onStageMouseWheel = (e: KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
-    this._snapTimeout && window.clearTimeout(this._snapTimeout);
+    if (this._snapTimeout !== null) {
+      window.clearTimeout(this._snapTimeout);
+    }
 
     if (e.evt.ctrlKey || e.evt.metaKey) {
       return;

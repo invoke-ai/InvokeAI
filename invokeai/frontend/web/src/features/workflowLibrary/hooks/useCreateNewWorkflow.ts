@@ -70,15 +70,15 @@ export const useCreateLibraryWorkflow = (): CreateLibraryWorkflowReturn => {
         // When a workflow is saved, the form field initial values are updated to the current form field values
         dispatch(formFieldInitialValuesChanged({ formFieldInitialValues: getFormFieldInitialValues() }));
         updateOpenedAt({ workflow_id: id });
-        onSuccess && onSuccess();
+        onSuccess?.();
         toast.update(toastRef.current, {
           title: t('workflows.workflowSaved'),
           status: 'success',
           duration: 1000,
           isClosable: true,
         });
-      } catch (e) {
-        onError && onError();
+      } catch {
+        onError?.();
         if (!toast.isActive(`auth-error-toast-${workflowsApi.endpoints.createWorkflow.name}`)) {
           toast.update(toastRef.current, {
             title: t('workflows.problemSavingWorkflow'),

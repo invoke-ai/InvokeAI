@@ -1,6 +1,5 @@
 import { Flex, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
 import { compare } from 'compare-versions';
-import { useNodeNeedsUpdate } from 'features/nodes/hooks/useNodeNeedsUpdate';
 import { useInvocationNodeNotes } from 'features/nodes/hooks/useNodeNotes';
 import { useNodeTemplateOrThrow } from 'features/nodes/hooks/useNodeTemplateOrThrow';
 import { useNodeUserTitleSafe } from 'features/nodes/hooks/useNodeUserTitleSafe';
@@ -14,22 +13,20 @@ interface Props {
 }
 
 export const InvocationNodeInfoIcon = memo(({ nodeId }: Props) => {
-  const needsUpdate = useNodeNeedsUpdate(nodeId);
-
   return (
     <Tooltip label={<TooltipContent nodeId={nodeId} />} placement="top" shouldWrapChildren>
-      <Icon as={PiInfoBold} display="block" boxSize={4} w={8} color={needsUpdate ? 'error.400' : 'base.400'} />
+      <Icon as={PiInfoBold} display="block" boxSize={4} w={8} />
     </Tooltip>
   );
 });
 
 InvocationNodeInfoIcon.displayName = 'InvocationNodeInfoIcon';
 
-const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
-  const notes = useInvocationNodeNotes(nodeId);
-  const label = useNodeUserTitleSafe(nodeId);
-  const version = useNodeVersion(nodeId);
-  const nodeTemplate = useNodeTemplateOrThrow(nodeId);
+const TooltipContent = memo((_: { nodeId: string }) => {
+  const notes = useInvocationNodeNotes();
+  const label = useNodeUserTitleSafe();
+  const version = useNodeVersion();
+  const nodeTemplate = useNodeTemplateOrThrow();
   const { t } = useTranslation();
 
   const title = useMemo(() => {

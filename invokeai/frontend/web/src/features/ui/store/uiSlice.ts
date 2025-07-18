@@ -65,6 +65,9 @@ export const uiSlice = createSlice({
     shouldShowNotificationChanged: (state, action: PayloadAction<UIState['shouldShowNotificationV2']>) => {
       state.shouldShowNotificationV2 = action.payload;
     },
+    pickerCompactViewStateChanged: (state, action: PayloadAction<{ pickerId: string; isCompact: boolean }>) => {
+      state.pickerCompactViewStates[action.payload.pickerId] = action.payload.isCompact;
+    },
   },
 });
 
@@ -77,6 +80,7 @@ export const {
   shouldShowNotificationChanged,
   textAreaSizesStateChanged,
   dockviewStorageKeyChanged,
+  pickerCompactViewStateChanged,
 } = uiSlice.actions;
 
 export const selectUiSlice = (state: RootState) => state.ui;

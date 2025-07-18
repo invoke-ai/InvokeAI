@@ -574,6 +574,10 @@
                 "title": "Transform",
                 "desc": "Transform the selected layer."
             },
+            "invertMask": {
+                "title": "Invert Mask",
+                "desc": "Invert the selected inpaint mask, creating a new mask with opposite transparency."
+            },
             "applyFilter": {
                 "title": "Apply Filter",
                 "desc": "Apply the pending filter to the selected layer."
@@ -599,6 +603,10 @@
             "toggleNonRasterLayers": {
                 "title": "Toggle Non-Raster Layers",
                 "desc": "Show or hide all non-raster layer categories (Control Layers, Inpaint Masks, Regional Guidance)."
+            },
+            "fitBboxToMasks": {
+                "title": "Fit Bbox To Masks",
+                "desc": "Automatically adjust the generation bounding box to fit visible inpaint masks"
             }
         },
         "workflows": {
@@ -1423,7 +1431,15 @@
         "sentToUpscale": "Sent to Upscale",
         "promptGenerationStarted": "Prompt generation started",
         "uploadAndPromptGenerationFailed": "Failed to upload image and generate prompt",
-        "promptExpansionFailed": "We ran into an issue. Please try prompt expansion again."
+        "promptExpansionFailed": "We ran into an issue. Please try prompt expansion again.",
+        "maskInverted": "Mask Inverted",
+        "maskInvertFailed": "Failed to Invert Mask",
+        "noVisibleMasks": "No Visible Masks",
+        "noVisibleMasksDesc": "Create or enable at least one inpaint mask to invert",
+        "noInpaintMaskSelected": "No Inpaint Mask Selected",
+        "noInpaintMaskSelectedDesc": "Select an inpaint mask to invert",
+        "invalidBbox": "Invalid Bounding Box",
+        "invalidBboxDesc": "The bounding box has no valid dimensions"
     },
     "popovers": {
         "clipSkip": {
@@ -1956,6 +1972,7 @@
         "canvas": "Canvas",
         "bookmark": "Bookmark for Quick Switch",
         "fitBboxToLayers": "Fit Bbox To Layers",
+        "fitBboxToMasks": "Fit Bbox To Masks",
         "removeBookmark": "Remove Bookmark",
         "saveCanvasToGallery": "Save Canvas to Gallery",
         "saveBboxToGallery": "Save Bbox to Gallery",
@@ -2020,6 +2037,7 @@
         "rasterLayer": "Raster Layer",
         "controlLayer": "Control Layer",
         "inpaintMask": "Inpaint Mask",
+        "invertMask": "Invert Mask",
         "regionalGuidance": "Regional Guidance",
         "referenceImageRegional": "Reference Image (Regional)",
         "referenceImageGlobal": "Reference Image (Global)",

@@ -43,10 +43,10 @@ interface Props {
 export const InputFieldTitle = memo((props: Props) => {
   const { nodeId, fieldName, isInvalid, isDragging } = props;
   const inputRef = useRef<HTMLInputElement>(null);
-  const label = useInputFieldUserTitleSafe(nodeId, fieldName);
-  const fieldTemplateTitle = useInputFieldTemplateTitleOrThrow(nodeId, fieldName);
+  const label = useInputFieldUserTitleSafe(fieldName);
+  const fieldTemplateTitle = useInputFieldTemplateTitleOrThrow(fieldName);
   const { t } = useTranslation();
-  const isConnected = useInputFieldIsConnected(nodeId, fieldName);
+  const isConnected = useInputFieldIsConnected(fieldName);
   const isConnectionStartField = useIsConnectionStartField(nodeId, fieldName, 'target');
   const isConnectionInProgress = useIsConnectionInProgress();
   const connectionError = useConnectionErrorTKey(nodeId, fieldName, 'target');

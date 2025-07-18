@@ -9,6 +9,7 @@ import { selectNodes } from 'features/nodes/store/selectors';
 import type { InvocationNodeData } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
 
+import { InvocationNodeContextProvider } from './context';
 import InvocationNodeUnknownFallback from './InvocationNodeUnknownFallback';
 
 const InvocationNodeWrapper = (props: NodeProps<Node<InvocationNodeData>>) => {
@@ -28,16 +29,20 @@ const InvocationNodeWrapper = (props: NodeProps<Node<InvocationNodeData>>) => {
 
   if (!hasTemplate) {
     return (
-      <NodeWrapper nodeId={nodeId} selected={selected}>
-        <InvocationNodeUnknownFallback nodeId={nodeId} isOpen={isOpen} label={label} type={type} />
-      </NodeWrapper>
+      <InvocationNodeContextProvider nodeId={nodeId}>
+        <NodeWrapper nodeId={nodeId} selected={selected} isMissingTemplate>
+          <InvocationNodeUnknownFallback nodeId={nodeId} isOpen={isOpen} label={label} type={type} />
+        </NodeWrapper>
+      </InvocationNodeContextProvider>
     );
   }
 
   return (
-    <NodeWrapper nodeId={nodeId} selected={selected}>
-      <InvocationNode nodeId={nodeId} isOpen={isOpen} />
-    </NodeWrapper>
+    <InvocationNodeContextProvider nodeId={nodeId}>
+      <NodeWrapper nodeId={nodeId} selected={selected}>
+        <InvocationNode nodeId={nodeId} isOpen={isOpen} />
+      </NodeWrapper>
+    </InvocationNodeContextProvider>
   );
 };
 

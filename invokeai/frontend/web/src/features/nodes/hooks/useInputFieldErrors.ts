@@ -1,44 +1,36 @@
 import { useStore } from '@nanostores/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { useDebouncedAppSelector } from 'app/store/use-debounced-app-selector';
-import { $templates } from 'features/nodes/store/nodesSlice';
-import { selectFieldInputInstance, selectInvocationNodeSafe, selectNodesSlice } from 'features/nodes/store/selectors';
-import { getFieldErrors } from 'features/nodes/store/util/fieldValidators';
+import { EMPTY_ARRAY } from 'app/store/constants';
+import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
+import type { FieldError } from 'features/nodes/store/util/fieldValidators';
+import { $nodeErrors } from 'features/nodes/store/util/fieldValidators';
+import { computed } from 'nanostores';
 import { useMemo } from 'react';
-import { assert } from 'tsafe';
 
 /**
  * A hook that returns the errors for a given input field. The errors calculation is debounced.
  *
- * @param nodeId The id of the node
  * @param fieldName The name of the field
  * @returns An array of FieldError objects
  */
-export const useInputFieldErrors = (nodeId: string, fieldName: string) => {
-  const templates = useStore($templates);
-
-  const selectFieldErrors = useMemo(
+export const useInputFieldErrors = (fieldName: string): FieldError[] => {
+  const ctx = useInvocationNodeContext();
+  const $errors = useMemo(
     () =>
-      createSelector(selectNodesSlice, (nodes) => {
-        const node = selectInvocationNodeSafe(nodes, nodeId);
-        if (!node) {
-          // If the node is not found, return an empty array - might happen during node deletion
-          return [];
+      computed($nodeErrors, (nodeErrors) => {
+        const thisNodeErrors = nodeErrors[ctx.nodeId];
+        if (!thisNodeErrors) {
+          return EMPTY_ARRAY;
         }
-        const field = selectFieldInputInstance(nodes, nodeId, fieldName);
-
-        const nodeTemplate = templates[node.data.type];
-        assert(nodeTemplate, `Template for input node type ${node.data.type} not found.`);
-
-        const fieldTemplate = nodeTemplate.inputs[fieldName];
-        assert(fieldTemplate, `Template for input field ${fieldName} not found.`);
-
-        return getFieldErrors(node, nodeTemplate, field, fieldTemplate, nodes);
+        const errors = thisNodeErrors.filter((error) => {
+          return error.type === 'field-error' && error.fieldName === fieldName;
+        });
+        if (errors.length === 0) {
+          return EMPTY_ARRAY;
+        }
+        return errors as FieldError[];
       }),
-    [nodeId, fieldName, templates]
+    [ctx, fieldName]
   );
 
-  const fieldErrors = useDebouncedAppSelector(selectFieldErrors);
-
-  return fieldErrors;
+  return useStore($errors);
 };

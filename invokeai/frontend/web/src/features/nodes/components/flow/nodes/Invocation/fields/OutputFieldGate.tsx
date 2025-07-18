@@ -12,7 +12,7 @@ type Props = PropsWithChildren<{
 }>;
 
 export const OutputFieldGate = memo(({ nodeId, fieldName, children }: Props) => {
-  const hasTemplate = useOutputFieldTemplateExists(nodeId, fieldName);
+  const hasTemplate = useOutputFieldTemplateExists(fieldName);
 
   if (!hasTemplate) {
     return <Fallback nodeId={nodeId} fieldName={fieldName} />;
@@ -23,9 +23,9 @@ export const OutputFieldGate = memo(({ nodeId, fieldName, children }: Props) => 
 
 OutputFieldGate.displayName = 'OutputFieldGate';
 
-const Fallback = memo(({ nodeId, fieldName }: Props) => {
+const Fallback = memo(({ fieldName }: Props) => {
   const { t } = useTranslation();
-  const name = useOutputFieldName(nodeId, fieldName);
+  const name = useOutputFieldName(fieldName);
 
   return (
     <OutputFieldWrapper>
