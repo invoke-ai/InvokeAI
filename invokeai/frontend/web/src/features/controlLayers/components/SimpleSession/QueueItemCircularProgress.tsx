@@ -4,7 +4,7 @@ import { getProgressMessage } from 'features/controlLayers/components/SimpleSess
 import { memo } from 'react';
 import type { S } from 'services/api/types';
 
-import { useProgressDatum } from './context2';
+import { useProgressDatum } from './context';
 
 const circleStyles: SystemStyleObject = {
   circle: {

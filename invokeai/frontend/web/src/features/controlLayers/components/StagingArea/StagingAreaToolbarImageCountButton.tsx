@@ -1,6 +1,6 @@
 import { Button } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useStagingAreaContext } from 'features/controlLayers/components/SimpleSession/context2';
+import { useStagingAreaContext } from 'features/controlLayers/components/SimpleSession/context';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { memo, useMemo } from 'react';
 
