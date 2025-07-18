@@ -40,7 +40,13 @@ export const InitialStateMainModelPicker = memo(() => {
           </InformationalPopover>
         )}
       </FormLabel>
-      <ModelPicker modelConfigs={modelConfigs} selectedModelConfig={selectedModelConfig} onChange={onChange} grouped />
+      <ModelPicker
+        pickerId="initial-state-main-model"
+        modelConfigs={modelConfigs}
+        selectedModelConfig={selectedModelConfig}
+        onChange={onChange}
+        grouped
+      />
     </FormControl>
   );
 });
