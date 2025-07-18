@@ -42,7 +42,7 @@ export const useAutoLayout = (): (() => void) => {
     g.setDefaultEdgeLabel(() => ({}));
 
     const selectedNodes = nodes.filter((n) => n.selected);
-    const isLayoutSelection = selectedNodes.length > 0 && nodes.length > selectedNodes.length;
+    const isLayoutSelection = selectedNodes.length > 1 && nodes.length > selectedNodes.length;
     const nodesToLayout = isLayoutSelection ? selectedNodes : nodes;
 
     //Anchor of the selected nodes

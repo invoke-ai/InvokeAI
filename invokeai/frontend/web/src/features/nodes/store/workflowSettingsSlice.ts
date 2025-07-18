@@ -103,7 +103,6 @@ export const {
   nodeOpacityChanged,
   selectionModeChanged,
 } = workflowSettingsSlice.actions;
-export const { reducer } = workflowSettingsSlice;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateWorkflowSettingsState = (state: any): any => {
