@@ -11,9 +11,11 @@ import {
   Text,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { typedMemo } from 'common/util/typedMemo';
 import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
+import { selectModelPickerCompactViewStates, setModelPickerCompactView } from 'features/ui/store/uiSlice';
 import type { AnyStore, ReadableAtom, Task, WritableAtom } from 'nanostores';
 import { atom, computed } from 'nanostores';
 import type { StoreValues } from 'nanostores/computed';
@@ -141,6 +143,10 @@ NoMatchesFallbackWrapper.displayName = 'NoMatchesFallbackWrapper';
 
 type PickerProps<T extends object> = {
   /**
+   * Unique identifier for this picker instance. Used to persist compact view state.
+   */
+  pickerId?: string;
+  /**
    * The options to display in the picker. This can be a flat array of options or an array of groups.
    */
   optionsOrGroups: OptionOrGroup<T>[];
@@ -207,7 +213,7 @@ type PickerProps<T extends object> = {
 export type PickerContextState<T extends object> = {
   $optionsOrGroups: WritableAtom<OptionOrGroup<T>[]>;
   $groupStatusMap: WritableAtom<GroupStatusMap>;
-  $compactView: WritableAtom<boolean>;
+  isCompactView: boolean;
   $activeOptionId: WritableAtom<string | undefined>;
   $filteredOptions: WritableAtom<OptionOrGroup<T>[]>;
   $flattenedFilteredOptions: ReadableAtom<T[]>;
@@ -233,6 +239,7 @@ export type PickerContextState<T extends object> = {
   OptionComponent: React.ComponentType<{ option: T } & BoxProps>;
   NextToSearchBar?: React.ReactNode;
   searchable?: boolean;
+  pickerId?: string;
 };
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -503,6 +510,7 @@ const countOptions = <T extends object>(optionsOrGroups: OptionOrGroup<T>[]) => 
 
 export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
   const {
+    pickerId,
     getOptionId,
     optionsOrGroups,
     handleRef,
@@ -521,12 +529,13 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
   } = props;
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const compactViewStates = useAppSelector(selectModelPickerCompactViewStates);
+
   const { $groupStatusMap, $areAllGroupsDisabled, toggleGroup } = useTogglableGroups(
     optionsOrGroups,
     initialGroupStates
   );
   const $activeOptionId = useAtom(getFirstOptionId(optionsOrGroups, getOptionId));
-  const $compactView = useAtom(true);
   const $optionsOrGroups = useAtom(optionsOrGroups);
   const $totalOptionCount = useComputed([$optionsOrGroups], countOptions);
   const $filteredOptions = useAtom<OptionOrGroup<T>[]>([]);
@@ -537,6 +546,9 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
   const $selectedItem = useAtom<T | undefined>(undefined);
   const $searchTerm = useAtom('');
   const $selectedItemId = useComputed([$selectedItem], (item) => (item ? getOptionId(item) : undefined));
+
+  // Use Redux state for compact view, defaulting to true if no pickerId or no saved state
+  const isCompactView = pickerId ? (compactViewStates[pickerId] ?? true) : true;
 
   const onSelectById = useCallback(
     (id: string) => {
@@ -565,7 +577,7 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
       ({
         $optionsOrGroups,
         $groupStatusMap,
-        $compactView,
+        isCompactView,
         $activeOptionId,
         $filteredOptions,
         $flattenedFilteredOptions,
@@ -591,11 +603,12 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
         $hasOptions,
         $hasFilteredOptions,
         $filteredOptionsCount,
+        pickerId,
       }) satisfies PickerContextState<T>,
     [
       $optionsOrGroups,
       $groupStatusMap,
-      $compactView,
+      isCompactView,
       $activeOptionId,
       $filteredOptions,
       $flattenedFilteredOptions,
@@ -619,6 +632,7 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
       $hasOptions,
       $hasFilteredOptions,
       $filteredOptionsCount,
+      pickerId,
     ]
   );
 
@@ -869,15 +883,17 @@ GroupToggleButtons.displayName = 'GroupToggleButtons';
 
 const CompactViewToggleButton = typedMemo(<T extends object>() => {
   const { t } = useTranslation();
-  const { $compactView } = usePickerContext<T>();
-  const compactView = useStore($compactView);
+  const dispatch = useAppDispatch();
+  const { isCompactView, pickerId } = usePickerContext<T>();
 
   const onClick = useCallback(() => {
-    $compactView.set(!$compactView.get());
-  }, [$compactView]);
+    if (pickerId) {
+      dispatch(setModelPickerCompactView({ pickerId, isCompact: !isCompactView }));
+    }
+  }, [dispatch, pickerId, isCompactView]);
 
-  const label = compactView ? t('common.fullView') : t('common.compactView');
-  const icon = compactView ? <PiArrowsOutLineVerticalBold /> : <PiArrowsInLineVerticalBold />;
+  const label = isCompactView ? t('common.fullView') : t('common.compactView');
+  const icon = isCompactView ? <PiArrowsOutLineVerticalBold /> : <PiArrowsInLineVerticalBold />;
 
   return <IconButton aria-label={label} tooltip={label} size="sm" variant="ghost" icon={icon} onClick={onClick} />;
 });
@@ -924,8 +940,8 @@ const listSx = {
 } satisfies SystemStyleObject;
 
 const PickerList = typedMemo(<T extends object>() => {
-  const { getOptionId, $compactView, $filteredOptions } = usePickerContext<T>();
-  const compactView = useStore($compactView);
+  const { getOptionId, isCompactView, $filteredOptions } = usePickerContext<T>();
+  const compactView = isCompactView;
   const filteredOptions = useStore($filteredOptions);
 
   if (filteredOptions.length === 0) {
@@ -1079,8 +1095,8 @@ const groupHeaderSx = {
 
 const PickerGroupHeader = typedMemo(<T extends object>({ group }: { group: Group<T> }) => {
   const { t } = useTranslation();
-  const { $compactView } = usePickerContext<T>();
-  const compactView = useStore($compactView);
+  const { isCompactView } = usePickerContext<T>();
+  const compactView = isCompactView;
   const color = getGroupColor(group);
   const name = getGroupName(group);
   const count = getGroupCount(group, t);

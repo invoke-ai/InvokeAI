@@ -23,6 +23,7 @@ const zUIState = z.object({
   textAreaSizes: z.record(z.string(), zPartialDimensions).default({}),
   panels: z.record(z.string(), zSerializable).default({}),
   shouldShowNotificationV2: z.boolean().default(true),
+  modelPickerCompactViewStates: z.record(z.string(), z.boolean()).default(() => ({})),
 });
 const INITIAL_STATE = zUIState.parse({});
 export type UIState = z.infer<typeof zUIState>;
