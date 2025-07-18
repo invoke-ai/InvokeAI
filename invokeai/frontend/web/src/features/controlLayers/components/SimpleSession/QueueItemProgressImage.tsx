@@ -2,7 +2,7 @@ import type { ImageProps } from '@invoke-ai/ui-library';
 import { Image } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 
-import { useProgressDatum } from './context2';
+import { useProgressDatum } from './context';
 
 type Props = { itemId: number } & ImageProps;
 
