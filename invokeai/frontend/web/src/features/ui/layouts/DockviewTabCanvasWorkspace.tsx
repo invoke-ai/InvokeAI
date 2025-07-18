@@ -10,7 +10,6 @@ import { memo, useCallback, useRef } from 'react';
 import { useIsGenerationInProgress } from 'services/api/endpoints/queue';
 
 import type { PanelParameters } from './auto-layout-context';
-import { useHackOutDvTabDraggable } from './use-hack-out-dv-tab-draggable';
 
 export const DockviewTabCanvasWorkspace = memo((props: IDockviewPanelHeaderProps<PanelParameters>) => {
   const isGenerationInProgress = useIsGenerationInProgress();
@@ -29,8 +28,6 @@ export const DockviewTabCanvasWorkspace = memo((props: IDockviewPanelHeaderProps
   const onPointerDown = useCallback(() => {
     setFocusedRegion(props.params.focusRegion);
   }, [props.params.focusRegion]);
-
-  useHackOutDvTabDraggable(ref);
 
   return (
     <Flex ref={ref} position="relative" alignItems="center" h="full" onPointerDown={onPointerDown}>
