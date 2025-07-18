@@ -26,7 +26,7 @@ export const StagingAreaToolbarPrevButton = memo(() => {
     ctx.selectPrev,
     {
       preventDefault: true,
-      enabled: isCanvasFocused && !shouldShowStagedImage && itemCount > 1,
+      enabled: isCanvasFocused && shouldShowStagedImage && itemCount > 1,
     },
     [isCanvasFocused, shouldShowStagedImage, itemCount, ctx.selectPrev]
   );
