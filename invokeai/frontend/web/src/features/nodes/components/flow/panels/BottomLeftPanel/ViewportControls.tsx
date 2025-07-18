@@ -32,6 +32,7 @@ import {
   type LayoutDirection,
   layoutDirectionChanged,
   nodeAlignmentChanged,
+  type NodeAlignment,
   nodeSpacingChanged,
   selectLayeringStrategy,
   selectLayerSpacing,

@@ -1,5 +1,5 @@
 import { graphlib, layout } from '@dagrejs/dagre';
-import type { Edge, NodeChange} from '@xyflow/react';
+import type { Edge, NodeChange } from '@xyflow/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { nodesChanged } from 'features/nodes/store/nodesSlice';
 import { selectEdges, selectNodes } from 'features/nodes/store/selectors';
@@ -59,9 +59,12 @@ export const useAutoLayout = (): (() => void) => {
       }
       // update the Height based on the node's measured height or use a default value
       const measuredHeight = node.measured?.height;
-      const height = typeof measuredHeight === 'number'
-        ? measuredHeight
-        : isNotesNode(node) ? ESTIMATED_NOTES_NODE_HEIGHT : DEFAULT_NODE_HEIGHT;
+      const height =
+        typeof measuredHeight === 'number'
+          ? measuredHeight
+          : isNotesNode(node)
+            ? ESTIMATED_NOTES_NODE_HEIGHT
+            : DEFAULT_NODE_HEIGHT;
 
       g.setNode(node.id, {
         width: node.width ?? NODE_WIDTH,
@@ -72,10 +75,7 @@ export const useAutoLayout = (): (() => void) => {
     let edgesToLayout: Edge[] = edges;
     if (isLayoutSelection) {
       const nodesToLayoutIds = new Set(nodesToLayout.map((n) => n.id));
-      edgesToLayout = edges.filter(
-        (edge) =>
-          nodesToLayoutIds.has(edge.source) && nodesToLayoutIds.has(edge.target)
-      );
+      edgesToLayout = edges.filter((edge) => nodesToLayoutIds.has(edge.source) && nodesToLayoutIds.has(edge.target));
     }
 
     edgesToLayout.forEach((edge) => {
