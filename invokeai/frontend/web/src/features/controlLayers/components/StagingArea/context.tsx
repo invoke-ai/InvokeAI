@@ -15,7 +15,7 @@ import { selectBboxRect, selectSelectedEntityIdentifier } from 'features/control
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageNameToImageObject } from 'features/controlLayers/store/util';
 import type { PropsWithChildren } from 'react';
-import { createContext, memo, useContext, useMemo } from 'react';
+import { createContext, memo, useContext, useEffect, useMemo } from 'react';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { S } from 'services/api/types';
@@ -94,7 +94,16 @@ export const StagingAreaContextProvider = memo(({ children, sessionId }: PropsWi
 
     return _stagingAreaAppApi;
   }, [sessionId, socket, store]);
-  const value = useMemo(() => new StagingAreaApi(sessionId, stagingAreaAppApi), [sessionId, stagingAreaAppApi]);
+  const value = useMemo(() => {
+    return new StagingAreaApi(sessionId, stagingAreaAppApi);
+  }, [sessionId, stagingAreaAppApi]);
+
+  useEffect(() => {
+    const api = value;
+    return () => {
+      api.cleanup();
+    };
+  }, [value]);
 
   return <StagingAreaContext.Provider value={value}>{children}</StagingAreaContext.Provider>;
 });
