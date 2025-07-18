@@ -27,7 +27,7 @@ export const StagingAreaToolbarNextButton = memo(() => {
     ctx.selectNext,
     {
       preventDefault: true,
-      enabled: isCanvasFocused && !shouldShowStagedImage && itemCount > 1,
+      enabled: isCanvasFocused && shouldShowStagedImage && itemCount > 1,
     },
     [isCanvasFocused, shouldShowStagedImage, itemCount, ctx.selectNext]
   );
