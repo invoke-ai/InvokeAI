@@ -1,16 +1,16 @@
 import type { TextProps } from '@invoke-ai/ui-library';
 import { Text } from '@invoke-ai/ui-library';
-import { useCanvasSessionContext, useProgressData } from 'features/controlLayers/components/SimpleSession/context';
 import { memo } from 'react';
 import type { S } from 'services/api/types';
+
+import { useProgressDatum } from './context2';
 
 type Props = { item: S['SessionQueueItem'] } & TextProps;
 
 export const QueueItemStatusLabel = memo(({ item, ...rest }: Props) => {
-  const ctx = useCanvasSessionContext();
-  const { progressImage, imageLoaded } = useProgressData(ctx.$progressData, item.item_id);
+  const { progressImage } = useProgressDatum(item.item_id);
 
-  if (progressImage || imageLoaded) {
+  if (progressImage) {
     return null;
   }
 

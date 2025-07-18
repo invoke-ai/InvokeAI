@@ -1,11 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  useCanvasSessionContext,
-  useOutputImageDTO,
-  useProgressData,
-} from 'features/controlLayers/components/SimpleSession/context';
 import { QueueItemCircularProgress } from 'features/controlLayers/components/SimpleSession/QueueItemCircularProgress';
 import { QueueItemNumber } from 'features/controlLayers/components/SimpleSession/QueueItemNumber';
 import { QueueItemProgressImage } from 'features/controlLayers/components/SimpleSession/QueueItemProgressImage';
@@ -17,8 +13,10 @@ import {
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import { DndImage } from 'features/dnd/DndImage';
 import { toast } from 'features/toast/toast';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import type { S } from 'services/api/types';
+
+import { useOutputImageDTO, useStagingAreaContext } from './context2';
 
 const sx = {
   cursor: 'pointer',
@@ -41,19 +39,19 @@ const sx = {
 type Props = {
   item: S['SessionQueueItem'];
   index: number;
-  isSelected: boolean;
 };
 
-export const QueueItemPreviewMini = memo(({ item, isSelected, index }: Props) => {
+export const QueueItemPreviewMini = memo(({ item, index }: Props) => {
+  const ctx = useStagingAreaContext();
   const dispatch = useAppDispatch();
-  const ctx = useCanvasSessionContext();
-  const { imageLoaded } = useProgressData(ctx.$progressData, item.item_id);
-  const imageDTO = useOutputImageDTO(item);
+  const $isSelected = useMemo(() => ctx.buildIsSelectedComputed(item.item_id), [ctx, item.item_id]);
+  const isSelected = useStore($isSelected);
+  const imageDTO = useOutputImageDTO(item.item_id);
   const autoSwitch = useAppSelector(selectStagingAreaAutoSwitch);
 
   const onClick = useCallback(() => {
-    ctx.$selectedItemId.set(item.item_id);
-  }, [ctx.$selectedItemId, item.item_id]);
+    ctx.select(item.item_id);
+  }, [ctx, item.item_id]);
 
   const onDoubleClick = useCallback(() => {
     if (autoSwitch !== 'off') {
@@ -74,7 +72,7 @@ export const QueueItemPreviewMini = memo(({ item, isSelected, index }: Props) =>
     >
       <QueueItemStatusLabel item={item} position="absolute" margin="auto" />
       {imageDTO && <DndImage imageDTO={imageDTO} asThumbnail position="absolute" />}
-      {!imageLoaded && <QueueItemProgressImage itemId={item.item_id} position="absolute" />}
+      <QueueItemProgressImage itemId={item.item_id} position="absolute" />
       <QueueItemNumber number={index + 1} position="absolute" top={0} left={1} />
       <QueueItemCircularProgress itemId={item.item_id} status={item.status} position="absolute" top={1} right={2} />
     </Flex>

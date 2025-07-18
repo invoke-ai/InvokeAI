@@ -1,9 +1,10 @@
 import type { CircularProgressProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { CircularProgress, Tooltip } from '@invoke-ai/ui-library';
-import { useCanvasSessionContext, useProgressData } from 'features/controlLayers/components/SimpleSession/context';
 import { getProgressMessage } from 'features/controlLayers/components/SimpleSession/shared';
 import { memo } from 'react';
 import type { S } from 'services/api/types';
+
+import { useProgressDatum } from './context2';
 
 const circleStyles: SystemStyleObject = {
   circle: {
@@ -18,8 +19,7 @@ const circleStyles: SystemStyleObject = {
 type Props = { itemId: number; status: S['SessionQueueItem']['status'] } & CircularProgressProps;
 
 export const QueueItemCircularProgress = memo(({ itemId, status, ...rest }: Props) => {
-  const { $progressData } = useCanvasSessionContext();
-  const { progressEvent } = useProgressData($progressData, itemId);
+  const { progressEvent } = useProgressDatum(itemId);
 
   if (status !== 'in_progress') {
     return null;

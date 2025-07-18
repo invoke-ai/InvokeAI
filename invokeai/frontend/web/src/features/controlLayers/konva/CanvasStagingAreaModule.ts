@@ -1,5 +1,5 @@
 import { Mutex } from 'async-mutex';
-import type { ProgressData, ProgressDataMap } from 'features/controlLayers/components/SimpleSession/context';
+import type { SelectedItemData } from 'features/controlLayers/components/SimpleSession/state';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
@@ -149,33 +149,24 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     this.render();
   };
 
-  connectToSession = (
-    $items: Atom<S['SessionQueueItem'][]>,
-    $selectedItemId: Atom<number | null>,
-    $progressData: ProgressDataMap
-  ) => {
-    const imageSrcListener = (
-      selectedItemId: number | null,
-      progressData: Record<number, ProgressData | undefined>
-    ) => {
-      if (!selectedItemId) {
+  connectToSession = ($items: Atom<S['SessionQueueItem'][]>, $selectedItem: Atom<SelectedItemData | null>) => {
+    const imageSrcListener = (selectedItem: SelectedItemData | null) => {
+      if (!selectedItem) {
         this.$imageSrc.set(null);
         return;
       }
 
-      const datum = progressData[selectedItemId];
-
-      if (datum?.imageDTO) {
-        this.$imageSrc.set({ type: 'imageName', data: datum.imageDTO.image_name });
+      if (selectedItem.progressData.imageDTO) {
+        this.$imageSrc.set({ type: 'imageName', data: selectedItem.progressData.imageDTO.image_name });
         return;
-      } else if (datum?.progressImage) {
-        this.$imageSrc.set({ type: 'dataURL', data: datum.progressImage.dataURL });
+      } else if (selectedItem.progressData?.progressImage) {
+        this.$imageSrc.set({ type: 'dataURL', data: selectedItem.progressData.progressImage.dataURL });
         return;
       } else {
         this.$imageSrc.set(null);
       }
     };
-    const unsubImageSrc = effect([$selectedItemId, $progressData], imageSrcListener);
+    const unsubImageSrc = effect([$selectedItem], imageSrcListener);
 
     const isPendingListener = (items: S['SessionQueueItem'][]) => {
       this.$isPending.set(items.some((item) => item.status === 'pending' || item.status === 'in_progress'));
@@ -190,7 +181,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     // Run the effects & forcibly render once to initialize
     isStagingListener($items.get());
     isPendingListener($items.get());
-    imageSrcListener($selectedItemId.get(), $progressData.get());
+    imageSrcListener($selectedItem.get());
     this.render();
 
     return () => {
