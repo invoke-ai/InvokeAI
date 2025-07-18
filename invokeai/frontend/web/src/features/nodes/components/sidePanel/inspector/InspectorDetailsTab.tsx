@@ -2,6 +2,7 @@ import { Box, Flex, FormControl, FormLabel, HStack, Text } from '@invoke-ai/ui-l
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
+import { InvocationNodeContextProvider } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { InvocationNodeNotesTextarea } from 'features/nodes/components/flow/nodes/Invocation/InvocationNodeNotesTextarea';
 import { TemplateGate } from 'features/nodes/components/sidePanel/inspector/NodeTemplateGate';
 import { useNodeNeedsUpdate } from 'features/nodes/hooks/useNodeNeedsUpdate';
@@ -22,12 +23,14 @@ const InspectorDetailsTab = () => {
   }
 
   return (
-    <TemplateGate
-      nodeId={lastSelectedNodeId}
-      fallback={<IAINoContentFallback label={t('nodes.noNodeSelected')} icon={null} />}
-    >
-      <Content nodeId={lastSelectedNodeId} />
-    </TemplateGate>
+    <InvocationNodeContextProvider nodeId={lastSelectedNodeId}>
+      <TemplateGate
+        nodeId={lastSelectedNodeId}
+        fallback={<IAINoContentFallback label={t('nodes.noNodeSelected')} icon={null} />}
+      >
+        <Content nodeId={lastSelectedNodeId} />
+      </TemplateGate>
+    </InvocationNodeContextProvider>
   );
 };
 
