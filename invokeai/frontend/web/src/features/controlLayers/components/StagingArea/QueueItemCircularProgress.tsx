@@ -1,6 +1,6 @@
 import type { CircularProgressProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { CircularProgress, Tooltip } from '@invoke-ai/ui-library';
-import { getProgressMessage } from 'features/controlLayers/components/SimpleSession/shared';
+import { getProgressMessage } from 'features/controlLayers/components/StagingArea/shared';
 import { memo } from 'react';
 import type { S } from 'services/api/types';
 
