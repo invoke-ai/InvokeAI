@@ -1,5 +1,5 @@
 import { Mutex } from 'async-mutex';
-import type { SelectedItemData } from 'features/controlLayers/components/SimpleSession/state';
+import type { SelectedItemData } from 'features/controlLayers/components/StagingArea/state';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';

@@ -2,7 +2,7 @@ import { MenuGroup, MenuItem } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppStore } from 'app/store/storeHooks';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
-import { useStagingAreaContext } from 'features/controlLayers/components/SimpleSession/context';
+import { useStagingAreaContext } from 'features/controlLayers/components/StagingArea/context';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { createNewCanvasEntityFromImage } from 'features/imageActions/actions';
 import { toast } from 'features/toast/toast';
