@@ -16,7 +16,8 @@ describe('StagingAreaApi', () => {
 
   beforeEach(() => {
     mockApp = createMockStagingAreaApp();
-    api = new StagingAreaApi(sessionId, mockApp);
+    api = new StagingAreaApi();
+    api.connectToApp(sessionId, mockApp);
   });
 
   afterEach(() => {
@@ -25,7 +26,7 @@ describe('StagingAreaApi', () => {
 
   describe('Constructor and Setup', () => {
     it('should initialize with correct session ID', () => {
-      expect(api.sessionId).toBe(sessionId);
+      expect(api._sessionId).toBe(sessionId);
     });
 
     it('should set up event subscriptions', () => {
@@ -747,8 +748,10 @@ describe('StagingAreaApi', () => {
 
     describe('Event Subscription Management', () => {
       it('should handle multiple subscriptions and unsubscriptions', () => {
-        const api2 = new StagingAreaApi(sessionId, mockApp);
-        const api3 = new StagingAreaApi(sessionId, mockApp);
+        const api2 = new StagingAreaApi();
+        api2.connectToApp(sessionId, mockApp);
+        const api3 = new StagingAreaApi();
+        api3.connectToApp(sessionId, mockApp);
 
         // All should be subscribed
         expect(mockApp.onItemsChanged).toHaveBeenCalledTimes(3);

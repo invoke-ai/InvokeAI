@@ -15,7 +15,7 @@ import { selectBboxRect, selectSelectedEntityIdentifier } from 'features/control
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageNameToImageObject } from 'features/controlLayers/store/util';
 import type { PropsWithChildren } from 'react';
-import { createContext, memo, useContext, useEffect, useMemo } from 'react';
+import { createContext, memo, useContext, useEffect, useMemo, useState } from 'react';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { S } from 'services/api/types';
@@ -94,18 +94,24 @@ export const StagingAreaContextProvider = memo(({ children, sessionId }: PropsWi
 
     return _stagingAreaAppApi;
   }, [sessionId, socket, store]);
-  const value = useMemo(() => {
-    return new StagingAreaApi(sessionId, stagingAreaAppApi);
-  }, [sessionId, stagingAreaAppApi]);
+
+  const [stagingAreaApi] = useState(() => new StagingAreaApi());
 
   useEffect(() => {
-    const api = value;
-    return () => {
-      api.cleanup();
-    };
-  }, [value]);
+    stagingAreaApi.connectToApp(sessionId, stagingAreaAppApi);
 
-  return <StagingAreaContext.Provider value={value}>{children}</StagingAreaContext.Provider>;
+    // We need to subscribe to the queue items query manually to ensure the staging area actually gets the items
+    const { unsubscribe: unsubQueueItemsQuery } = store.dispatch(
+      queueApi.endpoints.listAllQueueItems.initiate({ destination: sessionId })
+    );
+
+    return () => {
+      stagingAreaApi.cleanup();
+      unsubQueueItemsQuery();
+    };
+  }, [sessionId, stagingAreaApi, stagingAreaAppApi, store]);
+
+  return <StagingAreaContext.Provider value={stagingAreaApi}>{children}</StagingAreaContext.Provider>;
 });
 StagingAreaContextProvider.displayName = 'StagingAreaContextProvider';
 
