@@ -123,6 +123,7 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('canvas', 'applySegmentAnything', ['enter']);
     addHotkey('canvas', 'cancelSegmentAnything', ['esc']);
     addHotkey('canvas', 'toggleNonRasterLayers', ['shift+h']);
+    addHotkey('canvas', 'fitBboxToMasks', ['shift+b']);
 
     // Workflows
     addHotkey('workflows', 'addNode', ['shift+a', 'space']);

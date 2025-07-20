@@ -599,6 +599,10 @@
             "toggleNonRasterLayers": {
                 "title": "Toggle Non-Raster Layers",
                 "desc": "Show or hide all non-raster layer categories (Control Layers, Inpaint Masks, Regional Guidance)."
+            },
+            "fitBboxToMasks": {
+                "title": "Fit Bbox To Masks",
+                "desc": "Automatically adjust the generation bounding box to fit visible inpaint masks"
             }
         },
         "workflows": {
@@ -1940,6 +1944,7 @@
         "canvas": "Canvas",
         "bookmark": "Bookmark for Quick Switch",
         "fitBboxToLayers": "Fit Bbox To Layers",
+        "fitBboxToMasks": "Fit Bbox To Masks",
         "removeBookmark": "Remove Bookmark",
         "saveCanvasToGallery": "Save Canvas to Gallery",
         "saveBboxToGallery": "Save Bbox to Gallery",
