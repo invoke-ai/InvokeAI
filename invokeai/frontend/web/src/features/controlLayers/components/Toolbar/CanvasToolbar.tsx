@@ -13,6 +13,7 @@ import { CanvasToolbarUndoButton } from 'features/controlLayers/components/Toolb
 import { useCanvasDeleteLayerHotkey } from 'features/controlLayers/hooks/useCanvasDeleteLayerHotkey';
 import { useCanvasEntityQuickSwitchHotkey } from 'features/controlLayers/hooks/useCanvasEntityQuickSwitchHotkey';
 import { useCanvasFilterHotkey } from 'features/controlLayers/hooks/useCanvasFilterHotkey';
+import { useCanvasInvertMaskHotkey } from 'features/controlLayers/hooks/useCanvasInvertMaskHotkey';
 import { useCanvasResetLayerHotkey } from 'features/controlLayers/hooks/useCanvasResetLayerHotkey';
 import { useCanvasToggleNonRasterLayersHotkey } from 'features/controlLayers/hooks/useCanvasToggleNonRasterLayersHotkey';
 import { useCanvasTransformHotkey } from 'features/controlLayers/hooks/useCanvasTransformHotkey';
@@ -28,6 +29,7 @@ export const CanvasToolbar = memo(() => {
   useNextPrevEntityHotkeys();
   useCanvasTransformHotkey();
   useCanvasFilterHotkey();
+  useCanvasInvertMaskHotkey();
   useCanvasToggleNonRasterLayersHotkey();
 
   return (

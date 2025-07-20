@@ -112,6 +112,7 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('canvas', 'resetSelected', ['shift+c']);
     addHotkey('canvas', 'transformSelected', ['shift+t']);
     addHotkey('canvas', 'filterSelected', ['shift+f']);
+    addHotkey('canvas', 'invertMask', ['shift+v']);
     addHotkey('canvas', 'undo', ['mod+z']);
     addHotkey('canvas', 'redo', ['mod+shift+z', 'mod+y']);
     addHotkey('canvas', 'nextEntity', ['alt+]']);
