@@ -1,8 +1,8 @@
-import torch
 from collections import OrderedDict
 
 import torch
 import torch.nn as nn
+
 
 def make_layers(block, no_relu_layers):
     layers = []

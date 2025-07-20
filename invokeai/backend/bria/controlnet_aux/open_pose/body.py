@@ -1,13 +1,12 @@
 import math
 from typing import List, NamedTuple, Union
 
-import cv2
 import numpy as np
 import torch
 from scipy.ndimage.filters import gaussian_filter
 
-from . import util
-from .model import bodypose_model
+from invokeai.backend.bria.controlnet_aux.open_pose import util
+from invokeai.backend.bria.controlnet_aux.open_pose.model import bodypose_model
 
 
 class Keypoint(NamedTuple):
@@ -101,7 +100,7 @@ class Body(object):
 
             peaks_binary = np.logical_and.reduce(
                 (one_heatmap >= map_left, one_heatmap >= map_right, one_heatmap >= map_up, one_heatmap >= map_down, one_heatmap > thre1))
-            peaks = list(zip(np.nonzero(peaks_binary)[1], np.nonzero(peaks_binary)[0]))  # note reverse
+            peaks = list(zip(np.nonzero(peaks_binary)[1], np.nonzero(peaks_binary)[0], strict=False))  # note reverse
             peaks_with_score = [x + (map_ori[x[1], x[0]],) for x in peaks]
             peak_id = range(peak_counter, peak_counter + len(peaks))
             peaks_with_score_and_id = [peaks_with_score[i] + (peak_id[i],) for i in range(len(peak_id))]
@@ -139,12 +138,12 @@ class Body(object):
                         vec = np.divide(vec, norm)
 
                         startend = list(zip(np.linspace(candA[i][0], candB[j][0], num=mid_num), \
-                                            np.linspace(candA[i][1], candB[j][1], num=mid_num)))
+                                            np.linspace(candA[i][1], candB[j][1], num=mid_num), strict=False))
 
-                        vec_x = np.array([score_mid[int(round(startend[I][1])), int(round(startend[I][0])), 0] \
-                                          for I in range(len(startend))])
-                        vec_y = np.array([score_mid[int(round(startend[I][1])), int(round(startend[I][0])), 1] \
-                                          for I in range(len(startend))])
+                        vec_x = np.array([score_mid[int(round(startend[i][1])), int(round(startend[i][0])), 0] \
+                                          for i in range(len(startend))])
+                        vec_y = np.array([score_mid[int(round(startend[i][1])), int(round(startend[i][0])), 1] \
+                                          for i in range(len(startend))])
 
                         score_midpts = np.multiply(vec_x, vec[0]) + np.multiply(vec_y, vec[1])
                         score_with_dist_prior = sum(score_midpts) / len(score_midpts) + min(
@@ -225,12 +224,12 @@ class Body(object):
         # subset: n*20 array, 0-17 is the index in candidate, 18 is the total score, 19 is the total parts
         # candidate: x, y, score, id
         return candidate, subset
-    
+
     @staticmethod
     def format_body_result(candidate: np.ndarray, subset: np.ndarray) -> List[BodyResult]:
         """
         Format the body results from the candidate and subset arrays into a list of BodyResult objects.
-        
+
         Args:
             candidate (np.ndarray): An array of candidates containing the x, y coordinates, score, and id
                 for each body part.

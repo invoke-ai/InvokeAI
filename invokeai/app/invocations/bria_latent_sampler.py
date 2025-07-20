@@ -1,19 +1,16 @@
 import torch
 
-from invokeai.app.invocations.fields import Input, InputField
+from invokeai.app.invocations.fields import Input, InputField, OutputField
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import (
     BaseInvocationOutput,
     FieldDescriptions,
-    Input,
     LatentsField,
-    OutputField,
 )
 from invokeai.backend.bria.pipeline_bria_controlnet import prepare_latents
 from invokeai.invocation_api import (
     BaseInvocation,
     Classification,
-    InputField,
     InvocationContext,
     invocation,
     invocation_output,
@@ -56,7 +53,7 @@ class BriaLatentSamplerInvocation(BaseInvocation):
 
         height, width = 1024, 1024
         generator = torch.Generator(device=device).manual_seed(self.seed)
-        
+
         num_channels_latents = 4
         latents, latent_image_ids = prepare_latents(
             batch_size=1,

@@ -4,9 +4,9 @@ from typing import Optional
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     CheckpointConfigBase,
-    DiffusersConfigBase,
-    ControlNetDiffusersConfig,
     ControlNetCheckpointConfig,
+    ControlNetDiffusersConfig,
+    DiffusersConfigBase,
 )
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader

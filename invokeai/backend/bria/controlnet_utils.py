@@ -1,11 +1,9 @@
 from typing import List, Tuple
-from PIL import Image
-from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
-
-from diffusers.image_processor import VaeImageProcessor
 
 import torch
-
+from diffusers.image_processor import VaeImageProcessor
+from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
+from PIL import Image
 
 
 @torch.no_grad()
@@ -17,7 +15,7 @@ def prepare_control_images(
     height: int,
     device: torch.device,
 ) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
-    
+
     tensored_control_images = []
     tensored_control_modes = []
     for idx, control_image_ in enumerate(control_images):

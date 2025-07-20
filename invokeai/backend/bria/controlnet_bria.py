@@ -14,23 +14,26 @@
 # limitations under the License.
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, Union
-from typing import Literal
 from enum import Enum
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
-
-from invokeai.backend.bria.transformer_bria import TimestepProjEmbeddings, FluxSingleTransformerBlock, FluxTransformerBlock, EmbedND
-from diffusers.models.controlnet import zero_module
-from diffusers.utils.outputs import BaseOutput
 from diffusers.configuration_utils import ConfigMixin, register_to_config
 from diffusers.loaders import PeftAdapterMixin
+from diffusers.models.attention_processor import AttentionProcessor
+from diffusers.models.controlnet import zero_module
+from diffusers.models.modeling_outputs import Transformer2DModelOutput
 from diffusers.models.modeling_utils import ModelMixin
 from diffusers.utils import USE_PEFT_BACKEND, is_torch_version, logging, scale_lora_layers, unscale_lora_layers
-from diffusers.models.modeling_outputs import Transformer2DModelOutput
+from diffusers.utils.outputs import BaseOutput
 
-from diffusers.models.attention_processor import AttentionProcessor
+from invokeai.backend.bria.transformer_bria import (
+    EmbedND,
+    FluxSingleTransformerBlock,
+    FluxTransformerBlock,
+    TimestepProjEmbeddings,
+)
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -66,7 +69,7 @@ class BriaControlNetModel(ModelMixin, ConfigMixin, PeftAdapterMixin):
         joint_attention_dim: int = 4096,
         pooled_projection_dim: int = 768,
         guidance_embeds: bool = False,
-        axes_dims_rope: List[int] = [16, 56, 56],
+        axes_dims_rope: Optional[List[int]] = None,
         num_mode: int = None,
         rope_theta: int = 10000,
         time_theta: int = 10000,
@@ -76,6 +79,7 @@ class BriaControlNetModel(ModelMixin, ConfigMixin, PeftAdapterMixin):
         self.inner_dim = num_attention_heads * attention_head_dim
 
         # self.pos_embed = FluxPosEmbed(theta=10000, axes_dim=axes_dims_rope)
+        axes_dims_rope = [16, 56, 56] if axes_dims_rope is None else axes_dims_rope
         self.pos_embed = EmbedND(theta=rope_theta, axes_dim=axes_dims_rope)
 
         # text_time_guidance_cls = (
@@ -87,7 +91,7 @@ class BriaControlNetModel(ModelMixin, ConfigMixin, PeftAdapterMixin):
         self.time_embed = TimestepProjEmbeddings(
             embedding_dim=self.inner_dim, time_theta=time_theta
         )
-        
+
         self.context_embedder = nn.Linear(joint_attention_dim, self.inner_dim)
         self.x_embedder = torch.nn.Linear(in_channels, self.inner_dim)
 
@@ -290,7 +294,7 @@ class BriaControlNetModel(ModelMixin, ConfigMixin, PeftAdapterMixin):
 
         # Convert controlnet_cond to the same dtype as the model weights
         controlnet_cond = controlnet_cond.to(dtype=self.controlnet_x_embedder.weight.dtype)
-        
+
         # add
         hidden_states = hidden_states + self.controlnet_x_embedder(controlnet_cond)
 
@@ -316,28 +320,28 @@ class BriaControlNetModel(ModelMixin, ConfigMixin, PeftAdapterMixin):
                 "Please remove the batch dimension and pass it as a 2d torch Tensor"
             )
             img_ids = img_ids[0]
-            
+
         if self.union:
             # union mode
             if controlnet_mode is None:
                 raise ValueError("`controlnet_mode` cannot be `None` when applying ControlNet-Union")
-            
+
             # Validate controlnet_mode values are within the valid range
             if torch.any(controlnet_mode < 0) or torch.any(controlnet_mode >= self.num_mode):
                 raise ValueError(f"`controlnet_mode` values must be in range [0, {self.num_mode-1}], but got values outside this range")
-                
+
             # union mode emb
             controlnet_mode_emb = self.controlnet_mode_embedder(controlnet_mode)
             if controlnet_mode_emb.shape[0] < encoder_hidden_states.shape[0]: # duplicate mode emb for each batch
-                controlnet_mode_emb = controlnet_mode_emb.expand(encoder_hidden_states.shape[0], 1, encoder_hidden_states.shape[2]) 
+                controlnet_mode_emb = controlnet_mode_emb.expand(encoder_hidden_states.shape[0], 1, encoder_hidden_states.shape[2])
             encoder_hidden_states = torch.cat([controlnet_mode_emb, encoder_hidden_states], dim=1)
-            
-        txt_ids = torch.cat((txt_ids[0:1, :], txt_ids), dim=0)   
+
+        txt_ids = torch.cat((txt_ids[0:1, :], txt_ids), dim=0)
         ids = torch.cat((txt_ids, img_ids), dim=0)
         image_rotary_emb = self.pos_embed(ids)
 
         block_samples = ()
-        for index_block, block in enumerate(self.transformer_blocks):
+        for _, block in enumerate(self.transformer_blocks):
             if self.training and self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
@@ -371,7 +375,7 @@ class BriaControlNetModel(ModelMixin, ConfigMixin, PeftAdapterMixin):
         hidden_states = torch.cat([encoder_hidden_states, hidden_states], dim=1)
 
         single_block_samples = ()
-        for index_block, block in enumerate(self.single_transformer_blocks):
+        for _, block in enumerate(self.single_transformer_blocks):
             if self.training and self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
@@ -402,12 +406,12 @@ class BriaControlNetModel(ModelMixin, ConfigMixin, PeftAdapterMixin):
 
         # controlnet block
         controlnet_block_samples = ()
-        for block_sample, controlnet_block in zip(block_samples, self.controlnet_blocks):
+        for block_sample, controlnet_block in zip(block_samples, self.controlnet_blocks, strict=False):
             block_sample = controlnet_block(block_sample)
             controlnet_block_samples = controlnet_block_samples + (block_sample,)
 
         controlnet_single_block_samples = ()
-        for single_block_sample, controlnet_block in zip(single_block_samples, self.controlnet_single_blocks):
+        for single_block_sample, controlnet_block in zip(single_block_samples, self.controlnet_single_blocks, strict=False):
             single_block_sample = controlnet_block(single_block_sample)
             controlnet_single_block_samples = controlnet_single_block_samples + (single_block_sample,)
 
@@ -468,7 +472,7 @@ class BriaMultiControlNetModel(ModelMixin):
         if len(self.nets) == 1 and self.nets[0].union:
             controlnet = self.nets[0]
 
-            for i, (image, mode, scale) in enumerate(zip(controlnet_cond, controlnet_mode, conditioning_scale)):
+            for i, (image, mode, scale) in enumerate(zip(controlnet_cond, controlnet_mode, conditioning_scale, strict=False)):
                 block_samples, single_block_samples = controlnet(
                     hidden_states=hidden_states,
                     controlnet_cond=image,
@@ -491,13 +495,13 @@ class BriaMultiControlNetModel(ModelMixin):
                 else:
                     control_block_samples = [
                         control_block_sample + block_sample
-                        for control_block_sample, block_sample in zip(control_block_samples, block_samples)
+                        for control_block_sample, block_sample in zip(control_block_samples, block_samples, strict=False)
                     ]
 
                     control_single_block_samples = [
                         control_single_block_sample + block_sample
                         for control_single_block_sample, block_sample in zip(
-                            control_single_block_samples, single_block_samples
+                            control_single_block_samples, single_block_samples, strict=False
                         )
                     ]
 
@@ -505,8 +509,8 @@ class BriaMultiControlNetModel(ModelMixin):
         # load all ControlNets into memories
         else:
             for i, (image, mode, scale, controlnet) in enumerate(
-                zip(controlnet_cond, controlnet_mode, conditioning_scale, self.nets)
-            ):               
+                zip(controlnet_cond, controlnet_mode, conditioning_scale, self.nets, strict=False)
+            ):
                 block_samples, single_block_samples = controlnet(
                     hidden_states=hidden_states,
                     controlnet_cond=image,
@@ -530,13 +534,13 @@ class BriaMultiControlNetModel(ModelMixin):
                     if block_samples is not None and control_block_samples is not None:
                         control_block_samples = [
                             control_block_sample + block_sample
-                            for control_block_sample, block_sample in zip(control_block_samples, block_samples)
+                            for control_block_sample, block_sample in zip(control_block_samples, block_samples, strict=False)
                         ]
                     if single_block_samples is not None and control_single_block_samples is not None:
                         control_single_block_samples = [
                             control_single_block_sample + block_sample
                             for control_single_block_sample, block_sample in zip(
-                                control_single_block_samples, single_block_samples
+                                control_single_block_samples, single_block_samples, strict=False
                             )
                         ]
 

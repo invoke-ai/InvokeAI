@@ -11,9 +11,8 @@ import os
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
-import json
 import warnings
-from typing import Callable, List, NamedTuple, Tuple, Union
+from typing import List, NamedTuple, Tuple, Union
 
 import cv2
 import numpy as np
@@ -21,11 +20,11 @@ import torch
 from huggingface_hub import hf_hub_download
 from PIL import Image
 
-from ..util import HWC3, resize_image
-from . import util
-from .body import Body, BodyResult, Keypoint
-from .face import Face
-from .hand import Hand
+from invokeai.backend.bria.controlnet_aux.open_pose import util
+from invokeai.backend.bria.controlnet_aux.open_pose.body import Body, BodyResult, Keypoint
+from invokeai.backend.bria.controlnet_aux.open_pose.face import Face
+from invokeai.backend.bria.controlnet_aux.open_pose.hand import Hand
+from invokeai.backend.bria.controlnet_aux.util import HWC3, resize_image
 
 HandResult = List[Keypoint]
 FaceResult = List[Keypoint]
@@ -65,8 +64,8 @@ def draw_poses(poses: List[PoseResult], H, W, draw_body=True, draw_hand=True, dr
             canvas = util.draw_facepose(canvas, pose.face)
 
     return canvas
-    
-    
+
+
 class OpenposeDetector:
     """
     A class for detecting human poses in images using the Openpose model.
@@ -125,7 +124,7 @@ class OpenposeDetector:
             if peaks.ndim == 2 and peaks.shape[1] == 2:
                 peaks[:, 0] = np.where(peaks[:, 0] < 1e-6, -1, peaks[:, 0] + x) / float(W)
                 peaks[:, 1] = np.where(peaks[:, 1] < 1e-6, -1, peaks[:, 1] + y) / float(H)
-                
+
                 hand_result = [
                     Keypoint(x=peak[0], y=peak[1])
                     for peak in peaks
@@ -142,7 +141,7 @@ class OpenposeDetector:
         face = util.faceDetect(body, oriImg)
         if face is None:
             return None
-        
+
         x, y, w = face
         H, W, _ = oriImg.shape
         heatmaps = self.face_estimation(oriImg[y:y+w, x:x+w, :])
@@ -154,7 +153,7 @@ class OpenposeDetector:
                 Keypoint(x=peak[0], y=peak[1])
                 for peak in peaks
             ]
-        
+
         return None
 
     def detect_poses(self, oriImg, include_hand=False, include_face=False) -> List[PoseResult]:
@@ -181,7 +180,7 @@ class OpenposeDetector:
                     left_hand, right_hand = self.detect_hands(body, oriImg)
                 if include_face:
                     face = self.detect_face(body, oriImg)
-                
+
                 results.append(PoseResult(BodyResult(
                     keypoints=[
                         Keypoint(
@@ -189,24 +188,24 @@ class OpenposeDetector:
                             y=keypoint.y / float(H)
                         ) if keypoint is not None else None
                         for keypoint in body.keypoints
-                    ], 
+                    ],
                     total_score=body.total_score,
                     total_parts=body.total_parts
                 ), left_hand, right_hand, face))
-            
+
             return results
-        
+
     def __call__(self, input_image, detect_resolution=512, image_resolution=512, include_body=True, include_hand=False, include_face=False, hand_and_face=None, output_type="pil", **kwargs):
         if hand_and_face is not None:
-            warnings.warn("hand_and_face is deprecated. Use include_hand and include_face instead.", DeprecationWarning)
+            warnings.warn("hand_and_face is deprecated. Use include_hand and include_face instead.", DeprecationWarning, stacklevel=2)
             include_hand = hand_and_face
             include_face = hand_and_face
 
         if "return_pil" in kwargs:
-            warnings.warn("return_pil is deprecated. Use output_type instead.", DeprecationWarning)
+            warnings.warn("return_pil is deprecated. Use output_type instead.", DeprecationWarning, stacklevel=2)
             output_type = "pil" if kwargs["return_pil"] else "np"
         if type(output_type) is bool:
-            warnings.warn("Passing `True` or `False` to `output_type` is deprecated and will raise an error in future versions")
+            warnings.warn("Passing `True` or `False` to `output_type` is deprecated and will raise an error in future versions", stacklevel=2)
             if output_type:
                 output_type = "pil"
 
@@ -216,13 +215,13 @@ class OpenposeDetector:
         input_image = HWC3(input_image)
         input_image = resize_image(input_image, detect_resolution)
         H, W, C = input_image.shape
-        
+
         poses = self.detect_poses(input_image, include_hand, include_face)
-        canvas = draw_poses(poses, H, W, draw_body=include_body, draw_hand=include_hand, draw_face=include_face) 
+        canvas = draw_poses(poses, H, W, draw_body=include_body, draw_hand=include_hand, draw_face=include_face)
 
         detected_map = canvas
         detected_map = HWC3(detected_map)
-        
+
         img = resize_image(input_image, image_resolution)
         H, W, C = img.shape
 

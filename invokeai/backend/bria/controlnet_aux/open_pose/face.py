@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch.nn import Conv2d, MaxPool2d, Module, ReLU, init
 from torchvision.transforms import ToPILImage, ToTensor
 
-from . import util
+from invokeai.backend.bria.controlnet_aux.open_pose import util
 
 
 class FaceNet(Module):

@@ -1,9 +1,10 @@
 import math
-import numpy as np
-import cv2
 from typing import List, Tuple, Union
 
-from .body import BodyResult, Keypoint
+import cv2
+import numpy as np
+
+from invokeai.backend.bria.controlnet_aux.open_pose.body import BodyResult, Keypoint
 
 eps = 0.01
 
@@ -84,10 +85,10 @@ def draw_bodypose(canvas: np.ndarray, keypoints: List[Keypoint]) -> np.ndarray:
     stickwidth = 4
 
     limbSeq = [
-        [2, 3], [2, 6], [3, 4], [4, 5], 
-        [6, 7], [7, 8], [2, 9], [9, 10], 
-        [10, 11], [2, 12], [12, 13], [13, 14], 
-        [2, 1], [1, 15], [15, 17], [1, 16], 
+        [2, 3], [2, 6], [3, 4], [4, 5],
+        [6, 7], [7, 8], [2, 9], [9, 10],
+        [10, 11], [2, 12], [12, 13], [13, 14],
+        [2, 1], [1, 15], [15, 17], [1, 16],
         [16, 18],
     ]
 
@@ -95,7 +96,7 @@ def draw_bodypose(canvas: np.ndarray, keypoints: List[Keypoint]) -> np.ndarray:
               [0, 255, 85], [0, 255, 170], [0, 255, 255], [0, 170, 255], [0, 85, 255], [0, 0, 255], [85, 0, 255], \
               [170, 0, 255], [255, 0, 255], [255, 0, 170], [255, 0, 85]]
 
-    for (k1_index, k2_index), color in zip(limbSeq, colors):
+    for (k1_index, k2_index), color in zip(limbSeq, colors, strict=False):
         keypoint1 = keypoints[k1_index - 1]
         keypoint2 = keypoints[k2_index - 1]
 
@@ -111,7 +112,7 @@ def draw_bodypose(canvas: np.ndarray, keypoints: List[Keypoint]) -> np.ndarray:
         polygon = cv2.ellipse2Poly((int(mY), int(mX)), (int(length / 2), stickwidth), int(angle), 0, 360, 1)
         cv2.fillConvexPoly(canvas, polygon, [int(float(c) * 0.6) for c in color])
 
-    for keypoint, color in zip(keypoints, colors):
+    for keypoint, color in zip(keypoints, colors, strict=False):
         if keypoint is None:
             continue
 
@@ -141,7 +142,7 @@ def draw_handpose(canvas: np.ndarray, keypoints: Union[List[Keypoint], None]) ->
     """
     if not keypoints:
         return canvas
-    
+
     H, W, C = canvas.shape
 
     edges = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [0, 9], [9, 10], \
@@ -152,7 +153,7 @@ def draw_handpose(canvas: np.ndarray, keypoints: Union[List[Keypoint], None]) ->
         k2 = keypoints[e2]
         if k1 is None or k2 is None:
             continue
-        
+
         x1 = int(k1.x * W)
         y1 = int(k1.y * H)
         x2 = int(k2.x * W)
@@ -183,10 +184,10 @@ def draw_facepose(canvas: np.ndarray, keypoints: Union[List[Keypoint], None]) ->
 
     Note:
         The function expects the x and y coordinates of the keypoints to be normalized between 0 and 1.
-    """    
+    """
     if not keypoints:
         return canvas
-    
+
     H, W, C = canvas.shape
     for keypoint in keypoints:
         x, y = keypoint.x, keypoint.y
@@ -220,7 +221,7 @@ def handDetect(body: BodyResult, oriImg) -> List[Tuple[int, int, int, bool]]:
     ratioWristElbow = 0.33
     detect_result = []
     image_height, image_width = oriImg.shape[0:2]
-    
+
     keypoints = body.keypoints
     # right hand: wrist 4, elbow 3, shoulder 2
     # left hand: wrist 7, elbow 6, shoulder 5
@@ -236,7 +237,7 @@ def handDetect(body: BodyResult, oriImg) -> List[Tuple[int, int, int, bool]]:
     has_right = all(keypoint is not None for keypoint in (right_shoulder, right_elbow, right_wrist))
     if not (has_left or has_right):
         return []
-    
+
     hands = []
     #left hand
     if has_left:
@@ -273,12 +274,16 @@ def handDetect(body: BodyResult, oriImg) -> List[Tuple[int, int, int, bool]]:
         x -= width / 2
         y -= width / 2  # width = height
         # overflow the image
-        if x < 0: x = 0
-        if y < 0: y = 0
+        if x < 0:
+            x = 0
+        if y < 0:
+            y = 0
         width1 = width
         width2 = width
-        if x + width > image_width: width1 = image_width - x
-        if y + width > image_height: width2 = image_height - y
+        if x + width > image_width:
+            width1 = image_width - x
+        if y + width > image_height:
+            width2 = image_height - y
         width = min(width1, width2)
         # the max hand box value is 20 pixels
         if width >= 20:
@@ -287,7 +292,7 @@ def handDetect(body: BodyResult, oriImg) -> List[Tuple[int, int, int, bool]]:
     '''
     return value: [[x, y, w, True if left hand else False]].
     width=height since the network require squared input.
-    x, y is the coordinate of top left 
+    x, y is the coordinate of top left.
     '''
     return detect_result
 
@@ -312,14 +317,14 @@ def faceDetect(body: BodyResult, oriImg) -> Union[Tuple[int, int, int], None]:
     """
     # left right eye ear 14 15 16 17
     image_height, image_width = oriImg.shape[0:2]
-    
+
     keypoints = body.keypoints
     head = keypoints[0]
     left_eye = keypoints[14]
     right_eye = keypoints[15]
     left_ear = keypoints[16]
     right_ear = keypoints[17]
-    
+
     if head is None or all(keypoint is None for keypoint in (left_eye, right_eye, left_ear, right_ear)):
         return None
 

@@ -4,8 +4,8 @@ import torch
 from scipy.ndimage.filters import gaussian_filter
 from skimage.measure import label
 
-from . import util
-from .model import handpose_model
+from invokeai.backend.bria.controlnet_aux.open_pose import util
+from invokeai.backend.bria.controlnet_aux.open_pose.model import handpose_model
 
 
 class Hand(object):
