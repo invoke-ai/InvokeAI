@@ -3,7 +3,6 @@ from typing import Any, Dict, List, Optional, Union
 import numpy as np
 import torch
 import torch.nn as nn
-from .bria_utils import FluxPosEmbed as EmbedND
 from diffusers.configuration_utils import ConfigMixin, register_to_config
 from diffusers.loaders import FromOriginalModelMixin, PeftAdapterMixin
 from diffusers.models.embeddings import TimestepEmbedding, get_timestep_embedding
@@ -12,6 +11,8 @@ from diffusers.models.modeling_utils import ModelMixin
 from diffusers.models.normalization import AdaLayerNormContinuous
 from diffusers.models.transformers.transformer_flux import FluxSingleTransformerBlock, FluxTransformerBlock
 from diffusers.utils import USE_PEFT_BACKEND, is_torch_version, logging, scale_lora_layers, unscale_lora_layers
+
+from invokeai.backend.bria.bria_utils import FluxPosEmbed as EmbedND
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -94,7 +95,7 @@ class BriaTransformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, FromOrig
         joint_attention_dim: int = 4096,
         pooled_projection_dim: int = None,
         guidance_embeds: bool = False,
-        axes_dims_rope: List[int] = [16, 56, 56],
+        axes_dims_rope: Optional[List[int]] = None,
         rope_theta=10000,
         time_theta=10000,
     ):
@@ -102,6 +103,7 @@ class BriaTransformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, FromOrig
         self.out_channels = in_channels
         self.inner_dim = self.config.num_attention_heads * self.config.attention_head_dim
 
+        axes_dims_rope = [16, 56, 56] if axes_dims_rope is None else axes_dims_rope
         self.pos_embed = EmbedND(theta=rope_theta, axes_dim=axes_dims_rope)
 
         self.time_embed = TimestepProjEmbeddings(embedding_dim=self.inner_dim, time_theta=time_theta)

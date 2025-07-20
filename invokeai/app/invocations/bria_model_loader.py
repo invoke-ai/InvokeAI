@@ -10,9 +10,7 @@ from invokeai.invocation_api import (
     BaseInvocation,
     BaseInvocationOutput,
     Classification,
-    InputField,
     InvocationContext,
-    OutputField,
     invocation,
     invocation_output,
 )

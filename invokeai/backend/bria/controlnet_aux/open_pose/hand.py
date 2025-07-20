@@ -4,8 +4,8 @@ import torch
 from scipy.ndimage.filters import gaussian_filter
 from skimage.measure import label
 
-from . import util
-from .model import handpose_model
+from invokeai.backend.bria.controlnet_aux.open_pose import util
+from invokeai.backend.bria.controlnet_aux.open_pose.model import handpose_model
 
 
 class Hand(object):
@@ -53,7 +53,7 @@ class Hand(object):
             # extract outputs, resize, and remove padding
             heatmap = np.transpose(np.squeeze(output), (1, 2, 0))  # output 1 is heatmaps
             heatmap = util.smart_resize_k(heatmap, fx=stride, fy=stride)
-            heatmap = heatmap[:imageToTest_padded.shape[0] - pad[2], :imageToTest_padded.shape[1] - pad[3], :]
+            heatmap = heatmap[: imageToTest_padded.shape[0] - pad[2], : imageToTest_padded.shape[1] - pad[3], :]
             heatmap = util.smart_resize(heatmap, (wsize, wsize))
 
             heatmap_avg += heatmap / len(multiplier)
@@ -78,13 +78,14 @@ class Hand(object):
             all_peaks.append([x, y])
         return np.array(all_peaks)
 
+
 if __name__ == "__main__":
-    hand_estimation = Hand('../model/hand_pose_model.pth')
+    hand_estimation = Hand("../model/hand_pose_model.pth")
 
     # test_image = '../images/hand.jpg'
-    test_image = '../images/hand.jpg'
+    test_image = "../images/hand.jpg"
     oriImg = cv2.imread(test_image)  # B,G,R order
     peaks = hand_estimation(oriImg)
     canvas = util.draw_handpose(oriImg, peaks, True)
-    cv2.imshow('', canvas)
+    cv2.imshow("", canvas)
     cv2.waitKey(0)

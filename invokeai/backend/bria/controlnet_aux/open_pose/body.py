@@ -1,13 +1,12 @@
 import math
 from typing import List, NamedTuple, Union
 
-import cv2
 import numpy as np
 import torch
 from scipy.ndimage.filters import gaussian_filter
 
-from . import util
-from .model import bodypose_model
+from invokeai.backend.bria.controlnet_aux.open_pose import util
+from invokeai.backend.bria.controlnet_aux.open_pose.model import bodypose_model
 
 
 class Keypoint(NamedTuple):
@@ -71,17 +70,17 @@ class Body(object):
             # heatmap = np.transpose(np.squeeze(net.blobs[output_blobs.keys()[1]].data), (1, 2, 0))  # output 1 is heatmaps
             heatmap = np.transpose(np.squeeze(Mconv7_stage6_L2), (1, 2, 0))  # output 1 is heatmaps
             heatmap = util.smart_resize_k(heatmap, fx=stride, fy=stride)
-            heatmap = heatmap[:imageToTest_padded.shape[0] - pad[2], :imageToTest_padded.shape[1] - pad[3], :]
+            heatmap = heatmap[: imageToTest_padded.shape[0] - pad[2], : imageToTest_padded.shape[1] - pad[3], :]
             heatmap = util.smart_resize(heatmap, (oriImg.shape[0], oriImg.shape[1]))
 
             # paf = np.transpose(np.squeeze(net.blobs[output_blobs.keys()[0]].data), (1, 2, 0))  # output 0 is PAFs
             paf = np.transpose(np.squeeze(Mconv7_stage6_L1), (1, 2, 0))  # output 0 is PAFs
             paf = util.smart_resize_k(paf, fx=stride, fy=stride)
-            paf = paf[:imageToTest_padded.shape[0] - pad[2], :imageToTest_padded.shape[1] - pad[3], :]
+            paf = paf[: imageToTest_padded.shape[0] - pad[2], : imageToTest_padded.shape[1] - pad[3], :]
             paf = util.smart_resize(paf, (oriImg.shape[0], oriImg.shape[1]))
 
             heatmap_avg += heatmap_avg + heatmap / len(multiplier)
-            paf_avg += + paf / len(multiplier)
+            paf_avg += +paf / len(multiplier)
 
         all_peaks = []
         peak_counter = 0
@@ -100,8 +99,15 @@ class Body(object):
             map_down[:, :-1] = one_heatmap[:, 1:]
 
             peaks_binary = np.logical_and.reduce(
-                (one_heatmap >= map_left, one_heatmap >= map_right, one_heatmap >= map_up, one_heatmap >= map_down, one_heatmap > thre1))
-            peaks = list(zip(np.nonzero(peaks_binary)[1], np.nonzero(peaks_binary)[0]))  # note reverse
+                (
+                    one_heatmap >= map_left,
+                    one_heatmap >= map_right,
+                    one_heatmap >= map_up,
+                    one_heatmap >= map_down,
+                    one_heatmap > thre1,
+                )
+            )
+            peaks = list(zip(np.nonzero(peaks_binary)[1], np.nonzero(peaks_binary)[0], strict=False))  # note reverse
             peaks_with_score = [x + (map_ori[x[1], x[0]],) for x in peaks]
             peak_id = range(peak_counter, peak_counter + len(peaks))
             peaks_with_score_and_id = [peaks_with_score[i] + (peak_id[i],) for i in range(len(peak_id))]
@@ -110,13 +116,49 @@ class Body(object):
             peak_counter += len(peaks)
 
         # find connection in the specified sequence, center 29 is in the position 15
-        limbSeq = [[2, 3], [2, 6], [3, 4], [4, 5], [6, 7], [7, 8], [2, 9], [9, 10], \
-                   [10, 11], [2, 12], [12, 13], [13, 14], [2, 1], [1, 15], [15, 17], \
-                   [1, 16], [16, 18], [3, 17], [6, 18]]
+        limbSeq = [
+            [2, 3],
+            [2, 6],
+            [3, 4],
+            [4, 5],
+            [6, 7],
+            [7, 8],
+            [2, 9],
+            [9, 10],
+            [10, 11],
+            [2, 12],
+            [12, 13],
+            [13, 14],
+            [2, 1],
+            [1, 15],
+            [15, 17],
+            [1, 16],
+            [16, 18],
+            [3, 17],
+            [6, 18],
+        ]
         # the middle joints heatmap correpondence
-        mapIdx = [[31, 32], [39, 40], [33, 34], [35, 36], [41, 42], [43, 44], [19, 20], [21, 22], \
-                  [23, 24], [25, 26], [27, 28], [29, 30], [47, 48], [49, 50], [53, 54], [51, 52], \
-                  [55, 56], [37, 38], [45, 46]]
+        mapIdx = [
+            [31, 32],
+            [39, 40],
+            [33, 34],
+            [35, 36],
+            [41, 42],
+            [43, 44],
+            [19, 20],
+            [21, 22],
+            [23, 24],
+            [25, 26],
+            [27, 28],
+            [29, 30],
+            [47, 48],
+            [49, 50],
+            [53, 54],
+            [51, 52],
+            [55, 56],
+            [37, 38],
+            [45, 46],
+        ]
 
         connection_all = []
         special_k = []
@@ -129,7 +171,7 @@ class Body(object):
             nA = len(candA)
             nB = len(candB)
             indexA, indexB = limbSeq[k]
-            if (nA != 0 and nB != 0):
+            if nA != 0 and nB != 0:
                 connection_candidate = []
                 for i in range(nA):
                     for j in range(nB):
@@ -138,30 +180,45 @@ class Body(object):
                         norm = max(0.001, norm)
                         vec = np.divide(vec, norm)
 
-                        startend = list(zip(np.linspace(candA[i][0], candB[j][0], num=mid_num), \
-                                            np.linspace(candA[i][1], candB[j][1], num=mid_num)))
+                        startend = list(
+                            zip(
+                                np.linspace(candA[i][0], candB[j][0], num=mid_num),
+                                np.linspace(candA[i][1], candB[j][1], num=mid_num),
+                                strict=False,
+                            )
+                        )
 
-                        vec_x = np.array([score_mid[int(round(startend[I][1])), int(round(startend[I][0])), 0] \
-                                          for I in range(len(startend))])
-                        vec_y = np.array([score_mid[int(round(startend[I][1])), int(round(startend[I][0])), 1] \
-                                          for I in range(len(startend))])
+                        vec_x = np.array(
+                            [
+                                score_mid[int(round(startend[i][1])), int(round(startend[i][0])), 0]
+                                for i in range(len(startend))
+                            ]
+                        )
+                        vec_y = np.array(
+                            [
+                                score_mid[int(round(startend[i][1])), int(round(startend[i][0])), 1]
+                                for i in range(len(startend))
+                            ]
+                        )
 
                         score_midpts = np.multiply(vec_x, vec[0]) + np.multiply(vec_y, vec[1])
                         score_with_dist_prior = sum(score_midpts) / len(score_midpts) + min(
-                            0.5 * oriImg.shape[0] / norm - 1, 0)
+                            0.5 * oriImg.shape[0] / norm - 1, 0
+                        )
                         criterion1 = len(np.nonzero(score_midpts > thre2)[0]) > 0.8 * len(score_midpts)
                         criterion2 = score_with_dist_prior > 0
                         if criterion1 and criterion2:
                             connection_candidate.append(
-                                [i, j, score_with_dist_prior, score_with_dist_prior + candA[i][2] + candB[j][2]])
+                                [i, j, score_with_dist_prior, score_with_dist_prior + candA[i][2] + candB[j][2]]
+                            )
 
                 connection_candidate = sorted(connection_candidate, key=lambda x: x[2], reverse=True)
                 connection = np.zeros((0, 5))
                 for c in range(len(connection_candidate)):
                     i, j, s = connection_candidate[c][0:3]
-                    if (i not in connection[:, 3] and j not in connection[:, 4]):
+                    if i not in connection[:, 3] and j not in connection[:, 4]:
                         connection = np.vstack([connection, [candA[i][3], candB[j][3], s, i, j]])
-                        if (len(connection) >= min(nA, nB)):
+                        if len(connection) >= min(nA, nB):
                             break
 
                 connection_all.append(connection)
@@ -198,7 +255,7 @@ class Body(object):
                         j1, j2 = subset_idx
                         membership = ((subset[j1] >= 0).astype(int) + (subset[j2] >= 0).astype(int))[:-2]
                         if len(np.nonzero(membership == 2)[0]) == 0:  # merge
-                            subset[j1][:-2] += (subset[j2][:-2] + 1)
+                            subset[j1][:-2] += subset[j2][:-2] + 1
                             subset[j1][-2:] += subset[j2][-2:]
                             subset[j1][-2] += connection_all[k][i][2]
                             subset = np.delete(subset, j2, 0)
@@ -225,12 +282,12 @@ class Body(object):
         # subset: n*20 array, 0-17 is the index in candidate, 18 is the total score, 19 is the total parts
         # candidate: x, y, score, id
         return candidate, subset
-    
+
     @staticmethod
     def format_body_result(candidate: np.ndarray, subset: np.ndarray) -> List[BodyResult]:
         """
         Format the body results from the candidate and subset arrays into a list of BodyResult objects.
-        
+
         Args:
             candidate (np.ndarray): An array of candidates containing the x, y coordinates, score, and id
                 for each body part.
@@ -249,12 +306,14 @@ class Body(object):
                         x=candidate[candidate_index][0],
                         y=candidate[candidate_index][1],
                         score=candidate[candidate_index][2],
-                        id=candidate[candidate_index][3]
-                    ) if candidate_index != -1 else None
+                        id=candidate[candidate_index][3],
+                    )
+                    if candidate_index != -1
+                    else None
                     for candidate_index in person[:18].astype(int)
                 ],
                 total_score=person[18],
-                total_parts=person[19]
+                total_parts=person[19],
             )
             for person in subset
         ]

@@ -30,15 +30,15 @@ class BriaDecoderInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.tensors.load(self.latents.latents_name)
         latents = latents.view(1, 64, 64, 4, 2, 2).permute(0, 3, 1, 4, 2, 5).reshape(1, 4, 128, 128)
-        
+
         with context.models.load(self.vae.vae) as vae:
             assert isinstance(vae, AutoencoderKL)
-            latents = (latents / vae.config.scaling_factor)
+            latents = latents / vae.config.scaling_factor
             latents = latents.to(device=vae.device, dtype=vae.dtype)
-            
+
             decoded_output = vae.decode(latents)
             image = decoded_output.sample
-            
+
         # Convert to numpy with proper gradient handling
         image = ((image.clamp(-1, 1) + 1) / 2 * 255).cpu().detach().permute(0, 2, 3, 1).numpy().astype("uint8")[0]
         img = Image.fromarray(image)
