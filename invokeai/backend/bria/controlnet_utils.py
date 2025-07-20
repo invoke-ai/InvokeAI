@@ -1,11 +1,9 @@
 from typing import List, Tuple
-from PIL import Image
-from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
-
-from diffusers.image_processor import VaeImageProcessor
 
 import torch
-
+from diffusers.image_processor import VaeImageProcessor
+from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
+from PIL import Image
 
 
 @torch.no_grad()
@@ -17,7 +15,6 @@ def prepare_control_images(
     height: int,
     device: torch.device,
 ) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
-    
     tensored_control_images = []
     tensored_control_modes = []
     for idx, control_image_ in enumerate(control_images):
@@ -42,10 +39,12 @@ def prepare_control_images(
             width_control_image,
         )
         tensored_control_images.append(tensored_control_image)
-        tensored_control_modes.append(torch.tensor(control_modes[idx]).expand(
-            tensored_control_image.shape[0]).to(device, dtype=torch.long))
+        tensored_control_modes.append(
+            torch.tensor(control_modes[idx]).expand(tensored_control_image.shape[0]).to(device, dtype=torch.long)
+        )
 
     return tensored_control_images, tensored_control_modes
+
 
 def _prepare_image(
     image: Image.Image,
@@ -60,10 +59,10 @@ def _prepare_image(
     image = image.to(device=device, dtype=dtype)
     return image
 
+
 def _pack_latents(latents, height, width):
     latents = latents.view(1, 4, height // 2, 2, width // 2, 2)
     latents = latents.permute(0, 2, 4, 1, 3, 5)
     latents = latents.reshape(1, (height // 2) * (width // 2), 16)
 
     return latents
-
