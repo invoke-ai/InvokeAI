@@ -57,7 +57,7 @@ export const useInvertMask = () => {
       const data = imageData.data;
 
       for (let i = 3; i < data.length; i += 4) {
-        data[i] = 255 - data[i]; // Invert alpha
+        data[i] = 255 - (data[i] ?? 0); // Invert alpha
       }
 
       fullCtx.putImageData(imageData, 0, 0);
