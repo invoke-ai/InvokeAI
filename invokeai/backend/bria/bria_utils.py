@@ -87,7 +87,7 @@ def is_ng_none(negative_prompt):
         negative_prompt is None
         or negative_prompt == ""
         or (isinstance(negative_prompt, list) and negative_prompt[0] is None)
-        or (type(negative_prompt) == list and negative_prompt[0] == "")
+        or (isinstance(negative_prompt, list) and negative_prompt[0] == "")
     )
 
 
