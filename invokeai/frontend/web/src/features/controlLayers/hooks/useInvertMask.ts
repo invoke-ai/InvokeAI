@@ -17,6 +17,7 @@ export const useInvertMask = () => {
 
   const invertMask = useCallback(async () => {
     try {
+      const bboxRect = canvasManager.stateApi.getBbox().rect;
 
       const adapters = canvasManager.compositor.getVisibleAdaptersOfType('inpaint_mask');
 
@@ -39,37 +40,28 @@ export const useInvertMask = () => {
         throw new Error('Failed to get canvas context');
       }
 
-      // Fill with transparent black (no mask)
       fullCtx.fillStyle = 'rgba(0, 0, 0, 0)';
       fullCtx.fillRect(0, 0, bboxRect.width, bboxRect.height);
 
-      // Get the visible masks rect
       const visibleMasksRect = canvasManager.compositor.getVisibleRectOfType('inpaint_mask');
 
-      // Only composite if there's a visible rect
       if (visibleMasksRect.width > 0 && visibleMasksRect.height > 0) {
-        // Get composite of masks in their original position
         const compositeCanvas = canvasManager.compositor.getCompositeCanvas(adapters, visibleMasksRect);
 
-        // Draw the composite onto the full canvas at the correct position
         const offsetX = visibleMasksRect.x - bboxRect.x;
         const offsetY = visibleMasksRect.y - bboxRect.y;
         fullCtx.drawImage(compositeCanvas, offsetX, offsetY);
       }
 
-      // Get image data and invert
       const imageData = canvasToImageData(fullCanvas);
       const data = imageData.data;
 
-      // Invert alpha values (where current masks are opaque, inverted mask will be transparent)
       for (let i = 3; i < data.length; i += 4) {
         data[i] = 255 - data[i]; // Invert alpha
       }
 
-      // Put the inverted data back
       fullCtx.putImageData(imageData, 0, 0);
 
-      // Convert to blob and upload
       const blob = await canvasToBlob(fullCanvas);
       const imageDTO = await uploadImage({
         file: new File([blob], 'inverted-mask.png', { type: 'image/png' }),
@@ -78,10 +70,8 @@ export const useInvertMask = () => {
         silent: true,
       });
 
-      // Create image object from the inverted mask
       const imageObject = imageDTOToImageObject(imageDTO);
 
-      // Replace the selected mask's objects with the inverted mask
       if (selectedEntityIdentifier) {
         dispatch(
           entityRasterized({
