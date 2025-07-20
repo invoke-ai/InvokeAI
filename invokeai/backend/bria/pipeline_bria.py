@@ -1,18 +1,15 @@
-from diffusers.pipelines.flux.pipeline_flux import FluxPipeline, retrieve_timesteps, calculate_shift
 from typing import Any, Callable, Dict, List, Optional, Union
 
+import diffusers
+import numpy as np
 import torch
-
-from transformers import (
-    T5EncoderModel,
-    T5TokenizerFast,
-)
-
+from diffusers import AutoencoderKL, DDIMScheduler, EulerAncestralDiscreteScheduler
 from diffusers.image_processor import VaeImageProcessor
-from diffusers import AutoencoderKL , DDIMScheduler, EulerAncestralDiscreteScheduler
-from diffusers.schedulers import FlowMatchEulerDiscreteScheduler
-from diffusers.schedulers import KarrasDiffusionSchedulers
 from diffusers.loaders import FluxLoraLoaderMixin
+from diffusers.pipelines.flux.pipeline_flux import FluxPipeline, calculate_shift, retrieve_timesteps
+from diffusers.pipelines.flux.pipeline_output import FluxPipelineOutput
+from diffusers.pipelines.pipeline_utils import DiffusionPipeline
+from diffusers.schedulers import FlowMatchEulerDiscreteScheduler, KarrasDiffusionSchedulers
 from diffusers.utils import (
     USE_PEFT_BACKEND,
     logging,
@@ -20,16 +17,14 @@ from diffusers.utils import (
     scale_lora_layers,
     unscale_lora_layers,
 )
-from diffusers.pipelines.pipeline_utils import DiffusionPipeline
-from diffusers.pipelines.flux.pipeline_output import FluxPipelineOutput
-from invokeai.backend.bria.transformer_bria import BriaTransformer2DModel
-from invokeai.backend.bria.bria_utils import get_t5_prompt_embeds, get_original_sigmas, is_ng_none
 from diffusers.utils.torch_utils import randn_tensor
-import diffusers
-import numpy as np
+from transformers import (
+    T5EncoderModel,
+    T5TokenizerFast,
+)
 
-XLA_AVAILABLE = False
-
+from invokeai.backend.bria.bria_utils import get_original_sigmas, get_t5_prompt_embeds, is_ng_none
+from invokeai.backend.bria.transformer_bria import BriaTransformer2DModel
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -57,6 +52,8 @@ Based on FluxPipeline with several changes:
 - We use zero padding for prompts
 - No guidance embedding since this is not a distilled version
 """
+
+
 class BriaPipeline(FluxPipeline):
     r"""
     Args:
@@ -78,10 +75,10 @@ class BriaPipeline(FluxPipeline):
     def __init__(
         self,
         transformer: BriaTransformer2DModel,
-        scheduler: Union[FlowMatchEulerDiscreteScheduler,KarrasDiffusionSchedulers],
+        scheduler: Union[FlowMatchEulerDiscreteScheduler, KarrasDiffusionSchedulers],
         vae: AutoencoderKL,
         text_encoder: T5EncoderModel,
-        tokenizer: T5TokenizerFast
+        tokenizer: T5TokenizerFast,
     ):
         self.register_modules(
             vae=vae,
@@ -96,14 +93,13 @@ class BriaPipeline(FluxPipeline):
             2 ** (len(self.vae.config.block_out_channels)) if hasattr(self, "vae") and self.vae is not None else 16
         )
         self.image_processor = VaeImageProcessor(vae_scale_factor=self.vae_scale_factor)
-        self.default_sample_size = 64 # due to patchify=> 128,128 => res of 1k,1k
+        self.default_sample_size = 64  # due to patchify=> 128,128 => res of 1k,1k
 
         # T5 is senstive to precision so we use the precision used for precompute and cast as needed
-        
-        if self.vae.config.shift_factor is None:
-            self.vae.config.shift_factor=0
-            self.vae.to(dtype=torch.float32)
 
+        if self.vae.config.shift_factor is None:
+            self.vae.config.shift_factor = 0
+            self.vae.to(dtype=torch.float32)
 
     def encode_prompt(
         self,
@@ -169,7 +165,9 @@ class BriaPipeline(FluxPipeline):
 
         if do_classifier_free_guidance and negative_prompt_embeds is None:
             if not is_ng_none(negative_prompt):
-                negative_prompt = batch_size * [negative_prompt] if isinstance(negative_prompt, str) else negative_prompt
+                negative_prompt = (
+                    batch_size * [negative_prompt] if isinstance(negative_prompt, str) else negative_prompt
+                )
 
                 if prompt is not None and type(prompt) is not type(negative_prompt):
                     raise TypeError(
@@ -182,7 +180,7 @@ class BriaPipeline(FluxPipeline):
                         f" {prompt} has batch size {batch_size}. Please make sure that passed `negative_prompt` matches"
                         " the batch size of `prompt`."
                     )
-                
+
                 negative_prompt_embeds = get_t5_prompt_embeds(
                     self.tokenizer,
                     self.text_encoder,
@@ -192,7 +190,7 @@ class BriaPipeline(FluxPipeline):
                     device=device,
                 ).to(dtype=self.transformer.dtype)
             else:
-                negative_prompt_embeds = torch.zeros_like(prompt_embeds)    
+                negative_prompt_embeds = torch.zeros_like(prompt_embeds)
 
         if self.text_encoder is not None:
             if isinstance(self, FluxLoraLoaderMixin) and USE_PEFT_BACKEND:
@@ -208,7 +206,6 @@ class BriaPipeline(FluxPipeline):
     @property
     def guidance_scale(self):
         return self._guidance_scale
-
 
     # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
     # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
@@ -249,10 +246,10 @@ class BriaPipeline(FluxPipeline):
         return_dict: bool = True,
         joint_attention_kwargs: Optional[Dict[str, Any]] = None,
         callback_on_step_end: Optional[Callable[[int, int, Dict], None]] = None,
-        callback_on_step_end_tensor_inputs: List[str] = ["latents"],
+        callback_on_step_end_tensor_inputs: Optional[List[str]] = None,
         max_sequence_length: int = 128,
-        clip_value:Union[None,float] = None,
-        normalize:bool = False
+        clip_value: Union[None, float] = None,
+        normalize: bool = False,
     ):
         r"""
         Function invoked when calling the pipeline for generation.
@@ -331,6 +328,9 @@ class BriaPipeline(FluxPipeline):
         width = width or self.default_sample_size * self.vae_scale_factor
 
         # 1. Check inputs. Raise error if not correct
+        callback_on_step_end_tensor_inputs = (
+            ["latents"] if callback_on_step_end_tensor_inputs is None else callback_on_step_end_tensor_inputs
+        )
         self.check_inputs(
             prompt=prompt,
             height=height,
@@ -353,16 +353,10 @@ class BriaPipeline(FluxPipeline):
             batch_size = prompt_embeds.shape[0]
 
         device = self._execution_device
-        
-        lora_scale = (
-            self.joint_attention_kwargs.get("scale", None) if self.joint_attention_kwargs is not None else None
-        )
-        
-        (
-            prompt_embeds,
-            negative_prompt_embeds,
-            text_ids
-        ) = self.encode_prompt(
+
+        lora_scale = self.joint_attention_kwargs.get("scale", None) if self.joint_attention_kwargs is not None else None
+
+        (prompt_embeds, negative_prompt_embeds, text_ids) = self.encode_prompt(
             prompt=prompt,
             negative_prompt=negative_prompt,
             do_classifier_free_guidance=self.do_classifier_free_guidance,
@@ -376,11 +370,9 @@ class BriaPipeline(FluxPipeline):
 
         if self.do_classifier_free_guidance:
             prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds], dim=0)
-            
-
 
         # 5. Prepare latent variables
-        num_channels_latents = self.transformer.config.in_channels // 4 # due to patch=2, we devide by 4
+        num_channels_latents = self.transformer.config.in_channels // 4  # due to patch=2, we devide by 4
         latents, latent_image_ids = self.prepare_latents(
             batch_size * num_images_per_prompt,
             num_channels_latents,
@@ -392,11 +384,14 @@ class BriaPipeline(FluxPipeline):
             latents,
         )
 
-        if  isinstance(self.scheduler,FlowMatchEulerDiscreteScheduler) and self.scheduler.config['use_dynamic_shifting']:
+        if (
+            isinstance(self.scheduler, FlowMatchEulerDiscreteScheduler)
+            and self.scheduler.config["use_dynamic_shifting"]
+        ):
             sigmas = np.linspace(1.0, 1 / num_inference_steps, num_inference_steps)
-            image_seq_len = latents.shape[1] # Shift by height - Why just height?
+            image_seq_len = latents.shape[1]  # Shift by height - Why just height?
             print(f"Using dynamic shift in pipeline with sequence length {image_seq_len}")
-            
+
             mu = calculate_shift(
                 image_seq_len,
                 self.scheduler.config.base_image_seq_len,
@@ -415,19 +410,26 @@ class BriaPipeline(FluxPipeline):
         else:
             # 4. Prepare timesteps
             # Sample from training sigmas
-            if isinstance(self.scheduler,DDIMScheduler) or isinstance(self.scheduler,EulerAncestralDiscreteScheduler):
-                timesteps, num_inference_steps = retrieve_timesteps(self.scheduler, num_inference_steps, device, None, None)
+            if isinstance(self.scheduler, DDIMScheduler) or isinstance(self.scheduler, EulerAncestralDiscreteScheduler):
+                timesteps, num_inference_steps = retrieve_timesteps(
+                    self.scheduler, num_inference_steps, device, None, None
+                )
             else:
-                sigmas = get_original_sigmas(num_train_timesteps=self.scheduler.config.num_train_timesteps,num_inference_steps=num_inference_steps)    
-                timesteps, num_inference_steps = retrieve_timesteps(self.scheduler, num_inference_steps, device, timesteps,sigmas=sigmas)
-            
+                sigmas = get_original_sigmas(
+                    num_train_timesteps=self.scheduler.config.num_train_timesteps,
+                    num_inference_steps=num_inference_steps,
+                )
+                timesteps, num_inference_steps = retrieve_timesteps(
+                    self.scheduler, num_inference_steps, device, timesteps, sigmas=sigmas
+                )
+
         num_warmup_steps = max(len(timesteps) - num_inference_steps * self.scheduler.order, 0)
         self._num_timesteps = len(timesteps)
 
         # Supprot different diffusers versions
-        if diffusers.__version__>='0.32.0':
-            latent_image_ids=latent_image_ids[0]
-            text_ids=text_ids[0]
+        if diffusers.__version__ >= "0.32.0":
+            latent_image_ids = latent_image_ids[0]
+            text_ids = text_ids[0]
 
         # 6. Denoising loop
         with self.progress_bar(total=num_inference_steps) as progress_bar:
@@ -437,7 +439,7 @@ class BriaPipeline(FluxPipeline):
 
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = torch.cat([latents] * 2) if self.do_classifier_free_guidance else latents
-                if type(self.scheduler)!=FlowMatchEulerDiscreteScheduler:
+                if not isinstance(self.scheduler, FlowMatchEulerDiscreteScheduler):
                     latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
                 # broadcast to batch dimension in a way that's compatible with ONNX/Core ML
@@ -453,7 +455,7 @@ class BriaPipeline(FluxPipeline):
                     txt_ids=text_ids,
                     img_ids=latent_image_ids,
                 )[0]
-   
+
                 # perform guidance
                 if self.do_classifier_free_guidance:
                     noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
@@ -461,16 +463,16 @@ class BriaPipeline(FluxPipeline):
                     noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_text - noise_pred_uncond)
 
                 if normalize:
-                    noise_pred = noise_pred * (0.7 *(cfg_noise_pred_text/noise_pred.std())) + 0.3 * noise_pred
+                    noise_pred = noise_pred * (0.7 * (cfg_noise_pred_text / noise_pred.std())) + 0.3 * noise_pred
 
                 if clip_value:
-                    assert clip_value>0
-                    noise_pred = noise_pred.clip(-clip_value,clip_value)
-             
+                    assert clip_value > 0
+                    noise_pred = noise_pred.clip(-clip_value, clip_value)
+
                 # compute the previous noisy sample x_t -> x_t-1
                 latents_dtype = latents.dtype
                 latents = self.scheduler.step(noise_pred, t, latents, return_dict=False)[0]
-                
+
                 if latents.dtype != latents_dtype:
                     if torch.backends.mps.is_available():
                         # some platforms (eg. apple mps) misbehave due to a pytorch bug: https://github.com/pytorch/pytorch/pull/99272
@@ -485,13 +487,10 @@ class BriaPipeline(FluxPipeline):
                     latents = callback_outputs.pop("latents", latents)
                     prompt_embeds = callback_outputs.pop("prompt_embeds", prompt_embeds)
                     negative_prompt_embeds = callback_outputs.pop("negative_prompt_embeds", negative_prompt_embeds)
-                    
+
                 # call the callback, if provided
                 if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
                     progress_bar.update()
-
-                if XLA_AVAILABLE:
-                    xm.mark_step()
 
         if output_type == "latent":
             image = latents
@@ -509,7 +508,7 @@ class BriaPipeline(FluxPipeline):
             return (image,)
 
         return FluxPipelineOutput(images=image)
-    
+
     def check_inputs(
         self,
         prompt,
@@ -548,7 +547,6 @@ class BriaPipeline(FluxPipeline):
                 f"Cannot forward both `negative_prompt`: {negative_prompt} and `negative_prompt_embeds`:"
                 f" {negative_prompt_embeds}. Please make sure to only forward one of the two."
             )
-       
 
         if max_sequence_length is not None and max_sequence_length > 512:
             raise ValueError(f"`max_sequence_length` cannot be greater than 512 but is {max_sequence_length}")
@@ -560,13 +558,11 @@ class BriaPipeline(FluxPipeline):
         for block in self.text_encoder.encoder.block:
             block.layer[-1].DenseReluDense.wo.to(dtype=torch.float32)
 
-        if self.vae.config.shift_factor == 0 and self.vae.dtype!=torch.float32:
+        if self.vae.config.shift_factor == 0 and self.vae.dtype != torch.float32:
             self.vae.to(dtype=torch.float32)
 
-        
         return self
 
-    
     def prepare_latents(
         self,
         batch_size,
@@ -581,7 +577,7 @@ class BriaPipeline(FluxPipeline):
         # VAE applies 8x compression on images but we must also account for packing which requires
         # latent height and width to be divisible by 2.
         height = 2 * (int(height) // self.vae_scale_factor)
-        width = 2 * (int(width) // self.vae_scale_factor )
+        width = 2 * (int(width) // self.vae_scale_factor)
 
         shape = (batch_size, num_channels_latents, height, width)
 
@@ -623,7 +619,7 @@ class BriaPipeline(FluxPipeline):
         latents = latents.reshape(batch_size, channels // (2 * 2), height * 2, width * 2)
 
         return latents
-    
+
     @staticmethod
     def _prepare_latent_image_ids(batch_size, height, width, device, dtype):
         latent_image_ids = torch.zeros(height, width, 3)
@@ -631,17 +627,10 @@ class BriaPipeline(FluxPipeline):
         latent_image_ids[..., 2] = latent_image_ids[..., 2] + torch.arange(width)[None, :]
 
         latent_image_id_height, latent_image_id_width, latent_image_id_channels = latent_image_ids.shape
-        
+
         latent_image_ids = latent_image_ids.repeat(batch_size, 1, 1, 1)
         latent_image_ids = latent_image_ids.reshape(
             batch_size, latent_image_id_height * latent_image_id_width, latent_image_id_channels
         )
 
         return latent_image_ids.to(device=device, dtype=dtype)
-
-
-    
-
-
-
-

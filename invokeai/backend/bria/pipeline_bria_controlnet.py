@@ -13,31 +13,27 @@
 # limitations under the License.
 
 from typing import Any, Callable, Dict, List, Optional, Union
-from diffusers.utils.peft_utils import scale_lora_layers, unscale_lora_layers
+
+import diffusers
+import numpy as np
 import torch
+from diffusers import AutoencoderKL  # Waiting for diffusers udpdate
+from diffusers.image_processor import PipelineImageInput
+from diffusers.pipelines.flux.pipeline_flux import calculate_shift, retrieve_timesteps
+from diffusers.pipelines.flux.pipeline_output import FluxPipelineOutput
+from diffusers.schedulers import FlowMatchEulerDiscreteScheduler, KarrasDiffusionSchedulers
+from diffusers.utils import USE_PEFT_BACKEND, logging
+from diffusers.utils.peft_utils import scale_lora_layers, unscale_lora_layers
+from diffusers.utils.torch_utils import randn_tensor
 from transformers import (
     T5EncoderModel,
     T5TokenizerFast,
 )
-from diffusers.image_processor import PipelineImageInput
 
-from diffusers import AutoencoderKL  # Waiting for diffusers udpdate
-from diffusers.schedulers import FlowMatchEulerDiscreteScheduler
-from diffusers.schedulers import KarrasDiffusionSchedulers
-from diffusers.utils import logging, USE_PEFT_BACKEND
-from diffusers.pipelines.flux.pipeline_output import FluxPipelineOutput
-from invokeai.backend.bria.controlnet_bria import BriaControlNetModel, BriaMultiControlNetModel
-from diffusers.pipelines.flux.pipeline_flux import retrieve_timesteps, calculate_shift
+from invokeai.backend.bria.bria_utils import get_original_sigmas, get_t5_prompt_embeds, is_ng_none
+from invokeai.backend.bria.controlnet_bria import BriaControlNetModel
 from invokeai.backend.bria.pipeline_bria import BriaPipeline
 from invokeai.backend.bria.transformer_bria import BriaTransformer2DModel
-from invokeai.backend.bria.bria_utils import get_original_sigmas
-import numpy as np
-import diffusers
-from invokeai.backend.bria.bria_utils import get_t5_prompt_embeds, get_original_sigmas, is_ng_none
-from diffusers.utils.torch_utils import randn_tensor
-
-XLA_AVAILABLE = False
-
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -148,10 +144,12 @@ class BriaControlNetPipeline(BriaPipeline):
 
         return control_image, control_mode
 
-    def prepare_multi_control(self, control_image, width, height, batch_size, num_images_per_prompt, device, control_mode):
+    def prepare_multi_control(
+        self, control_image, width, height, batch_size, num_images_per_prompt, device, control_mode
+    ):
         num_channels_latents = self.transformer.config.in_channels // 4
         control_images = []
-        for i, control_image_ in enumerate(control_image):
+        for _, control_image_ in enumerate(control_image):
             control_image_ = self.prepare_image(
                 image=control_image_,
                 width=width,
@@ -198,13 +196,13 @@ class BriaControlNetPipeline(BriaPipeline):
         control_mode = control_modes
 
         return control_image, control_mode
-    
+
     def get_controlnet_keep(self, timesteps, control_guidance_start, control_guidance_end):
         controlnet_keep = []
         for i in range(len(timesteps)):
             keeps = [
                 1.0 - float(i / len(timesteps) < s or (i + 1) / len(timesteps) > e)
-                for s, e in zip(control_guidance_start, control_guidance_end)
+                for s, e in zip(control_guidance_start, control_guidance_end, strict=False)
             ]
             controlnet_keep.append(keeps[0] if isinstance(self.controlnet, BriaControlNetModel) else keeps)
         return controlnet_keep
@@ -249,7 +247,7 @@ class BriaControlNetPipeline(BriaPipeline):
         return_dict: bool = True,
         joint_attention_kwargs: Optional[Dict[str, Any]] = None,
         callback_on_step_end: Optional[Callable[[int, int, Dict], None]] = None,
-        callback_on_step_end_tensor_inputs: List[str] = ["latents"],
+        callback_on_step_end_tensor_inputs: Optional[List[str]] = None,
         max_sequence_length: int = 128,
     ):
         r"""
@@ -329,6 +327,9 @@ class BriaControlNetPipeline(BriaPipeline):
         )
 
         # 1. Check inputs. Raise error if not correct
+        callback_on_step_end_tensor_inputs = (
+            ["latents"] if callback_on_step_end_tensor_inputs is None else callback_on_step_end_tensor_inputs
+        )
         self.check_inputs(
             prompt,
             height,
@@ -346,24 +347,25 @@ class BriaControlNetPipeline(BriaPipeline):
 
         device = self._execution_device
 
-
         # 4. Prepare timesteps
-        if  isinstance(self.scheduler,FlowMatchEulerDiscreteScheduler) and self.scheduler.config['use_dynamic_shifting']:
+        if (
+            isinstance(self.scheduler, FlowMatchEulerDiscreteScheduler)
+            and self.scheduler.config["use_dynamic_shifting"]
+        ):
             sigmas = np.linspace(1.0, 1 / num_inference_steps, num_inference_steps)
-            
-            
+
             # Determine image sequence length
             if control_image is not None:
-                if type(control_image) == list:
-                    image_seq_len = control_image[0].shape[1] 
+                if isinstance(control_image, list):
+                    image_seq_len = control_image[0].shape[1]
                 else:
-                    image_seq_len = control_image.shape[1] 
+                    image_seq_len = control_image.shape[1]
             else:
                 # Use latents sequence length when no control image is provided
                 image_seq_len = latents.shape[1]
-                
+
             print(f"Using dynamic shift in pipeline with sequence length {image_seq_len}")
-            
+
             mu = calculate_shift(
                 image_seq_len,
                 self.scheduler.config.base_image_seq_len,
@@ -387,9 +389,9 @@ class BriaControlNetPipeline(BriaPipeline):
             timesteps, num_inference_steps = retrieve_timesteps(
                 self.scheduler, num_inference_steps, device, timesteps, sigmas=sigmas
             )
-            
+
         num_warmup_steps = max(len(timesteps) - num_inference_steps * self.scheduler.order, 0)
-        self._num_timesteps = len(timesteps)        
+        self._num_timesteps = len(timesteps)
 
         # 6. Create tensor stating which controlnets to keep
         if control_image is not None:
@@ -399,13 +401,13 @@ class BriaControlNetPipeline(BriaPipeline):
                 control_guidance_end=control_guidance_end,
             )
 
-        if diffusers.__version__>='0.32.0':
-            latent_image_ids=latent_image_ids[0]
-            text_ids=text_ids[0]
-        
+        if diffusers.__version__ >= "0.32.0":
+            latent_image_ids = latent_image_ids[0]
+            text_ids = text_ids[0]
+
         if self.do_classifier_free_guidance:
             prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds], dim=0)
-            
+
         # EYAL - added the CFG loop
         # 7. Denoising loop
         with self.progress_bar(total=num_inference_steps) as progress_bar:
@@ -428,13 +430,15 @@ class BriaControlNetPipeline(BriaPipeline):
                         if isinstance(controlnet_conditioning_scale, list):
                             cond_scale = controlnet_conditioning_scale
                         else:
-                            cond_scale = [c * s for c, s in zip(controlnet_conditioning_scale, controlnet_keep[i])]
+                            cond_scale = [
+                                c * s for c, s in zip(controlnet_conditioning_scale, controlnet_keep[i], strict=False)
+                            ]
                     else:
                         controlnet_cond_scale = controlnet_conditioning_scale
                         if isinstance(controlnet_cond_scale, list):
                             controlnet_cond_scale = controlnet_cond_scale[0]
                         cond_scale = controlnet_cond_scale * controlnet_keep[i]
-                        
+
                     controlnet_block_samples, controlnet_single_block_samples = self.controlnet(
                         hidden_states=latents,
                         controlnet_cond=control_image,
@@ -492,9 +496,6 @@ class BriaControlNetPipeline(BriaPipeline):
                 if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
                     progress_bar.update()
 
-                if XLA_AVAILABLE:
-                    xm.mark_step()
-
         if output_type == "latent":
             image = latents
 
@@ -514,17 +515,17 @@ class BriaControlNetPipeline(BriaPipeline):
 
 
 def encode_prompt(
-        prompt: Union[str, List[str]],
-        tokenizer: T5TokenizerFast,
-        text_encoder: T5EncoderModel,
-        device: Optional[torch.device] = None,
-        num_images_per_prompt: int = 1,
-        negative_prompt: Optional[Union[str, List[str]]] = None,
-        prompt_embeds: Optional[torch.FloatTensor] = None,
-        negative_prompt_embeds: Optional[torch.FloatTensor] = None,
-        max_sequence_length: int = 128,
-        lora_scale: Optional[float] = None,
-    ):
+    prompt: Union[str, List[str]],
+    tokenizer: T5TokenizerFast,
+    text_encoder: T5EncoderModel,
+    device: Optional[torch.device] = None,
+    num_images_per_prompt: int = 1,
+    negative_prompt: Optional[Union[str, List[str]]] = None,
+    prompt_embeds: Optional[torch.FloatTensor] = None,
+    negative_prompt_embeds: Optional[torch.FloatTensor] = None,
+    max_sequence_length: int = 128,
+    lora_scale: Optional[float] = None,
+):
     r"""
 
     Args:
@@ -561,7 +562,7 @@ def encode_prompt(
         batch_size = len(prompt)
     else:
         batch_size = prompt_embeds.shape[0]
-        
+
     dtype = text_encoder.dtype if text_encoder is not None else torch.float32
     if prompt_embeds is None:
         prompt_embeds = get_t5_prompt_embeds(
@@ -588,7 +589,7 @@ def encode_prompt(
                     f" {prompt} has batch size {batch_size}. Please make sure that passed `negative_prompt` matches"
                     " the batch size of `prompt`."
                 )
-            
+
             negative_prompt_embeds = get_t5_prompt_embeds(
                 tokenizer,
                 text_encoder,
@@ -598,7 +599,7 @@ def encode_prompt(
                 device=device,
             ).to(dtype=dtype)
         else:
-            negative_prompt_embeds = torch.zeros_like(prompt_embeds)    
+            negative_prompt_embeds = torch.zeros_like(prompt_embeds)
 
     if text_encoder is not None:
         if USE_PEFT_BACKEND:
@@ -625,7 +626,7 @@ def prepare_latents(
     # latent height and width to be divisible by 2.
     vae_scale_factor = 16
     height = 2 * (int(height) // vae_scale_factor)
-    width = 2 * (int(width) // vae_scale_factor )
+    width = 2 * (int(width) // vae_scale_factor)
 
     shape = (batch_size, num_channels_latents, height, width)
 
@@ -653,7 +654,7 @@ def _prepare_latent_image_ids(batch_size, height, width, device, dtype):
     latent_image_ids[..., 2] = latent_image_ids[..., 2] + torch.arange(width)[None, :]
 
     latent_image_id_height, latent_image_id_width, latent_image_id_channels = latent_image_ids.shape
-    
+
     latent_image_ids = latent_image_ids.repeat(batch_size, 1, 1, 1)
     latent_image_ids = latent_image_ids.reshape(
         batch_size, latent_image_id_height * latent_image_id_width, latent_image_id_channels
@@ -661,8 +662,6 @@ def _prepare_latent_image_ids(batch_size, height, width, device, dtype):
 
     return latent_image_ids.to(device=device, dtype=dtype)
 
-
-    
 
 def _pack_latents(latents, batch_size, num_channels_latents, height, width):
     latents = latents.view(batch_size, num_channels_latents, height // 2, 2, width // 2, 2)

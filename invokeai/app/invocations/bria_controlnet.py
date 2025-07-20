@@ -1,30 +1,40 @@
-from invokeai.backend.bria.controlnet_bria import BRIA_CONTROL_MODES
+import cv2
+import numpy as np
+from PIL import Image
 from pydantic import BaseModel, Field
-from invokeai.invocation_api import ImageOutput, Classification
+
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import FieldDescriptions, ImageField, InputField, OutputField, UIType, WithBoard, WithMetadata
+from invokeai.app.invocations.fields import (
+    FieldDescriptions,
+    ImageField,
+    InputField,
+    OutputField,
+    UIType,
+    WithBoard,
+    WithMetadata,
+)
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.shared.invocation_context import InvocationContext
-import numpy as np
-import cv2
-from PIL import Image
-
+from invokeai.backend.bria.controlnet_aux.open_pose import Body, Face, Hand, OpenposeDetector
+from invokeai.backend.bria.controlnet_bria import BRIA_CONTROL_MODES
 from invokeai.backend.image_util.depth_anything.depth_anything_pipeline import DepthAnythingPipeline
-from invokeai.backend.bria.controlnet_aux.open_pose import OpenposeDetector, Body, Hand, Face
+from invokeai.invocation_api import Classification, ImageOutput
 
 DEPTH_SMALL_V2_URL = "depth-anything/Depth-Anything-V2-Small-hf"
 HF_LLLYASVIEL = "https://huggingface.co/lllyasviel/Annotators/resolve/main/"
+
 
 class BriaControlNetField(BaseModel):
     image: ImageField = Field(description="The control image")
     model: ModelIdentifierField = Field(description="The ControlNet model to use")
     mode: BRIA_CONTROL_MODES = Field(description="The mode of the ControlNet")
     conditioning_scale: float = Field(description="The weight given to the ControlNet")
+
 
 @invocation_output("bria_controlnet_output")
 class BriaControlNetOutput(BaseInvocationOutput):
@@ -49,12 +59,8 @@ class BriaControlNetInvocation(BaseInvocation, WithMetadata, WithBoard):
     control_model: ModelIdentifierField = InputField(
         description=FieldDescriptions.controlnet_model, ui_type=UIType.BriaControlNetModel
     )
-    control_mode: BRIA_CONTROL_MODES = InputField(
-        default="depth", description="The mode of the ControlNet"
-    )
-    control_weight: float = InputField(
-        default=1.0, ge=-1, le=2, description="The weight given to the ControlNet"
-    )
+    control_mode: BRIA_CONTROL_MODES = InputField(default="depth", description="The mode of the ControlNet")
+    control_weight: float = InputField(default=1.0, ge=-1, le=2, description="The weight given to the ControlNet")
 
     def invoke(self, context: InvocationContext) -> BriaControlNetOutput:
         image_in = resize_img(context.images.get_pil(self.control_image.image_name))
@@ -70,7 +76,7 @@ class BriaControlNetInvocation(BaseInvocation, WithMetadata, WithBoard):
             control_image = convert_to_grayscale(image_in)
         elif self.control_mode == "tile":
             control_image = tile(16, image_in)
-            
+
         control_image = resize_img(control_image)
         image_dto = context.images.save(image=control_image)
         image_output = ImageOutput.build(image_dto)
@@ -99,6 +105,7 @@ RATIO_CONFIGS_1024 = {
     1.7708333333333333: {"width": 1360, "height": 768},
 }
 
+
 def extract_depth(image: Image.Image, context: InvocationContext):
     loaded_model = context.models.load_remote_model(DEPTH_SMALL_V2_URL, DepthAnythingPipeline.load_model)
 
@@ -106,6 +113,7 @@ def extract_depth(image: Image.Image, context: InvocationContext):
         assert isinstance(depth_anything_detector, DepthAnythingPipeline)
         depth_map = depth_anything_detector.generate_depth(image)
     return depth_map
+
 
 def extract_openpose(image: Image.Image, context: InvocationContext):
     body_model = context.models.load_remote_model(f"{HF_LLLYASVIEL}body_pose_model.pth", Body)
@@ -115,10 +123,10 @@ def extract_openpose(image: Image.Image, context: InvocationContext):
     with body_model as body_model, hand_model as hand_model, face_model as face_model:
         open_pose_model = OpenposeDetector(body_model, hand_model, face_model)
         processed_image_open_pose = open_pose_model(image, hand_and_face=True)
-    
+
     processed_image_open_pose = processed_image_open_pose.resize(image.size)
     return processed_image_open_pose
-    
+
 
 def extract_canny(input_image):
     image = np.array(input_image)
@@ -130,13 +138,17 @@ def extract_canny(input_image):
 
 
 def convert_to_grayscale(image):
-    gray_image = image.convert('L').convert('RGB')
+    gray_image = image.convert("L").convert("RGB")
     return gray_image
 
+
 def tile(downscale_factor, input_image):
-    control_image = input_image.resize((input_image.size[0] // downscale_factor, input_image.size[1] // downscale_factor)).resize(input_image.size, Image.Resampling.NEAREST)
+    control_image = input_image.resize(
+        (input_image.size[0] // downscale_factor, input_image.size[1] // downscale_factor)
+    ).resize(input_image.size, Image.Resampling.NEAREST)
     return control_image
-    
+
+
 def resize_img(control_image):
     image_ratio = control_image.width / control_image.height
     ratio = min(RATIO_CONFIGS_1024.keys(), key=lambda k: abs(k - image_ratio))

@@ -1,19 +1,20 @@
 from typing import List, Tuple
-from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
-from invokeai.backend.bria.controlnet_bria import BriaControlModes, BriaMultiControlNetModel
-from invokeai.backend.bria.controlnet_utils import prepare_control_images
-from invokeai.backend.bria.pipeline_bria_controlnet import BriaControlNetPipeline
-from invokeai.app.invocations.bria_controlnet import BriaControlNetField
 
 import torch
+from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
 
+from invokeai.app.invocations.bria_controlnet import BriaControlNetField
 from invokeai.app.invocations.fields import Input, InputField, LatentsField, OutputField
 from invokeai.app.invocations.model import SubModelType, T5EncoderField, TransformerField, VAEField
 from invokeai.app.invocations.primitives import BaseInvocationOutput, FieldDescriptions
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.invocation_api import BaseInvocation, Classification, invocation, invocation_output
+from invokeai.backend.bria.controlnet_bria import BriaControlModes, BriaMultiControlNetModel
+from invokeai.backend.bria.controlnet_utils import prepare_control_images
+from invokeai.backend.bria.pipeline_bria_controlnet import BriaControlNetPipeline
 from invokeai.backend.bria.transformer_bria import BriaTransformer2DModel
+from invokeai.invocation_api import BaseInvocation, Classification, invocation, invocation_output
+
 
 @invocation_output("bria_denoise_output")
 class BriaDenoiseInvocationOutput(BaseInvocationOutput):
@@ -80,7 +81,7 @@ class BriaDenoiseInvocation(BaseInvocation):
         description="ControlNet",
         input=Input.Connection,
         title="ControlNet",
-        default = None,
+        default=None,
     )
 
     @torch.no_grad()
@@ -106,7 +107,7 @@ class BriaDenoiseInvocation(BaseInvocation):
             assert isinstance(vae, AutoencoderKL)
             dtype = transformer.dtype
             device = transformer.device
-            latents, pos_embeds, neg_embeds = map(lambda x: x.to(device, dtype), (latents, pos_embeds, neg_embeds))
+            latents, pos_embeds, neg_embeds = (x.to(device, dtype) for x in (latents, pos_embeds, neg_embeds))
 
             control_model, control_images, control_modes, control_scales = None, None, None, None
             if self.control is not None:
@@ -134,7 +135,7 @@ class BriaDenoiseInvocation(BaseInvocation):
                 width=1024,
                 height=1024,
                 controlnet_conditioning_scale=control_scales,
-                num_inference_steps=self.num_steps, 
+                num_inference_steps=self.num_steps,
                 max_sequence_length=128,
                 guidance_scale=self.guidance_scale,
                 latents=latents,
@@ -150,36 +151,30 @@ class BriaDenoiseInvocation(BaseInvocation):
         latents_output = LatentsField(latents_name=saved_input_latents_tensor)
         return BriaDenoiseInvocationOutput(latents=latents_output)
 
-
     def _prepare_multi_control(
-        self,
-        context: InvocationContext,
-        vae: AutoencoderKL,
-        width: int,
-        height: int,
-        device: torch.device
+        self, context: InvocationContext, vae: AutoencoderKL, width: int, height: int, device: torch.device
     ) -> Tuple[BriaMultiControlNetModel, List[torch.Tensor], List[torch.Tensor], List[float]]:
-
         control = self.control if isinstance(self.control, list) else [self.control]
         control_images, control_models, control_modes, control_scales = [], [], [], []
         for controlnet in control:
             if controlnet is not None:
                 control_models.append(context.models.load(controlnet.model).model)
-                control_modes.append(BriaControlModes[controlnet.mode].value)   
+                control_modes.append(BriaControlModes[controlnet.mode].value)
                 control_scales.append(controlnet.conditioning_scale)
                 try:
                     control_images.append(context.images.get_pil(controlnet.image.image_name))
-                except:
-                    raise FileNotFoundError(f"Control image {controlnet.image.image_name} not found. Make sure not to delete the preprocessed image before finishing the pipeline.")
+                except Exception:
+                    raise FileNotFoundError(
+                        f"Control image {controlnet.image.image_name} not found. Make sure not to delete the preprocessed image before finishing the pipeline."
+                    )
 
         control_model = BriaMultiControlNetModel(control_models).to(device)
         tensored_control_images, tensored_control_modes = prepare_control_images(
             vae=vae,
-            control_images=control_images, 
-            control_modes=control_modes, 
+            control_images=control_images,
+            control_modes=control_modes,
             width=width,
             height=height,
-            device=device, 
-            )
+            device=device,
+        )
         return control_model, tensored_control_images, tensored_control_modes, control_scales
-        

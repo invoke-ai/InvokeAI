@@ -19,8 +19,6 @@ from invokeai.invocation_api import (
     invocation_output,
 )
 
-from invokeai.backend.bria.bria_utils import get_t5_prompt_embeds, is_ng_none
-
 
 @invocation_output("bria_text_encoder_output")
 class BriaTextEncoderInvocationOutput(BaseInvocationOutput):
@@ -70,7 +68,7 @@ class BriaTextEncoderInvocation(BaseInvocation):
         ):
             assert isinstance(tokenizer, T5TokenizerFast)
             assert isinstance(text_encoder, T5EncoderModel)
-            
+
         (prompt_embeds, negative_prompt_embeds, text_ids) = encode_prompt(
             prompt=self.prompt,
             tokenizer=tokenizer,
@@ -81,7 +79,7 @@ class BriaTextEncoderInvocation(BaseInvocation):
             max_sequence_length=self.max_length,
             lora_scale=1.0,
         )
-        
+
         saved_pos_tensor = context.tensors.save(prompt_embeds)
         saved_neg_tensor = context.tensors.save(negative_prompt_embeds)
         saved_text_ids_tensor = context.tensors.save(text_ids)
