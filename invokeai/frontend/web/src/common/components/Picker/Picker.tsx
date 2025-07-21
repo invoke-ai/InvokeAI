@@ -11,11 +11,13 @@ import {
   Text,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { typedMemo } from 'common/util/typedMemo';
 import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
-import { selectModelPickerCompactViewStates, setModelPickerCompactView } from 'features/ui/store/uiSlice';
+import { selectPickerCompactViewStates } from 'features/ui/store/uiSelectors';
+import { pickerCompactViewStateChanged } from 'features/ui/store/uiSlice';
 import type { AnyStore, ReadableAtom, Task, WritableAtom } from 'nanostores';
 import { atom, computed } from 'nanostores';
 import type { StoreValues } from 'nanostores/computed';
@@ -209,6 +211,14 @@ type PickerProps<T extends object> = {
    */
   initialGroupStates?: GroupStatusMap;
 };
+
+const buildSelectIsCompactView = (pickerId?: string) =>
+  createSelector([selectPickerCompactViewStates], (compactViewStates) => {
+    if (!pickerId) {
+      return true;
+    }
+    return compactViewStates[pickerId] ?? true;
+  });
 
 export type PickerContextState<T extends object> = {
   $optionsOrGroups: WritableAtom<OptionOrGroup<T>[]>;
@@ -529,7 +539,6 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
   } = props;
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const compactViewStates = useAppSelector(selectModelPickerCompactViewStates);
 
   const { $groupStatusMap, $areAllGroupsDisabled, toggleGroup } = useTogglableGroups(
     optionsOrGroups,
@@ -547,8 +556,8 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
   const $searchTerm = useAtom('');
   const $selectedItemId = useComputed([$selectedItem], (item) => (item ? getOptionId(item) : undefined));
 
-  // Use Redux state for compact view, defaulting to true if no pickerId or no saved state
-  const isCompactView = pickerId ? (compactViewStates[pickerId] ?? true) : true;
+  const selectIsCompactView = useMemo(() => buildSelectIsCompactView(pickerId), [pickerId]);
+  const isCompactView = useAppSelector(selectIsCompactView);
 
   const onSelectById = useCallback(
     (id: string) => {
@@ -888,7 +897,7 @@ const CompactViewToggleButton = typedMemo(<T extends object>() => {
 
   const onClick = useCallback(() => {
     if (pickerId) {
-      dispatch(setModelPickerCompactView({ pickerId, isCompact: !isCompactView }));
+      dispatch(pickerCompactViewStateChanged({ pickerId, isCompact: !isCompactView }));
     }
   }, [dispatch, pickerId, isCompactView]);
 
