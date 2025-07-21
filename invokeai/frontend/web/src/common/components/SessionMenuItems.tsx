@@ -1,6 +1,8 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { allEntitiesDeleted } from 'features/controlLayers/store/canvasSlice';
+import { canvasReset } from 'features/controlLayers/store/actions';
+import { inpaintMaskAdded } from 'features/controlLayers/store/canvasSlice';
+import { $canvasManager } from 'features/controlLayers/store/ephemeral';
 import { paramsReset } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,7 +13,9 @@ export const SessionMenuItems = memo(() => {
   const dispatch = useAppDispatch();
 
   const resetCanvasLayers = useCallback(() => {
-    dispatch(allEntitiesDeleted());
+    dispatch(canvasReset());
+    dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
+    $canvasManager.get()?.stage.fitBboxToStage();
   }, [dispatch]);
   const resetGenerationSettings = useCallback(() => {
     dispatch(paramsReset());

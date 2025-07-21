@@ -1618,7 +1618,6 @@ export const {
   entityArrangedToBack,
   entityOpacityChanged,
   entitiesReordered,
-  allEntitiesDeleted,
   allEntitiesOfTypeIsHiddenToggled,
   allNonRasterLayersIsHiddenToggled,
   // bbox
