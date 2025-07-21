@@ -1,5 +1,6 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Divider, Flex, FormControl } from '@invoke-ai/ui-library';
+import { InvocationNodeContextProvider } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { InputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldGate';
 import { InputFieldRenderer } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldRenderer';
 import { useContainerContext } from 'features/nodes/components/sidePanel/builder/contexts';
@@ -63,25 +64,27 @@ const NodeFieldElementEditModeContent = memo(
       <>
         <FormElementEditModeHeader dragHandleRef={dragHandleRef} element={el} data-is-dragging={isDragging} />
         <FormElementEditModeContent data-is-dragging={isDragging} p={4}>
-          <InputFieldGate nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName}>
-            <FormControl flex="1 1 0" orientation="vertical">
-              <NodeFieldElementLabelEditable el={el} />
-              <Flex w="full" gap={4}>
-                <InputFieldRenderer
-                  nodeId={fieldIdentifier.nodeId}
-                  fieldName={fieldIdentifier.fieldName}
-                  settings={data.settings}
-                />
-              </Flex>
-              {showDescription && <NodeFieldElementDescriptionEditable el={el} />}
-              {data.settings?.type === 'string-field-config' && data.settings.component === 'dropdown' && (
-                <>
-                  <Divider />
-                  <NodeFieldElementStringDropdownSettings id={id} settings={data.settings} />
-                </>
-              )}
-            </FormControl>
-          </InputFieldGate>
+          <InvocationNodeContextProvider nodeId={fieldIdentifier.nodeId}>
+            <InputFieldGate nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName}>
+              <FormControl flex="1 1 0" orientation="vertical">
+                <NodeFieldElementLabelEditable el={el} />
+                <Flex w="full" gap={4}>
+                  <InputFieldRenderer
+                    nodeId={fieldIdentifier.nodeId}
+                    fieldName={fieldIdentifier.fieldName}
+                    settings={data.settings}
+                  />
+                </Flex>
+                {showDescription && <NodeFieldElementDescriptionEditable el={el} />}
+                {data.settings?.type === 'string-field-config' && data.settings.component === 'dropdown' && (
+                  <>
+                    <Divider />
+                    <NodeFieldElementStringDropdownSettings id={id} settings={data.settings} />
+                  </>
+                )}
+              </FormControl>
+            </InputFieldGate>
+          </InvocationNodeContextProvider>
         </FormElementEditModeContent>
       </>
     );

@@ -156,8 +156,8 @@ type Props = {
 };
 
 export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) => {
-  const field = useInputFieldInstance(nodeId, fieldName);
-  const template = useInputFieldTemplateOrThrow(nodeId, fieldName);
+  const field = useInputFieldInstance(fieldName);
+  const template = useInputFieldTemplateOrThrow(fieldName);
 
   // When deciding which component to render, first we check the type of the template, which is more efficient than the
   // instance type check. The instance type check uses zod and is slower.

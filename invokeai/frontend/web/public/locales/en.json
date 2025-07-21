@@ -574,6 +574,10 @@
                 "title": "Transform",
                 "desc": "Transform the selected layer."
             },
+            "invertMask": {
+                "title": "Invert Mask",
+                "desc": "Invert the selected inpaint mask, creating a new mask with opposite transparency."
+            },
             "applyFilter": {
                 "title": "Apply Filter",
                 "desc": "Apply the pending filter to the selected layer."
@@ -599,6 +603,10 @@
             "toggleNonRasterLayers": {
                 "title": "Toggle Non-Raster Layers",
                 "desc": "Show or hide all non-raster layer categories (Control Layers, Inpaint Masks, Regional Guidance)."
+            },
+            "fitBboxToMasks": {
+                "title": "Fit Bbox To Masks",
+                "desc": "Automatically adjust the generation bounding box to fit visible inpaint masks"
             }
         },
         "workflows": {
@@ -1125,7 +1133,23 @@
         "addItem": "Add Item",
         "generateValues": "Generate Values",
         "floatRangeGenerator": "Float Range Generator",
-        "integerRangeGenerator": "Integer Range Generator"
+        "integerRangeGenerator": "Integer Range Generator",
+        "layout": {
+            "autoLayout": "Auto Layout",
+            "layeringStrategy": "Layering Strategy",
+            "networkSimplex": "Network Simplex",
+            "longestPath": "Longest Path",
+            "nodeSpacing": "Node Spacing",
+            "layerSpacing": "Layer Spacing",
+            "layoutDirection": "Layout Direction",
+            "layoutDirectionRight": "Right",
+            "layoutDirectionDown": "Down",
+            "alignment": "Node Alignment",
+            "alignmentUL": "Top Left",
+            "alignmentDL": "Bottom Left",
+            "alignmentUR": "Top Right",
+            "alignmentDR": "Bottom Right"
+        }
     },
     "parameters": {
         "aspect": "Aspect",
@@ -1407,7 +1431,15 @@
         "sentToUpscale": "Sent to Upscale",
         "promptGenerationStarted": "Prompt generation started",
         "uploadAndPromptGenerationFailed": "Failed to upload image and generate prompt",
-        "promptExpansionFailed": "We ran into an issue. Please try prompt expansion again."
+        "promptExpansionFailed": "We ran into an issue. Please try prompt expansion again.",
+        "maskInverted": "Mask Inverted",
+        "maskInvertFailed": "Failed to Invert Mask",
+        "noVisibleMasks": "No Visible Masks",
+        "noVisibleMasksDesc": "Create or enable at least one inpaint mask to invert",
+        "noInpaintMaskSelected": "No Inpaint Mask Selected",
+        "noInpaintMaskSelectedDesc": "Select an inpaint mask to invert",
+        "invalidBbox": "Invalid Bounding Box",
+        "invalidBboxDesc": "The bounding box has no valid dimensions"
     },
     "popovers": {
         "clipSkip": {
@@ -1775,6 +1807,20 @@
                 "Structure controls how closely the output image will keep to the layout of the original. Low structure allows major changes, while high structure strictly maintains the original composition and layout."
             ]
         },
+        "tileSize": {
+            "heading": "Tile Size",
+            "paragraphs": [
+                "Controls the size of tiles used during the upscaling process. Larger tiles use more memory but may produce better results.",
+                "SD1.5 models default to 768, while SDXL models default to 1024. Reduce tile size if you encounter memory issues."
+            ]
+        },
+        "tileOverlap": {
+            "heading": "Tile Overlap",
+            "paragraphs": [
+                "Controls the overlap between adjacent tiles during upscaling. Higher overlap values help reduce visible seams between tiles but use more memory.",
+                "The default value of 128 works well for most cases, but you can adjust based on your specific needs and memory constraints."
+            ]
+        },
         "fluxDevLicense": {
             "heading": "Non-Commercial License",
             "paragraphs": [
@@ -1926,6 +1972,7 @@
         "canvas": "Canvas",
         "bookmark": "Bookmark for Quick Switch",
         "fitBboxToLayers": "Fit Bbox To Layers",
+        "fitBboxToMasks": "Fit Bbox To Masks",
         "removeBookmark": "Remove Bookmark",
         "saveCanvasToGallery": "Save Canvas to Gallery",
         "saveBboxToGallery": "Save Bbox to Gallery",
@@ -1962,7 +2009,6 @@
         "recalculateRects": "Recalculate Rects",
         "clipToBbox": "Clip Strokes to Bbox",
         "outputOnlyMaskedRegions": "Output Only Generated Regions",
-        "saveAllImagesToGallery": "Save All Images to Gallery",
         "addLayer": "Add Layer",
         "duplicate": "Duplicate",
         "moveToFront": "Move to Front",
@@ -1991,6 +2037,7 @@
         "rasterLayer": "Raster Layer",
         "controlLayer": "Control Layer",
         "inpaintMask": "Inpaint Mask",
+        "invertMask": "Invert Mask",
         "regionalGuidance": "Regional Guidance",
         "referenceImageRegional": "Reference Image (Regional)",
         "referenceImageGlobal": "Reference Image (Global)",
@@ -2087,9 +2134,9 @@
         "resetCanvasLayers": "Reset Canvas Layers",
         "resetGenerationSettings": "Reset Generation Settings",
         "replaceCurrent": "Replace Current",
-        "controlLayerEmptyState": "<UploadButton>Upload an image</UploadButton>, drag an image from the <GalleryButton>gallery</GalleryButton> onto this layer, <PullBboxButton>pull the bounding box into this layer</PullBboxButton>, or draw on the canvas to get started.",
-        "referenceImageEmptyStateWithCanvasOptions": "<UploadButton>Upload an image</UploadButton>, drag an image from the <GalleryButton>gallery</GalleryButton> onto this Reference Image or <PullBboxButton>pull the bounding box into this Reference Image</PullBboxButton> to get started.",
-        "referenceImageEmptyState": "<UploadButton>Upload an image</UploadButton> or drag an image from the <GalleryButton>gallery</GalleryButton> onto this Reference Image to get started.",
+        "controlLayerEmptyState": "<UploadButton>Upload an image</UploadButton>, drag an image from the gallery onto this layer, <PullBboxButton>pull the bounding box into this layer</PullBboxButton>, or draw on the canvas to get started.",
+        "referenceImageEmptyStateWithCanvasOptions": "<UploadButton>Upload an image</UploadButton>, drag an image from the gallery onto this Reference Image or <PullBboxButton>pull the bounding box into this Reference Image</PullBboxButton> to get started.",
+        "referenceImageEmptyState": "<UploadButton>Upload an image</UploadButton> or drag an image from the gallery onto this Reference Image to get started.",
         "uploadOrDragAnImage": "Drag an image from the gallery or <UploadButton>upload an image</UploadButton>.",
         "imageNoise": "Image Noise",
         "denoiseLimit": "Denoise Limit",
@@ -2332,7 +2379,8 @@
                 "alert": "Preserving Masked Region"
             },
             "saveAllImagesToGallery": {
-                "alert": "Saving All Images to Gallery"
+                "label": "Send New Generations to Gallery",
+                "alert": "Sending new generations to Gallery, bypassing Canvas"
             },
             "isolatedStagingPreview": "Isolated Staging Preview",
             "isolatedPreview": "Isolated Preview",
@@ -2396,6 +2444,9 @@
         "upscaleModel": "Upscale Model",
         "postProcessingModel": "Post-Processing Model",
         "scale": "Scale",
+        "tileControl": "Tile Control",
+        "tileSize": "Tile Size",
+        "tileOverlap": "Tile Overlap",
         "postProcessingMissingModelWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install a post-processing (image to image) model.",
         "missingModelsWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install the required models:",
         "mainModelDesc": "Main model (SD1.5 or SDXL architecture)",

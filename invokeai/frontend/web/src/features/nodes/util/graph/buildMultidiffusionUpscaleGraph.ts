@@ -12,7 +12,16 @@ import type { GraphBuilderReturn } from './types';
 
 export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise<GraphBuilderReturn> => {
   const { model, upscaleCfgScale: cfg_scale, upscaleScheduler: scheduler, steps, vaePrecision, vae } = state.params;
-  const { upscaleModel, upscaleInitialImage, structure, creativity, tileControlnetModel, scale } = state.upscale;
+  const {
+    upscaleModel,
+    upscaleInitialImage,
+    structure,
+    creativity,
+    tileControlnetModel,
+    scale,
+    tileSize,
+    tileOverlap,
+  } = state.upscale;
 
   assert(model, 'No model selected');
   assert(model.base === 'sd-1' || model.base === 'sdxl', 'Multi-Diffusion upscaling requires a SD1.5 or SDXL model');
@@ -62,7 +71,7 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
     type: 'i2l',
     id: getPrefixedId('i2l'),
     fp32: vaePrecision === 'fp32',
-    tile_size: 1024,
+    tile_size: tileSize,
     tiled: true,
   });
 
@@ -72,7 +81,7 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
     type: 'l2i',
     id: getPrefixedId('l2i'),
     fp32: vaePrecision === 'fp32',
-    tile_size: 1024,
+    tile_size: tileSize,
     tiled: true,
     board: getBoardField(state),
     is_intermediate: false,
@@ -81,9 +90,9 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
   const tiledMultidiffusion = g.addNode({
     type: 'tiled_multi_diffusion_denoise_latents',
     id: getPrefixedId('tiled_multidiffusion_denoise_latents'),
-    tile_height: 1024, // is this dependent on base model
-    tile_width: 1024, // is this dependent on base model
-    tile_overlap: 128,
+    tile_height: tileSize,
+    tile_width: tileSize,
+    tile_overlap: tileOverlap,
     steps,
     cfg_scale,
     scheduler,
@@ -184,6 +193,8 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
     upscale_model: Graph.getModelMetadataField(upscaleModelConfig),
     creativity,
     structure,
+    tile_size: tileSize,
+    tile_overlap: tileOverlap,
     upscale_initial_image: {
       image_name: upscaleInitialImage.image_name,
       width: upscaleInitialImage.width,

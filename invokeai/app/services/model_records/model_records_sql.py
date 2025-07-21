@@ -78,11 +78,6 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         self._db = db
         self._logger = logger
 
-    @property
-    def db(self) -> SqliteDatabase:
-        """Return the underlying database."""
-        return self._db
-
     def add_model(self, config: AnyModelConfig) -> AnyModelConfig:
         """
         Add a model to the database.
@@ -93,38 +88,33 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         Can raise DuplicateModelException and InvalidModelConfigException exceptions.
         """
-        try:
-            cursor = self._db.conn.cursor()
-            cursor.execute(
-                """--sql
-                INSERT INTO models (
-                    id,
-                    config
-                    )
-                VALUES (?,?);
-                """,
-                (
-                    config.key,
-                    config.model_dump_json(),
-                ),
-            )
-            self._db.conn.commit()
+        with self._db.transaction() as cursor:
+            try:
+                cursor.execute(
+                    """--sql
+                    INSERT INTO models (
+                        id,
+                        config
+                        )
+                    VALUES (?,?);
+                    """,
+                    (
+                        config.key,
+                        config.model_dump_json(),
+                    ),
+                )
 
-        except sqlite3.IntegrityError as e:
-            self._db.conn.rollback()
-            if "UNIQUE constraint failed" in str(e):
-                if "models.path" in str(e):
-                    msg = f"A model with path '{config.path}' is already installed"
-                elif "models.name" in str(e):
-                    msg = f"A model with name='{config.name}', type='{config.type}', base='{config.base}' is already installed"
+            except sqlite3.IntegrityError as e:
+                if "UNIQUE constraint failed" in str(e):
+                    if "models.path" in str(e):
+                        msg = f"A model with path '{config.path}' is already installed"
+                    elif "models.name" in str(e):
+                        msg = f"A model with name='{config.name}', type='{config.type}', base='{config.base}' is already installed"
+                    else:
+                        msg = f"A model with key '{config.key}' is already installed"
+                    raise DuplicateModelException(msg) from e
                 else:
-                    msg = f"A model with key '{config.key}' is already installed"
-                raise DuplicateModelException(msg) from e
-            else:
-                raise e
-        except sqlite3.Error as e:
-            self._db.conn.rollback()
-            raise e
+                    raise e
 
         return self.get_model(config.key)
 
@@ -136,8 +126,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         Can raise an UnknownModelException
         """
-        try:
-            cursor = self._db.conn.cursor()
+        with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
                 DELETE FROM models
@@ -147,22 +136,17 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             )
             if cursor.rowcount == 0:
                 raise UnknownModelException("model not found")
-            self._db.conn.commit()
-        except sqlite3.Error as e:
-            self._db.conn.rollback()
-            raise e
 
     def update_model(self, key: str, changes: ModelRecordChanges) -> AnyModelConfig:
-        record = self.get_model(key)
+        with self._db.transaction() as cursor:
+            record = self.get_model(key)
 
-        # Model configs use pydantic's `validate_assignment`, so each change is validated by pydantic.
-        for field_name in changes.model_fields_set:
-            setattr(record, field_name, getattr(changes, field_name))
+            # Model configs use pydantic's `validate_assignment`, so each change is validated by pydantic.
+            for field_name in changes.model_fields_set:
+                setattr(record, field_name, getattr(changes, field_name))
 
-        json_serialized = record.model_dump_json()
+            json_serialized = record.model_dump_json()
 
-        try:
-            cursor = self._db.conn.cursor()
             cursor.execute(
                 """--sql
                 UPDATE models
@@ -174,10 +158,6 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             )
             if cursor.rowcount == 0:
                 raise UnknownModelException("model not found")
-            self._db.conn.commit()
-        except sqlite3.Error as e:
-            self._db.conn.rollback()
-            raise e
 
         return self.get_model(key)
 
@@ -189,30 +169,30 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         Exceptions: UnknownModelException
         """
-        cursor = self._db.conn.cursor()
-        cursor.execute(
-            """--sql
-            SELECT config, strftime('%s',updated_at) FROM models
-            WHERE id=?;
-            """,
-            (key,),
-        )
-        rows = cursor.fetchone()
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT config, strftime('%s',updated_at) FROM models
+                WHERE id=?;
+                """,
+                (key,),
+            )
+            rows = cursor.fetchone()
         if not rows:
             raise UnknownModelException("model not found")
         model = ModelConfigFactory.make_config(json.loads(rows[0]), timestamp=rows[1])
         return model
 
     def get_model_by_hash(self, hash: str) -> AnyModelConfig:
-        cursor = self._db.conn.cursor()
-        cursor.execute(
-            """--sql
-            SELECT config, strftime('%s',updated_at) FROM models
-            WHERE hash=?;
-            """,
-            (hash,),
-        )
-        rows = cursor.fetchone()
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT config, strftime('%s',updated_at) FROM models
+                WHERE hash=?;
+                """,
+                (hash,),
+            )
+            rows = cursor.fetchone()
         if not rows:
             raise UnknownModelException("model not found")
         model = ModelConfigFactory.make_config(json.loads(rows[0]), timestamp=rows[1])
@@ -224,15 +204,15 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         :param key: Unique key for the model to be deleted
         """
-        cursor = self._db.conn.cursor()
-        cursor.execute(
-            """--sql
-            select count(*) FROM models
-            WHERE id=?;
-            """,
-            (key,),
-        )
-        count = cursor.fetchone()[0]
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                select count(*) FROM models
+                WHERE id=?;
+                """,
+                (key,),
+            )
+            count = cursor.fetchone()[0]
         return count > 0
 
     def search_by_attr(
@@ -255,43 +235,42 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         If none of the optional filters are passed, will return all
         models in the database.
         """
+        with self._db.transaction() as cursor:
+            assert isinstance(order_by, ModelRecordOrderBy)
+            ordering = {
+                ModelRecordOrderBy.Default: "type, base, name, format",
+                ModelRecordOrderBy.Type: "type",
+                ModelRecordOrderBy.Base: "base",
+                ModelRecordOrderBy.Name: "name",
+                ModelRecordOrderBy.Format: "format",
+            }
 
-        assert isinstance(order_by, ModelRecordOrderBy)
-        ordering = {
-            ModelRecordOrderBy.Default: "type, base, name, format",
-            ModelRecordOrderBy.Type: "type",
-            ModelRecordOrderBy.Base: "base",
-            ModelRecordOrderBy.Name: "name",
-            ModelRecordOrderBy.Format: "format",
-        }
+            where_clause: list[str] = []
+            bindings: list[str] = []
+            if model_name:
+                where_clause.append("name=?")
+                bindings.append(model_name)
+            if base_model:
+                where_clause.append("base=?")
+                bindings.append(base_model)
+            if model_type:
+                where_clause.append("type=?")
+                bindings.append(model_type)
+            if model_format:
+                where_clause.append("format=?")
+                bindings.append(model_format)
+            where = f"WHERE {' AND '.join(where_clause)}" if where_clause else ""
 
-        where_clause: list[str] = []
-        bindings: list[str] = []
-        if model_name:
-            where_clause.append("name=?")
-            bindings.append(model_name)
-        if base_model:
-            where_clause.append("base=?")
-            bindings.append(base_model)
-        if model_type:
-            where_clause.append("type=?")
-            bindings.append(model_type)
-        if model_format:
-            where_clause.append("format=?")
-            bindings.append(model_format)
-        where = f"WHERE {' AND '.join(where_clause)}" if where_clause else ""
-
-        cursor = self._db.conn.cursor()
-        cursor.execute(
-            f"""--sql
-            SELECT config, strftime('%s',updated_at)
-            FROM models
-            {where}
-            ORDER BY {ordering[order_by]} -- using ? to bind doesn't work here for some reason;
-            """,
-            tuple(bindings),
-        )
-        result = cursor.fetchall()
+            cursor.execute(
+                f"""--sql
+                SELECT config, strftime('%s',updated_at)
+                FROM models
+                {where}
+                ORDER BY {ordering[order_by]} -- using ? to bind doesn't work here for some reason;
+                """,
+                tuple(bindings),
+            )
+            result = cursor.fetchall()
 
         # Parse the model configs.
         results: list[AnyModelConfig] = []
@@ -313,69 +292,68 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
     def search_by_path(self, path: Union[str, Path]) -> List[AnyModelConfig]:
         """Return models with the indicated path."""
-        cursor = self._db.conn.cursor()
-        cursor.execute(
-            """--sql
-            SELECT config, strftime('%s',updated_at) FROM models
-            WHERE path=?;
-            """,
-            (str(path),),
-        )
-        results = [ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in cursor.fetchall()]
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT config, strftime('%s',updated_at) FROM models
+                WHERE path=?;
+                """,
+                (str(path),),
+            )
+            results = [ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in cursor.fetchall()]
         return results
 
     def search_by_hash(self, hash: str) -> List[AnyModelConfig]:
         """Return models with the indicated hash."""
-        cursor = self._db.conn.cursor()
-        cursor.execute(
-            """--sql
-            SELECT config, strftime('%s',updated_at) FROM models
-            WHERE hash=?;
-            """,
-            (hash,),
-        )
-        results = [ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in cursor.fetchall()]
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT config, strftime('%s',updated_at) FROM models
+                WHERE hash=?;
+                """,
+                (hash,),
+            )
+            results = [ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in cursor.fetchall()]
         return results
 
     def list_models(
         self, page: int = 0, per_page: int = 10, order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default
     ) -> PaginatedResults[ModelSummary]:
         """Return a paginated summary listing of each model in the database."""
-        assert isinstance(order_by, ModelRecordOrderBy)
-        ordering = {
-            ModelRecordOrderBy.Default: "type, base, name, format",
-            ModelRecordOrderBy.Type: "type",
-            ModelRecordOrderBy.Base: "base",
-            ModelRecordOrderBy.Name: "name",
-            ModelRecordOrderBy.Format: "format",
-        }
+        with self._db.transaction() as cursor:
+            assert isinstance(order_by, ModelRecordOrderBy)
+            ordering = {
+                ModelRecordOrderBy.Default: "type, base, name, format",
+                ModelRecordOrderBy.Type: "type",
+                ModelRecordOrderBy.Base: "base",
+                ModelRecordOrderBy.Name: "name",
+                ModelRecordOrderBy.Format: "format",
+            }
 
-        cursor = self._db.conn.cursor()
+            # Lock so that the database isn't updated while we're doing the two queries.
+            # query1: get the total number of model configs
+            cursor.execute(
+                """--sql
+                select count(*) from models;
+                """,
+                (),
+            )
+            total = int(cursor.fetchone()[0])
 
-        # Lock so that the database isn't updated while we're doing the two queries.
-        # query1: get the total number of model configs
-        cursor.execute(
-            """--sql
-            select count(*) from models;
-            """,
-            (),
-        )
-        total = int(cursor.fetchone()[0])
-
-        # query2: fetch key fields
-        cursor.execute(
-            f"""--sql
-            SELECT config
-            FROM models
-            ORDER BY {ordering[order_by]} -- using ? to bind doesn't work here for some reason
-            LIMIT ?
-            OFFSET ?;
-            """,
-            (
-                per_page,
-                page * per_page,
-            ),
-        )
-        rows = cursor.fetchall()
+            # query2: fetch key fields
+            cursor.execute(
+                f"""--sql
+                SELECT config
+                FROM models
+                ORDER BY {ordering[order_by]} -- using ? to bind doesn't work here for some reason
+                LIMIT ?
+                OFFSET ?;
+                """,
+                (
+                    per_page,
+                    page * per_page,
+                ),
+            )
+            rows = cursor.fetchall()
         items = [ModelSummary.model_validate(dict(x)) for x in rows]
         return PaginatedResults(page=page, pages=ceil(total / per_page), per_page=per_page, total=total, items=items)

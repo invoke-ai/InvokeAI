@@ -6,7 +6,6 @@ import { atom, computed } from 'nanostores';
 import type { RefObject } from 'react';
 import { useEffect } from 'react';
 import { objectKeys } from 'tsafe';
-import z from 'zod/v4';
 
 /**
  * We need to manage focus regions to conditionally enable hotkeys:
@@ -28,10 +27,7 @@ import z from 'zod/v4';
 
 const log = logger('system');
 
-/**
- * The names of the focus regions.
- */
-const zFocusRegionName = z.enum([
+const REGION_NAMES = [
   'launchpad',
   'viewer',
   'gallery',
@@ -41,13 +37,16 @@ const zFocusRegionName = z.enum([
   'workflows',
   'progress',
   'settings',
-]);
-export type FocusRegionName = z.infer<typeof zFocusRegionName>;
+] as const;
+/**
+ * The names of the focus regions.
+ */
+export type FocusRegionName = (typeof REGION_NAMES)[number];
 
 /**
  * A map of focus regions to the elements that are part of that region.
  */
-const REGION_TARGETS: Record<FocusRegionName, Set<HTMLElement>> = zFocusRegionName.options.values().reduce(
+const REGION_TARGETS: Record<FocusRegionName, Set<HTMLElement>> = REGION_NAMES.reduce(
   (acc, region) => {
     acc[region] = new Set<HTMLElement>();
     return acc;

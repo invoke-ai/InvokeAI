@@ -6,7 +6,7 @@ import { memo, useCallback, useRef } from 'react';
 
 import type { PanelParameters } from './auto-layout-context';
 
-export const TabWithoutCloseButton = memo((props: IDockviewPanelHeaderProps<PanelParameters>) => {
+export const DockviewTab = memo((props: IDockviewPanelHeaderProps<PanelParameters>) => {
   const ref = useRef<HTMLDivElement>(null);
   const setActive = useCallback(() => {
     if (!props.api.isActive) {
@@ -28,4 +28,4 @@ export const TabWithoutCloseButton = memo((props: IDockviewPanelHeaderProps<Pane
     </Flex>
   );
 });
-TabWithoutCloseButton.displayName = 'TabWithoutCloseButton';
+DockviewTab.displayName = 'DockviewTab';

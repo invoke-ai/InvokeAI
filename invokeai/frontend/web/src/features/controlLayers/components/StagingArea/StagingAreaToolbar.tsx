@@ -1,7 +1,5 @@
 import { ButtonGroup, Flex } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
-import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
-import { getQueueItemElementId } from 'features/controlLayers/components/SimpleSession/shared';
+import { useStagingAreaContext } from 'features/controlLayers/components/StagingArea/context';
 import { StagingAreaToolbarAcceptButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarAcceptButton';
 import { StagingAreaToolbarDiscardAllButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarDiscardAllButton';
 import { StagingAreaToolbarDiscardSelectedButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarDiscardSelectedButton';
@@ -11,27 +9,13 @@ import { StagingAreaToolbarNextButton } from 'features/controlLayers/components/
 import { StagingAreaToolbarPrevButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarPrevButton';
 import { StagingAreaToolbarSaveSelectedToGalleryButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarSaveSelectedToGalleryButton';
 import { StagingAreaToolbarToggleShowResultsButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarToggleShowResultsButton';
-import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { memo, useEffect } from 'react';
+import { memo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 import { StagingAreaAutoSwitchButtons } from './StagingAreaAutoSwitchButtons';
 
 export const StagingAreaToolbar = memo(() => {
-  const canvasManager = useCanvasManager();
-  const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
-
-  const ctx = useCanvasSessionContext();
-
-  useEffect(() => {
-    return ctx.$selectedItemId.listen((id) => {
-      if (id !== null) {
-        document
-          .getElementById(getQueueItemElementId(id))
-          ?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
-      }
-    });
-  }, [ctx.$selectedItemId]);
+  const ctx = useStagingAreaContext();
 
   useHotkeys('meta+left', ctx.selectFirst, { preventDefault: true });
   useHotkeys('meta+right', ctx.selectLast, { preventDefault: true });
@@ -39,22 +23,22 @@ export const StagingAreaToolbar = memo(() => {
   return (
     <Flex gap={2}>
       <ButtonGroup borderRadius="base" shadow="dark-lg">
-        <StagingAreaToolbarPrevButton isDisabled={!shouldShowStagedImage} />
+        <StagingAreaToolbarPrevButton />
         <StagingAreaToolbarImageCountButton />
-        <StagingAreaToolbarNextButton isDisabled={!shouldShowStagedImage} />
+        <StagingAreaToolbarNextButton />
       </ButtonGroup>
       <ButtonGroup borderRadius="base" shadow="dark-lg">
         <StagingAreaToolbarAcceptButton />
         <StagingAreaToolbarToggleShowResultsButton />
         <StagingAreaToolbarSaveSelectedToGalleryButton />
         <StagingAreaToolbarMenu />
-        <StagingAreaToolbarDiscardSelectedButton isDisabled={!shouldShowStagedImage} />
+        <StagingAreaToolbarDiscardSelectedButton />
       </ButtonGroup>
       <ButtonGroup borderRadius="base" shadow="dark-lg">
         <StagingAreaAutoSwitchButtons />
       </ButtonGroup>
       <ButtonGroup borderRadius="base" shadow="dark-lg">
-        <StagingAreaToolbarDiscardAllButton isDisabled={!shouldShowStagedImage} />
+        <StagingAreaToolbarDiscardAllButton />
       </ButtonGroup>
     </Flex>
   );

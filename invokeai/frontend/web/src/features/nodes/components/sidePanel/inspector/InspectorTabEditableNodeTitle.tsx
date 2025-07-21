@@ -14,8 +14,8 @@ type Props = {
 
 const InspectorTabEditableNodeTitle = ({ nodeId, title }: Props) => {
   const dispatch = useAppDispatch();
-  const label = useNodeUserTitleSafe(nodeId);
-  const templateTitle = useNodeTemplateTitleSafe(nodeId);
+  const label = useNodeUserTitleSafe();
+  const templateTitle = useNodeTemplateTitleSafe();
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const onChange = useCallback(

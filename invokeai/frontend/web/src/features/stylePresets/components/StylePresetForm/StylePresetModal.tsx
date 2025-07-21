@@ -55,7 +55,7 @@ export const StylePresetModal = () => {
             if (blob) {
               file = new File([blob], 'style_preset.png', { type: 'image/png' });
             }
-          } catch (error) {
+          } catch {
             // do nothing
           }
         }

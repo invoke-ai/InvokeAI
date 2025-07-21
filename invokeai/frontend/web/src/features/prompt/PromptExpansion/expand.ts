@@ -27,12 +27,11 @@ export const expandPrompt = async (arg: { dispatch: AppDispatch; getState: AppGe
       dependencies,
       options: {
         prepend: true,
-        timeout: 15000,
       },
     });
     assert(output.type === 'string_output');
     promptExpansionApi.setSuccess(output.value);
-  } catch (error) {
+  } catch {
     promptExpansionApi.reset();
     toast({
       id: 'PROMPT_EXPANSION_FAILED',

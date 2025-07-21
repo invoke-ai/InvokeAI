@@ -1,4 +1,5 @@
 import { Box, Button, Flex, Icon, IconButton, Image, Tooltip } from '@invoke-ai/ui-library';
+import { dropzoneAccept } from 'common/hooks/useImageUploadButton';
 import { convertImageUrlToBlob } from 'common/util/convertImageUrlToBlob';
 import { useCallback, useEffect, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
@@ -25,7 +26,7 @@ export const WorkflowThumbnailField = ({
         const file = new File([blob], 'workflow.png', { type: 'image/png' });
         setThumbnail(file);
       }
-    } catch (error) {
+    } catch {
       setThumbnail(null);
     }
   }, []);
@@ -53,7 +54,7 @@ export const WorkflowThumbnailField = ({
   }, [onChange]);
 
   const { getInputProps, getRootProps } = useDropzone({
-    accept: { 'image/png': ['.png'], 'image/jpeg': ['.jpg', '.jpeg', '.png'] },
+    accept: dropzoneAccept,
     onDropAccepted,
     noDrag: true,
     multiple: false,

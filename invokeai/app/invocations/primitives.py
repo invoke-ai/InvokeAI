@@ -430,6 +430,15 @@ class FluxConditioningOutput(BaseInvocationOutput):
         return cls(conditioning=FluxConditioningField(conditioning_name=conditioning_name))
 
 
+@invocation_output("flux_conditioning_collection_output")
+class FluxConditioningCollectionOutput(BaseInvocationOutput):
+    """Base class for nodes that output a collection of conditioning tensors"""
+
+    collection: list[FluxConditioningField] = OutputField(
+        description="The output conditioning tensors",
+    )
+
+
 @invocation_output("sd3_conditioning_output")
 class SD3ConditioningOutput(BaseInvocationOutput):
     """Base class for nodes that output a single SD3 conditioning tensor"""

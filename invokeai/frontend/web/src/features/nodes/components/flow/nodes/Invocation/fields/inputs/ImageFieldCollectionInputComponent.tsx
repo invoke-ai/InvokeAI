@@ -40,7 +40,7 @@ export const ImageFieldCollectionInputComponent = memo(
     const { nodeId, field } = props;
     const store = useAppStore();
 
-    const isInvalid = useInputFieldIsInvalid(nodeId, field.name);
+    const isInvalid = useInputFieldIsInvalid(field.name);
 
     const dndTargetData = useMemo<AddImagesToNodeImageFieldCollection>(
       () =>

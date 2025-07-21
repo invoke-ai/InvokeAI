@@ -5,8 +5,6 @@ import type { AppStore } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
 import { extractMessageFromAssertionError } from 'common/util/extractMessageFromAssertionError';
 import { withResult, withResultAsync } from 'common/util/result';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { generateSessionIdChanged, selectGenerateSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildChatGPT4oGraph } from 'features/nodes/util/graph/generation/buildChatGPT4oGraph';
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
@@ -27,7 +25,7 @@ import { assert, AssertionError } from 'tsafe';
 
 const log = logger('generation');
 
-const enqueueRequestedGenerate = createAction('app/enqueueRequestedGenerate');
+export const enqueueRequestedGenerate = createAction('app/enqueueRequestedGenerate');
 
 const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
   const { dispatch, getState } = store;
@@ -36,11 +34,7 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
 
   const state = getState();
 
-  let destination = selectGenerateSessionId(state);
-  if (destination === null) {
-    destination = getPrefixedId('generate');
-    dispatch(generateSessionIdChanged({ id: destination }));
-  }
+  const destination = 'generate';
 
   const buildGraphResult = await withResultAsync(async () => {
     const model = state.params.model;

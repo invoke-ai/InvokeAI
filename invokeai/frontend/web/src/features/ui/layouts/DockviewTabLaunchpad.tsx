@@ -25,7 +25,7 @@ const TAB_ICONS: Record<TabName, IconType> = {
   queue: PiQueueBold,
 };
 
-export const TabWithLaunchpadIcon = memo((props: IDockviewPanelHeaderProps) => {
+export const DockviewTabLaunchpad = memo((props: IDockviewPanelHeaderProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const activeTab = useAppSelector(selectActiveTab);
 
@@ -48,4 +48,4 @@ export const TabWithLaunchpadIcon = memo((props: IDockviewPanelHeaderProps) => {
     </Flex>
   );
 });
-TabWithLaunchpadIcon.displayName = 'TabWithLaunchpadIcon';
+DockviewTabLaunchpad.displayName = 'DockviewTabLaunchpad';

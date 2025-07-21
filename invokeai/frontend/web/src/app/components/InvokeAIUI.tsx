@@ -42,7 +42,6 @@ import { $socketOptions } from 'services/events/stores';
 import type { ManagerOptions, SocketOptions } from 'socket.io-client';
 
 const App = lazy(() => import('./App'));
-const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
 
 interface Props extends PropsWithChildren {
   apiUrl?: string;
@@ -318,7 +317,7 @@ const InvokeAIUI = ({
     if (import.meta.env.MODE === 'development') {
       window.$store = $store;
     }
-    () => {
+    return () => {
       $store.set(undefined);
       if (import.meta.env.MODE === 'development') {
         window.$store = undefined;
@@ -330,9 +329,7 @@ const InvokeAIUI = ({
     <React.StrictMode>
       <Provider store={store}>
         <React.Suspense fallback={<Loading />}>
-          <ThemeLocaleProvider>
-            <App config={config} studioInitAction={studioInitAction} />
-          </ThemeLocaleProvider>
+          <App config={config} studioInitAction={studioInitAction} />
         </React.Suspense>
       </Provider>
     </React.StrictMode>

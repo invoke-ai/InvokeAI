@@ -22,9 +22,9 @@ interface Props {
 }
 
 export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
-  const fieldTemplate = useInputFieldTemplateOrThrow(nodeId, fieldName);
-  const isInvalid = useInputFieldIsInvalid(nodeId, fieldName);
-  const isConnected = useInputFieldIsConnected(nodeId, fieldName);
+  const fieldTemplate = useInputFieldTemplateOrThrow(fieldName);
+  const isInvalid = useInputFieldIsInvalid(fieldName);
+  const isConnected = useInputFieldIsConnected(fieldName);
 
   if (fieldTemplate.input === 'connection' || isConnected) {
     return (

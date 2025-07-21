@@ -1,25 +1,13 @@
-import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { $templates } from 'features/nodes/store/nodesSlice';
-import { selectNodesSlice } from 'features/nodes/store/selectors';
-import { isInvocationNode } from 'features/nodes/types/invocation';
+import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { useMemo } from 'react';
 
-export const useNodeTemplateTitleSafe = (nodeId: string): string | null => {
-  const templates = useStore($templates);
+export const useNodeTemplateTitleSafe = (): string | null => {
+  const ctx = useInvocationNodeContext();
   const selector = useMemo(
-    () =>
-      createSelector(selectNodesSlice, (nodesSlice) => {
-        const node = nodesSlice.nodes.find((node) => node.id === nodeId);
-        if (!isInvocationNode(node)) {
-          return null;
-        }
-        const template = templates[node.data.type];
-        return template?.title ?? null;
-      }),
-    [nodeId, templates]
+    () => createSelector(ctx.selectNodeTemplateSafe, (template) => template?.title ?? ''),
+    [ctx]
   );
-  const title = useAppSelector(selector);
-  return title;
+  return useAppSelector(selector);
 };

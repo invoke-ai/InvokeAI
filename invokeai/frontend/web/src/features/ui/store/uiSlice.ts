@@ -12,9 +12,6 @@ export const uiSlice = createSlice({
     setActiveTab: (state, action: PayloadAction<UIState['activeTab']>) => {
       state.activeTab = action.payload;
     },
-    activeTabCanvasRightPanelChanged: (state, action: PayloadAction<UIState['activeTabCanvasRightPanel']>) => {
-      state.activeTabCanvasRightPanel = action.payload;
-    },
     setShouldShowImageDetails: (state, action: PayloadAction<UIState['shouldShowImageDetails']>) => {
       state.shouldShowImageDetails = action.payload;
     },
@@ -68,12 +65,14 @@ export const uiSlice = createSlice({
     shouldShowNotificationChanged: (state, action: PayloadAction<UIState['shouldShowNotificationV2']>) => {
       state.shouldShowNotificationV2 = action.payload;
     },
+    pickerCompactViewStateChanged: (state, action: PayloadAction<{ pickerId: string; isCompact: boolean }>) => {
+      state.pickerCompactViewStates[action.payload.pickerId] = action.payload.isCompact;
+    },
   },
 });
 
 export const {
   setActiveTab,
-  activeTabCanvasRightPanelChanged,
   setShouldShowImageDetails,
   setShouldShowProgressInViewer,
   accordionStateChanged,
@@ -81,6 +80,7 @@ export const {
   shouldShowNotificationChanged,
   textAreaSizesStateChanged,
   dockviewStorageKeyChanged,
+  pickerCompactViewStateChanged,
 } = uiSlice.actions;
 
 export const selectUiSlice = (state: RootState) => state.ui;

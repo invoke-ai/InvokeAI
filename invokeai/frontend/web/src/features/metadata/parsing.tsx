@@ -92,7 +92,7 @@ import { useTranslation } from 'react-i18next';
 import { modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig, ModelType } from 'services/api/types';
 import { assert } from 'tsafe';
-import z from 'zod/v4';
+import z from 'zod';
 
 const MetadataLabel = ({ i18nKey }: { i18nKey: string }) => {
   const { t } = useTranslation();
@@ -990,7 +990,7 @@ const recallByHandlers = async (arg: {
       const value = await handler.parse(metadata, store);
       handler.recall(value, store);
       recalled.set(handler, value);
-    } catch (error) {
+    } catch {
       //
     }
   }
@@ -1146,7 +1146,6 @@ export function useSingleMetadataDatum<T>(metadata: unknown, handler: SingleMeta
   return { data, recall };
 }
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 export function useCollectionMetadataDatum<T extends any[]>(metadata: unknown, handler: CollectionMetadataHandler<T>) {
   const store = useAppStore();
   const [data, setData] = useState<Data<T>>(buildUnparsedData);

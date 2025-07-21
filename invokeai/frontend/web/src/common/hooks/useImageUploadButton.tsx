@@ -6,7 +6,7 @@ import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { selectIsClientSideUploadEnabled } from 'features/system/store/configSlice';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
-import type { FileRejection } from 'react-dropzone';
+import type { Accept, FileRejection } from 'react-dropzone';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 import { PiUploadBold } from 'react-icons/pi';
@@ -14,6 +14,18 @@ import { uploadImages, useUploadImageMutation } from 'services/api/endpoints/ima
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 import type { SetOptional } from 'type-fest';
+
+const addUpperCaseReducer = (acc: string[], ext: string) => {
+  acc.push(ext);
+  acc.push(ext.toUpperCase());
+  return acc;
+};
+
+export const dropzoneAccept: Accept = {
+  'image/png': ['.png'].reduce(addUpperCaseReducer, [] as string[]),
+  'image/jpeg': ['.jpg', '.jpeg', '.png'].reduce(addUpperCaseReducer, [] as string[]),
+  'image/webp': ['.webp'].reduce(addUpperCaseReducer, [] as string[]),
+};
 
 import { useClientSideUpload } from './useClientSideUpload';
 type UseImageUploadButtonArgs =
@@ -164,11 +176,7 @@ export const useImageUploadButton = ({
     getInputProps: getUploadInputProps,
     open: openUploader,
   } = useDropzone({
-    accept: {
-      'image/png': ['.png'],
-      'image/jpeg': ['.jpg', '.jpeg', '.png'],
-      'image/webp': ['.webp'],
-    },
+    accept: dropzoneAccept,
     onDropAccepted,
     onDropRejected,
     disabled: isDisabled,

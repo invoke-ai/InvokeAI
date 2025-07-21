@@ -2,7 +2,7 @@ import { NUMPY_RAND_MAX } from 'app/constants';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { buildZodTypeGuard } from 'common/util/zodUtils';
 import { zModelIdentifierField, zSchedulerField } from 'features/nodes/types/common';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 /**
  * Schemas, types and type guards for parameters.
@@ -131,8 +131,8 @@ export type ParameterCLIPGEmbedModel = z.infer<typeof zParameterCLIPGEmbedModel>
 // #endregion
 
 // #region LoRA Model
-const zParameterLoRAModel = zModelIdentifierField;
-export type ParameterLoRAModel = z.infer<typeof zParameterLoRAModel>;
+const _zParameterLoRAModel = zModelIdentifierField;
+export type ParameterLoRAModel = z.infer<typeof _zParameterLoRAModel>;
 // #endregion
 
 // #region VAE Model
