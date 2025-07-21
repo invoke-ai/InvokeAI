@@ -160,6 +160,7 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('gallery', 'galleryNavDownAlt', ['alt+down']);
     addHotkey('gallery', 'galleryNavLeftAlt', ['alt+left']);
     addHotkey('gallery', 'deleteSelection', ['delete', 'backspace']);
+    addHotkey('gallery', 'starImage', ['.']);
 
     return data;
   }, [isMacOS, isModelManagerEnabled, t]);

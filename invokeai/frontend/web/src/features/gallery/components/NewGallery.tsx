@@ -26,6 +26,8 @@ import type {
 import { VirtuosoGrid } from 'react-virtuoso';
 import { imagesApi } from 'services/api/endpoints/images';
 import { useDebounce } from 'use-debounce';
+import { useImageDTO } from 'services/api/endpoints/images';
+import { useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
 
 import { GalleryImage, GalleryImagePlaceholder } from './ImageGrid/GalleryImage';
 import { GallerySelectionCountTag } from './ImageGrid/GallerySelectionCountTag';
@@ -462,6 +464,30 @@ export const NewGallery = memo(() => {
   const { onRangeChanged } = useRangeBasedImageFetching({
     imageNames,
     enabled: !isLoading,
+  });
+
+  const lastSelectedImage = useAppSelector(selectLastSelectedImage);
+  const selectionCount = useAppSelector((state) => state.gallery.selection.length);
+  const isGalleryFocused = getFocusedRegion() === 'gallery';
+  const imageDTO = useImageDTO(lastSelectedImage);
+  const [starImages] = useStarImagesMutation();
+  const [unstarImages] = useUnstarImagesMutation();
+
+  const handleStarHotkey = useCallback(() => {
+    if (!imageDTO) return;
+    if (imageDTO.starred) {
+      unstarImages({ image_names: [imageDTO.image_name] });
+    } else {
+      starImages({ image_names: [imageDTO.image_name] });
+    }
+  }, [imageDTO, starImages, unstarImages]);
+
+  useRegisteredHotkeys({
+    id: 'starImage',
+    category: 'gallery',
+    callback: handleStarHotkey,
+    options: { enabled: !!imageDTO && selectionCount === 1 && isGalleryFocused },
+    dependencies: [imageDTO, selectionCount, isGalleryFocused, handleStarHotkey],
   });
 
   useKeepSelectedImageInView(imageNames, virtuosoRef, rootRef, rangeRef);

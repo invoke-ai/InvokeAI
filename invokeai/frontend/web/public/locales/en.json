@@ -470,6 +470,11 @@
             "togglePanels": {
                 "title": "Toggle Panels",
                 "desc": "Show or hide both left and right panels at once."
+            },
+            "selectGenerateTab": {
+                "title": "Select the Generate Tab",
+                "desc": "Selects the Generate tab.",
+                "key": "1"
             }
         },
         "canvas": {
@@ -607,6 +612,16 @@
             "fitBboxToMasks": {
                 "title": "Fit Bbox To Masks",
                 "desc": "Automatically adjust the generation bounding box to fit visible inpaint masks"
+            },
+            "applySegmentAnything": {
+                "title": "Apply Segment Anything",
+                "desc": "Apply the current Segment Anything mask.",
+                "key": "enter"
+            },
+            "cancelSegmentAnything": {
+                "title": "Cancel Segment Anything",
+                "desc": "Cancel the current Segment Anything operation.",
+                "key": "esc"
             }
         },
         "workflows": {
@@ -736,6 +751,10 @@
             "deleteSelection": {
                 "title": "Delete",
                 "desc": "Delete all selected images. By default, you will be prompted to confirm deletion. If the images are currently in use in the app, you will be warned."
+            },
+            "starImage": {
+                "title": "Star/Unstar Image",
+                "desc": "Star or unstar the selected image."
             }
         }
     },
