@@ -1,5 +1,5 @@
 import { graphlib, layout } from '@dagrejs/dagre';
-import type { Edge, NodeChange } from '@xyflow/react';
+import type { Edge, NodePositionChange } from '@xyflow/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { nodesChanged } from 'features/nodes/store/nodesSlice';
 import { selectEdges, selectNodes } from 'features/nodes/store/selectors';
@@ -18,6 +18,23 @@ import { useCallback } from 'react';
 const ESTIMATED_NOTES_NODE_HEIGHT = 200;
 const DEFAULT_NODE_HEIGHT = NODE_WIDTH;
 
+const getNodeHeight = (node: AnyNode): number => {
+  if (node.measured?.height) {
+    return node.measured.height;
+  }
+  if (isNotesNode(node)) {
+    return ESTIMATED_NOTES_NODE_HEIGHT;
+  }
+  return DEFAULT_NODE_HEIGHT;
+};
+
+const getNodeWidth = (node: AnyNode): number => {
+  if (node.measured?.width) {
+    return node.measured.width;
+  }
+  return NODE_WIDTH;
+};
+
 export const useAutoLayout = (): (() => void) => {
   const dispatch = useAppDispatch();
   const nodes = useAppSelector(selectNodes);
@@ -29,6 +46,7 @@ export const useAutoLayout = (): (() => void) => {
   const nodeAlignment = useAppSelector(selectNodeAlignment);
 
   const autoLayout = useCallback(() => {
+    // We'll do graph layout using dagre, then convert the results to reactflow position changes
     const g = new graphlib.Graph();
 
     g.setGraph({
@@ -57,18 +75,10 @@ export const useAutoLayout = (): (() => void) => {
         selectionAnchor.minX = Math.min(selectionAnchor.minX, node.position.x);
         selectionAnchor.minY = Math.min(selectionAnchor.minY, node.position.y);
       }
-      // update the Height based on the node's measured height or use a default value
-      const measuredHeight = node.measured?.height;
-      const height =
-        typeof measuredHeight === 'number'
-          ? measuredHeight
-          : isNotesNode(node)
-            ? ESTIMATED_NOTES_NODE_HEIGHT
-            : DEFAULT_NODE_HEIGHT;
 
       g.setNode(node.id, {
-        width: node.width ?? NODE_WIDTH,
-        height: height,
+        width: getNodeWidth(node),
+        height: getNodeHeight(node),
       });
     });
 
@@ -108,8 +118,8 @@ export const useAutoLayout = (): (() => void) => {
       offsetY = selectionAnchor.minY - layoutAnchor.minY;
     }
 
-    // Create position changes for each node based on the new layout
-    const positionChanges: NodeChange<AnyNode>[] = nodesToLayout.map((node) => {
+    // Create reactflow position changes for each node based on the new layout
+    const positionChanges: NodePositionChange[] = nodesToLayout.map((node) => {
       const nodeInfo = g.node(node.id);
       // Convert from center-based position to top-left-based position
       const x = nodeInfo.x - nodeInfo.width / 2;

@@ -3,10 +3,14 @@ import { createSelector, createSlice } from '@reduxjs/toolkit';
 import { SelectionMode } from '@xyflow/react';
 import type { PersistConfig, RootState } from 'app/store/store';
 import type { Selector } from 'react-redux';
+import z from 'zod';
 
-export type LayeringStrategy = 'network-simplex' | 'longest-path';
-export type LayoutDirection = 'TB' | 'LR';
-export type NodeAlignment = 'UL' | 'UR' | 'DL' | 'DR';
+export const zLayeringStrategy = z.enum(['network-simplex', 'longest-path']);
+export type LayeringStrategy = z.infer<typeof zLayeringStrategy>;
+export const zLayoutDirection = z.enum(['TB', 'LR']);
+export type LayoutDirection = z.infer<typeof zLayoutDirection>;
+export const zNodeAlignment = z.enum(['UL', 'UR', 'DL', 'DR']);
+export type NodeAlignment = z.infer<typeof zNodeAlignment>;
 
 export type WorkflowSettingsState = {
   _version: 1;
