@@ -263,7 +263,7 @@ export const Flow = memo(() => {
         noWheelClassName={NO_WHEEL_CLASS}
         noPanClassName={NO_PAN_CLASS}
       >
-        <Background />
+        <Background gap={snapGrid} offset={snapGrid} />
       </ReactFlow>
       <HotkeyIsolator />
     </>
