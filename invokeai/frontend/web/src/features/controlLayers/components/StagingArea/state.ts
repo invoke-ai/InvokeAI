@@ -24,7 +24,6 @@ export type StagingAreaAppApi = {
   getAutoSwitch: () => AutoSwitchMode;
   onAutoSwitchChange?: (mode: AutoSwitchMode) => void;
   getImageDTO: (imageName: string) => Promise<ImageDTO | null>;
-  loadImage: (imageName: string) => Promise<HTMLImageElement>;
   onItemsChanged: (handler: (data: S['SessionQueueItem'][]) => Promise<void> | void) => () => void;
   onQueueItemStatusChanged: (handler: (data: S['QueueItemStatusChangedEvent']) => Promise<void> | void) => () => void;
   onInvocationProgress: (handler: (data: S['InvocationProgressEvent']) => Promise<void> | void) => () => void;
@@ -36,6 +35,7 @@ export type ProgressData = {
   progressEvent: S['InvocationProgressEvent'] | null;
   progressImage: ProgressImage | null;
   imageDTO: ImageDTO | null;
+  imageLoaded: boolean;
 };
 
 /** Combined data for the currently selected item */
@@ -51,6 +51,7 @@ export const getInitialProgressData = (itemId: number): ProgressData => ({
   progressEvent: null,
   progressImage: null,
   imageDTO: null,
+  imageLoaded: false,
 });
 type ProgressDataMap = Record<number, ProgressData | undefined>;
 
@@ -282,7 +283,7 @@ export class StagingAreaApi {
        * queue items as part of the list query, so it's rather inefficient to fetch it again here.
        *
        * To reduce the number of extra network requests, we instead store this item as the last completed item.
-       * Then in the progress data sync effect, we process the queue item load its image.
+       * Then when the image loads, it calls onImageLoaded and we switch to it then.
        */
       this.$lastCompletedItemId.set(data.item_id);
     }
@@ -312,71 +313,72 @@ export class StagingAreaApi {
 
     const progressData = this.$progressData.get();
 
-    const toDelete: number[] = [];
-    const toUpdate: ProgressData[] = [];
-
     for (const [id, datum] of objectEntries(progressData)) {
-      if (!datum) {
-        toDelete.push(id);
+      if (!datum || !items.find(({ item_id }) => item_id === datum.itemId)) {
+        this.$progressData.setKey(id, undefined);
         continue;
-      }
-      const item = items.find(({ item_id }) => item_id === datum.itemId);
-      if (!item) {
-        toDelete.push(datum.itemId);
-      } else if (item.status === 'canceled' || item.status === 'failed') {
-        toUpdate.push({
-          ...datum,
-          progressEvent: null,
-          progressImage: null,
-          imageDTO: null,
-        });
       }
     }
 
     for (const item of items) {
       const datum = progressData[item.item_id];
 
-      if (this.$lastStartedItemId.get() === item.item_id && this._app?.getAutoSwitch() === 'switch_on_start') {
-        this.$selectedItemId.set(item.item_id);
-        this.$lastStartedItemId.set(null);
-      }
-
-      if (datum?.imageDTO) {
-        continue;
-      }
-      const outputImageName = getOutputImageName(item);
-      if (!outputImageName) {
-        continue;
-      }
-      const imageDTO = await this._app?.getImageDTO(outputImageName);
-      if (!imageDTO) {
+      if (item.status === 'canceled' || item.status === 'failed') {
+        this.$progressData.setKey(item.item_id, {
+          ...(datum ?? getInitialProgressData(item.item_id)),
+          progressEvent: null,
+          progressImage: null,
+          imageDTO: null,
+        });
         continue;
       }
 
-      // This is the load logic mentioned in the comment in the QueueItemStatusChangedEvent handler above.
-      if (this.$lastCompletedItemId.get() === item.item_id && this._app?.getAutoSwitch() === 'switch_on_finish') {
-        this._app.loadImage(imageDTO.image_url).then(() => {
+      if (item.status === 'in_progress') {
+        if (this.$lastStartedItemId.get() === item.item_id && this._app?.getAutoSwitch() === 'switch_on_start') {
           this.$selectedItemId.set(item.item_id);
-          this.$lastCompletedItemId.set(null);
+          this.$lastStartedItemId.set(null);
+        }
+        continue;
+      }
+
+      if (item.status === 'completed') {
+        if (datum?.imageDTO) {
+          continue;
+        }
+        const outputImageName = getOutputImageName(item);
+        if (!outputImageName) {
+          continue;
+        }
+        const imageDTO = await this._app?.getImageDTO(outputImageName);
+        if (!imageDTO) {
+          continue;
+        }
+
+        this.$progressData.setKey(item.item_id, {
+          ...(datum ?? getInitialProgressData(item.item_id)),
+          imageDTO,
         });
       }
-
-      toUpdate.push({
-        ...getInitialProgressData(item.item_id),
-        ...datum,
-        imageDTO,
-      });
-    }
-
-    for (const itemId of toDelete) {
-      this.$progressData.setKey(itemId, undefined);
-    }
-
-    for (const datum of toUpdate) {
-      this.$progressData.setKey(datum.itemId, datum);
     }
 
     this.$items.set(items);
+  };
+
+  onImageLoaded = (itemId: number) => {
+    const item = this.$items.get().find(({ item_id }) => item_id === itemId);
+    if (!item) {
+      return;
+    }
+    // This is the load logic mentioned in the comment in the QueueItemStatusChangedEvent handler above.
+    if (this.$lastCompletedItemId.get() === item.item_id && this._app?.getAutoSwitch() === 'switch_on_finish') {
+      this.$selectedItemId.set(item.item_id);
+      this.$lastCompletedItemId.set(null);
+    }
+    const datum = this.$progressData.get()[item.item_id];
+    this.$progressData.setKey(item.item_id, {
+      ...(datum ?? getInitialProgressData(item.item_id)),
+      imageLoaded: true,
+    });
   };
 
   /** Creates a computed value that returns true if the given item ID is selected. */
@@ -402,25 +404,13 @@ export class StagingAreaApi {
 const setProgress = ($progressData: MapStore<ProgressDataMap>, data: S['InvocationProgressEvent']) => {
   const progressData = $progressData.get();
   const current = progressData[data.item_id];
-  if (current) {
-    const next = { ...current };
-    next.progressEvent = data;
-    if (data.image) {
-      next.progressImage = data.image;
-    }
-    $progressData.set({
-      ...progressData,
-      [data.item_id]: next,
-    });
-  } else {
-    $progressData.set({
-      ...progressData,
-      [data.item_id]: {
-        itemId: data.item_id,
-        progressEvent: data,
-        progressImage: data.image ?? null,
-        imageDTO: null,
-      },
-    });
+  const next = { ...(current ?? getInitialProgressData(data.item_id)) };
+  next.progressEvent = data;
+  if (data.image) {
+    next.progressImage = data.image;
   }
+  $progressData.set({
+    ...progressData,
+    [data.item_id]: next,
+  });
 };

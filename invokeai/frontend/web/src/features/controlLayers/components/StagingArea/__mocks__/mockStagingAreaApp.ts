@@ -12,7 +12,6 @@ export const createMockStagingAreaApp = (): StagingAreaAppApi & {
   _triggerInvocationProgress: (data: S['InvocationProgressEvent']) => void;
   _setAutoSwitchMode: (mode: AutoSwitchMode) => void;
   _setImageDTO: (imageName: string, imageDTO: ImageDTO | null) => void;
-  _setLoadImageDelay: (delay: number) => void;
 } => {
   const itemsChangedHandlers = new Set<(items: S['SessionQueueItem'][]) => void>();
   const queueItemStatusChangedHandlers = new Set<(data: S['QueueItemStatusChangedEvent']) => void>();
@@ -20,7 +19,6 @@ export const createMockStagingAreaApp = (): StagingAreaAppApi & {
 
   let autoSwitchMode: AutoSwitchMode = 'switch_on_start';
   const imageDTOs = new Map<string, ImageDTO | null>();
-  let loadImageDelay = 0;
 
   return {
     onDiscard: vi.fn(),
@@ -35,22 +33,6 @@ export const createMockStagingAreaApp = (): StagingAreaAppApi & {
     onAutoSwitchChange: vi.fn(),
     getImageDTO: vi.fn((imageName: string) => {
       return Promise.resolve(imageDTOs.get(imageName) || null);
-    }),
-    loadImage: vi.fn(async (imageName: string) => {
-      if (loadImageDelay > 0) {
-        await new Promise((resolve) => {
-          setTimeout(resolve, loadImageDelay);
-        });
-      }
-      // Mock HTMLImageElement for testing environment
-      const mockImage = {
-        src: imageName,
-        width: 512,
-        height: 512,
-        onload: null,
-        onerror: null,
-      } as HTMLImageElement;
-      return mockImage;
     }),
     onItemsChanged: vi.fn((handler) => {
       itemsChangedHandlers.add(handler);
@@ -80,9 +62,6 @@ export const createMockStagingAreaApp = (): StagingAreaAppApi & {
     },
     _setImageDTO: (imageName: string, imageDTO: ImageDTO | null) => {
       imageDTOs.set(imageName, imageDTO);
-    },
-    _setLoadImageDelay: (delay: number) => {
-      loadImageDelay = delay;
     },
   };
 };
