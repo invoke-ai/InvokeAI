@@ -2603,64 +2603,7 @@
     "supportVideos": {
         "gettingStarted": "Iniziare",
         "supportVideos": "Video di supporto",
-        "videos": {
-            "usingControlLayersAndReferenceGuides": {
-                "title": "Utilizzo di livelli di controllo e guide di riferimento",
-                "description": "Scopri come guidare la creazione delle tue immagini con livelli di controllo e immagini di riferimento."
-            },
-            "creatingYourFirstImage": {
-                "description": "Introduzione alla creazione di un'immagine da zero utilizzando gli strumenti di Invoke.",
-                "title": "Creazione della tua prima immagine"
-            },
-            "understandingImageToImageAndDenoising": {
-                "description": "Panoramica delle trasformazioni immagine-a-immagine e della riduzione del rumore in Invoke.",
-                "title": "Comprendere immagine-a-immagine e riduzione del rumore"
-            },
-            "howDoIDoImageToImageTransformation": {
-                "description": "Tutorial su come eseguire trasformazioni da immagine a immagine in Invoke.",
-                "title": "Come si esegue la trasformazione da immagine-a-immagine?"
-            },
-            "howDoIUseInpaintMasks": {
-                "title": "Come si usano le maschere Inpaint?",
-                "description": "Come applicare maschere inpaint per la correzione e la variazione delle immagini."
-            },
-            "howDoIOutpaint": {
-                "description": "Guida all'outpainting oltre i confini dell'immagine originale.",
-                "title": "Come posso eseguire l'outpainting?"
-            },
-            "exploringAIModelsAndConceptAdapters": {
-                "description": "Approfondisci i modelli di intelligenza artificiale e scopri come utilizzare gli adattatori concettuali per il controllo creativo.",
-                "title": "Esplorazione dei modelli di IA e degli adattatori concettuali"
-            },
-            "upscaling": {
-                "title": "Ampliamento",
-                "description": "Come ampliare le immagini con gli strumenti di Invoke per migliorarne la risoluzione."
-            },
-            "creatingAndComposingOnInvokesControlCanvas": {
-                "description": "Impara a comporre immagini utilizzando la tela di controllo di Invoke.",
-                "title": "Creare e comporre sulla tela di controllo di Invoke"
-            },
-            "howDoIGenerateAndSaveToTheGallery": {
-                "description": "Passaggi per generare e salvare le immagini nella galleria.",
-                "title": "Come posso generare e salvare nella Galleria?"
-            },
-            "howDoIEditOnTheCanvas": {
-                "title": "Come posso apportare modifiche sulla tela?",
-                "description": "Guida alla modifica delle immagini direttamente sulla tela."
-            },
-            "howDoIUseControlNetsAndControlLayers": {
-                "title": "Come posso utilizzare le Reti di Controllo e i Livelli di Controllo?",
-                "description": "Impara ad applicare livelli di controllo e reti di controllo alle tue immagini."
-            },
-            "howDoIUseGlobalIPAdaptersAndReferenceImages": {
-                "title": "Come si utilizzano gli adattatori IP globali e le immagini di riferimento?",
-                "description": "Introduzione all'aggiunta di immagini di riferimento e adattatori IP globali."
-            }
-        },
-        "controlCanvas": "Tela di Controllo",
-        "watch": "Guarda",
-        "studioSessionsDesc1": "Dai un'occhiata a <StudioSessionsPlaylistLink /> per approfondimenti su Invoke.",
-        "studioSessionsDesc2": "Unisciti al nostro <DiscordLink /> per partecipare alle sessioni live e fare domande. Le sessioni vengono caricate sulla playlist la settimana successiva."
+        "watch": "Guarda"
     },
     "modelCache": {
         "clear": "Cancella la cache del modello",

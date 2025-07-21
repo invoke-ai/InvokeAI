@@ -2579,63 +2579,6 @@
     "supportVideos": {
         "supportVideos": "サポートビデオ",
         "gettingStarted": "はじめる",
-        "controlCanvas": "コントロールキャンバス",
-        "watch": "ウォッチ",
-        "studioSessionsDesc1": "Invoke の詳細な情報については、<StudioSessionsPlaylistLink /> をご覧ください。",
-        "studioSessionsDesc2": "<DiscordLink /> に参加してライブセッションに参加したり、質問したりしてください。セッションは翌週にプレイリストにアップロードされます。",
-        "videos": {
-            "creatingYourFirstImage": {
-                "title": "最初の画像を作成する",
-                "description": "Invoke のツールを使用してゼロからイメージを作成する方法の紹介。"
-            },
-            "usingControlLayersAndReferenceGuides": {
-                "title": "制御レイヤーとリファレンスガイドの使用",
-                "description": "コントロールレイヤーと参照画像を使用して画像作成をガイドする方法を学びます。"
-            },
-            "understandingImageToImageAndDenoising": {
-                "title": "画像間変換とノイズ除去の理解",
-                "description": "Invoke でのimg2imgの変換とノイズ除去の概要。"
-            },
-            "exploringAIModelsAndConceptAdapters": {
-                "title": "AIモデルとコンセプトアダプターの探索",
-                "description": "AI モデルの詳細と、クリエイティブなコントロールのためのコンセプトアダプターの使用方法について説明します。"
-            },
-            "creatingAndComposingOnInvokesControlCanvas": {
-                "title": "Invoke のコントロール キャンバスでの作成と構成",
-                "description": "Invoke のコントロール キャンバスを使用して画像を構成する方法を学びます。"
-            },
-            "upscaling": {
-                "title": "アップスケーリング",
-                "description": "Invoke のツールを使用して画像を拡大し、解像度を高める方法。"
-            },
-            "howDoIGenerateAndSaveToTheGallery": {
-                "title": "ギャラリーを生成して保存するにはどうすればよいですか?",
-                "description": "画像を生成してギャラリーに保存する手順。"
-            },
-            "howDoIEditOnTheCanvas": {
-                "title": "キャンバス上で編集するにはどうすればいいですか?",
-                "description": "キャンバス上で直接画像を編集するためのガイド。"
-            },
-            "howDoIDoImageToImageTransformation": {
-                "title": "img2imgへの変換を行うにはどうすればいいですか?",
-                "description": "Invoke でimg2imgの変換を実行する方法に関するチュートリアル。"
-            },
-            "howDoIUseControlNetsAndControlLayers": {
-                "title": "コントロールネットとコントロールレイヤーはどのように使用すればよいですか?",
-                "description": "画像にコントロールレイヤーとコントロール ネットを適用する方法を学びます。"
-            },
-            "howDoIUseGlobalIPAdaptersAndReferenceImages": {
-                "title": "グローバル IP アダプターと参照イメージを使用するにはどうすればよいですか?",
-                "description": "参照画像とグローバル IP アダプターの追加の概要。"
-            },
-            "howDoIUseInpaintMasks": {
-                "title": "インペイントマスクはどのように使用すればいいですか?",
-                "description": "画像の補正とバリエーションのためにインペイントマスクを適用する方法。"
-            },
-            "howDoIOutpaint": {
-                "title": "どうやってアウトペイントするのですか?",
-                "description": "元の画像の境界を越えてペイントするためのガイド。"
-            }
-        }
+        "watch": "ウォッチ"
     }
 }
