@@ -68,14 +68,8 @@ class CacheType(str, Enum):
 
 def add_cover_image_to_model_config(config: AnyModelConfig, dependencies: Type[ApiDependencies]) -> AnyModelConfig:
     """Add a cover image URL to a model configuration."""
-    # If cover_image is already set and looks like a file path, serve it directly
-    if config.cover_image and not config.cover_image.startswith('http'):
-        # This is a file path, so we'll serve it via a special endpoint
-        config.cover_image = f"/api/v2/models/i/{config.key}/cover_image"
-    else:
-        # Try to get from model images service
-        cover_image = dependencies.invoker.services.model_images.get_url(config.key)
-        config.cover_image = cover_image
+    cover_image = dependencies.invoker.services.model_images.get_url(config.key)
+    config.cover_image = cover_image
     return config
 
 
@@ -347,58 +341,6 @@ async def get_model_image(
         return response
     except Exception:
         raise HTTPException(status_code=404)
-
-
-@model_manager_router.get(
-    "/i/{key}/cover_image",
-    operation_id="get_model_cover_image",
-    responses={
-        200: {
-            "description": "The model cover image was fetched successfully",
-        },
-        400: {"description": "Bad request"},
-        404: {"description": "The model cover image could not be found"},
-    },
-    status_code=200,
-)
-async def get_model_cover_image(
-    key: str = Path(description="The key of the model whose cover image to get"),
-) -> FileResponse:
-    """Gets a cover image file for a model from its stored path"""
-
-    try:
-        # Get the model config to find the cover image path
-        config = ApiDependencies.invoker.services.model_manager.store.get_model(key)
-        
-        if not config.cover_image:
-            raise HTTPException(status_code=404, detail="No cover image found for this model")
-        
-        # Construct the full path to the image file
-        models_path = ApiDependencies.invoker.services.configuration.models_path
-        image_path = models_path / config.cover_image
-        
-        if not image_path.exists():
-            raise HTTPException(status_code=404, detail="Cover image file not found")
-        
-        # Determine the media type based on file extension
-        media_type = "image/png"  # default
-        if image_path.suffix.lower() in ['.jpg', '.jpeg']:
-            media_type = "image/jpeg"
-        elif image_path.suffix.lower() == '.webp':
-            media_type = "image/webp"
-        
-        response = FileResponse(
-            image_path,
-            media_type=media_type,
-            filename=image_path.name,
-            content_disposition_type="inline",
-        )
-        response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
-        return response
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Error serving cover image: {str(e)}")
 
 
 @model_manager_router.patch(

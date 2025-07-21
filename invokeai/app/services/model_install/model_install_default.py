@@ -1,6 +1,5 @@
 """Model installation class."""
 
-import json
 import locale
 import os
 import re
@@ -661,7 +660,6 @@ class ModelInstallService(ModelInstallServiceBase):
             return ModelProbe.probe(model_path=model_path, fields=fields, hash_algo=hash_algo)  # type: ignore
         except InvalidModelConfigException:
             return ModelConfigBase.classify(model_path, hash_algo, **fields)
-
 
     def _register(
         self, model_path: Path, config: Optional[ModelRecordChanges] = None, info: Optional[AnyModelConfig] = None
