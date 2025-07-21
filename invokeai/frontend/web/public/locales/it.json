@@ -932,9 +932,9 @@
         "psdExportSuccessDesc": "Esportazione riuscita di {{count}} livelli nel file PSD",
         "problemExportingPSD": "Problema durante l'esportazione PSD",
         "noValidLayerAdapters": "Nessun adattatore di livello valido trovato",
-        "fluxKontextIncompatibleGenerationMode": "Flux Kontext supporta solo la conversione da testo a immagine. Utilizza altri modelli per le attività di conversione da immagine a immagine, inpainting e outpainting.",
+        "fluxKontextIncompatibleGenerationMode": "FLUX Kontext non supporta la generazione di immagini posizionate sulla tela. Riprova utilizzando la sezione Immagine di riferimento e disattiva tutti i livelli raster.",
         "canvasManagerNotAvailable": "Gestione tela non disponibile",
-        "promptExpansionFailed": "Espansione del prompt non riuscita",
+        "promptExpansionFailed": "Abbiamo riscontrato un problema. Riprova a eseguire l'espansione del prompt.",
         "uploadAndPromptGenerationFailed": "Impossibile caricare l'immagine e generare il prompt",
         "promptGenerationStarted": "Generazione del prompt avviata"
     },
@@ -1736,6 +1736,20 @@
             "paragraphs": [
                 "Controlla quale area viene modificata, in base all'intensità di riduzione del rumore."
             ]
+        },
+        "tileSize": {
+            "heading": "Dimensione riquadro",
+            "paragraphs": [
+                "Controlla la dimensione dei riquadri utilizzati durante il processo di ampliamento. Riquadri più grandi consumano più memoria, ma possono produrre risultati migliori.",
+                "I modelli SD1.5 hanno un valore predefinito di 768, mentre i modelli SDXL hanno un valore predefinito di 1024. Ridurre le dimensioni dei riquadri in caso di problemi di memoria."
+            ]
+        },
+        "tileOverlap": {
+            "heading": "Sovrapposizione riquadri",
+            "paragraphs": [
+                "Controlla la sovrapposizione tra riquadri adiacenti durante l'ampliamento. Valori di sovrapposizione più elevati aiutano a ridurre le giunzioni visibili tra i riquadri, ma consuma più memoria.",
+                "Il valore predefinito di 128 è adatto alla maggior parte dei casi, ma è possibile modificarlo in base alle proprie esigenze specifiche e ai limiti di memoria."
+            ]
         }
     },
     "sdxl": {
@@ -2274,7 +2288,11 @@
                 "label": "Preserva la regione mascherata"
             },
             "isolatedLayerPreview": "Anteprima livello isolato",
-            "isolatedLayerPreviewDesc": "Se visualizzare solo questo livello quando si eseguono operazioni come il filtraggio o la trasformazione."
+            "isolatedLayerPreviewDesc": "Se visualizzare solo questo livello quando si eseguono operazioni come il filtraggio o la trasformazione.",
+            "saveAllImagesToGallery": {
+                "alert": "Invia le nuove generazioni alla Galleria, bypassando la Tela",
+                "label": "Invia le nuove generazioni alla Galleria"
+            }
         },
         "transform": {
             "reset": "Reimposta",
@@ -2324,7 +2342,8 @@
             "newRegionalGuidance": "Nuova Guida Regionale",
             "copyToClipboard": "Copia negli appunti",
             "copyCanvasToClipboard": "Copia la tela negli appunti",
-            "copyBboxToClipboard": "Copia il riquadro di delimitazione negli appunti"
+            "copyBboxToClipboard": "Copia il riquadro di delimitazione negli appunti",
+            "newResizedControlLayer": "Nuovo livello di controllo ridimensionato"
         },
         "newImg2ImgCanvasFromImage": "Nuova Immagine da immagine",
         "copyRasterLayerTo": "Copia $t(controlLayers.rasterLayer) in",
@@ -2361,10 +2380,10 @@
         "replaceCurrent": "Sostituisci corrente",
         "mergeDown": "Unire in basso",
         "mergingLayers": "Unione dei livelli",
-        "controlLayerEmptyState": "<UploadButton>Carica un'immagine</UploadButton>, trascina un'immagine dalla <GalleryButton>galleria</GalleryButton> su questo livello, <PullBboxButton>trascina il riquadro di delimitazione in questo livello</PullBboxButton> oppure disegna sulla tela per iniziare.",
+        "controlLayerEmptyState": "<UploadButton>Carica un'immagine</UploadButton>, trascina un'immagine dalla galleria su questo livello, <PullBboxButton>trascina il riquadro di delimitazione in questo livello</PullBboxButton> oppure disegna sulla tela per iniziare.",
         "useImage": "Usa immagine",
         "resetGenerationSettings": "Ripristina impostazioni di generazione",
-        "referenceImageEmptyState": "Per iniziare, <UploadButton>carica un'immagine</UploadButton> oppure trascina un'immagine dalla <GalleryButton>galleria</GalleryButton> su questa Immagine di riferimento.",
+        "referenceImageEmptyState": "Per iniziare, <UploadButton>carica un'immagine</UploadButton> oppure trascina un'immagine dalla galleria su questa Immagine di riferimento.",
         "asRasterLayer": "Come $t(controlLayers.rasterLayer)",
         "asRasterLayerResize": "Come $t(controlLayers.rasterLayer) (Ridimensiona)",
         "asControlLayer": "Come $t(controlLayers.controlLayer)",
@@ -2419,8 +2438,14 @@
         "ruleOfThirds": "Mostra la regola dei terzi",
         "showNonRasterLayers": "Mostra livelli non raster (Shift+H)",
         "hideNonRasterLayers": "Nascondi livelli non raster (Shift+H)",
-        "referenceImageEmptyStateWithCanvasOptions": "<UploadButton>Carica un'immagine</UploadButton>, trascina un'immagine dalla <GalleryButton>galleria</GalleryButton> su questa immagine di riferimento o <PullBboxButton>trascina il riquadro di delimitazione in questa immagine di riferimento</PullBboxButton> per iniziare.",
-        "uploadOrDragAnImage": "Trascina un'immagine dalla galleria o <UploadButton>carica un'immagine</UploadButton>."
+        "referenceImageEmptyStateWithCanvasOptions": "<UploadButton>Carica un'immagine</UploadButton>, trascina un'immagine dalla galleria su questa immagine di riferimento o <PullBboxButton>trascina il riquadro di delimitazione in questa immagine di riferimento</PullBboxButton> per iniziare.",
+        "uploadOrDragAnImage": "Trascina un'immagine dalla galleria o <UploadButton>carica un'immagine</UploadButton>.",
+        "saveAllImagesToGallery": "Salva tutte le immagini nella Galleria",
+        "autoSwitch": {
+            "switchOnStart": "All'inizio",
+            "switchOnFinish": "Alla fine",
+            "off": "Spento"
+        }
     },
     "ui": {
         "tabs": {
@@ -2503,7 +2528,10 @@
         "exceedsMaxSizeDetails": "Il limite massimo di ampliamento è {{maxUpscaleDimension}}x{{maxUpscaleDimension}} pixel. Prova un'immagine più piccola o diminuisci la scala selezionata.",
         "upscale": "Amplia",
         "incompatibleBaseModel": "Architettura del modello principale non supportata per l'ampliamento",
-        "incompatibleBaseModelDesc": "L'ampliamento è supportato solo per i modelli di architettura SD1.5 e SDXL. Cambia il modello principale per abilitare l'ampliamento."
+        "incompatibleBaseModelDesc": "L'ampliamento è supportato solo per i modelli di architettura SD1.5 e SDXL. Cambia il modello principale per abilitare l'ampliamento.",
+        "tileControl": "Controllo del riquadro",
+        "tileSize": "Dimensione del riquadro",
+        "tileOverlap": "Sovrapposizione riquadro"
     },
     "upsell": {
         "inviteTeammates": "Invita collaboratori",
@@ -2570,8 +2598,9 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "Inpainting: livelli di rumore per maschera e limiti di denoise.",
-            "Canvas: proporzioni più intelligenti per SDXL e scorrimento e zoom migliorati."
+            "Genera immagini più velocemente con le nuove Rampe di lancio e una scheda Genera semplificata.",
+            "Modifica con prompt utilizzando Flux Kontext Dev.",
+            "Esporta in PSD, nascondi sovrapposizioni in blocco, organizza modelli e immagini: il tutto in un'interfaccia riprogettata e pensata per il controllo."
         ]
     },
     "system": {
@@ -2603,7 +2632,18 @@
     "supportVideos": {
         "gettingStarted": "Iniziare",
         "supportVideos": "Video di supporto",
-        "watch": "Guarda"
+        "watch": "Guarda",
+        "studioSessionsDesc": "Unisciti al nostro <DiscordLink /> per partecipare alle sessioni live e porre domande. Le sessioni vengono caricate nella playlist la settimana successiva.",
+        "videos": {
+            "gettingStarted": {
+                "title": "Introduzione a Invoke",
+                "description": "Serie video completa che copre tutto ciò che devi sapere per iniziare a usare Invoke, dalla creazione della tua prima immagine alle tecniche avanzate."
+            },
+            "studioSessions": {
+                "title": "Sessioni in studio",
+                "description": "Sessioni approfondite che esplorano le funzionalità avanzate di Invoke, i flussi di lavoro creativi e le discussioni della community."
+            }
+        }
     },
     "modelCache": {
         "clear": "Cancella la cache del modello",
