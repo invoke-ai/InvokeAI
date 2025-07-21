@@ -96,6 +96,7 @@ describe('StagingAreaApi', () => {
         progressEvent: null,
         progressImage: null,
         imageDTO,
+        imageLoaded: false,
       });
 
       expect(api.$selectedItemImageDTO.get()).toBe(imageDTO);
@@ -262,6 +263,7 @@ describe('StagingAreaApi', () => {
         progressEvent: null,
         progressImage: null,
         imageDTO,
+        imageLoaded: false,
       });
 
       const selectedItem = api.$selectedItem.get();
@@ -276,6 +278,7 @@ describe('StagingAreaApi', () => {
         progressEvent: null,
         progressImage: null,
         imageDTO: null,
+        imageLoaded: false,
       });
 
       api.acceptSelected();
@@ -299,6 +302,7 @@ describe('StagingAreaApi', () => {
         progressEvent: null,
         progressImage: null,
         imageDTO,
+        imageLoaded: false,
       });
 
       expect(api.$acceptSelectedIsEnabled.get()).toBe(true);
@@ -336,6 +340,7 @@ describe('StagingAreaApi', () => {
         progressEvent: null,
         progressImage: null,
         imageDTO: createMockImageDTO(),
+        imageLoaded: false,
       });
 
       const progressEvent = createMockProgressEvent({
@@ -455,6 +460,7 @@ describe('StagingAreaApi', () => {
       // Wait for async image loading - the loadImage promise needs to complete
       await new Promise((resolve) => {
         setTimeout(resolve, 50);
+        api.onImageLoaded(1);
       });
 
       expect(api.$selectedItemId.get()).toBe(1);
@@ -468,6 +474,7 @@ describe('StagingAreaApi', () => {
         progressEvent: null,
         progressImage: null,
         imageDTO: null,
+        imageLoaded: false,
       });
 
       const items = [createMockQueueItem({ item_id: 1 })];
@@ -484,6 +491,7 @@ describe('StagingAreaApi', () => {
         progressEvent: createMockProgressEvent({ item_id: 1 }),
         progressImage: null,
         imageDTO: createMockImageDTO(),
+        imageLoaded: false,
       });
 
       const items = [createMockQueueItem({ item_id: 1, status: 'canceled' })];
@@ -497,10 +505,44 @@ describe('StagingAreaApi', () => {
     });
   });
 
+  describe('Image Loading', () => {
+    it('should handle image loading for completed items', () => {
+      api.$items.set([createMockQueueItem({ item_id: 1 })]);
+      const imageDTO = createMockImageDTO({ image_name: 'test-image.png' });
+      mockApp._setImageDTO('test-image.png', imageDTO);
+      api.onImageLoaded(1);
+      const progressData = api.$progressData.get();
+      expect(progressData[1]?.imageLoaded).toBe(true);
+    });
+  });
+
   describe('Auto Switch', () => {
     it('should set auto switch mode', () => {
       api.setAutoSwitch('switch_on_finish');
       expect(mockApp.onAutoSwitchChange).toHaveBeenCalledWith('switch_on_finish');
+    });
+
+    it('should auto-switch on finish when the image loads', async () => {
+      mockApp._setAutoSwitchMode('switch_on_finish');
+      api.$lastCompletedItemId.set(1);
+
+      const imageDTO = createMockImageDTO({ image_name: 'test-image.png' });
+      mockApp._setImageDTO('test-image.png', imageDTO);
+
+      const items = [
+        createMockQueueItem({
+          item_id: 1,
+          status: 'completed',
+        }),
+      ];
+
+      await api.onItemsChangedEvent(items);
+      await new Promise((resolve) => {
+        setTimeout(resolve, 50);
+        api.onImageLoaded(1);
+      });
+      expect(api.$selectedItemId.get()).toBe(1);
+      expect(api.$lastCompletedItemId.get()).toBe(null);
     });
   });
 
@@ -525,6 +567,7 @@ describe('StagingAreaApi', () => {
         progressEvent: null,
         progressImage: null,
         imageDTO: null,
+        imageLoaded: false,
       });
 
       api.cleanup();
@@ -586,6 +629,7 @@ describe('StagingAreaApi', () => {
           progressEvent: null,
           progressImage: null,
           imageDTO,
+          imageLoaded: false,
         });
 
         const progressEvent = createMockProgressEvent({
@@ -618,9 +662,6 @@ describe('StagingAreaApi', () => {
         mockApp._setAutoSwitchMode('switch_on_finish');
         api.$lastCompletedItemId.set(1);
 
-        // Mock image loading failure
-        mockApp._setImageDTO('test-image.png', null);
-
         const items = [
           createMockQueueItem({
             item_id: 1,
@@ -642,41 +683,14 @@ describe('StagingAreaApi', () => {
 
         await api.onItemsChangedEvent(items);
 
-        // Should not switch when image loading fails
-        expect(api.$selectedItemId.get()).toBe(1);
-        expect(api.$lastCompletedItemId.get()).toBe(1);
-      });
-
-      it('should handle auto-switch on finish with slow image loading', async () => {
-        mockApp._setAutoSwitchMode('switch_on_finish');
-        api.$lastCompletedItemId.set(1);
-
-        const imageDTO = createMockImageDTO({ image_name: 'test-image.png' });
-        mockApp._setImageDTO('test-image.png', imageDTO);
-        mockApp._setLoadImageDelay(50); // Add delay to image loading
-
-        const items = [
-          createMockQueueItem({
-            item_id: 1,
-            status: 'completed',
-            session: {
-              id: sessionId,
-              source_prepared_mapping: { canvas_output: ['test-node-id'] },
-              results: { 'test-node-id': { image: { image_name: 'test-image.png' } } },
-            },
-          }),
-        ];
-
-        await api.onItemsChangedEvent(items);
-
-        // Should switch after image loads - wait for both the delay and promise resolution
+        // Wait a while but do not load the image
         await new Promise((resolve) => {
           setTimeout(resolve, 150);
         });
 
+        // Should not switch when image loading fails
         expect(api.$selectedItemId.get()).toBe(1);
-        // The lastCompletedItemId should be reset after the loadImage promise resolves
-        expect(api.$lastCompletedItemId.get()).toBe(null);
+        expect(api.$lastCompletedItemId.get()).toBe(1);
       });
     });
 
@@ -728,6 +742,7 @@ describe('StagingAreaApi', () => {
             progressEvent: null,
             progressImage: null,
             imageDTO: null,
+            imageLoaded: false,
           });
         }
 

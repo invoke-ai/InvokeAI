@@ -1,6 +1,5 @@
 import { useStore } from '@nanostores/react';
 import { useAppStore } from 'app/store/storeHooks';
-import { loadImage } from 'features/controlLayers/konva/util';
 import {
   selectStagingAreaAutoSwitch,
   settingsStagingAreaAutoSwitchChanged,
@@ -36,7 +35,6 @@ export const StagingAreaContextProvider = memo(({ children, sessionId }: PropsWi
     const _stagingAreaAppApi: StagingAreaAppApi = {
       getAutoSwitch: () => selectStagingAreaAutoSwitch(store.getState()),
       getImageDTO: (imageName: string) => getImageDTOSafe(imageName),
-      loadImage: (imageUrl: string) => loadImage(imageUrl, true),
       onInvocationProgress: (handler) => {
         socket?.on('invocation_progress', handler);
         return () => {

@@ -62,6 +62,10 @@ export const QueueItemPreviewMini = memo(({ item, index }: Props) => {
     }
   }, [autoSwitch, dispatch]);
 
+  const onLoad = useCallback(() => {
+    ctx.onImageLoaded(item.item_id);
+  }, [ctx, item.item_id]);
+
   return (
     <Flex
       id={getQueueItemElementId(index)}
@@ -71,7 +75,7 @@ export const QueueItemPreviewMini = memo(({ item, index }: Props) => {
       onDoubleClick={onDoubleClick}
     >
       <QueueItemStatusLabel item={item} position="absolute" margin="auto" />
-      {imageDTO && <DndImage imageDTO={imageDTO} asThumbnail position="absolute" />}
+      {imageDTO && <DndImage imageDTO={imageDTO} position="absolute" onLoad={onLoad} />}
       <QueueItemProgressImage itemId={item.item_id} position="absolute" />
       <QueueItemNumber number={index + 1} position="absolute" top={0} left={1} />
       <QueueItemCircularProgress itemId={item.item_id} status={item.status} position="absolute" top={1} right={2} />

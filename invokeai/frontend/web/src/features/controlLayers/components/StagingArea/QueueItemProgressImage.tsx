@@ -7,9 +7,9 @@ import { useProgressDatum } from './context';
 type Props = { itemId: number } & ImageProps;
 
 export const QueueItemProgressImage = memo(({ itemId, ...rest }: Props) => {
-  const { progressImage } = useProgressDatum(itemId);
+  const { progressImage, imageLoaded } = useProgressDatum(itemId);
 
-  if (!progressImage) {
+  if (!progressImage || imageLoaded) {
     return null;
   }
 
