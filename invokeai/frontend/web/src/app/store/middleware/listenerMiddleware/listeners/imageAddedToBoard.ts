@@ -1,5 +1,5 @@
 import { logger } from 'app/logging/logger';
-import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import type { AppStartListening } from 'app/store/store';
 import { imagesApi } from 'services/api/endpoints/images';
 
 const log = logger('gallery');

@@ -1,7 +1,6 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
-import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import type { RootState } from 'app/store/store';
+import type { AppStartListening, RootState } from 'app/store/store';
 import { omit } from 'es-toolkit/compat';
 import { imageUploadedClientSide } from 'features/gallery/store/actions';
 import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';

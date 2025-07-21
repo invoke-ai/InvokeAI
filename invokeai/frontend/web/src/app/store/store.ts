@@ -1,8 +1,23 @@
-import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
-import { autoBatchEnhancer, combineReducers, configureStore } from '@reduxjs/toolkit';
+import type { ThunkDispatch, TypedStartListening, UnknownAction } from '@reduxjs/toolkit';
+import { addListener, combineReducers, configureStore, createAction, createListenerMiddleware } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
-import { idbKeyValDriver } from 'app/store/enhancers/reduxRemember/driver';
+import { serverBackedDriver } from 'app/store/enhancers/reduxRemember/driver';
 import { errorHandler } from 'app/store/enhancers/reduxRemember/errors';
+import { addAdHocPostProcessingRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
+import { addAnyEnqueuedListener } from 'app/store/middleware/listenerMiddleware/listeners/anyEnqueued';
+import { addAppConfigReceivedListener } from 'app/store/middleware/listenerMiddleware/listeners/appConfigReceived';
+import { addAppStartedListener } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
+import { addBatchEnqueuedListener } from 'app/store/middleware/listenerMiddleware/listeners/batchEnqueued';
+import { addDeleteBoardAndImagesFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/boardAndImagesDeleted';
+import { addBoardIdSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/boardIdSelected';
+import { addBulkDownloadListeners } from 'app/store/middleware/listenerMiddleware/listeners/bulkDownload';
+import { addGetOpenAPISchemaListener } from 'app/store/middleware/listenerMiddleware/listeners/getOpenAPISchema';
+import { addImageAddedToBoardFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/imageAddedToBoard';
+import { addImageRemovedFromBoardFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/imageRemovedFromBoard';
+import { addModelSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/modelSelected';
+import { addModelsLoadedListener } from 'app/store/middleware/listenerMiddleware/listeners/modelsLoaded';
+import { addSetDefaultSettingsListener } from 'app/store/middleware/listenerMiddleware/listeners/setDefaultSettings';
+import { addSocketConnectedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
 import { deepClone } from 'common/util/deepClone';
 import { keys, mergeWith, omit, pick } from 'es-toolkit/compat';
 import { changeBoardModalSlice } from 'features/changeBoardModal/store/slice';
@@ -28,20 +43,24 @@ import { configSlice } from 'features/system/store/configSlice';
 import { systemPersistConfig, systemSlice } from 'features/system/store/systemSlice';
 import { uiPersistConfig, uiSlice } from 'features/ui/store/uiSlice';
 import { diff } from 'jsondiffpatch';
+import { atom } from 'nanostores';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
 import type { SerializeFunction, UnserializeFunction } from 'redux-remember';
-import { rememberEnhancer, rememberReducer } from 'redux-remember';
+import { REMEMBER_PERSISTED, rememberEnhancer, rememberReducer } from 'redux-remember';
 import undoable, { newHistory } from 'redux-undo';
 import { serializeError } from 'serialize-error';
 import { api } from 'services/api';
 import { authToastMiddleware } from 'services/api/authToastMiddleware';
 import type { JsonObject } from 'type-fest';
 
-import { STORAGE_PREFIX } from './constants';
+import { getDebugLoggerMiddleware } from './middleware/debugLoggerMiddleware';
 import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
-import { listenerMiddleware } from './middleware/listenerMiddleware';
+import { addArchivedOrDeletedBoardListener } from './middleware/listenerMiddleware/listeners/addArchivedOrDeletedBoardListener';
+import { addImageUploadedFulfilledListener } from './middleware/listenerMiddleware/listeners/imageUploaded';
+
+export const listenerMiddleware = createListenerMiddleware();
 
 const log = logger('system');
 
@@ -94,7 +113,7 @@ export type PersistConfig<T = any> = {
   persistDenylist: (keyof T)[];
 };
 
-const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
+export const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [galleryPersistConfig.name]: galleryPersistConfig,
   [nodesPersistConfig.name]: nodesPersistConfig,
   [systemPersistConfig.name]: systemPersistConfig,
@@ -112,6 +131,8 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [workflowLibraryPersistConfig.name]: workflowLibraryPersistConfig,
   [refImagesSlice.name]: refImagesPersistConfig,
 };
+
+export const $isPendingPersist = atom(false);
 
 const unserialize: UnserializeFunction = (data, key) => {
   const persistConfig = persistConfigs[key as keyof typeof persistConfigs];
@@ -176,28 +197,32 @@ export const createStore = (uniqueStoreKey?: string, persist = true) =>
     reducer: rememberedRootReducer,
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({
-        serializableCheck: import.meta.env.MODE === 'development',
-        immutableCheck: import.meta.env.MODE === 'development',
+        serializableCheck: false,
+        immutableCheck: false,
+        // serializableCheck: import.meta.env.MODE === 'development',
+        // immutableCheck: import.meta.env.MODE === 'development',
       })
         .concat(api.middleware)
         .concat(dynamicMiddlewares)
         .concat(authToastMiddleware)
-        // .concat(getDebugLoggerMiddleware())
+        .concat(getDebugLoggerMiddleware())
         .prepend(listenerMiddleware.middleware),
     enhancers: (getDefaultEnhancers) => {
-      const _enhancers = getDefaultEnhancers().concat(autoBatchEnhancer());
+      const enhancers = getDefaultEnhancers();
       if (persist) {
-        _enhancers.push(
-          rememberEnhancer(idbKeyValDriver, keys(persistConfigs), {
-            persistDebounce: 300,
+        const res = enhancers.prepend(
+          rememberEnhancer(serverBackedDriver, keys(persistConfigs), {
+            persistDebounce: 3000,
             serialize,
             unserialize,
-            prefix: uniqueStoreKey ? `${STORAGE_PREFIX}${uniqueStoreKey}-` : STORAGE_PREFIX,
+            prefix: '',
             errorHandler,
           })
         );
+        return res;
+      } else {
+        return enhancers;
       }
-      return _enhancers;
     },
     devTools: {
       actionSanitizer,
@@ -218,3 +243,76 @@ export type RootState = ReturnType<AppStore['getState']>;
 export type AppThunkDispatch = ThunkDispatch<RootState, any, UnknownAction>;
 export type AppDispatch = ReturnType<typeof createStore>['dispatch'];
 export type AppGetState = ReturnType<typeof createStore>['getState'];
+export type AppStartListening = TypedStartListening<RootState, AppDispatch>;
+
+export const addAppListener = addListener.withTypes<RootState, AppDispatch>();
+
+const startAppListening = listenerMiddleware.startListening as AppStartListening;
+addImageUploadedFulfilledListener(startAppListening);
+
+// Image deleted
+addDeleteBoardAndImagesFulfilledListener(startAppListening);
+
+// User Invoked
+addAnyEnqueuedListener(startAppListening);
+addBatchEnqueuedListener(startAppListening);
+
+// Socket.IO
+addSocketConnectedEventListener(startAppListening);
+
+// Gallery bulk download
+addBulkDownloadListeners(startAppListening);
+
+// Boards
+addImageAddedToBoardFulfilledListener(startAppListening);
+addImageRemovedFromBoardFulfilledListener(startAppListening);
+addBoardIdSelectedListener(startAppListening);
+addArchivedOrDeletedBoardListener(startAppListening);
+
+// Node schemas
+addGetOpenAPISchemaListener(startAppListening);
+
+// Models
+addModelSelectedListener(startAppListening);
+
+// app startup
+addAppStartedListener(startAppListening);
+addModelsLoadedListener(startAppListening);
+addAppConfigReceivedListener(startAppListening);
+
+// Ad-hoc upscale workflwo
+addAdHocPostProcessingRequestedListener(startAppListening);
+
+addSetDefaultSettingsListener(startAppListening);
+
+const addPersistenceListener = (startAppListening: AppStartListening) => {
+  startAppListening({
+    predicate: (action, currentRootState, originalRootState) => {
+      for (const { name, persistDenylist } of Object.values(persistConfigs)) {
+        const originalState = originalRootState[name];
+        const currentState = currentRootState[name];
+        for (const [k, v] of Object.entries(currentState)) {
+          if (persistDenylist.includes(k)) {
+            continue;
+          }
+
+          if (v !== originalState[k as keyof typeof originalState]) {
+            return true;
+          }
+        }
+      }
+      return false;
+    },
+    effect: () => {
+      $isPendingPersist.set(true);
+    },
+  });
+
+  startAppListening({
+    matcher: createAction(REMEMBER_PERSISTED).match,
+    effect: () => {
+      $isPendingPersist.set(false);
+    },
+  });
+};
+addPersistenceListener(startAppListening);
