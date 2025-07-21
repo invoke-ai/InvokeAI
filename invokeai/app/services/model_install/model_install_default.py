@@ -52,6 +52,7 @@ from invokeai.backend.model_manager.metadata import (
 from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMetadata
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant, ModelSourceType
+from invokeai.backend.model_manager.util.lora_metadata_extractor import apply_lora_metadata
 from invokeai.backend.util import InvokeAILogger
 from invokeai.backend.util.catch_sigint import catch_sigint
 from invokeai.backend.util.devices import TorchDevice
@@ -661,82 +662,6 @@ class ModelInstallService(ModelInstallServiceBase):
         except InvalidModelConfigException:
             return ModelConfigBase.classify(model_path, hash_algo, **fields)
 
-    def _check_for_lora_metadata(self, model_path: Path, info: "AnyModelConfig") -> None:
-        """
-        Check for image files (PNG, JPG, WebP) or JSON metadata files with the same name as the LoRA model.
-        If found, extract relevant metadata and update the model configuration.
-        """
-        from invokeai.backend.model_manager.config import ModelType
-        
-        # Only process LoRA models
-        if info.type != ModelType.LoRA:
-            return
-            
-        # Get the base name without extension
-        model_stem = model_path.stem
-        model_dir = model_path.parent
-        
-        # Look for image files with same name (PNG, JPG, WebP)
-        image_extensions = ['.png', '.jpg', '.jpeg', '.webp']
-        preview_image_path = None
-        
-        for ext in image_extensions:
-            image_path = model_dir / f"{model_stem}{ext}"
-            if image_path.exists():
-                preview_image_path = image_path
-                self._logger.info(f"Found preview image {image_path.name} for LoRA model {model_path.name}")
-                break
-        
-        # Set the preview image if found
-        if preview_image_path:
-            # Store the relative path to the image file
-            if preview_image_path.is_relative_to(self.app_config.models_path):
-                relative_path = preview_image_path.relative_to(self.app_config.models_path)
-                info.cover_image = relative_path.as_posix()
-            else:
-                info.cover_image = preview_image_path.as_posix()
-            self._logger.info(f"Set cover_image to {info.cover_image} for LoRA model {model_path.name}")
-        
-        # Look for JSON file with same name
-        json_path = model_dir / f"{model_stem}.json"
-        
-        if json_path.exists():
-            try:
-                with open(json_path, 'r', encoding='utf-8') as f:
-                    metadata = json.load(f)
-                
-                # Check if the JSON has any of the expected keys
-                expected_keys = {
-                    "description", "sd version", "activation text", 
-                    "preferred weight", "negative text", "notes"
-                }
-                
-                if any(key in metadata for key in expected_keys):
-                    # Map description + notes to model description
-                    description_parts = []
-                    if "description" in metadata and metadata["description"]:
-                        description_parts.append(str(metadata["description"]).strip())
-                    if "notes" in metadata and metadata["notes"]:
-                        description_parts.append(str(metadata["notes"]).strip())
-                    
-                    if description_parts:
-                        combined_description = " | ".join(description_parts)
-                        info.description = combined_description
-                    
-                    # Map activation text to trigger phrases
-                    if "activation text" in metadata and metadata["activation text"]:
-                        activation_text = str(metadata["activation text"]).strip()
-                        if activation_text:
-                            # Split on commas and clean up each phrase
-                            phrases = [phrase.strip() for phrase in activation_text.split(',')]
-                            phrases = [phrase for phrase in phrases if phrase]  # Remove empty strings
-                            if phrases:
-                                info.trigger_phrases = set(phrases)
-                
-                self._logger.info(f"Applied metadata from {json_path.name} to LoRA model {model_path.name}")
-                
-            except (json.JSONDecodeError, IOError, Exception) as e:
-                self._logger.warning(f"Failed to read metadata from {json_path}: {e}")
 
     def _register(
         self, model_path: Path, config: Optional[ModelRecordChanges] = None, info: Optional[AnyModelConfig] = None
@@ -745,11 +670,9 @@ class ModelInstallService(ModelInstallServiceBase):
 
         info = info or self._probe(model_path, config)
 
-        # Store the original resolved path for metadata checking
-        original_path = model_path.resolve()
-        
-        # Check for LoRA metadata files before finalizing the model config
-        self._check_for_lora_metadata(original_path, info)
+        # Apply LoRA metadata if applicable
+        model_images_path = self.app_config.models_path / "model_images"
+        apply_lora_metadata(info, model_path.resolve(), model_images_path)
 
         model_path = model_path.resolve()
 
