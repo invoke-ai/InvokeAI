@@ -6,7 +6,7 @@ import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/sel
 import { isInpaintMaskEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCheckerboardDuotone } from 'react-icons/pi';
+import { PiSelectionInverseBold } from 'react-icons/pi';
 
 export const EntityListSelectedEntityActionBarInvertMaskButton = memo(() => {
   const { t } = useTranslation();
@@ -31,7 +31,7 @@ export const EntityListSelectedEntityActionBarInvertMaskButton = memo(() => {
       alignSelf="stretch"
       aria-label={t('controlLayers.invertMask')}
       tooltip={t('controlLayers.invertMask')}
-      icon={<PiCheckerboardDuotone />}
+      icon={<PiSelectionInverseBold />}
     />
   );
 });
