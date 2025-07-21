@@ -663,7 +663,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _check_for_lora_metadata(self, model_path: Path, info: "AnyModelConfig") -> None:
         """
-        Check for PNG or JSON metadata files with the same name as the LoRA model.
+        Check for image files (PNG, JPG, WebP) or JSON metadata files with the same name as the LoRA model.
         If found, extract relevant metadata and update the model configuration.
         """
         from invokeai.backend.model_manager.config import ModelType
@@ -676,10 +676,26 @@ class ModelInstallService(ModelInstallServiceBase):
         model_stem = model_path.stem
         model_dir = model_path.parent
         
-        # Look for PNG file with same name (just for logging)
-        png_path = model_dir / f"{model_stem}.png"
-        if png_path.exists():
-            self._logger.info(f"Found preview image {png_path.name} for LoRA model {model_path.name}")
+        # Look for image files with same name (PNG, JPG, WebP)
+        image_extensions = ['.png', '.jpg', '.jpeg', '.webp']
+        preview_image_path = None
+        
+        for ext in image_extensions:
+            image_path = model_dir / f"{model_stem}{ext}"
+            if image_path.exists():
+                preview_image_path = image_path
+                self._logger.info(f"Found preview image {image_path.name} for LoRA model {model_path.name}")
+                break
+        
+        # Set the preview image if found
+        if preview_image_path:
+            # Store the relative path to the image file
+            if preview_image_path.is_relative_to(self.app_config.models_path):
+                relative_path = preview_image_path.relative_to(self.app_config.models_path)
+                info.cover_image = relative_path.as_posix()
+            else:
+                info.cover_image = preview_image_path.as_posix()
+            self._logger.info(f"Set cover_image to {info.cover_image} for LoRA model {model_path.name}")
         
         # Look for JSON file with same name
         json_path = model_dir / f"{model_stem}.json"
