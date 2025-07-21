@@ -2375,65 +2375,8 @@
     },
     "supportVideos": {
         "watch": "Regarder",
-        "videos": {
-            "upscaling": {
-                "description": "Comment améliorer la résolution des images avec les outils d'Invoke pour les agrandir.",
-                "title": "Upscaling"
-            },
-            "howDoIGenerateAndSaveToTheGallery": {
-                "description": "Étapes pour générer et enregistrer des images dans la galerie.",
-                "title": "Comment générer et enregistrer dans la galerie ?"
-            },
-            "usingControlLayersAndReferenceGuides": {
-                "title": "Utilisation des couche de contrôle et des guides de référence",
-                "description": "Apprenez à guider la création de vos images avec des couche de contrôle et des images de référence."
-            },
-            "exploringAIModelsAndConceptAdapters": {
-                "description": "Plongez dans les modèles d'IA et découvrez comment utiliser les adaptateurs de concepts pour un contrôle créatif.",
-                "title": "Exploration des modèles d'IA et des adaptateurs de concepts"
-            },
-            "howDoIUseControlNetsAndControlLayers": {
-                "title": "Comment utiliser les réseaux de contrôle et les couches de contrôle ?",
-                "description": "Apprenez à appliquer des couches de contrôle et des ControlNets à vos images."
-            },
-            "creatingAndComposingOnInvokesControlCanvas": {
-                "description": "Apprenez à composer des images en utilisant le canvas de contrôle d'Invoke.",
-                "title": "Créer et composer sur le canvas de contrôle d'Invoke"
-            },
-            "howDoIEditOnTheCanvas": {
-                "title": "Comment puis-je modifier sur la toile ?",
-                "description": "Guide pour éditer des images directement sur la toile."
-            },
-            "howDoIDoImageToImageTransformation": {
-                "title": "Comment effectuer une transformation d'image à image ?",
-                "description": "Tutoriel sur la réalisation de transformations d'image à image dans Invoke."
-            },
-            "howDoIUseGlobalIPAdaptersAndReferenceImages": {
-                "title": "Comment utiliser les IP Adapters globaux et les images de référence ?",
-                "description": "Introduction à l'ajout d'images de référence et IP Adapters globaux."
-            },
-            "howDoIUseInpaintMasks": {
-                "title": "Comment utiliser les masques d'inpainting ?",
-                "description": "Comment appliquer des masques de retourche pour la correction et la variation d'image."
-            },
-            "creatingYourFirstImage": {
-                "title": "Créer votre première image",
-                "description": "Introduction à la création d'une image à partir de zéro en utilisant les outils d'Invoke."
-            },
-            "understandingImageToImageAndDenoising": {
-                "title": "Comprendre l'Image-à-Image et le Débruitage",
-                "description": "Aperçu des transformations d'image à image et du débruitage dans Invoke."
-            },
-            "howDoIOutpaint": {
-                "title": "Comment effectuer un outpainting ?",
-                "description": "Guide pour l'extension au-delà des bordures de l'image originale."
-            }
-        },
         "gettingStarted": "Commencer",
-        "studioSessionsDesc1": "Consultez le <StudioSessionsPlaylistLink /> pour des approfondissements sur Invoke.",
-        "studioSessionsDesc2": "Rejoignez notre <DiscordLink /> pour participer aux sessions en direct et poser vos questions. Les sessions sont ajoutée dans la playlist la semaine suivante.",
-        "supportVideos": "Vidéos d'assistance",
-        "controlCanvas": "Contrôler la toile"
+        "supportVideos": "Vidéos d'assistance"
     },
     "modelCache": {
         "clear": "Effacer le cache du modèle",
