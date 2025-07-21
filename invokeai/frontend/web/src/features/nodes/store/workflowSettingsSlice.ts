@@ -6,11 +6,11 @@ import type { Selector } from 'react-redux';
 import z from 'zod';
 
 export const zLayeringStrategy = z.enum(['network-simplex', 'longest-path']);
-export type LayeringStrategy = z.infer<typeof zLayeringStrategy>;
+type LayeringStrategy = z.infer<typeof zLayeringStrategy>;
 export const zLayoutDirection = z.enum(['TB', 'LR']);
-export type LayoutDirection = z.infer<typeof zLayoutDirection>;
+type LayoutDirection = z.infer<typeof zLayoutDirection>;
 export const zNodeAlignment = z.enum(['UL', 'UR', 'DL', 'DR']);
-export type NodeAlignment = z.infer<typeof zNodeAlignment>;
+type NodeAlignment = z.infer<typeof zNodeAlignment>;
 
 export type WorkflowSettingsState = {
   _version: 1;
