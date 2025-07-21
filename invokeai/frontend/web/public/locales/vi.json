@@ -1517,6 +1517,20 @@
                 "Lát khối liền mạch bức ảnh theo trục ngang."
             ],
             "heading": "Lát Khối Liền Mạch Trục X"
+        },
+        "tileSize": {
+            "heading": "Kích Thước Khối",
+            "paragraphs": [
+                "Điều chỉnh kích thước của khối trong quá trình upscale. Khối càng lớn, bộ nhớ được sử dụng càng nhiều, nhưng có thể tạo sinh ảnh tốt hơn.",
+                "Model SD1.5 mặt định là 768, trong khi SDXL mặc định là 1024. Giảm kích thước khối nếu các gặp vấn đề bộ nhớ."
+            ]
+        },
+        "tileOverlap": {
+            "heading": "Chồng Chéo Khối",
+            "paragraphs": [
+                "Điều chỉnh sự chồng chéo giữa các khối liền kề trong quá trình upscale. Giá trị chồng chép lớn giúp giảm sự rõ nét của các chỗ nối nhau, nhưng ngốn nhiều bộ nhớ hơn.",
+                "Giá trị mặc định (128) hoạt động tốt với đa số trường hợp, nhưng bạn có thể điều chỉnh cho phù hợp với nhu cầu cụ thể và hạn chế về bộ nhớ."
+            ]
         }
     },
     "models": {
@@ -2098,7 +2112,11 @@
             },
             "isolatedLayerPreviewDesc": "Có hay không hiển thị riêng layer này khi thực hiện các thao tác như lọc hay biến đổi.",
             "isolatedStagingPreview": "Xem Trước Tổng Quan Phần Cô Lập",
-            "isolatedPreview": "Xem Trước Phần Cô Lập"
+            "isolatedPreview": "Xem Trước Phần Cô Lập",
+            "saveAllImagesToGallery": {
+                "label": "Chuyển Sản Phẩm Tạo Sinh Mới Vào Thư Viện Ảnh",
+                "alert": "Đang chuyển sản phẩm tạo sinh mới vào Thư Viện Ảnh, bỏ qua Canvas"
+            }
         },
         "tool": {
             "eraser": "Tẩy",
@@ -2110,8 +2128,8 @@
             "colorPicker": "Chọn Màu"
         },
         "mergingLayers": "Đang gộp layer",
-        "controlLayerEmptyState": "<UploadButton>Tải lên ảnh</UploadButton>, kéo thả ảnh từ <GalleryButton>thư viện</GalleryButton> vào layer này, <PullBboxButton>kéo hộp giới hạn vào layer này</PullBboxButton>, hoặc vẽ trên canvas để bắt đầu.",
-        "referenceImageEmptyState": "<UploadButton>Tải lên hình ảnh</UploadButton> hoặc kéo ảnh từ <GalleryButton>thư viện ảnh</GalleryButton> vào Ảnh Mẫu để bắt đầu.",
+        "controlLayerEmptyState": "<UploadButton>Tải lên ảnh</UploadButton>, kéo thả ảnh từ thư viện ảnh vào layer này, <PullBboxButton>kéo hộp giới hạn vào layer này</PullBboxButton>, hoặc vẽ trên canvas để bắt đầu.",
+        "referenceImageEmptyState": "<UploadButton>Tải lên hình ảnh</UploadButton> hoặc kéo ảnh từ thư viện ảnh vào Ảnh Mẫu để bắt đầu.",
         "useImage": "Dùng Hình Ảnh",
         "resetCanvasLayers": "Khởi Động Lại Layer Canvas",
         "asRasterLayer": "Như $t(controlLayers.rasterLayer)",
@@ -2164,12 +2182,17 @@
         "imageNoise": "Độ Nhiễu Hình Ảnh",
         "denoiseLimit": "Giới Hạn Khử Nhiễu",
         "addImageNoise": "Thêm $t(controlLayers.imageNoise)",
-        "referenceImageEmptyStateWithCanvasOptions": "<UploadButton>Tải lên hình ảnh</UploadButton>, kéo ảnh từ <GalleryButton>thư viện ảnh</GalleryButton> vào Ảnh Mẫu này, hoặc <PullBboxButton>kéo hộp giới hạn vào Ảnh Mẫu này</PullBboxButton> để bắt đầu.",
+        "referenceImageEmptyStateWithCanvasOptions": "<UploadButton>Tải lên hình ảnh</UploadButton>, kéo ảnh từ thư viện ảnh vào Ảnh Mẫu này, hoặc <PullBboxButton>kéo hộp giới hạn vào Ảnh Mẫu này</PullBboxButton> để bắt đầu.",
         "uploadOrDragAnImage": "Kéo ảnh từ thư viện ảnh hoặc <UploadButton>tải lên ảnh</UploadButton>.",
         "exportCanvasToPSD": "Xuất Canvas Thành File PSD",
         "ruleOfThirds": "Hiển Thị Quy Tắc Một Phần Ba",
         "showNonRasterLayers": "Hiển Thị Layer Không Thuộc Dạng Raster (Shift + H)",
-        "hideNonRasterLayers": "Ẩn Layer Không Thuộc Dạng Raster (Shift + H)"
+        "hideNonRasterLayers": "Ẩn Layer Không Thuộc Dạng Raster (Shift + H)",
+        "autoSwitch": {
+            "off": "Tắt",
+            "switchOnStart": "Khi Bắt Đầu",
+            "switchOnFinish": "Khi Kết Thúc"
+        }
     },
     "stylePresets": {
         "negativePrompt": "Lệnh Tiêu Cực",
@@ -2313,7 +2336,7 @@
         "problemUnpublishingWorkflow": "Có Vấn Đề Khi Ngừng Đăng Tải Workflow",
         "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4o chỉ hỗ trợ Từ Ngữ Sang Hình Ảnh và Hình Ảnh Sang Hình Ảnh. Hãy dùng model khác cho các tác vụ Inpaint và Outpaint.",
         "imagenIncompatibleGenerationMode": "Google {{model}} chỉ hỗ trợ Từ Ngữ Sang Hình Ảnh. Dùng các model khác cho Hình Ảnh Sang Hình Ảnh, Inpaint và Outpaint.",
-        "fluxKontextIncompatibleGenerationMode": "FLUX Kontext chỉ hỗ trợ Từ Ngữ Sang Hình Ảnh. Hãy dùng model khác cho các tác vụ Hình Ảnh sang Hình Ảnh, Inpaint và Outpaint.",
+        "fluxKontextIncompatibleGenerationMode": "FLUX Kontext không hỗ trợ tạo sinh từ hình ảnh từ canvas. Thử sử dụng Ảnh Mẫu và tắt các Layer Dạng Raster.",
         "noRasterLayers": "Không Tìm Thấy Layer Dạng Raster",
         "noRasterLayersDesc": "Tạo ít nhất một layer dạng raster để xuất file PSD",
         "noActiveRasterLayers": "Không Có Layer Dạng Raster Hoạt Động",
@@ -2546,7 +2569,10 @@
         "postProcessingMissingModelWarning": "Đến <LinkComponent>Trình Quản Lý Model</LinkComponent> để tải model xử lý hậu kỳ (ảnh sang ảnh).",
         "missingModelsWarning": "Đến <LinkComponent>Trình Quản Lý Model</LinkComponent> để tải model cần thiết:",
         "incompatibleBaseModel": "Phiên bản model chính không được hỗ trợ để upscale",
-        "incompatibleBaseModelDesc": "Upscale chỉ hỗ trợ cho model phiên bản SD1.5 và SDXL. Đổi model chính để bật lại tính năng upscale."
+        "incompatibleBaseModelDesc": "Upscale chỉ hỗ trợ cho model phiên bản SD1.5 và SDXL. Đổi model chính để bật lại tính năng upscale.",
+        "tileControl": "Điều Chỉnh Khối",
+        "tileSize": "Kích Thước Khối",
+        "tileOverlap": "Chồng Chéo Khối"
     },
     "newUserExperience": {
         "toGetStartedLocal": "Để bắt đầu, hãy chắc chắn đã tải xuống hoặc thêm vào model cần để chạy Invoke. Sau đó, nhập lệnh vào hộp và nhấp chuột vào <StrongComponent>Kích Hoạt</StrongComponent> để tạo ra bức ảnh đầu tiên. Chọn một mẫu trình bày cho lệnh để cải thiện kết quả. Bạn có thể chọn để lưu ảnh trực tiếp vào <StrongComponent>Thư Viện Ảnh</StrongComponent> hoặc chỉnh sửa chúng ở <StrongComponent>Canvas</StrongComponent>.",
@@ -2562,8 +2588,9 @@
         "watchRecentReleaseVideos": "Xem Video Phát Hành Mới Nhất",
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
         "items": [
-            "Trình Inpaint: Cấp độ nhiễu theo lớp phủ và giới hạn khử nhiễu.",
-            "Canvas: Tỉ lệ giao diện thông minh hơn cho SDXL và nâng cấp tính năng lăn để phóng to."
+            "Tạo sinh ảnh nhanh hơn với Launchpad và thẻ Tạo Sinh đã cơ bản hoá.",
+            "Biên tập với lệnh bằng Flux Kontext Dev.",
+            "Xuất ra file PSD, ẩn số lượng lớn lớp phủ, sắp xếp model & ảnh — tất cả cho một giao diện đã thiết kế lại để chuyên điều khiển."
         ]
     },
     "upsell": {
@@ -2575,7 +2602,18 @@
     "supportVideos": {
         "supportVideos": "Video Hỗ Trợ",
         "gettingStarted": "Bắt Đầu Làm Quen",
-        "watch": "Xem"
+        "watch": "Xem",
+        "studioSessionsDesc": "Tham gia <DiscordLink /> để xem các buổi phát trực tiếp và đặt câu hỏi. Các phiên được đăng lên trên playlist các tuần tiếp theo.",
+        "videos": {
+            "gettingStarted": {
+                "title": "Bắt Đầu Với Invoke",
+                "description": "Hoàn thành các video bao hàm mọi thứ bạn cần biết để bắt đầu với Invoke, từ tạo bức ảnh đầu tiên đến các kỹ thuật phức tạp khác."
+            },
+            "studioSessions": {
+                "title": "Phiên Studio",
+                "description": "Đào sâu vào các phiên họp để khám phá những tính năng nâng cao của Invoke, sáng tạo workflow, và thảo luận cộng đồng."
+            }
+        }
     },
     "modelCache": {
         "clearSucceeded": "Cache Model Đã Được Dọn",
