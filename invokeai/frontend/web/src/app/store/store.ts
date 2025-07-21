@@ -31,7 +31,7 @@ import { diff } from 'jsondiffpatch';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
 import type { SerializeFunction, UnserializeFunction } from 'redux-remember';
 import { rememberEnhancer, rememberReducer } from 'redux-remember';
-import undoable from 'redux-undo';
+import undoable, { newHistory } from 'redux-undo';
 import { serializeError } from 'serialize-error';
 import { api } from 'services/api';
 import { authToastMiddleware } from 'services/api/authToastMiddleware';
@@ -118,6 +118,7 @@ const unserialize: UnserializeFunction = (data, key) => {
   if (!persistConfig) {
     throw new Error(`No persist config for slice "${key}"`);
   }
+  let state;
   try {
     const { initialState, migrate } = persistConfig;
     const parsed = JSON.parse(data);
@@ -141,13 +142,21 @@ const unserialize: UnserializeFunction = (data, key) => {
       },
       `Rehydrated slice "${key}"`
     );
-    return transformed;
+    state = transformed;
   } catch (err) {
     log.warn(
       { error: serializeError(err as Error) },
       `Error rehydrating slice "${key}", falling back to default initial state`
     );
-    return persistConfig.initialState;
+    state = persistConfig.initialState;
+  }
+
+  // If the slice is undoable, we need to wrap it in a new history - only nodes and canvas are undoable at the moment.
+  // TODO(psyche): make this automatic & remove the hard-coding for specific slices.
+  if (key === nodesSlice.name || key === canvasSlice.name) {
+    return newHistory([], state, []);
+  } else {
+    return state;
   }
 };
 
