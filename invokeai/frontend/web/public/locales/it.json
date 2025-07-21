@@ -2440,7 +2440,6 @@
         "hideNonRasterLayers": "Nascondi livelli non raster (Shift+H)",
         "referenceImageEmptyStateWithCanvasOptions": "<UploadButton>Carica un'immagine</UploadButton>, trascina un'immagine dalla galleria su questa immagine di riferimento o <PullBboxButton>trascina il riquadro di delimitazione in questa immagine di riferimento</PullBboxButton> per iniziare.",
         "uploadOrDragAnImage": "Trascina un'immagine dalla galleria o <UploadButton>carica un'immagine</UploadButton>.",
-        "saveAllImagesToGallery": "Salva tutte le immagini nella Galleria",
         "autoSwitch": {
             "switchOnStart": "All'inizio",
             "switchOnFinish": "Alla fine",
