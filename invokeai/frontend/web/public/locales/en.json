@@ -1133,7 +1133,23 @@
         "addItem": "Add Item",
         "generateValues": "Generate Values",
         "floatRangeGenerator": "Float Range Generator",
-        "integerRangeGenerator": "Integer Range Generator"
+        "integerRangeGenerator": "Integer Range Generator",
+        "layout": {
+            "autoLayout": "Auto Layout",
+            "layeringStrategy": "Layering Strategy",
+            "networkSimplex": "Network Simplex",
+            "longestPath": "Longest Path",
+            "nodeSpacing": "Node Spacing",
+            "layerSpacing": "Layer Spacing",
+            "layoutDirection": "Layout Direction",
+            "layoutDirectionRight": "Right",
+            "layoutDirectionDown": "Down",
+            "alignment": "Node Alignment",
+            "alignmentUL": "Top Left",
+            "alignmentDL": "Bottom Left",
+            "alignmentUR": "Top Right",
+            "alignmentDR": "Bottom Right"
+        }
     },
     "parameters": {
         "aspect": "Aspect",
