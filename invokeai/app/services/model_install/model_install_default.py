@@ -1,5 +1,6 @@
 """Model installation class."""
 
+import json
 import locale
 import os
 import re
@@ -660,12 +661,79 @@ class ModelInstallService(ModelInstallServiceBase):
         except InvalidModelConfigException:
             return ModelConfigBase.classify(model_path, hash_algo, **fields)
 
+    def _check_for_lora_metadata(self, model_path: Path, info: "AnyModelConfig") -> None:
+        """
+        Check for PNG or JSON metadata files with the same name as the LoRA model.
+        If found, extract relevant metadata and update the model configuration.
+        """
+        from invokeai.backend.model_manager.config import ModelType
+        
+        # Only process LoRA models
+        if info.type != ModelType.LoRA:
+            return
+            
+        # Get the base name without extension
+        model_stem = model_path.stem
+        model_dir = model_path.parent
+        
+        # Look for PNG file with same name (just for logging)
+        png_path = model_dir / f"{model_stem}.png"
+        if png_path.exists():
+            self._logger.info(f"Found preview image {png_path.name} for LoRA model {model_path.name}")
+        
+        # Look for JSON file with same name
+        json_path = model_dir / f"{model_stem}.json"
+        
+        if json_path.exists():
+            try:
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    metadata = json.load(f)
+                
+                # Check if the JSON has any of the expected keys
+                expected_keys = {
+                    "description", "sd version", "activation text", 
+                    "preferred weight", "negative text", "notes"
+                }
+                
+                if any(key in metadata for key in expected_keys):
+                    # Map description + notes to model description
+                    description_parts = []
+                    if "description" in metadata and metadata["description"]:
+                        description_parts.append(str(metadata["description"]).strip())
+                    if "notes" in metadata and metadata["notes"]:
+                        description_parts.append(str(metadata["notes"]).strip())
+                    
+                    if description_parts:
+                        combined_description = " | ".join(description_parts)
+                        info.description = combined_description
+                    
+                    # Map activation text to trigger phrases
+                    if "activation text" in metadata and metadata["activation text"]:
+                        activation_text = str(metadata["activation text"]).strip()
+                        if activation_text:
+                            # Split on commas and clean up each phrase
+                            phrases = [phrase.strip() for phrase in activation_text.split(',')]
+                            phrases = [phrase for phrase in phrases if phrase]  # Remove empty strings
+                            if phrases:
+                                info.trigger_phrases = set(phrases)
+                
+                self._logger.info(f"Applied metadata from {json_path.name} to LoRA model {model_path.name}")
+                
+            except (json.JSONDecodeError, IOError, Exception) as e:
+                self._logger.warning(f"Failed to read metadata from {json_path}: {e}")
+
     def _register(
         self, model_path: Path, config: Optional[ModelRecordChanges] = None, info: Optional[AnyModelConfig] = None
     ) -> str:
         config = config or ModelRecordChanges()
 
         info = info or self._probe(model_path, config)
+
+        # Store the original resolved path for metadata checking
+        original_path = model_path.resolve()
+        
+        # Check for LoRA metadata files before finalizing the model config
+        self._check_for_lora_metadata(original_path, info)
 
         model_path = model_path.resolve()
 
