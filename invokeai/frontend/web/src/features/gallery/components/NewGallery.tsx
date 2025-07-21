@@ -24,10 +24,8 @@ import type {
   VirtuosoGridHandle,
 } from 'react-virtuoso';
 import { VirtuosoGrid } from 'react-virtuoso';
-import { imagesApi } from 'services/api/endpoints/images';
+import { imagesApi, useImageDTO, useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
 import { useDebounce } from 'use-debounce';
-import { useImageDTO } from 'services/api/endpoints/images';
-import { useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
 
 import { GalleryImage, GalleryImagePlaceholder } from './ImageGrid/GalleryImage';
 import { GallerySelectionCountTag } from './ImageGrid/GallerySelectionCountTag';
@@ -474,7 +472,9 @@ export const NewGallery = memo(() => {
   const [unstarImages] = useUnstarImagesMutation();
 
   const handleStarHotkey = useCallback(() => {
-    if (!imageDTO) return;
+    if (!imageDTO) {
+      return;
+    }
     if (imageDTO.starred) {
       unstarImages({ image_names: [imageDTO.image_name] });
     } else {
