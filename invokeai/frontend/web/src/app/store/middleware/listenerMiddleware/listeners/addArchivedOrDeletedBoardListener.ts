@@ -1,5 +1,5 @@
 import { isAnyOf } from '@reduxjs/toolkit';
-import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import type { AppStartListening } from 'app/store/store';
 import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import {
   autoAddBoardIdChanged,

@@ -1,8 +1,8 @@
 import { objectEquals } from '@observ33r/object-equals';
 import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
-import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
+import type { AppStartListening } from 'app/store/store';
 import { atom } from 'nanostores';
 import { api } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';

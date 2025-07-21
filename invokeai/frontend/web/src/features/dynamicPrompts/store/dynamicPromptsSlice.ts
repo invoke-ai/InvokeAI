@@ -77,7 +77,7 @@ export const dynamicPromptsPersistConfig: PersistConfig<DynamicPromptsState> = {
   name: dynamicPromptsSlice.name,
   initialState: initialDynamicPromptsState,
   migrate: migrateDynamicPromptsState,
-  persistDenylist: ['prompts'],
+  persistDenylist: ['prompts', 'parsingError', 'isError', 'isLoading'],
 };
 
 export const selectDynamicPromptsSlice = (state: RootState) => state.dynamicPrompts;

@@ -1,4 +1,4 @@
-import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import type { AppStartListening } from 'app/store/store';
 import { queueApi, selectQueueStatus } from 'services/api/endpoints/queue';
 
 export const addAnyEnqueuedListener = (startAppListening: AppStartListening) => {

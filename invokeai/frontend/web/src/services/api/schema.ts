@@ -1164,6 +1164,34 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/app/client_state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Client State By Key
+         * @description Gets the client state
+         */
+        get: operations["get_client_state_by_key"];
+        put?: never;
+        /**
+         * Set Client State
+         * @description Sets the client state
+         */
+        post: operations["set_client_state"];
+        /**
+         * Delete Client State
+         * @description Deletes the client state
+         */
+        delete: operations["delete_client_state"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/{queue_id}/enqueue_batch": {
         parameters: {
             query?: never;
@@ -2725,6 +2753,16 @@ export type components = {
              * @description The names of the images to remove
              */
             image_names: string[];
+        };
+        /** Body_set_client_state */
+        Body_set_client_state: {
+            /**
+             * Key
+             * @description Key to set
+             */
+            key: string;
+            /** @description Value of the key */
+            value: components["schemas"]["JsonValue"];
         };
         /** Body_set_workflow_thumbnail */
         Body_set_workflow_thumbnail: {
@@ -24694,6 +24732,98 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["InvocationCacheStatus"];
                 };
+            };
+        };
+    };
+    get_client_state_by_key: {
+        parameters: {
+            query: {
+                /** @description Key to retrieve from client state persistence */
+                key: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonValue"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_client_state: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_set_client_state"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_client_state: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Client state deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
