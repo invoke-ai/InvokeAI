@@ -26,7 +26,7 @@ const getInitialState = (): SystemState => ({
   shouldHighlightFocusedRegions: false,
 });
 
-export const slice = createSlice({
+const slice = createSlice({
   name: 'system',
   initialState: getInitialState(),
   reducers: {
