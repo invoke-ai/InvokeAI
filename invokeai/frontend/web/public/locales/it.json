@@ -260,6 +260,10 @@
             "togglePanels": {
                 "title": "Attiva/disattiva i pannelli",
                 "desc": "Mostra o nascondi contemporaneamente i pannelli sinistro e destro."
+            },
+            "selectGenerateTab": {
+                "title": "Seleziona la scheda Genera",
+                "desc": "Seleziona la scheda Genera."
             }
         },
         "hotkeys": "Tasti di scelta rapida",
@@ -389,6 +393,23 @@
                 "behavior": "Comportamento",
                 "display": "Mostra",
                 "grid": "Griglia"
+            },
+            "invertMask": {
+                "title": "Inverti maschera",
+                "desc": "Inverte la maschera di inpaint selezionata, creando una nuova maschera con trasparenza opposta."
+            },
+            "fitBboxToMasks": {
+                "title": "Adatta il riquadro di delimitazione alle maschere",
+                "desc": "Regola automaticamente il riquadro di delimitazione della generazione per adattarlo alle maschere di inpaint visibili"
+            },
+            "applySegmentAnything": {
+                "title": "Applica Segment Anything",
+                "desc": "Applica la maschera Segment Anything corrente.",
+                "key": "invio"
+            },
+            "cancelSegmentAnything": {
+                "title": "Annulla Segment Anything",
+                "desc": "Annulla l'operazione Segment Anything corrente."
             }
         },
         "workflows": {
@@ -936,7 +957,15 @@
         "canvasManagerNotAvailable": "Gestione tela non disponibile",
         "promptExpansionFailed": "Abbiamo riscontrato un problema. Riprova a eseguire l'espansione del prompt.",
         "uploadAndPromptGenerationFailed": "Impossibile caricare l'immagine e generare il prompt",
-        "promptGenerationStarted": "Generazione del prompt avviata"
+        "promptGenerationStarted": "Generazione del prompt avviata",
+        "invalidBboxDesc": "Il riquadro di delimitazione non ha dimensioni valide",
+        "invalidBbox": "Riquadro di delimitazione non valido",
+        "noInpaintMaskSelectedDesc": "Seleziona una maschera di inpaint da invertire",
+        "noInpaintMaskSelected": "Nessuna maschera di inpaint selezionata",
+        "noVisibleMasksDesc": "Crea o abilita almeno una maschera inpaint da invertire",
+        "noVisibleMasks": "Nessuna maschera visibile",
+        "maskInvertFailed": "Impossibile invertire la maschera",
+        "maskInverted": "Maschera invertita"
     },
     "accessibility": {
         "invokeProgressBar": "Barra di avanzamento generazione",
@@ -1131,7 +1160,10 @@
         "missingField_withName": "Campo \"{{name}}\" mancante",
         "unknownFieldEditWorkflowToFix_withName": "Il flusso di lavoro contiene un campo \"{{name}}\" sconosciuto .\nModifica il flusso di lavoro per risolvere il problema.",
         "unexpectedField_withName": "Campo \"{{name}}\" inaspettato",
-        "missingSourceOrTargetHandle": "Identificatore del nodo sorgente o di destinazione mancante"
+        "missingSourceOrTargetHandle": "Identificatore del nodo sorgente o di destinazione mancante",
+        "layout": {
+            "alignmentDR": "In basso a destra"
+        }
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -2444,7 +2476,9 @@
             "switchOnStart": "All'inizio",
             "switchOnFinish": "Alla fine",
             "off": "Spento"
-        }
+        },
+        "invertMask": "Inverti maschera",
+        "fitBboxToMasks": "Adatta il riquadro di delimitazione alle maschere"
     },
     "ui": {
         "tabs": {
