@@ -201,7 +201,7 @@ const slice = createSlice({
 
 export const { configChanged } = slice.actions;
 
-export const configSliceConfig: SliceConfig<ConfigState> = {
+export const configSliceConfig: SliceConfig<typeof slice> = {
   slice,
   getInitialState,
 };

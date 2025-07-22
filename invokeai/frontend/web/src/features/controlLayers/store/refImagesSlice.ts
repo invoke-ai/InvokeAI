@@ -271,14 +271,14 @@ const migrate = (state: any): any => {
   return state;
 };
 
-export const refImagesSliceConfig: SliceConfig<RefImagesState> = {
+export const refImagesSliceConfig: SliceConfig<typeof slice> = {
   slice,
   getInitialState: getInitialRefImagesState,
   persistConfig: {
     migrate,
     persistDenylist: ['selectedEntityId', 'isPanelOpen'],
   },
-} as const;
+};
 
 export const selectRefImagesSlice = (state: RootState) => state.refImages;
 

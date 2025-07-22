@@ -79,7 +79,7 @@ export const {
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrate = (state: any): any => state;
 
-export const workflowLibrarySliceConfig: SliceConfig<WorkflowLibraryState> = {
+export const workflowLibrarySliceConfig: SliceConfig<typeof slice> = {
   slice,
   getInitialState,
   persistConfig: {

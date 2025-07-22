@@ -5,7 +5,6 @@ import type { SliceConfig } from 'app/store/types';
 import { deepClone } from 'common/util/deepClone';
 
 import { initialState } from './initialState';
-import type { ChangeBoardModalState } from './types';
 
 const getInitialState = () => deepClone(initialState);
 
@@ -30,7 +29,7 @@ export const { isModalOpenChanged, imagesToChangeSelected, changeBoardReset } = 
 
 export const selectChangeBoardModalSlice = (state: RootState) => state.changeBoardModal;
 
-export const changeBoardModalSliceConfig: SliceConfig<ChangeBoardModalState> = {
+export const changeBoardModalSliceConfig: SliceConfig<typeof slice> = {
   slice,
   getInitialState,
 };

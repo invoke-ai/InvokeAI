@@ -117,7 +117,7 @@ const migrate = (state: any): any => {
   return state;
 };
 
-export const workflowSettingsSliceConfig: SliceConfig<WorkflowSettingsState> = {
+export const workflowSettingsSliceConfig: SliceConfig<typeof slice> = {
   slice,
   getInitialState,
   persistConfig: {

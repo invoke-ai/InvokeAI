@@ -68,7 +68,7 @@ const migrate = (state: any): any => {
   return state;
 };
 
-export const stylePresetSliceConfig: SliceConfig<StylePresetState> = {
+export const stylePresetSliceConfig: SliceConfig<typeof slice> = {
   slice,
   getInitialState,
   persistConfig: {

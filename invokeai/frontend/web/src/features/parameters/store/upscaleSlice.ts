@@ -85,7 +85,7 @@ const migrate = (state: any): any => {
   return state;
 };
 
-export const upscaleSliceConfig: SliceConfig<UpscaleState> = {
+export const upscaleSliceConfig: SliceConfig<typeof slice> = {
   slice,
   getInitialState,
   persistConfig: {

@@ -74,7 +74,7 @@ const migrate = (state: any): any => {
   return state;
 };
 
-export const dynamicPromptsSliceConfig: SliceConfig<DynamicPromptsState> = {
+export const dynamicPromptsSliceConfig: SliceConfig<typeof slice> = {
   slice,
   getInitialState,
   persistConfig: {

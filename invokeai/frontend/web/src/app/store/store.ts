@@ -1,5 +1,5 @@
 import type { ThunkDispatch, TypedStartListening, UnknownAction } from '@reduxjs/toolkit';
-import { addListener, combineReducers, configureStore, createAction, createListenerMiddleware } from '@reduxjs/toolkit';
+import { addListener, combineReducers, configureStore, createListenerMiddleware } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { serverBackedDriver } from 'app/store/enhancers/reduxRemember/driver';
 import { errorHandler } from 'app/store/enhancers/reduxRemember/errors';
@@ -43,14 +43,13 @@ import { diff } from 'jsondiffpatch';
 import { atom } from 'nanostores';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
 import type { SerializeFunction, UnserializeFunction } from 'redux-remember';
-import { REMEMBER_PERSISTED, rememberEnhancer, rememberReducer } from 'redux-remember';
-import { newHistory } from 'redux-undo';
+import { rememberEnhancer, rememberReducer } from 'redux-remember';
+import undoable, { newHistory } from 'redux-undo';
 import { serializeError } from 'serialize-error';
 import { api } from 'services/api';
 import { authToastMiddleware } from 'services/api/authToastMiddleware';
 import type { JsonObject } from 'type-fest';
 
-import { getDebugLoggerMiddleware } from './middleware/debugLoggerMiddleware';
 import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
@@ -61,49 +60,60 @@ export const listenerMiddleware = createListenerMiddleware();
 
 const log = logger('system');
 
+// When adding a slice, add the config to the SLICE_CONFIGS object below, then add the reducer to ALL_REDUCERS.
+// Remember to wrap undoable slices in `undoable()`.
+
 const SLICE_CONFIGS = {
-  [canvasSessionSliceConfig.slice.name]: canvasSessionSliceConfig,
-  [canvasSettingsSliceConfig.slice.name]: canvasSettingsSliceConfig,
-  [canvasSliceConfig.slice.name]: canvasSliceConfig,
-  [changeBoardModalSliceConfig.slice.name]: changeBoardModalSliceConfig,
-  [configSliceConfig.slice.name]: configSliceConfig,
-  [dynamicPromptsSliceConfig.slice.name]: dynamicPromptsSliceConfig,
-  [gallerySliceConfig.slice.name]: gallerySliceConfig,
-  [lorasSliceConfig.slice.name]: lorasSliceConfig,
-  [modelManagerSliceConfig.slice.name]: modelManagerSliceConfig,
-  [nodesSliceConfig.slice.name]: nodesSliceConfig,
-  [paramsSliceConfig.slice.name]: paramsSliceConfig,
-  [queueSliceConfig.slice.name]: queueSliceConfig,
-  [refImagesSliceConfig.slice.name]: refImagesSliceConfig,
-  [stylePresetSliceConfig.slice.name]: stylePresetSliceConfig,
-  [systemSliceConfig.slice.name]: systemSliceConfig,
-  [uiSliceConfig.slice.name]: uiSliceConfig,
-  [upscaleSliceConfig.slice.name]: upscaleSliceConfig,
-  [workflowLibrarySliceConfig.slice.name]: workflowLibrarySliceConfig,
-  [workflowSettingsSliceConfig.slice.name]: workflowSettingsSliceConfig,
+  [canvasSessionSliceConfig.slice.reducerPath]: canvasSessionSliceConfig,
+  [canvasSettingsSliceConfig.slice.reducerPath]: canvasSettingsSliceConfig,
+  [canvasSliceConfig.slice.reducerPath]: canvasSliceConfig,
+  [changeBoardModalSliceConfig.slice.reducerPath]: changeBoardModalSliceConfig,
+  [configSliceConfig.slice.reducerPath]: configSliceConfig,
+  [dynamicPromptsSliceConfig.slice.reducerPath]: dynamicPromptsSliceConfig,
+  [gallerySliceConfig.slice.reducerPath]: gallerySliceConfig,
+  [lorasSliceConfig.slice.reducerPath]: lorasSliceConfig,
+  [modelManagerSliceConfig.slice.reducerPath]: modelManagerSliceConfig,
+  [nodesSliceConfig.slice.reducerPath]: nodesSliceConfig,
+  [paramsSliceConfig.slice.reducerPath]: paramsSliceConfig,
+  [queueSliceConfig.slice.reducerPath]: queueSliceConfig,
+  [refImagesSliceConfig.slice.reducerPath]: refImagesSliceConfig,
+  [stylePresetSliceConfig.slice.reducerPath]: stylePresetSliceConfig,
+  [systemSliceConfig.slice.reducerPath]: systemSliceConfig,
+  [uiSliceConfig.slice.reducerPath]: uiSliceConfig,
+  [upscaleSliceConfig.slice.reducerPath]: upscaleSliceConfig,
+  [workflowLibrarySliceConfig.slice.reducerPath]: workflowLibrarySliceConfig,
+  [workflowSettingsSliceConfig.slice.reducerPath]: workflowSettingsSliceConfig,
 };
 
 const ALL_REDUCERS = {
   [api.reducerPath]: api.reducer,
-  [canvasSessionSliceConfig.slice.name]: canvasSessionSliceConfig.slice.reducer,
-  [canvasSettingsSliceConfig.slice.name]: canvasSettingsSliceConfig.slice.reducer,
-  [canvasSliceConfig.slice.name]: canvasSliceConfig.slice.reducer,
-  [changeBoardModalSliceConfig.slice.name]: changeBoardModalSliceConfig.slice.reducer,
-  [configSliceConfig.slice.name]: configSliceConfig.slice.reducer,
-  [dynamicPromptsSliceConfig.slice.name]: dynamicPromptsSliceConfig.slice.reducer,
-  [gallerySliceConfig.slice.name]: gallerySliceConfig.slice.reducer,
-  [lorasSliceConfig.slice.name]: lorasSliceConfig.slice.reducer,
-  [modelManagerSliceConfig.slice.name]: modelManagerSliceConfig.slice.reducer,
-  [nodesSliceConfig.slice.name]: nodesSliceConfig.slice.reducer,
-  [paramsSliceConfig.slice.name]: paramsSliceConfig.slice.reducer,
-  [queueSliceConfig.slice.name]: queueSliceConfig.slice.reducer,
-  [refImagesSliceConfig.slice.name]: refImagesSliceConfig.slice.reducer,
-  [stylePresetSliceConfig.slice.name]: stylePresetSliceConfig.slice.reducer,
-  [systemSliceConfig.slice.name]: systemSliceConfig.slice.reducer,
-  [uiSliceConfig.slice.name]: uiSliceConfig.slice.reducer,
-  [upscaleSliceConfig.slice.name]: upscaleSliceConfig.slice.reducer,
-  [workflowLibrarySliceConfig.slice.name]: workflowLibrarySliceConfig.slice.reducer,
-  [workflowSettingsSliceConfig.slice.name]: workflowSettingsSliceConfig.slice.reducer,
+  [canvasSessionSliceConfig.slice.reducerPath]: canvasSessionSliceConfig.slice.reducer,
+  [canvasSettingsSliceConfig.slice.reducerPath]: canvasSettingsSliceConfig.slice.reducer,
+  // Undoable!
+  [canvasSliceConfig.slice.reducerPath]: undoable(
+    canvasSliceConfig.slice.reducer,
+    canvasSliceConfig.undoableConfig?.reduxUndoOptions
+  ),
+  [changeBoardModalSliceConfig.slice.reducerPath]: changeBoardModalSliceConfig.slice.reducer,
+  [configSliceConfig.slice.reducerPath]: configSliceConfig.slice.reducer,
+  [dynamicPromptsSliceConfig.slice.reducerPath]: dynamicPromptsSliceConfig.slice.reducer,
+  [gallerySliceConfig.slice.reducerPath]: gallerySliceConfig.slice.reducer,
+  [lorasSliceConfig.slice.reducerPath]: lorasSliceConfig.slice.reducer,
+  [modelManagerSliceConfig.slice.reducerPath]: modelManagerSliceConfig.slice.reducer,
+  // Undoable!
+  [nodesSliceConfig.slice.reducerPath]: undoable(
+    nodesSliceConfig.slice.reducer,
+    nodesSliceConfig.undoableConfig?.reduxUndoOptions
+  ),
+  [paramsSliceConfig.slice.reducerPath]: paramsSliceConfig.slice.reducer,
+  [queueSliceConfig.slice.reducerPath]: queueSliceConfig.slice.reducer,
+  [refImagesSliceConfig.slice.reducerPath]: refImagesSliceConfig.slice.reducer,
+  [stylePresetSliceConfig.slice.reducerPath]: stylePresetSliceConfig.slice.reducer,
+  [systemSliceConfig.slice.reducerPath]: systemSliceConfig.slice.reducer,
+  [uiSliceConfig.slice.reducerPath]: uiSliceConfig.slice.reducer,
+  [upscaleSliceConfig.slice.reducerPath]: upscaleSliceConfig.slice.reducer,
+  [workflowLibrarySliceConfig.slice.reducerPath]: workflowLibrarySliceConfig.slice.reducer,
+  [workflowSettingsSliceConfig.slice.reducerPath]: workflowSettingsSliceConfig.slice.reducer,
 };
 
 const rootReducer = combineReducers(ALL_REDUCERS);
@@ -111,6 +121,10 @@ const rootReducer = combineReducers(ALL_REDUCERS);
 const rememberedRootReducer = rememberReducer(rootReducer);
 
 export const $isPendingPersist = atom(false);
+
+$isPendingPersist.listen((isPendingPersist) => {
+  console.log({ isPendingPersist });
+});
 
 const unserialize: UnserializeFunction = (data, key) => {
   const sliceConfig = SLICE_CONFIGS[key as keyof typeof SLICE_CONFIGS];
@@ -164,10 +178,11 @@ const serialize: SerializeFunction = (data, key) => {
   if (!sliceConfig?.persistConfig) {
     throw new Error(`No persist config for slice "${key}"`);
   }
-  // Heuristic to determine if the slice is undoable - could just hardcode it in the persistConfig
-  const isUndoable = 'present' in data && 'past' in data && 'future' in data && '_latestUnfiltered' in data;
 
-  const result = omit(isUndoable ? data.present : data, sliceConfig.persistConfig.persistDenylist ?? []);
+  const result = omit(
+    sliceConfig.undoableConfig ? data.present : data,
+    sliceConfig.persistConfig.persistDenylist ?? []
+  );
   return JSON.stringify(result);
 };
 
@@ -187,7 +202,7 @@ export const createStore = (uniqueStoreKey?: string, persist = true) =>
         .concat(api.middleware)
         .concat(dynamicMiddlewares)
         .concat(authToastMiddleware)
-        .concat(getDebugLoggerMiddleware())
+        // .concat(getDebugLoggerMiddleware())
         .prepend(listenerMiddleware.middleware),
     enhancers: (getDefaultEnhancers) => {
       const enhancers = getDefaultEnhancers();
@@ -266,40 +281,3 @@ addAppConfigReceivedListener(startAppListening);
 addAdHocPostProcessingRequestedListener(startAppListening);
 
 addSetDefaultSettingsListener(startAppListening);
-
-const addPersistenceListener = (startAppListening: AppStartListening) => {
-  startAppListening({
-    predicate: (action, currentRootState, originalRootState) => {
-      for (const { slice, persistConfig } of Object.values(PERSISTED_SLICE_CONFIGS)) {
-        if (!persistConfig) {
-          // shouldn't get here, we filtered out slices without persistConfig
-          return false;
-        }
-        const persistDenylist: string[] = persistConfig.persistDenylist ?? [];
-        const originalState = originalRootState[slice.name];
-        const currentState = currentRootState[slice.name];
-        for (const [k, v] of Object.entries(currentState)) {
-          if (persistDenylist.includes(k)) {
-            continue;
-          }
-
-          if (v !== originalState[k as keyof typeof originalState]) {
-            return true;
-          }
-        }
-      }
-      return false;
-    },
-    effect: () => {
-      $isPendingPersist.set(true);
-    },
-  });
-
-  startAppListening({
-    matcher: createAction(REMEMBER_PERSISTED).match,
-    effect: () => {
-      $isPendingPersist.set(false);
-    },
-  });
-};
-addPersistenceListener(startAppListening);

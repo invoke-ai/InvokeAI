@@ -69,7 +69,7 @@ const migrate = (state: any): any => {
   return state;
 };
 
-export const modelManagerSliceConfig: SliceConfig<ModelManagerState> = {
+export const modelManagerSliceConfig: SliceConfig<typeof slice> = {
   slice,
   getInitialState,
   persistConfig: {

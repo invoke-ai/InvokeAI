@@ -79,7 +79,7 @@ const migrate = (state: any): any => {
   return state;
 };
 
-export const lorasSliceConfig: SliceConfig<LoRAsState> = {
+export const lorasSliceConfig: SliceConfig<typeof slice> = {
   slice,
   getInitialState,
   persistConfig: {

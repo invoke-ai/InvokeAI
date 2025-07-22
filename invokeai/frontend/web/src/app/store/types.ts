@@ -1,12 +1,14 @@
-import type { Slice, UnknownAction } from '@reduxjs/toolkit';
+import type { Slice } from '@reduxjs/toolkit';
 import type { UndoableOptions } from 'redux-undo';
 
-export type SliceConfig<T> = {
-  slice: Slice<T>;
+type StateFromSlice<T extends Slice> = T extends Slice<infer U> ? U : never;
+
+export type SliceConfig<T extends Slice = Slice> = {
+  slice: T;
   /**
    * A function that returns the initial state of the slice.
    */
-  getInitialState: () => T;
+  getInitialState: () => StateFromSlice<T>;
   /**
    * The optional persist configuration for this slice. If omitted, the slice will not be persisted.
    */
@@ -16,11 +18,11 @@ export type SliceConfig<T> = {
      * @param state The rehydrated state.
      * @returns A correctly-shaped state.
      */
-    migrate: (state: unknown) => T;
+    migrate: (state: unknown) => StateFromSlice<T>;
     /**
      * Keys to omit from the persisted state.
      */
-    persistDenylist?: (keyof T)[];
+    persistDenylist?: (keyof StateFromSlice<T>)[];
   };
   /**
    * The optional undoable configuration for this slice. If omitted, the slice will not be undoable.
@@ -29,6 +31,6 @@ export type SliceConfig<T> = {
     /**
      * The options to be passed into redux-undo.
      */
-    reduxUndoOptions: UndoableOptions<T, UnknownAction>;
+    reduxUndoOptions: UndoableOptions<StateFromSlice<T>>;
   };
 };
