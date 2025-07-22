@@ -67,7 +67,7 @@ def mock_services() -> InvocationServices:
         workflow_thumbnails=None,  # type: ignore
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
-        client_state_persistence=None # type: ignore
+        client_state_persistence=None,  # type: ignore
     )
 
 
