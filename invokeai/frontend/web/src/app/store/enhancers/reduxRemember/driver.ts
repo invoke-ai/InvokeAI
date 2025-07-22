@@ -1,10 +1,8 @@
-import { objectEquals } from '@observ33r/object-equals';
 import { logger } from 'app/logging/logger';
 import { StorageError } from 'app/store/enhancers/reduxRemember/errors';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $projectId } from 'app/store/nanostores/projectId';
 import { $queueId } from 'app/store/nanostores/queueId';
-import { atom } from 'nanostores';
 import type { Driver } from 'redux-remember';
 import { getBaseUrl } from 'services/api';
 import { buildAppInfoUrl } from 'services/api/endpoints/appInfo';
@@ -13,13 +11,7 @@ const log = logger('system');
 
 // Persistence happens per slice. To track when persistence is in progress, maintain a ref count, incrementing
 // it when a slice is being persisted and decrementing it when the persistence is done.
-const $persistRefCount = atom(0);
-const inc = () => {
-  $persistRefCount.set($persistRefCount.get() + 1);
-};
-const dec = () => {
-  $persistRefCount.set($persistRefCount.get() - 1);
-};
+let persistRefCount = 0;
 
 // Keep track of the last persisted state for each key to avoid unnecessary network requests.
 const lastPersistedState = new Map<string, unknown>();
@@ -76,9 +68,26 @@ export const serverBackedDriver: Driver = {
   },
   setItem: async (key, value) => {
     try {
-      inc();
-      if (objectEquals(lastPersistedState.get(key), value)) {
-        log.debug(`Skipping persist for key "${key}" as value is unchanged.`);
+      persistRefCount++;
+      // Deep equality check to avoid noop persist network requests.
+      //
+      // `redux-remember` persists individual slices of state, so we can implicity denylist a slice by not giving it a
+      // persist config.
+      //
+      // However, we may need to avoid persisting individual _fields_ of a slice. `redux-remember` does not provide a
+      // way to do this directly.
+      //
+      // To accomplish this, we add a layer of logic on top of the `redux-remember`. In the state serializer function
+      // provided to `redux-remember`, we can omit certain fields from the state that we do not want to persist. See
+      // the implementation in `store.ts` for this logic.
+      //
+      // This logic is unknown to `redux-remember`. When an omitted field changes, it will still attempt to persist the
+      // whole slice, even if the final, _serialized_ slice value is unchanged.
+      //
+      // To avoid unnecessary network requests, we keep track of the last persisted state for each key. If the value to
+      // be persisted is the same as the last persisted value, we skip the network request.
+      if (lastPersistedState.get(key) === value) {
+        log.trace(`Skipping persist for key "${key}" as value is unchanged.`);
         return value;
       }
       const url = getUrl(key);
@@ -87,6 +96,7 @@ export const serverBackedDriver: Driver = {
       if (!res.ok) {
         throw new Error(`Response status: ${res.status}`);
       }
+      lastPersistedState.set(key, value);
       return value;
     } catch (originalError) {
       throw new StorageError({
@@ -96,15 +106,18 @@ export const serverBackedDriver: Driver = {
         originalError,
       });
     } finally {
-      lastPersistedState.set(key, value);
-      dec();
+      persistRefCount--;
+      if (persistRefCount < 0) {
+        log.warn('Persist ref count is negative, resetting to 0');
+        persistRefCount = 0;
+      }
     }
   },
 };
 
 export const resetClientState = async () => {
   try {
-    inc();
+    persistRefCount++;
     const url = getUrl();
     const headers = getHeaders();
     const res = await fetch(url, { headers, method: 'DELETE' });
@@ -114,12 +127,17 @@ export const resetClientState = async () => {
   } catch {
     log.error('Failed to reset client state');
   } finally {
-    dec();
+    persistRefCount--;
+    lastPersistedState.clear();
+    if (persistRefCount < 0) {
+      log.warn('Persist ref count is negative, resetting to 0');
+      persistRefCount = 0;
+    }
   }
 };
 
 window.addEventListener('beforeunload', (e) => {
-  if ($persistRefCount.get() > 0) {
+  if (persistRefCount > 0) {
     e.preventDefault();
   }
 });
