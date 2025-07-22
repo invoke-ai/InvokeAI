@@ -2754,16 +2754,6 @@ export type components = {
              */
             image_names: string[];
         };
-        /** Body_set_client_state */
-        Body_set_client_state: {
-            /**
-             * Key
-             * @description Key to set
-             */
-            key: string;
-            /** @description Value of the key */
-            value: components["schemas"]["JsonValue"];
-        };
         /** Body_set_workflow_thumbnail */
         Body_set_workflow_thumbnail: {
             /**
@@ -24738,7 +24728,7 @@ export interface operations {
     get_client_state_by_key: {
         parameters: {
             query: {
-                /** @description Key to retrieve from client state persistence */
+                /** @description Key to get */
                 key: string;
             };
             header?: never;
@@ -24769,14 +24759,17 @@ export interface operations {
     };
     set_client_state: {
         parameters: {
-            query?: never;
+            query: {
+                /** @description Key to set */
+                key: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Body_set_client_state"];
+                "application/json": components["schemas"]["JsonValue"];
             };
         };
         responses: {
