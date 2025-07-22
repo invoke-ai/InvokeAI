@@ -31,7 +31,7 @@ const getInitialState = (): UpscaleState => ({
   tileOverlap: 128,
 });
 
-export const slice = createSlice({
+const slice = createSlice({
   name: 'upscale',
   initialState: getInitialState(),
   reducers: {

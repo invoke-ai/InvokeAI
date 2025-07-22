@@ -1703,7 +1703,7 @@ const syncScaledSize = (state: CanvasState) => {
 
 let filter = true;
 
-export const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
+const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
   limit: 64,
   undoType: canvasUndo.type,
   redoType: canvasRedo.type,

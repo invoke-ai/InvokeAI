@@ -37,7 +37,7 @@ type PayloadActionWithId<T = void> = T extends void
       } & T
     >;
 
-export const slice = createSlice({
+const slice = createSlice({
   name: 'refImages',
   initialState: getInitialRefImagesState(),
   reducers: {

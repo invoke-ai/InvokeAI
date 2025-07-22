@@ -31,7 +31,7 @@ const getInitialState = (): DynamicPromptsState => ({
   seedBehaviour: 'PER_ITERATION',
 });
 
-export const slice = createSlice({
+const slice = createSlice({
   name: 'dynamicPrompts',
   initialState: getInitialState(),
   reducers: {

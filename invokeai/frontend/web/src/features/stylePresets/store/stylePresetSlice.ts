@@ -15,7 +15,7 @@ const getInitialState = (): StylePresetState => ({
   showPromptPreviews: false,
 });
 
-export const slice = createSlice({
+const slice = createSlice({
   name: 'stylePreset',
   initialState: getInitialState(),
   reducers: {
