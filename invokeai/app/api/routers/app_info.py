@@ -181,7 +181,7 @@ async def get_invocation_cache_status() -> InvocationCacheStatus:
     response_model=JsonValue | None,
 )
 async def get_client_state_by_key(
-    key: str = Query(..., description="Key to retrieve from client state persistence"),
+    key: str = Query(..., description="Key to get"),
 ) -> JsonValue | None:
     """Gets the client state"""
     try:
@@ -197,7 +197,7 @@ async def get_client_state_by_key(
     response_model=None,
 )
 async def set_client_state(
-    key: str = Body(..., description="Key to set"),
+    key: str = Query(..., description="Key to set"),
     value: JsonValue = Body(..., description="Value of the key"),
 ) -> None:
     """Sets the client state"""
