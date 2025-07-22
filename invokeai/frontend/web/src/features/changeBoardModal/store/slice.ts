@@ -8,7 +8,7 @@ import { initialState } from './initialState';
 
 const getInitialState = () => deepClone(initialState);
 
-export const slice = createSlice({
+const slice = createSlice({
   name: 'changeBoardModal',
   initialState,
   reducers: {

@@ -6,7 +6,7 @@ import { deepClone } from 'common/util/deepClone';
 
 import { INITIAL_STATE, type UIState } from './uiTypes';
 
-export const getInitialState = (): UIState => deepClone(INITIAL_STATE);
+const getInitialState = (): UIState => deepClone(INITIAL_STATE);
 
 const slice = createSlice({
   name: 'ui',

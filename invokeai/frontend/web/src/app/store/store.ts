@@ -40,7 +40,6 @@ import { configSliceConfig } from 'features/system/store/configSlice';
 import { systemSliceConfig } from 'features/system/store/systemSlice';
 import { uiSliceConfig } from 'features/ui/store/uiSlice';
 import { diff } from 'jsondiffpatch';
-import { atom } from 'nanostores';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
 import type { SerializeFunction, UnserializeFunction } from 'redux-remember';
 import { rememberEnhancer, rememberReducer } from 'redux-remember';
@@ -61,8 +60,6 @@ export const listenerMiddleware = createListenerMiddleware();
 const log = logger('system');
 
 // When adding a slice, add the config to the SLICE_CONFIGS object below, then add the reducer to ALL_REDUCERS.
-// Remember to wrap undoable slices in `undoable()`.
-
 const SLICE_CONFIGS = {
   [canvasSessionSliceConfig.slice.reducerPath]: canvasSessionSliceConfig,
   [canvasSettingsSliceConfig.slice.reducerPath]: canvasSettingsSliceConfig,
@@ -85,6 +82,8 @@ const SLICE_CONFIGS = {
   [workflowSettingsSliceConfig.slice.reducerPath]: workflowSettingsSliceConfig,
 };
 
+// TS makes it really hard to dynamically create this object :/ so it's just hardcoded here.
+// Remember to wrap undoable reducers in `undoable()`!
 const ALL_REDUCERS = {
   [api.reducerPath]: api.reducer,
   [canvasSessionSliceConfig.slice.reducerPath]: canvasSessionSliceConfig.slice.reducer,
@@ -120,12 +119,6 @@ const rootReducer = combineReducers(ALL_REDUCERS);
 
 const rememberedRootReducer = rememberReducer(rootReducer);
 
-export const $isPendingPersist = atom(false);
-
-$isPendingPersist.listen((isPendingPersist) => {
-  console.log({ isPendingPersist });
-});
-
 const unserialize: UnserializeFunction = (data, key) => {
   const sliceConfig = SLICE_CONFIGS[key as keyof typeof SLICE_CONFIGS];
   if (!sliceConfig?.persistConfig) {
@@ -153,7 +146,7 @@ const unserialize: UnserializeFunction = (data, key) => {
       {
         persistedData: parsed,
         rehydratedData: transformed as JsonObject,
-        diff: diff(parsed, transformed) as JsonObject, // this is always serializable
+        diff: diff(parsed, transformed) as JsonObject,
       },
       `Rehydrated slice "${key}"`
     );
@@ -166,6 +159,7 @@ const unserialize: UnserializeFunction = (data, key) => {
     state = getInitialState();
   }
 
+  // Undoable slices must be wrapped in a history!
   if (undoableConfig) {
     return newHistory([], state, []);
   } else {
@@ -183,11 +177,13 @@ const serialize: SerializeFunction = (data, key) => {
     sliceConfig.undoableConfig ? data.present : data,
     sliceConfig.persistConfig.persistDenylist ?? []
   );
+
   return JSON.stringify(result);
 };
 
-const PERSISTED_SLICE_CONFIGS = Object.values(SLICE_CONFIGS).filter(({ persistConfig }) => !!persistConfig);
-const PERSISTED_KEYS = PERSISTED_SLICE_CONFIGS.map(({ slice }) => slice.name);
+const PERSISTED_KEYS = Object.values(SLICE_CONFIGS)
+  .filter((sliceConfig) => !!sliceConfig.persistConfig)
+  .map((sliceConfig) => sliceConfig.slice.reducerPath);
 
 export const createStore = (uniqueStoreKey?: string, persist = true) =>
   configureStore({
@@ -209,7 +205,7 @@ export const createStore = (uniqueStoreKey?: string, persist = true) =>
       if (persist) {
         const res = enhancers.prepend(
           rememberEnhancer(serverBackedDriver, PERSISTED_KEYS, {
-            persistDebounce: 3000,
+            persistThrottle: 2000,
             serialize,
             unserialize,
             prefix: '',
