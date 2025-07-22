@@ -2630,9 +2630,10 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "Generate images faster with new Launchpads and a simplified Generate tab.",
-            "Edit with prompts using Flux Kontext Dev.",
-            "Export to PSD, bulk-hide overlays, organize models & images — all in a reimagined interface built for control."
+            "New setting to send all Canvas generations directly to the Gallery.",
+            "New Invert Mask (Shift+V) and Fit BBox to Mask (Shift+B) capabilities.",
+            "Expanded support for Model Thumbnails and configurations.",
+            "Various other quality of life updates and fixes"
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
