@@ -1,6 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
-import type { PersistConfig, RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
 import type { ModelType } from 'services/api/types';
 
 export type FilterableModelType = Exclude<ModelType, 'onnx'> | 'refiner';
@@ -15,7 +16,7 @@ type ModelManagerState = {
   shouldInstallInPlace: boolean;
 };
 
-const initialModelManagerState: ModelManagerState = {
+const getInitialState = (): ModelManagerState => ({
   _version: 1,
   selectedModelKey: null,
   selectedModelMode: 'view',
@@ -23,11 +24,11 @@ const initialModelManagerState: ModelManagerState = {
   searchTerm: '',
   scanPath: undefined,
   shouldInstallInPlace: true,
-};
+});
 
-export const modelManagerV2Slice = createSlice({
+const slice = createSlice({
   name: 'modelmanagerV2',
-  initialState: initialModelManagerState,
+  initialState: getInitialState(),
   reducers: {
     setSelectedModelKey: (state, action: PayloadAction<string | null>) => {
       state.selectedModelMode = 'view';
@@ -58,21 +59,23 @@ export const {
   setSelectedModelMode,
   setScanPath,
   shouldInstallInPlaceChanged,
-} = modelManagerV2Slice.actions;
+} = slice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrateModelManagerState = (state: any): any => {
+const migrate = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
   }
   return state;
 };
 
-export const modelManagerV2PersistConfig: PersistConfig<ModelManagerState> = {
-  name: modelManagerV2Slice.name,
-  initialState: initialModelManagerState,
-  migrate: migrateModelManagerState,
-  persistDenylist: ['selectedModelKey', 'selectedModelMode', 'filteredModelType', 'searchTerm'],
+export const modelManagerSliceConfig: SliceConfig<ModelManagerState> = {
+  slice,
+  getInitialState,
+  persistConfig: {
+    migrate,
+    persistDenylist: ['selectedModelKey', 'selectedModelMode', 'filteredModelType', 'searchTerm'],
+  },
 };
 
 export const selectModelManagerV2Slice = (state: RootState) => state.modelmanagerV2;

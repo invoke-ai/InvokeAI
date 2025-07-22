@@ -1,7 +1,8 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import { SelectionMode } from '@xyflow/react';
-import type { PersistConfig, RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
 import type { Selector } from 'react-redux';
 import z from 'zod';
 
@@ -29,7 +30,7 @@ export type WorkflowSettingsState = {
   selectionMode: SelectionMode;
 };
 
-const initialState: WorkflowSettingsState = {
+const getInitialState = (): WorkflowSettingsState => ({
   _version: 1,
   shouldShowMinimapPanel: true,
   layeringStrategy: 'network-simplex',
@@ -44,11 +45,11 @@ const initialState: WorkflowSettingsState = {
   shouldShowEdgeLabels: false,
   nodeOpacity: 1,
   selectionMode: SelectionMode.Partial,
-};
+});
 
-export const workflowSettingsSlice = createSlice({
+const slice = createSlice({
   name: 'workflowSettings',
-  initialState,
+  initialState: getInitialState(),
   reducers: {
     shouldShowMinimapPanelChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldShowMinimapPanel = action.payload;
@@ -106,21 +107,22 @@ export const {
   shouldValidateGraphChanged,
   nodeOpacityChanged,
   selectionModeChanged,
-} = workflowSettingsSlice.actions;
+} = slice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrateWorkflowSettingsState = (state: any): any => {
+const migrate = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
   }
   return state;
 };
 
-export const workflowSettingsPersistConfig: PersistConfig<WorkflowSettingsState> = {
-  name: workflowSettingsSlice.name,
-  initialState,
-  migrate: migrateWorkflowSettingsState,
-  persistDenylist: [],
+export const workflowSettingsSliceConfig: SliceConfig<WorkflowSettingsState> = {
+  slice,
+  getInitialState,
+  persistConfig: {
+    migrate,
+  },
 };
 
 export const selectWorkflowSettingsSlice = (state: RootState) => state.workflowSettings;

@@ -20,34 +20,31 @@ import { addSetDefaultSettingsListener } from 'app/store/middleware/listenerMidd
 import { addSocketConnectedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
 import { deepClone } from 'common/util/deepClone';
 import { keys, mergeWith, omit, pick } from 'es-toolkit/compat';
-import { changeBoardModalSlice } from 'features/changeBoardModal/store/slice';
-import { canvasSettingsPersistConfig, canvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
-import { canvasPersistConfig, canvasSlice, canvasUndoableConfig } from 'features/controlLayers/store/canvasSlice';
-import {
-  canvasSessionSlice,
-  canvasStagingAreaPersistConfig,
-} from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { lorasPersistConfig, lorasSlice } from 'features/controlLayers/store/lorasSlice';
-import { paramsPersistConfig, paramsSlice } from 'features/controlLayers/store/paramsSlice';
-import { refImagesPersistConfig, refImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { dynamicPromptsPersistConfig, dynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
-import { galleryPersistConfig, gallerySlice } from 'features/gallery/store/gallerySlice';
-import { modelManagerV2PersistConfig, modelManagerV2Slice } from 'features/modelManagerV2/store/modelManagerV2Slice';
-import { nodesPersistConfig, nodesSlice, nodesUndoableConfig } from 'features/nodes/store/nodesSlice';
-import { workflowLibraryPersistConfig, workflowLibrarySlice } from 'features/nodes/store/workflowLibrarySlice';
-import { workflowSettingsPersistConfig, workflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
-import { upscalePersistConfig, upscaleSlice } from 'features/parameters/store/upscaleSlice';
-import { queueSlice } from 'features/queue/store/queueSlice';
-import { stylePresetPersistConfig, stylePresetSlice } from 'features/stylePresets/store/stylePresetSlice';
-import { configSlice } from 'features/system/store/configSlice';
-import { systemPersistConfig, systemSlice } from 'features/system/store/systemSlice';
-import { uiPersistConfig, uiSlice } from 'features/ui/store/uiSlice';
+import { changeBoardModalSliceConfig } from 'features/changeBoardModal/store/slice';
+import { canvasSettingsSliceConfig } from 'features/controlLayers/store/canvasSettingsSlice';
+import { canvasSliceConfig } from 'features/controlLayers/store/canvasSlice';
+import { canvasSessionSliceConfig } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { lorasSliceConfig } from 'features/controlLayers/store/lorasSlice';
+import { paramsSliceConfig } from 'features/controlLayers/store/paramsSlice';
+import { refImagesSliceConfig } from 'features/controlLayers/store/refImagesSlice';
+import { dynamicPromptsSliceConfig } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
+import { gallerySliceConfig } from 'features/gallery/store/gallerySlice';
+import { modelManagerSliceConfig } from 'features/modelManagerV2/store/modelManagerV2Slice';
+import { nodesSliceConfig } from 'features/nodes/store/nodesSlice';
+import { workflowLibrarySliceConfig } from 'features/nodes/store/workflowLibrarySlice';
+import { workflowSettingsSliceConfig } from 'features/nodes/store/workflowSettingsSlice';
+import { upscaleSliceConfig } from 'features/parameters/store/upscaleSlice';
+import { queueSliceConfig } from 'features/queue/store/queueSlice';
+import { stylePresetSliceConfig } from 'features/stylePresets/store/stylePresetSlice';
+import { configSliceConfig } from 'features/system/store/configSlice';
+import { systemSliceConfig } from 'features/system/store/systemSlice';
+import { uiSliceConfig } from 'features/ui/store/uiSlice';
 import { diff } from 'jsondiffpatch';
 import { atom } from 'nanostores';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
 import type { SerializeFunction, UnserializeFunction } from 'redux-remember';
 import { REMEMBER_PERSISTED, rememberEnhancer, rememberReducer } from 'redux-remember';
-import undoable, { newHistory } from 'redux-undo';
+import { newHistory } from 'redux-undo';
 import { serializeError } from 'serialize-error';
 import { api } from 'services/api';
 import { authToastMiddleware } from 'services/api/authToastMiddleware';
@@ -64,90 +61,73 @@ export const listenerMiddleware = createListenerMiddleware();
 
 const log = logger('system');
 
-const allReducers = {
-  [api.reducerPath]: api.reducer,
-  [gallerySlice.name]: gallerySlice.reducer,
-  [nodesSlice.name]: undoable(nodesSlice.reducer, nodesUndoableConfig),
-  [systemSlice.name]: systemSlice.reducer,
-  [configSlice.name]: configSlice.reducer,
-  [uiSlice.name]: uiSlice.reducer,
-  [dynamicPromptsSlice.name]: dynamicPromptsSlice.reducer,
-  [changeBoardModalSlice.name]: changeBoardModalSlice.reducer,
-  [modelManagerV2Slice.name]: modelManagerV2Slice.reducer,
-  [queueSlice.name]: queueSlice.reducer,
-  [canvasSlice.name]: undoable(canvasSlice.reducer, canvasUndoableConfig),
-  [workflowSettingsSlice.name]: workflowSettingsSlice.reducer,
-  [upscaleSlice.name]: upscaleSlice.reducer,
-  [stylePresetSlice.name]: stylePresetSlice.reducer,
-  [paramsSlice.name]: paramsSlice.reducer,
-  [canvasSettingsSlice.name]: canvasSettingsSlice.reducer,
-  [canvasSessionSlice.name]: canvasSessionSlice.reducer,
-  [lorasSlice.name]: lorasSlice.reducer,
-  [workflowLibrarySlice.name]: workflowLibrarySlice.reducer,
-  [refImagesSlice.name]: refImagesSlice.reducer,
+const SLICE_CONFIGS = {
+  [canvasSessionSliceConfig.slice.name]: canvasSessionSliceConfig,
+  [canvasSettingsSliceConfig.slice.name]: canvasSettingsSliceConfig,
+  [canvasSliceConfig.slice.name]: canvasSliceConfig,
+  [changeBoardModalSliceConfig.slice.name]: changeBoardModalSliceConfig,
+  [configSliceConfig.slice.name]: configSliceConfig,
+  [dynamicPromptsSliceConfig.slice.name]: dynamicPromptsSliceConfig,
+  [gallerySliceConfig.slice.name]: gallerySliceConfig,
+  [lorasSliceConfig.slice.name]: lorasSliceConfig,
+  [modelManagerSliceConfig.slice.name]: modelManagerSliceConfig,
+  [nodesSliceConfig.slice.name]: nodesSliceConfig,
+  [paramsSliceConfig.slice.name]: paramsSliceConfig,
+  [queueSliceConfig.slice.name]: queueSliceConfig,
+  [refImagesSliceConfig.slice.name]: refImagesSliceConfig,
+  [stylePresetSliceConfig.slice.name]: stylePresetSliceConfig,
+  [systemSliceConfig.slice.name]: systemSliceConfig,
+  [uiSliceConfig.slice.name]: uiSliceConfig,
+  [upscaleSliceConfig.slice.name]: upscaleSliceConfig,
+  [workflowLibrarySliceConfig.slice.name]: workflowLibrarySliceConfig,
+  [workflowSettingsSliceConfig.slice.name]: workflowSettingsSliceConfig,
 };
 
-const rootReducer = combineReducers(allReducers);
+const ALL_REDUCERS = {
+  [api.reducerPath]: api.reducer,
+  [canvasSessionSliceConfig.slice.name]: canvasSessionSliceConfig.slice.reducer,
+  [canvasSettingsSliceConfig.slice.name]: canvasSettingsSliceConfig.slice.reducer,
+  [canvasSliceConfig.slice.name]: canvasSliceConfig.slice.reducer,
+  [changeBoardModalSliceConfig.slice.name]: changeBoardModalSliceConfig.slice.reducer,
+  [configSliceConfig.slice.name]: configSliceConfig.slice.reducer,
+  [dynamicPromptsSliceConfig.slice.name]: dynamicPromptsSliceConfig.slice.reducer,
+  [gallerySliceConfig.slice.name]: gallerySliceConfig.slice.reducer,
+  [lorasSliceConfig.slice.name]: lorasSliceConfig.slice.reducer,
+  [modelManagerSliceConfig.slice.name]: modelManagerSliceConfig.slice.reducer,
+  [nodesSliceConfig.slice.name]: nodesSliceConfig.slice.reducer,
+  [paramsSliceConfig.slice.name]: paramsSliceConfig.slice.reducer,
+  [queueSliceConfig.slice.name]: queueSliceConfig.slice.reducer,
+  [refImagesSliceConfig.slice.name]: refImagesSliceConfig.slice.reducer,
+  [stylePresetSliceConfig.slice.name]: stylePresetSliceConfig.slice.reducer,
+  [systemSliceConfig.slice.name]: systemSliceConfig.slice.reducer,
+  [uiSliceConfig.slice.name]: uiSliceConfig.slice.reducer,
+  [upscaleSliceConfig.slice.name]: upscaleSliceConfig.slice.reducer,
+  [workflowLibrarySliceConfig.slice.name]: workflowLibrarySliceConfig.slice.reducer,
+  [workflowSettingsSliceConfig.slice.name]: workflowSettingsSliceConfig.slice.reducer,
+};
+
+const rootReducer = combineReducers(ALL_REDUCERS);
 
 const rememberedRootReducer = rememberReducer(rootReducer);
-
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-export type PersistConfig<T = any> = {
-  /**
-   * The name of the slice.
-   */
-  name: keyof typeof allReducers;
-  /**
-   * The initial state of the slice.
-   */
-  initialState: T;
-  /**
-   * Migrate the state to the current version during rehydration.
-   * @param state The rehydrated state.
-   * @returns A correctly-shaped state.
-   */
-  migrate: (state: unknown) => T;
-  /**
-   * Keys to omit from the persisted state.
-   */
-  persistDenylist: (keyof T)[];
-};
-
-export const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
-  [galleryPersistConfig.name]: galleryPersistConfig,
-  [nodesPersistConfig.name]: nodesPersistConfig,
-  [systemPersistConfig.name]: systemPersistConfig,
-  [uiPersistConfig.name]: uiPersistConfig,
-  [dynamicPromptsPersistConfig.name]: dynamicPromptsPersistConfig,
-  [modelManagerV2PersistConfig.name]: modelManagerV2PersistConfig,
-  [canvasPersistConfig.name]: canvasPersistConfig,
-  [workflowSettingsPersistConfig.name]: workflowSettingsPersistConfig,
-  [upscalePersistConfig.name]: upscalePersistConfig,
-  [stylePresetPersistConfig.name]: stylePresetPersistConfig,
-  [paramsPersistConfig.name]: paramsPersistConfig,
-  [canvasSettingsPersistConfig.name]: canvasSettingsPersistConfig,
-  [canvasStagingAreaPersistConfig.name]: canvasStagingAreaPersistConfig,
-  [lorasPersistConfig.name]: lorasPersistConfig,
-  [workflowLibraryPersistConfig.name]: workflowLibraryPersistConfig,
-  [refImagesSlice.name]: refImagesPersistConfig,
-};
 
 export const $isPendingPersist = atom(false);
 
 const unserialize: UnserializeFunction = (data, key) => {
-  const persistConfig = persistConfigs[key as keyof typeof persistConfigs];
-  if (!persistConfig) {
+  const sliceConfig = SLICE_CONFIGS[key as keyof typeof SLICE_CONFIGS];
+  if (!sliceConfig?.persistConfig) {
     throw new Error(`No persist config for slice "${key}"`);
   }
+  const { getInitialState, persistConfig, undoableConfig } = sliceConfig;
   let state;
   try {
-    const { initialState, migrate } = persistConfig;
+    const initialState = getInitialState();
+
     const parsed = JSON.parse(data);
 
     // strip out old keys
     const stripped = pick(deepClone(parsed), keys(initialState));
     // run (additive) migrations
-    const migrated = migrate(stripped);
+    const migrated = persistConfig.migrate(stripped);
     /*
      * Merge in initial state as default values, covering any missing keys. You might be tempted to use _.defaultsDeep,
      * but that merges arrays by index and partial objects by key. Using an identity function as the customizer results
@@ -158,7 +138,7 @@ const unserialize: UnserializeFunction = (data, key) => {
     log.debug(
       {
         persistedData: parsed,
-        rehydratedData: transformed,
+        rehydratedData: transformed as JsonObject,
         diff: diff(parsed, transformed) as JsonObject, // this is always serializable
       },
       `Rehydrated slice "${key}"`
@@ -169,12 +149,10 @@ const unserialize: UnserializeFunction = (data, key) => {
       { error: serializeError(err as Error) },
       `Error rehydrating slice "${key}", falling back to default initial state`
     );
-    state = persistConfig.initialState;
+    state = getInitialState();
   }
 
-  // If the slice is undoable, we need to wrap it in a new history - only nodes and canvas are undoable at the moment.
-  // TODO(psyche): make this automatic & remove the hard-coding for specific slices.
-  if (key === nodesSlice.name || key === canvasSlice.name) {
+  if (undoableConfig) {
     return newHistory([], state, []);
   } else {
     return state;
@@ -182,15 +160,19 @@ const unserialize: UnserializeFunction = (data, key) => {
 };
 
 const serialize: SerializeFunction = (data, key) => {
-  const persistConfig = persistConfigs[key as keyof typeof persistConfigs];
-  if (!persistConfig) {
+  const sliceConfig = SLICE_CONFIGS[key as keyof typeof SLICE_CONFIGS];
+  if (!sliceConfig?.persistConfig) {
     throw new Error(`No persist config for slice "${key}"`);
   }
   // Heuristic to determine if the slice is undoable - could just hardcode it in the persistConfig
   const isUndoable = 'present' in data && 'past' in data && 'future' in data && '_latestUnfiltered' in data;
-  const result = omit(isUndoable ? data.present : data, persistConfig.persistDenylist);
+
+  const result = omit(isUndoable ? data.present : data, sliceConfig.persistConfig.persistDenylist ?? []);
   return JSON.stringify(result);
 };
+
+const PERSISTED_SLICE_CONFIGS = Object.values(SLICE_CONFIGS).filter(({ persistConfig }) => !!persistConfig);
+const PERSISTED_KEYS = PERSISTED_SLICE_CONFIGS.map(({ slice }) => slice.name);
 
 export const createStore = (uniqueStoreKey?: string, persist = true) =>
   configureStore({
@@ -211,7 +193,7 @@ export const createStore = (uniqueStoreKey?: string, persist = true) =>
       const enhancers = getDefaultEnhancers();
       if (persist) {
         const res = enhancers.prepend(
-          rememberEnhancer(serverBackedDriver, keys(persistConfigs), {
+          rememberEnhancer(serverBackedDriver, PERSISTED_KEYS, {
             persistDebounce: 3000,
             serialize,
             unserialize,
@@ -288,9 +270,14 @@ addSetDefaultSettingsListener(startAppListening);
 const addPersistenceListener = (startAppListening: AppStartListening) => {
   startAppListening({
     predicate: (action, currentRootState, originalRootState) => {
-      for (const { name, persistDenylist } of Object.values(persistConfigs)) {
-        const originalState = originalRootState[name];
-        const currentState = currentRootState[name];
+      for (const { slice, persistConfig } of Object.values(PERSISTED_SLICE_CONFIGS)) {
+        if (!persistConfig) {
+          // shouldn't get here, we filtered out slices without persistConfig
+          return false;
+        }
+        const persistDenylist: string[] = persistConfig.persistDenylist ?? [];
+        const originalState = originalRootState[slice.name];
+        const currentState = currentRootState[slice.name];
         for (const [k, v] of Object.entries(currentState)) {
           if (persistDenylist.includes(k)) {
             continue;

@@ -1,6 +1,7 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
-import type { PersistConfig, RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
 import { clamp } from 'es-toolkit/compat';
@@ -40,7 +41,7 @@ import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/par
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 
-export const paramsSlice = createSlice({
+const slice = createSlice({
   name: 'params',
   initialState: getInitialParamsState(),
   reducers: {
@@ -397,18 +398,17 @@ export const {
   syncedToOptimalDimension,
 
   paramsReset,
-} = paramsSlice.actions;
+} = slice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrate = (state: any): any => {
   return state;
 };
 
-export const paramsPersistConfig: PersistConfig<ParamsState> = {
-  name: paramsSlice.name,
-  initialState: getInitialParamsState(),
-  migrate,
-  persistDenylist: [],
+export const paramsSliceConfig: SliceConfig<ParamsState> = {
+  slice,
+  getInitialState: getInitialParamsState,
+  persistConfig: { migrate },
 };
 
 export const selectParamsSlice = (state: RootState) => state.params;

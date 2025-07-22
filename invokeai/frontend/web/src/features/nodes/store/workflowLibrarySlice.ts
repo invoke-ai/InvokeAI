@@ -1,6 +1,7 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
-import type { PersistConfig, RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
 import type { WorkflowMode } from 'features/nodes/store/types';
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
 import { atom, computed } from 'nanostores';
@@ -17,18 +18,18 @@ type WorkflowLibraryState = {
   selectedTags: string[];
 };
 
-const initialWorkflowLibraryState: WorkflowLibraryState = {
+const getInitialState = (): WorkflowLibraryState => ({
   mode: 'view',
   searchTerm: '',
   orderBy: 'opened_at',
   direction: 'DESC',
   selectedTags: [],
   view: 'defaults',
-};
+});
 
-export const workflowLibrarySlice = createSlice({
+const slice = createSlice({
   name: 'workflowLibrary',
-  initialState: initialWorkflowLibraryState,
+  initialState: getInitialState(),
   reducers: {
     workflowModeChanged: (state, action: PayloadAction<WorkflowMode>) => {
       state.mode = action.payload;
@@ -73,16 +74,17 @@ export const {
   workflowLibraryTagToggled,
   workflowLibraryTagsReset,
   workflowLibraryViewChanged,
-} = workflowLibrarySlice.actions;
+} = slice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrateWorkflowLibraryState = (state: any): any => state;
+const migrate = (state: any): any => state;
 
-export const workflowLibraryPersistConfig: PersistConfig<WorkflowLibraryState> = {
-  name: workflowLibrarySlice.name,
-  initialState: initialWorkflowLibraryState,
-  migrate: migrateWorkflowLibraryState,
-  persistDenylist: [],
+export const workflowLibrarySliceConfig: SliceConfig<WorkflowLibraryState> = {
+  slice,
+  getInitialState,
+  persistConfig: {
+    migrate,
+  },
 };
 
 const selectWorkflowLibrarySlice = (state: RootState) => state.workflowLibrary;
