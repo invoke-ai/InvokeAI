@@ -1,6 +1,7 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
-import type { PersistConfig, RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
 import { buildZodTypeGuard } from 'common/util/zodUtils';
 import { z } from 'zod';
 
@@ -19,7 +20,7 @@ export interface DynamicPromptsState {
   seedBehaviour: SeedBehaviour;
 }
 
-const initialDynamicPromptsState: DynamicPromptsState = {
+const getInitialState = (): DynamicPromptsState => ({
   _version: 1,
   maxPrompts: 100,
   combinatorial: true,
@@ -28,11 +29,11 @@ const initialDynamicPromptsState: DynamicPromptsState = {
   isError: false,
   isLoading: false,
   seedBehaviour: 'PER_ITERATION',
-};
+});
 
-export const dynamicPromptsSlice = createSlice({
+export const slice = createSlice({
   name: 'dynamicPrompts',
-  initialState: initialDynamicPromptsState,
+  initialState: getInitialState(),
   reducers: {
     maxPromptsChanged: (state, action: PayloadAction<number>) => {
       state.maxPrompts = action.payload;
@@ -63,21 +64,23 @@ export const {
   isErrorChanged,
   isLoadingChanged,
   seedBehaviourChanged,
-} = dynamicPromptsSlice.actions;
+} = slice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrateDynamicPromptsState = (state: any): any => {
+const migrate = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
   }
   return state;
 };
 
-export const dynamicPromptsPersistConfig: PersistConfig<DynamicPromptsState> = {
-  name: dynamicPromptsSlice.name,
-  initialState: initialDynamicPromptsState,
-  migrate: migrateDynamicPromptsState,
-  persistDenylist: ['prompts', 'parsingError', 'isError', 'isLoading'],
+export const dynamicPromptsSliceConfig: SliceConfig<DynamicPromptsState> = {
+  slice,
+  getInitialState,
+  persistConfig: {
+    migrate,
+    persistDenylist: ['prompts', 'parsingError', 'isError', 'isLoading'],
+  },
 };
 
 export const selectDynamicPromptsSlice = (state: RootState) => state.dynamicPrompts;

@@ -1,13 +1,14 @@
 import { objectEquals } from '@observ33r/object-equals';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { PersistConfig, RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
 import { uniq } from 'es-toolkit/compat';
 import type { BoardRecordOrderBy } from 'services/api/types';
 
 import type { BoardId, ComparisonMode, GalleryState, GalleryView, OrderDir } from './types';
 
-const initialGalleryState: GalleryState = {
+const getInitialState = (): GalleryState => ({
   selection: [],
   shouldAutoSwitch: true,
   autoAssignBoardOnClick: true,
@@ -26,11 +27,11 @@ const initialGalleryState: GalleryState = {
   shouldShowArchivedBoards: false,
   boardsListOrderBy: 'created_at',
   boardsListOrderDir: 'DESC',
-};
+});
 
-export const gallerySlice = createSlice({
+const slice = createSlice({
   name: 'gallery',
-  initialState: initialGalleryState,
+  initialState: getInitialState(),
   reducers: {
     imageSelected: (state, action: PayloadAction<string | null>) => {
       // Let's be efficient here and not update the selection unless it has actually changed. This helps to prevent
@@ -187,21 +188,23 @@ export const {
   searchTermChanged,
   boardsListOrderByChanged,
   boardsListOrderDirChanged,
-} = gallerySlice.actions;
+} = slice.actions;
 
 export const selectGallerySlice = (state: RootState) => state.gallery;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrateGalleryState = (state: any): any => {
+const migrate = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
   }
   return state;
 };
 
-export const galleryPersistConfig: PersistConfig<GalleryState> = {
-  name: gallerySlice.name,
-  initialState: initialGalleryState,
-  migrate: migrateGalleryState,
-  persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'imageToCompare'],
+export const gallerySliceConfig: SliceConfig<GalleryState> = {
+  slice,
+  getInitialState,
+  persistConfig: {
+    migrate,
+    persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'imageToCompare'],
+  },
 };

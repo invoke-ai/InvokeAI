@@ -1,6 +1,7 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
-import type { PersistConfig, RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
 import type { ParameterSpandrelImageToImageModel } from 'features/parameters/types/parameterSchemas';
 import type { ControlNetModelConfig, ImageDTO } from 'services/api/types';
 
@@ -17,7 +18,7 @@ export interface UpscaleState {
   tileOverlap: number;
 }
 
-const initialUpscaleState: UpscaleState = {
+const getInitialState = (): UpscaleState => ({
   _version: 1,
   upscaleModel: null,
   upscaleInitialImage: null,
@@ -28,11 +29,11 @@ const initialUpscaleState: UpscaleState = {
   postProcessingModel: null,
   tileSize: 1024,
   tileOverlap: 128,
-};
+});
 
-export const upscaleSlice = createSlice({
+export const slice = createSlice({
   name: 'upscale',
-  initialState: initialUpscaleState,
+  initialState: getInitialState(),
   reducers: {
     upscaleModelChanged: (state, action: PayloadAction<ParameterSpandrelImageToImageModel | null>) => {
       state.upscaleModel = action.payload;
@@ -74,21 +75,22 @@ export const {
   postProcessingModelChanged,
   tileSizeChanged,
   tileOverlapChanged,
-} = upscaleSlice.actions;
+} = slice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrateUpscaleState = (state: any): any => {
+const migrate = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
   }
   return state;
 };
 
-export const upscalePersistConfig: PersistConfig<UpscaleState> = {
-  name: upscaleSlice.name,
-  initialState: initialUpscaleState,
-  migrate: migrateUpscaleState,
-  persistDenylist: [],
+export const upscaleSliceConfig: SliceConfig<UpscaleState> = {
+  slice,
+  getInitialState,
+  persistConfig: {
+    migrate,
+  },
 };
 
 export const selectUpscaleSlice = (state: RootState) => state.upscale;

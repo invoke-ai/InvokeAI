@@ -1,6 +1,7 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
 import type { AppConfig, NumericalParameterConfig, PartialAppConfig } from 'app/types/invokeai';
 import { merge } from 'es-toolkit/compat';
 
@@ -14,7 +15,9 @@ const baseDimensionConfig: NumericalParameterConfig = {
   coarseStep: 64,
 };
 
-const initialConfigState: AppConfig & { didLoad: boolean } = {
+type ConfigState = AppConfig & { didLoad: boolean };
+
+const getInitialState = (): ConfigState => ({
   didLoad: false,
   isLocal: true,
   shouldUpdateImagesOnConnect: false,
@@ -183,11 +186,11 @@ const initialConfigState: AppConfig & { didLoad: boolean } = {
       coarseStep: 0.5,
     },
   },
-};
+});
 
-export const configSlice = createSlice({
+const slice = createSlice({
   name: 'config',
-  initialState: initialConfigState,
+  initialState: getInitialState(),
   reducers: {
     configChanged: (state, action: PayloadAction<PartialAppConfig>) => {
       merge(state, action.payload);
@@ -196,11 +199,15 @@ export const configSlice = createSlice({
   },
 });
 
-export const { configChanged } = configSlice.actions;
+export const { configChanged } = slice.actions;
+
+export const configSliceConfig: SliceConfig<ConfigState> = {
+  slice,
+  getInitialState,
+};
 
 export const selectConfigSlice = (state: RootState) => state.config;
-const createConfigSelector = <T>(selector: Selector<typeof initialConfigState, T>) =>
-  createSelector(selectConfigSlice, selector);
+const createConfigSelector = <T>(selector: Selector<ConfigState, T>) => createSelector(selectConfigSlice, selector);
 
 export const selectWidthConfig = createConfigSelector((config) => config.sd.width);
 export const selectHeightConfig = createConfigSelector((config) => config.sd.height);

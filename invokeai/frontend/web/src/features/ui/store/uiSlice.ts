@@ -1,13 +1,16 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { PersistConfig, RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
+import { deepClone } from 'common/util/deepClone';
 
-import type { UIState } from './uiTypes';
-import { getInitialUIState } from './uiTypes';
+import { INITIAL_STATE, type UIState } from './uiTypes';
 
-export const uiSlice = createSlice({
+export const getInitialState = (): UIState => deepClone(INITIAL_STATE);
+
+const slice = createSlice({
   name: 'ui',
-  initialState: getInitialUIState(),
+  initialState: getInitialState(),
   reducers: {
     setActiveTab: (state, action: PayloadAction<UIState['activeTab']>) => {
       state.activeTab = action.payload;
@@ -81,12 +84,12 @@ export const {
   textAreaSizesStateChanged,
   dockviewStorageKeyChanged,
   pickerCompactViewStateChanged,
-} = uiSlice.actions;
+} = slice.actions;
 
 export const selectUiSlice = (state: RootState) => state.ui;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrateUIState = (state: any): any => {
+const migrate = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
   }
@@ -101,9 +104,11 @@ const migrateUIState = (state: any): any => {
   return state;
 };
 
-export const uiPersistConfig: PersistConfig<UIState> = {
-  name: uiSlice.name,
-  initialState: getInitialUIState(),
-  migrate: migrateUIState,
-  persistDenylist: ['shouldShowImageDetails'],
+export const uiSliceConfig: SliceConfig<UIState> = {
+  slice,
+  getInitialState,
+  persistConfig: {
+    migrate,
+    persistDenylist: ['shouldShowImageDetails'],
+  },
 };

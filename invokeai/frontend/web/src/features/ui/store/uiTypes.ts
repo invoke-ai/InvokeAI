@@ -1,4 +1,3 @@
-import { deepClone } from 'common/util/deepClone';
 import { isPlainObject } from 'es-toolkit';
 import { z } from 'zod';
 
@@ -25,6 +24,5 @@ const zUIState = z.object({
   shouldShowNotificationV2: z.boolean().default(true),
   pickerCompactViewStates: z.record(z.string(), z.boolean()).default(() => ({})),
 });
-const INITIAL_STATE = zUIState.parse({});
+export const INITIAL_STATE = zUIState.parse({});
 export type UIState = z.infer<typeof zUIState>;
-export const getInitialUIState = (): UIState => deepClone(INITIAL_STATE);

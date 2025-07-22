@@ -1,10 +1,15 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
+import { deepClone } from 'common/util/deepClone';
 
 import { initialState } from './initialState';
+import type { ChangeBoardModalState } from './types';
 
-export const changeBoardModalSlice = createSlice({
+const getInitialState = () => deepClone(initialState);
+
+export const slice = createSlice({
   name: 'changeBoardModal',
   initialState,
   reducers: {
@@ -21,6 +26,11 @@ export const changeBoardModalSlice = createSlice({
   },
 });
 
-export const { isModalOpenChanged, imagesToChangeSelected, changeBoardReset } = changeBoardModalSlice.actions;
+export const { isModalOpenChanged, imagesToChangeSelected, changeBoardReset } = slice.actions;
 
 export const selectChangeBoardModalSlice = (state: RootState) => state.changeBoardModal;
+
+export const changeBoardModalSliceConfig: SliceConfig<ChangeBoardModalState> = {
+  slice,
+  getInitialState,
+};

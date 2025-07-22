@@ -1,7 +1,8 @@
 import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
-import type { PersistConfig, RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
+import type { SliceConfig } from 'app/store/types';
 import { deepClone } from 'common/util/deepClone';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { useMemo } from 'react';
@@ -21,7 +22,7 @@ const INITIAL_STATE: CanvasStagingAreaState = {
 
 const getInitialState = (): CanvasStagingAreaState => deepClone(INITIAL_STATE);
 
-export const canvasSessionSlice = createSlice({
+const slice = createSlice({
   name: 'canvasSession',
   initialState: getInitialState(),
   reducers: {
@@ -48,7 +49,7 @@ export const canvasSessionSlice = createSlice({
   },
 });
 
-export const { canvasSessionReset, canvasQueueItemDiscarded } = canvasSessionSlice.actions;
+export const { canvasSessionReset, canvasQueueItemDiscarded } = slice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrate = (state: any): any => {
@@ -60,14 +61,13 @@ const migrate = (state: any): any => {
   return state;
 };
 
-export const canvasStagingAreaPersistConfig: PersistConfig<CanvasStagingAreaState> = {
-  name: canvasSessionSlice.name,
-  initialState: getInitialState(),
-  migrate,
-  persistDenylist: [],
+export const canvasSessionSliceConfig: SliceConfig<CanvasStagingAreaState> = {
+  slice,
+  getInitialState,
+  persistConfig: { migrate },
 };
 
-export const selectCanvasSessionSlice = (s: RootState) => s[canvasSessionSlice.name];
+export const selectCanvasSessionSlice = (s: RootState) => s[slice.name];
 export const selectCanvasSessionId = createSelector(selectCanvasSessionSlice, ({ canvasSessionId }) => canvasSessionId);
 
 const selectDiscardedItems = createSelector(

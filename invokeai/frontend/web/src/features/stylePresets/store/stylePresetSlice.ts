@@ -1,23 +1,23 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
-import type { PersistConfig, RootState } from 'app/store/store';
-import { deepClone } from 'common/util/deepClone';
+import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
 import { paramsReset } from 'features/controlLayers/store/paramsSlice';
 import { atom } from 'nanostores';
 import { stylePresetsApi } from 'services/api/endpoints/stylePresets';
 
 import type { StylePresetState } from './types';
 
-const initialState: StylePresetState = {
+const getInitialState = (): StylePresetState => ({
   activeStylePresetId: null,
   searchTerm: '',
   viewMode: false,
   showPromptPreviews: false,
-};
+});
 
-export const stylePresetSlice = createSlice({
+export const slice = createSlice({
   name: 'stylePreset',
-  initialState: initialState,
+  initialState: getInitialState(),
   reducers: {
     activeStylePresetIdChanged: (state, action: PayloadAction<string | null>) => {
       state.activeStylePresetId = action.payload;
@@ -34,7 +34,7 @@ export const stylePresetSlice = createSlice({
   },
   extraReducers(builder) {
     builder.addCase(paramsReset, () => {
-      return deepClone(initialState);
+      return getInitialState();
     });
     builder.addMatcher(stylePresetsApi.endpoints.deleteStylePreset.matchFulfilled, (state, action) => {
       if (state.activeStylePresetId === null) {
@@ -58,21 +58,22 @@ export const stylePresetSlice = createSlice({
 });
 
 export const { activeStylePresetIdChanged, searchTermChanged, viewModeChanged, showPromptPreviewsChanged } =
-  stylePresetSlice.actions;
+  slice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrateStylePresetState = (state: any): any => {
+const migrate = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
   }
   return state;
 };
 
-export const stylePresetPersistConfig: PersistConfig<StylePresetState> = {
-  name: stylePresetSlice.name,
-  initialState,
-  migrate: migrateStylePresetState,
-  persistDenylist: [],
+export const stylePresetSliceConfig: SliceConfig<StylePresetState> = {
+  slice,
+  getInitialState,
+  persistConfig: {
+    migrate,
+  },
 };
 
 export const selectStylePresetSlice = (state: RootState) => state.stylePreset;

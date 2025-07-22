@@ -1,6 +1,7 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
-import type { PersistConfig, RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
 import { zRgbaColor } from 'features/controlLayers/store/types';
 import { z } from 'zod';
 
@@ -94,7 +95,7 @@ const zCanvasSettingsState = z.object({
 type CanvasSettingsState = z.infer<typeof zCanvasSettingsState>;
 const getInitialState = () => zCanvasSettingsState.parse({});
 
-export const canvasSettingsSlice = createSlice({
+const slice = createSlice({
   name: 'canvasSettings',
   initialState: getInitialState(),
   reducers: {
@@ -184,18 +185,19 @@ export const {
   settingsRuleOfThirdsToggled,
   settingsSaveAllImagesToGalleryToggled,
   settingsStagingAreaAutoSwitchChanged,
-} = canvasSettingsSlice.actions;
+} = slice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrate = (state: any): any => {
   return state;
 };
 
-export const canvasSettingsPersistConfig: PersistConfig<CanvasSettingsState> = {
-  name: canvasSettingsSlice.name,
-  initialState: getInitialState(),
-  migrate,
-  persistDenylist: [],
+export const canvasSettingsSliceConfig: SliceConfig<CanvasSettingsState> = {
+  slice,
+  getInitialState,
+  persistConfig: {
+    migrate,
+  },
 };
 
 export const selectCanvasSettingsSlice = (s: RootState) => s.canvasSettings;
