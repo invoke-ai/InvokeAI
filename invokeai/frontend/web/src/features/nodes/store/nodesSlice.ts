@@ -936,7 +936,7 @@ const reduxUndoOptions: UndoableOptions<NodesState, UnknownAction> = {
   },
 };
 
-export const nodesSliceConfig: SliceConfig<NodesState> = {
+export const nodesSliceConfig: SliceConfig<typeof slice> = {
   slice,
   getInitialState,
   persistConfig: {

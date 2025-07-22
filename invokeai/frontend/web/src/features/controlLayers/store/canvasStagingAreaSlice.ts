@@ -61,7 +61,7 @@ const migrate = (state: any): any => {
   return state;
 };
 
-export const canvasSessionSliceConfig: SliceConfig<CanvasStagingAreaState> = {
+export const canvasSessionSliceConfig: SliceConfig<typeof slice> = {
   slice,
   getInitialState,
   persistConfig: { migrate },

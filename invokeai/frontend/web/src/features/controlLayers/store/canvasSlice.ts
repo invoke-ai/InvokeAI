@@ -1721,7 +1721,7 @@ export const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> =
   // debug: import.meta.env.MODE === 'development',
 };
 
-export const canvasSliceConfig: SliceConfig<CanvasState> = {
+export const canvasSliceConfig: SliceConfig<typeof slice> = {
   slice,
   getInitialState: getInitialCanvasState,
   persistConfig: {

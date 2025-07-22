@@ -405,7 +405,7 @@ const migrate = (state: any): any => {
   return state;
 };
 
-export const paramsSliceConfig: SliceConfig<ParamsState> = {
+export const paramsSliceConfig: SliceConfig<typeof slice> = {
   slice,
   getInitialState: getInitialParamsState,
   persistConfig: { migrate },

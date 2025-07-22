@@ -104,7 +104,7 @@ const migrate = (state: any): any => {
   return state;
 };
 
-export const uiSliceConfig: SliceConfig<UIState> = {
+export const uiSliceConfig: SliceConfig<typeof slice> = {
   slice,
   getInitialState,
   persistConfig: {

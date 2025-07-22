@@ -1,45 +1,25 @@
 import { StorageError } from 'app/store/enhancers/reduxRemember/errors';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $projectId } from 'app/store/nanostores/projectId';
-import type { UseStore } from 'idb-keyval';
-import { clear, createStore as createIDBKeyValStore, get, set } from 'idb-keyval';
-import { atom } from 'nanostores';
+import { $queueId } from 'app/store/nanostores/queueId';
+import { $isPendingPersist } from 'app/store/store';
 import type { Driver } from 'redux-remember';
 import { getBaseUrl } from 'services/api';
 import { buildAppInfoUrl } from 'services/api/endpoints/appInfo';
 
-// Create a custom idb-keyval store (just needed to customize the name)
-const $idbKeyValStore = atom<UseStore>(createIDBKeyValStore('invoke', 'invoke-store'));
-
-export const clearIdbKeyValStore = () => {
-  clear($idbKeyValStore.get());
-};
-
-// Create redux-remember driver, wrapping idb-keyval
-export const idbKeyValDriver: Driver = {
-  getItem: (key) => {
-    try {
-      return get(key, $idbKeyValStore.get());
-    } catch (originalError) {
-      throw new StorageError({
-        key,
-        projectId: $projectId.get(),
-        originalError,
-      });
-    }
-  },
-  setItem: (key, value) => {
-    try {
-      return set(key, value, $idbKeyValStore.get());
-    } catch (originalError) {
-      throw new StorageError({
-        key,
-        value,
-        projectId: $projectId.get(),
-        originalError,
-      });
-    }
-  },
+const getUrl = (key?: string) => {
+  const baseUrl = getBaseUrl();
+  const query: Record<string, string> = {};
+  if (key) {
+    query['key'] = key;
+  }
+  const queueId = $queueId.get();
+  if (queueId) {
+    query['queueId'] = queueId;
+  }
+  const path = buildAppInfoUrl('client_state', query);
+  const url = `${baseUrl}/${path}`;
+  return url;
 };
 
 const getHeaders = (extra?: Record<string, string>) => {
@@ -61,9 +41,7 @@ const getHeaders = (extra?: Record<string, string>) => {
 export const serverBackedDriver: Driver = {
   getItem: async (key) => {
     try {
-      const baseUrl = getBaseUrl();
-      const path = buildAppInfoUrl('client_state', { key });
-      const url = `${baseUrl}/${path}`;
+      const url = getUrl(key);
       const headers = getHeaders();
       const res = await fetch(url, { headers, method: 'GET' });
       if (!res.ok) {
@@ -81,11 +59,9 @@ export const serverBackedDriver: Driver = {
   },
   setItem: async (key, value) => {
     try {
-      const baseUrl = getBaseUrl();
-      const path = buildAppInfoUrl('client_state');
-      const url = `${baseUrl}/${path}`;
+      const url = getUrl(key);
       const headers = getHeaders({ 'content-type': 'application/json' });
-      const res = await fetch(url, { headers, method: 'POST', body: JSON.stringify({ key, value }) });
+      const res = await fetch(url, { headers, method: 'POST', body: JSON.stringify(value) });
       if (!res.ok) {
         throw new Error(`Response status: ${res.status}`);
       }
@@ -102,12 +78,16 @@ export const serverBackedDriver: Driver = {
 };
 
 export const resetClientState = async () => {
-  const baseUrl = getBaseUrl();
-  const path = buildAppInfoUrl('client_state');
-  const url = `${baseUrl}/${path}`;
+  const url = getUrl();
   const headers = getHeaders();
   const res = await fetch(url, { headers, method: 'DELETE' });
   if (!res.ok) {
     throw new Error(`Response status: ${res.status}`);
   }
 };
+
+window.addEventListener('beforeunload', (e) => {
+  if ($isPendingPersist.get()) {
+    e.preventDefault();
+  }
+});

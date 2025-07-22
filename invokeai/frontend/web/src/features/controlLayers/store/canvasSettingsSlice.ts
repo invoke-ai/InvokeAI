@@ -192,7 +192,7 @@ const migrate = (state: any): any => {
   return state;
 };
 
-export const canvasSettingsSliceConfig: SliceConfig<CanvasSettingsState> = {
+export const canvasSettingsSliceConfig: SliceConfig<typeof slice> = {
   slice,
   getInitialState,
   persistConfig: {

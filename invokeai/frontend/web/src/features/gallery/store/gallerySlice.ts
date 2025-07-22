@@ -200,7 +200,7 @@ const migrate = (state: any): any => {
   return state;
 };
 
-export const gallerySliceConfig: SliceConfig<GalleryState> = {
+export const gallerySliceConfig: SliceConfig<typeof slice> = {
   slice,
   getInitialState,
   persistConfig: {

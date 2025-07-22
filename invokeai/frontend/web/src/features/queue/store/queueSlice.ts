@@ -36,7 +36,7 @@ const slice = createSlice({
 
 export const { listCursorChanged, listPriorityChanged, listParamsReset } = slice.actions;
 
-export const queueSliceConfig: SliceConfig<QueueState> = {
+export const queueSliceConfig: SliceConfig<typeof slice> = {
   slice,
   getInitialState,
 };
