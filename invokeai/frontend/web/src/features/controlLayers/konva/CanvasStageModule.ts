@@ -42,7 +42,7 @@ const DEFAULT_CONFIG: CanvasStageModuleConfig = {
   SCALE_FACTOR: 0.999,
   FIT_LAYERS_TO_STAGE_PADDING_PX: 48,
   SCALE_SNAP_POINTS: [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 5],
-  SCALE_SNAP_TOLERANCE: 0.05,
+  SCALE_SNAP_TOLERANCE: 0.02,
 };
 
 export class CanvasStageModule extends CanvasModuleBase {
