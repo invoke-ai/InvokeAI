@@ -1,5 +1,5 @@
 import type { DockviewApi, GridviewApi } from 'dockview';
-import { DockviewPanel, GridviewPanel } from 'dockview';
+import { DockviewApi as MockedDockviewApi, DockviewPanel, GridviewPanel } from 'dockview';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { NavigationAppApi } from './navigation-api';
@@ -49,7 +49,7 @@ vi.mock('dockview', async () => {
     }
   }
 
-  // Mock GridviewPanel class for instanceof checks
+  // Mock DockviewPanel class for instanceof checks
   class MockDockviewPanel {
     api = {
       setActive: vi.fn(),
@@ -59,10 +59,21 @@ vi.mock('dockview', async () => {
     };
   }
 
+  // Mock DockviewApi class for instanceof checks
+  class MockDockviewApi {
+    panels = [];
+    activePanel = null;
+    toJSON = vi.fn();
+    fromJSON = vi.fn();
+    onDidLayoutChange = vi.fn();
+    onDidActivePanelChange = vi.fn();
+  }
+
   return {
     ...actual,
     GridviewPanel: MockGridviewPanel,
     DockviewPanel: MockDockviewPanel,
+    DockviewApi: MockDockviewApi,
   };
 });
 
@@ -1319,6 +1330,201 @@ describe('AppNavigationApi', () => {
       const result3 = await navigationApi.toggleViewerPanel();
       expect(result3).toBe(true);
       expect(mockViewerPanel.api.setActive).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('Disposable Cleanup', () => {
+    beforeEach(() => {
+      navigationApi.connectToApp(mockAppApi);
+    });
+
+    it('should add disposable functions for a tab', () => {
+      const dispose1 = vi.fn();
+      const dispose2 = vi.fn();
+
+      navigationApi._addDisposeForTab('generate', dispose1);
+      navigationApi._addDisposeForTab('generate', dispose2);
+
+      // Check that disposables are stored
+      const disposables = navigationApi._disposablesForTab.get('generate');
+      expect(disposables).toBeDefined();
+      expect(disposables?.size).toBe(2);
+      expect(disposables?.has(dispose1)).toBe(true);
+      expect(disposables?.has(dispose2)).toBe(true);
+    });
+
+    it('should handle multiple tabs independently', () => {
+      const dispose1 = vi.fn();
+      const dispose2 = vi.fn();
+      const dispose3 = vi.fn();
+
+      navigationApi._addDisposeForTab('generate', dispose1);
+      navigationApi._addDisposeForTab('generate', dispose2);
+      navigationApi._addDisposeForTab('canvas', dispose3);
+
+      const generateDisposables = navigationApi._disposablesForTab.get('generate');
+      const canvasDisposables = navigationApi._disposablesForTab.get('canvas');
+
+      expect(generateDisposables?.size).toBe(2);
+      expect(canvasDisposables?.size).toBe(1);
+      expect(generateDisposables?.has(dispose1)).toBe(true);
+      expect(generateDisposables?.has(dispose2)).toBe(true);
+      expect(canvasDisposables?.has(dispose3)).toBe(true);
+    });
+
+    it('should call all dispose functions when unregistering a tab', () => {
+      const dispose1 = vi.fn();
+      const dispose2 = vi.fn();
+      const dispose3 = vi.fn();
+
+      // Add disposables for generate tab
+      navigationApi._addDisposeForTab('generate', dispose1);
+      navigationApi._addDisposeForTab('generate', dispose2);
+      
+      // Add disposable for canvas tab (should not be called)
+      navigationApi._addDisposeForTab('canvas', dispose3);
+
+      // Unregister generate tab
+      navigationApi.unregisterTab('generate');
+
+      // Check that generate tab disposables were called
+      expect(dispose1).toHaveBeenCalledOnce();
+      expect(dispose2).toHaveBeenCalledOnce();
+      
+      // Check that canvas tab disposable was not called
+      expect(dispose3).not.toHaveBeenCalled();
+
+      // Check that generate tab disposables are cleared
+      expect(navigationApi._disposablesForTab.has('generate')).toBe(false);
+      
+      // Check that canvas tab disposables remain
+      expect(navigationApi._disposablesForTab.has('canvas')).toBe(true);
+    });
+
+    it('should handle unregistering tab with no disposables gracefully', () => {
+      // Should not throw when unregistering tab with no disposables
+      expect(() => navigationApi.unregisterTab('generate')).not.toThrow();
+    });
+
+    it('should handle duplicate dispose functions', () => {
+      const dispose1 = vi.fn();
+
+      // Add the same dispose function twice
+      navigationApi._addDisposeForTab('generate', dispose1);
+      navigationApi._addDisposeForTab('generate', dispose1);
+
+      const disposables = navigationApi._disposablesForTab.get('generate');
+      // Set should contain only one instance (sets don't allow duplicates)
+      expect(disposables?.size).toBe(1);
+
+      navigationApi.unregisterTab('generate');
+      
+      // Should be called only once despite being added twice
+      expect(dispose1).toHaveBeenCalledOnce();
+    });
+
+    it('should automatically add dispose functions during container registration with DockviewApi', () => {
+      const tab = 'generate';
+      const viewId = 'myView';
+      mockGetStorage.mockReturnValue(undefined);
+      
+      const initialize = vi.fn();
+      const panel = { id: 'p1' };
+      const mockDispose = vi.fn();
+      
+      // Create a mock that will pass the instanceof DockviewApi check
+      const mockApi = Object.create(MockedDockviewApi.prototype);
+      Object.assign(mockApi, {
+        panels: [panel],
+        activePanel: { id: 'p1' },
+        toJSON: vi.fn(() => ({ foo: 'bar' })),
+        onDidLayoutChange: vi.fn(() => ({ dispose: vi.fn() })),
+        onDidActivePanelChange: vi.fn(() => ({ dispose: mockDispose })),
+      });
+
+      navigationApi.registerContainer(tab, viewId, mockApi, initialize);
+
+      // Check that dispose function was added to disposables
+      const disposables = navigationApi._disposablesForTab.get(tab);
+      expect(disposables).toBeDefined();
+      expect(disposables?.size).toBe(1);
+
+      // Unregister tab and check dispose was called
+      navigationApi.unregisterTab(tab);
+      expect(mockDispose).toHaveBeenCalledOnce();
+    });
+
+    it('should not add dispose functions for GridviewApi during container registration', () => {
+      const tab = 'generate';
+      const viewId = 'myView';
+      mockGetStorage.mockReturnValue(undefined);
+      
+      const initialize = vi.fn();
+      const panel = { id: 'p1' };
+      
+      // Mock GridviewApi (not DockviewApi)
+      const mockApi = {
+        panels: [panel],
+        toJSON: vi.fn(() => ({ foo: 'bar' })),
+        onDidLayoutChange: vi.fn(() => ({ dispose: vi.fn() })),
+      } as unknown as GridviewApi;
+
+      navigationApi.registerContainer(tab, viewId, mockApi, initialize);
+
+      // Check that no dispose function was added for GridviewApi
+      const disposables = navigationApi._disposablesForTab.get(tab);
+      expect(disposables).toBeUndefined();
+    });
+
+    it('should handle dispose function errors gracefully', () => {
+      const goodDispose = vi.fn();
+      const errorDispose = vi.fn(() => {
+        throw new Error('Dispose error');
+      });
+      const anotherGoodDispose = vi.fn();
+
+      navigationApi._addDisposeForTab('generate', goodDispose);
+      navigationApi._addDisposeForTab('generate', errorDispose);
+      navigationApi._addDisposeForTab('generate', anotherGoodDispose);
+
+      // Should not throw even if one dispose function throws
+      expect(() => navigationApi.unregisterTab('generate')).not.toThrow();
+
+      // All dispose functions should have been called
+      expect(goodDispose).toHaveBeenCalledOnce();
+      expect(errorDispose).toHaveBeenCalledOnce();
+      expect(anotherGoodDispose).toHaveBeenCalledOnce();
+    });
+
+    it('should clear panel tracking state when unregistering tab', () => {
+      const tab = 'generate';
+      
+      // Set up some panel tracking state
+      navigationApi._currentActiveDockviewPanel.set(tab, VIEWER_PANEL_ID);
+      navigationApi._prevActiveDockviewPanel.set(tab, SETTINGS_PANEL_ID);
+      
+      // Add some disposables
+      const dispose1 = vi.fn();
+      const dispose2 = vi.fn();
+      navigationApi._addDisposeForTab(tab, dispose1);
+      navigationApi._addDisposeForTab(tab, dispose2);
+
+      // Verify state exists before unregistering
+      expect(navigationApi._currentActiveDockviewPanel.has(tab)).toBe(true);
+      expect(navigationApi._prevActiveDockviewPanel.has(tab)).toBe(true);
+      expect(navigationApi._disposablesForTab.has(tab)).toBe(true);
+
+      // Unregister tab
+      navigationApi.unregisterTab(tab);
+
+      // Verify all state is cleared
+      expect(navigationApi._currentActiveDockviewPanel.has(tab)).toBe(false);
+      expect(navigationApi._prevActiveDockviewPanel.has(tab)).toBe(false);
+      expect(navigationApi._disposablesForTab.has(tab)).toBe(false);
+      
+      // Verify dispose functions were called
+      expect(dispose1).toHaveBeenCalledOnce();
+      expect(dispose2).toHaveBeenCalledOnce();
     });
   });
 });
