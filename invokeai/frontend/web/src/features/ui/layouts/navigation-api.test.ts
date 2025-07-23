@@ -12,6 +12,7 @@ import {
   RIGHT_PANEL_MIN_SIZE_PX,
   SETTINGS_PANEL_ID,
   SWITCH_TABS_FAKE_DELAY_MS,
+  VIEWER_PANEL_ID,
   WORKSPACE_PANEL_ID,
 } from './shared';
 
@@ -1103,6 +1104,221 @@ describe('AppNavigationApi', () => {
       expect(() => navigationApi.registerContainer(tab, viewId, mockApi, initialize)).not.toThrow();
       expect(mockGetStorage).not.toHaveBeenCalled();
       expect(initialize).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('toggleViewerPanel', () => {
+    beforeEach(() => {
+      navigationApi.connectToApp(mockAppApi);
+    });
+
+    it('should switch to viewer panel when not currently on viewer', async () => {
+      const mockViewerPanel = createMockDockPanel();
+      navigationApi._registerPanel('generate', VIEWER_PANEL_ID, mockViewerPanel);
+      mockGetAppTab.mockReturnValue('generate');
+
+      // Set current panel to something other than viewer
+      navigationApi._currentActiveDockviewPanel.set('generate', SETTINGS_PANEL_ID);
+
+      const result = await navigationApi.toggleViewerPanel();
+
+      expect(result).toBe(true);
+      expect(mockViewerPanel.api.setActive).toHaveBeenCalledOnce();
+    });
+
+    it('should switch to previous panel when on viewer and previous panel exists', async () => {
+      const mockPreviousPanel = createMockDockPanel();
+      const mockViewerPanel = createMockDockPanel();
+      
+      navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockPreviousPanel);
+      navigationApi._registerPanel('generate', VIEWER_PANEL_ID, mockViewerPanel);
+      mockGetAppTab.mockReturnValue('generate');
+
+      // Set current panel to viewer and previous to settings
+      navigationApi._currentActiveDockviewPanel.set('generate', VIEWER_PANEL_ID);
+      navigationApi._prevActiveDockviewPanel.set('generate', SETTINGS_PANEL_ID);
+
+      const result = await navigationApi.toggleViewerPanel();
+
+      expect(result).toBe(true);
+      expect(mockPreviousPanel.api.setActive).toHaveBeenCalledOnce();
+      expect(mockViewerPanel.api.setActive).not.toHaveBeenCalled();
+    });
+
+    it('should switch to launchpad when on viewer and no valid previous panel', async () => {
+      const mockLaunchpadPanel = createMockDockPanel();
+      const mockViewerPanel = createMockDockPanel();
+      
+      navigationApi._registerPanel('generate', LAUNCHPAD_PANEL_ID, mockLaunchpadPanel);
+      navigationApi._registerPanel('generate', VIEWER_PANEL_ID, mockViewerPanel);
+      mockGetAppTab.mockReturnValue('generate');
+
+      // Set current panel to viewer and no previous panel
+      navigationApi._currentActiveDockviewPanel.set('generate', VIEWER_PANEL_ID);
+      navigationApi._prevActiveDockviewPanel.set('generate', null);
+
+      const result = await navigationApi.toggleViewerPanel();
+
+      expect(result).toBe(true);
+      expect(mockLaunchpadPanel.api.setActive).toHaveBeenCalledOnce();
+      expect(mockViewerPanel.api.setActive).not.toHaveBeenCalled();
+    });
+
+    it('should switch to launchpad when on viewer and previous panel is also viewer', async () => {
+      const mockLaunchpadPanel = createMockDockPanel();
+      const mockViewerPanel = createMockDockPanel();
+      
+      navigationApi._registerPanel('generate', LAUNCHPAD_PANEL_ID, mockLaunchpadPanel);
+      navigationApi._registerPanel('generate', VIEWER_PANEL_ID, mockViewerPanel);
+      mockGetAppTab.mockReturnValue('generate');
+
+      // Set current panel to viewer and previous panel was also viewer
+      navigationApi._currentActiveDockviewPanel.set('generate', VIEWER_PANEL_ID);
+      navigationApi._prevActiveDockviewPanel.set('generate', VIEWER_PANEL_ID);
+
+      const result = await navigationApi.toggleViewerPanel();
+
+      expect(result).toBe(true);
+      expect(mockLaunchpadPanel.api.setActive).toHaveBeenCalledOnce();
+      expect(mockViewerPanel.api.setActive).not.toHaveBeenCalled();
+    });
+
+    it('should return false when no active tab', async () => {
+      mockGetAppTab.mockReturnValue(null);
+
+      const result = await navigationApi.toggleViewerPanel();
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false when viewer panel is not registered', async () => {
+      mockGetAppTab.mockReturnValue('generate');
+      navigationApi._currentActiveDockviewPanel.set('generate', SETTINGS_PANEL_ID);
+
+      // Don't register viewer panel
+      const result = await navigationApi.toggleViewerPanel();
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false when previous panel is not registered', async () => {
+      const mockViewerPanel = createMockDockPanel();
+      
+      navigationApi._registerPanel('generate', VIEWER_PANEL_ID, mockViewerPanel);
+      mockGetAppTab.mockReturnValue('generate');
+
+      // Set current to viewer and previous to unregistered panel
+      navigationApi._currentActiveDockviewPanel.set('generate', VIEWER_PANEL_ID);
+      navigationApi._prevActiveDockviewPanel.set('generate', 'unregistered-panel');
+
+      const result = await navigationApi.toggleViewerPanel();
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false when launchpad panel is not registered as fallback', async () => {
+      const mockViewerPanel = createMockDockPanel();
+      
+      navigationApi._registerPanel('generate', VIEWER_PANEL_ID, mockViewerPanel);
+      mockGetAppTab.mockReturnValue('generate');
+
+      // Set current to viewer and no previous panel, but don't register launchpad
+      navigationApi._currentActiveDockviewPanel.set('generate', VIEWER_PANEL_ID);
+      navigationApi._prevActiveDockviewPanel.set('generate', null);
+
+      const result = await navigationApi.toggleViewerPanel();
+
+      expect(result).toBe(false);
+    });
+
+    it('should work across different tabs independently', async () => {
+      const mockViewerPanel1 = createMockDockPanel();
+      const mockViewerPanel2 = createMockDockPanel();
+      const mockSettingsPanel1 = createMockDockPanel();
+      const mockSettingsPanel2 = createMockDockPanel();
+      const mockLaunchpadPanel = createMockDockPanel();
+      
+      navigationApi._registerPanel('generate', VIEWER_PANEL_ID, mockViewerPanel1);
+      navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockSettingsPanel1);
+      navigationApi._registerPanel('canvas', VIEWER_PANEL_ID, mockViewerPanel2);
+      navigationApi._registerPanel('canvas', SETTINGS_PANEL_ID, mockSettingsPanel2);
+      navigationApi._registerPanel('canvas', LAUNCHPAD_PANEL_ID, mockLaunchpadPanel);
+
+      // Set up different states for different tabs
+      navigationApi._currentActiveDockviewPanel.set('generate', SETTINGS_PANEL_ID);
+      navigationApi._currentActiveDockviewPanel.set('canvas', VIEWER_PANEL_ID);
+      navigationApi._prevActiveDockviewPanel.set('canvas', SETTINGS_PANEL_ID);
+
+      // Test generate tab (should switch to viewer)
+      mockGetAppTab.mockReturnValue('generate');
+      const result1 = await navigationApi.toggleViewerPanel();
+      expect(result1).toBe(true);
+      expect(mockViewerPanel1.api.setActive).toHaveBeenCalledOnce();
+
+      // Test canvas tab (should switch to previous panel - settings panel in canvas)
+      mockGetAppTab.mockReturnValue('canvas');
+      const result2 = await navigationApi.toggleViewerPanel();
+      expect(result2).toBe(true);
+      expect(mockSettingsPanel2.api.setActive).toHaveBeenCalledOnce();
+    });
+
+    it('should handle panel focus timeout gracefully', async () => {
+      const mockViewerPanel = createMockDockPanel();
+      
+      navigationApi._registerPanel('generate', VIEWER_PANEL_ID, mockViewerPanel);
+      mockGetAppTab.mockReturnValue('generate');
+
+      // Mock focusPanelInActiveTab to return false (simulating timeout)
+      const originalFocusPanelInActiveTab = navigationApi.focusPanelInActiveTab;
+      navigationApi.focusPanelInActiveTab = vi.fn().mockResolvedValue(false);
+
+      navigationApi._currentActiveDockviewPanel.set('generate', SETTINGS_PANEL_ID);
+
+      const result = await navigationApi.toggleViewerPanel();
+
+      expect(result).toBe(false);
+      expect(navigationApi.focusPanelInActiveTab).toHaveBeenCalledWith(VIEWER_PANEL_ID);
+
+      // Restore original method
+      navigationApi.focusPanelInActiveTab = originalFocusPanelInActiveTab;
+    });
+
+    it('should handle sequence of viewer toggles correctly', async () => {
+      const mockViewerPanel = createMockDockPanel();
+      const mockSettingsPanel = createMockDockPanel();
+      const mockLaunchpadPanel = createMockDockPanel();
+      
+      navigationApi._registerPanel('generate', VIEWER_PANEL_ID, mockViewerPanel);
+      navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockSettingsPanel);
+      navigationApi._registerPanel('generate', LAUNCHPAD_PANEL_ID, mockLaunchpadPanel);
+      mockGetAppTab.mockReturnValue('generate');
+
+      // Start on settings panel
+      navigationApi._currentActiveDockviewPanel.set('generate', SETTINGS_PANEL_ID);
+      navigationApi._prevActiveDockviewPanel.set('generate', null);
+
+      // First toggle: settings -> viewer
+      const result1 = await navigationApi.toggleViewerPanel();
+      expect(result1).toBe(true);
+      expect(mockViewerPanel.api.setActive).toHaveBeenCalledOnce();
+
+      // Simulate panel change tracking (normally done by dockview listener)
+      navigationApi._prevActiveDockviewPanel.set('generate', SETTINGS_PANEL_ID);
+      navigationApi._currentActiveDockviewPanel.set('generate', VIEWER_PANEL_ID);
+
+      // Second toggle: viewer -> settings (previous panel)
+      const result2 = await navigationApi.toggleViewerPanel();
+      expect(result2).toBe(true);
+      expect(mockSettingsPanel.api.setActive).toHaveBeenCalledOnce();
+
+      // Simulate panel change tracking again
+      navigationApi._prevActiveDockviewPanel.set('generate', VIEWER_PANEL_ID);
+      navigationApi._currentActiveDockviewPanel.set('generate', SETTINGS_PANEL_ID);
+
+      // Third toggle: settings -> viewer again
+      const result3 = await navigationApi.toggleViewerPanel();
+      expect(result3).toBe(true);
+      expect(mockViewerPanel.api.setActive).toHaveBeenCalledTimes(2);
     });
   });
 });
