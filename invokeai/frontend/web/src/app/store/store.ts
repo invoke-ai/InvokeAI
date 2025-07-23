@@ -1,7 +1,6 @@
 import type { ThunkDispatch, TypedStartListening, UnknownAction } from '@reduxjs/toolkit';
 import { addListener, combineReducers, configureStore, createListenerMiddleware } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
-import { serverBackedDriver } from 'app/store/enhancers/reduxRemember/driver';
 import { errorHandler } from 'app/store/enhancers/reduxRemember/errors';
 import { addAdHocPostProcessingRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
 import { addAnyEnqueuedListener } from 'app/store/middleware/listenerMiddleware/listeners/anyEnqueued';
@@ -41,7 +40,7 @@ import { systemSliceConfig } from 'features/system/store/systemSlice';
 import { uiSliceConfig } from 'features/ui/store/uiSlice';
 import { diff } from 'jsondiffpatch';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
-import type { SerializeFunction, UnserializeFunction } from 'redux-remember';
+import type { Driver, SerializeFunction, UnserializeFunction } from 'redux-remember';
 import { rememberEnhancer, rememberReducer } from 'redux-remember';
 import undoable, { newHistory } from 'redux-undo';
 import { serializeError } from 'serialize-error';
@@ -185,7 +184,7 @@ const PERSISTED_KEYS = Object.values(SLICE_CONFIGS)
   .filter((sliceConfig) => !!sliceConfig.persistConfig)
   .map((sliceConfig) => sliceConfig.slice.reducerPath);
 
-export const createStore = (uniqueStoreKey?: string, persist = true) =>
+export const createStore = (driver: Driver, persist = true) =>
   configureStore({
     reducer: rememberedRootReducer,
     middleware: (getDefaultMiddleware) =>
@@ -204,7 +203,7 @@ export const createStore = (uniqueStoreKey?: string, persist = true) =>
       const enhancers = getDefaultEnhancers();
       if (persist) {
         const res = enhancers.prepend(
-          rememberEnhancer(serverBackedDriver, PERSISTED_KEYS, {
+          rememberEnhancer(driver, PERSISTED_KEYS, {
             persistThrottle: 2000,
             serialize,
             unserialize,

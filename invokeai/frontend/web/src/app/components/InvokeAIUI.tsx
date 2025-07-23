@@ -5,6 +5,12 @@ import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
 import { $didStudioInit } from 'app/hooks/useStudioInitAction';
 import type { LoggingOverrides } from 'app/logging/logger';
 import { $loggingOverrides, configureLogging } from 'app/logging/logger';
+import {
+  $resetClientState,
+  buildDriver,
+  buildResetClientState,
+  type StorageDriverApi,
+} from 'app/store/enhancers/reduxRemember/driver';
 import { $accountSettingsLink } from 'app/store/nanostores/accountSettingsLink';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
@@ -70,6 +76,7 @@ interface Props extends PropsWithChildren {
    * If provided, overrides in-app navigation to the model manager
    */
   onClickGoToModelManager?: () => void;
+  storageDriverApi?: StorageDriverApi;
 }
 
 const InvokeAIUI = ({
@@ -96,6 +103,7 @@ const InvokeAIUI = ({
   loggingOverrides,
   onClickGoToModelManager,
   whatsNew,
+  storageDriverApi,
 }: Props) => {
   useLayoutEffect(() => {
     /*
@@ -308,9 +316,18 @@ const InvokeAIUI = ({
     };
   }, [isDebugging]);
 
+  useEffect(() => {
+    $resetClientState.set(buildResetClientState(storageDriverApi));
+
+    return () => {
+      $resetClientState.set(() => {});
+    };
+  }, [storageDriverApi]);
+
   const store = useMemo(() => {
-    return createStore(projectId);
-  }, [projectId]);
+    const driver = buildDriver(storageDriverApi);
+    return createStore(driver);
+  }, [storageDriverApi]);
 
   useEffect(() => {
     $store.set(store);
