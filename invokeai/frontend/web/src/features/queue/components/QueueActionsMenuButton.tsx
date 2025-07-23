@@ -9,15 +9,19 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiListBold, PiPauseFill, PiPlayFill, PiQueueBold, PiXBold, PiXCircle } from 'react-icons/pi';
+import { PiListBold, PiPauseFill, PiPlayFill, PiQueueBold, PiTrashBold, PiXBold, PiXCircle } from 'react-icons/pi';
+
+import { useClearQueueDialog } from './ClearQueueConfirmationAlertDialog';
 
 export const QueueActionsMenuButton = memo(() => {
   const ref = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
   const isPauseEnabled = useFeatureStatus('pauseQueue');
   const isResumeEnabled = useFeatureStatus('resumeQueue');
+  const isClearAllEnabled = useFeatureStatus('cancelAndClearAll');
   const cancelAllExceptCurrent = useCancelAllExceptCurrentQueueItemDialog();
   const cancelCurrentQueueItem = useCancelCurrentQueueItem();
+  const clearQueue = useClearQueueDialog();
   const resumeProcessor = useResumeProcessor();
   const pauseProcessor = usePauseProcessor();
   const openQueue = useCallback(() => {
@@ -55,6 +59,17 @@ export const QueueActionsMenuButton = memo(() => {
             >
               {t('queue.cancelAllExceptCurrentTooltip')}
             </MenuItem>
+            {isClearAllEnabled && (
+              <MenuItem
+                isDestructive
+                icon={<PiTrashBold />}
+                onClick={clearQueue.openDialog}
+                isLoading={clearQueue.isLoading}
+                isDisabled={clearQueue.isDisabled}
+              >
+                {t('queue.clearTooltip')}
+              </MenuItem>
+            )}
             {isResumeEnabled && (
               <MenuItem
                 icon={<PiPlayFill />}

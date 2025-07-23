@@ -13,14 +13,13 @@ export const CancelAllExceptCurrentButton = memo((props: ButtonProps) => {
     <Button
       isDisabled={api.isDisabled}
       isLoading={api.isLoading}
-      aria-label={t('queue.clear')}
       tooltip={t('queue.cancelAllExceptCurrentTooltip')}
       leftIcon={<PiXCircle />}
       colorScheme="error"
       onClick={api.openDialog}
       {...props}
     >
-      {t('queue.clear')}
+      {t('queue.cancelAllExceptCurrentTooltip')}
     </Button>
   );
 });
