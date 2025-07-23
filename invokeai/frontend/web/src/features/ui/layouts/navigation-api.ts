@@ -609,13 +609,21 @@ export class NavigationApi {
     const prevActiveDockviewPanel = this._prevActiveDockviewPanel.get(activeTab);
     const currentActiveDockviewPanel = this._currentActiveDockviewPanel.get(activeTab);
 
+    let targetPanel;
+
     if (currentActiveDockviewPanel !== VIEWER_PANEL_ID) {
-      return this.focusPanelInActiveTab(VIEWER_PANEL_ID);
+      targetPanel = VIEWER_PANEL_ID;
     } else if (prevActiveDockviewPanel && prevActiveDockviewPanel !== VIEWER_PANEL_ID) {
-      return this.focusPanelInActiveTab(prevActiveDockviewPanel);
+      targetPanel = prevActiveDockviewPanel;
     } else {
-      return this.focusPanelInActiveTab(LAUNCHPAD_PANEL_ID);
+      targetPanel = LAUNCHPAD_PANEL_ID;
     }
+
+    if (this.getRegisteredPanels(activeTab).includes(targetPanel)) {
+      return this.focusPanel(activeTab, targetPanel);
+    }
+
+    return Promise.resolve(false);
   };
 
   /**
