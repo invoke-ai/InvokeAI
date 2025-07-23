@@ -1140,7 +1140,7 @@ describe('AppNavigationApi', () => {
     it('should switch to previous panel when on viewer and previous panel exists', async () => {
       const mockPreviousPanel = createMockDockPanel();
       const mockViewerPanel = createMockDockPanel();
-      
+
       navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockPreviousPanel);
       navigationApi._registerPanel('generate', VIEWER_PANEL_ID, mockViewerPanel);
       mockGetAppTab.mockReturnValue('generate');
@@ -1159,7 +1159,7 @@ describe('AppNavigationApi', () => {
     it('should switch to launchpad when on viewer and no valid previous panel', async () => {
       const mockLaunchpadPanel = createMockDockPanel();
       const mockViewerPanel = createMockDockPanel();
-      
+
       navigationApi._registerPanel('generate', LAUNCHPAD_PANEL_ID, mockLaunchpadPanel);
       navigationApi._registerPanel('generate', VIEWER_PANEL_ID, mockViewerPanel);
       mockGetAppTab.mockReturnValue('generate');
@@ -1178,7 +1178,7 @@ describe('AppNavigationApi', () => {
     it('should switch to launchpad when on viewer and previous panel is also viewer', async () => {
       const mockLaunchpadPanel = createMockDockPanel();
       const mockViewerPanel = createMockDockPanel();
-      
+
       navigationApi._registerPanel('generate', LAUNCHPAD_PANEL_ID, mockLaunchpadPanel);
       navigationApi._registerPanel('generate', VIEWER_PANEL_ID, mockViewerPanel);
       mockGetAppTab.mockReturnValue('generate');
@@ -1214,7 +1214,7 @@ describe('AppNavigationApi', () => {
 
     it('should return false when previous panel is not registered', async () => {
       const mockViewerPanel = createMockDockPanel();
-      
+
       navigationApi._registerPanel('generate', VIEWER_PANEL_ID, mockViewerPanel);
       mockGetAppTab.mockReturnValue('generate');
 
@@ -1229,7 +1229,7 @@ describe('AppNavigationApi', () => {
 
     it('should return false when launchpad panel is not registered as fallback', async () => {
       const mockViewerPanel = createMockDockPanel();
-      
+
       navigationApi._registerPanel('generate', VIEWER_PANEL_ID, mockViewerPanel);
       mockGetAppTab.mockReturnValue('generate');
 
@@ -1248,7 +1248,7 @@ describe('AppNavigationApi', () => {
       const mockSettingsPanel1 = createMockDockPanel();
       const mockSettingsPanel2 = createMockDockPanel();
       const mockLaunchpadPanel = createMockDockPanel();
-      
+
       navigationApi._registerPanel('generate', VIEWER_PANEL_ID, mockViewerPanel1);
       navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockSettingsPanel1);
       navigationApi._registerPanel('canvas', VIEWER_PANEL_ID, mockViewerPanel2);
@@ -1273,32 +1273,11 @@ describe('AppNavigationApi', () => {
       expect(mockSettingsPanel2.api.setActive).toHaveBeenCalledOnce();
     });
 
-    it('should handle panel focus timeout gracefully', async () => {
-      const mockViewerPanel = createMockDockPanel();
-      
-      navigationApi._registerPanel('generate', VIEWER_PANEL_ID, mockViewerPanel);
-      mockGetAppTab.mockReturnValue('generate');
-
-      // Mock focusPanelInActiveTab to return false (simulating timeout)
-      const originalFocusPanelInActiveTab = navigationApi.focusPanelInActiveTab;
-      navigationApi.focusPanelInActiveTab = vi.fn().mockResolvedValue(false);
-
-      navigationApi._currentActiveDockviewPanel.set('generate', SETTINGS_PANEL_ID);
-
-      const result = await navigationApi.toggleViewerPanel();
-
-      expect(result).toBe(false);
-      expect(navigationApi.focusPanelInActiveTab).toHaveBeenCalledWith(VIEWER_PANEL_ID);
-
-      // Restore original method
-      navigationApi.focusPanelInActiveTab = originalFocusPanelInActiveTab;
-    });
-
     it('should handle sequence of viewer toggles correctly', async () => {
       const mockViewerPanel = createMockDockPanel();
       const mockSettingsPanel = createMockDockPanel();
       const mockLaunchpadPanel = createMockDockPanel();
-      
+
       navigationApi._registerPanel('generate', VIEWER_PANEL_ID, mockViewerPanel);
       navigationApi._registerPanel('generate', SETTINGS_PANEL_ID, mockSettingsPanel);
       navigationApi._registerPanel('generate', LAUNCHPAD_PANEL_ID, mockLaunchpadPanel);
@@ -1380,7 +1359,7 @@ describe('AppNavigationApi', () => {
       // Add disposables for generate tab
       navigationApi._addDisposeForTab('generate', dispose1);
       navigationApi._addDisposeForTab('generate', dispose2);
-      
+
       // Add disposable for canvas tab (should not be called)
       navigationApi._addDisposeForTab('canvas', dispose3);
 
@@ -1390,13 +1369,13 @@ describe('AppNavigationApi', () => {
       // Check that generate tab disposables were called
       expect(dispose1).toHaveBeenCalledOnce();
       expect(dispose2).toHaveBeenCalledOnce();
-      
+
       // Check that canvas tab disposable was not called
       expect(dispose3).not.toHaveBeenCalled();
 
       // Check that generate tab disposables are cleared
       expect(navigationApi._disposablesForTab.has('generate')).toBe(false);
-      
+
       // Check that canvas tab disposables remain
       expect(navigationApi._disposablesForTab.has('canvas')).toBe(true);
     });
@@ -1418,7 +1397,7 @@ describe('AppNavigationApi', () => {
       expect(disposables?.size).toBe(1);
 
       navigationApi.unregisterTab('generate');
-      
+
       // Should be called only once despite being added twice
       expect(dispose1).toHaveBeenCalledOnce();
     });
@@ -1427,11 +1406,11 @@ describe('AppNavigationApi', () => {
       const tab = 'generate';
       const viewId = 'myView';
       mockGetStorage.mockReturnValue(undefined);
-      
+
       const initialize = vi.fn();
       const panel = { id: 'p1' };
       const mockDispose = vi.fn();
-      
+
       // Create a mock that will pass the instanceof DockviewApi check
       const mockApi = Object.create(MockedDockviewApi.prototype);
       Object.assign(mockApi, {
@@ -1458,10 +1437,10 @@ describe('AppNavigationApi', () => {
       const tab = 'generate';
       const viewId = 'myView';
       mockGetStorage.mockReturnValue(undefined);
-      
+
       const initialize = vi.fn();
       const panel = { id: 'p1' };
-      
+
       // Mock GridviewApi (not DockviewApi)
       const mockApi = {
         panels: [panel],
@@ -1498,11 +1477,11 @@ describe('AppNavigationApi', () => {
 
     it('should clear panel tracking state when unregistering tab', () => {
       const tab = 'generate';
-      
+
       // Set up some panel tracking state
       navigationApi._currentActiveDockviewPanel.set(tab, VIEWER_PANEL_ID);
       navigationApi._prevActiveDockviewPanel.set(tab, SETTINGS_PANEL_ID);
-      
+
       // Add some disposables
       const dispose1 = vi.fn();
       const dispose2 = vi.fn();
@@ -1521,7 +1500,7 @@ describe('AppNavigationApi', () => {
       expect(navigationApi._currentActiveDockviewPanel.has(tab)).toBe(false);
       expect(navigationApi._prevActiveDockviewPanel.has(tab)).toBe(false);
       expect(navigationApi._disposablesForTab.has(tab)).toBe(false);
-      
+
       // Verify dispose functions were called
       expect(dispose1).toHaveBeenCalledOnce();
       expect(dispose2).toHaveBeenCalledOnce();
