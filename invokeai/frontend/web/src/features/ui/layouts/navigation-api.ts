@@ -90,8 +90,15 @@ export class NavigationApi {
   /**
    * Convenience method to add a dispose function for a specific tab.
    */
+  /**
+   * Convenience method to add a dispose function for a specific tab.
+   */
   _addDisposeForTab = (tab: TabName, disposeFn: () => void): void => {
-    const disposables = this._disposablesForTab.get(tab) ?? new Set();
+    let disposables = this._disposablesForTab.get(tab);
+    if (!disposables) {
+      disposables = new Set<() => void>();
+      this._disposablesForTab.set(tab, disposables);
+    }
     disposables.add(disposeFn);
   };
 
@@ -662,7 +669,13 @@ export class NavigationApi {
     // Clear previous panel tracking for this tab
     this._prevActiveDockviewPanel.delete(tab);
     this._currentActiveDockviewPanel.delete(tab);
-    this._disposablesForTab.get(tab)?.forEach((disposeFn) => disposeFn());
+    this._disposablesForTab.get(tab)?.forEach((disposeFn) => {
+      try {
+        disposeFn();
+      } catch (error) {
+        log.error({ error: parseify(error) }, `Error disposing resource for tab ${tab}`);
+      }
+    });
     this._disposablesForTab.delete(tab);
 
     log.trace(`Unregistered all panels for tab ${tab}`);
