@@ -366,11 +366,22 @@ export class CanvasStageModule extends CanvasModuleBase {
     if (deltaT > 300) {
       dynamicScaleFactor = this.config.SCALE_FACTOR + (1 - this.config.SCALE_FACTOR) / 2;
     } else if (deltaT < 300) {
-      dynamicScaleFactor = this.config.SCALE_FACTOR + (1 - this.config.SCALE_FACTOR) * (deltaT / 200);
+      // Ensure dynamic scale factor stays below 1 to maintain zoom-out direction - if it goes over, we could end up
+      // zooming in the wrong direction with small scroll amounts
+      const maxScaleFactor = 0.9999;
+      dynamicScaleFactor = Math.min(
+        this.config.SCALE_FACTOR + (1 - this.config.SCALE_FACTOR) * (deltaT / 200),
+        maxScaleFactor
+      );
     }
 
     // Update the intended scale based on the last intended scale, creating a continuous zoom feel
-    const newIntendedScale = this._intendedScale * dynamicScaleFactor ** scrollAmount;
+    // Handle the sign explicitly to prevent direction reversal with small scroll amounts
+    const scaleFactor =
+      scrollAmount > 0
+        ? dynamicScaleFactor ** Math.abs(scrollAmount)
+        : (1 / dynamicScaleFactor) ** Math.abs(scrollAmount);
+    const newIntendedScale = this._intendedScale * scaleFactor;
     this._intendedScale = this.constrainScale(newIntendedScale);
 
     // Pass control to the snapping logic
@@ -397,6 +408,9 @@ export class CanvasStageModule extends CanvasModuleBase {
         // User has scrolled far enough to break the snap
         this._activeSnapPoint = null;
         this._applyScale(this._intendedScale, center);
+      } else {
+        // Reset intended scale to prevent drift while snapped
+        this._intendedScale = this._activeSnapPoint;
       }
       // Else, do nothing - we remain snapped at the current scale, creating a "dead zone"
       return;
