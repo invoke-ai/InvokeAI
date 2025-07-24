@@ -7,35 +7,6 @@ import type { Driver as ReduxRememberDriver } from 'redux-remember';
 import { getBaseUrl } from 'services/api';
 import { buildAppInfoUrl } from 'services/api/endpoints/appInfo';
 
-// Persistence happens per slice. To track when persistence is in progress, maintain a ref count, incrementing
-// it when a slice is being persisted and decrementing it when the persistence is done.
-let persistRefCount = 0;
-
-// Keep track of the last persisted state for each key to avoid unnecessary network requests.
-//
-// `redux-remember` persists individual slices of state, so we can implicity denylist a slice by not giving it a
-// persist config.
-//
-// However, we may need to avoid persisting individual _fields_ of a slice. `redux-remember` does not provide a
-// way to do this directly.
-//
-// To accomplish this, we add a layer of logic on top of the `redux-remember`. In the state serializer function
-// provided to `redux-remember`, we can omit certain fields from the state that we do not want to persist. See
-// the implementation in `store.ts` for this logic.
-//
-// This logic is unknown to `redux-remember`. When an omitted field changes, it will still attempt to persist the
-// whole slice, even if the final, _serialized_ slice value is unchanged.
-//
-// To avoid unnecessary network requests, we keep track of the last persisted state for each key. If the value to
-// be persisted is the same as the last persisted value, we can skip the network request.
-const lastPersistedState = new Map<string, unknown>();
-
-export type StorageDriverApi = {
-  getItem: (key: string) => Promise<any>;
-  setItem: (key: string, value: any) => Promise<any>;
-  clear: () => Promise<void>;
-};
-
 const log = logger('system');
 
 const buildOSSServerBackedDriver = (): {
@@ -43,6 +14,29 @@ const buildOSSServerBackedDriver = (): {
   clearStorage: () => Promise<void>;
   registerListeners: () => () => void;
 } => {
+  // Persistence happens per slice. To track when persistence is in progress, maintain a ref count, incrementing
+  // it when a slice is being persisted and decrementing it when the persistence is done.
+  let persistRefCount = 0;
+
+  // Keep track of the last persisted state for each key to avoid unnecessary network requests.
+  //
+  // `redux-remember` persists individual slices of state, so we can implicity denylist a slice by not giving it a
+  // persist config.
+  //
+  // However, we may need to avoid persisting individual _fields_ of a slice. `redux-remember` does not provide a
+  // way to do this directly.
+  //
+  // To accomplish this, we add a layer of logic on top of the `redux-remember`. In the state serializer function
+  // provided to `redux-remember`, we can omit certain fields from the state that we do not want to persist. See
+  // the implementation in `store.ts` for this logic.
+  //
+  // This logic is unknown to `redux-remember`. When an omitted field changes, it will still attempt to persist the
+  // whole slice, even if the final, _serialized_ slice value is unchanged.
+  //
+  // To avoid unnecessary network requests, we keep track of the last persisted state for each key. If the value to
+  // be persisted is the same as the last persisted value, we can skip the network request.
+  const lastPersistedState = new Map<string, unknown>();
+
   const getUrl = (key?: string) => {
     const baseUrl = getBaseUrl();
     const query: Record<string, string> = {};
@@ -80,10 +74,15 @@ const buildOSSServerBackedDriver = (): {
           return value;
         }
         const url = getUrl(key);
-        const res = await fetch(url, { method: 'POST', body: value });
+        const headers = new Headers({
+          'Content-Type': 'application/json',
+        });
+        const res = await fetch(url, { method: 'POST', headers, body: value });
         if (!res.ok) {
           throw new Error(`Response status: ${res.status}`);
         }
+        lastPersistedState.set(key, value);
+        return value;
       } catch (originalError) {
         throw new StorageError({
           key,
@@ -137,13 +136,21 @@ const buildOSSServerBackedDriver = (): {
   return { reduxRememberDriver, clearStorage, registerListeners };
 };
 
-const buildCustomDriver = (
-  api: StorageDriverApi
-): {
+const buildCustomDriver = (api: {
+  getItem: (key: string) => Promise<any>;
+  setItem: (key: string, value: any) => Promise<any>;
+  clear: () => Promise<void>;
+}): {
   reduxRememberDriver: ReduxRememberDriver;
   clearStorage: () => Promise<void>;
   registerListeners: () => () => void;
 } => {
+  // See the comment in `buildOSSServerBackedDriver` for an explanation of this variable.
+  let persistRefCount = 0;
+
+  // See the comment in `buildOSSServerBackedDriver` for an explanation of this variable.
+  const lastPersistedState = new Map<string, unknown>();
+
   const reduxRememberDriver: ReduxRememberDriver = {
     getItem: async (key) => {
       try {
@@ -219,9 +226,13 @@ const buildCustomDriver = (
   return { reduxRememberDriver, clearStorage, registerListeners };
 };
 
-export const buildStorageApi = (driverApi?: StorageDriverApi) => {
-  if (driverApi) {
-    return buildCustomDriver(driverApi);
+export const buildStorageApi = (api?: {
+  getItem: (key: string) => Promise<any>;
+  setItem: (key: string, value: any) => Promise<any>;
+  clear: () => Promise<void>;
+}) => {
+  if (api) {
+    return buildCustomDriver(api);
   } else {
     return buildOSSServerBackedDriver();
   }

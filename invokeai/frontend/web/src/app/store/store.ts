@@ -184,7 +184,7 @@ const PERSISTED_KEYS = Object.values(SLICE_CONFIGS)
   .filter((sliceConfig) => !!sliceConfig.persistConfig)
   .map((sliceConfig) => sliceConfig.slice.reducerPath);
 
-export const createStore = (driver: Driver, persist = true) =>
+export const createStore = (reduxRememberOptions: { driver: Driver; persistThrottle: number }) =>
   configureStore({
     reducer: rememberedRootReducer,
     middleware: (getDefaultMiddleware) =>
@@ -201,20 +201,15 @@ export const createStore = (driver: Driver, persist = true) =>
         .prepend(listenerMiddleware.middleware),
     enhancers: (getDefaultEnhancers) => {
       const enhancers = getDefaultEnhancers();
-      if (persist) {
-        const res = enhancers.prepend(
-          rememberEnhancer(driver, PERSISTED_KEYS, {
-            persistThrottle: 2000,
-            serialize,
-            unserialize,
-            prefix: '',
-            errorHandler,
-          })
-        );
-        return res;
-      } else {
-        return enhancers;
-      }
+      return enhancers.prepend(
+        rememberEnhancer(reduxRememberOptions.driver, PERSISTED_KEYS, {
+          persistThrottle: reduxRememberOptions.persistThrottle,
+          serialize,
+          unserialize,
+          prefix: '',
+          errorHandler,
+        })
+      );
     },
     devTools: {
       actionSanitizer,

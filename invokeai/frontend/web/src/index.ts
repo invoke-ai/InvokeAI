@@ -31,7 +31,6 @@ import {
 export { default as InvokeAIUI } from './app/components/InvokeAIUI';
 export type { StudioInitAction } from './app/hooks/useStudioInitAction';
 export type { LoggingOverrides } from './app/logging/logger';
-export type { StorageDriverApi } from './app/store/enhancers/reduxRemember/driver';
 export type { PartialAppConfig } from './app/types/invokeai';
 export { default as HotkeysModal } from './features/system/components/HotkeysModal/HotkeysModal';
 export { default as InvokeAiLogoComponent } from './features/system/components/InvokeAILogoComponent';
