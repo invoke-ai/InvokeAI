@@ -2,15 +2,12 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
-import { deepClone } from 'common/util/deepClone';
 
-import { INITIAL_STATE, type UIState } from './uiTypes';
-
-const getInitialState = (): UIState => deepClone(INITIAL_STATE);
+import { getInitialUIState, type UIState, zUIState } from './uiTypes';
 
 const slice = createSlice({
   name: 'ui',
-  initialState: getInitialState(),
+  initialState: getInitialUIState(),
   reducers: {
     setActiveTab: (state, action: PayloadAction<UIState['activeTab']>) => {
       state.activeTab = action.payload;
@@ -88,27 +85,25 @@ export const {
 
 export const selectUiSlice = (state: RootState) => state.ui;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrate = (state: any): any => {
-  if (!('_version' in state)) {
-    state._version = 1;
-  }
-  if (state._version === 1) {
-    state.activeTab = 'generation';
-    state._version = 2;
-  }
-  if (state._version === 2) {
-    state.activeTab = 'canvas';
-    state._version = 3;
-  }
-  return state;
-};
-
 export const uiSliceConfig: SliceConfig<typeof slice> = {
   slice,
-  getInitialState,
+  zSchema: zUIState,
+  getInitialState: getInitialUIState,
   persistConfig: {
-    migrate,
+    migrate: (state) => {
+      if (!('_version' in state)) {
+        state._version = 1;
+      }
+      if (state._version === 1) {
+        state.activeTab = 'generation';
+        state._version = 2;
+      }
+      if (state._version === 2) {
+        state.activeTab = 'canvas';
+        state._version = 3;
+      }
+      return zUIState.parse(state);
+    },
     persistDenylist: ['shouldShowImageDetails'],
   },
 };

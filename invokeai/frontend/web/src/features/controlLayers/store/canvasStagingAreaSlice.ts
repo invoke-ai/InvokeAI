@@ -3,24 +3,19 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import type { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { SliceConfig } from 'app/store/types';
-import { deepClone } from 'common/util/deepClone';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { useMemo } from 'react';
 import { queueApi } from 'services/api/endpoints/queue';
+import z from 'zod';
 
-type CanvasStagingAreaState = {
-  _version: 1;
-  canvasSessionId: string;
-  canvasDiscardedQueueItems: number[];
-};
+const zCanvasStagingAreaState = z.object({
+  _version: z.literal(1).default(1),
+  canvasSessionId: z.string().default(() => getPrefixedId('canvas')),
+  canvasDiscardedQueueItems: z.array(z.number().int()).default(() => []),
+});
+type CanvasStagingAreaState = z.infer<typeof zCanvasStagingAreaState>;
 
-const INITIAL_STATE: CanvasStagingAreaState = {
-  _version: 1,
-  canvasSessionId: getPrefixedId('canvas'),
-  canvasDiscardedQueueItems: [],
-};
-
-const getInitialState = (): CanvasStagingAreaState => deepClone(INITIAL_STATE);
+const getInitialState = (): CanvasStagingAreaState => zCanvasStagingAreaState.parse({});
 
 const slice = createSlice({
   name: 'canvasSession',
@@ -51,20 +46,22 @@ const slice = createSlice({
 
 export const { canvasSessionReset, canvasQueueItemDiscarded } = slice.actions;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrate = (state: any): any => {
-  if (!('_version' in state)) {
-    state._version = 1;
-    state.canvasSessionId = state.canvasSessionId ?? getPrefixedId('canvas');
-  }
-
-  return state;
-};
-
 export const canvasSessionSliceConfig: SliceConfig<typeof slice> = {
   slice,
+  zSchema: zCanvasStagingAreaState,
   getInitialState,
-  persistConfig: { migrate },
+  persistConfig: {
+    migrate: (state) => {
+      {
+        if (!('_version' in state)) {
+          state._version = 1;
+          state.canvasSessionId = state.canvasSessionId ?? getPrefixedId('canvas');
+        }
+
+        return zCanvasStagingAreaState.parse(state);
+      }
+    },
+  },
 };
 
 export const selectCanvasSessionSlice = (s: RootState) => s[slice.name];

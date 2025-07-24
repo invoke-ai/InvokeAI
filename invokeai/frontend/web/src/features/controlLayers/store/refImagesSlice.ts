@@ -19,7 +19,7 @@ import { assert } from 'tsafe';
 import type { PartialDeep } from 'type-fest';
 
 import type { CLIPVisionModelV2, IPMethodV2, RefImageState } from './types';
-import { getInitialRefImagesState, isFLUXReduxConfig, isIPAdapterConfig } from './types';
+import { getInitialRefImagesState, isFLUXReduxConfig, isIPAdapterConfig, zRefImagesState } from './types';
 import {
   getReferenceImageState,
   imageDTOToImageWithDims,
@@ -273,6 +273,7 @@ const migrate = (state: any): any => {
 
 export const refImagesSliceConfig: SliceConfig<typeof slice> = {
   slice,
+  zSchema: zRefImagesState,
   getInitialState: getInitialRefImagesState,
   persistConfig: {
     migrate,

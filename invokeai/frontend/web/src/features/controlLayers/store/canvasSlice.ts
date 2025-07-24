@@ -80,6 +80,7 @@ import {
   isFLUXReduxConfig,
   isImagenAspectRatioID,
   isIPAdapterConfig,
+  zCanvasState,
 } from './types';
 import {
   converters,
@@ -1677,11 +1678,6 @@ export const {
   // inpaintMaskRecalled,
 } = slice.actions;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrate = (state: any): any => {
-  return state;
-};
-
 const syncScaledSize = (state: CanvasState) => {
   if (API_BASE_MODELS.includes(state.bbox.modelBase)) {
     // Imagen3 has fixed sizes. Scaled bbox is not supported.
@@ -1724,8 +1720,9 @@ const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
 export const canvasSliceConfig: SliceConfig<typeof slice> = {
   slice,
   getInitialState: getInitialCanvasState,
+  zSchema: zCanvasState,
   persistConfig: {
-    migrate,
+    migrate: (state) => zCanvasState.parse(state),
   },
   undoableConfig: {
     reduxUndoOptions: canvasUndoableConfig,
