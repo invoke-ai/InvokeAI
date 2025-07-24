@@ -231,7 +231,7 @@ export const createStore = (driver: Driver, persist = true) =>
 
 export type AppStore = ReturnType<typeof createStore>;
 export type RootState = ReturnType<AppStore['getState']>;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 export type AppThunkDispatch = ThunkDispatch<RootState, any, UnknownAction>;
 export type AppDispatch = ReturnType<typeof createStore>['dispatch'];
 export type AppGetState = ReturnType<typeof createStore>['getState'];

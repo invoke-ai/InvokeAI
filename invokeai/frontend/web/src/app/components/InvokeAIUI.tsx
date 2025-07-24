@@ -1,16 +1,12 @@
 import 'i18n';
 
 import type { Middleware } from '@reduxjs/toolkit';
+import { ClearStorageProvider } from 'app/contexts/clear-storage-context';
 import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
 import { $didStudioInit } from 'app/hooks/useStudioInitAction';
 import type { LoggingOverrides } from 'app/logging/logger';
 import { $loggingOverrides, configureLogging } from 'app/logging/logger';
-import {
-  $resetClientState,
-  buildDriver,
-  buildResetClientState,
-  type StorageDriverApi,
-} from 'app/store/enhancers/reduxRemember/driver';
+import { buildStorageApi, type StorageDriverApi } from 'app/store/enhancers/reduxRemember/driver';
 import { $accountSettingsLink } from 'app/store/nanostores/accountSettingsLink';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
@@ -316,18 +312,18 @@ const InvokeAIUI = ({
     };
   }, [isDebugging]);
 
-  useEffect(() => {
-    $resetClientState.set(buildResetClientState(storageDriverApi));
+  const storage = useMemo(() => buildStorageApi(storageDriverApi), [storageDriverApi]);
 
+  useEffect(() => {
+    const storageCleanup = storage.registerListeners();
     return () => {
-      $resetClientState.set(() => {});
+      storageCleanup();
     };
-  }, [storageDriverApi]);
+  }, [storage]);
 
   const store = useMemo(() => {
-    const driver = buildDriver(storageDriverApi);
-    return createStore(driver);
-  }, [storageDriverApi]);
+    return createStore(storage.reduxRememberDriver);
+  }, [storage.reduxRememberDriver]);
 
   useEffect(() => {
     $store.set(store);
@@ -344,11 +340,13 @@ const InvokeAIUI = ({
 
   return (
     <React.StrictMode>
-      <Provider store={store}>
-        <React.Suspense fallback={<Loading />}>
-          <App config={config} studioInitAction={studioInitAction} />
-        </React.Suspense>
-      </Provider>
+      <ClearStorageProvider value={storage.clearStorage}>
+        <Provider store={store}>
+          <React.Suspense fallback={<Loading />}>
+            <App config={config} studioInitAction={studioInitAction} />
+          </React.Suspense>
+        </Provider>
+      </ClearStorageProvider>
     </React.StrictMode>
   );
 };
