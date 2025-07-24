@@ -6,7 +6,7 @@ import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
 import { $didStudioInit } from 'app/hooks/useStudioInitAction';
 import type { LoggingOverrides } from 'app/logging/logger';
 import { $loggingOverrides, configureLogging } from 'app/logging/logger';
-import { buildStorageApi, type StorageDriverApi } from 'app/store/enhancers/reduxRemember/driver';
+import { buildStorageApi } from 'app/store/enhancers/reduxRemember/driver';
 import { $accountSettingsLink } from 'app/store/nanostores/accountSettingsLink';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
@@ -72,7 +72,14 @@ interface Props extends PropsWithChildren {
    * If provided, overrides in-app navigation to the model manager
    */
   onClickGoToModelManager?: () => void;
-  storageDriverApi?: StorageDriverApi;
+  storageConfig?: {
+    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+    getItem: (key: string) => Promise<any>;
+    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+    setItem: (key: string, value: any) => Promise<any>;
+    clear: () => Promise<void>;
+    persistThrottle: number;
+  };
 }
 
 const InvokeAIUI = ({
@@ -99,7 +106,7 @@ const InvokeAIUI = ({
   loggingOverrides,
   onClickGoToModelManager,
   whatsNew,
-  storageDriverApi,
+  storageConfig,
 }: Props) => {
   useLayoutEffect(() => {
     /*
@@ -312,7 +319,7 @@ const InvokeAIUI = ({
     };
   }, [isDebugging]);
 
-  const storage = useMemo(() => buildStorageApi(storageDriverApi), [storageDriverApi]);
+  const storage = useMemo(() => buildStorageApi(storageConfig), [storageConfig]);
 
   useEffect(() => {
     const storageCleanup = storage.registerListeners();
@@ -322,8 +329,11 @@ const InvokeAIUI = ({
   }, [storage]);
 
   const store = useMemo(() => {
-    return createStore(storage.reduxRememberDriver);
-  }, [storage.reduxRememberDriver]);
+    return createStore({
+      driver: storage.reduxRememberDriver,
+      persistThrottle: storageConfig?.persistThrottle ?? 2000,
+    });
+  }, [storage.reduxRememberDriver, storageConfig?.persistThrottle]);
 
   useEffect(() => {
     $store.set(store);
