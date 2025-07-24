@@ -1,10 +1,19 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Slice } from '@reduxjs/toolkit';
 import type { UndoableOptions } from 'redux-undo';
+import type { ZodType } from 'zod';
 
 type StateFromSlice<T extends Slice> = T extends Slice<infer U> ? U : never;
 
-export type SliceConfig<T extends Slice = Slice> = {
+export type SliceConfig<T extends Slice> = {
+  /**
+   * The redux slice (return of createSlice).
+   */
   slice: T;
+  /**
+   * The zod schema for the slice.
+   */
+  zSchema: ZodType<StateFromSlice<T>>;
   /**
    * A function that returns the initial state of the slice.
    */
@@ -18,7 +27,7 @@ export type SliceConfig<T extends Slice = Slice> = {
      * @param state The rehydrated state.
      * @returns A correctly-shaped state.
      */
-    migrate: (state: unknown) => StateFromSlice<T>;
+    migrate: (state: any) => StateFromSlice<T>;
     /**
      * Keys to omit from the persisted state.
      */

@@ -12,32 +12,32 @@ const zCanvasSettingsState = z.object({
   /**
    * Whether to show HUD (Heads-Up Display) on the canvas.
    */
-  showHUD: z.boolean().default(true),
+  showHUD: z.boolean(),
   /**
    * Whether to clip lines and shapes to the generation bounding box. If disabled, lines and shapes will be clipped to
    * the canvas bounds.
    */
-  clipToBbox: z.boolean().default(false),
+  clipToBbox: z.boolean(),
   /**
    * Whether to show a dynamic grid on the canvas. If disabled, a checkerboard pattern will be shown instead.
    */
-  dynamicGrid: z.boolean().default(false),
+  dynamicGrid: z.boolean(),
   /**
    * Whether to invert the scroll direction when adjusting the brush or eraser width with the scroll wheel.
    */
-  invertScrollForToolWidth: z.boolean().default(false),
+  invertScrollForToolWidth: z.boolean(),
   /**
    * The width of the brush tool.
    */
-  brushWidth: z.int().gt(0).default(50),
+  brushWidth: z.int().gt(0),
   /**
    * The width of the eraser tool.
    */
-  eraserWidth: z.int().gt(0).default(50),
+  eraserWidth: z.int().gt(0),
   /**
    * The color to use when drawing lines or filling shapes.
    */
-  color: zRgbaColor.default({ r: 31, g: 160, b: 224, a: 1 }), // invokeBlue.500
+  color: zRgbaColor,
   /**
    * Whether to composite inpainted/outpainted regions back onto the source image when saving canvas generations.
    *
@@ -45,55 +45,75 @@ const zCanvasSettingsState = z.object({
    *
    * When `sendToCanvas` is disabled, this setting is ignored, masked regions will always be composited.
    */
-  outputOnlyMaskedRegions: z.boolean().default(true),
+  outputOnlyMaskedRegions: z.boolean(),
   /**
    * Whether to automatically process the operations like filtering and auto-masking.
    */
-  autoProcess: z.boolean().default(true),
+  autoProcess: z.boolean(),
   /**
    * The snap-to-grid setting for the canvas.
    */
-  snapToGrid: z.boolean().default(true),
+  snapToGrid: z.boolean(),
   /**
    * Whether to show progress on the canvas when generating images.
    */
-  showProgressOnCanvas: z.boolean().default(true),
+  showProgressOnCanvas: z.boolean(),
   /**
    * Whether to show the bounding box overlay on the canvas.
    */
-  bboxOverlay: z.boolean().default(false),
+  bboxOverlay: z.boolean(),
   /**
    * Whether to preserve the masked region instead of inpainting it.
    */
-  preserveMask: z.boolean().default(false),
+  preserveMask: z.boolean(),
   /**
    * Whether to show only raster layers while staging.
    */
-  isolatedStagingPreview: z.boolean().default(true),
+  isolatedStagingPreview: z.boolean(),
   /**
    * Whether to show only the selected layer while filtering, transforming, or doing other operations.
    */
-  isolatedLayerPreview: z.boolean().default(true),
+  isolatedLayerPreview: z.boolean(),
   /**
    * Whether to use pressure sensitivity for the brush and eraser tool when a pen device is used.
    */
-  pressureSensitivity: z.boolean().default(true),
+  pressureSensitivity: z.boolean(),
   /**
    * Whether to show the rule of thirds composition guide overlay on the canvas.
    */
-  ruleOfThirds: z.boolean().default(false),
+  ruleOfThirds: z.boolean(),
   /**
    * Whether to save all staging images to the gallery instead of keeping them as intermediate images.
    */
-  saveAllImagesToGallery: z.boolean().default(false),
+  saveAllImagesToGallery: z.boolean(),
   /**
    * The auto-switch mode for the canvas staging area.
    */
-  stagingAreaAutoSwitch: zAutoSwitchMode.default('switch_on_start'),
+  stagingAreaAutoSwitch: zAutoSwitchMode,
 });
 
 type CanvasSettingsState = z.infer<typeof zCanvasSettingsState>;
-const getInitialState = () => zCanvasSettingsState.parse({});
+const getInitialState = (): CanvasSettingsState => ({
+  showHUD: true,
+  clipToBbox: false,
+  dynamicGrid: false,
+  invertScrollForToolWidth: false,
+  brushWidth: 50,
+  eraserWidth: 50,
+  color: { r: 31, g: 160, b: 224, a: 1 }, // invokeBlue.500
+  outputOnlyMaskedRegions: true,
+  autoProcess: true,
+  snapToGrid: true,
+  showProgressOnCanvas: true,
+  bboxOverlay: false,
+  preserveMask: false,
+  isolatedStagingPreview: true,
+  isolatedLayerPreview: true,
+  pressureSensitivity: true,
+  ruleOfThirds: false,
+  saveAllImagesToGallery: false,
+  stagingAreaAutoSwitch: 'switch_on_start' as const,
+});
 
 const slice = createSlice({
   name: 'canvasSettings',
@@ -187,16 +207,12 @@ export const {
   settingsStagingAreaAutoSwitchChanged,
 } = slice.actions;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrate = (state: any): any => {
-  return state;
-};
-
 export const canvasSettingsSliceConfig: SliceConfig<typeof slice> = {
   slice,
+  zSchema: zCanvasSettingsState,
   getInitialState,
   persistConfig: {
-    migrate,
+    migrate: (state) => zCanvasSettingsState.parse(state),
   },
 };
 

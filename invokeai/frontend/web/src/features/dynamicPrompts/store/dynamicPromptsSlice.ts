@@ -9,16 +9,17 @@ const zSeedBehaviour = z.enum(['PER_ITERATION', 'PER_PROMPT']);
 export const isSeedBehaviour = buildZodTypeGuard(zSeedBehaviour);
 export type SeedBehaviour = z.infer<typeof zSeedBehaviour>;
 
-export interface DynamicPromptsState {
-  _version: 1;
-  maxPrompts: number;
-  combinatorial: boolean;
-  prompts: string[];
-  parsingError: string | undefined | null;
-  isError: boolean;
-  isLoading: boolean;
-  seedBehaviour: SeedBehaviour;
-}
+const zDynamicPromptsState = z.object({
+  _version: z.literal(1),
+  maxPrompts: z.number().int().min(1).max(1000),
+  combinatorial: z.boolean(),
+  prompts: z.array(z.string()),
+  parsingError: z.string().nullish(),
+  isError: z.boolean(),
+  isLoading: z.boolean(),
+  seedBehaviour: zSeedBehaviour,
+});
+type DynamicPromptsState = z.infer<typeof zDynamicPromptsState>;
 
 const getInitialState = (): DynamicPromptsState => ({
   _version: 1,
@@ -66,19 +67,17 @@ export const {
   seedBehaviourChanged,
 } = slice.actions;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrate = (state: any): any => {
-  if (!('_version' in state)) {
-    state._version = 1;
-  }
-  return state;
-};
-
 export const dynamicPromptsSliceConfig: SliceConfig<typeof slice> = {
   slice,
+  zSchema: zDynamicPromptsState,
   getInitialState,
   persistConfig: {
-    migrate,
+    migrate: (state) => {
+      if (!('_version' in state)) {
+        state._version = 1;
+      }
+      return zDynamicPromptsState.parse(state);
+    },
     persistDenylist: ['prompts', 'parsingError', 'isError', 'isLoading'],
   },
 };

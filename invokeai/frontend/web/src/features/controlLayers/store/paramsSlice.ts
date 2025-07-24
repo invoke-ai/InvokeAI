@@ -16,6 +16,7 @@ import {
   isChatGPT4oAspectRatioID,
   isFluxKontextAspectRatioID,
   isImagenAspectRatioID,
+  zParamsState,
 } from 'features/controlLayers/store/types';
 import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
@@ -400,15 +401,13 @@ export const {
   paramsReset,
 } = slice.actions;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrate = (state: any): any => {
-  return state;
-};
-
 export const paramsSliceConfig: SliceConfig<typeof slice> = {
   slice,
+  zSchema: zParamsState,
   getInitialState: getInitialParamsState,
-  persistConfig: { migrate },
+  persistConfig: {
+    migrate: (state) => zParamsState.parse(state),
+  },
 };
 
 export const selectParamsSlice = (state: RootState) => state.params;

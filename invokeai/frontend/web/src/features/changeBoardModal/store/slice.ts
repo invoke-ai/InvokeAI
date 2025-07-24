@@ -2,15 +2,19 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
-import { deepClone } from 'common/util/deepClone';
+import z from 'zod';
 
-import { initialState } from './initialState';
+const zChangeBoardModalState = z.object({
+  isModalOpen: z.boolean().default(false),
+  image_names: z.array(z.string()).default(() => []),
+});
+type ChangeBoardModalState = z.infer<typeof zChangeBoardModalState>;
 
-const getInitialState = () => deepClone(initialState);
+const getInitialState = (): ChangeBoardModalState => zChangeBoardModalState.parse({});
 
 const slice = createSlice({
   name: 'changeBoardModal',
-  initialState,
+  initialState: getInitialState(),
   reducers: {
     isModalOpenChanged: (state, action: PayloadAction<boolean>) => {
       state.isModalOpen = action.payload;
@@ -31,5 +35,6 @@ export const selectChangeBoardModalSlice = (state: RootState) => state.changeBoa
 
 export const changeBoardModalSliceConfig: SliceConfig<typeof slice> = {
   slice,
+  zSchema: zChangeBoardModalState,
   getInitialState,
 };
