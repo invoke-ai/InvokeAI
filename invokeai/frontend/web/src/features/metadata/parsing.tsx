@@ -89,6 +89,7 @@ import { t } from 'i18next';
 import type { ComponentType } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig, ModelType } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -787,11 +788,55 @@ const LoRAs: CollectionMetadataHandler<LoRA[]> = {
 const CanvasLayers: SingleMetadataHandler<CanvasMetadata> = {
   [SingleMetadataKey]: true,
   type: 'CanvasLayers',
-  parse: async (metadata) => {
+  parse: async (metadata, store) => {
     const raw = getProperty(metadata, 'canvas_v2_metadata');
     // This validator fetches all referenced images. If any do not exist, validation fails. The logic for this is in
     // the zImageWithDims schema.
     const parsed = await zCanvasMetadata.parseAsync(raw);
+
+    for (const entity of parsed.controlLayers) {
+      if (entity.controlAdapter.model) {
+        await throwIfModelDoesNotExist(entity.controlAdapter.model.key, store);
+      }
+      for (const object of entity.objects) {
+        if (object.type === 'image' && 'image_name' in object.image) {
+          await throwIfImageDoesNotExist(object.image.image_name, store);
+        }
+      }
+    }
+
+    for (const entity of parsed.inpaintMasks) {
+      for (const object of entity.objects) {
+        if (object.type === 'image' && 'image_name' in object.image) {
+          await throwIfImageDoesNotExist(object.image.image_name, store);
+        }
+      }
+    }
+
+    for (const entity of parsed.rasterLayers) {
+      for (const object of entity.objects) {
+        if (object.type === 'image' && 'image_name' in object.image) {
+          await throwIfImageDoesNotExist(object.image.image_name, store);
+        }
+      }
+    }
+
+    for (const entity of parsed.regionalGuidance) {
+      for (const object of entity.objects) {
+        if (object.type === 'image' && 'image_name' in object.image) {
+          await throwIfImageDoesNotExist(object.image.image_name, store);
+        }
+      }
+      for (const refImage of entity.referenceImages) {
+        if (refImage.config.image) {
+          await throwIfImageDoesNotExist(refImage.config.image.image_name, store);
+        }
+        if (refImage.config.model) {
+          await throwIfModelDoesNotExist(refImage.config.model.key, store);
+        }
+      }
+    }
+
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
@@ -824,27 +869,39 @@ const CanvasLayers: SingleMetadataHandler<CanvasMetadata> = {
 const RefImages: CollectionMetadataHandler<RefImageState[]> = {
   [CollectionMetadataKey]: true,
   type: 'RefImages',
-  parse: async (metadata) => {
+  parse: async (metadata, store) => {
+    let parsed: RefImageState[] | null = null;
     try {
       // First attempt to parse from the v6 slot
       const raw = getProperty(metadata, 'ref_images');
-      // This validator fetches all referenced images. If any do not exist, validation fails. The logic for this is in
-      // the zImageWithDims schema.
-      const parsed = await z.array(zRefImageState).parseAsync(raw);
-      return Promise.resolve(parsed);
+      parsed = z.array(zRefImageState).parse(raw);
     } catch {
       // Fall back to extracting from canvas metadata]
       const raw = getProperty(metadata, 'canvas_v2_metadata.referenceImages.entities');
       // This validator fetches all referenced images. If any do not exist, validation fails. The logic for this is in
       // the zImageWithDims schema.
       const oldParsed = await z.array(zCanvasReferenceImageState_OLD).parseAsync(raw);
-      const parsed: RefImageState[] = oldParsed.map(({ id, ipAdapter, isEnabled }) => ({
+      parsed = oldParsed.map(({ id, ipAdapter, isEnabled }) => ({
         id,
         config: ipAdapter,
         isEnabled,
       }));
-      return parsed;
     }
+
+    if (!parsed) {
+      throw new Error('No valid reference images found in metadata');
+    }
+
+    for (const refImage of parsed) {
+      if (refImage.config.image) {
+        await throwIfImageDoesNotExist(refImage.config.image.image_name, store);
+      }
+      if (refImage.config.model) {
+        await throwIfModelDoesNotExist(refImage.config.model.key, store);
+      }
+    }
+
+    return parsed;
   },
   recall: (value, store) => {
     const entities = value.map((data) => ({ ...data, id: getPrefixedId('reference_image') }));
@@ -1240,4 +1297,20 @@ const isCompatibleWithMainModel = (candidate: ModelIdentifierField, store: AppSt
     return true;
   }
   return candidate.base === base;
+};
+
+const throwIfImageDoesNotExist = async (name: string, store: AppStore): Promise<void> => {
+  try {
+    await store.dispatch(imagesApi.endpoints.getImageDTO.initiate(name, { subscribe: false })).unwrap();
+  } catch {
+    throw new Error(`Image with name ${name} does not exist`);
+  }
+};
+
+const throwIfModelDoesNotExist = async (key: string, store: AppStore): Promise<void> => {
+  try {
+    await store.dispatch(modelsApi.endpoints.getModelConfig.initiate(key, { subscribe: false }));
+  } catch {
+    throw new Error(`Model with key ${key} does not exist`);
+  }
 };
