@@ -94,7 +94,12 @@ const slice = createSlice({
       state,
       action: PayloadAction<{ model: ParameterModel | null; previousModel?: ParameterModel | null }>
     ) => {
-      const { model, previousModel } = action.payload;
+      const { previousModel } = action.payload;
+      const result = zParamsState.shape.model.safeParse(action.payload.model);
+      if (!result.success) {
+        return;
+      }
+      const model = result.data;
       state.model = model;
 
       // If the model base changes (e.g. SD1.5 -> SDXL), we need to change a few things
@@ -113,25 +118,53 @@ const slice = createSlice({
     },
     vaeSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
       // null is a valid VAE!
-      state.vae = action.payload;
+      const result = zParamsState.shape.vae.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.vae = result.data;
     },
     fluxVAESelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
-      state.fluxVAE = action.payload;
+      const result = zParamsState.shape.fluxVAE.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.fluxVAE = result.data;
     },
     t5EncoderModelSelected: (state, action: PayloadAction<ParameterT5EncoderModel | null>) => {
-      state.t5EncoderModel = action.payload;
+      const result = zParamsState.shape.t5EncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.t5EncoderModel = result.data;
     },
     controlLoRAModelSelected: (state, action: PayloadAction<ParameterControlLoRAModel | null>) => {
-      state.controlLora = action.payload;
+      const result = zParamsState.shape.controlLora.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.controlLora = result.data;
     },
     clipEmbedModelSelected: (state, action: PayloadAction<ParameterCLIPEmbedModel | null>) => {
-      state.clipEmbedModel = action.payload;
+      const result = zParamsState.shape.clipEmbedModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.clipEmbedModel = result.data;
     },
     clipLEmbedModelSelected: (state, action: PayloadAction<ParameterCLIPLEmbedModel | null>) => {
-      state.clipLEmbedModel = action.payload;
+      const result = zParamsState.shape.clipLEmbedModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.clipLEmbedModel = result.data;
     },
     clipGEmbedModelSelected: (state, action: PayloadAction<ParameterCLIPGEmbedModel | null>) => {
-      state.clipGEmbedModel = action.payload;
+      const result = zParamsState.shape.clipGEmbedModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.clipGEmbedModel = result.data;
     },
     vaePrecisionChanged: (state, action: PayloadAction<ParameterPrecision>) => {
       state.vaePrecision = action.payload;
@@ -158,7 +191,11 @@ const slice = createSlice({
       state.shouldConcatPrompts = action.payload;
     },
     refinerModelChanged: (state, action: PayloadAction<ParameterSDXLRefinerModel | null>) => {
-      state.refinerModel = action.payload;
+      const result = zParamsState.shape.refinerModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.refinerModel = result.data;
     },
     setRefinerSteps: (state, action: PayloadAction<number>) => {
       state.refinerSteps = action.payload;

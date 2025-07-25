@@ -44,7 +44,10 @@ const slice = createSlice({
   initialState: getInitialState(),
   reducers: {
     upscaleModelChanged: (state, action: PayloadAction<ParameterSpandrelImageToImageModel | null>) => {
-      state.upscaleModel = action.payload;
+      const result = zUpscaleState.shape.upscaleModel.safeParse(action.payload);
+      if (result.success) {
+        state.upscaleModel = result.data;
+      }
     },
     upscaleInitialImageChanged: (state, action: PayloadAction<ImageWithDims | null>) => {
       state.upscaleInitialImage = action.payload;
@@ -56,13 +59,19 @@ const slice = createSlice({
       state.creativity = action.payload;
     },
     tileControlnetModelChanged: (state, action: PayloadAction<ControlNetModelConfig | null>) => {
-      state.tileControlnetModel = action.payload;
+      const result = zUpscaleState.shape.tileControlnetModel.safeParse(action.payload);
+      if (result.success) {
+        state.tileControlnetModel = result.data;
+      }
     },
     scaleChanged: (state, action: PayloadAction<number>) => {
       state.scale = action.payload;
     },
     postProcessingModelChanged: (state, action: PayloadAction<ParameterSpandrelImageToImageModel | null>) => {
-      state.postProcessingModel = action.payload;
+      const result = zUpscaleState.shape.postProcessingModel.safeParse(action.payload);
+      if (result.success) {
+        state.postProcessingModel = result.data;
+      }
     },
     tileSizeChanged: (state, action: PayloadAction<number>) => {
       state.tileSize = action.payload;
