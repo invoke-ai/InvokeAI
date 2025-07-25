@@ -1,6 +1,7 @@
 import { Box, Button, ButtonGroup, Flex, Grid, Heading, Icon, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
+import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
 import { setUpscaleInitialImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import {
@@ -37,7 +38,7 @@ export const UpscalingLaunchpadPanel = memo(() => {
 
   const onUpload = useCallback(
     (imageDTO: ImageDTO) => {
-      dispatch(upscaleInitialImageChanged(imageDTO));
+      dispatch(upscaleInitialImageChanged(imageDTOToImageWithDims(imageDTO)));
     },
     [dispatch]
   );

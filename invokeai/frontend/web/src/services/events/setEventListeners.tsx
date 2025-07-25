@@ -1,12 +1,12 @@
 import { ExternalLink } from '@invoke-ai/ui-library';
 import { isAnyOf } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
-import { listenerMiddleware } from 'app/store/middleware/listenerMiddleware';
 import { socketConnected } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $bulkDownloadId } from 'app/store/nanostores/bulkDownloadId';
 import { $queueId } from 'app/store/nanostores/queueId';
 import type { AppStore } from 'app/store/store';
+import { listenerMiddleware } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { forEach, isNil, round } from 'es-toolkit/compat';
 import {

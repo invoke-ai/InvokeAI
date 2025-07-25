@@ -1,7 +1,7 @@
 import { $alt, $ctrl, $meta, $shift } from '@invoke-ai/ui-library';
 import type { Selector } from '@reduxjs/toolkit';
-import { addAppListener } from 'app/store/middleware/listenerMiddleware';
 import type { AppStore, RootState } from 'app/store/store';
+import { addAppListener } from 'app/store/store';
 import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterControlLayer';
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';

@@ -1,6 +1,7 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { UploadImageIconButton } from 'common/hooks/useImageUploadButton';
+import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
 import type { SetUpscaleInitialImageDndTargetData } from 'features/dnd/dnd';
 import { setUpscaleInitialImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
@@ -10,11 +11,13 @@ import { selectUpscaleInitialImage, upscaleInitialImageChanged } from 'features/
 import { t } from 'i18next';
 import { useCallback, useMemo } from 'react';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
+import { useImageDTO } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
 export const UpscaleInitialImage = () => {
   const dispatch = useAppDispatch();
-  const imageDTO = useAppSelector(selectUpscaleInitialImage);
+  const upscaleInitialImage = useAppSelector(selectUpscaleInitialImage);
+  const imageDTO = useImageDTO(upscaleInitialImage?.image_name);
   const dndTargetData = useMemo<SetUpscaleInitialImageDndTargetData>(
     () => setUpscaleInitialImageDndTarget.getData(),
     []
@@ -26,7 +29,7 @@ export const UpscaleInitialImage = () => {
 
   const onUpload = useCallback(
     (imageDTO: ImageDTO) => {
-      dispatch(upscaleInitialImageChanged(imageDTO));
+      dispatch(upscaleInitialImageChanged(imageDTOToImageWithDims(imageDTO)));
     },
     [dispatch]
   );

@@ -1,24 +1,33 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
-import type { PersistConfig, RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
+import { isPlainObject } from 'es-toolkit';
+import type { ImageWithDims } from 'features/controlLayers/store/types';
+import { zImageWithDims } from 'features/controlLayers/store/types';
+import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { ParameterSpandrelImageToImageModel } from 'features/parameters/types/parameterSchemas';
-import type { ControlNetModelConfig, ImageDTO } from 'services/api/types';
+import type { ControlNetModelConfig } from 'services/api/types';
+import { assert } from 'tsafe';
+import z from 'zod';
 
-export interface UpscaleState {
-  _version: 1;
-  upscaleModel: ParameterSpandrelImageToImageModel | null;
-  upscaleInitialImage: ImageDTO | null;
-  structure: number;
-  creativity: number;
-  tileControlnetModel: ControlNetModelConfig | null;
-  scale: number;
-  postProcessingModel: ParameterSpandrelImageToImageModel | null;
-  tileSize: number;
-  tileOverlap: number;
-}
+const zUpscaleState = z.object({
+  _version: z.literal(2),
+  upscaleModel: zModelIdentifierField.nullable(),
+  upscaleInitialImage: zImageWithDims.nullable(),
+  structure: z.number(),
+  creativity: z.number(),
+  tileControlnetModel: zModelIdentifierField.nullable(),
+  scale: z.number(),
+  postProcessingModel: zModelIdentifierField.nullable(),
+  tileSize: z.number(),
+  tileOverlap: z.number(),
+});
 
-const initialUpscaleState: UpscaleState = {
-  _version: 1,
+export type UpscaleState = z.infer<typeof zUpscaleState>;
+
+const getInitialState = (): UpscaleState => ({
+  _version: 2,
   upscaleModel: null,
   upscaleInitialImage: null,
   structure: 0,
@@ -28,16 +37,19 @@ const initialUpscaleState: UpscaleState = {
   postProcessingModel: null,
   tileSize: 1024,
   tileOverlap: 128,
-};
+});
 
-export const upscaleSlice = createSlice({
+const slice = createSlice({
   name: 'upscale',
-  initialState: initialUpscaleState,
+  initialState: getInitialState(),
   reducers: {
     upscaleModelChanged: (state, action: PayloadAction<ParameterSpandrelImageToImageModel | null>) => {
-      state.upscaleModel = action.payload;
+      const result = zUpscaleState.shape.upscaleModel.safeParse(action.payload);
+      if (result.success) {
+        state.upscaleModel = result.data;
+      }
     },
-    upscaleInitialImageChanged: (state, action: PayloadAction<ImageDTO | null>) => {
+    upscaleInitialImageChanged: (state, action: PayloadAction<ImageWithDims | null>) => {
       state.upscaleInitialImage = action.payload;
     },
     structureChanged: (state, action: PayloadAction<number>) => {
@@ -47,13 +59,19 @@ export const upscaleSlice = createSlice({
       state.creativity = action.payload;
     },
     tileControlnetModelChanged: (state, action: PayloadAction<ControlNetModelConfig | null>) => {
-      state.tileControlnetModel = action.payload;
+      const result = zUpscaleState.shape.tileControlnetModel.safeParse(action.payload);
+      if (result.success) {
+        state.tileControlnetModel = result.data;
+      }
     },
     scaleChanged: (state, action: PayloadAction<number>) => {
       state.scale = action.payload;
     },
     postProcessingModelChanged: (state, action: PayloadAction<ParameterSpandrelImageToImageModel | null>) => {
-      state.postProcessingModel = action.payload;
+      const result = zUpscaleState.shape.postProcessingModel.safeParse(action.payload);
+      if (result.success) {
+        state.postProcessingModel = result.data;
+      }
     },
     tileSizeChanged: (state, action: PayloadAction<number>) => {
       state.tileSize = action.payload;
@@ -74,21 +92,33 @@ export const {
   postProcessingModelChanged,
   tileSizeChanged,
   tileOverlapChanged,
-} = upscaleSlice.actions;
+} = slice.actions;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrateUpscaleState = (state: any): any => {
-  if (!('_version' in state)) {
-    state._version = 1;
-  }
-  return state;
-};
-
-export const upscalePersistConfig: PersistConfig<UpscaleState> = {
-  name: upscaleSlice.name,
-  initialState: initialUpscaleState,
-  migrate: migrateUpscaleState,
-  persistDenylist: [],
+export const upscaleSliceConfig: SliceConfig<typeof slice> = {
+  slice,
+  schema: zUpscaleState,
+  getInitialState,
+  persistConfig: {
+    migrate: (state) => {
+      assert(isPlainObject(state));
+      if (!('_version' in state)) {
+        state._version = 1;
+      }
+      if (state._version === 1) {
+        state._version = 2;
+        // Migrate from v1 to v2: upscaleInitialImage was an ImageDTO, now it's an ImageWithDims
+        if (state.upscaleInitialImage) {
+          const { image_name, width, height } = state.upscaleInitialImage;
+          state.upscaleInitialImage = {
+            image_name,
+            width,
+            height,
+          };
+        }
+      }
+      return zUpscaleState.parse(state);
+    },
+  },
 };
 
 export const selectUpscaleSlice = (state: RootState) => state.upscale;

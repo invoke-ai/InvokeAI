@@ -5,9 +5,9 @@ from pathlib import Path
 from typing import Optional
 
 import torch
-from fastapi import Body
+from fastapi import Body, HTTPException, Query
 from fastapi.routing import APIRouter
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, JsonValue
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.invocations.upscale import ESRGAN_MODELS
@@ -173,3 +173,50 @@ async def disable_invocation_cache() -> None:
 async def get_invocation_cache_status() -> InvocationCacheStatus:
     """Clears the invocation cache"""
     return ApiDependencies.invoker.services.invocation_cache.get_status()
+
+
+@app_router.get(
+    "/client_state",
+    operation_id="get_client_state_by_key",
+    response_model=JsonValue | None,
+)
+async def get_client_state_by_key(
+    key: str = Query(..., description="Key to get"),
+) -> JsonValue | None:
+    """Gets the client state"""
+    try:
+        return ApiDependencies.invoker.services.client_state_persistence.get_by_key(key)
+    except Exception as e:
+        logging.error(f"Error getting client state: {e}")
+        raise HTTPException(status_code=500, detail="Error setting client state")
+
+
+@app_router.post(
+    "/client_state",
+    operation_id="set_client_state",
+    response_model=None,
+)
+async def set_client_state(
+    key: str = Query(..., description="Key to set"),
+    value: JsonValue = Body(..., description="Value of the key"),
+) -> None:
+    """Sets the client state"""
+    try:
+        ApiDependencies.invoker.services.client_state_persistence.set_by_key(key, value)
+    except Exception as e:
+        logging.error(f"Error setting client state: {e}")
+        raise HTTPException(status_code=500, detail="Error setting client state")
+
+
+@app_router.delete(
+    "/client_state",
+    operation_id="delete_client_state",
+    responses={204: {"description": "Client state deleted"}},
+)
+async def delete_client_state() -> None:
+    """Deletes the client state"""
+    try:
+        ApiDependencies.invoker.services.client_state_persistence.delete()
+    except Exception as e:
+        logging.error(f"Error deleting client state: {e}")
+        raise HTTPException(status_code=500, detail="Error deleting client state")

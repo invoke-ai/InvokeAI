@@ -1,34 +1,43 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
-import type { PersistConfig, RootState } from 'app/store/store';
-import type { WorkflowMode } from 'features/nodes/store/types';
+import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
+import { type WorkflowMode, zWorkflowMode } from 'features/nodes/store/types';
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
 import { atom, computed } from 'nanostores';
-import type { SQLiteDirection, WorkflowRecordOrderBy } from 'services/api/types';
+import {
+  type SQLiteDirection,
+  type WorkflowRecordOrderBy,
+  zSQLiteDirection,
+  zWorkflowRecordOrderBy,
+} from 'services/api/types';
+import z from 'zod';
 
-export type WorkflowLibraryView = 'recent' | 'yours' | 'private' | 'shared' | 'defaults' | 'published';
+const zWorkflowLibraryView = z.enum(['recent', 'yours', 'private', 'shared', 'defaults', 'published']);
+export type WorkflowLibraryView = z.infer<typeof zWorkflowLibraryView>;
 
-type WorkflowLibraryState = {
-  mode: WorkflowMode;
-  view: WorkflowLibraryView;
-  orderBy: WorkflowRecordOrderBy;
-  direction: SQLiteDirection;
-  searchTerm: string;
-  selectedTags: string[];
-};
+const zWorkflowLibraryState = z.object({
+  mode: zWorkflowMode,
+  view: zWorkflowLibraryView,
+  orderBy: zWorkflowRecordOrderBy,
+  direction: zSQLiteDirection,
+  searchTerm: z.string(),
+  selectedTags: z.array(z.string()),
+});
+type WorkflowLibraryState = z.infer<typeof zWorkflowLibraryState>;
 
-const initialWorkflowLibraryState: WorkflowLibraryState = {
+const getInitialState = (): WorkflowLibraryState => ({
   mode: 'view',
   searchTerm: '',
   orderBy: 'opened_at',
   direction: 'DESC',
   selectedTags: [],
   view: 'defaults',
-};
+});
 
-export const workflowLibrarySlice = createSlice({
+const slice = createSlice({
   name: 'workflowLibrary',
-  initialState: initialWorkflowLibraryState,
+  initialState: getInitialState(),
   reducers: {
     workflowModeChanged: (state, action: PayloadAction<WorkflowMode>) => {
       state.mode = action.payload;
@@ -73,16 +82,15 @@ export const {
   workflowLibraryTagToggled,
   workflowLibraryTagsReset,
   workflowLibraryViewChanged,
-} = workflowLibrarySlice.actions;
+} = slice.actions;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrateWorkflowLibraryState = (state: any): any => state;
-
-export const workflowLibraryPersistConfig: PersistConfig<WorkflowLibraryState> = {
-  name: workflowLibrarySlice.name,
-  initialState: initialWorkflowLibraryState,
-  migrate: migrateWorkflowLibraryState,
-  persistDenylist: [],
+export const workflowLibrarySliceConfig: SliceConfig<typeof slice> = {
+  slice,
+  schema: zWorkflowLibraryState,
+  getInitialState,
+  persistConfig: {
+    migrate: (state) => zWorkflowLibraryState.parse(state),
+  },
 };
 
 const selectWorkflowLibrarySlice = (state: RootState) => state.workflowLibrary;

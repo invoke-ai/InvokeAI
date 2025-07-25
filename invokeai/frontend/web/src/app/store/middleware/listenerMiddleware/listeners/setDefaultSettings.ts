@@ -1,4 +1,4 @@
-import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import type { AppStartListening } from 'app/store/store';
 import { isNil } from 'es-toolkit';
 import { bboxHeightChanged, bboxWidthChanged } from 'features/controlLayers/store/canvasSlice';
 import { buildSelectIsStaging, selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';

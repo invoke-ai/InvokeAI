@@ -1,8 +1,10 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
-import { SelectionMode } from '@xyflow/react';
-import type { PersistConfig, RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
+import { isPlainObject } from 'es-toolkit';
 import type { Selector } from 'react-redux';
+import { assert } from 'tsafe';
 import z from 'zod';
 
 export const zLayeringStrategy = z.enum(['network-simplex', 'longest-path']);
@@ -11,25 +13,28 @@ export const zLayoutDirection = z.enum(['TB', 'LR']);
 type LayoutDirection = z.infer<typeof zLayoutDirection>;
 export const zNodeAlignment = z.enum(['UL', 'UR', 'DL', 'DR']);
 type NodeAlignment = z.infer<typeof zNodeAlignment>;
+const zSelectionMode = z.enum(['partial', 'full']);
 
-export type WorkflowSettingsState = {
-  _version: 1;
-  shouldShowMinimapPanel: boolean;
-  layeringStrategy: LayeringStrategy;
-  nodeSpacing: number;
-  layerSpacing: number;
-  layoutDirection: LayoutDirection;
-  shouldValidateGraph: boolean;
-  shouldAnimateEdges: boolean;
-  nodeAlignment: NodeAlignment;
-  nodeOpacity: number;
-  shouldSnapToGrid: boolean;
-  shouldColorEdges: boolean;
-  shouldShowEdgeLabels: boolean;
-  selectionMode: SelectionMode;
-};
+const zWorkflowSettingsState = z.object({
+  _version: z.literal(1),
+  shouldShowMinimapPanel: z.boolean(),
+  layeringStrategy: zLayeringStrategy,
+  nodeSpacing: z.number(),
+  layerSpacing: z.number(),
+  layoutDirection: zLayoutDirection,
+  shouldValidateGraph: z.boolean(),
+  shouldAnimateEdges: z.boolean(),
+  nodeAlignment: zNodeAlignment,
+  nodeOpacity: z.number(),
+  shouldSnapToGrid: z.boolean(),
+  shouldColorEdges: z.boolean(),
+  shouldShowEdgeLabels: z.boolean(),
+  selectionMode: zSelectionMode,
+});
 
-const initialState: WorkflowSettingsState = {
+export type WorkflowSettingsState = z.infer<typeof zWorkflowSettingsState>;
+
+const getInitialState = (): WorkflowSettingsState => ({
   _version: 1,
   shouldShowMinimapPanel: true,
   layeringStrategy: 'network-simplex',
@@ -43,12 +48,12 @@ const initialState: WorkflowSettingsState = {
   shouldColorEdges: true,
   shouldShowEdgeLabels: false,
   nodeOpacity: 1,
-  selectionMode: SelectionMode.Partial,
-};
+  selectionMode: 'partial',
+});
 
-export const workflowSettingsSlice = createSlice({
+const slice = createSlice({
   name: 'workflowSettings',
-  initialState,
+  initialState: getInitialState(),
   reducers: {
     shouldShowMinimapPanelChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldShowMinimapPanel = action.payload;
@@ -87,7 +92,7 @@ export const workflowSettingsSlice = createSlice({
       state.nodeAlignment = action.payload;
     },
     selectionModeChanged: (state, action: PayloadAction<boolean>) => {
-      state.selectionMode = action.payload ? SelectionMode.Full : SelectionMode.Partial;
+      state.selectionMode = action.payload ? 'full' : 'partial';
     },
   },
 });
@@ -106,21 +111,21 @@ export const {
   shouldValidateGraphChanged,
   nodeOpacityChanged,
   selectionModeChanged,
-} = workflowSettingsSlice.actions;
+} = slice.actions;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrateWorkflowSettingsState = (state: any): any => {
-  if (!('_version' in state)) {
-    state._version = 1;
-  }
-  return state;
-};
-
-export const workflowSettingsPersistConfig: PersistConfig<WorkflowSettingsState> = {
-  name: workflowSettingsSlice.name,
-  initialState,
-  migrate: migrateWorkflowSettingsState,
-  persistDenylist: [],
+export const workflowSettingsSliceConfig: SliceConfig<typeof slice> = {
+  slice,
+  schema: zWorkflowSettingsState,
+  getInitialState,
+  persistConfig: {
+    migrate: (state) => {
+      assert(isPlainObject(state));
+      if (!('_version' in state)) {
+        state._version = 1;
+      }
+      return zWorkflowSettingsState.parse(state);
+    },
+  },
 };
 
 export const selectWorkflowSettingsSlice = (state: RootState) => state.workflowSettings;

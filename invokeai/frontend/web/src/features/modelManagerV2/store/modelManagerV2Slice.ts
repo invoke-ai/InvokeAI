@@ -1,21 +1,28 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
-import type { PersistConfig, RootState } from 'app/store/store';
-import type { ModelType } from 'services/api/types';
+import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
+import { isPlainObject } from 'es-toolkit';
+import { zModelType } from 'features/nodes/types/common';
+import { assert } from 'tsafe';
+import z from 'zod';
 
-export type FilterableModelType = Exclude<ModelType, 'onnx'> | 'refiner';
+const zFilterableModelType = zModelType.exclude(['onnx']).or(z.literal('refiner'));
+export type FilterableModelType = z.infer<typeof zFilterableModelType>;
 
-type ModelManagerState = {
-  _version: 1;
-  selectedModelKey: string | null;
-  selectedModelMode: 'edit' | 'view';
-  searchTerm: string;
-  filteredModelType: FilterableModelType | null;
-  scanPath: string | undefined;
-  shouldInstallInPlace: boolean;
-};
+const zModelManagerState = z.object({
+  _version: z.literal(1),
+  selectedModelKey: z.string().nullable(),
+  selectedModelMode: z.enum(['edit', 'view']),
+  searchTerm: z.string(),
+  filteredModelType: zFilterableModelType.nullable(),
+  scanPath: z.string().optional(),
+  shouldInstallInPlace: z.boolean(),
+});
 
-const initialModelManagerState: ModelManagerState = {
+type ModelManagerState = z.infer<typeof zModelManagerState>;
+
+const getInitialState = (): ModelManagerState => ({
   _version: 1,
   selectedModelKey: null,
   selectedModelMode: 'view',
@@ -23,11 +30,11 @@ const initialModelManagerState: ModelManagerState = {
   searchTerm: '',
   scanPath: undefined,
   shouldInstallInPlace: true,
-};
+});
 
-export const modelManagerV2Slice = createSlice({
+const slice = createSlice({
   name: 'modelmanagerV2',
-  initialState: initialModelManagerState,
+  initialState: getInitialState(),
   reducers: {
     setSelectedModelKey: (state, action: PayloadAction<string | null>) => {
       state.selectedModelMode = 'view';
@@ -58,21 +65,22 @@ export const {
   setSelectedModelMode,
   setScanPath,
   shouldInstallInPlaceChanged,
-} = modelManagerV2Slice.actions;
+} = slice.actions;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrateModelManagerState = (state: any): any => {
-  if (!('_version' in state)) {
-    state._version = 1;
-  }
-  return state;
-};
-
-export const modelManagerV2PersistConfig: PersistConfig<ModelManagerState> = {
-  name: modelManagerV2Slice.name,
-  initialState: initialModelManagerState,
-  migrate: migrateModelManagerState,
-  persistDenylist: ['selectedModelKey', 'selectedModelMode', 'filteredModelType', 'searchTerm'],
+export const modelManagerSliceConfig: SliceConfig<typeof slice> = {
+  slice,
+  schema: zModelManagerState,
+  getInitialState,
+  persistConfig: {
+    migrate: (state) => {
+      assert(isPlainObject(state));
+      if (!('_version' in state)) {
+        state._version = 1;
+      }
+      return zModelManagerState.parse(state);
+    },
+    persistDenylist: ['selectedModelKey', 'selectedModelMode', 'filteredModelType', 'searchTerm'],
+  },
 };
 
 export const selectModelManagerV2Slice = (state: RootState) => state.modelmanagerV2;

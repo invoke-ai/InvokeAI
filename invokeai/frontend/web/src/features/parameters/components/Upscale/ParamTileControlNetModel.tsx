@@ -1,4 +1,5 @@
 import { FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { selectBase } from 'features/controlLayers/store/paramsSlice';
@@ -6,13 +7,35 @@ import { ModelPicker } from 'features/parameters/components/ModelPicker';
 import { selectTileControlNetModel, tileControlnetModelChanged } from 'features/parameters/store/upscaleSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import { useControlNetModels } from 'services/api/hooks/modelsByType';
-import type { ControlNetModelConfig } from 'services/api/types';
+import { type ControlNetModelConfig, isControlNetModelConfig } from 'services/api/types';
+
+const selectTileControlNetModelConfig = createSelector(
+  selectModelConfigsQuery,
+  selectTileControlNetModel,
+  (modelConfigs, modelIdentifierField) => {
+    if (!modelConfigs.data) {
+      return null;
+    }
+    if (!modelIdentifierField) {
+      return null;
+    }
+    const modelConfig = modelConfigsAdapterSelectors.selectById(modelConfigs.data, modelIdentifierField.key);
+    if (!modelConfig) {
+      return null;
+    }
+    if (!isControlNetModelConfig(modelConfig)) {
+      return null;
+    }
+    return modelConfig;
+  }
+);
 
 const ParamTileControlNetModel = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const tileControlNetModel = useAppSelector(selectTileControlNetModel);
+  const tileControlNetModel = useAppSelector(selectTileControlNetModelConfig);
   const currentBaseModel = useAppSelector(selectBase);
   const [modelConfigs, { isLoading }] = useControlNetModels();
 

@@ -3,12 +3,15 @@ import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { LogNamespace } from 'app/logging/logger';
 import { zLogNamespace } from 'app/logging/logger';
 import { EMPTY_ARRAY } from 'app/store/constants';
-import type { PersistConfig, RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
+import { isPlainObject } from 'es-toolkit';
 import { uniq } from 'es-toolkit/compat';
+import { assert } from 'tsafe';
 
-import type { Language, SystemState } from './types';
+import { type Language, type SystemState, zSystemState } from './types';
 
-const initialSystemState: SystemState = {
+const getInitialState = (): SystemState => ({
   _version: 2,
   shouldConfirmOnDelete: true,
   shouldAntialiasProgressImage: false,
@@ -23,11 +26,11 @@ const initialSystemState: SystemState = {
   logNamespaces: [...zLogNamespace.options],
   shouldShowInvocationProgressDetail: false,
   shouldHighlightFocusedRegions: false,
-};
+});
 
-export const systemSlice = createSlice({
+const slice = createSlice({
   name: 'system',
-  initialState: initialSystemState,
+  initialState: getInitialState(),
   reducers: {
     setShouldConfirmOnDelete: (state, action: PayloadAction<boolean>) => {
       state.shouldConfirmOnDelete = action.payload;
@@ -89,25 +92,25 @@ export const {
   shouldConfirmOnNewSessionToggled,
   setShouldShowInvocationProgressDetail,
   setShouldHighlightFocusedRegions,
-} = systemSlice.actions;
+} = slice.actions;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrateSystemState = (state: any): any => {
-  if (!('_version' in state)) {
-    state._version = 1;
-  }
-  if (state._version === 1) {
-    state.language = (state as SystemState).language.replace('_', '-');
-    state._version = 2;
-  }
-  return state;
-};
-
-export const systemPersistConfig: PersistConfig<SystemState> = {
-  name: systemSlice.name,
-  initialState: initialSystemState,
-  migrate: migrateSystemState,
-  persistDenylist: [],
+export const systemSliceConfig: SliceConfig<typeof slice> = {
+  slice,
+  schema: zSystemState,
+  getInitialState,
+  persistConfig: {
+    migrate: (state) => {
+      assert(isPlainObject(state));
+      if (!('_version' in state)) {
+        state._version = 1;
+      }
+      if (state._version === 1) {
+        state.language = (state as SystemState).language.replace('_', '-');
+        state._version = 2;
+      }
+      return zSystemState.parse(state);
+    },
+  },
 };
 
 export const selectSystemSlice = (state: RootState) => state.system;
