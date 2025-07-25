@@ -3,8 +3,8 @@ import { createSelector } from '@reduxjs/toolkit';
 import type { Node, NodeProps } from '@xyflow/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import NodeCollapseButton from 'features/nodes/components/flow/nodes/common/NodeCollapseButton';
-import NodeTitle from 'features/nodes/components/flow/nodes/common/NodeTitle';
-import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
+import NonInvocationNodeTitle from 'features/nodes/components/flow/nodes/common/NonInvocationNodeTitle';
+import NonInvocationNodeWrapper from 'features/nodes/components/flow/nodes/common/NonInvocationNodeWrapper';
 import { notesNodeValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectNodes } from 'features/nodes/store/selectors';
 import { NO_DRAG_CLASS, NO_PAN_CLASS } from 'features/nodes/types/constants';
@@ -34,7 +34,7 @@ const NotesNode = (props: NodeProps<Node<NotesNodeData>>) => {
   }
 
   return (
-    <NodeWrapper nodeId={nodeId} selected={selected}>
+    <NonInvocationNodeWrapper nodeId={nodeId} selected={selected}>
       <Flex
         layerStyle="nodeHeader"
         borderTopRadius="base"
@@ -44,7 +44,7 @@ const NotesNode = (props: NodeProps<Node<NotesNodeData>>) => {
         h={8}
       >
         <NodeCollapseButton nodeId={nodeId} isOpen={isOpen} />
-        <NodeTitle nodeId={nodeId} title="Notes" />
+        <NonInvocationNodeTitle nodeId={nodeId} title="Notes" />
         <Box minW={8} />
       </Flex>
       {isOpen && (
@@ -73,7 +73,7 @@ const NotesNode = (props: NodeProps<Node<NotesNodeData>>) => {
           </Flex>
         </>
       )}
-    </NodeWrapper>
+    </NonInvocationNodeWrapper>
   );
 };
 
