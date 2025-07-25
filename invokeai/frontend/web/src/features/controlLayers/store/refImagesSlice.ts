@@ -266,17 +266,12 @@ export const {
   refImagesRecalled,
 } = slice.actions;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrate = (state: any): any => {
-  return state;
-};
-
 export const refImagesSliceConfig: SliceConfig<typeof slice> = {
   slice,
-  zSchema: zRefImagesState,
+  schema: zRefImagesState,
   getInitialState: getInitialRefImagesState,
   persistConfig: {
-    migrate,
+    migrate: (state) => zRefImagesState.parse(state),
     persistDenylist: ['selectedEntityId', 'isPanelOpen'],
   },
 };

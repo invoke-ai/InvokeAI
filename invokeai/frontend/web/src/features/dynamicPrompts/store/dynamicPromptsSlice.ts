@@ -3,6 +3,8 @@ import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import { buildZodTypeGuard } from 'common/util/zodUtils';
+import { isPlainObject } from 'es-toolkit';
+import { assert } from 'tsafe';
 import { z } from 'zod';
 
 const zSeedBehaviour = z.enum(['PER_ITERATION', 'PER_PROMPT']);
@@ -19,7 +21,7 @@ const zDynamicPromptsState = z.object({
   isLoading: z.boolean(),
   seedBehaviour: zSeedBehaviour,
 });
-type DynamicPromptsState = z.infer<typeof zDynamicPromptsState>;
+export type DynamicPromptsState = z.infer<typeof zDynamicPromptsState>;
 
 const getInitialState = (): DynamicPromptsState => ({
   _version: 1,
@@ -69,10 +71,11 @@ export const {
 
 export const dynamicPromptsSliceConfig: SliceConfig<typeof slice> = {
   slice,
-  zSchema: zDynamicPromptsState,
+  schema: zDynamicPromptsState,
   getInitialState,
   persistConfig: {
     migrate: (state) => {
+      assert(isPlainObject(state));
       if (!('_version' in state)) {
         state._version = 1;
       }

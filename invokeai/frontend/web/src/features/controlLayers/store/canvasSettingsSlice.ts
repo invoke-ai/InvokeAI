@@ -112,7 +112,7 @@ const getInitialState = (): CanvasSettingsState => ({
   pressureSensitivity: true,
   ruleOfThirds: false,
   saveAllImagesToGallery: false,
-  stagingAreaAutoSwitch: 'switch_on_start' as const,
+  stagingAreaAutoSwitch: 'switch_on_start',
 });
 
 const slice = createSlice({
@@ -209,7 +209,7 @@ export const {
 
 export const canvasSettingsSliceConfig: SliceConfig<typeof slice> = {
   slice,
-  zSchema: zCanvasSettingsState,
+  schema: zCanvasSettingsState,
   getInitialState,
   persistConfig: {
     migrate: (state) => zCanvasSettingsState.parse(state),

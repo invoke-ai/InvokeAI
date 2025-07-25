@@ -1,7 +1,8 @@
 import type { HandleType } from '@xyflow/react';
-import type { FieldInputTemplate, FieldOutputTemplate, StatefulFieldValue } from 'features/nodes/types/field';
-import type { AnyEdge, AnyNode, InvocationTemplate, NodeExecutionState } from 'features/nodes/types/invocation';
-import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import { type FieldInputTemplate, type FieldOutputTemplate, zStatefulFieldValue } from 'features/nodes/types/field';
+import { type InvocationTemplate, type NodeExecutionState, zAnyEdge, zAnyNode } from 'features/nodes/types/invocation';
+import { zWorkflowV3 } from 'features/nodes/types/workflow';
+import z from 'zod';
 
 export type Templates = Record<string, InvocationTemplate>;
 export type NodeExecutionStates = Record<string, NodeExecutionState | undefined>;
@@ -13,11 +14,13 @@ export type PendingConnection = {
   fieldTemplate: FieldInputTemplate | FieldOutputTemplate;
 };
 
-export type WorkflowMode = 'edit' | 'view';
-
-export type NodesState = {
-  _version: 1;
-  nodes: AnyNode[];
-  edges: AnyEdge[];
-  formFieldInitialValues: Record<string, StatefulFieldValue>;
-} & Omit<WorkflowV3, 'nodes' | 'edges' | 'is_published'>;
+export const zWorkflowMode = z.enum(['edit', 'view']);
+export type WorkflowMode = z.infer<typeof zWorkflowMode>;
+export const zNodesState = z.object({
+  _version: z.literal(1),
+  nodes: z.array(zAnyNode),
+  edges: z.array(zAnyEdge),
+  formFieldInitialValues: z.record(z.string(), zStatefulFieldValue),
+  ...zWorkflowV3.omit({ nodes: true, edges: true, is_published: true }).shape,
+});
+export type NodesState = z.infer<typeof zNodesState>;

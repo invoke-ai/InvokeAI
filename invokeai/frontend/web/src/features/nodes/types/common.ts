@@ -92,7 +92,7 @@ export const zMainModelBase = z.enum([
 ]);
 type MainModelBase = z.infer<typeof zMainModelBase>;
 export const isMainModelBase = (base: unknown): base is MainModelBase => zMainModelBase.safeParse(base).success;
-const zModelType = z.enum([
+export const zModelType = z.enum([
   'main',
   'vae',
   'lora',

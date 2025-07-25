@@ -403,7 +403,7 @@ export const {
 
 export const paramsSliceConfig: SliceConfig<typeof slice> = {
   slice,
-  zSchema: zParamsState,
+  schema: zParamsState,
   getInitialState: getInitialParamsState,
   persistConfig: {
     migrate: (state) => zParamsState.parse(state),

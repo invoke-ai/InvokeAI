@@ -2,21 +2,29 @@ import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
-import type { WorkflowMode } from 'features/nodes/store/types';
+import { type WorkflowMode, zWorkflowMode } from 'features/nodes/store/types';
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
 import { atom, computed } from 'nanostores';
-import type { SQLiteDirection, WorkflowRecordOrderBy } from 'services/api/types';
+import {
+  type SQLiteDirection,
+  type WorkflowRecordOrderBy,
+  zSQLiteDirection,
+  zWorkflowRecordOrderBy,
+} from 'services/api/types';
+import z from 'zod';
 
-export type WorkflowLibraryView = 'recent' | 'yours' | 'private' | 'shared' | 'defaults' | 'published';
+const zWorkflowLibraryView = z.enum(['recent', 'yours', 'private', 'shared', 'defaults', 'published']);
+export type WorkflowLibraryView = z.infer<typeof zWorkflowLibraryView>;
 
-type WorkflowLibraryState = {
-  mode: WorkflowMode;
-  view: WorkflowLibraryView;
-  orderBy: WorkflowRecordOrderBy;
-  direction: SQLiteDirection;
-  searchTerm: string;
-  selectedTags: string[];
-};
+const zWorkflowLibraryState = z.object({
+  mode: zWorkflowMode,
+  view: zWorkflowLibraryView,
+  orderBy: zWorkflowRecordOrderBy,
+  direction: zSQLiteDirection,
+  searchTerm: z.string(),
+  selectedTags: z.array(z.string()),
+});
+type WorkflowLibraryState = z.infer<typeof zWorkflowLibraryState>;
 
 const getInitialState = (): WorkflowLibraryState => ({
   mode: 'view',
@@ -76,14 +84,12 @@ export const {
   workflowLibraryViewChanged,
 } = slice.actions;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrate = (state: any): any => state;
-
 export const workflowLibrarySliceConfig: SliceConfig<typeof slice> = {
   slice,
+  schema: zWorkflowLibraryState,
   getInitialState,
   persistConfig: {
-    migrate,
+    migrate: (state) => zWorkflowLibraryState.parse(state),
   },
 };
 

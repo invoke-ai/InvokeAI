@@ -2,13 +2,15 @@ import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
+import z from 'zod';
 
-interface QueueState {
-  listCursor: number | undefined;
-  listPriority: number | undefined;
-  selectedQueueItem: string | undefined;
-  resumeProcessorOnEnqueue: boolean;
-}
+const zQueueState = z.object({
+  listCursor: z.number().optional(),
+  listPriority: z.number().optional(),
+  selectedQueueItem: z.string().optional(),
+  resumeProcessorOnEnqueue: z.boolean(),
+});
+type QueueState = z.infer<typeof zQueueState>;
 
 const getInitialState = (): QueueState => ({
   listCursor: undefined,
@@ -38,6 +40,7 @@ export const { listCursorChanged, listPriorityChanged, listParamsReset } = slice
 
 export const queueSliceConfig: SliceConfig<typeof slice> = {
   slice,
+  schema: zQueueState,
   getInitialState,
 };
 

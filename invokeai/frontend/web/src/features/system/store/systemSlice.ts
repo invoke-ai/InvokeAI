@@ -5,9 +5,11 @@ import { zLogNamespace } from 'app/logging/logger';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
+import { isPlainObject } from 'es-toolkit';
 import { uniq } from 'es-toolkit/compat';
+import { assert } from 'tsafe';
 
-import type { Language, SystemState } from './types';
+import { type Language, type SystemState, zSystemState } from './types';
 
 const getInitialState = (): SystemState => ({
   _version: 2,
@@ -92,23 +94,22 @@ export const {
   setShouldHighlightFocusedRegions,
 } = slice.actions;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrate = (state: any): any => {
-  if (!('_version' in state)) {
-    state._version = 1;
-  }
-  if (state._version === 1) {
-    state.language = (state as SystemState).language.replace('_', '-');
-    state._version = 2;
-  }
-  return state;
-};
-
 export const systemSliceConfig: SliceConfig<typeof slice> = {
   slice,
+  schema: zSystemState,
   getInitialState,
   persistConfig: {
-    migrate,
+    migrate: (state) => {
+      assert(isPlainObject(state));
+      if (!('_version' in state)) {
+        state._version = 1;
+      }
+      if (state._version === 1) {
+        state.language = (state as SystemState).language.replace('_', '-');
+        state._version = 2;
+      }
+      return zSystemState.parse(state);
+    },
   },
 };
 

@@ -3,19 +3,25 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import type { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { SliceConfig } from 'app/store/types';
+import { isPlainObject } from 'es-toolkit';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { useMemo } from 'react';
 import { queueApi } from 'services/api/endpoints/queue';
+import { assert } from 'tsafe';
 import z from 'zod';
 
 const zCanvasStagingAreaState = z.object({
-  _version: z.literal(1).default(1),
-  canvasSessionId: z.string().default(() => getPrefixedId('canvas')),
-  canvasDiscardedQueueItems: z.array(z.number().int()).default(() => []),
+  _version: z.literal(1),
+  canvasSessionId: z.string(),
+  canvasDiscardedQueueItems: z.array(z.number().int()),
 });
 type CanvasStagingAreaState = z.infer<typeof zCanvasStagingAreaState>;
 
-const getInitialState = (): CanvasStagingAreaState => zCanvasStagingAreaState.parse({});
+const getInitialState = (): CanvasStagingAreaState => ({
+  _version: 1,
+  canvasSessionId: getPrefixedId('canvas'),
+  canvasDiscardedQueueItems: [],
+});
 
 const slice = createSlice({
   name: 'canvasSession',
@@ -48,18 +54,17 @@ export const { canvasSessionReset, canvasQueueItemDiscarded } = slice.actions;
 
 export const canvasSessionSliceConfig: SliceConfig<typeof slice> = {
   slice,
-  zSchema: zCanvasStagingAreaState,
+  schema: zCanvasStagingAreaState,
   getInitialState,
   persistConfig: {
     migrate: (state) => {
-      {
-        if (!('_version' in state)) {
-          state._version = 1;
-          state.canvasSessionId = state.canvasSessionId ?? getPrefixedId('canvas');
-        }
-
-        return zCanvasStagingAreaState.parse(state);
+      assert(isPlainObject(state));
+      if (!('_version' in state)) {
+        state._version = 1;
+        state.canvasSessionId = state.canvasSessionId ?? getPrefixedId('canvas');
       }
+
+      return zCanvasStagingAreaState.parse(state);
     },
   },
 };

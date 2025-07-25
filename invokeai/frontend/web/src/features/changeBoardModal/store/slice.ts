@@ -35,6 +35,6 @@ export const selectChangeBoardModalSlice = (state: RootState) => state.changeBoa
 
 export const changeBoardModalSliceConfig: SliceConfig<typeof slice> = {
   slice,
-  zSchema: zChangeBoardModalState,
+  schema: zChangeBoardModalState,
   getInitialState,
 };

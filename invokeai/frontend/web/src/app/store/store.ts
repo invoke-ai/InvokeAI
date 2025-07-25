@@ -128,28 +128,26 @@ const unserialize: UnserializeFunction = (data, key) => {
   try {
     const initialState = getInitialState();
 
-    const parsed = JSON.parse(data);
-
     // strip out old keys
-    const stripped = pick(deepClone(parsed), keys(initialState));
-    // run (additive) migrations
-    const migrated = persistConfig.migrate(stripped);
+    const stripped = pick(deepClone(data), keys(initialState));
     /*
      * Merge in initial state as default values, covering any missing keys. You might be tempted to use _.defaultsDeep,
      * but that merges arrays by index and partial objects by key. Using an identity function as the customizer results
      * in behaviour like defaultsDeep, but doesn't overwrite any values that are not undefined in the migrated state.
      */
-    const transformed = mergeWith(migrated, initialState, (objVal) => objVal);
+    const unPersistDenylisted = mergeWith(stripped, initialState, (objVal) => objVal);
+    // run (additive) migrations
+    const migrated = persistConfig.migrate(unPersistDenylisted);
 
     log.debug(
       {
-        persistedData: parsed,
-        rehydratedData: transformed as JsonObject,
-        diff: diff(parsed, transformed) as JsonObject,
+        persistedData: data as JsonObject,
+        rehydratedData: migrated as JsonObject,
+        diff: diff(data, migrated) as JsonObject,
       },
       `Rehydrated slice "${key}"`
     );
-    state = transformed;
+    state = migrated;
   } catch (err) {
     log.warn(
       { error: serializeError(err as Error) },

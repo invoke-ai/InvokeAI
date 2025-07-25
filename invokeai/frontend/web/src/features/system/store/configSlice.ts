@@ -32,7 +32,7 @@ export const { configChanged } = slice.actions;
 
 export const configSliceConfig: SliceConfig<typeof slice> = {
   slice,
-  zSchema: zConfigState,
+  schema: zConfigState,
   getInitialState,
 };
 
