@@ -187,10 +187,10 @@ export const createStore = (reduxRememberOptions: { driver: Driver; persistThrot
     reducer: rememberedRootReducer,
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({
-        serializableCheck: false,
-        immutableCheck: false,
-        // serializableCheck: import.meta.env.MODE === 'development',
-        // immutableCheck: import.meta.env.MODE === 'development',
+        // serializableCheck: false,
+        // immutableCheck: false,
+        serializableCheck: import.meta.env.MODE === 'development',
+        immutableCheck: import.meta.env.MODE === 'development',
       })
         .concat(api.middleware)
         .concat(dynamicMiddlewares)
