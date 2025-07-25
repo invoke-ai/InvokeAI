@@ -102,7 +102,7 @@
     "use-debounce": "^10.0.5",
     "use-device-pixel-ratio": "^1.1.2",
     "uuid": "^11.1.0",
-    "zod": "^4.0.5",
+    "zod": "^4.0.10",
     "zod-validation-error": "^3.5.2"
   },
   "peerDependencies": {
