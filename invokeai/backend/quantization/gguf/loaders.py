@@ -12,7 +12,7 @@ def gguf_sd_loader(path: Path, compute_dtype: torch.dtype) -> dict[str, GGMLTens
 
     sd: dict[str, GGMLTensor] = {}
     for tensor in reader.tensors:
-        torch_tensor = torch.from_numpy(tensor.data)
+        torch_tensor = torch.from_numpy(tensor.data.copy() if not tensor.data.flags.writeable else tensor.data)
         shape = torch.Size(tuple(int(v) for v in reversed(tensor.shape)))
         if tensor.tensor_type in TORCH_COMPATIBLE_QTYPES:
             torch_tensor = torch_tensor.view(*shape)
