@@ -1,4 +1,4 @@
-import type { LogLevel, LogNamespace } from 'app/logging/logger';
+import { zLogLevel, zLogNamespace } from 'app/logging/logger';
 import { z } from 'zod';
 
 const zLanguage = z.enum([
@@ -29,19 +29,20 @@ const zLanguage = z.enum([
 export type Language = z.infer<typeof zLanguage>;
 export const isLanguage = (v: unknown): v is Language => zLanguage.safeParse(v).success;
 
-export interface SystemState {
-  _version: 2;
-  shouldConfirmOnDelete: boolean;
-  shouldAntialiasProgressImage: boolean;
-  shouldConfirmOnNewSession: boolean;
-  language: Language;
-  shouldUseNSFWChecker: boolean;
-  shouldUseWatermarker: boolean;
-  shouldEnableInformationalPopovers: boolean;
-  shouldEnableModelDescriptions: boolean;
-  logIsEnabled: boolean;
-  logLevel: LogLevel;
-  logNamespaces: LogNamespace[];
-  shouldShowInvocationProgressDetail: boolean;
-  shouldHighlightFocusedRegions: boolean;
-}
+export const zSystemState = z.object({
+  _version: z.literal(2),
+  shouldConfirmOnDelete: z.boolean(),
+  shouldAntialiasProgressImage: z.boolean(),
+  shouldConfirmOnNewSession: z.boolean(),
+  language: zLanguage,
+  shouldUseNSFWChecker: z.boolean(),
+  shouldUseWatermarker: z.boolean(),
+  shouldEnableInformationalPopovers: z.boolean(),
+  shouldEnableModelDescriptions: z.boolean(),
+  logIsEnabled: z.boolean(),
+  logLevel: zLogLevel,
+  logNamespaces: z.array(zLogNamespace),
+  shouldShowInvocationProgressDetail: z.boolean(),
+  shouldHighlightFocusedRegions: z.boolean(),
+});
+export type SystemState = z.infer<typeof zSystemState>;

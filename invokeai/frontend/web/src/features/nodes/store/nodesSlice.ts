@@ -13,12 +13,13 @@ import type {
 import { applyEdgeChanges, applyNodeChanges, getConnectedEdges, getIncomers, getOutgoers } from '@xyflow/react';
 import type { SliceConfig } from 'app/store/types';
 import { deepClone } from 'common/util/deepClone';
+import { isPlainObject } from 'es-toolkit';
 import {
   addElement,
   removeElement,
   reparentElement,
 } from 'features/nodes/components/sidePanel/builder/form-manipulation';
-import type { NodesState } from 'features/nodes/store/types';
+import { type NodesState, zNodesState } from 'features/nodes/store/types';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
   BoardFieldValue,
@@ -127,6 +128,7 @@ import {
 import { atom, computed } from 'nanostores';
 import type { MouseEvent } from 'react';
 import type { UndoableOptions } from 'redux-undo';
+import { assert } from 'tsafe';
 import type { z } from 'zod';
 
 import type { PendingConnection, Templates } from './types';
@@ -760,14 +762,6 @@ export const {
   redo,
 } = slice.actions;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrate = (state: any): any => {
-  if (!('_version' in state)) {
-    state._version = 1;
-  }
-  return state;
-};
-
 export const $cursorPos = atom<XYPosition | null>(null);
 export const $templates = atom<Templates>({});
 export const $hasTemplates = computed($templates, (templates) => Object.keys(templates).length > 0);
@@ -938,9 +932,16 @@ const reduxUndoOptions: UndoableOptions<NodesState, UnknownAction> = {
 
 export const nodesSliceConfig: SliceConfig<typeof slice> = {
   slice,
+  schema: zNodesState,
   getInitialState,
   persistConfig: {
-    migrate,
+    migrate: (state) => {
+      assert(isPlainObject(state));
+      if (!('_version' in state)) {
+        state._version = 1;
+      }
+      return zNodesState.parse(state);
+    },
   },
   undoableConfig: {
     reduxUndoOptions,

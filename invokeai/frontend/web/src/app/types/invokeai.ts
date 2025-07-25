@@ -58,7 +58,6 @@ const zNumericalParameterConfig = z.object({
   fineStep: z.number().default(8),
   coarseStep: z.number().default(64),
 });
-export type NumericalParameterConfig = z.infer<typeof zNumericalParameterConfig>;
 
 /**
  * Configuration options for the InvokeAI UI.

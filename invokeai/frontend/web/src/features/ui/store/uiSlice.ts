@@ -2,6 +2,8 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
+import { isPlainObject } from 'es-toolkit';
+import { assert } from 'tsafe';
 
 import { getInitialUIState, type UIState, zUIState } from './uiTypes';
 
@@ -87,10 +89,11 @@ export const selectUiSlice = (state: RootState) => state.ui;
 
 export const uiSliceConfig: SliceConfig<typeof slice> = {
   slice,
-  zSchema: zUIState,
+  schema: zUIState,
   getInitialState: getInitialUIState,
   persistConfig: {
     migrate: (state) => {
+      assert(isPlainObject(state));
       if (!('_version' in state)) {
         state._version = 1;
       }

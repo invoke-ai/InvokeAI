@@ -1720,7 +1720,7 @@ const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
 export const canvasSliceConfig: SliceConfig<typeof slice> = {
   slice,
   getInitialState: getInitialCanvasState,
-  zSchema: zCanvasState,
+  schema: zCanvasState,
   persistConfig: {
     migrate: (state) => zCanvasState.parse(state),
   },

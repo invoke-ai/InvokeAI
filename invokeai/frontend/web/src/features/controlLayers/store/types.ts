@@ -3,7 +3,6 @@ import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEnt
 import { fetchModelConfigByIdentifier } from 'features/metadata/util/modelFetchingHelpers';
 import type { ProgressImage } from 'features/nodes/types/common';
 import { zMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
-import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
 import {
   zParameterCanvasCoherenceMode,
   zParameterCFGRescaleMultiplier,
@@ -45,7 +44,7 @@ const zServerValidatedModelIdentifierField = zModelIdentifierField.refine(async 
   }
 });
 
-const zImageWithDims = z
+export const zImageWithDims = z
   .object({
     image_name: z.string(),
     width: z.number().int().positive(),
@@ -424,12 +423,13 @@ export const zCanvasEntityIdentifer = z.object({
 });
 export type CanvasEntityIdentifier<T extends CanvasEntityType = CanvasEntityType> = { id: string; type: T };
 
-export type LoRA = {
-  id: string;
-  isEnabled: boolean;
-  model: ParameterLoRAModel;
-  weight: number;
-};
+export const zLoRA = z.object({
+  id: z.string(),
+  isEnabled: z.boolean(),
+  model: zServerValidatedModelIdentifierField,
+  weight: z.number().gte(-1).lte(2),
+});
+export type LoRA = z.infer<typeof zLoRA>;
 
 export type EphemeralProgressImage = { sessionId: string; image: ProgressImage };
 
@@ -574,11 +574,11 @@ export const zParamsState = z.object({
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
   maskBlur: 16,
-  maskBlurMethod: 'box' as const,
-  canvasCoherenceMode: 'Gaussian Blur' as const,
+  maskBlurMethod: 'box',
+  canvasCoherenceMode: 'Gaussian Blur',
   canvasCoherenceMinDenoise: 0,
   canvasCoherenceEdgeSize: 16,
-  infillMethod: 'lama' as const,
+  infillMethod: 'lama',
   infillTileSize: 32,
   infillPatchmatchDownscaleSize: 1,
   infillColorValue: { r: 0, g: 0, b: 0, a: 1 },
@@ -588,15 +588,15 @@ export const getInitialParamsState = (): ParamsState => ({
   img2imgStrength: 0.75,
   optimizedDenoisingEnabled: true,
   iterations: 1,
-  scheduler: 'dpmpp_3m_k' as const,
-  upscaleScheduler: 'kdpm_2' as const,
+  scheduler: 'dpmpp_3m_k',
+  upscaleScheduler: 'kdpm_2',
   upscaleCfgScale: 2,
   seed: 0,
   shouldRandomizeSeed: true,
   steps: 30,
   model: null,
   vae: null,
-  vaePrecision: 'fp32' as const,
+  vaePrecision: 'fp32',
   fluxVAE: null,
   seamlessXAxis: false,
   seamlessYAxis: false,
@@ -610,7 +610,7 @@ export const getInitialParamsState = (): ParamsState => ({
   refinerModel: null,
   refinerSteps: 20,
   refinerCFGScale: 7.5,
-  refinerScheduler: 'euler' as const,
+  refinerScheduler: 'euler',
   refinerPositiveAestheticScore: 6,
   refinerNegativeAestheticScore: 2.5,
   refinerStart: 0.8,
@@ -653,7 +653,7 @@ export const zCanvasState = z.object({
 });
 export type CanvasState = z.infer<typeof zCanvasState>;
 export const getInitialCanvasState = (): CanvasState => ({
-  _version: 3 as const,
+  _version: 3,
   selectedEntityIdentifier: null,
   bookmarkedEntityIdentifier: null,
   inpaintMasks: { isHidden: false, entities: [] },
@@ -663,9 +663,9 @@ export const getInitialCanvasState = (): CanvasState => ({
   bbox: {
     rect: { x: 0, y: 0, width: 512, height: 512 },
     aspectRatio: deepClone(DEFAULT_ASPECT_RATIO_CONFIG),
-    scaleMethod: 'auto' as const,
+    scaleMethod: 'auto',
     scaledSize: { width: 512, height: 512 },
-    modelBase: 'sd-1' as const,
+    modelBase: 'sd-1',
   },
 });
 

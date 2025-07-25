@@ -2,11 +2,21 @@ import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
+import { isPlainObject } from 'es-toolkit';
 import { paramsReset } from 'features/controlLayers/store/paramsSlice';
 import { atom } from 'nanostores';
 import { stylePresetsApi } from 'services/api/endpoints/stylePresets';
+import { assert } from 'tsafe';
+import z from 'zod';
 
-import type { StylePresetState } from './types';
+const zStylePresetState = z.object({
+  activeStylePresetId: z.string().nullable(),
+  searchTerm: z.string(),
+  viewMode: z.boolean(),
+  showPromptPreviews: z.boolean(),
+});
+
+type StylePresetState = z.infer<typeof zStylePresetState>;
 
 const getInitialState = (): StylePresetState => ({
   activeStylePresetId: null,
@@ -60,19 +70,18 @@ const slice = createSlice({
 export const { activeStylePresetIdChanged, searchTermChanged, viewModeChanged, showPromptPreviewsChanged } =
   slice.actions;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrate = (state: any): any => {
-  if (!('_version' in state)) {
-    state._version = 1;
-  }
-  return state;
-};
-
 export const stylePresetSliceConfig: SliceConfig<typeof slice> = {
   slice,
+  schema: zStylePresetState,
   getInitialState,
   persistConfig: {
-    migrate,
+    migrate: (state) => {
+      assert(isPlainObject(state));
+      if (!('_version' in state)) {
+        state._version = 1;
+      }
+      return zStylePresetState.parse(state);
+    },
   },
 };
 

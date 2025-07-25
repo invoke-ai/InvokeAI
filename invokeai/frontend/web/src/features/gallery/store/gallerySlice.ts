@@ -3,10 +3,19 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
+import { isPlainObject } from 'es-toolkit';
 import { uniq } from 'es-toolkit/compat';
 import type { BoardRecordOrderBy } from 'services/api/types';
+import { assert } from 'tsafe';
 
-import type { BoardId, ComparisonMode, GalleryState, GalleryView, OrderDir } from './types';
+import {
+  type BoardId,
+  type ComparisonMode,
+  type GalleryState,
+  type GalleryView,
+  type OrderDir,
+  zGalleryState,
+} from './types';
 
 const getInitialState = (): GalleryState => ({
   selection: [],
@@ -192,19 +201,18 @@ export const {
 
 export const selectGallerySlice = (state: RootState) => state.gallery;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrate = (state: any): any => {
-  if (!('_version' in state)) {
-    state._version = 1;
-  }
-  return state;
-};
-
 export const gallerySliceConfig: SliceConfig<typeof slice> = {
   slice,
+  schema: zGalleryState,
   getInitialState,
   persistConfig: {
-    migrate,
+    migrate: (state) => {
+      assert(isPlainObject(state));
+      if (!('_version' in state)) {
+        state._version = 1;
+      }
+      return zGalleryState.parse(state);
+    },
     persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'imageToCompare'],
   },
 };

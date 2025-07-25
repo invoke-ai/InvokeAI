@@ -14,7 +14,13 @@ import type {
   ReactFlowProps,
   ReactFlowState,
 } from '@xyflow/react';
-import { Background, ReactFlow, useStore as useReactFlowStore, useUpdateNodeInternals } from '@xyflow/react';
+import {
+  Background,
+  ReactFlow,
+  SelectionMode,
+  useStore as useReactFlowStore,
+  useUpdateNodeInternals,
+} from '@xyflow/react';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
 import { $isSelectingOutputNode, $outputNodeId } from 'features/nodes/components/sidePanel/workflow/publish';
@@ -256,7 +262,7 @@ export const Flow = memo(() => {
         style={flowStyles}
         onPaneClick={handlePaneClick}
         deleteKeyCode={null}
-        selectionMode={selectionMode}
+        selectionMode={selectionMode === 'full' ? SelectionMode.Full : SelectionMode.Partial}
         elevateEdgesOnSelect
         nodeDragThreshold={1}
         noDragClassName={NO_DRAG_CLASS}

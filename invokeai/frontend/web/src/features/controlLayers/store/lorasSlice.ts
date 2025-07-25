@@ -2,14 +2,16 @@ import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolki
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import { paramsReset } from 'features/controlLayers/store/paramsSlice';
-import type { LoRA } from 'features/controlLayers/store/types';
+import { type LoRA, zLoRA } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { LoRAModelConfig } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
+import z from 'zod';
 
-type LoRAsState = {
-  loras: LoRA[];
-};
+const zLoRAsState = z.object({
+  loras: z.array(zLoRA),
+});
+type LoRAsState = z.infer<typeof zLoRAsState>;
 
 const defaultLoRAConfig: Pick<LoRA, 'weight' | 'isEnabled'> = {
   weight: 0.75,
@@ -74,16 +76,12 @@ const slice = createSlice({
 export const { loraAdded, loraRecalled, loraDeleted, loraWeightChanged, loraIsEnabledChanged, loraAllDeleted } =
   slice.actions;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrate = (state: any): any => {
-  return state;
-};
-
 export const lorasSliceConfig: SliceConfig<typeof slice> = {
   slice,
+  schema: zLoRAsState,
   getInitialState,
   persistConfig: {
-    migrate,
+    migrate: (state) => zLoRAsState.parse(state),
   },
 };
 

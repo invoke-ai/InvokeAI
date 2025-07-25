@@ -2,24 +2,32 @@ import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
+import { isPlainObject } from 'es-toolkit';
+import type { ImageWithDims } from 'features/controlLayers/store/types';
+import { zImageWithDims } from 'features/controlLayers/store/types';
+import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { ParameterSpandrelImageToImageModel } from 'features/parameters/types/parameterSchemas';
-import type { ControlNetModelConfig, ImageDTO } from 'services/api/types';
+import type { ControlNetModelConfig } from 'services/api/types';
+import { assert } from 'tsafe';
+import z from 'zod';
 
-export interface UpscaleState {
-  _version: 1;
-  upscaleModel: ParameterSpandrelImageToImageModel | null;
-  upscaleInitialImage: ImageDTO | null;
-  structure: number;
-  creativity: number;
-  tileControlnetModel: ControlNetModelConfig | null;
-  scale: number;
-  postProcessingModel: ParameterSpandrelImageToImageModel | null;
-  tileSize: number;
-  tileOverlap: number;
-}
+const zUpscaleState = z.object({
+  _version: z.literal(2),
+  upscaleModel: zModelIdentifierField.nullable(),
+  upscaleInitialImage: zImageWithDims.nullable(),
+  structure: z.number(),
+  creativity: z.number(),
+  tileControlnetModel: zModelIdentifierField.nullable(),
+  scale: z.number(),
+  postProcessingModel: zModelIdentifierField.nullable(),
+  tileSize: z.number(),
+  tileOverlap: z.number(),
+});
+
+export type UpscaleState = z.infer<typeof zUpscaleState>;
 
 const getInitialState = (): UpscaleState => ({
-  _version: 1,
+  _version: 2,
   upscaleModel: null,
   upscaleInitialImage: null,
   structure: 0,
@@ -38,7 +46,7 @@ const slice = createSlice({
     upscaleModelChanged: (state, action: PayloadAction<ParameterSpandrelImageToImageModel | null>) => {
       state.upscaleModel = action.payload;
     },
-    upscaleInitialImageChanged: (state, action: PayloadAction<ImageDTO | null>) => {
+    upscaleInitialImageChanged: (state, action: PayloadAction<ImageWithDims | null>) => {
       state.upscaleInitialImage = action.payload;
     },
     structureChanged: (state, action: PayloadAction<number>) => {
@@ -77,19 +85,30 @@ export const {
   tileOverlapChanged,
 } = slice.actions;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrate = (state: any): any => {
-  if (!('_version' in state)) {
-    state._version = 1;
-  }
-  return state;
-};
-
 export const upscaleSliceConfig: SliceConfig<typeof slice> = {
   slice,
+  schema: zUpscaleState,
   getInitialState,
   persistConfig: {
-    migrate,
+    migrate: (state) => {
+      assert(isPlainObject(state));
+      if (!('_version' in state)) {
+        state._version = 1;
+      }
+      if (state._version === 1) {
+        state._version = 2;
+        // Migrate from v1 to v2: upscaleInitialImage was an ImageDTO, now it's an ImageWithDims
+        if (state.upscaleInitialImage) {
+          const { image_name, width, height } = state.upscaleInitialImage;
+          state.upscaleInitialImage = {
+            image_name,
+            width,
+            height,
+          };
+        }
+      }
+      return zUpscaleState.parse(state);
+    },
   },
 };
 
