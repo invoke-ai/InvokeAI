@@ -20,6 +20,7 @@ import type {
   CanvasInpaintMaskState,
   CanvasMetadata,
   ControlLoRAConfig,
+  ControlMode,
   EntityMovedByPayload,
   FillStyle,
   FLUXReduxImageInfluence,
@@ -515,10 +516,27 @@ const slice = createSlice({
         default:
           break;
       }
+      
+      // When switching to a BRIA controlnet model, set appropriate default control mode
+      if (layer.controlAdapter.type === 'controlnet' && modelConfig.base === 'bria') {
+        const currentMode = layer.controlAdapter.controlMode;
+        // Check if current mode is not a valid BRIA mode
+        if (!['depth', 'canny', 'colorgrid', 'recolor', 'tile', 'pose'].includes(currentMode)) {
+          layer.controlAdapter.controlMode = 'depth'; // Default BRIA mode
+        }
+      }
+      // When switching from BRIA to other controlnet models, set appropriate default control mode
+      else if (layer.controlAdapter.type === 'controlnet' && modelConfig.base !== 'bria') {
+        const currentMode = layer.controlAdapter.controlMode;
+        // Check if current mode is a BRIA-specific mode
+        if (['depth', 'canny', 'colorgrid', 'recolor', 'tile', 'pose'].includes(currentMode)) {
+          layer.controlAdapter.controlMode = 'balanced'; // Default standard mode
+        }
+      }
     },
     controlLayerControlModeChanged: (
       state,
-      action: PayloadAction<EntityIdentifierPayload<{ controlMode: ControlModeV2 }, 'control_layer'>>
+      action: PayloadAction<EntityIdentifierPayload<{ controlMode: ControlMode }, 'control_layer'>>
     ) => {
       const { entityIdentifier, controlMode } = action.payload;
       const layer = selectEntity(state, entityIdentifier);

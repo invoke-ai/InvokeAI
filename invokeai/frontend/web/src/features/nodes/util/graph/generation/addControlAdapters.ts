@@ -158,18 +158,33 @@ const addControlNetToGraph = (
   assert(model !== null);
   const { image_name } = imageDTO;
 
-  const controlNet = g.addNode({
-    id: `control_net_${id}`,
-    type: model.base === 'flux' ? 'flux_controlnet' : 'controlnet',
-    begin_step_percent: beginEndStepPct[0],
-    end_step_percent: beginEndStepPct[1],
-    control_mode: model.base === 'flux' ? undefined : controlMode,
-    resize_mode: 'just_resize',
-    control_model: model,
-    control_weight: weight,
-    image: { image_name },
-  });
-  g.addEdge(controlNet, 'control', collector, 'item');
+  if (model.base === 'bria') {
+    // BRIA uses a different node type and parameters
+    const controlNet = g.addNode({
+      id: `control_net_${id}`,
+      type: 'bria_controlnet',
+      control_model: model,
+      control_weight: weight,
+      control_image: { image_name },
+      // BRIA uses control_mode instead of controlMode
+      control_mode: controlMode || 'pose', // Default to 'pose' if not specified
+    });
+    g.addEdge(controlNet, 'control', collector, 'item');
+  } else {
+    // Standard controlnet for other models
+    const controlNet = g.addNode({
+      id: `control_net_${id}`,
+      type: model.base === 'flux' ? 'flux_controlnet' : 'controlnet',
+      begin_step_percent: beginEndStepPct[0],
+      end_step_percent: beginEndStepPct[1],
+      control_mode: model.base === 'flux' ? undefined : controlMode,
+      resize_mode: 'just_resize',
+      control_model: model,
+      control_weight: weight,
+      image: { image_name },
+    });
+    g.addEdge(controlNet, 'control', collector, 'item');
+  }
 };
 
 const addT2IAdapterToGraph = (
