@@ -267,6 +267,13 @@ const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
   }
 
+  if (model?.base === 'bria') {
+    if (!params.t5EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noT5EncoderModelSelected') });
+    }
+    // Bria uses fixed 1024x1024 dimensions, no need to validate dimensions
+  }
+
   if (model && isChatGPT4oHighModelDisabled(model)) {
     reasons.push({ content: i18n.t('parameters.invoke.modelDisabledForTrial', { modelName: model.name }) });
   }
@@ -595,6 +602,34 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
             model: 'CogView4',
             height: bbox.scaledSize.height,
             multiple: gridSize,
+          }),
+        });
+      }
+    }
+  }
+
+  if (model?.base === 'bria') {
+    if (!params.t5EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noT5EncoderModelSelected') });
+    }
+
+    // Bria requires fixed 1024x1024 dimensions
+    const { bbox } = canvas;
+    const requiredSize = 1024;
+
+    if (bbox.scaleMethod === 'none') {
+      if (bbox.rect.width !== requiredSize || bbox.rect.height !== requiredSize) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.briaRequiresExactDimensions', {
+            size: requiredSize,
+          }),
+        });
+      }
+    } else {
+      if (bbox.scaledSize.width !== requiredSize || bbox.scaledSize.height !== requiredSize) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.briaRequiresExactScaledDimensions', {
+            size: requiredSize,
           }),
         });
       }

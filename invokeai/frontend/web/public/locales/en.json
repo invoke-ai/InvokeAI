@@ -1234,6 +1234,8 @@
             "modelIncompatibleBboxHeight": "Bbox height is {{height}} but {{model}} requires multiple of {{multiple}}",
             "modelIncompatibleScaledBboxWidth": "Scaled bbox width is {{width}} but {{model}} requires multiple of {{multiple}}",
             "modelIncompatibleScaledBboxHeight": "Scaled bbox height is {{height}} but {{model}} requires multiple of {{multiple}}",
+            "briaRequiresExactDimensions": "Bria requires exact {{size}}x{{size}} dimensions",
+            "briaRequiresExactScaledDimensions": "Bria requires exact {{size}}x{{size}} scaled dimensions",
             "fluxModelMultipleControlLoRAs": "Can only use 1 Control LoRA at a time",
             "fluxKontextMultipleReferenceImages": "Can only use 1 Reference Image at a time with Flux Kontext",
             "canvasIsFiltering": "Canvas is busy (filtering)",
@@ -2185,7 +2187,13 @@
             "balanced": "Balanced (recommended)",
             "prompt": "Prompt",
             "control": "Control",
-            "megaControl": "Mega Control"
+            "megaControl": "Mega Control",
+            "depth": "Depth",
+            "canny": "Canny",
+            "colorgrid": "Color Grid",
+            "recolor": "Recolor",
+            "tile": "Tile",
+            "pose": "Pose"
         },
         "ipAdapterMethod": {
             "ipAdapterMethod": "Mode",

@@ -20,7 +20,7 @@ import {
 import { getFilterForModel } from 'features/controlLayers/store/filters';
 import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
-import type { CanvasEntityIdentifier, ControlModeV2 } from 'features/controlLayers/store/types';
+import type { CanvasEntityIdentifier, ControlMode } from 'features/controlLayers/store/types';
 import { replaceCanvasEntityObjectsWithImage } from 'features/imageActions/actions';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -56,7 +56,7 @@ export const ControlLayerControlAdapter = memo(() => {
   );
 
   const onChangeControlMode = useCallback(
-    (controlMode: ControlModeV2) => {
+    (controlMode: ControlMode) => {
       dispatch(controlLayerControlModeChanged({ entityIdentifier, controlMode }));
     },
     [dispatch, entityIdentifier]
@@ -169,6 +169,7 @@ export const ControlLayerControlAdapter = memo(() => {
         <ControlLayerControlAdapterControlMode
           controlMode={controlAdapter.controlMode}
           onChange={onChangeControlMode}
+          model={controlAdapter.model}
         />
       )}
     </Flex>
