@@ -35,7 +35,7 @@ import { z } from 'zod';
 const zId = z.string().min(1);
 const zName = z.string().min(1).nullable();
 
-const zServerValidatedModelIdentifierField = zModelIdentifierField.refine(async (modelIdentifier) => {
+export const zServerValidatedModelIdentifierField = zModelIdentifierField.refine(async (modelIdentifier) => {
   try {
     await fetchModelConfigByIdentifier(modelIdentifier);
     return true;
@@ -44,17 +44,16 @@ const zServerValidatedModelIdentifierField = zModelIdentifierField.refine(async 
   }
 });
 
-export const zImageWithDims = z
-  .object({
-    image_name: z.string(),
-    width: z.number().int().positive(),
-    height: z.number().int().positive(),
-  })
-  .refine(async (v) => {
-    const { image_name } = v;
-    const imageDTO = await getImageDTOSafe(image_name, { forceRefetch: true });
-    return imageDTO !== null;
-  });
+export const zImageWithDims = z.object({
+  image_name: z.string(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+});
+export const zServerValidatedImageWithDims = zImageWithDims.refine(async (v) => {
+  const { image_name } = v;
+  const imageDTO = await getImageDTOSafe(image_name, { forceRefetch: true });
+  return imageDTO !== null;
+});
 export type ImageWithDims = z.infer<typeof zImageWithDims>;
 
 const zImageWithDimsDataURL = z.object({
@@ -249,10 +248,10 @@ const zCanvasObjectState = z.union([
 ]);
 export type CanvasObjectState = z.infer<typeof zCanvasObjectState>;
 
-const zIPAdapterConfig = z.object({
+export const zIPAdapterConfig = z.object({
   type: z.literal('ip_adapter'),
   image: zImageWithDims.nullable(),
-  model: zServerValidatedModelIdentifierField.nullable(),
+  model: zModelIdentifierField.nullable(),
   weight: z.number().gte(-1).lte(2),
   beginEndStepPct: zBeginEndStepPct,
   method: zIPMethodV2,
@@ -267,7 +266,7 @@ export type FLUXReduxImageInfluence = z.infer<typeof zFLUXReduxImageInfluence>;
 const zFLUXReduxConfig = z.object({
   type: z.literal('flux_redux'),
   image: zImageWithDims.nullable(),
-  model: zServerValidatedModelIdentifierField.nullable(),
+  model: zModelIdentifierField.nullable(),
   imageInfluence: zFLUXReduxImageInfluence.default('highest'),
 });
 export type FLUXReduxConfig = z.infer<typeof zFLUXReduxConfig>;
@@ -280,14 +279,14 @@ const zChatGPT4oReferenceImageConfig = z.object({
    * But we use a model drop down to switch between different ref image types, so there needs to be a model here else
    * there will be no way to switch between ref image types.
    */
-  model: zServerValidatedModelIdentifierField.nullable(),
+  model: zModelIdentifierField.nullable(),
 });
 export type ChatGPT4oReferenceImageConfig = z.infer<typeof zChatGPT4oReferenceImageConfig>;
 
 const zFluxKontextReferenceImageConfig = z.object({
   type: z.literal('flux_kontext_reference_image'),
   image: zImageWithDims.nullable(),
-  model: zServerValidatedModelIdentifierField.nullable(),
+  model: zModelIdentifierField.nullable(),
 });
 export type FluxKontextReferenceImageConfig = z.infer<typeof zFluxKontextReferenceImageConfig>;
 
@@ -359,7 +358,7 @@ export type CanvasInpaintMaskState = z.infer<typeof zCanvasInpaintMaskState>;
 
 const zControlNetConfig = z.object({
   type: z.literal('controlnet'),
-  model: zServerValidatedModelIdentifierField.nullable(),
+  model: zModelIdentifierField.nullable(),
   weight: z.number().gte(-1).lte(2),
   beginEndStepPct: zBeginEndStepPct,
   controlMode: zControlModeV2,
@@ -368,7 +367,7 @@ export type ControlNetConfig = z.infer<typeof zControlNetConfig>;
 
 const zT2IAdapterConfig = z.object({
   type: z.literal('t2i_adapter'),
-  model: zServerValidatedModelIdentifierField.nullable(),
+  model: zModelIdentifierField.nullable(),
   weight: z.number().gte(-1).lte(2),
   beginEndStepPct: zBeginEndStepPct,
 });
@@ -377,7 +376,7 @@ export type T2IAdapterConfig = z.infer<typeof zT2IAdapterConfig>;
 const zControlLoRAConfig = z.object({
   type: z.literal('control_lora'),
   weight: z.number().gte(-1).lte(2),
-  model: zServerValidatedModelIdentifierField.nullable(),
+  model: zModelIdentifierField.nullable(),
 });
 export type ControlLoRAConfig = z.infer<typeof zControlLoRAConfig>;
 
@@ -426,7 +425,7 @@ export type CanvasEntityIdentifier<T extends CanvasEntityType = CanvasEntityType
 export const zLoRA = z.object({
   id: z.string(),
   isEnabled: z.boolean(),
-  model: zServerValidatedModelIdentifierField,
+  model: zModelIdentifierField,
   weight: z.number().gte(-1).lte(2),
 });
 export type LoRA = z.infer<typeof zLoRA>;
