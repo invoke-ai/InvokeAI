@@ -1,7 +1,6 @@
 import { getStore } from 'app/store/nanostores/store';
-import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { modelsApi } from 'services/api/endpoints/models';
-import type { AnyModelConfig, BaseModelType, ModelType } from 'services/api/types';
+import type { AnyModelConfig } from 'services/api/types';
 
 /**
  * Raised when a model config is unable to be fetched.
@@ -44,45 +43,6 @@ const fetchModelConfig = async (key: string): Promise<AnyModelConfig> => {
     return await req.unwrap();
   } catch {
     throw new ModelConfigNotFoundError(`Unable to retrieve model config for key ${key}`);
-  }
-};
-
-/**
- * Fetches the model config for a given model name, base model, and model type. This provides backwards compatibility
- * for MM1 model identifiers.
- * @param name The model name.
- * @param base The base model.
- * @param type The model type.
- * @returns A promise that resolves to the model config.
- * @throws {ModelConfigNotFoundError} If the model config is unable to be fetched.
- */
-const fetchModelConfigByAttrs = async (name: string, base: BaseModelType, type: ModelType): Promise<AnyModelConfig> => {
-  const { dispatch } = getStore();
-  try {
-    const req = dispatch(
-      modelsApi.endpoints.getModelConfigByAttrs.initiate({ name, base, type }, { subscribe: false })
-    );
-    return await req.unwrap();
-  } catch {
-    throw new ModelConfigNotFoundError(`Unable to retrieve model config for name/base/type ${name}/${base}/${type}`);
-  }
-};
-
-/**
- * Fetches the model config given an identifier. First attempts to fetch by key, then falls back to fetching by attrs.
- * @param identifier The model identifier.
- * @returns A promise that resolves to the model config.
- * @throws {ModelConfigNotFoundError} If the model config is unable to be fetched.
- */
-export const fetchModelConfigByIdentifier = async (identifier: ModelIdentifierField): Promise<AnyModelConfig> => {
-  try {
-    return await fetchModelConfig(identifier.key);
-  } catch {
-    try {
-      return await fetchModelConfigByAttrs(identifier.name, identifier.base, identifier.type);
-    } catch {
-      throw new ModelConfigNotFoundError(`Unable to retrieve model config for identifier ${identifier}`);
-    }
   }
 };
 
