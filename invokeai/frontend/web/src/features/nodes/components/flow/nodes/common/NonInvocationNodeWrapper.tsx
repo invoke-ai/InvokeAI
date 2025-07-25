@@ -1,7 +1,6 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Box, useGlobalMenuClose } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { useMouseOverFormField, useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
@@ -14,17 +13,16 @@ import { memo, useCallback } from 'react';
 
 import { containerSx, inProgressSx, shadowsSx } from './shared';
 
-type NodeWrapperProps = PropsWithChildren & {
+type NonInvocationNodeWrapperProps = PropsWithChildren & {
   nodeId: string;
   selected: boolean;
   width?: ChakraProps['w'];
   isMissingTemplate?: boolean;
 };
 
-const NodeWrapper = (props: NodeWrapperProps) => {
+const NonInvocationNodeWrapper = (props: NonInvocationNodeWrapperProps) => {
   const { nodeId, width, children, isMissingTemplate, selected } = props;
-  const ctx = useInvocationNodeContext();
-  const needsUpdate = useAppSelector(ctx.selectNodeNeedsUpdate);
+  // Skip needsUpdate check since we don't have invocation context
   const mouseOverNode = useMouseOverNode(nodeId);
   const mouseOverFormField = useMouseOverFormField(nodeId);
   const zoomToNode = useZoomToNode(nodeId);
@@ -74,7 +72,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
       data-is-editor-locked={isLocked}
       data-is-selected={selected}
       data-is-mouse-over-form-field={mouseOverFormField.isMouseOverFormField}
-      data-status={isMissingTemplate ? 'error' : needsUpdate ? 'warning' : undefined}
+      data-status={isMissingTemplate ? 'error' : undefined}
     >
       <Box sx={shadowsSx} />
       <Box sx={inProgressSx} data-is-in-progress={isInProgress} />
@@ -84,4 +82,4 @@ const NodeWrapper = (props: NodeWrapperProps) => {
   );
 };
 
-export default memo(NodeWrapper);
+export default memo(NonInvocationNodeWrapper);
