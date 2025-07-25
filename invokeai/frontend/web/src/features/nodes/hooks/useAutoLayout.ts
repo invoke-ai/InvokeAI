@@ -1,6 +1,6 @@
 import { graphlib, layout } from '@dagrejs/dagre';
 import type { Edge, NodePositionChange } from '@xyflow/react';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { nodesChanged } from 'features/nodes/store/nodesSlice';
 import { selectEdges, selectNodes } from 'features/nodes/store/selectors';
 import {
@@ -36,9 +36,7 @@ const getNodeWidth = (node: AnyNode): number => {
 };
 
 export const useAutoLayout = (): (() => void) => {
-  const dispatch = useAppDispatch();
-  const nodes = useAppSelector(selectNodes);
-  const edges = useAppSelector(selectEdges);
+  const store = useAppStore();
   const nodeSpacing = useAppSelector(selectNodeSpacing);
   const layerSpacing = useAppSelector(selectLayerSpacing);
   const layeringStrategy = useAppSelector(selectLayeringStrategy);
@@ -46,6 +44,9 @@ export const useAutoLayout = (): (() => void) => {
   const nodeAlignment = useAppSelector(selectNodeAlignment);
 
   const autoLayout = useCallback(() => {
+    const state = store.getState();
+    const nodes = selectNodes(state);
+    const edges = selectEdges(state);
     // We'll do graph layout using dagre, then convert the results to reactflow position changes
     const g = new graphlib.Graph();
 
@@ -131,8 +132,8 @@ export const useAutoLayout = (): (() => void) => {
       return { id: node.id, type: 'position', position: newPosition };
     });
 
-    dispatch(nodesChanged(positionChanges));
-  }, [dispatch, edges, nodes, nodeSpacing, layerSpacing, layeringStrategy, layoutDirection, nodeAlignment]);
+    store.dispatch(nodesChanged(positionChanges));
+  }, [layerSpacing, layeringStrategy, layoutDirection, nodeAlignment, nodeSpacing, store]);
 
   return autoLayout;
 };
