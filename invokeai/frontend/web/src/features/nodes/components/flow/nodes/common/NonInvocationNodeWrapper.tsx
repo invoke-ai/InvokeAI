@@ -2,7 +2,7 @@ import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Box, useGlobalMenuClose } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
-import { useMouseOverFormField, useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
+import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { useZoomToNode } from 'features/nodes/hooks/useZoomToNode';
 import { selectNodeOpacity } from 'features/nodes/store/workflowSettingsSlice';
@@ -17,14 +17,11 @@ type NonInvocationNodeWrapperProps = PropsWithChildren & {
   nodeId: string;
   selected: boolean;
   width?: ChakraProps['w'];
-  isMissingTemplate?: boolean;
 };
 
 const NonInvocationNodeWrapper = (props: NonInvocationNodeWrapperProps) => {
-  const { nodeId, width, children, isMissingTemplate, selected } = props;
-  // Skip needsUpdate check since we don't have invocation context
+  const { nodeId, width, children, selected } = props;
   const mouseOverNode = useMouseOverNode(nodeId);
-  const mouseOverFormField = useMouseOverFormField(nodeId);
   const zoomToNode = useZoomToNode(nodeId);
   const isLocked = useIsWorkflowEditorLocked();
 
@@ -71,8 +68,6 @@ const NonInvocationNodeWrapper = (props: NonInvocationNodeWrapperProps) => {
       opacity={opacity}
       data-is-editor-locked={isLocked}
       data-is-selected={selected}
-      data-is-mouse-over-form-field={mouseOverFormField.isMouseOverFormField}
-      data-status={isMissingTemplate ? 'error' : undefined}
     >
       <Box sx={shadowsSx} />
       <Box sx={inProgressSx} data-is-in-progress={isInProgress} />
