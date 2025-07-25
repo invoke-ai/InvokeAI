@@ -1,6 +1,5 @@
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
-import { fetchModelConfigByIdentifier } from 'features/metadata/util/modelFetchingHelpers';
 import type { ProgressImage } from 'features/nodes/types/common';
 import { zMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
 import {
@@ -28,31 +27,16 @@ import {
   zParameterT5EncoderModel,
   zParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
-import { getImageDTOSafe } from 'services/api/endpoints/images';
 import type { JsonObject } from 'type-fest';
 import { z } from 'zod';
 
 const zId = z.string().min(1);
 const zName = z.string().min(1).nullable();
 
-export const zServerValidatedModelIdentifierField = zModelIdentifierField.refine(async (modelIdentifier) => {
-  try {
-    await fetchModelConfigByIdentifier(modelIdentifier);
-    return true;
-  } catch {
-    return false;
-  }
-});
-
 export const zImageWithDims = z.object({
   image_name: z.string(),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
-});
-export const zServerValidatedImageWithDims = zImageWithDims.refine(async (v) => {
-  const { image_name } = v;
-  const imageDTO = await getImageDTOSafe(image_name, { forceRefetch: true });
-  return imageDTO !== null;
 });
 export type ImageWithDims = z.infer<typeof zImageWithDims>;
 
