@@ -18,6 +18,7 @@ import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableCon
 import { withResultAsync } from 'common/util/result';
 import { parseify } from 'common/util/serialize';
 import { ExternalLink } from 'features/gallery/components/ImageViewer/NoContentForViewer';
+import { InvocationNodeContextProvider } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { NodeFieldElementOverlay } from 'features/nodes/components/sidePanel/builder/NodeFieldElementEditMode';
 import { useDoesWorkflowHaveUnsavedChanges } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
 import {
@@ -89,7 +90,11 @@ const OutputFields = memo(() => {
           {t('workflows.builder.noOutputNodeSelected')}
         </Text>
       )}
-      {outputNodeId && <OutputFieldsContent outputNodeId={outputNodeId} />}
+      {outputNodeId && (
+        <InvocationNodeContextProvider nodeId={outputNodeId}>
+          <OutputFieldsContent outputNodeId={outputNodeId} />
+        </InvocationNodeContextProvider>
+      )}
     </Flex>
   );
 });
@@ -127,7 +132,11 @@ const PublishableInputFields = memo(() => {
       <Text fontWeight="semibold">{t('workflows.builder.publishedWorkflowInputs')}</Text>
       <Divider />
       {inputs.publishable.map(({ nodeId, fieldName }) => {
-        return <NodeInputFieldPreview key={`${nodeId}-${fieldName}`} nodeId={nodeId} fieldName={fieldName} />;
+        return (
+          <InvocationNodeContextProvider nodeId={nodeId} key={`${nodeId}-${fieldName}`}>
+            <NodeInputFieldPreview nodeId={nodeId} fieldName={fieldName} />
+          </InvocationNodeContextProvider>
+        );
       })}
     </Flex>
   );
@@ -149,7 +158,11 @@ const UnpublishableInputFields = memo(() => {
       </Text>
       <Divider />
       {inputs.unpublishable.map(({ nodeId, fieldName }) => {
-        return <NodeInputFieldPreview key={`${nodeId}-${fieldName}`} nodeId={nodeId} fieldName={fieldName} />;
+        return (
+          <InvocationNodeContextProvider nodeId={nodeId} key={`${nodeId}-${fieldName}`}>
+            <NodeInputFieldPreview key={`${nodeId}-${fieldName}`} nodeId={nodeId} fieldName={fieldName} />
+          </InvocationNodeContextProvider>
+        );
       })}
     </Flex>
   );
