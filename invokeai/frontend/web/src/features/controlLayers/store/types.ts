@@ -232,7 +232,7 @@ const zCanvasObjectState = z.union([
 ]);
 export type CanvasObjectState = z.infer<typeof zCanvasObjectState>;
 
-export const zIPAdapterConfig = z.object({
+const zIPAdapterConfig = z.object({
   type: z.literal('ip_adapter'),
   image: zImageWithDims.nullable(),
   model: zModelIdentifierField.nullable(),
