@@ -56,8 +56,11 @@ const buildOSSServerBackedDriver = (): {
         if (!res.ok) {
           throw new Error(`Response status: ${res.status}`);
         }
-        const json = await res.json();
-        return json;
+        const text = await res.text();
+        if (!lastPersistedState.get(key)) {
+          lastPersistedState.set(key, text);
+        }
+        return JSON.parse(text);
       } catch (originalError) {
         throw new StorageError({
           key,
@@ -81,6 +84,7 @@ const buildOSSServerBackedDriver = (): {
         if (!res.ok) {
           throw new Error(`Response status: ${res.status}`);
         }
+
         lastPersistedState.set(key, value);
         return value;
       } catch (originalError) {
