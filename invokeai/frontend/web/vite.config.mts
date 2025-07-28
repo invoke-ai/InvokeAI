@@ -72,7 +72,7 @@ export default defineConfig(({ mode }) => {
       react(),
       mode !== 'test' && eslint({ failOnError: mode === 'production', failOnWarning: mode === 'production' }),
       tsconfigPaths(),
-      loggerContextPlugin(),
+      mode !== 'test' && loggerContextPlugin(),
       visualizer(),
     ],
     build: {
