@@ -71,7 +71,6 @@ export const queueApi = api.injectEndpoints({
         method: 'POST',
       }),
       invalidatesTags: [
-        'SessionQueueStatus',
         'CurrentSessionQueueItem',
         'NextSessionQueueItem',
         'QueueCountsByDestination',
@@ -83,46 +82,10 @@ export const queueApi = api.injectEndpoints({
         try {
           const { data } = await queryFulfilled;
           resetListQueryData(dispatch);
-          /**
-           * When a batch is enqueued, we need to update the queue status. While it might be templting to invalidate the
-           * `SessionQueueStatus` tag here, this can introduce a race condition when the queue item executes quickly:
-           *
-           * - Enqueue via this query
-           * - On success, we invalidate `SessionQueueStatus` tag - network request sent to server
-           * - The server gets the queue status request and responds, but this takes some time... in the meantime:
-           *   - The new queue item starts executing, and we receive a socket queue item status changed event
-           *   - We optimistically update the queue status in the queue item status changed socket handler
-           *   - At this point, the queue status is correct
-           * - Finally, we get the queue status from the tag invalidation request - but it's reporting the queue status
-           *   from _before_ the last queue event
-           * - The queue status is now incorrect!
-           *
-           * Ok, what if we just never did optimistic updates and invalidated the tag in the queue event handlers instead?
-           * It's much simpler that way, but it causes a lot of network requests - 3 per queue item, as it moves from
-           * pending -> in_progress -> completed/failed/canceled.
-           *
-           * We can do a bit of extra work here, incrementing the pending and total counts in the queue status, and do
-           * similar optimistic updates in the socket handler. Because this optimistic update runs immediately after the
-           * enqueue network request, it should always occur _before_ the next queue event, so no race condition:
-           *
-           * - Enqueue batch via this query
-           * - On success, optimistically update - this happens immediately on the HTTP OK - before the next queue event
-           * - At this point, the queue status is correct
-           * - A queue item status changes and we receive a socket event w/ updated status
-           * - Update status optimistically in socket handler
-           * - Queue status is still correct
-           *
-           * This problem occurs most commonly with canvas filters like Canny edge detection, which are single-node
-           * graphs that execute very quickly. Image generation graphs take long enough to not trigger this race
-           * condition - even when all nodes are cached on the server.
-           */
           dispatch(
             queueApi.util.updateQueryData('getQueueStatus', undefined, (draft) => {
-              if (!draft) {
-                return;
-              }
-              draft.queue.pending += data.enqueued;
-              draft.queue.total += data.enqueued;
+              draft.queue.in_progress += data.item_ids.length;
+              draft.queue.total += data.item_ids.length;
             })
           );
         } catch {
