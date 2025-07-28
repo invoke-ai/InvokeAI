@@ -29,6 +29,8 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
   const $progressEvent = useState(() => atom<S['InvocationProgressEvent'] | null>(null))[0];
   const $progressImage = useState(() => atom<ProgressImageType | null>(null))[0];
   const $hasProgressImage = useState(() => computed($progressImage, (progressImage) => progressImage !== null))[0];
+  // We can have race conditions where we receive a progress event for a queue item that has already finished. Easiest
+  // way to handle this is to keep track of finished queue items in a cache and ignore progress events for those.
   const [finishedQueueItemIds] = useState(() => new LRUCache<number, boolean>({ max: 200 }));
 
   useEffect(() => {
