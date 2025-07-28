@@ -46,6 +46,8 @@ const selectModelInstalls = modelsApi.endpoints.listModelInstalls.select();
 export const setEventListeners = ({ socket, store, setIsConnected }: SetEventListenersArg) => {
   const { dispatch, getState } = store;
 
+  // We can have race conditions where we receive a progress event for a queue item that has already finished. Easiest
+  // way to handle this is to keep track of finished queue items in a cache and ignore progress events for those.
   const finishedQueueItemIds = new LRUCache<number, boolean>({ max: 100 });
 
   socket.on('connect', () => {
