@@ -19,6 +19,7 @@ import { zNodeStatus } from 'features/nodes/types/invocation';
 import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
+import { LRUCache } from 'lru-cache';
 import type { ApiTagDescription } from 'services/api';
 import { api, LIST_ALL_TAG, LIST_TAG } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
@@ -50,6 +51,8 @@ const selectModelInstalls = modelsApi.endpoints.listModelInstalls.select();
 
 export const setEventListeners = ({ socket, store, setIsConnected }: SetEventListenersArg) => {
   const { dispatch, getState } = store;
+
+  const finishedQueueItemIds = new LRUCache<number, boolean>({ max: 100 });
 
   socket.on('connect', () => {
     log.debug('Connected');
@@ -88,6 +91,9 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('invocation_started', (data) => {
+    if (finishedQueueItemIds.has(data.item_id)) {
+      return;
+    }
     const { invocation_source_id, invocation } = data;
     log.debug({ data } as JsonObject, `Invocation started (${invocation.type}, ${invocation_source_id})`);
     const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
@@ -98,6 +104,10 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('invocation_progress', (data) => {
+    if (finishedQueueItemIds.has(data.item_id)) {
+      log.trace({ data } as JsonObject, `Received event for already-finished queue item ${data.item_id}`);
+      return;
+    }
     const { invocation_source_id, invocation, session_id, image, origin, percentage, message } = data;
 
     let _message = 'Invocation progress';
@@ -138,6 +148,10 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('invocation_error', (data) => {
+    if (finishedQueueItemIds.has(data.item_id)) {
+      log.trace({ data } as JsonObject, `Received event for already-finished queue item ${data.item_id}`);
+      return;
+    }
     const { invocation_source_id, invocation, error_type, error_message, error_traceback } = data;
     log.error({ data } as JsonObject, `Invocation error (${invocation.type}, ${invocation_source_id})`);
     const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
@@ -154,7 +168,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     }
   });
 
-  const onInvocationComplete = buildOnInvocationComplete(getState, dispatch);
+  const onInvocationComplete = buildOnInvocationComplete(getState, dispatch, finishedQueueItemIds);
   socket.on('invocation_complete', onInvocationComplete);
 
   socket.on('model_load_started', (data) => {
@@ -342,6 +356,11 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('queue_item_status_changed', (data) => {
+    if (finishedQueueItemIds.has(data.item_id)) {
+      log.trace({ data }, `Received event for already-finished queue item ${data.item_id}`);
+      return;
+    }
+
     // we've got new status for the queue item, batch and queue
     const {
       item_id,
@@ -413,6 +432,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         // $progressImages.setKey(session_id, { sessionId: session_id, isFinished: false });
       }
     } else if (status === 'completed' || status === 'failed' || status === 'canceled') {
+      finishedQueueItemIds.set(item_id, true);
       if (status === 'failed' && error_type) {
         const isLocal = getState().config.isLocal ?? true;
         const sessionId = session_id;
