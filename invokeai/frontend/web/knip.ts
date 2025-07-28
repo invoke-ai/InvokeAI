@@ -17,6 +17,7 @@ const config: KnipConfig = {
     'src/app/store/use-debounced-app-selector.ts',
   ],
   ignoreBinaries: ['only-allow'],
+  ignoreDependencies: ['magic-string'],
   paths: {
     'public/*': ['public/*'],
   },
