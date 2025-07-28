@@ -1,6 +1,5 @@
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
-import type { ProgressImage } from 'features/nodes/types/common';
 import { zMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
 import {
   zParameterCanvasCoherenceMode,
@@ -413,8 +412,6 @@ export const zLoRA = z.object({
   weight: z.number().gte(-1).lte(2),
 });
 export type LoRA = z.infer<typeof zLoRA>;
-
-export type EphemeralProgressImage = { sessionId: string; image: ProgressImage };
 
 export const zAspectRatioID = z.enum(['Free', '21:9', '16:9', '3:2', '4:3', '1:1', '3:4', '2:3', '9:16', '9:21']);
 export type AspectRatioID = z.infer<typeof zAspectRatioID>;
