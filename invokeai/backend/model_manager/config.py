@@ -442,6 +442,26 @@ class LoRADiffusersConfig(LoRAConfigBase, ModelConfigBase):
             "base": cls.base_model(mod),
         }
 
+class BriaDiffusersConfig(LoRAConfigBase, ModelConfigBase):
+    """Model config for Bria/Diffusers models."""
+
+    format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+
+    @classmethod
+    def matches(cls, mod: ModelOnDisk) -> bool:
+        if mod.path.is_file():
+            return cls.flux_lora_format(mod) == FluxLoRAFormat.Diffusers
+
+        suffixes = ["bin", "safetensors"]
+        weight_files = [mod.path / f"pytorch_lora_weights.{sfx}" for sfx in suffixes]
+        return any(wf.exists() for wf in weight_files)
+
+    @classmethod
+    def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
+        return {
+            "base": cls.base_model(mod),
+        }
+
 
 class VAECheckpointConfig(CheckpointConfigBase, LegacyProbeMixin, ModelConfigBase):
     """Model config for standalone VAE models."""
@@ -703,6 +723,7 @@ AnyModelConfig = Annotated[
         Annotated[ControlLoRALyCORISConfig, ControlLoRALyCORISConfig.get_tag()],
         Annotated[ControlLoRADiffusersConfig, ControlLoRADiffusersConfig.get_tag()],
         Annotated[LoRADiffusersConfig, LoRADiffusersConfig.get_tag()],
+        Annotated[BriaDiffusersConfig, BriaDiffusersConfig.get_tag()],
         Annotated[T5EncoderConfig, T5EncoderConfig.get_tag()],
         Annotated[T5EncoderBnbQuantizedLlmInt8bConfig, T5EncoderBnbQuantizedLlmInt8bConfig.get_tag()],
         Annotated[TextualInversionFileConfig, TextualInversionFileConfig.get_tag()],

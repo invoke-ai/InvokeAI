@@ -14,7 +14,7 @@ from diffusers.utils import USE_PEFT_BACKEND, is_torch_version, logging, scale_l
 
 from invokeai.backend.bria.bria_utils import FluxPosEmbed as EmbedND
 
-logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
+logger = logging.get_logger(__name__)
 
 
 class Timesteps(nn.Module):

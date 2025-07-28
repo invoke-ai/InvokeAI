@@ -12,9 +12,6 @@ from diffusers.pipelines.pipeline_utils import DiffusionPipeline
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
 from transformers import CLIPTokenizer, T5Tokenizer, T5TokenizerFast
 
-from invokeai.backend.bria.controlnet_aux.open_pose.body import Body
-from invokeai.backend.bria.controlnet_aux.open_pose.face import Face
-from invokeai.backend.bria.controlnet_aux.open_pose.hand import Hand
 from invokeai.backend.image_util.depth_anything.depth_anything_pipeline import DepthAnythingPipeline
 from invokeai.backend.image_util.grounding_dino.grounding_dino_pipeline import GroundingDinoPipeline
 from invokeai.backend.image_util.segment_anything.segment_anything_pipeline import SegmentAnythingPipeline
@@ -65,8 +62,6 @@ def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
         else:
             # If neither is available, return 0
             return 0
-    elif isinstance(model, (Body, Hand, Face)):
-        return calc_module_size(model.model)
     elif isinstance(
         model,
         (

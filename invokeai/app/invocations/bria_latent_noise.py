@@ -1,4 +1,5 @@
 import torch
+from pydantic import BaseModel, Field 
 
 from invokeai.app.invocations.fields import Input, InputField, OutputField
 from invokeai.app.invocations.model import TransformerField
@@ -17,23 +18,28 @@ from invokeai.invocation_api import (
 )
 
 
-@invocation_output("bria_latent_sampler_output")
-class BriaLatentSamplerInvocationOutput(BaseInvocationOutput):
-    """Base class for nodes that output a CogView text conditioning tensor."""
+class BriaLatentNoiseOutput(BaseModel):
+    latents: LatentsField
+    latent_image_ids: LatentsField
 
-    latents: LatentsField = OutputField(description=FieldDescriptions.cond)
-    latent_image_ids: LatentsField = OutputField(description=FieldDescriptions.cond)
-
+@invocation_output("bria_latent_noise_output")
+class BriaLatentNoiseInvocationOutput(BaseInvocationOutput):
+    """Base class for nodes that output Bria latent tensors."""
+    latent_noise: BriaLatentNoiseOutput = OutputField(description="The latent noise, containing latents and latent image ids.")
+    height: int = OutputField(description="The height of the output image", default=1024)
+    width: int = OutputField(description="The width of the output image", default=1024)
 
 @invocation(
-    "bria_latent_sampler",
-    title="Latent Sampler - Bria",
+    "bria_latent_noise",
+    title="Latent Noise - Bria",
     tags=["image", "bria"],
     category="image",
     version="1.0.0",
     classification=Classification.Prototype,
 )
-class BriaLatentSamplerInvocation(BaseInvocation):
+class BriaLatentNoiseInvocation(BaseInvocation):
+    """ Generate latent noise for Bria. """
+
     seed: int = InputField(
         default=42,
         title="Seed",
@@ -44,22 +50,31 @@ class BriaLatentSamplerInvocation(BaseInvocation):
         input=Input.Connection,
         title="Transformer",
     )
+    height: int = InputField(
+        default=1024,
+        title="Height",
+        description="The height of the output image",
+    )
+    width: int = InputField(
+        default=1024,
+        title="Width",
+        description="The width of the output image",
+    )
 
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> BriaLatentSamplerInvocationOutput:
+    def invoke(self, context: InvocationContext) -> BriaLatentNoiseInvocationOutput:
         with context.models.load(self.transformer.transformer) as transformer:
             device = transformer.device
             dtype = transformer.dtype
 
-        height, width = 1024, 1024
         generator = torch.Generator(device=device).manual_seed(self.seed)
 
         num_channels_latents = 4
         latents, latent_image_ids = prepare_latents(
             batch_size=1,
             num_channels_latents=num_channels_latents,
-            height=height,
-            width=width,
+            height=self.height,
+            width=self.width,
             dtype=dtype,
             device=device,
             generator=generator,
@@ -70,7 +85,11 @@ class BriaLatentSamplerInvocation(BaseInvocation):
         latents_output = LatentsField(latents_name=saved_latents_tensor)
         latent_image_ids_output = LatentsField(latents_name=saved_latent_image_ids_tensor)
 
-        return BriaLatentSamplerInvocationOutput(
-            latents=latents_output,
-            latent_image_ids=latent_image_ids_output,
+        return BriaLatentNoiseInvocationOutput(
+            latent_noise=BriaLatentNoiseOutput(
+                latents=latents_output,
+                latent_image_ids=latent_image_ids_output,
+            ),
+            height=self.height,
+            width=self.width,
         )

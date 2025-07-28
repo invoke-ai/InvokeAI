@@ -34,12 +34,15 @@ from invokeai.backend.bria.bria_utils import get_original_sigmas, get_t5_prompt_
 from invokeai.backend.bria.controlnet_bria import BriaControlNetModel
 from invokeai.backend.bria.pipeline_bria import BriaPipeline
 from invokeai.backend.bria.transformer_bria import BriaTransformer2DModel
+from invokeai.backend.stable_diffusion.extensions.preview import PipelineIntermediateState
 
-logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
+logger = logging.get_logger(__name__)
 
 
 class BriaControlNetPipeline(BriaPipeline):
     r"""
+    Bria pipeline that supports optional ControlNet models.
+    
     Args:
         transformer ([`SD3Transformer2DModel`]):
             Conditional Transformer (MMDiT) architecture to denoise the encoded image latents.
@@ -249,6 +252,7 @@ class BriaControlNetPipeline(BriaPipeline):
         callback_on_step_end: Optional[Callable[[int, int, Dict], None]] = None,
         callback_on_step_end_tensor_inputs: Optional[List[str]] = None,
         max_sequence_length: int = 128,
+        step_callback: Callable[[PipelineIntermediateState], None] = None,
     ):
         r"""
         Function invoked when calling the pipeline for generation.
@@ -400,6 +404,9 @@ class BriaControlNetPipeline(BriaPipeline):
                 control_guidance_start=control_guidance_start,
                 control_guidance_end=control_guidance_end,
             )
+        if text_ids is None:
+            text_ids = torch.zeros(1, prompt_embeds.shape[1], 3).to(device=device, dtype=prompt_embeds.dtype)
+            text_ids = text_ids.repeat(1, 1, 1)
 
         if diffusers.__version__ >= "0.32.0":
             latent_image_ids = latent_image_ids[0]
@@ -407,6 +414,17 @@ class BriaControlNetPipeline(BriaPipeline):
 
         if self.do_classifier_free_guidance:
             prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds], dim=0)
+
+        # Init Invoke step callback
+        # step_callback(
+        #     PipelineIntermediateState(
+        #         step=0,
+        #         order=1,
+        #         total_steps=num_inference_steps,
+        #         timestep=int(timesteps[0]),
+        #         latents=latents,
+        #     ),
+        # )
 
         # EYAL - added the CFG loop
         # 7. Denoising loop
@@ -495,6 +513,15 @@ class BriaControlNetPipeline(BriaPipeline):
                 # call the callback, if provided
                 if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
                     progress_bar.update()
+                    # step_callback(
+                    #     PipelineIntermediateState(
+                    #         step=i + 1,
+                    #         order=1,
+                    #         total_steps=num_inference_steps,
+                    #         timestep=int(t),
+                    #         latents=latents,
+                    #     ),
+                    # )
 
         if output_type == "latent":
             image = latents
@@ -606,10 +633,8 @@ def encode_prompt(
             # Retrieve the original scale by scaling back the LoRA layers
             unscale_lora_layers(text_encoder, lora_scale)
 
-    text_ids = torch.zeros(batch_size, prompt_embeds.shape[1], 3).to(device=device, dtype=dtype)
-    text_ids = text_ids.repeat(num_images_per_prompt, 1, 1)
 
-    return prompt_embeds, negative_prompt_embeds, text_ids
+    return prompt_embeds, negative_prompt_embeds
 
 
 def prepare_latents(

@@ -73,8 +73,7 @@ dependencies = [
   "pypatchmatch",
   "python-multipart",
   "requests",
-  "semver~=3.0.1",
-  "scikit-image"
+  "semver~=3.0.1"
 ]
 
 [project.optional-dependencies]
