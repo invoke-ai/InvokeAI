@@ -133,6 +133,8 @@ export const buildChatGPT4oGraph = async (arg: GraphBuilderArg): Promise<GraphBu
       g.upsertMetadata(selectCanvasMetadata(state));
     }
 
+    g.setMetadataReceivingNode(gptImage);
+
     return {
       g,
       positivePrompt,
