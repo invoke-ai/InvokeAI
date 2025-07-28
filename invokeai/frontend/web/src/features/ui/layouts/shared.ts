@@ -5,7 +5,6 @@ export const RIGHT_PANEL_ID = 'right';
 export const LAUNCHPAD_PANEL_ID = 'launchpad';
 export const WORKSPACE_PANEL_ID = 'workspace';
 export const VIEWER_PANEL_ID = 'viewer';
-export const PROGRESS_PANEL_ID = 'progress';
 
 export const BOARDS_PANEL_ID = 'boards';
 export const GALLERY_PANEL_ID = 'gallery';

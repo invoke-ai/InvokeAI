@@ -3,7 +3,6 @@ import { DockviewReact, GridviewReact, LayoutPriority, Orientation } from 'dockv
 import { CanvasLayersPanel } from 'features/controlLayers/components/CanvasLayersPanelContent';
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
 import { GalleryPanel } from 'features/gallery/components/Gallery';
-import { GenerationProgressPanel } from 'features/gallery/components/ImageViewer/GenerationProgressPanel';
 import { ImageViewerPanel } from 'features/gallery/components/ImageViewer/ImageViewerPanel';
 import { FloatingCanvasLeftPanelButtons } from 'features/ui/components/FloatingLeftPanelButtons';
 import { FloatingRightPanelButtons } from 'features/ui/components/FloatingRightPanelButtons';
@@ -42,7 +41,6 @@ import {
   LEFT_PANEL_ID,
   LEFT_PANEL_MIN_SIZE_PX,
   MAIN_PANEL_ID,
-  PROGRESS_PANEL_ID,
   RIGHT_PANEL_ID,
   RIGHT_PANEL_MIN_SIZE_PX,
   SETTINGS_PANEL_ID,
@@ -60,7 +58,6 @@ const mainPanelComponents: AutoLayoutDockviewComponents = {
   [LAUNCHPAD_PANEL_ID]: withPanelContainer(CanvasLaunchpadPanel),
   [WORKSPACE_PANEL_ID]: withPanelContainer(CanvasWorkspacePanel),
   [VIEWER_PANEL_ID]: withPanelContainer(ImageViewerPanel),
-  [PROGRESS_PANEL_ID]: withPanelContainer(GenerationProgressPanel),
 };
 
 const initializeCenterPanelLayout = (tab: TabName, api: DockviewApi) => {
