@@ -1,6 +1,6 @@
 import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
-import type { PersistConfig } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
@@ -80,6 +80,7 @@ import {
   isFLUXReduxConfig,
   isImagenAspectRatioID,
   isIPAdapterConfig,
+  zCanvasState,
 } from './types';
 import {
   converters,
@@ -95,7 +96,7 @@ import {
   initialT2IAdapter,
 } from './util';
 
-export const canvasSlice = createSlice({
+const slice = createSlice({
   name: 'canvas',
   initialState: getInitialCanvasState(),
   reducers: {
@@ -1675,19 +1676,7 @@ export const {
   inpaintMaskDenoiseLimitChanged,
   inpaintMaskDenoiseLimitDeleted,
   // inpaintMaskRecalled,
-} = canvasSlice.actions;
-
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrate = (state: any): any => {
-  return state;
-};
-
-export const canvasPersistConfig: PersistConfig<CanvasState> = {
-  name: canvasSlice.name,
-  initialState: getInitialCanvasState(),
-  migrate,
-  persistDenylist: [],
-};
+} = slice.actions;
 
 const syncScaledSize = (state: CanvasState) => {
   if (API_BASE_MODELS.includes(state.bbox.modelBase)) {
@@ -1710,14 +1699,14 @@ const syncScaledSize = (state: CanvasState) => {
 
 let filter = true;
 
-export const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
+const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
   limit: 64,
   undoType: canvasUndo.type,
   redoType: canvasRedo.type,
   clearHistoryType: canvasClearHistory.type,
   filter: (action, _state, _history) => {
     // Ignore all actions from other slices
-    if (!action.type.startsWith(canvasSlice.name)) {
+    if (!action.type.startsWith(slice.name)) {
       return false;
     }
     // Throttle rapid actions of the same type
@@ -1726,6 +1715,18 @@ export const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> =
   },
   // This is pretty spammy, leave commented out unless you need it
   // debug: import.meta.env.MODE === 'development',
+};
+
+export const canvasSliceConfig: SliceConfig<typeof slice> = {
+  slice,
+  getInitialState: getInitialCanvasState,
+  schema: zCanvasState,
+  persistConfig: {
+    migrate: (state) => zCanvasState.parse(state),
+  },
+  undoableConfig: {
+    reduxUndoOptions: canvasUndoableConfig,
+  },
 };
 
 const doNotGroupMatcher = isAnyOf(entityBrushLineAdded, entityEraserLineAdded, entityRectAdded);

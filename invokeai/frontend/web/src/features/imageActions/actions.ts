@@ -58,7 +58,7 @@ export const setRegionalGuidanceReferenceImage = (arg: {
 
 export const setUpscaleInitialImage = (arg: { imageDTO: ImageDTO; dispatch: AppDispatch }) => {
   const { imageDTO, dispatch } = arg;
-  dispatch(upscaleInitialImageChanged(imageDTO));
+  dispatch(upscaleInitialImageChanged(imageDTOToImageWithDims(imageDTO)));
 };
 
 export const setNodeImageFieldImage = (arg: {

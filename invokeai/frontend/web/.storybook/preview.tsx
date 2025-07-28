@@ -26,7 +26,7 @@ i18n.use(initReactI18next).init({
   returnNull: false,
 });
 
-const store = createStore(undefined, false);
+const store = createStore({ driver: { getItem: () => {}, setItem: () => {} }, persistThrottle: 2000 });
 $store.set(store);
 $baseUrl.set('http://localhost:9090');
 

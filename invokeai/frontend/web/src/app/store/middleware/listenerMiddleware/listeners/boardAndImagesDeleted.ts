@@ -1,4 +1,4 @@
-import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import type { AppStartListening } from 'app/store/store';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { getImageUsage } from 'features/deleteImageModal/store/state';

@@ -254,8 +254,8 @@
                 "desc": "Attiva/disattiva il pannello destro."
             },
             "resetPanelLayout": {
-                "title": "Ripristina il layout del pannello",
-                "desc": "Ripristina le dimensioni e il layout predefiniti dei pannelli sinistro e destro."
+                "title": "Ripristina lo schema del pannello",
+                "desc": "Ripristina le dimensioni e lo schema predefiniti dei pannelli sinistro e destro."
             },
             "togglePanels": {
                 "title": "Attiva/disattiva i pannelli",
@@ -539,6 +539,10 @@
             "galleryNavUpAlt": {
                 "desc": "Uguale a Naviga verso l'alto, ma seleziona l'immagine da confrontare, aprendo la modalità di confronto se non è già aperta.",
                 "title": "Naviga verso l'alto (Confronta immagine)"
+            },
+            "starImage": {
+                "desc": "Aggiungi/Rimuovi contrassegno all'immagine selezionata.",
+                "title": "Aggiungi / Rimuovi contrassegno immagine"
             }
         }
     },
@@ -1162,7 +1166,19 @@
         "unexpectedField_withName": "Campo \"{{name}}\" inaspettato",
         "missingSourceOrTargetHandle": "Identificatore del nodo sorgente o di destinazione mancante",
         "layout": {
-            "alignmentDR": "In basso a destra"
+            "alignmentDR": "In basso a destra",
+            "autoLayout": "Schema automatico",
+            "nodeSpacing": "Spaziatura nodi",
+            "layerSpacing": "Spaziatura livelli",
+            "layeringStrategy": "Strategia livelli",
+            "longestPath": "Percorso più lungo",
+            "layoutDirection": "Direzione schema",
+            "layoutDirectionRight": "Orizzontale",
+            "layoutDirectionDown": "Verticale",
+            "alignment": "Allineamento nodi",
+            "alignmentUL": "In alto a sinistra",
+            "alignmentDL": "In basso a sinistra",
+            "alignmentUR": "In alto a destra"
         }
     },
     "boards": {
@@ -1240,7 +1256,7 @@
         "batchQueuedDesc_other": "Aggiunte {{count}} sessioni a {{direction}} della coda",
         "graphQueued": "Grafico in coda",
         "batch": "Lotto",
-        "clearQueueAlertDialog": "Lo svuotamento della coda annulla immediatamente tutti gli elementi in elaborazione e cancella completamente la coda. I filtri in sospeso verranno annullati.",
+        "clearQueueAlertDialog": "La cancellazione della coda annulla immediatamente tutti gli elementi in elaborazione e cancella completamente la coda. I filtri in sospeso verranno annullati e l'area di lavoro della Tela verrà reimpostata.",
         "pending": "In attesa",
         "completedIn": "Completato in",
         "resumeFailed": "Problema nel riavvio dell'elaborazione",
@@ -1296,7 +1312,8 @@
         "retrySucceeded": "Elemento rieseguito",
         "retryItem": "Riesegui elemento",
         "retryFailed": "Problema riesecuzione elemento",
-        "credits": "Crediti"
+        "credits": "Crediti",
+        "cancelAllExceptCurrent": "Annulla tutto tranne quello corrente"
     },
     "models": {
         "noMatchingModels": "Nessun modello corrispondente",
@@ -1711,7 +1728,7 @@
         "structure": {
             "heading": "Struttura",
             "paragraphs": [
-                "La struttura determina quanto l'immagine finale rispecchierà il layout dell'originale. Una struttura bassa permette cambiamenti significativi, mentre una struttura alta conserva la composizione e il layout originali."
+                "La struttura determina quanto l'immagine finale rispecchierà il layout dell'originale. Un valore struttura basso permette cambiamenti significativi, mentre un valore struttura alto conserva la composizione e lo schema originali."
             ]
         },
         "fluxDevLicense": {
@@ -1877,7 +1894,7 @@
         "opened": "Aperto",
         "convertGraph": "Converti grafico",
         "loadWorkflow": "$t(common.load) Flusso di lavoro",
-        "autoLayout": "Disposizione automatica",
+        "autoLayout": "Schema automatico",
         "loadFromGraph": "Carica il flusso di lavoro dal grafico",
         "userWorkflows": "Flussi di lavoro utente",
         "projectWorkflows": "Flussi di lavoro del progetto",
@@ -2631,9 +2648,10 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "Genera immagini più velocemente con le nuove Rampe di lancio e una scheda Genera semplificata.",
-            "Modifica con prompt utilizzando Flux Kontext Dev.",
-            "Esporta in PSD, nascondi sovrapposizioni in blocco, organizza modelli e immagini: il tutto in un'interfaccia riprogettata e pensata per il controllo."
+            "Nuova impostazione per inviare tutte le generazioni della Tela direttamente alla Galleria.",
+            "Nuove funzionalità Inverti maschera (Maiusc+V) e Adatta il Riquadro di delimitazione alla maschera (Maiusc+B).",
+            "Supporto esteso per miniature e configurazioni dei modelli.",
+            "Vari altri aggiornamenti e correzioni per la qualità della vita"
         ]
     },
     "system": {

@@ -197,6 +197,10 @@ export default [
               importNames: ['isEqual'],
               message: 'Please use objectEquals from @observ33r/object-equals instead.',
             },
+            {
+              name: 'zod/v3',
+              message: 'Import from zod instead.',
+            },
           ],
         },
       ],

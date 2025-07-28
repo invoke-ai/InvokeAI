@@ -1,6 +1,5 @@
 import { logger } from 'app/logging/logger';
-import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import type { AppDispatch, RootState } from 'app/store/store';
+import type { AppDispatch, AppStartListening, RootState } from 'app/store/store';
 import { controlLayerModelChanged, rgRefImageModelChanged } from 'features/controlLayers/store/canvasSlice';
 import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
 import {

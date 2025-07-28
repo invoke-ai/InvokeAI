@@ -6,7 +6,7 @@ import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { DndImage } from 'features/dnd/DndImage';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
-import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
+import NonInvocationNodeWrapper from 'features/nodes/components/flow/nodes/common/NonInvocationNodeWrapper';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import type { AnimationProps } from 'framer-motion';
 import { motion } from 'framer-motion';
@@ -58,13 +58,14 @@ const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => {
   }, []);
   const { t } = useTranslation();
   return (
-    <NodeWrapper nodeId={props.nodeProps.id} selected={props.nodeProps.selected} width={384}>
+    <NonInvocationNodeWrapper nodeId={props.nodeProps.id} selected={props.nodeProps.selected} width={384}>
       <Flex
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         className={DRAG_HANDLE_CLASSNAME}
         position="relative"
         flexDirection="column"
+        aspectRatio="1/1"
       >
         <Flex layerStyle="nodeHeader" borderTopRadius="base" alignItems="center" justifyContent="center" h={8}>
           <Text fontSize="sm" fontWeight="semibold" color="base.200">
@@ -80,7 +81,7 @@ const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => {
           )}
         </Flex>
       </Flex>
-    </NodeWrapper>
+    </NonInvocationNodeWrapper>
   );
 };
 

@@ -31,8 +31,10 @@ export const UpscaleWarning = () => {
     const validModel = modelConfigs.find((cnetModel) => {
       return cnetModel.base === model?.base && cnetModel.name.toLowerCase().includes('tile');
     });
-    dispatch(tileControlnetModelChanged(validModel || null));
-  }, [model?.base, modelConfigs, dispatch]);
+    if (tileControlnetModel?.key !== validModel?.key) {
+      dispatch(tileControlnetModelChanged(validModel || null));
+    }
+  }, [dispatch, model?.base, modelConfigs, tileControlnetModel?.key]);
 
   const isBaseModelCompatible = useMemo(() => {
     return model && ['sd-1', 'sdxl'].includes(model.base);

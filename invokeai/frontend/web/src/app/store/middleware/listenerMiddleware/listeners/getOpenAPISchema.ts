@@ -1,5 +1,5 @@
 import { logger } from 'app/logging/logger';
-import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import type { AppStartListening } from 'app/store/store';
 import { parseify } from 'common/util/serialize';
 import { size } from 'es-toolkit/compat';
 import { $templates } from 'features/nodes/store/nodesSlice';

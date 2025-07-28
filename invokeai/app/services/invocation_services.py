@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.board_records.board_records_base import BoardRecordStorageBase
     from invokeai.app.services.boards.boards_base import BoardServiceABC
     from invokeai.app.services.bulk_download.bulk_download_base import BulkDownloadBase
+    from invokeai.app.services.client_state_persistence.client_state_persistence_base import ClientStatePersistenceABC
     from invokeai.app.services.config import InvokeAIAppConfig
     from invokeai.app.services.download import DownloadQueueServiceBase
     from invokeai.app.services.events.events_base import EventServiceBase
@@ -73,6 +74,7 @@ class InvocationServices:
         style_preset_records: "StylePresetRecordsStorageBase",
         style_preset_image_files: "StylePresetImageFileStorageBase",
         workflow_thumbnails: "WorkflowThumbnailServiceBase",
+        client_state_persistence: "ClientStatePersistenceABC",
     ):
         self.board_images = board_images
         self.board_image_records = board_image_records
@@ -102,3 +104,4 @@ class InvocationServices:
         self.style_preset_records = style_preset_records
         self.style_preset_image_files = style_preset_image_files
         self.workflow_thumbnails = workflow_thumbnails
+        self.client_state_persistence = client_state_persistence

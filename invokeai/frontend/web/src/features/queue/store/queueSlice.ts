@@ -1,24 +1,27 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
+import z from 'zod';
 
-interface QueueState {
-  listCursor: number | undefined;
-  listPriority: number | undefined;
-  selectedQueueItem: string | undefined;
-  resumeProcessorOnEnqueue: boolean;
-}
+const zQueueState = z.object({
+  listCursor: z.number().optional(),
+  listPriority: z.number().optional(),
+  selectedQueueItem: z.string().optional(),
+  resumeProcessorOnEnqueue: z.boolean(),
+});
+type QueueState = z.infer<typeof zQueueState>;
 
-const initialQueueState: QueueState = {
+const getInitialState = (): QueueState => ({
   listCursor: undefined,
   listPriority: undefined,
   selectedQueueItem: undefined,
   resumeProcessorOnEnqueue: true,
-};
+});
 
-export const queueSlice = createSlice({
+const slice = createSlice({
   name: 'queue',
-  initialState: initialQueueState,
+  initialState: getInitialState(),
   reducers: {
     listCursorChanged: (state, action: PayloadAction<number | undefined>) => {
       state.listCursor = action.payload;
@@ -33,7 +36,13 @@ export const queueSlice = createSlice({
   },
 });
 
-export const { listCursorChanged, listPriorityChanged, listParamsReset } = queueSlice.actions;
+export const { listCursorChanged, listPriorityChanged, listParamsReset } = slice.actions;
+
+export const queueSliceConfig: SliceConfig<typeof slice> = {
+  slice,
+  schema: zQueueState,
+  getInitialState,
+};
 
 const selectQueueSlice = (state: RootState) => state.queue;
 const createQueueSelector = <T>(selector: Selector<QueueState, T>) => createSelector(selectQueueSlice, selector);

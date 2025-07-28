@@ -1,6 +1,6 @@
 import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
-import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import type { AppStartListening } from 'app/store/store';
 import { buildAdHocPostProcessingGraph } from 'features/nodes/util/graph/buildAdHocPostProcessingGraph';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';

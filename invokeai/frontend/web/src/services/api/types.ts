@@ -1,6 +1,9 @@
 import type { Dimensions } from 'features/controlLayers/store/types';
 import type { components, paths } from 'services/api/schema';
+import type { Equals } from 'tsafe';
+import { assert } from 'tsafe';
 import type { JsonObject, SetRequired } from 'type-fest';
+import z from 'zod';
 
 export type S = components['schemas'];
 
@@ -33,10 +36,36 @@ export type InvocationJSONSchemaExtra = S['UIConfigBase'];
 export type AppVersion = S['AppVersion'];
 export type AppConfig = S['AppConfig'];
 
+const zResourceOrigin = z.enum(['internal', 'external']);
+type ResourceOrigin = z.infer<typeof zResourceOrigin>;
+assert<Equals<ResourceOrigin, S['ResourceOrigin']>>();
+const zImageCategory = z.enum(['general', 'mask', 'control', 'user', 'other']);
+export type ImageCategory = z.infer<typeof zImageCategory>;
+assert<Equals<ImageCategory, S['ImageCategory']>>();
+
 // Images
-export type ImageDTO = S['ImageDTO'];
+const _zImageDTO = z.object({
+  image_name: z.string(),
+  image_url: z.string(),
+  thumbnail_url: z.string(),
+  image_origin: zResourceOrigin,
+  image_category: zImageCategory,
+  width: z.number().int().gt(0),
+  height: z.number().int().gt(0),
+  created_at: z.string(),
+  updated_at: z.string(),
+  deleted_at: z.string().nullish(),
+  is_intermediate: z.boolean(),
+  session_id: z.string().nullish(),
+  node_id: z.string().nullish(),
+  starred: z.boolean(),
+  has_workflow: z.boolean(),
+  board_id: z.string().nullish(),
+});
+export type ImageDTO = z.infer<typeof _zImageDTO>;
+assert<Equals<ImageDTO, S['ImageDTO']>>();
+
 export type BoardDTO = S['BoardDTO'];
-export type ImageCategory = S['ImageCategory'];
 export type OffsetPaginatedResults_ImageDTO_ = S['OffsetPaginatedResults_ImageDTO_'];
 
 // Models
@@ -298,8 +327,13 @@ export type ModelInstallStatus = S['InstallStatus'];
 export type Graph = S['Graph'];
 export type NonNullableGraph = SetRequired<Graph, 'nodes' | 'edges'>;
 export type Batch = S['Batch'];
-export type WorkflowRecordOrderBy = S['WorkflowRecordOrderBy'];
-export type SQLiteDirection = S['SQLiteDirection'];
+export const zWorkflowRecordOrderBy = z.enum(['name', 'created_at', 'updated_at', 'opened_at']);
+export type WorkflowRecordOrderBy = z.infer<typeof zWorkflowRecordOrderBy>;
+assert<Equals<S['WorkflowRecordOrderBy'], WorkflowRecordOrderBy>>();
+
+export const zSQLiteDirection = z.enum(['ASC', 'DESC']);
+export type SQLiteDirection = z.infer<typeof zSQLiteDirection>;
+assert<Equals<S['SQLiteDirection'], SQLiteDirection>>();
 export type WorkflowRecordListItemWithThumbnailDTO = S['WorkflowRecordListItemWithThumbnailDTO'];
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
