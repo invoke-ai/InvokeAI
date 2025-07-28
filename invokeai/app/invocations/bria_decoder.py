@@ -17,6 +17,10 @@ from invokeai.invocation_api import BaseInvocation, Classification, ImageOutput,
     classification=Classification.Prototype,
 )
 class BriaDecoderInvocation(BaseInvocation):
+    """
+    Decode Bria latents to an image.
+    """
+
     vae: VAEField = InputField(
         description=FieldDescriptions.vae,
         input=Input.Connection,

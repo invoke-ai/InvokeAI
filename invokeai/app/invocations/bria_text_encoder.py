@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Literal, Optional
 
 import torch
 from transformers import (
@@ -14,7 +14,7 @@ from invokeai.invocation_api import (
     BaseInvocation,
     Classification,
     InputField,
-    LatentsField,
+    FluxConditioningField,
     invocation,
     invocation_output,
 )
@@ -22,11 +22,10 @@ from invokeai.invocation_api import (
 
 @invocation_output("bria_text_encoder_output")
 class BriaTextEncoderInvocationOutput(BaseInvocationOutput):
-    """Base class for nodes that output a CogView text conditioning tensor."""
+    """Base class for nodes that output a Bria text conditioning tensor."""
 
-    pos_embeds: LatentsField = OutputField(description=FieldDescriptions.cond)
-    neg_embeds: LatentsField = OutputField(description=FieldDescriptions.cond)
-    text_ids: LatentsField = OutputField(description=FieldDescriptions.cond)
+    pos_embeds: FluxConditioningField = OutputField(description=FieldDescriptions.cond)
+    neg_embeds: FluxConditioningField = OutputField(description=FieldDescriptions.cond)
 
 
 @invocation(
@@ -38,6 +37,10 @@ class BriaTextEncoderInvocationOutput(BaseInvocationOutput):
     classification=Classification.Prototype,
 )
 class BriaTextEncoderInvocation(BaseInvocation):
+    """
+    Encode a prompt into a Bria text conditioning tensor.
+    """
+
     prompt: str = InputField(
         title="Prompt",
         description="The prompt to encode",
@@ -48,7 +51,9 @@ class BriaTextEncoderInvocation(BaseInvocation):
         default="Logo,Watermark,Text,Ugly,Morbid,Extra fingers,Poorly drawn hands,Mutation,Blurry,Extra limbs,Gross proportions,Missing arms,Mutated hands,Long neck,Duplicate",
     )
     max_length: int = InputField(
-        default=128,
+        default=256,
+        ge=128,
+        le=512,
         title="Max Length",
         description="The maximum length of the prompt",
     )
@@ -69,7 +74,7 @@ class BriaTextEncoderInvocation(BaseInvocation):
             assert isinstance(tokenizer, T5TokenizerFast)
             assert isinstance(text_encoder, T5EncoderModel)
 
-        (prompt_embeds, negative_prompt_embeds, text_ids) = encode_prompt(
+        prompt_embeds, negative_prompt_embeds = encode_prompt(
             prompt=self.prompt,
             tokenizer=tokenizer,
             text_encoder=text_encoder,
@@ -82,12 +87,9 @@ class BriaTextEncoderInvocation(BaseInvocation):
 
         saved_pos_tensor = context.tensors.save(prompt_embeds)
         saved_neg_tensor = context.tensors.save(negative_prompt_embeds)
-        saved_text_ids_tensor = context.tensors.save(text_ids)
-        pos_embeds_output = LatentsField(latents_name=saved_pos_tensor)
-        neg_embeds_output = LatentsField(latents_name=saved_neg_tensor)
-        text_ids_output = LatentsField(latents_name=saved_text_ids_tensor)
+        pos_embeds_output = FluxConditioningField(conditioning_name=saved_pos_tensor)
+        neg_embeds_output = FluxConditioningField(conditioning_name=saved_neg_tensor)
         return BriaTextEncoderInvocationOutput(
             pos_embeds=pos_embeds_output,
             neg_embeds=neg_embeds_output,
-            text_ids=text_ids_output,
         )

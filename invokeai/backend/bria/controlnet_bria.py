@@ -35,7 +35,7 @@ from invokeai.backend.bria.transformer_bria import (
     TimestepProjEmbeddings,
 )
 
-logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
+logger = logging.get_logger(__name__)
 
 
 BRIA_CONTROL_MODES = Literal["depth", "canny", "colorgrid", "recolor", "tile", "pose"]

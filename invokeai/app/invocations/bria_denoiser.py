@@ -1,11 +1,12 @@
-from typing import List, Tuple
+from typing import Callable, List, Tuple
 
 import torch
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
 
 from invokeai.app.invocations.bria_controlnet import BriaControlNetField
-from invokeai.app.invocations.fields import Input, InputField, LatentsField, OutputField
+from invokeai.app.invocations.bria_latent_noise import BriaLatentNoiseOutput
+from invokeai.app.invocations.fields import FluxConditioningField, Input, InputField, LatentsField, OutputField
 from invokeai.app.invocations.model import SubModelType, T5EncoderField, TransformerField, VAEField
 from invokeai.app.invocations.primitives import BaseInvocationOutput, FieldDescriptions
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -13,6 +14,8 @@ from invokeai.backend.bria.controlnet_bria import BriaControlModes, BriaMultiCon
 from invokeai.backend.bria.controlnet_utils import prepare_control_images
 from invokeai.backend.bria.pipeline_bria_controlnet import BriaControlNetPipeline
 from invokeai.backend.bria.transformer_bria import BriaTransformer2DModel
+from invokeai.backend.model_manager.taxonomy import BaseModelType
+from invokeai.backend.stable_diffusion.extensions.preview import PipelineIntermediateState
 from invokeai.invocation_api import BaseInvocation, Classification, invocation, invocation_output
 
 
@@ -30,6 +33,11 @@ class BriaDenoiseInvocationOutput(BaseInvocationOutput):
     classification=Classification.Prototype,
 )
 class BriaDenoiseInvocation(BaseInvocation):
+
+    """
+    Denoise Bria latents using a Bria Pipeline.
+    """
+
     num_steps: int = InputField(
         default=30, title="Number of Steps", description="The number of steps to use for the denoiser"
     )
@@ -52,30 +60,30 @@ class BriaDenoiseInvocation(BaseInvocation):
         input=Input.Connection,
         title="VAE",
     )
-    latents: LatentsField = InputField(
-        description="Latents to denoise",
-        input=Input.Connection,
-        title="Latents",
+    height: int = InputField(
+        default=1024,
+        title="Height",
+        description="The height of the output image",
     )
-    latent_image_ids: LatentsField = InputField(
-        description="Latent Image IDs to denoise",
-        input=Input.Connection,
-        title="Latent Image IDs",
+    width: int = InputField(
+        default=1024,
+        title="Width",
+        description="The width of the output image",
     )
-    pos_embeds: LatentsField = InputField(
+    latent_noise: BriaLatentNoiseOutput = InputField(
+        description="Latent noise to denoise",
+        input=Input.Connection,
+        title="Latent Noise",
+    )
+    pos_embeds: FluxConditioningField = InputField(
         description="Positive Prompt Embeds",
         input=Input.Connection,
         title="Positive Prompt Embeds",
     )
-    neg_embeds: LatentsField = InputField(
+    neg_embeds: FluxConditioningField = InputField(
         description="Negative Prompt Embeds",
         input=Input.Connection,
         title="Negative Prompt Embeds",
-    )
-    text_ids: LatentsField = InputField(
-        description="Text IDs",
-        input=Input.Connection,
-        title="Text IDs",
     )
     control: BriaControlNetField | list[BriaControlNetField] | None = InputField(
         description="ControlNet",
@@ -86,11 +94,10 @@ class BriaDenoiseInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> BriaDenoiseInvocationOutput:
-        latents = context.tensors.load(self.latents.latents_name)
-        pos_embeds = context.tensors.load(self.pos_embeds.latents_name)
-        neg_embeds = context.tensors.load(self.neg_embeds.latents_name)
-        text_ids = context.tensors.load(self.text_ids.latents_name)
-        latent_image_ids = context.tensors.load(self.latent_image_ids.latents_name)
+        latents = context.tensors.load(self.latent_noise.latents.latents_name)
+        pos_embeds = context.tensors.load(self.pos_embeds.conditioning_name)
+        neg_embeds = context.tensors.load(self.neg_embeds.conditioning_name)
+        latent_image_ids = context.tensors.load(self.latent_noise.latent_image_ids.latents_name)
         scheduler_identifier = self.transformer.transformer.model_copy(update={"submodel_type": SubModelType.Scheduler})
 
         device = None
@@ -114,10 +121,11 @@ class BriaDenoiseInvocation(BaseInvocation):
                 control_model, control_images, control_modes, control_scales = self._prepare_multi_control(
                     context=context,
                     vae=vae,
-                    width=1024,
-                    height=1024,
+                    width=self.width,
+                    height=self.height,
                     device=vae.device,
                 )
+
 
             pipeline = BriaControlNetPipeline(
                 transformer=transformer,
@@ -129,31 +137,32 @@ class BriaDenoiseInvocation(BaseInvocation):
             )
             pipeline.to(device=transformer.device, dtype=transformer.dtype)
 
-            latents = pipeline(
+            output_latents = pipeline(
                 control_image=control_images,
                 control_mode=control_modes,
-                width=1024,
-                height=1024,
+                width=self.width,
+                height=self.height,
                 controlnet_conditioning_scale=control_scales,
                 num_inference_steps=self.num_steps,
                 max_sequence_length=128,
                 guidance_scale=self.guidance_scale,
                 latents=latents,
                 latent_image_ids=latent_image_ids,
-                text_ids=text_ids,
                 prompt_embeds=pos_embeds,
                 negative_prompt_embeds=neg_embeds,
                 output_type="latent",
+                step_callback=_build_step_callback(context),
             )[0]
 
-        assert isinstance(latents, torch.Tensor)
-        saved_input_latents_tensor = context.tensors.save(latents)
-        latents_output = LatentsField(latents_name=saved_input_latents_tensor)
-        return BriaDenoiseInvocationOutput(latents=latents_output)
+            
+
+        assert isinstance(output_latents, torch.Tensor)
+        saved_input_latents_tensor = context.tensors.save(output_latents)
+        return BriaDenoiseInvocationOutput(latents=LatentsField(latents_name=saved_input_latents_tensor))
 
     def _prepare_multi_control(
         self, context: InvocationContext, vae: AutoencoderKL, width: int, height: int, device: torch.device
-    ) -> Tuple[BriaMultiControlNetModel, List[torch.Tensor], List[torch.Tensor], List[float]]:
+    ) -> Tuple[BriaMultiControlNetModel, List[torch.Tensor], List[int], List[float]]:
         control = self.control if isinstance(self.control, list) else [self.control]
         control_images, control_models, control_modes, control_scales = [], [], [], []
         for controlnet in control:
@@ -178,3 +187,11 @@ class BriaDenoiseInvocation(BaseInvocation):
             device=device,
         )
         return control_model, tensored_control_images, tensored_control_modes, control_scales
+
+
+def _build_step_callback(context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
+    def step_callback(state: PipelineIntermediateState) -> None:
+        return 
+        context.util.sd_step_callback(state, BaseModelType.Bria)
+
+    return step_callback
