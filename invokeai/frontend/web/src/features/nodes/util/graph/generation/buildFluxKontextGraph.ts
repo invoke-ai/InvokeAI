@@ -76,11 +76,15 @@ export const buildFluxKontextGraph = (arg: GraphBuilderArg): GraphBuilderReturn 
     'positive_prompt'
   );
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
+
   g.upsertMetadata({
     model: Graph.getModelMetadataField(model),
     width: originalSize.width,
     height: originalSize.height,
   });
+
+  g.setMetadataReceivingNode(fluxKontextImage);
+
   return {
     g,
     positivePrompt,
