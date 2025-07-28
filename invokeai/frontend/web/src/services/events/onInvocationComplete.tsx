@@ -11,6 +11,7 @@ import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gal
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { isImageField, isImageFieldCollection } from 'features/nodes/types/common';
 import { zNodeStatus } from 'features/nodes/types/invocation';
+import type { LRUCache } from 'lru-cache';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO, S } from 'services/api/types';
@@ -26,7 +27,11 @@ const log = logger('events');
 
 const nodeTypeDenylist = ['load_image', 'image'];
 
-export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDispatch) => {
+export const buildOnInvocationComplete = (
+  getState: AppGetState,
+  dispatch: AppDispatch,
+  finishedQueueItemIds: LRUCache<number, boolean>
+) => {
   const addImagesToGallery = async (data: S['InvocationCompleteEvent']) => {
     if (nodeTypeDenylist.includes(data.invocation.type)) {
       log.trace(`Skipping denylisted node type (${data.invocation.type})`);
@@ -191,6 +196,10 @@ export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDi
   };
 
   return async (data: S['InvocationCompleteEvent']) => {
+    if (finishedQueueItemIds.has(data.item_id)) {
+      log.trace({ data } as JsonObject, `Received event for already-finished queue item ${data.item_id}`);
+      return;
+    }
     log.debug({ data } as JsonObject, `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`);
 
     const nodeExecutionState = $nodeExecutionStates.get()[data.invocation_source_id];
