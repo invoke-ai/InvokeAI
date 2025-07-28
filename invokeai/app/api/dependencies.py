@@ -22,7 +22,7 @@ from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_images.model_images_default import ModelImageFileStorageDisk
-from invokeai.app.services.model_manager.model_manager_default import ModelManagerService
+from invokeai.app.services.model_manager.model_manager_dummy import DummyModelManagerService
 from invokeai.app.services.model_records.model_records_sql import ModelRecordServiceSQL
 from invokeai.app.services.model_relationship_records.model_relationship_records_sqlite import (
     SqliteModelRelationshipRecordStorage,
@@ -135,12 +135,7 @@ class ApiDependencies:
         )
         download_queue_service = DownloadQueueService(app_config=configuration, event_bus=events)
         model_images_service = ModelImageFileStorageDisk(model_images_folder / "model_images")
-        model_manager = ModelManagerService.build_model_manager(
-            app_config=configuration,
-            model_record_service=ModelRecordServiceSQL(db=db, logger=logger),
-            download_queue=download_queue_service,
-            events=events,
-        )
+        model_manager = DummyModelManagerService()
         model_relationships = ModelRelationshipsService()
         model_relationship_records = SqliteModelRelationshipRecordStorage(db=db)
         names = SimpleNameService()

@@ -1,6 +1,7 @@
 # Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Team
 
 from abc import ABC, abstractmethod
+from typing import Optional
 
 import torch
 from typing_extensions import Self
@@ -42,19 +43,19 @@ class ModelManagerServiceBase(ABC):
 
     @property
     @abstractmethod
-    def store(self) -> ModelRecordServiceBase:
+    def store(self) -> Optional[ModelRecordServiceBase]:
         """Return the ModelRecordServiceBase used to store and retrieve configuration records."""
         pass
 
     @property
     @abstractmethod
-    def load(self) -> ModelLoadServiceBase:
+    def load(self) -> Optional[ModelLoadServiceBase]:
         """Return the ModelLoadServiceBase used to load models from their configuration records."""
         pass
 
     @property
     @abstractmethod
-    def install(self) -> ModelInstallServiceBase:
+    def install(self) -> Optional[ModelInstallServiceBase]:
         """Return the ModelInstallServiceBase used to download and manipulate model files."""
         pass
 

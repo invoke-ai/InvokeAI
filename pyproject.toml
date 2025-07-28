@@ -33,25 +33,6 @@ classifiers = [
 ]
 dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
-  "accelerate",
-  "bitsandbytes; sys_platform!='darwin'",
-  "compel==2.1.1",
-  "diffusers[torch]==0.33.0",
-  "gguf",
-  "invisible-watermark==0.2.0",           # needed to install SDXL base and refiner using their repo_ids
-  "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
-  "numpy<2.0.0",
-  "onnx==1.16.1",
-  "onnxruntime==1.19.2",
-  "opencv-contrib-python",
-  "safetensors",
-  "sentencepiece",
-  "spandrel",
-  "torch~=2.7.0",                         # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
-  "torchsde",                             # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
-  "torchvision",
-  "transformers",
-
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events",
   "fastapi",
@@ -59,6 +40,7 @@ dependencies = [
   "pydantic-settings",
   "pydantic",
   "python-socketio",
+  "uvicorn",
   "uvicorn[standard]",
 
   # Auxiliary dependencies, pinned only if necessary.
@@ -77,15 +59,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-"xformers" = [
-  # Core generation dependencies, pinned for reproducible builds.
-  "xformers>=0.0.28.post1; sys_platform!='darwin'",
-  # torch 2.4+cu carries its own triton dependency
-]
-
-"onnx" = ["onnxruntime"]
-"onnx-cuda" = ["onnxruntime-gpu"]
-"onnx-directml" = ["onnxruntime-directml"]
 "dist" = ["pip-tools", "pipdeptree", "twine"]
 "docs" = [
   "mkdocs-material>=9.5.36",

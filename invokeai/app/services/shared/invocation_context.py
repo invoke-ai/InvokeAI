@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Callable, Optional, Union
 
 from PIL.Image import Image
 from pydantic.networks import AnyHttpUrl
-from torch import Tensor
+from typing import Any
 
 from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.invocations.fields import MetadataField, WithBoard, WithMetadata
@@ -23,10 +23,7 @@ from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     ModelConfigBase,
 )
-from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
-from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
-from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation
@@ -292,7 +289,7 @@ class ImagesInterface(InvocationContextInterface):
 
 
 class TensorsInterface(InvocationContextInterface):
-    def save(self, tensor: Tensor) -> str:
+    def save(self, tensor: Any) -> str:
         """Saves a tensor, returning its name.
 
         Args:
@@ -305,7 +302,7 @@ class TensorsInterface(InvocationContextInterface):
         name = self._services.tensors.save(obj=tensor)
         return name
 
-    def load(self, name: str) -> Tensor:
+    def load(self, name: str) -> Any:
         """Loads a tensor by name. This method returns a copy of the tensor.
 
         Args:
@@ -318,7 +315,7 @@ class TensorsInterface(InvocationContextInterface):
 
 
 class ConditioningInterface(InvocationContextInterface):
-    def save(self, conditioning_data: ConditioningFieldData) -> str:
+    def save(self, conditioning_data: Any) -> str:
         """Saves a conditioning data object, returning its name.
 
         Args:
@@ -331,7 +328,7 @@ class ConditioningInterface(InvocationContextInterface):
         name = self._services.conditioning.save(obj=conditioning_data)
         return name
 
-    def load(self, name: str) -> ConditioningFieldData:
+    def load(self, name: str) -> Any:
         """Loads conditioning data by name. This method returns a copy of the conditioning data.
 
         Args:
@@ -367,7 +364,7 @@ class ModelsInterface(InvocationContextInterface):
 
     def load(
         self, identifier: Union[str, "ModelIdentifierField"], submodel_type: Optional[SubModelType] = None
-    ) -> LoadedModel:
+    ) -> Any:
         """Load a model.
 
         Args:
@@ -395,7 +392,7 @@ class ModelsInterface(InvocationContextInterface):
 
     def load_by_attrs(
         self, name: str, base: BaseModelType, type: ModelType, submodel_type: Optional[SubModelType] = None
-    ) -> LoadedModel:
+    ) -> Any:
         """Load a model by its attributes.
 
         Args:
@@ -497,7 +494,7 @@ class ModelsInterface(InvocationContextInterface):
         self,
         model_path: Path,
         loader: Optional[Callable[[Path], AnyModel]] = None,
-    ) -> LoadedModelWithoutConfig:
+    ) -> Any:
         """
         Load the model file located at the indicated path
 
@@ -521,7 +518,7 @@ class ModelsInterface(InvocationContextInterface):
         self,
         source: str | AnyHttpUrl,
         loader: Optional[Callable[[Path], AnyModel]] = None,
-    ) -> LoadedModelWithoutConfig:
+    ) -> Any:
         """
         Download, cache, and load the model file located at the indicated URL or repo_id.
 
@@ -595,7 +592,7 @@ class UtilInterface(InvocationContextInterface):
         """
         return self._is_canceled()
 
-    def sd_step_callback(self, intermediate_state: PipelineIntermediateState, base_model: BaseModelType) -> None:
+    def sd_step_callback(self, intermediate_state: Any, base_model: BaseModelType) -> None:
         """
         The step callback emits a progress event with the current step, the total number of
         steps, a preview image, and some other internal metadata.
@@ -614,7 +611,7 @@ class UtilInterface(InvocationContextInterface):
             is_canceled=self.is_canceled,
         )
 
-    def flux_step_callback(self, intermediate_state: PipelineIntermediateState) -> None:
+    def flux_step_callback(self, intermediate_state: Any) -> None:
         """
         The step callback emits a progress event with the current step, the total number of
         steps, a preview image, and some other internal metadata.

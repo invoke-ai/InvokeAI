@@ -64,6 +64,9 @@ export const LIST_TAG = 'LIST';
 export const LIST_ALL_TAG = 'LIST_ALL';
 
 export const getBaseUrl = (): string => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
   const baseUrl = $baseUrl.get();
   return baseUrl || window.location.href.replace(/\/$/, '');
 };

@@ -18,7 +18,6 @@ def run_app() -> None:
     import uvicorn
 
     from invokeai.app.services.config.config_default import get_config
-    from invokeai.app.util.torch_cuda_allocator import configure_torch_cuda_allocator
     from invokeai.backend.util.logging import InvokeAILogger
 
     # Load config.
@@ -26,23 +25,10 @@ def run_app() -> None:
 
     logger = InvokeAILogger.get_logger(config=app_config)
 
-    # Configure the torch CUDA memory allocator.
-    # NOTE: It is important that this happens before torch is imported.
-    if app_config.pytorch_cuda_alloc_conf:
-        configure_torch_cuda_allocator(app_config.pytorch_cuda_alloc_conf, logger)
-
-    # This import must happen after configure_torch_cuda_allocator() is called, because the module imports torch.
     from invokeai.app.invocations.baseinvocation import InvocationRegistry
     from invokeai.app.invocations.load_custom_nodes import load_custom_nodes
-    from invokeai.backend.util.devices import TorchDevice
 
-    torch_device_name = TorchDevice.get_torch_device_name()
-    logger.info(f"Using torch device: {torch_device_name}")
-
-    # Import from startup_utils here to avoid importing torch before configure_torch_cuda_allocator() is called.
     from invokeai.app.util.startup_utils import (
-        apply_monkeypatches,
-        check_cudnn,
         enable_dev_reload,
         find_open_port,
         register_mime_types,
@@ -56,9 +42,7 @@ def run_app() -> None:
         logger.warning(f"Port {orig_config_port} is already in use. Using port {app_config.port}.")
 
     # Miscellaneous startup tasks.
-    apply_monkeypatches()
     register_mime_types()
-    check_cudnn(logger)
 
     # Initialize the app and event loop.
     app, loop = get_app()
