@@ -381,7 +381,6 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
     // Invalidate caches for things we cannot easily update
     const tagsToInvalidate: ApiTagDescription[] = [
-      'SessionQueueStatus',
       'CurrentSessionQueueItem',
       'NextSessionQueueItem',
       'InvocationCacheStatus',
@@ -394,6 +393,16 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       tagsToInvalidate.push({ type: 'QueueCountsByDestination', id: destination });
     }
     dispatch(queueApi.util.invalidateTags(tagsToInvalidate));
+    dispatch(
+      queueApi.util.updateQueryData('getQueueStatus', undefined, (draft) => {
+        draft.queue = data.queue_status;
+      })
+    );
+    dispatch(
+      queueApi.util.updateQueryData('getBatchStatus', { batch_id: data.batch_id }, (draft) => {
+        Object.assign(draft, data.batch_status);
+      })
+    );
 
     if (status === 'in_progress') {
       forEach($nodeExecutionStates.get(), (nes) => {
@@ -408,10 +417,6 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         clone.outputs = [];
         $nodeExecutionStates.setKey(clone.nodeId, clone);
       });
-      if (data.origin === 'canvas') {
-        // store.dispatch(stagingAreaGenerationStarted({ sessionId: session_id }));
-        // $progressImages.setKey(session_id, { sessionId: session_id, isFinished: false });
-      }
     } else if (status === 'completed' || status === 'failed' || status === 'canceled') {
       finishedQueueItemIds.set(item_id, true);
       if (status === 'failed' && error_type) {
