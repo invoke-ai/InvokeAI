@@ -8,6 +8,7 @@ import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
 import dts from 'vite-plugin-dts';
 import eslint from 'vite-plugin-eslint';
 import tsconfigPaths from 'vite-tsconfig-paths';
+import { loggerContextPlugin } from './vite-plugin-logger-context';
 
 export default defineConfig(({ mode }) => {
   if (mode === 'package') {
@@ -17,6 +18,7 @@ export default defineConfig(({ mode }) => {
         react(),
         eslint(),
         tsconfigPaths(),
+        loggerContextPlugin(),
         visualizer(),
         dts({
           insertTypesEntry: true,
@@ -70,6 +72,7 @@ export default defineConfig(({ mode }) => {
       react(),
       mode !== 'test' && eslint({ failOnError: mode === 'production', failOnWarning: mode === 'production' }),
       tsconfigPaths(),
+      loggerContextPlugin(),
       visualizer(),
     ],
     build: {
