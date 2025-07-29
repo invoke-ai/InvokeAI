@@ -73,7 +73,7 @@ dependencies = [
   "pypatchmatch",
   "python-multipart",
   "requests",
-  "semver~=3.0.1"
+  "semver~=3.0.1",
 ]
 
 [project.optional-dependencies]
@@ -81,6 +81,14 @@ dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
   "xformers>=0.0.28.post1; sys_platform!='darwin'",
   # torch 2.4+cu carries its own triton dependency
+]
+
+"cpu" = ["torch==2.7.1+cpu", "torchvision==0.22.1+cpu"]
+"cuda" = ["torch==2.7.1+cu128", "torchvision==0.22.1+cu128"]
+"rocm" = [
+  "torch==2.7.1+rocm6.3",
+  "torchvision==0.22.1+rocm6.3",
+  "pytorch-triton-rocm",
 ]
 
 "onnx" = ["onnxruntime"]
@@ -113,7 +121,38 @@ dependencies = [
 # Prevent opencv-python from ever being chosen during dependency resolution.
 # This prevents conflicts with opencv-contrib-python, which Invoke requires.
 override-dependencies = ["opencv-python; sys_platform=='never'"]
+conflicts = [[{ extra = "cpu" }, { extra = "cuda" }, { extra = "rocm" }]]
+index-strategy = "unsafe-best-match"
 
+[tool.uv.sources]
+torch = [
+  { index = "torch-cpu", extra = "cpu" },
+  { index = "torch-cuda", extra = "cuda" },
+  { index = "torch-rocm", extra = "rocm" },
+]
+torchvision = [
+  { index = "torch-cpu", extra = "cpu" },
+  { index = "torch-cuda", extra = "cuda" },
+  { index = "torch-rocm", extra = "rocm" },
+]
+pytorch-triton-rocm = [
+  { index = "torch-rocm", extra = "rocm", marker = "sys_platform == 'linux'" },
+]
+
+[[tool.uv.index]]
+name = "torch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "torch-cuda"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[[tool.uv.index]]
+name = "torch-rocm"
+url = "https://download.pytorch.org/whl/rocm6.3"
+explicit = true
 
 [project.scripts]
 "invokeai-web" = "invokeai.app.run_app:run_app"

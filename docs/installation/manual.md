@@ -69,34 +69,34 @@ The following commands vary depending on the version of Invoke being installed a
     - If you have an Nvidia 20xx series GPU or older, use `invokeai[xformers]`.
     - If you have an Nvidia 30xx series GPU or newer, or do not have an Nvidia GPU, use `invokeai`.
 
-7. Determine the `PyPI` index URL to use for installation, if any. This is necessary to get the right version of torch installed.
+7. Determine the torch backend to use for installation, if any. This is necessary to get the right version of torch installed. This is acheived by using [UV's built in torch support.](https://docs.astral.sh/uv/guides/integration/pytorch/#automatic-backend-selection)
 
     === "Invoke v5.12 and later"
 
-        - If you are on Windows or Linux with an Nvidia GPU, use `https://download.pytorch.org/whl/cu128`.
-        - If you are on Linux with no GPU, use `https://download.pytorch.org/whl/cpu`.
-        - If you are on Linux with an AMD GPU, use `https://download.pytorch.org/whl/rocm6.2.4`.
-        - **In all other cases, do not use an index.**
+        - If you are on Windows or Linux with an Nvidia GPU, use `--torch-backend=cu128`.
+        - If you are on Linux with no GPU, use `--torch-backend=cpu`.
+        - If you are on Linux with an AMD GPU, use `--torch-backend=rocm6.3`.
+        - **In all other cases, do not use a torch backend.**
 
     === "Invoke v5.10.0 to v5.11.0"
 
-        - If you are on Windows or Linux with an Nvidia GPU, use `https://download.pytorch.org/whl/cu126`.
-        - If you are on Linux with no GPU, use `https://download.pytorch.org/whl/cpu`.
-        - If you are on Linux with an AMD GPU, use `https://download.pytorch.org/whl/rocm6.2.4`.
+        - If you are on Windows or Linux with an Nvidia GPU, use `--torch-backend=cu126`.
+        - If you are on Linux with no GPU, use `--torch-backend=cpu`.
+        - If you are on Linux with an AMD GPU, use `--torch-backend=rocm6.2.4`.
         - **In all other cases, do not use an index.**
 
     === "Invoke v5.0.0 to v5.9.1"
 
-        - If you are on Windows with an Nvidia GPU, use `https://download.pytorch.org/whl/cu124`.
-        - If you are on Linux with no GPU, use `https://download.pytorch.org/whl/cpu`.
-        - If you are on Linux with an AMD GPU, use `https://download.pytorch.org/whl/rocm6.1`.
+        - If you are on Windows with an Nvidia GPU, use `--torch-backend=cu124`.
+        - If you are on Linux with no GPU, use `--torch-backend=cpu`.
+        - If you are on Linux with an AMD GPU, use `--torch-backend=rocm6.1`.
         - **In all other cases, do not use an index.**
 
     === "Invoke v4"
 
-        - If you are on Windows with an Nvidia GPU, use `https://download.pytorch.org/whl/cu124`.
-        - If you are on Linux with no GPU, use `https://download.pytorch.org/whl/cpu`.
-        - If you are on Linux with an AMD GPU, use `https://download.pytorch.org/whl/rocm5.2`.
+        - If you are on Windows with an Nvidia GPU, use `--torch-backend=cu124`.
+        - If you are on Linux with no GPU, use `--torch-backend=cpu`.
+        - If you are on Linux with an AMD GPU, use `--torch-backend=rocm5.2`.
         - **In all other cases, do not use an index.**
 
 8. Install the `invokeai` package. Substitute the package specifier and version.
@@ -105,10 +105,10 @@ The following commands vary depending on the version of Invoke being installed a
     uv pip install <PACKAGE_SPECIFIER>==<VERSION> --python 3.12 --python-preference only-managed --force-reinstall
     ```
 
-    If you determined you needed to use a `PyPI` index URL in the previous step, you'll need to add `--index=<INDEX_URL>` like this:
+    If you determined you needed to use a torch backend in the previous step, you'll need to set the backend like this:
 
     ```sh
-    uv pip install <PACKAGE_SPECIFIER>==<VERSION> --python 3.12 --python-preference only-managed --index=<INDEX_URL> --force-reinstall
+    uv pip install <PACKAGE_SPECIFIER>==<VERSION> --python 3.12 --python-preference only-managed --torch-backend=<VERSION> --force-reinstall
     ```
 
 9. Deactivate and reactivate your venv so that the invokeai-specific commands become available in the environment:
