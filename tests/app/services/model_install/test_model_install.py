@@ -182,24 +182,34 @@ def test_background_install(
 def test_not_inplace_install(
     mm2_installer: ModelInstallServiceBase, embedding_file: Path, mm2_app_config: InvokeAIAppConfig
 ) -> None:
+    # An non in-place install will/should call `register_path()` internally
     source = LocalModelSource(path=embedding_file, inplace=False)
     job = mm2_installer.import_model(source)
     mm2_installer.wait_for_installs()
     assert job is not None
     assert job.config_out is not None
+    # Non in-place install should _move_ the model from the original location to the models path
+    # The model config's path should be different from the original file
     assert Path(job.config_out.path) != embedding_file
+    # Original file should _not_ exist after install
+    assert not embedding_file.exists()
     assert (mm2_app_config.models_path / job.config_out.path).exists()
 
 
 def test_inplace_install(
     mm2_installer: ModelInstallServiceBase, embedding_file: Path, mm2_app_config: InvokeAIAppConfig
 ) -> None:
+    # An in-place install will/should call `install_path()` internally
     source = LocalModelSource(path=embedding_file, inplace=True)
     job = mm2_installer.import_model(source)
     mm2_installer.wait_for_installs()
     assert job is not None
     assert job.config_out is not None
+    # In-place install should not touch the model file, just register it
+    # The model config's path should be the same as the original file
     assert Path(job.config_out.path) == embedding_file
+    # Model file should still exist after install
+    assert embedding_file.exists()
     assert Path(job.config_out.path).exists()
 
 
@@ -207,15 +217,13 @@ def test_delete_install(
     mm2_installer: ModelInstallServiceBase, embedding_file: Path, mm2_app_config: InvokeAIAppConfig
 ) -> None:
     store = mm2_installer.record_store
-    key = mm2_installer.install_path(embedding_file)
+    key = mm2_installer.install_path(embedding_file)  # non in-place install
     model_record = store.get_model(key)
     assert (mm2_app_config.models_path / model_record.path).exists()
-    assert embedding_file.exists()  # original should still be there after installation
+    assert not embedding_file.exists()
     mm2_installer.delete(key)
-    assert not (
-        mm2_app_config.models_path / model_record.path
-    ).exists()  # after deletion, installed copy should not exist
-    assert embedding_file.exists()  # but original should still be there
+    # after deletion, installed copy should not exist
+    assert not (mm2_app_config.models_path / model_record.path).exists()
     with pytest.raises(UnknownModelException):
         store.get_model(key)
 
@@ -224,10 +232,10 @@ def test_delete_register(
     mm2_installer: ModelInstallServiceBase, embedding_file: Path, mm2_app_config: InvokeAIAppConfig
 ) -> None:
     store = mm2_installer.record_store
-    key = mm2_installer.register_path(embedding_file)
+    key = mm2_installer.register_path(embedding_file)  # in-place install
     model_record = store.get_model(key)
     assert Path(model_record.path).exists()
-    assert embedding_file.exists()  # original should still be there after installation
+    assert embedding_file.exists()
     mm2_installer.delete(key)
     assert Path(model_record.path).exists()
     with pytest.raises(UnknownModelException):
