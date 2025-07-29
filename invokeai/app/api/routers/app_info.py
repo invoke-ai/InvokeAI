@@ -7,7 +7,7 @@ from typing import Optional
 import torch
 from fastapi import Body, HTTPException, Query
 from fastapi.routing import APIRouter
-from pydantic import BaseModel, Field, JsonValue
+from pydantic import BaseModel, Field
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.invocations.upscale import ESRGAN_MODELS
@@ -178,11 +178,11 @@ async def get_invocation_cache_status() -> InvocationCacheStatus:
 @app_router.get(
     "/client_state",
     operation_id="get_client_state_by_key",
-    response_model=JsonValue | None,
+    response_model=str | None,
 )
 async def get_client_state_by_key(
     key: str = Query(..., description="Key to get"),
-) -> JsonValue | None:
+) -> str | None:
     """Gets the client state"""
     try:
         return ApiDependencies.invoker.services.client_state_persistence.get_by_key(key)
@@ -194,15 +194,15 @@ async def get_client_state_by_key(
 @app_router.post(
     "/client_state",
     operation_id="set_client_state",
-    response_model=None,
+    response_model=str,
 )
 async def set_client_state(
     key: str = Query(..., description="Key to set"),
-    value: JsonValue = Body(..., description="Value of the key"),
-) -> None:
+    value: str = Body(..., description="Stringified value to set"),
+) -> str:
     """Sets the client state"""
     try:
-        ApiDependencies.invoker.services.client_state_persistence.set_by_key(key, value)
+        return ApiDependencies.invoker.services.client_state_persistence.set_by_key(key, value)
     except Exception as e:
         logging.error(f"Error setting client state: {e}")
         raise HTTPException(status_code=500, detail="Error setting client state")

@@ -1,7 +1,5 @@
 import json
 
-from pydantic import JsonValue
-
 from invokeai.app.services.client_state_persistence.client_state_persistence_base import ClientStatePersistenceABC
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
@@ -21,8 +19,21 @@ class ClientStatePersistenceSqlite(ClientStatePersistenceABC):
     def start(self, invoker: Invoker) -> None:
         self._invoker = invoker
 
-    def set_by_key(self, key: str, value: JsonValue) -> None:
-        state = self.get() or {}
+    def _get(self) -> dict[str, str] | None:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                f"""
+                SELECT data FROM client_state
+                WHERE id = {self._default_row_id}
+                """
+            )
+            row = cursor.fetchone()
+            if row is None:
+                return None
+            return json.loads(row[0])
+
+    def set_by_key(self, key: str, value: str) -> str:
+        state = self._get() or {}
         state.update({key: value})
 
         with self._db.transaction() as cursor:
@@ -36,21 +47,10 @@ class ClientStatePersistenceSqlite(ClientStatePersistenceABC):
                 (json.dumps(state),),
             )
 
-    def get(self) -> dict[str, JsonValue] | None:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                f"""
-                SELECT data FROM client_state
-                WHERE id = {self._default_row_id}
-                """
-            )
-            row = cursor.fetchone()
-            if row is None:
-                return None
-            return json.loads(row[0])
+        return value
 
-    def get_by_key(self, key: str) -> JsonValue | None:
-        state = self.get()
+    def get_by_key(self, key: str) -> str | None:
+        state = self._get()
         if state is None:
             return None
         return state.get(key, None)
