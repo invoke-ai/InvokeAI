@@ -16,34 +16,15 @@ export const selectNode = (nodesSlice: NodesState, nodeId: string): AnyNode => {
   return node;
 };
 
-export const selectInvocationNode = (nodesSlice: NodesState, nodeId: string): InvocationNode => {
+const selectInvocationNode = (nodesSlice: NodesState, nodeId: string): InvocationNode => {
   const node = nodesSlice.nodes.find((node) => node.id === nodeId);
   assert(isInvocationNode(node), `Node ${nodeId} is not an invocation node`);
-  return node;
-};
-
-export const selectInvocationNodeSafe = (nodesSlice: NodesState, nodeId: string): InvocationNode | undefined => {
-  const node = nodesSlice.nodes.find((node) => node.id === nodeId);
-  if (!isInvocationNode(node)) {
-    return undefined;
-  }
   return node;
 };
 
 export const selectNodeData = (nodesSlice: NodesState, nodeId: string): InvocationNodeData => {
   const node = selectInvocationNode(nodesSlice, nodeId);
   return node.data;
-};
-
-export const selectFieldInputInstance = (
-  nodesSlice: NodesState,
-  nodeId: string,
-  fieldName: string
-): FieldInputInstance => {
-  const data = selectNodeData(nodesSlice, nodeId);
-  const field = data.inputs[fieldName];
-  assert(field !== undefined, `Field ${fieldName} not found in node ${nodeId}`);
-  return field;
 };
 
 export const selectFieldInputInstanceSafe = (

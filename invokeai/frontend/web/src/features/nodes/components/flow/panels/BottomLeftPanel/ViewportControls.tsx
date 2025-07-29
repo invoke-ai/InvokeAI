@@ -14,6 +14,8 @@ import {
   PiMapPinBold,
 } from 'react-icons/pi';
 
+import { AutoLayoutPopover } from './AutoLayoutPopover';
+
 const ViewportControls = () => {
   const { t } = useTranslation();
   const { zoomIn, zoomOut, fitView } = useReactFlow();
@@ -56,20 +58,7 @@ const ViewportControls = () => {
         onClick={handleClickedFitView}
         icon={<PiFrameCornersBold />}
       />
-      {/* <Tooltip
-        label={
-          shouldShowFieldTypeLegend
-            ? t('nodes.hideLegendNodes')
-            : t('nodes.showLegendNodes')
-        }
-      >
-        <IconButton
-          aria-label="Toggle field type legend"
-          isChecked={shouldShowFieldTypeLegend}
-          onClick={handleClickedToggleFieldTypeLegend}
-          icon={<FaInfo />}
-        />
-      </Tooltip> */}
+      <AutoLayoutPopover />
       <IconButton
         tooltip={shouldShowMinimapPanel ? t('nodes.hideMinimapnodes') : t('nodes.showMinimapnodes')}
         aria-label={shouldShowMinimapPanel ? t('nodes.hideMinimapnodes') : t('nodes.showMinimapnodes')}

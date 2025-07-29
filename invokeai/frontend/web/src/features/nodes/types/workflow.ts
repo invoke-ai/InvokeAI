@@ -1,5 +1,5 @@
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 import type { FieldType } from './field';
 import { zFieldIdentifier } from './field';

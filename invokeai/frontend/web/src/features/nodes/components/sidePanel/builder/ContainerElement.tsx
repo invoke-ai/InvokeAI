@@ -34,7 +34,7 @@ import { useTranslation } from 'react-i18next';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
-const ContainerElement = memo(({ id }: { id: string }) => {
+const ContainerElementComponent = memo(({ id }: { id: string }) => {
   const el = useElement(id);
   const mode = useAppSelector(selectWorkflowMode);
 
@@ -49,7 +49,7 @@ const ContainerElement = memo(({ id }: { id: string }) => {
   // mode === 'edit'
   return <ContainerElementComponentEditMode el={el} />;
 });
-ContainerElement.displayName = 'ContainerElementComponent';
+ContainerElementComponent.displayName = 'ContainerElementComponent';
 
 const containerViewModeSx: SystemStyleObject = {
   gap: 2,
@@ -301,7 +301,7 @@ const FormElementComponent = memo(({ id }: { id: string }) => {
   }
 
   if (isContainerElement(el)) {
-    return <ContainerElement key={id} id={id} />;
+    return <ContainerElementComponent key={id} id={id} />;
   }
 
   if (isNodeFieldElement(el)) {

@@ -1,3 +1,5 @@
-export const preventDefault = (e: React.MouseEvent) => {
+import type { MouseEvent } from 'react';
+
+export const preventDefault = (e: MouseEvent) => {
   e.preventDefault();
 };

@@ -2,7 +2,8 @@ import { objectEquals } from '@observ33r/object-equals';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import type { PersistConfig, RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
 import { clamp } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { FLUXReduxImageInfluence, RefImagesState } from 'features/controlLayers/store/types';
@@ -18,7 +19,7 @@ import { assert } from 'tsafe';
 import type { PartialDeep } from 'type-fest';
 
 import type { CLIPVisionModelV2, IPMethodV2, RefImageState } from './types';
-import { getInitialRefImagesState, isFLUXReduxConfig, isIPAdapterConfig } from './types';
+import { getInitialRefImagesState, isFLUXReduxConfig, isIPAdapterConfig, zRefImagesState } from './types';
 import {
   getReferenceImageState,
   imageDTOToImageWithDims,
@@ -36,7 +37,7 @@ type PayloadActionWithId<T = void> = T extends void
       } & T
     >;
 
-export const refImagesSlice = createSlice({
+const slice = createSlice({
   name: 'refImages',
   initialState: getInitialRefImagesState(),
   reducers: {
@@ -263,18 +264,16 @@ export const {
   refImageFLUXReduxImageInfluenceChanged,
   refImageIsEnabledToggled,
   refImagesRecalled,
-} = refImagesSlice.actions;
+} = slice.actions;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrate = (state: any): any => {
-  return state;
-};
-
-export const refImagesPersistConfig: PersistConfig<RefImagesState> = {
-  name: refImagesSlice.name,
-  initialState: getInitialRefImagesState(),
-  migrate,
-  persistDenylist: ['selectedEntityId', 'isPanelOpen'],
+export const refImagesSliceConfig: SliceConfig<typeof slice> = {
+  slice,
+  schema: zRefImagesState,
+  getInitialState: getInitialRefImagesState,
+  persistConfig: {
+    migrate: (state) => zRefImagesState.parse(state),
+    persistDenylist: ['selectedEntityId', 'isPanelOpen'],
+  },
 };
 
 export const selectRefImagesSlice = (state: RootState) => state.refImages;

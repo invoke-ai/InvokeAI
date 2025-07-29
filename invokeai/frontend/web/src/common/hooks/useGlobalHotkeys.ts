@@ -139,4 +139,13 @@ export const useGlobalHotkeys = () => {
     },
     dependencies: [getState, deleteImageModalApi],
   });
+
+  useRegisteredHotkeys({
+    id: 'toggleViewer',
+    category: 'viewer',
+    callback: () => {
+      navigationApi.toggleViewerPanel();
+    },
+    dependencies: [],
+  });
 };

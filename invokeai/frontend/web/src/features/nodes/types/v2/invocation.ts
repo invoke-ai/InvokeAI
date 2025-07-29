@@ -1,4 +1,4 @@
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 import { zFieldInputInstance, zFieldOutputInstance } from './field';
 import { zSemVer } from './semver';

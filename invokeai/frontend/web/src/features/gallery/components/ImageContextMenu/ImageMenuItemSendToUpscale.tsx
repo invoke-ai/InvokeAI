@@ -1,5 +1,6 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { toast } from 'features/toast/toast';
@@ -14,7 +15,7 @@ export const ImageMenuItemSendToUpscale = memo(() => {
   const imageDTO = useImageDTOContext();
 
   const handleSendToCanvas = useCallback(() => {
-    dispatch(upscaleInitialImageChanged(imageDTO));
+    dispatch(upscaleInitialImageChanged(imageDTOToImageWithDims(imageDTO)));
     navigationApi.switchToTab('upscaling');
     toast({
       id: 'SENT_TO_CANVAS',

@@ -141,7 +141,7 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     rand_device: shouldUseCpuNoise ? 'cpu' : 'cuda',
     scheduler,
     negative_prompt: prompts.negative,
-    negative_style_prompt: prompts.negativeStyle,
+    negative_style_prompt: prompts.useMainPromptsForStyle ? prompts.negative : prompts.negativeStyle,
     vae: vae ?? undefined,
   });
   g.addEdgeToMetadata(seed, 'value', 'seed');

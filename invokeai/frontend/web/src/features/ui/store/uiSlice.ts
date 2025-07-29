@@ -1,11 +1,13 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { PersistConfig, RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
+import { isPlainObject } from 'es-toolkit';
+import { assert } from 'tsafe';
 
-import type { UIState } from './uiTypes';
-import { getInitialUIState } from './uiTypes';
+import { getInitialUIState, type UIState, zUIState } from './uiTypes';
 
-export const uiSlice = createSlice({
+const slice = createSlice({
   name: 'ui',
   initialState: getInitialUIState(),
   reducers: {
@@ -65,6 +67,9 @@ export const uiSlice = createSlice({
     shouldShowNotificationChanged: (state, action: PayloadAction<UIState['shouldShowNotificationV2']>) => {
       state.shouldShowNotificationV2 = action.payload;
     },
+    pickerCompactViewStateChanged: (state, action: PayloadAction<{ pickerId: string; isCompact: boolean }>) => {
+      state.pickerCompactViewStates[action.payload.pickerId] = action.payload.isCompact;
+    },
   },
 });
 
@@ -77,29 +82,31 @@ export const {
   shouldShowNotificationChanged,
   textAreaSizesStateChanged,
   dockviewStorageKeyChanged,
-} = uiSlice.actions;
+  pickerCompactViewStateChanged,
+} = slice.actions;
 
 export const selectUiSlice = (state: RootState) => state.ui;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrateUIState = (state: any): any => {
-  if (!('_version' in state)) {
-    state._version = 1;
-  }
-  if (state._version === 1) {
-    state.activeTab = 'generation';
-    state._version = 2;
-  }
-  if (state._version === 2) {
-    state.activeTab = 'canvas';
-    state._version = 3;
-  }
-  return state;
-};
-
-export const uiPersistConfig: PersistConfig<UIState> = {
-  name: uiSlice.name,
-  initialState: getInitialUIState(),
-  migrate: migrateUIState,
-  persistDenylist: ['shouldShowImageDetails'],
+export const uiSliceConfig: SliceConfig<typeof slice> = {
+  slice,
+  schema: zUIState,
+  getInitialState: getInitialUIState,
+  persistConfig: {
+    migrate: (state) => {
+      assert(isPlainObject(state));
+      if (!('_version' in state)) {
+        state._version = 1;
+      }
+      if (state._version === 1) {
+        state.activeTab = 'generation';
+        state._version = 2;
+      }
+      if (state._version === 2) {
+        state.activeTab = 'canvas';
+        state._version = 3;
+      }
+      return zUIState.parse(state);
+    },
+    persistDenylist: ['shouldShowImageDetails'],
+  },
 };

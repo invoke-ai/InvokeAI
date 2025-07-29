@@ -126,6 +126,7 @@ const AddRefImageDropTargetAndButton = memo(() => {
     </Flex>
   );
 });
+AddRefImageDropTargetAndButton.displayName = 'AddRefImageDropTargetAndButton';
 
 const BboxButton = memo(() => {
   const { t } = useTranslation();
@@ -145,4 +146,4 @@ const BboxButton = memo(() => {
     />
   );
 });
-AddRefImageDropTargetAndButton.displayName = 'AddRefImageDropTargetAndButton';
+BboxButton.displayName = 'BboxButton';

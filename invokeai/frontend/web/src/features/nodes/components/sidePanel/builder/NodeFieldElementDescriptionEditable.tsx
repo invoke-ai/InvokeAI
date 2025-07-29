@@ -13,8 +13,8 @@ export const NodeFieldElementDescriptionEditable = memo(({ el }: { el: NodeField
   const { data } = el;
   const { fieldIdentifier } = data;
   const dispatch = useAppDispatch();
-  const description = useInputFieldUserDescriptionSafe(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
-  const fieldTemplate = useInputFieldTemplateOrThrow(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
+  const description = useInputFieldUserDescriptionSafe(fieldIdentifier.fieldName);
+  const fieldTemplate = useInputFieldTemplateOrThrow(fieldIdentifier.fieldName);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const onChange = useCallback(

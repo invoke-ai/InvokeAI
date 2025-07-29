@@ -128,7 +128,6 @@ export const buildOnModelInstallError = (getState: AppGetState, dispatch: AppDis
     if (!install) {
       dispatch(api.util.invalidateTags([{ type: 'ModelInstalls' }]));
     } else {
-      install.source;
       dispatch(
         modelsApi.util.updateQueryData('listModelInstalls', undefined, (draft) => {
           const modelImport = draft.find((m) => m.id === data.id);

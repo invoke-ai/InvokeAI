@@ -253,6 +253,7 @@
         "cancel": "Cancel",
         "cancelAllExceptCurrentQueueItemAlertDialog": "Canceling all queue items except the current one will stop pending items but allow the in-progress one to finish.",
         "cancelAllExceptCurrentQueueItemAlertDialog2": "Are you sure you want to cancel all pending queue items?",
+        "cancelAllExceptCurrent": "Cancel All Except Current",
         "cancelAllExceptCurrentTooltip": "Cancel All Except Current Item",
         "cancelTooltip": "Cancel Current Item",
         "cancelSucceeded": "Item Canceled",
@@ -273,7 +274,7 @@
         "retryItem": "Retry Item",
         "cancelBatchSucceeded": "Batch Canceled",
         "cancelBatchFailed": "Problem Canceling Batch",
-        "clearQueueAlertDialog": "Clearing the queue immediately cancels any processing items and clears the queue entirely. Pending filters will be canceled.",
+        "clearQueueAlertDialog": "Clearing the queue immediately cancels any processing items and clears the queue entirely. Pending filters will be canceled and the Canvas Staging Area will be reset.",
         "clearQueueAlertDialog2": "Are you sure you want to clear the queue?",
         "current": "Current",
         "next": "Next",
@@ -470,6 +471,11 @@
             "togglePanels": {
                 "title": "Toggle Panels",
                 "desc": "Show or hide both left and right panels at once."
+            },
+            "selectGenerateTab": {
+                "title": "Select the Generate Tab",
+                "desc": "Selects the Generate tab.",
+                "key": "1"
             }
         },
         "canvas": {
@@ -574,6 +580,10 @@
                 "title": "Transform",
                 "desc": "Transform the selected layer."
             },
+            "invertMask": {
+                "title": "Invert Mask",
+                "desc": "Invert the selected inpaint mask, creating a new mask with opposite transparency."
+            },
             "applyFilter": {
                 "title": "Apply Filter",
                 "desc": "Apply the pending filter to the selected layer."
@@ -599,6 +609,20 @@
             "toggleNonRasterLayers": {
                 "title": "Toggle Non-Raster Layers",
                 "desc": "Show or hide all non-raster layer categories (Control Layers, Inpaint Masks, Regional Guidance)."
+            },
+            "fitBboxToMasks": {
+                "title": "Fit Bbox To Masks",
+                "desc": "Automatically adjust the generation bounding box to fit visible inpaint masks"
+            },
+            "applySegmentAnything": {
+                "title": "Apply Segment Anything",
+                "desc": "Apply the current Segment Anything mask.",
+                "key": "enter"
+            },
+            "cancelSegmentAnything": {
+                "title": "Cancel Segment Anything",
+                "desc": "Cancel the current Segment Anything operation.",
+                "key": "esc"
             }
         },
         "workflows": {
@@ -728,6 +752,10 @@
             "deleteSelection": {
                 "title": "Delete",
                 "desc": "Delete all selected images. By default, you will be prompted to confirm deletion. If the images are currently in use in the app, you will be warned."
+            },
+            "starImage": {
+                "title": "Star/Unstar Image",
+                "desc": "Star or unstar the selected image."
             }
         }
     },
@@ -1125,7 +1153,23 @@
         "addItem": "Add Item",
         "generateValues": "Generate Values",
         "floatRangeGenerator": "Float Range Generator",
-        "integerRangeGenerator": "Integer Range Generator"
+        "integerRangeGenerator": "Integer Range Generator",
+        "layout": {
+            "autoLayout": "Auto Layout",
+            "layeringStrategy": "Layering Strategy",
+            "networkSimplex": "Network Simplex",
+            "longestPath": "Longest Path",
+            "nodeSpacing": "Node Spacing",
+            "layerSpacing": "Layer Spacing",
+            "layoutDirection": "Layout Direction",
+            "layoutDirectionRight": "Right",
+            "layoutDirectionDown": "Down",
+            "alignment": "Node Alignment",
+            "alignmentUL": "Top Left",
+            "alignmentDL": "Bottom Left",
+            "alignmentUR": "Top Right",
+            "alignmentDR": "Bottom Right"
+        }
     },
     "parameters": {
         "aspect": "Aspect",
@@ -1407,7 +1451,15 @@
         "sentToUpscale": "Sent to Upscale",
         "promptGenerationStarted": "Prompt generation started",
         "uploadAndPromptGenerationFailed": "Failed to upload image and generate prompt",
-        "promptExpansionFailed": "We ran into an issue. Please try prompt expansion again."
+        "promptExpansionFailed": "We ran into an issue. Please try prompt expansion again.",
+        "maskInverted": "Mask Inverted",
+        "maskInvertFailed": "Failed to Invert Mask",
+        "noVisibleMasks": "No Visible Masks",
+        "noVisibleMasksDesc": "Create or enable at least one inpaint mask to invert",
+        "noInpaintMaskSelected": "No Inpaint Mask Selected",
+        "noInpaintMaskSelectedDesc": "Select an inpaint mask to invert",
+        "invalidBbox": "Invalid Bounding Box",
+        "invalidBboxDesc": "The bounding box has no valid dimensions"
     },
     "popovers": {
         "clipSkip": {
@@ -1775,6 +1827,20 @@
                 "Structure controls how closely the output image will keep to the layout of the original. Low structure allows major changes, while high structure strictly maintains the original composition and layout."
             ]
         },
+        "tileSize": {
+            "heading": "Tile Size",
+            "paragraphs": [
+                "Controls the size of tiles used during the upscaling process. Larger tiles use more memory but may produce better results.",
+                "SD1.5 models default to 768, while SDXL models default to 1024. Reduce tile size if you encounter memory issues."
+            ]
+        },
+        "tileOverlap": {
+            "heading": "Tile Overlap",
+            "paragraphs": [
+                "Controls the overlap between adjacent tiles during upscaling. Higher overlap values help reduce visible seams between tiles but use more memory.",
+                "The default value of 128 works well for most cases, but you can adjust based on your specific needs and memory constraints."
+            ]
+        },
         "fluxDevLicense": {
             "heading": "Non-Commercial License",
             "paragraphs": [
@@ -1926,6 +1992,7 @@
         "canvas": "Canvas",
         "bookmark": "Bookmark for Quick Switch",
         "fitBboxToLayers": "Fit Bbox To Layers",
+        "fitBboxToMasks": "Fit Bbox To Masks",
         "removeBookmark": "Remove Bookmark",
         "saveCanvasToGallery": "Save Canvas to Gallery",
         "saveBboxToGallery": "Save Bbox to Gallery",
@@ -1990,6 +2057,7 @@
         "rasterLayer": "Raster Layer",
         "controlLayer": "Control Layer",
         "inpaintMask": "Inpaint Mask",
+        "invertMask": "Invert Mask",
         "regionalGuidance": "Regional Guidance",
         "referenceImageRegional": "Reference Image (Regional)",
         "referenceImageGlobal": "Reference Image (Global)",
@@ -2396,6 +2464,9 @@
         "upscaleModel": "Upscale Model",
         "postProcessingModel": "Post-Processing Model",
         "scale": "Scale",
+        "tileControl": "Tile Control",
+        "tileSize": "Tile Size",
+        "tileOverlap": "Tile Overlap",
         "postProcessingMissingModelWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install a post-processing (image to image) model.",
         "missingModelsWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install the required models:",
         "mainModelDesc": "Main model (SD1.5 or SDXL architecture)",
@@ -2560,9 +2631,10 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "Generate images faster with new Launchpads and a simplified Generate tab.",
-            "Edit with prompts using Flux Kontext Dev.",
-            "Export to PSD, bulk-hide overlays, organize models & images — all in a reimagined interface built for control."
+            "New setting to send all Canvas generations directly to the Gallery.",
+            "New Invert Mask (Shift+V) and Fit BBox to Mask (Shift+B) capabilities.",
+            "Expanded support for Model Thumbnails and configurations.",
+            "Various other quality of life updates and fixes"
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",

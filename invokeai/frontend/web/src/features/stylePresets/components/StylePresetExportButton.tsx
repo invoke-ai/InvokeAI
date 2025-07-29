@@ -27,7 +27,7 @@ export const StylePresetExportButton = () => {
     try {
       const response = await exportStylePresets().unwrap();
       blob = new Blob([response], { type: 'text/csv' });
-    } catch (error) {
+    } catch {
       toast({
         status: 'error',
         title: t('stylePresets.exportFailed'),

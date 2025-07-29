@@ -1,27 +1,29 @@
 import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
-import type { PersistConfig, RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { deepClone } from 'common/util/deepClone';
+import type { SliceConfig } from 'app/store/types';
+import { isPlainObject } from 'es-toolkit';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { useMemo } from 'react';
 import { queueApi } from 'services/api/endpoints/queue';
+import { assert } from 'tsafe';
+import z from 'zod';
 
-type CanvasStagingAreaState = {
-  _version: 1;
-  canvasSessionId: string;
-  canvasDiscardedQueueItems: number[];
-};
+const zCanvasStagingAreaState = z.object({
+  _version: z.literal(1),
+  canvasSessionId: z.string(),
+  canvasDiscardedQueueItems: z.array(z.number().int()),
+});
+type CanvasStagingAreaState = z.infer<typeof zCanvasStagingAreaState>;
 
-const INITIAL_STATE: CanvasStagingAreaState = {
+const getInitialState = (): CanvasStagingAreaState => ({
   _version: 1,
   canvasSessionId: getPrefixedId('canvas'),
   canvasDiscardedQueueItems: [],
-};
+});
 
-const getInitialState = (): CanvasStagingAreaState => deepClone(INITIAL_STATE);
-
-export const canvasSessionSlice = createSlice({
+const slice = createSlice({
   name: 'canvasSession',
   initialState: getInitialState(),
   reducers: {
@@ -48,26 +50,26 @@ export const canvasSessionSlice = createSlice({
   },
 });
 
-export const { canvasSessionReset, canvasQueueItemDiscarded } = canvasSessionSlice.actions;
+export const { canvasSessionReset, canvasQueueItemDiscarded } = slice.actions;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrate = (state: any): any => {
-  if (!('_version' in state)) {
-    state._version = 1;
-    state.canvasSessionId = state.canvasSessionId ?? getPrefixedId('canvas');
-  }
+export const canvasSessionSliceConfig: SliceConfig<typeof slice> = {
+  slice,
+  schema: zCanvasStagingAreaState,
+  getInitialState,
+  persistConfig: {
+    migrate: (state) => {
+      assert(isPlainObject(state));
+      if (!('_version' in state)) {
+        state._version = 1;
+        state.canvasSessionId = state.canvasSessionId ?? getPrefixedId('canvas');
+      }
 
-  return state;
+      return zCanvasStagingAreaState.parse(state);
+    },
+  },
 };
 
-export const canvasStagingAreaPersistConfig: PersistConfig<CanvasStagingAreaState> = {
-  name: canvasSessionSlice.name,
-  initialState: getInitialState(),
-  migrate,
-  persistDenylist: [],
-};
-
-export const selectCanvasSessionSlice = (s: RootState) => s[canvasSessionSlice.name];
+export const selectCanvasSessionSlice = (s: RootState) => s[slice.name];
 export const selectCanvasSessionId = createSelector(selectCanvasSessionSlice, ({ canvasSessionId }) => canvasSessionId);
 
 const selectDiscardedItems = createSelector(

@@ -4,9 +4,9 @@ import { useMemo } from 'react';
 
 import { useNodeHasImageOutput } from './useNodeHasImageOutput';
 
-export const useWithFooter = (nodeId: string) => {
-  const hasImageOutput = useNodeHasImageOutput(nodeId);
-  const isExecutableNode = useIsExecutableNode(nodeId);
+export const useWithFooter = () => {
+  const hasImageOutput = useNodeHasImageOutput();
+  const isExecutableNode = useIsExecutableNode();
   const isCacheEnabled = useFeatureStatus('invocationCache');
   const withFooter = useMemo(
     () => isExecutableNode && (hasImageOutput || isCacheEnabled),

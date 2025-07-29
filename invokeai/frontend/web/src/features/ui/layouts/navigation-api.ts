@@ -1,19 +1,21 @@
 import { logger } from 'app/logging/logger';
 import { createDeferredPromise, type Deferred } from 'common/util/createDeferredPromise';
 import { parseify } from 'common/util/serialize';
-import type { DockviewApi, GridviewApi, IDockviewPanel, IGridviewPanel } from 'dockview';
-import { GridviewPanel } from 'dockview';
+import type { GridviewApi, IDockviewPanel, IGridviewPanel } from 'dockview';
+import { DockviewApi, GridviewPanel } from 'dockview';
 import { debounce } from 'es-toolkit';
 import type { Serializable, TabName } from 'features/ui/store/uiTypes';
 import type { Atom } from 'nanostores';
 import { atom } from 'nanostores';
 
 import {
+  LAUNCHPAD_PANEL_ID,
   LEFT_PANEL_ID,
   LEFT_PANEL_MIN_SIZE_PX,
   RIGHT_PANEL_ID,
   RIGHT_PANEL_MIN_SIZE_PX,
   SWITCH_TABS_FAKE_DELAY_MS,
+  VIEWER_PANEL_ID,
 } from './shared';
 
 const log = logger('system');
@@ -68,6 +70,37 @@ export class NavigationApi {
    */
   private _$isLoading = atom(false);
   $isLoading: Atom<boolean> = this._$isLoading;
+
+  /**
+   * Track the _previous_ active dockview panel for each tab.
+   */
+  _prevActiveDockviewPanel: Map<TabName, string | null> = new Map();
+
+  /**
+   * Track the _current_ active dockview panel for each tab.
+   */
+  _currentActiveDockviewPanel: Map<TabName, string | null> = new Map();
+
+  /**
+   * Map of disposables for each tab.
+   * This is used to clean up resources when a tab is unregistered.
+   */
+  _disposablesForTab: Map<TabName, Set<() => void>> = new Map();
+
+  /**
+   * Convenience method to add a dispose function for a specific tab.
+   */
+  /**
+   * Convenience method to add a dispose function for a specific tab.
+   */
+  _addDisposeForTab = (tab: TabName, disposeFn: () => void): void => {
+    let disposables = this._disposablesForTab.get(tab);
+    if (!disposables) {
+      disposables = new Set<() => void>();
+      this._disposablesForTab.set(tab, disposables);
+    }
+    disposables.add(disposeFn);
+  };
 
   /**
    * Separator used to create unique keys for panels. Typo protection.
@@ -209,6 +242,18 @@ export class NavigationApi {
       this._registerPanel(tab, panel.id, panel);
     }
 
+    // Set up tracking for active tab for this panel - needed for viewer toggle functionality
+    if (api instanceof DockviewApi) {
+      this._currentActiveDockviewPanel.set(tab, api.activePanel?.id ?? null);
+      this._prevActiveDockviewPanel.set(tab, null);
+      const { dispose } = api.onDidActivePanelChange((panel) => {
+        const previousPanelId = this._currentActiveDockviewPanel.get(tab);
+        this._prevActiveDockviewPanel.set(tab, previousPanelId ?? null);
+        this._currentActiveDockviewPanel.set(tab, panel?.id ?? null);
+      });
+      this._addDisposeForTab(tab, dispose);
+    }
+
     api.onDidLayoutChange(
       debounce(() => {
         this._app?.storage.set(key, api.toJSON());
@@ -340,7 +385,7 @@ export class NavigationApi {
       log.trace(`Focused panel ${key}`);
 
       return true;
-    } catch (error) {
+    } catch {
       log.error(`Failed to focus panel ${panelId} in tab ${tab}`);
       return false;
     }
@@ -546,6 +591,42 @@ export class NavigationApi {
   };
 
   /**
+   * Toggle between the viewer panel and the previously focused dockview panel in the current tab.
+   * If currently on viewer and a previous panel exists, switch to the previous panel.
+   * If not on viewer, switch to viewer.
+   * If no previous panel exists, defaults to launchpad panel.
+   * Only operates on dockview panels (panels with tabs), not gridview panels.
+   *
+   * @returns Promise that resolves to true if successful, false otherwise
+   */
+  toggleViewerPanel = (): Promise<boolean> => {
+    const activeTab = this._app?.activeTab.get() ?? null;
+    if (!activeTab) {
+      log.warn('No active tab found for viewer toggle');
+      return Promise.resolve(false);
+    }
+
+    const prevActiveDockviewPanel = this._prevActiveDockviewPanel.get(activeTab);
+    const currentActiveDockviewPanel = this._currentActiveDockviewPanel.get(activeTab);
+
+    let targetPanel;
+
+    if (currentActiveDockviewPanel !== VIEWER_PANEL_ID) {
+      targetPanel = VIEWER_PANEL_ID;
+    } else if (prevActiveDockviewPanel && prevActiveDockviewPanel !== VIEWER_PANEL_ID) {
+      targetPanel = prevActiveDockviewPanel;
+    } else {
+      targetPanel = LAUNCHPAD_PANEL_ID;
+    }
+
+    if (this.getRegisteredPanels(activeTab).includes(targetPanel)) {
+      return this.focusPanel(activeTab, targetPanel);
+    }
+
+    return Promise.resolve(false);
+  };
+
+  /**
    * Check if a panel is registered.
    * @param tab - The tab the panel belongs to
    * @param panelId - The panel ID to check
@@ -592,6 +673,18 @@ export class NavigationApi {
       }
       this.waiters.delete(key);
     }
+
+    // Clear previous panel tracking for this tab
+    this._prevActiveDockviewPanel.delete(tab);
+    this._currentActiveDockviewPanel.delete(tab);
+    this._disposablesForTab.get(tab)?.forEach((disposeFn) => {
+      try {
+        disposeFn();
+      } catch (error) {
+        log.error({ error: parseify(error) }, `Error disposing resource for tab ${tab}`);
+      }
+    });
+    this._disposablesForTab.delete(tab);
 
     log.trace(`Unregistered all panels for tab ${tab}`);
   };

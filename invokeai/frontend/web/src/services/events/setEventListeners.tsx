@@ -1,12 +1,12 @@
 import { ExternalLink } from '@invoke-ai/ui-library';
 import { isAnyOf } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
-import { listenerMiddleware } from 'app/store/middleware/listenerMiddleware';
 import { socketConnected } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $bulkDownloadId } from 'app/store/nanostores/bulkDownloadId';
 import { $queueId } from 'app/store/nanostores/queueId';
 import type { AppStore } from 'app/store/store';
+import { listenerMiddleware } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { forEach, isNil, round } from 'es-toolkit/compat';
 import {
@@ -19,6 +19,7 @@ import { zNodeStatus } from 'features/nodes/types/invocation';
 import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
+import { LRUCache } from 'lru-cache';
 import type { ApiTagDescription } from 'services/api';
 import { api, LIST_ALL_TAG, LIST_TAG } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
@@ -30,13 +31,7 @@ import type { ClientToServerEvents, ServerToClientEvents } from 'services/events
 import type { Socket } from 'socket.io-client';
 import type { JsonObject } from 'type-fest';
 
-import {
-  $lastProgressEvent,
-  $lastUpscalingProgressEvent,
-  $lastUpscalingProgressImage,
-  $lastWorkflowsProgressEvent,
-  $lastWorkflowsProgressImage,
-} from './stores';
+import { $lastProgressEvent } from './stores';
 
 const log = logger('events');
 
@@ -50,6 +45,10 @@ const selectModelInstalls = modelsApi.endpoints.listModelInstalls.select();
 
 export const setEventListeners = ({ socket, store, setIsConnected }: SetEventListenersArg) => {
   const { dispatch, getState } = store;
+
+  // We can have race conditions where we receive a progress event for a queue item that has already finished. Easiest
+  // way to handle this is to keep track of finished queue items in a cache and ignore progress events for those.
+  const finishedQueueItemIds = new LRUCache<number, boolean>({ max: 100 });
 
   socket.on('connect', () => {
     log.debug('Connected');
@@ -88,6 +87,9 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('invocation_started', (data) => {
+    if (finishedQueueItemIds.has(data.item_id)) {
+      return;
+    }
     const { invocation_source_id, invocation } = data;
     log.debug({ data } as JsonObject, `Invocation started (${invocation.type}, ${invocation_source_id})`);
     const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
@@ -98,7 +100,11 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('invocation_progress', (data) => {
-    const { invocation_source_id, invocation, session_id, image, origin, percentage, message } = data;
+    if (finishedQueueItemIds.has(data.item_id)) {
+      log.trace({ data } as JsonObject, `Received event for already-finished queue item ${data.item_id}`);
+      return;
+    }
+    const { invocation_source_id, invocation, image, origin, percentage, message } = data;
 
     let _message = 'Invocation progress';
     if (message) {
@@ -113,20 +119,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
     $lastProgressEvent.set(data);
 
-    if (origin === 'upscaling') {
-      $lastUpscalingProgressEvent.set(data);
-      if (image) {
-        $lastUpscalingProgressImage.set({ sessionId: session_id, image });
-      }
-    }
-
     if (origin === 'workflows') {
-      $lastWorkflowsProgressEvent.set(data);
-
-      if (image) {
-        $lastWorkflowsProgressImage.set({ sessionId: session_id, image });
-      }
-
       const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
       if (nes) {
         nes.status = zNodeStatus.enum.IN_PROGRESS;
@@ -138,6 +131,10 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('invocation_error', (data) => {
+    if (finishedQueueItemIds.has(data.item_id)) {
+      log.trace({ data } as JsonObject, `Received event for already-finished queue item ${data.item_id}`);
+      return;
+    }
     const { invocation_source_id, invocation, error_type, error_message, error_traceback } = data;
     log.error({ data } as JsonObject, `Invocation error (${invocation.type}, ${invocation_source_id})`);
     const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
@@ -154,7 +151,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     }
   });
 
-  const onInvocationComplete = buildOnInvocationComplete(getState, dispatch);
+  const onInvocationComplete = buildOnInvocationComplete(getState, dispatch, finishedQueueItemIds);
   socket.on('invocation_complete', onInvocationComplete);
 
   socket.on('model_load_started', (data) => {
@@ -342,6 +339,11 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('queue_item_status_changed', (data) => {
+    if (finishedQueueItemIds.has(data.item_id)) {
+      log.trace({ data }, `Received event for already-finished queue item ${data.item_id}`);
+      return;
+    }
+
     // we've got new status for the queue item, batch and queue
     const {
       item_id,
@@ -381,7 +383,6 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
     // Invalidate caches for things we cannot easily update
     const tagsToInvalidate: ApiTagDescription[] = [
-      'SessionQueueStatus',
       'CurrentSessionQueueItem',
       'NextSessionQueueItem',
       'InvocationCacheStatus',
@@ -394,6 +395,16 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       tagsToInvalidate.push({ type: 'QueueCountsByDestination', id: destination });
     }
     dispatch(queueApi.util.invalidateTags(tagsToInvalidate));
+    dispatch(
+      queueApi.util.updateQueryData('getQueueStatus', undefined, (draft) => {
+        draft.queue = data.queue_status;
+      })
+    );
+    dispatch(
+      queueApi.util.updateQueryData('getBatchStatus', { batch_id: data.batch_id }, (draft) => {
+        Object.assign(draft, data.batch_status);
+      })
+    );
 
     if (status === 'in_progress') {
       forEach($nodeExecutionStates.get(), (nes) => {
@@ -408,11 +419,8 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         clone.outputs = [];
         $nodeExecutionStates.setKey(clone.nodeId, clone);
       });
-      if (data.origin === 'canvas') {
-        // store.dispatch(stagingAreaGenerationStarted({ sessionId: session_id }));
-        // $progressImages.setKey(session_id, { sessionId: session_id, isFinished: false });
-      }
     } else if (status === 'completed' || status === 'failed' || status === 'canceled') {
+      finishedQueueItemIds.set(item_id, true);
       if (status === 'failed' && error_type) {
         const isLocal = getState().config.isLocal ?? true;
         const sessionId = session_id;

@@ -1,9 +1,7 @@
 import type { DockviewApi, GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
 import { DockviewReact, GridviewReact, LayoutPriority, Orientation } from 'dockview';
-import { UpscalingLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/UpscalingLaunchpadPanel';
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
 import { GalleryPanel } from 'features/gallery/components/Gallery';
-import { GenerationProgressPanel } from 'features/gallery/components/ImageViewer/GenerationProgressPanel';
 import { ImageViewerPanel } from 'features/gallery/components/ImageViewer/ImageViewerPanel';
 import { FloatingLeftPanelButtons } from 'features/ui/components/FloatingLeftPanelButtons';
 import { FloatingRightPanelButtons } from 'features/ui/components/FloatingRightPanelButtons';
@@ -37,12 +35,12 @@ import {
   LEFT_PANEL_ID,
   LEFT_PANEL_MIN_SIZE_PX,
   MAIN_PANEL_ID,
-  PROGRESS_PANEL_ID,
   RIGHT_PANEL_ID,
   RIGHT_PANEL_MIN_SIZE_PX,
   SETTINGS_PANEL_ID,
   VIEWER_PANEL_ID,
 } from './shared';
+import { UpscalingLaunchpadPanel } from './UpscalingLaunchpadPanel';
 import { UpscalingTabLeftPanel } from './UpscalingTabLeftPanel';
 
 const tabComponents = {
@@ -54,7 +52,6 @@ const tabComponents = {
 const mainPanelComponents: AutoLayoutDockviewComponents = {
   [LAUNCHPAD_PANEL_ID]: withPanelContainer(UpscalingLaunchpadPanel),
   [VIEWER_PANEL_ID]: withPanelContainer(ImageViewerPanel),
-  [PROGRESS_PANEL_ID]: withPanelContainer(GenerationProgressPanel),
 };
 
 const initializeMainPanelLayout = (tab: TabName, api: DockviewApi) => {

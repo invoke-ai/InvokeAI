@@ -19,7 +19,7 @@ const collapsedHandleStyles: CSSProperties = {
 };
 
 const InvocationNodeCollapsedHandles = ({ nodeId }: Props) => {
-  const template = useNodeTemplateOrThrow(nodeId);
+  const template = useNodeTemplateOrThrow();
 
   if (!template) {
     return null;

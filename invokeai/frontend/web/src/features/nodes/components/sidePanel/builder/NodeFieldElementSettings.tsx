@@ -36,7 +36,7 @@ export const NodeFieldElementSettings = memo(({ element }: { element: NodeFieldE
   const { id, data } = element;
   const { showDescription, fieldIdentifier } = data;
   const { nodeId, fieldName } = fieldIdentifier;
-  const fieldTemplate = useInputFieldTemplateOrThrow(nodeId, fieldName);
+  const fieldTemplate = useInputFieldTemplateOrThrow(fieldName);
 
   const { t } = useTranslation();
   const dispatch = useAppDispatch();

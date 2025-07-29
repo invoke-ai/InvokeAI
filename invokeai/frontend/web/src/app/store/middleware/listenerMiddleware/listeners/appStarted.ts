@@ -1,5 +1,5 @@
 import { createAction } from '@reduxjs/toolkit';
-import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import type { AppStartListening } from 'app/store/store';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { imagesApi } from 'services/api/endpoints/images';

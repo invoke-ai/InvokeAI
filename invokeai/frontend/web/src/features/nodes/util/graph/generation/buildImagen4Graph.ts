@@ -66,6 +66,8 @@ export const buildImagen4Graph = (arg: GraphBuilderArg): GraphBuilderReturn => {
     model: Graph.getModelMetadataField(model),
   });
 
+  g.setMetadataReceivingNode(imagen4);
+
   return {
     g,
     positivePrompt,

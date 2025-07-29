@@ -74,7 +74,7 @@
         "bulkDownloadFailed": "Tải Xuống Thất Bại",
         "bulkDownloadRequestFailed": "Có Vấn Đề Khi Đang Chuẩn Bị Tải Xuống",
         "download": "Tải Xuống",
-        "dropOrUpload": "$t(gallery.drop) Hoặc Tải Lên",
+        "dropOrUpload": "Kéo Thả Hoặc Tải Lên",
         "currentlyInUse": "Hình ảnh này hiện đang sử dụng các tính năng sau:",
         "deleteImagePermanent": "Ảnh đã xoá không thể phục hồi.",
         "exitSearch": "Thoát Tìm Kiếm Hình Ảnh",
@@ -111,7 +111,7 @@
         "noImageSelected": "Không Có Ảnh Được Chọn",
         "noImagesInGallery": "Không Có Ảnh Để Hiển Thị",
         "assetsTab": "Tài liệu bạn đã tải lên để dùng cho dự án của mình.",
-        "imagesTab": "hình bạn vừa được tạo và lưu trong Invoke.",
+        "imagesTab": "Ảnh bạn vừa được tạo và lưu trong Invoke.",
         "loading": "Đang Tải",
         "oldestFirst": "Cũ Nhất Trước",
         "exitCompare": "Ngừng So Sánh",
@@ -122,7 +122,8 @@
         "boardsSettings": "Thiết Lập Bảng",
         "imagesSettings": "Cài Đặt Ảnh Trong Thư Viện Ảnh",
         "assets": "Tài Nguyên",
-        "images": "Hình Ảnh"
+        "images": "Hình Ảnh",
+        "useForPromptGeneration": "Dùng Để Tạo Sinh Lệnh"
     },
     "common": {
         "ipAdapter": "IP Adapter",
@@ -254,9 +255,18 @@
         "options_withCount_other": "{{count}} thiết lập"
     },
     "prompt": {
-        "addPromptTrigger": "Thêm Prompt Trigger",
+        "addPromptTrigger": "Thêm Trigger Cho Lệnh",
         "compatibleEmbeddings": "Embedding Tương Thích",
-        "noMatchingTriggers": "Không có trigger phù hợp"
+        "noMatchingTriggers": "Không có trigger phù hợp",
+        "generateFromImage": "Tạo sinh lệnh từ ảnh",
+        "expandCurrentPrompt": "Mở Rộng Lệnh Hiện Tại",
+        "uploadImageForPromptGeneration": "Tải Ảnh Để Tạo Sinh Lệnh",
+        "expandingPrompt": "Đang mở rộng lệnh...",
+        "resultTitle": "Mở Rộng Lệnh Hoàn Tất",
+        "resultSubtitle": "Chọn phương thức mở rộng lệnh:",
+        "replace": "Thay Thế",
+        "insert": "Chèn",
+        "discard": "Huỷ Bỏ"
     },
     "queue": {
         "resume": "Tiếp Tục",
@@ -453,6 +463,16 @@
             "applyFilter": {
                 "title": "Áp Dụng Bộ Lộc",
                 "desc": "Áp dụng bộ lọc đang chờ sẵn cho layer được chọn."
+            },
+            "settings": {
+                "behavior": "Hành Vi",
+                "display": "Hiển Thị",
+                "grid": "Lưới",
+                "debug": "Gỡ Lỗi"
+            },
+            "toggleNonRasterLayers": {
+                "title": "Bật/Tắt Layer Không Thuộc Dạng Raster",
+                "desc": "Hiện hoặc ẩn tất cả layer không thuộc dạng raster (Layer Điều Khiển Được, Lớp Phủ Inpaint, Chỉ Dẫn Khu Vực)."
             }
         },
         "workflows": {
@@ -695,7 +715,7 @@
         "cancel": "Huỷ",
         "huggingFace": "HuggingFace (HF)",
         "huggingFacePlaceholder": "chủ-sỡ-hữu/tên-model",
-        "includesNModels": "Thêm vào {{n}} model và dependency của nó",
+        "includesNModels": "Thêm vào {{n}} model và dependency của nó.",
         "localOnly": "chỉ ở trên máy chủ",
         "manual": "Thủ Công",
         "convertToDiffusersHelpText4": "Đây là quá trình diễn ra chỉ một lần. Nó có thể tốn tầm 30-60 giây tuỳ theo thông số kỹ thuật của máy tính.",
@@ -742,7 +762,7 @@
         "simpleModelPlaceholder": "Url hoặc đường đẫn đến tệp hoặc thư mục chứa diffusers trong máy chủ",
         "selectModel": "Chọn Model",
         "spandrelImageToImage": "Hình Ảnh Sang Hình Ảnh (Spandrel)",
-        "starterBundles": "Quà Tân Thủ",
+        "starterBundles": "Gói Khởi Đầu",
         "vae": "VAE",
         "urlOrLocalPath": "URL / Đường Dẫn",
         "triggerPhrases": "Từ Ngữ Kích Hoạt",
@@ -794,7 +814,30 @@
         "manageModels": "Quản Lý Model",
         "hfTokenReset": "Làm Mới HF Token",
         "relatedModels": "Model Liên Quan",
-        "showOnlyRelatedModels": "Liên Quan"
+        "showOnlyRelatedModels": "Liên Quan",
+        "installedModelsCount": "Đã tải {{installed}} trên {{total}} model.",
+        "allNModelsInstalled": "Đã tải tất cả {{count}} model",
+        "nToInstall": "Còn {{count}} để tải",
+        "nAlreadyInstalled": "Có {{count}} đã tải",
+        "bundleAlreadyInstalled": "Gói đã được cài sẵn",
+        "bundleAlreadyInstalledDesc": "Tất cả model trong gói {{bundleName}} đã được cài sẵn.",
+        "launchpadTab": "Launchpad",
+        "launchpad": {
+            "welcome": "Chào mừng đến Trình Quản Lý Model",
+            "description": "Invoke yêu cầu tải model nhằm tối ưu hoá các tính năng trên nền tảng. Chọn tải các phương án thủ công hoặc khám phá các model khởi đầu thích hợp.",
+            "manualInstall": "Tải Thủ Công",
+            "urlDescription": "Tải model bằng URL hoặc đường dẫn trên máy. Phù hợp để cụ thể model muốn thêm vào.",
+            "huggingFaceDescription": "Duyệt và cài đặt model từ các repository trên HuggingFace.",
+            "scanFolderDescription": "Quét một thư mục trên máy để tự động tra và tải model.",
+            "recommendedModels": "Model Khuyến Nghị",
+            "exploreStarter": "Hoặc duyệt tất cả model khởi đầu có sẵn",
+            "quickStart": "Gói Khởi Đầu Nhanh",
+            "bundleDescription": "Các gói đều bao gồm những model cần thiết cho từng nhánh model và những model cơ sở đã chọn lọc để bắt đầu.",
+            "browseAll": "Hoặc duyệt tất cả model có sẵn:",
+            "stableDiffusion15": "Stable Diffusion 1.5",
+            "sdxl": "SDXL",
+            "fluxDev": "FLUX.1 dev"
+        }
     },
     "metadata": {
         "guidance": "Hướng Dẫn",
@@ -802,7 +845,7 @@
         "imageDetails": "Chi Tiết Ảnh",
         "createdBy": "Được Tạo Bởi",
         "parsingFailed": "Lỗi Cú Pháp",
-        "canvasV2Metadata": "Canvas",
+        "canvasV2Metadata": "Layer Canvas",
         "parameterSet": "Dữ liệu tham số {{parameter}}",
         "positivePrompt": "Lệnh Tích Cực",
         "recallParameter": "Gợi Nhớ {{label}}",
@@ -1474,6 +1517,20 @@
                 "Lát khối liền mạch bức ảnh theo trục ngang."
             ],
             "heading": "Lát Khối Liền Mạch Trục X"
+        },
+        "tileSize": {
+            "heading": "Kích Thước Khối",
+            "paragraphs": [
+                "Điều chỉnh kích thước của khối trong quá trình upscale. Khối càng lớn, bộ nhớ được sử dụng càng nhiều, nhưng có thể tạo sinh ảnh tốt hơn.",
+                "Model SD1.5 mặt định là 768, trong khi SDXL mặc định là 1024. Giảm kích thước khối nếu các gặp vấn đề bộ nhớ."
+            ]
+        },
+        "tileOverlap": {
+            "heading": "Chồng Chéo Khối",
+            "paragraphs": [
+                "Điều chỉnh sự chồng chéo giữa các khối liền kề trong quá trình upscale. Giá trị chồng chép lớn giúp giảm sự rõ nét của các chỗ nối nhau, nhưng ngốn nhiều bộ nhớ hơn.",
+                "Giá trị mặc định (128) hoạt động tốt với đa số trường hợp, nhưng bạn có thể điều chỉnh cho phù hợp với nhu cầu cụ thể và hạn chế về bộ nhớ."
+            ]
         }
     },
     "models": {
@@ -1487,7 +1544,8 @@
         "defaultVAE": "VAE Mặc Định",
         "noMatchingModels": "Không có Model phù hợp",
         "noModelsAvailable": "Không có model",
-        "selectModel": "Chọn Model"
+        "selectModel": "Chọn Model",
+        "noCompatibleLoRAs": "Không Có LoRAs Tương Thích"
     },
     "parameters": {
         "postProcessing": "Xử Lý Hậu Kỳ (Shift + U)",
@@ -1538,7 +1596,10 @@
             "modelIncompatibleBboxHeight": "Chiều dài hộp giới hạn là {{height}} nhưng {{model}} yêu cầu bội số của {{multiple}}",
             "modelIncompatibleScaledBboxHeight": "Chiều dài hộp giới hạn theo tỉ lệ là {{height}} nhưng {{model}} yêu cầu bội số của {{multiple}}",
             "modelIncompatibleScaledBboxWidth": "Chiều rộng hộp giới hạn theo tỉ lệ là {{width}} nhưng {{model}} yêu cầu bội số của {{multiple}}",
-            "modelDisabledForTrial": "Tạo sinh với {{modelName}} là không thể với tài khoản trial. Vào phần thiết lập tài khoản để nâng cấp."
+            "modelDisabledForTrial": "Tạo sinh với {{modelName}} là không thể với tài khoản trial. Vào phần thiết lập tài khoản để nâng cấp.",
+            "fluxKontextMultipleReferenceImages": "Chỉ có thể dùng 1 Ảnh Mẫu cùng lúc với Flux Kontext",
+            "promptExpansionPending": "Trong quá trình mở rộng lệnh",
+            "promptExpansionResultPending": "Hãy chấp thuận hoặc huỷ bỏ kết quả mở rộng lệnh của bạn"
         },
         "cfgScale": "Thang CFG",
         "useSeed": "Dùng Hạt Giống",
@@ -1869,7 +1930,8 @@
             "canvasGroup": "Canvas",
             "copyCanvasToClipboard": "Sao Chép Canvas Vào Clipboard",
             "copyToClipboard": "Sao Chép Vào Clipboard",
-            "copyBboxToClipboard": "Sao Chép Hộp Giới Hạn Vào Clipboard"
+            "copyBboxToClipboard": "Sao Chép Hộp Giới Hạn Vào Clipboard",
+            "newResizedControlLayer": "Layer Điều Khiển Được Đã Chỉnh Kích Thước Mới"
         },
         "stagingArea": {
             "saveToGallery": "Lưu Vào Thư Viện Ảnh",
@@ -2050,7 +2112,11 @@
             },
             "isolatedLayerPreviewDesc": "Có hay không hiển thị riêng layer này khi thực hiện các thao tác như lọc hay biến đổi.",
             "isolatedStagingPreview": "Xem Trước Tổng Quan Phần Cô Lập",
-            "isolatedPreview": "Xem Trước Phần Cô Lập"
+            "isolatedPreview": "Xem Trước Phần Cô Lập",
+            "saveAllImagesToGallery": {
+                "label": "Chuyển Sản Phẩm Tạo Sinh Mới Vào Thư Viện Ảnh",
+                "alert": "Đang chuyển sản phẩm tạo sinh mới vào Thư Viện Ảnh, bỏ qua Canvas"
+            }
         },
         "tool": {
             "eraser": "Tẩy",
@@ -2062,8 +2128,8 @@
             "colorPicker": "Chọn Màu"
         },
         "mergingLayers": "Đang gộp layer",
-        "controlLayerEmptyState": "<UploadButton>Tải lên ảnh</UploadButton>, kéo thả ảnh từ <GalleryButton>thư viện</GalleryButton> vào layer này, <PullBboxButton>kéo hộp giới hạn vào layer này</PullBboxButton>, hoặc vẽ trên canvas để bắt đầu.",
-        "referenceImageEmptyState": "<UploadButton>Tải lên hình ảnh</UploadButton>, kéo ảnh từ <GalleryButton>thư viện ảnh</GalleryButton> vào layer này, hoặc <PullBboxButton>kéo hộp giới hạn vào layer này</PullBboxButton> để bắt đầu.",
+        "controlLayerEmptyState": "<UploadButton>Tải lên ảnh</UploadButton>, kéo thả ảnh từ thư viện ảnh vào layer này, <PullBboxButton>kéo hộp giới hạn vào layer này</PullBboxButton>, hoặc vẽ trên canvas để bắt đầu.",
+        "referenceImageEmptyState": "<UploadButton>Tải lên hình ảnh</UploadButton> hoặc kéo ảnh từ thư viện ảnh vào Ảnh Mẫu để bắt đầu.",
         "useImage": "Dùng Hình Ảnh",
         "resetCanvasLayers": "Khởi Động Lại Layer Canvas",
         "asRasterLayer": "Như $t(controlLayers.rasterLayer)",
@@ -2115,7 +2181,18 @@
         "addDenoiseLimit": "Thêm $t(controlLayers.denoiseLimit)",
         "imageNoise": "Độ Nhiễu Hình Ảnh",
         "denoiseLimit": "Giới Hạn Khử Nhiễu",
-        "addImageNoise": "Thêm $t(controlLayers.imageNoise)"
+        "addImageNoise": "Thêm $t(controlLayers.imageNoise)",
+        "referenceImageEmptyStateWithCanvasOptions": "<UploadButton>Tải lên hình ảnh</UploadButton>, kéo ảnh từ thư viện ảnh vào Ảnh Mẫu này, hoặc <PullBboxButton>kéo hộp giới hạn vào Ảnh Mẫu này</PullBboxButton> để bắt đầu.",
+        "uploadOrDragAnImage": "Kéo ảnh từ thư viện ảnh hoặc <UploadButton>tải lên ảnh</UploadButton>.",
+        "exportCanvasToPSD": "Xuất Canvas Thành File PSD",
+        "ruleOfThirds": "Hiển Thị Quy Tắc Một Phần Ba",
+        "showNonRasterLayers": "Hiển Thị Layer Không Thuộc Dạng Raster (Shift + H)",
+        "hideNonRasterLayers": "Ẩn Layer Không Thuộc Dạng Raster (Shift + H)",
+        "autoSwitch": {
+            "off": "Tắt",
+            "switchOnStart": "Khi Bắt Đầu",
+            "switchOnFinish": "Khi Kết Thúc"
+        }
     },
     "stylePresets": {
         "negativePrompt": "Lệnh Tiêu Cực",
@@ -2161,7 +2238,8 @@
         "deleteImage": "Xoá Hình Ảnh",
         "exportPromptTemplates": "Xuất Mẫu Trình Bày Cho Lệnh Ra (CSV)",
         "templateDeleted": "Mẫu trình bày cho lệnh đã được xoá",
-        "unableToDeleteTemplate": "Không thể xoá mẫu trình bày cho lệnh"
+        "unableToDeleteTemplate": "Không thể xoá mẫu trình bày cho lệnh",
+        "togglePromptPreviews": "Bật/Tắt Xem Trước Lệnh"
     },
     "system": {
         "enableLogging": "Bật Chế Độ Ghi Log",
@@ -2257,7 +2335,26 @@
         "workflowUnpublished": "Workflow Đã Được Ngừng Đăng Tải",
         "problemUnpublishingWorkflow": "Có Vấn Đề Khi Ngừng Đăng Tải Workflow",
         "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4o chỉ hỗ trợ Từ Ngữ Sang Hình Ảnh và Hình Ảnh Sang Hình Ảnh. Hãy dùng model khác cho các tác vụ Inpaint và Outpaint.",
-        "imagenIncompatibleGenerationMode": "Google {{model}} chỉ hỗ trợ Từ Ngữ Sang Hình Ảnh. Dùng các model khác cho Hình Ảnh Sang Hình Ảnh, Inpaint và Outpaint."
+        "imagenIncompatibleGenerationMode": "Google {{model}} chỉ hỗ trợ Từ Ngữ Sang Hình Ảnh. Dùng các model khác cho Hình Ảnh Sang Hình Ảnh, Inpaint và Outpaint.",
+        "fluxKontextIncompatibleGenerationMode": "FLUX Kontext không hỗ trợ tạo sinh từ hình ảnh từ canvas. Thử sử dụng Ảnh Mẫu và tắt các Layer Dạng Raster.",
+        "noRasterLayers": "Không Tìm Thấy Layer Dạng Raster",
+        "noRasterLayersDesc": "Tạo ít nhất một layer dạng raster để xuất file PSD",
+        "noActiveRasterLayers": "Không Có Layer Dạng Raster Hoạt Động",
+        "noActiveRasterLayersDesc": "Khởi động ít nhất một layer dạng raster để xuất file PSD",
+        "noVisibleRasterLayers": "Không Có Layer Dạng Raster Hiển Thị",
+        "noVisibleRasterLayersDesc": "Khởi động ít nhất một layer dạng raster để xuất file PSD",
+        "invalidCanvasDimensions": "Kích Thước Canvas Không Phù Hợp",
+        "canvasTooLarge": "Canvas Quá Lớn",
+        "canvasTooLargeDesc": "Kích thước canvas vượt mức tối đa cho phép để xuất file PSD. Giảm cả chiều dài và chiều rộng chủa canvas và thử lại.",
+        "failedToProcessLayers": "Thất Bại Khi Xử Lý Layer",
+        "psdExportSuccess": "Xuất File PSD Hoàn Tất",
+        "psdExportSuccessDesc": "Thành công xuất {{count}} layer sang file PSD",
+        "problemExportingPSD": "Có Vấn Đề Khi Xuất File PSD",
+        "canvasManagerNotAvailable": "Trình Quản Lý Canvas Không Có Sẵn",
+        "noValidLayerAdapters": "Không có Layer Adaper Phù Hợp",
+        "promptGenerationStarted": "Trình tạo sinh lệnh khởi động",
+        "uploadAndPromptGenerationFailed": "Thất bại khi tải lên ảnh để tạo sinh lệnh",
+        "promptExpansionFailed": "Có vấn đề xảy ra. Hãy thử mở rộng lệnh lại."
     },
     "ui": {
         "tabs": {
@@ -2271,6 +2368,55 @@
             "queue": "Queue (Hàng Đợi)",
             "workflows": "Workflow (Luồng Làm Việc)",
             "workflowsTab": "$t(common.tab) $t(ui.tabs.workflows)"
+        },
+        "launchpad": {
+            "workflowsTitle": "Đi sâu hơn với Workflow.",
+            "upscalingTitle": "Upscale và thêm chi tiết.",
+            "canvasTitle": "Biên tập và làm đẹp trên Canvas.",
+            "generateTitle": "Tạo sinh ảnh từ lệnh chữ.",
+            "modelGuideText": "Muốn biết lệnh nào tốt nhất cho từng model chứ?",
+            "modelGuideLink": "Xem thêm Hướng Dẫn Model.",
+            "workflows": {
+                "description": "Workflow là các template tái sử dụng được sẽ tự động hoá các tác vụ tạo sinh ảnh, cho phép bạn nhanh chóng thực hiện cách thao tác phức tạp và nhận được kết quả nhất quán.",
+                "learnMoreLink": "Học thêm cách tạo ra workflow",
+                "browseTemplates": {
+                    "title": "Duyệt Template Workflow",
+                    "description": "Chọn từ các workflow có sẵn cho những tác vụ cơ bản"
+                },
+                "createNew": {
+                    "title": "Tạo workflow mới",
+                    "description": "Tạo workflow mới từ ban đầu"
+                },
+                "loadFromFile": {
+                    "title": "Tải workflow từ tệp",
+                    "description": "Tải lên workflow để bắt đầu với những thiết lập sẵn có"
+                }
+            },
+            "upscaling": {
+                "uploadImage": {
+                    "title": "Tải Ảnh Để Upscale",
+                    "description": "Nhấp hoặc kéo ảnh để upscale (JPG, PNG, WebP lên đến 100MB)"
+                },
+                "replaceImage": {
+                    "title": "Thay Thế Ảnh Hiện Tại",
+                    "description": "Nhấp hoặc kéo ảnh mới để thay thế cái hiện tại"
+                },
+                "imageReady": {
+                    "title": "Ảnh Đã Sẵn Sàng",
+                    "description": "Bấm 'Kích Hoạt' để chuẩn bị upscale"
+                },
+                "readyToUpscale": {
+                    "title": "Chuẩn bị upscale!",
+                    "description": "Điều chỉnh thiết lập bên dưới, sau đó bấm vào nút 'Khởi Động' để chuẩn bị upscale ảnh."
+                },
+                "upscaleModel": "Model Upscale",
+                "model": "Model",
+                "helpText": {
+                    "promptAdvice": "Khi upscale, dùng lệnh để mô tả phương thức và phong cách. Tránh mô tả các chi tiết cụ thể trong ảnh.",
+                    "styleAdvice": "Upscale thích hợp nhất cho phong cách chung của ảnh."
+                },
+                "scale": "Kích Thước"
+            }
         }
     },
     "workflows": {
@@ -2423,7 +2569,10 @@
         "postProcessingMissingModelWarning": "Đến <LinkComponent>Trình Quản Lý Model</LinkComponent> để tải model xử lý hậu kỳ (ảnh sang ảnh).",
         "missingModelsWarning": "Đến <LinkComponent>Trình Quản Lý Model</LinkComponent> để tải model cần thiết:",
         "incompatibleBaseModel": "Phiên bản model chính không được hỗ trợ để upscale",
-        "incompatibleBaseModelDesc": "Upscale chỉ hỗ trợ cho model phiên bản SD1.5 và SDXL. Đổi model chính để bật lại tính năng upscale."
+        "incompatibleBaseModelDesc": "Upscale chỉ hỗ trợ cho model phiên bản SD1.5 và SDXL. Đổi model chính để bật lại tính năng upscale.",
+        "tileControl": "Điều Chỉnh Khối",
+        "tileSize": "Kích Thước Khối",
+        "tileOverlap": "Chồng Chéo Khối"
     },
     "newUserExperience": {
         "toGetStartedLocal": "Để bắt đầu, hãy chắc chắn đã tải xuống hoặc thêm vào model cần để chạy Invoke. Sau đó, nhập lệnh vào hộp và nhấp chuột vào <StrongComponent>Kích Hoạt</StrongComponent> để tạo ra bức ảnh đầu tiên. Chọn một mẫu trình bày cho lệnh để cải thiện kết quả. Bạn có thể chọn để lưu ảnh trực tiếp vào <StrongComponent>Thư Viện Ảnh</StrongComponent> hoặc chỉnh sửa chúng ở <StrongComponent>Canvas</StrongComponent>.",
@@ -2439,8 +2588,9 @@
         "watchRecentReleaseVideos": "Xem Video Phát Hành Mới Nhất",
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
         "items": [
-            "Nvidia 50xx GPUs: Invoke sử dụng PyTorch 2.7.0, thứ tối quan trọng cho những GPU trên.",
-            "Mối Quan Hệ Model: Kết nối LoRA với model chính, và LoRA đó sẽ được hiển thị đầu danh sách."
+            "Tạo sinh ảnh nhanh hơn với Launchpad và thẻ Tạo Sinh đã cơ bản hoá.",
+            "Biên tập với lệnh bằng Flux Kontext Dev.",
+            "Xuất ra file PSD, ẩn số lượng lớn lớp phủ, sắp xếp model & ảnh — tất cả cho một giao diện đã thiết kế lại để chuyên điều khiển."
         ]
     },
     "upsell": {
@@ -2452,64 +2602,18 @@
     "supportVideos": {
         "supportVideos": "Video Hỗ Trợ",
         "gettingStarted": "Bắt Đầu Làm Quen",
-        "studioSessionsDesc1": "Xem thử <StudioSessionsPlaylistLink /> để hiểu rõ Invoke hơn.",
-        "studioSessionsDesc2": "Đến <DiscordLink /> để tham gia vào phiên trực tiếp và hỏi câu hỏi. Các phiên được tải lên danh sách phát vào các tuần.",
+        "watch": "Xem",
+        "studioSessionsDesc": "Tham gia <DiscordLink /> để xem các buổi phát trực tiếp và đặt câu hỏi. Các phiên được đăng lên trên playlist các tuần tiếp theo.",
         "videos": {
-            "howDoIDoImageToImageTransformation": {
-                "title": "Làm Sao Để Tôi Dùng Trình Biến Đổi Hình Ảnh Sang Hình Ảnh?",
-                "description": "Hướng dẫn cách thực hiện biến đổi ảnh sang ảnh trong Invoke."
+            "gettingStarted": {
+                "title": "Bắt Đầu Với Invoke",
+                "description": "Hoàn thành các video bao hàm mọi thứ bạn cần biết để bắt đầu với Invoke, từ tạo bức ảnh đầu tiên đến các kỹ thuật phức tạp khác."
             },
-            "howDoIUseGlobalIPAdaptersAndReferenceImages": {
-                "description": "Giới thiệu về ảnh mẫu và IP adapter toàn vùng.",
-                "title": "Làm Sao Để Tôi Dùng IP Adapter Toàn Vùng Và Ảnh Mẫu?"
-            },
-            "creatingAndComposingOnInvokesControlCanvas": {
-                "description": "Học cách sáng tạo ảnh bằng trình điều khiển canvas của Invoke.",
-                "title": "Sáng Tạo Trong Trình Kiểm Soát Canvas Của Invoke"
-            },
-            "upscaling": {
-                "description": "Cách upscale ảnh bằng bộ công cụ của Invoke để nâng cấp độ phân giải.",
-                "title": "Upscale (Nâng Cấp Chất Lượng Hình Ảnh)"
-            },
-            "howDoIGenerateAndSaveToTheGallery": {
-                "title": "Làm Sao Để Tôi Tạo Sinh Và Lưu Vào Thư Viện Ảnh?",
-                "description": "Các bước để tạo sinh và lưu ảnh vào thư viện ảnh."
-            },
-            "howDoIEditOnTheCanvas": {
-                "description": "Hướng dẫn chỉnh sửa ảnh trực tiếp trên canvas.",
-                "title": "Làm Sao Để Tôi Chỉnh Sửa Trên Canvas?"
-            },
-            "howDoIUseControlNetsAndControlLayers": {
-                "title": "Làm Sao Để Tôi Dùng ControlNet và Layer Điều Khiển Được?",
-                "description": "Học cách áp dụng layer điều khiển được và controlnet vào ảnh của bạn."
-            },
-            "howDoIUseInpaintMasks": {
-                "title": "Làm Sao Để Tôi Dùng Lớp Phủ Inpaint?",
-                "description": "Cách áp dụng lớp phủ inpaint vào chỉnh sửa và thay đổi ảnh."
-            },
-            "howDoIOutpaint": {
-                "title": "Làm Sao Để Tôi Outpaint?",
-                "description": "Hướng dẫn outpaint bên ngoài viền ảnh gốc."
-            },
-            "creatingYourFirstImage": {
-                "description": "Giới thiệu về cách tạo ảnh từ ban đầu bằng công cụ Invoke.",
-                "title": "Tạo Hình Ảnh Đầu Tiên Của Bạn"
-            },
-            "usingControlLayersAndReferenceGuides": {
-                "description": "Học cách chỉ dẫn ảnh được tạo ra bằng layer điều khiển được và ảnh mẫu.",
-                "title": "Dùng Layer Điều Khiển Được và Chỉ Dẫn Mẫu"
-            },
-            "understandingImageToImageAndDenoising": {
-                "title": "Hiểu Rõ Trình Hình Ảnh Sang Hình Ảnh Và Trình Khử Nhiễu",
-                "description": "Tổng quan về trình biến đổi ảnh sang ảnh và trình khử nhiễu trong Invoke."
-            },
-            "exploringAIModelsAndConceptAdapters": {
-                "title": "Khám Phá Model AI Và Khái Niệm Về Adapter",
-                "description": "Đào sâu vào model AI và cách dùng những adapter để điều khiển một cách sáng tạo."
+            "studioSessions": {
+                "title": "Phiên Studio",
+                "description": "Đào sâu vào các phiên họp để khám phá những tính năng nâng cao của Invoke, sáng tạo workflow, và thảo luận cộng đồng."
             }
-        },
-        "controlCanvas": "Điều Khiển Canvas",
-        "watch": "Xem"
+        }
     },
     "modelCache": {
         "clearSucceeded": "Cache Model Đã Được Dọn",

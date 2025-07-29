@@ -1,21 +1,21 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
+import type { ImageWithDims } from 'features/controlLayers/store/types';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { useMemo } from 'react';
-import type { ImageDTO } from 'services/api/types';
 
-const createIsTooLargeToUpscaleSelector = (imageDTO?: ImageDTO | null) =>
-  createMemoizedSelector(selectUpscaleSlice, selectConfigSlice, (upscale, config) => {
+const createIsTooLargeToUpscaleSelector = (imageWithDims?: ImageWithDims | null) =>
+  createSelector(selectUpscaleSlice, selectConfigSlice, (upscale, config) => {
     const { upscaleModel, scale } = upscale;
     const { maxUpscaleDimension } = config;
 
-    if (!maxUpscaleDimension || !upscaleModel || !imageDTO) {
+    if (!maxUpscaleDimension || !upscaleModel || !imageWithDims) {
       // When these are missing, another warning will be shown
       return false;
     }
 
-    const { width, height } = imageDTO;
+    const { width, height } = imageWithDims;
 
     const maxPixels = maxUpscaleDimension ** 2;
     const upscaledPixels = width * scale * height * scale;
@@ -23,7 +23,7 @@ const createIsTooLargeToUpscaleSelector = (imageDTO?: ImageDTO | null) =>
     return upscaledPixels > maxPixels;
   });
 
-export const useIsTooLargeToUpscale = (imageDTO?: ImageDTO | null) => {
-  const selectIsTooLargeToUpscale = useMemo(() => createIsTooLargeToUpscaleSelector(imageDTO), [imageDTO]);
+export const useIsTooLargeToUpscale = (imageWithDims?: ImageWithDims | null) => {
+  const selectIsTooLargeToUpscale = useMemo(() => createIsTooLargeToUpscaleSelector(imageWithDims), [imageWithDims]);
   return useAppSelector(selectIsTooLargeToUpscale);
 };

@@ -2,19 +2,20 @@ import { Box, Flex, forwardRef, Grid, GridItem, Spinner, Text } from '@invoke-ai
 import { createSelector } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
-import { getFocusedRegion } from 'common/hooks/focus';
+import { getFocusedRegion, useIsRegionFocused } from 'common/hooks/focus';
 import { useRangeBasedImageFetching } from 'features/gallery/hooks/useRangeBasedImageFetching';
 import type { selectGetImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import {
   selectGalleryImageMinimumWidth,
   selectImageToCompare,
   selectLastSelectedImage,
+  selectSelectionCount,
 } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useOverlayScrollbars } from 'overlayscrollbars-react';
 import type { MutableRefObject, RefObject } from 'react';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   GridComponents,
   GridComputeItemKey,
@@ -24,7 +25,7 @@ import type {
   VirtuosoGridHandle,
 } from 'react-virtuoso';
 import { VirtuosoGrid } from 'react-virtuoso';
-import { imagesApi } from 'services/api/endpoints/images';
+import { imagesApi, useImageDTO, useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
 import { useDebounce } from 'use-debounce';
 
 import { GalleryImage, GalleryImagePlaceholder } from './ImageGrid/GalleryImage';
@@ -450,6 +451,37 @@ const useScrollableGallery = (rootRef: RefObject<HTMLDivElement>) => {
   return scrollerRef;
 };
 
+const useStarImageHotkey = () => {
+  const lastSelectedImage = useAppSelector(selectLastSelectedImage);
+  const selectionCount = useAppSelector(selectSelectionCount);
+  const isGalleryFocused = useIsRegionFocused('gallery');
+  const imageDTO = useImageDTO(lastSelectedImage);
+  const [starImages] = useStarImagesMutation();
+  const [unstarImages] = useUnstarImagesMutation();
+
+  const handleStarHotkey = useCallback(() => {
+    if (!imageDTO) {
+      return;
+    }
+    if (!isGalleryFocused) {
+      return;
+    }
+    if (imageDTO.starred) {
+      unstarImages({ image_names: [imageDTO.image_name] });
+    } else {
+      starImages({ image_names: [imageDTO.image_name] });
+    }
+  }, [imageDTO, isGalleryFocused, starImages, unstarImages]);
+
+  useRegisteredHotkeys({
+    id: 'starImage',
+    category: 'gallery',
+    callback: handleStarHotkey,
+    options: { enabled: !!imageDTO && selectionCount === 1 && isGalleryFocused },
+    dependencies: [imageDTO, selectionCount, isGalleryFocused, handleStarHotkey],
+  });
+};
+
 export const NewGallery = memo(() => {
   const virtuosoRef = useRef<VirtuosoGridHandle>(null);
   const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
@@ -464,6 +496,7 @@ export const NewGallery = memo(() => {
     enabled: !isLoading,
   });
 
+  useStarImageHotkey();
   useKeepSelectedImageInView(imageNames, virtuosoRef, rootRef, rangeRef);
   useKeyboardNavigation(imageNames, virtuosoRef, rootRef);
   const scrollerRef = useScrollableGallery(rootRef);

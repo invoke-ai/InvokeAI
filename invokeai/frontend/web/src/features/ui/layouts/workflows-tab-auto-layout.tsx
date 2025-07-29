@@ -1,9 +1,7 @@
 import type { DockviewApi, GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
 import { DockviewReact, GridviewReact, LayoutPriority, Orientation } from 'dockview';
-import { WorkflowsLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/WorkflowsLaunchpadPanel';
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
 import { GalleryPanel } from 'features/gallery/components/Gallery';
-import { GenerationProgressPanel } from 'features/gallery/components/ImageViewer/GenerationProgressPanel';
 import { ImageViewerPanel } from 'features/gallery/components/ImageViewer/ImageViewerPanel';
 import NodeEditor from 'features/nodes/components/NodeEditor';
 import WorkflowsTabLeftPanel from 'features/nodes/components/sidePanel/WorkflowsTabLeftPanel';
@@ -39,13 +37,13 @@ import {
   LEFT_PANEL_ID,
   LEFT_PANEL_MIN_SIZE_PX,
   MAIN_PANEL_ID,
-  PROGRESS_PANEL_ID,
   RIGHT_PANEL_ID,
   RIGHT_PANEL_MIN_SIZE_PX,
   SETTINGS_PANEL_ID,
   VIEWER_PANEL_ID,
   WORKSPACE_PANEL_ID,
 } from './shared';
+import { WorkflowsLaunchpadPanel } from './WorkflowsLaunchpadPanel';
 
 const tabComponents = {
   [DOCKVIEW_TAB_ID]: DockviewTab,
@@ -57,7 +55,6 @@ const mainPanelComponents: AutoLayoutDockviewComponents = {
   [LAUNCHPAD_PANEL_ID]: withPanelContainer(WorkflowsLaunchpadPanel),
   [WORKSPACE_PANEL_ID]: withPanelContainer(NodeEditor),
   [VIEWER_PANEL_ID]: withPanelContainer(ImageViewerPanel),
-  [PROGRESS_PANEL_ID]: withPanelContainer(GenerationProgressPanel),
 };
 
 const initializeMainPanelLayout = (tab: TabName, api: DockviewApi) => {

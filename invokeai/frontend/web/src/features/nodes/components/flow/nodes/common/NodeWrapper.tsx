@@ -1,6 +1,7 @@
-import type { ChakraProps, SystemStyleObject } from '@invoke-ai/ui-library';
+import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Box, useGlobalMenuClose } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { useMouseOverFormField, useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
@@ -11,95 +12,19 @@ import { zNodeStatus } from 'features/nodes/types/invocation';
 import type { MouseEvent, PropsWithChildren } from 'react';
 import { memo, useCallback } from 'react';
 
+import { containerSx, inProgressSx, shadowsSx } from './shared';
+
 type NodeWrapperProps = PropsWithChildren & {
   nodeId: string;
   selected: boolean;
   width?: ChakraProps['w'];
-};
-
-// Certain CSS transitions are disabled as a performance optimization - they can cause massive slowdowns in large
-// workflows even when the animations are GPU-accelerated CSS.
-
-const containerSx: SystemStyleObject = {
-  h: 'full',
-  position: 'relative',
-  borderRadius: 'base',
-  transitionProperty: 'none',
-  cursor: 'grab',
-  // The action buttons are hidden by default and shown on hover
-  '& .node-selection-overlay': {
-    display: 'block',
-    position: 'absolute',
-    top: 0,
-    insetInlineEnd: 0,
-    bottom: 0,
-    insetInlineStart: 0,
-    borderRadius: 'base',
-    transitionProperty: 'none',
-    pointerEvents: 'none',
-    shadow: '0 0 0 1px var(--invoke-colors-base-500)',
-  },
-  '&[data-is-mouse-over-node="true"] .node-selection-overlay': {
-    display: 'block',
-  },
-  '&[data-is-mouse-over-form-field="true"] .node-selection-overlay': {
-    display: 'block',
-    bg: 'invokeBlueAlpha.100',
-  },
-  _hover: {
-    '& .node-selection-overlay': {
-      display: 'block',
-      shadow: '0 0 0 1px var(--invoke-colors-blue-300)',
-    },
-    '&[data-is-selected="true"] .node-selection-overlay': {
-      display: 'block',
-      shadow: '0 0 0 2px var(--invoke-colors-blue-300)',
-    },
-  },
-  '&[data-is-selected="true"] .node-selection-overlay': {
-    display: 'block',
-    shadow: '0 0 0 2px var(--invoke-colors-blue-300)',
-  },
-  '&[data-is-editor-locked="true"]': {
-    '& *': {
-      cursor: 'not-allowed',
-      pointerEvents: 'none',
-    },
-  },
-};
-
-const shadowsSx: SystemStyleObject = {
-  position: 'absolute',
-  top: 0,
-  insetInlineEnd: 0,
-  bottom: 0,
-  insetInlineStart: 0,
-  borderRadius: 'base',
-  pointerEvents: 'none',
-  zIndex: -1,
-  shadow: 'var(--invoke-shadows-xl), var(--invoke-shadows-base), var(--invoke-shadows-base)',
-};
-
-const inProgressSx: SystemStyleObject = {
-  position: 'absolute',
-  top: 0,
-  insetInlineEnd: 0,
-  bottom: 0,
-  insetInlineStart: 0,
-  borderRadius: 'md',
-  pointerEvents: 'none',
-  transitionProperty: 'none',
-  opacity: 0.7,
-  zIndex: -1,
-  display: 'none',
-  shadow: '0 0 0 2px var(--invoke-colors-yellow-400), 0 0 20px 2px var(--invoke-colors-orange-700)',
-  '&[data-is-in-progress="true"]': {
-    display: 'block',
-  },
+  isMissingTemplate?: boolean;
 };
 
 const NodeWrapper = (props: NodeWrapperProps) => {
-  const { nodeId, width, children, selected } = props;
+  const { nodeId, width, children, isMissingTemplate, selected } = props;
+  const ctx = useInvocationNodeContext();
+  const needsUpdate = useAppSelector(ctx.selectNodeNeedsUpdate);
   const mouseOverNode = useMouseOverNode(nodeId);
   const mouseOverFormField = useMouseOverFormField(nodeId);
   const zoomToNode = useZoomToNode(nodeId);
@@ -149,6 +74,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
       data-is-editor-locked={isLocked}
       data-is-selected={selected}
       data-is-mouse-over-form-field={mouseOverFormField.isMouseOverFormField}
+      data-status={isMissingTemplate ? 'error' : needsUpdate ? 'warning' : undefined}
     >
       <Box sx={shadowsSx} />
       <Box sx={inProgressSx} data-is-in-progress={isInProgress} />

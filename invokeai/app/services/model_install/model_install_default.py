@@ -51,6 +51,7 @@ from invokeai.backend.model_manager.metadata import (
 from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMetadata
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant, ModelSourceType
+from invokeai.backend.model_manager.util.lora_metadata_extractor import apply_lora_metadata
 from invokeai.backend.util import InvokeAILogger
 from invokeai.backend.util.catch_sigint import catch_sigint
 from invokeai.backend.util.devices import TorchDevice
@@ -185,7 +186,8 @@ class ModelInstallService(ModelInstallServiceBase):
         info: AnyModelConfig = self._probe(Path(model_path), config)  # type: ignore
 
         if preferred_name := config.name:
-            preferred_name = Path(preferred_name).with_suffix(model_path.suffix)
+            # Careful! Don't use pathlib.Path(...).with_suffix - it can will strip everything after the first dot.
+            preferred_name = f"{preferred_name}{model_path.suffix}"
 
         dest_path = (
             self.app_config.models_path / info.base.value / info.type.value / (preferred_name or model_path.name)
@@ -666,6 +668,10 @@ class ModelInstallService(ModelInstallServiceBase):
         config = config or ModelRecordChanges()
 
         info = info or self._probe(model_path, config)
+
+        # Apply LoRA metadata if applicable
+        model_images_path = self.app_config.models_path / "model_images"
+        apply_lora_metadata(info, model_path.resolve(), model_images_path)
 
         model_path = model_path.resolve()
 

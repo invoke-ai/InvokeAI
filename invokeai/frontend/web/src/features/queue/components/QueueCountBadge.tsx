@@ -28,13 +28,24 @@ export const QueueCountBadge = memo(({ targetRef }: Props) => {
     }
 
     const cb = () => {
-      const { x, y } = target.getBoundingClientRect();
-      if (x === 0 || y === 0) {
-        // If the target is not visible, do not show the badge
+      // If the parent element is not visible, we do not want to show the badge. This can be tricky to reliably
+      // determine. The best way I've found is to check the bounding rect of the target and its parent.
+      const badgeElRect = target.getBoundingClientRect();
+      const parentElRect = parent.getBoundingClientRect();
+      if (
+        badgeElRect.x === 0 ||
+        badgeElRect.y === 0 ||
+        badgeElRect.width === 0 ||
+        badgeElRect.height === 0 ||
+        parentElRect.x === 0 ||
+        parentElRect.y === 0 ||
+        parentElRect.width === 0 ||
+        parentElRect.height === 0
+      ) {
         setBadgePos(null);
         return;
       }
-      setBadgePos({ x: `${x - 7}px`, y: `${y - 5}px` });
+      setBadgePos({ x: `${badgeElRect.x - 7}px`, y: `${badgeElRect.y - 5}px` });
     };
 
     const resizeObserver = new ResizeObserver(cb);

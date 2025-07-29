@@ -38,6 +38,7 @@ export type RootLayoutGridviewComponents = Record<string, FunctionComponent<IGri
 type PanelProps = IDockviewPanelProps<PanelParameters> | IGridviewPanelProps<PanelParameters>;
 
 export const withPanelContainer = (Component: FunctionComponent) =>
+  /* eslint-disable-next-line  react/display-name */
   memo((props: PanelProps) => {
     return (
       <AutoLayoutPanelContainer {...props}>

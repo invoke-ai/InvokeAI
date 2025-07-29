@@ -1,10 +1,8 @@
 import type { DockviewApi, GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
 import { DockviewReact, GridviewReact, LayoutPriority, Orientation } from 'dockview';
 import { CanvasLayersPanel } from 'features/controlLayers/components/CanvasLayersPanelContent';
-import { CanvasLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/CanvasLaunchpadPanel';
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
 import { GalleryPanel } from 'features/gallery/components/Gallery';
-import { GenerationProgressPanel } from 'features/gallery/components/ImageViewer/GenerationProgressPanel';
 import { ImageViewerPanel } from 'features/gallery/components/ImageViewer/ImageViewerPanel';
 import { FloatingCanvasLeftPanelButtons } from 'features/ui/components/FloatingLeftPanelButtons';
 import { FloatingRightPanelButtons } from 'features/ui/components/FloatingRightPanelButtons';
@@ -15,6 +13,7 @@ import type {
   RootLayoutGridviewComponents,
 } from 'features/ui/layouts/auto-layout-context';
 import { AutoLayoutProvider, useAutoLayoutContext, withPanelContainer } from 'features/ui/layouts/auto-layout-context';
+import { CanvasLaunchpadPanel } from 'features/ui/layouts/CanvasLaunchpadPanel';
 import type { TabName } from 'features/ui/store/uiTypes';
 import { dockviewTheme } from 'features/ui/styles/theme';
 import { memo, useCallback, useEffect } from 'react';
@@ -42,7 +41,6 @@ import {
   LEFT_PANEL_ID,
   LEFT_PANEL_MIN_SIZE_PX,
   MAIN_PANEL_ID,
-  PROGRESS_PANEL_ID,
   RIGHT_PANEL_ID,
   RIGHT_PANEL_MIN_SIZE_PX,
   SETTINGS_PANEL_ID,
@@ -60,7 +58,6 @@ const mainPanelComponents: AutoLayoutDockviewComponents = {
   [LAUNCHPAD_PANEL_ID]: withPanelContainer(CanvasLaunchpadPanel),
   [WORKSPACE_PANEL_ID]: withPanelContainer(CanvasWorkspacePanel),
   [VIEWER_PANEL_ID]: withPanelContainer(ImageViewerPanel),
-  [PROGRESS_PANEL_ID]: withPanelContainer(GenerationProgressPanel),
 };
 
 const initializeCenterPanelLayout = (tab: TabName, api: DockviewApi) => {

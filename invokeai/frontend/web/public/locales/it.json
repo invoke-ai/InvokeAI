@@ -152,7 +152,7 @@
         "image": "immagine",
         "drop": "Rilascia",
         "unstarImage": "Rimuovi contrassegno immagine",
-        "dropOrUpload": "$t(gallery.drop) o carica",
+        "dropOrUpload": "Rilascia o carica",
         "starImage": "Contrassegna l'immagine",
         "dropToUpload": "$t(gallery.drop) per aggiornare",
         "bulkDownloadRequested": "Preparazione del download",
@@ -197,7 +197,8 @@
         "boardsSettings": "Impostazioni Bacheche",
         "imagesSettings": "Impostazioni Immagini Galleria",
         "assets": "Risorse",
-        "images": "Immagini"
+        "images": "Immagini",
+        "useForPromptGeneration": "Usa per generare il prompt"
     },
     "hotkeys": {
         "searchHotkeys": "Cerca tasti di scelta rapida",
@@ -253,12 +254,16 @@
                 "desc": "Attiva/disattiva il pannello destro."
             },
             "resetPanelLayout": {
-                "title": "Ripristina il layout del pannello",
-                "desc": "Ripristina le dimensioni e il layout predefiniti dei pannelli sinistro e destro."
+                "title": "Ripristina lo schema del pannello",
+                "desc": "Ripristina le dimensioni e lo schema predefiniti dei pannelli sinistro e destro."
             },
             "togglePanels": {
                 "title": "Attiva/disattiva i pannelli",
                 "desc": "Mostra o nascondi contemporaneamente i pannelli sinistro e destro."
+            },
+            "selectGenerateTab": {
+                "title": "Seleziona la scheda Genera",
+                "desc": "Seleziona la scheda Genera."
             }
         },
         "hotkeys": "Tasti di scelta rapida",
@@ -379,6 +384,32 @@
             "applyTransform": {
                 "title": "Applica trasformazione",
                 "desc": "Applica la trasformazione in sospeso al livello selezionato."
+            },
+            "toggleNonRasterLayers": {
+                "desc": "Mostra o nascondi tutte le categorie di livelli non raster (Livelli di controllo, Maschere di Inpaint, Guida regionale).",
+                "title": "Attiva/disattiva livelli non raster"
+            },
+            "settings": {
+                "behavior": "Comportamento",
+                "display": "Mostra",
+                "grid": "Griglia"
+            },
+            "invertMask": {
+                "title": "Inverti maschera",
+                "desc": "Inverte la maschera di inpaint selezionata, creando una nuova maschera con trasparenza opposta."
+            },
+            "fitBboxToMasks": {
+                "title": "Adatta il riquadro di delimitazione alle maschere",
+                "desc": "Regola automaticamente il riquadro di delimitazione della generazione per adattarlo alle maschere di inpaint visibili"
+            },
+            "applySegmentAnything": {
+                "title": "Applica Segment Anything",
+                "desc": "Applica la maschera Segment Anything corrente.",
+                "key": "invio"
+            },
+            "cancelSegmentAnything": {
+                "title": "Annulla Segment Anything",
+                "desc": "Annulla l'operazione Segment Anything corrente."
             }
         },
         "workflows": {
@@ -508,6 +539,10 @@
             "galleryNavUpAlt": {
                 "desc": "Uguale a Naviga verso l'alto, ma seleziona l'immagine da confrontare, aprendo la modalità di confronto se non è già aperta.",
                 "title": "Naviga verso l'alto (Confronta immagine)"
+            },
+            "starImage": {
+                "desc": "Aggiungi/Rimuovi contrassegno all'immagine selezionata.",
+                "title": "Aggiungi / Rimuovi contrassegno immagine"
             }
         }
     },
@@ -623,7 +658,7 @@
         "installingXModels_one": "Installazione di {{count}} modello",
         "installingXModels_many": "Installazione di {{count}} modelli",
         "installingXModels_other": "Installazione di {{count}} modelli",
-        "includesNModels": "Include {{n}} modelli e le loro dipendenze",
+        "includesNModels": "Include {{n}} modelli e le loro dipendenze.",
         "starterBundleHelpText": "Installa facilmente tutti i modelli necessari per iniziare con un modello base, tra cui un modello principale, controlnet, adattatori IP e altro. Selezionando un pacchetto salterai tutti i modelli che hai già installato.",
         "noDefaultSettings": "Nessuna impostazione predefinita configurata per questo modello. Visita Gestione Modelli per aggiungere impostazioni predefinite.",
         "defaultSettingsOutOfSync": "Alcune impostazioni non corrispondono a quelle predefinite del modello:",
@@ -656,7 +691,27 @@
         "manageModels": "Gestione modelli",
         "hfTokenReset": "Ripristino del gettone HF",
         "relatedModels": "Modelli correlati",
-        "showOnlyRelatedModels": "Correlati"
+        "showOnlyRelatedModels": "Correlati",
+        "installedModelsCount": "{{installed}} di {{total}} modelli installati.",
+        "allNModelsInstalled": "Tutti i {{count}} modelli installati",
+        "nToInstall": "{{count}} da installare",
+        "nAlreadyInstalled": "{{count}} già installati",
+        "bundleAlreadyInstalled": "Pacchetto già installato",
+        "bundleAlreadyInstalledDesc": "Tutti i modelli nel pacchetto {{bundleName}} sono già installati.",
+        "launchpad": {
+            "description": "Per utilizzare la maggior parte delle funzionalità della piattaforma, Invoke richiede l'installazione di modelli. Scegli tra le opzioni di installazione manuale o esplora i modelli di avvio selezionati.",
+            "manualInstall": "Installazione manuale",
+            "urlDescription": "Installa i modelli da un URL o da un percorso file locale. Perfetto per modelli specifici che desideri aggiungere.",
+            "huggingFaceDescription": "Esplora e installa i modelli direttamente dai repository di HuggingFace.",
+            "scanFolderDescription": "Esegui la scansione di una cartella locale per rilevare e installare automaticamente i modelli.",
+            "recommendedModels": "Modelli consigliati",
+            "exploreStarter": "Oppure sfoglia tutti i modelli iniziali disponibili",
+            "welcome": "Benvenuti in Gestione Modelli",
+            "quickStart": "Pacchetti di avvio rapido",
+            "bundleDescription": "Ogni pacchetto include modelli essenziali per ogni famiglia di modelli e modelli base selezionati per iniziare.",
+            "browseAll": "Oppure scopri tutti i modelli disponibili:"
+        },
+        "launchpadTab": "Rampa di lancio"
     },
     "parameters": {
         "images": "Immagini",
@@ -742,7 +797,10 @@
             "modelIncompatibleBboxHeight": "L'altezza del riquadro è {{height}} ma {{model}} richiede multipli di {{multiple}}",
             "modelIncompatibleScaledBboxWidth": "La larghezza scalata del riquadro è {{width}} ma {{model}} richiede multipli di {{multiple}}",
             "modelIncompatibleScaledBboxHeight": "L'altezza scalata del riquadro è {{height}} ma {{model}} richiede multipli di {{multiple}}",
-            "modelDisabledForTrial": "La generazione con {{modelName}} non è disponibile per gli account di prova. Accedi alle impostazioni del tuo account per effettuare l'upgrade."
+            "modelDisabledForTrial": "La generazione con {{modelName}} non è disponibile per gli account di prova. Accedi alle impostazioni del tuo account per effettuare l'upgrade.",
+            "fluxKontextMultipleReferenceImages": "È possibile utilizzare solo 1 immagine di riferimento alla volta con Flux Kontext",
+            "promptExpansionResultPending": "Accetta o ignora il risultato dell'espansione del prompt",
+            "promptExpansionPending": "Espansione del prompt in corso"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -884,7 +942,34 @@
         "problemUnpublishingWorkflowDescription": "Si è verificato un problema durante l'annullamento della pubblicazione del flusso di lavoro. Riprova.",
         "workflowUnpublished": "Flusso di lavoro non pubblicato",
         "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4o supporta solo la conversione da testo a immagine e da immagine a immagine. Utilizza altri modelli per le attività di Inpainting e Outpainting.",
-        "imagenIncompatibleGenerationMode": "Google {{model}} supporta solo la generazione da testo a immagine. Utilizza altri modelli per le attività di conversione da immagine a immagine, inpainting e outpainting."
+        "imagenIncompatibleGenerationMode": "Google {{model}} supporta solo la generazione da testo a immagine. Utilizza altri modelli per le attività di conversione da immagine a immagine, inpainting e outpainting.",
+        "noRasterLayers": "Nessun livello raster trovato",
+        "noRasterLayersDesc": "Crea almeno un livello raster da esportare in PSD",
+        "noActiveRasterLayers": "Nessun livello raster attivo",
+        "noActiveRasterLayersDesc": "Abilitare almeno un livello raster da esportare in PSD",
+        "noVisibleRasterLayers": "Nessun livello raster visibile",
+        "noVisibleRasterLayersDesc": "Abilitare almeno un livello raster da esportare in PSD",
+        "invalidCanvasDimensions": "Dimensioni della tela non valide",
+        "canvasTooLarge": "Tela troppo grande",
+        "canvasTooLargeDesc": "Le dimensioni della tela superano le dimensioni massime consentite per l'esportazione in formato PSD. Riduci la larghezza e l'altezza totali della tela e riprova.",
+        "failedToProcessLayers": "Impossibile elaborare i livelli",
+        "psdExportSuccess": "Esportazione PSD completata",
+        "psdExportSuccessDesc": "Esportazione riuscita di {{count}} livelli nel file PSD",
+        "problemExportingPSD": "Problema durante l'esportazione PSD",
+        "noValidLayerAdapters": "Nessun adattatore di livello valido trovato",
+        "fluxKontextIncompatibleGenerationMode": "FLUX Kontext non supporta la generazione di immagini posizionate sulla tela. Riprova utilizzando la sezione Immagine di riferimento e disattiva tutti i livelli raster.",
+        "canvasManagerNotAvailable": "Gestione tela non disponibile",
+        "promptExpansionFailed": "Abbiamo riscontrato un problema. Riprova a eseguire l'espansione del prompt.",
+        "uploadAndPromptGenerationFailed": "Impossibile caricare l'immagine e generare il prompt",
+        "promptGenerationStarted": "Generazione del prompt avviata",
+        "invalidBboxDesc": "Il riquadro di delimitazione non ha dimensioni valide",
+        "invalidBbox": "Riquadro di delimitazione non valido",
+        "noInpaintMaskSelectedDesc": "Seleziona una maschera di inpaint da invertire",
+        "noInpaintMaskSelected": "Nessuna maschera di inpaint selezionata",
+        "noVisibleMasksDesc": "Crea o abilita almeno una maschera inpaint da invertire",
+        "noVisibleMasks": "Nessuna maschera visibile",
+        "maskInvertFailed": "Impossibile invertire la maschera",
+        "maskInverted": "Maschera invertita"
     },
     "accessibility": {
         "invokeProgressBar": "Barra di avanzamento generazione",
@@ -1079,7 +1164,22 @@
         "missingField_withName": "Campo \"{{name}}\" mancante",
         "unknownFieldEditWorkflowToFix_withName": "Il flusso di lavoro contiene un campo \"{{name}}\" sconosciuto .\nModifica il flusso di lavoro per risolvere il problema.",
         "unexpectedField_withName": "Campo \"{{name}}\" inaspettato",
-        "missingSourceOrTargetHandle": "Identificatore del nodo sorgente o di destinazione mancante"
+        "missingSourceOrTargetHandle": "Identificatore del nodo sorgente o di destinazione mancante",
+        "layout": {
+            "alignmentDR": "In basso a destra",
+            "autoLayout": "Schema automatico",
+            "nodeSpacing": "Spaziatura nodi",
+            "layerSpacing": "Spaziatura livelli",
+            "layeringStrategy": "Strategia livelli",
+            "longestPath": "Percorso più lungo",
+            "layoutDirection": "Direzione schema",
+            "layoutDirectionRight": "Orizzontale",
+            "layoutDirectionDown": "Verticale",
+            "alignment": "Allineamento nodi",
+            "alignmentUL": "In alto a sinistra",
+            "alignmentDL": "In basso a sinistra",
+            "alignmentUR": "In alto a destra"
+        }
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1156,7 +1256,7 @@
         "batchQueuedDesc_other": "Aggiunte {{count}} sessioni a {{direction}} della coda",
         "graphQueued": "Grafico in coda",
         "batch": "Lotto",
-        "clearQueueAlertDialog": "Lo svuotamento della coda annulla immediatamente tutti gli elementi in elaborazione e cancella completamente la coda. I filtri in sospeso verranno annullati.",
+        "clearQueueAlertDialog": "La cancellazione della coda annulla immediatamente tutti gli elementi in elaborazione e cancella completamente la coda. I filtri in sospeso verranno annullati e l'area di lavoro della Tela verrà reimpostata.",
         "pending": "In attesa",
         "completedIn": "Completato in",
         "resumeFailed": "Problema nel riavvio dell'elaborazione",
@@ -1212,7 +1312,8 @@
         "retrySucceeded": "Elemento rieseguito",
         "retryItem": "Riesegui elemento",
         "retryFailed": "Problema riesecuzione elemento",
-        "credits": "Crediti"
+        "credits": "Crediti",
+        "cancelAllExceptCurrent": "Annulla tutto tranne quello corrente"
     },
     "models": {
         "noMatchingModels": "Nessun modello corrispondente",
@@ -1225,7 +1326,8 @@
         "addLora": "Aggiungi LoRA",
         "defaultVAE": "VAE predefinito",
         "concepts": "Concetti",
-        "lora": "LoRA"
+        "lora": "LoRA",
+        "noCompatibleLoRAs": "Nessun LoRA compatibile"
     },
     "invocationCache": {
         "disable": "Disabilita",
@@ -1626,7 +1728,7 @@
         "structure": {
             "heading": "Struttura",
             "paragraphs": [
-                "La struttura determina quanto l'immagine finale rispecchierà il layout dell'originale. Una struttura bassa permette cambiamenti significativi, mentre una struttura alta conserva la composizione e il layout originali."
+                "La struttura determina quanto l'immagine finale rispecchierà il layout dell'originale. Un valore struttura basso permette cambiamenti significativi, mentre un valore struttura alto conserva la composizione e lo schema originali."
             ]
         },
         "fluxDevLicense": {
@@ -1683,6 +1785,20 @@
             "paragraphs": [
                 "Controlla quale area viene modificata, in base all'intensità di riduzione del rumore."
             ]
+        },
+        "tileSize": {
+            "heading": "Dimensione riquadro",
+            "paragraphs": [
+                "Controlla la dimensione dei riquadri utilizzati durante il processo di ampliamento. Riquadri più grandi consumano più memoria, ma possono produrre risultati migliori.",
+                "I modelli SD1.5 hanno un valore predefinito di 768, mentre i modelli SDXL hanno un valore predefinito di 1024. Ridurre le dimensioni dei riquadri in caso di problemi di memoria."
+            ]
+        },
+        "tileOverlap": {
+            "heading": "Sovrapposizione riquadri",
+            "paragraphs": [
+                "Controlla la sovrapposizione tra riquadri adiacenti durante l'ampliamento. Valori di sovrapposizione più elevati aiutano a ridurre le giunzioni visibili tra i riquadri, ma consuma più memoria.",
+                "Il valore predefinito di 128 è adatto alla maggior parte dei casi, ma è possibile modificarlo in base alle proprie esigenze specifiche e ai limiti di memoria."
+            ]
         }
     },
     "sdxl": {
@@ -1730,7 +1846,7 @@
         "parameterSet": "Parametro {{parameter}} impostato",
         "parsingFailed": "Analisi non riuscita",
         "recallParameter": "Richiama {{label}}",
-        "canvasV2Metadata": "Tela",
+        "canvasV2Metadata": "Livelli Tela",
         "guidance": "Guida",
         "seamlessXAxis": "Asse X senza giunte",
         "seamlessYAxis": "Asse Y senza giunte",
@@ -1778,7 +1894,7 @@
         "opened": "Aperto",
         "convertGraph": "Converti grafico",
         "loadWorkflow": "$t(common.load) Flusso di lavoro",
-        "autoLayout": "Disposizione automatica",
+        "autoLayout": "Schema automatico",
         "loadFromGraph": "Carica il flusso di lavoro dal grafico",
         "userWorkflows": "Flussi di lavoro utente",
         "projectWorkflows": "Flussi di lavoro del progetto",
@@ -1901,7 +2017,16 @@
     "prompt": {
         "compatibleEmbeddings": "Incorporamenti compatibili",
         "addPromptTrigger": "Aggiungi Trigger nel prompt",
-        "noMatchingTriggers": "Nessun Trigger corrispondente"
+        "noMatchingTriggers": "Nessun Trigger corrispondente",
+        "discard": "Scarta",
+        "insert": "Inserisci",
+        "replace": "Sostituisci",
+        "resultSubtitle": "Scegli come gestire il prompt espanso:",
+        "resultTitle": "Espansione del prompt completata",
+        "expandingPrompt": "Espansione del prompt...",
+        "uploadImageForPromptGeneration": "Carica l'immagine per la generazione del prompt",
+        "expandCurrentPrompt": "Espandi il prompt corrente",
+        "generateFromImage": "Genera prompt dall'immagine"
     },
     "controlLayers": {
         "addLayer": "Aggiungi Livello",
@@ -2212,7 +2337,11 @@
                 "label": "Preserva la regione mascherata"
             },
             "isolatedLayerPreview": "Anteprima livello isolato",
-            "isolatedLayerPreviewDesc": "Se visualizzare solo questo livello quando si eseguono operazioni come il filtraggio o la trasformazione."
+            "isolatedLayerPreviewDesc": "Se visualizzare solo questo livello quando si eseguono operazioni come il filtraggio o la trasformazione.",
+            "saveAllImagesToGallery": {
+                "alert": "Invia le nuove generazioni alla Galleria, bypassando la Tela",
+                "label": "Invia le nuove generazioni alla Galleria"
+            }
         },
         "transform": {
             "reset": "Reimposta",
@@ -2262,7 +2391,8 @@
             "newRegionalGuidance": "Nuova Guida Regionale",
             "copyToClipboard": "Copia negli appunti",
             "copyCanvasToClipboard": "Copia la tela negli appunti",
-            "copyBboxToClipboard": "Copia il riquadro di delimitazione negli appunti"
+            "copyBboxToClipboard": "Copia il riquadro di delimitazione negli appunti",
+            "newResizedControlLayer": "Nuovo livello di controllo ridimensionato"
         },
         "newImg2ImgCanvasFromImage": "Nuova Immagine da immagine",
         "copyRasterLayerTo": "Copia $t(controlLayers.rasterLayer) in",
@@ -2299,10 +2429,10 @@
         "replaceCurrent": "Sostituisci corrente",
         "mergeDown": "Unire in basso",
         "mergingLayers": "Unione dei livelli",
-        "controlLayerEmptyState": "<UploadButton>Carica un'immagine</UploadButton>, trascina un'immagine dalla <GalleryButton>galleria</GalleryButton> su questo livello, <PullBboxButton>trascina il riquadro di delimitazione in questo livello</PullBboxButton> oppure disegna sulla tela per iniziare.",
+        "controlLayerEmptyState": "<UploadButton>Carica un'immagine</UploadButton>, trascina un'immagine dalla galleria su questo livello, <PullBboxButton>trascina il riquadro di delimitazione in questo livello</PullBboxButton> oppure disegna sulla tela per iniziare.",
         "useImage": "Usa immagine",
         "resetGenerationSettings": "Ripristina impostazioni di generazione",
-        "referenceImageEmptyState": "Per iniziare, <UploadButton>carica un'immagine</UploadButton>, trascina un'immagine dalla <GalleryButton>galleria</GalleryButton>, oppure <PullBboxButton>trascina il riquadro di delimitazione in questo livello</PullBboxButton> su questo livello.",
+        "referenceImageEmptyState": "Per iniziare, <UploadButton>carica un'immagine</UploadButton> oppure trascina un'immagine dalla galleria su questa Immagine di riferimento.",
         "asRasterLayer": "Come $t(controlLayers.rasterLayer)",
         "asRasterLayerResize": "Come $t(controlLayers.rasterLayer) (Ridimensiona)",
         "asControlLayer": "Come $t(controlLayers.controlLayer)",
@@ -2352,7 +2482,20 @@
         "denoiseLimit": "Limite di riduzione del rumore",
         "addImageNoise": "Aggiungi $t(controlLayers.imageNoise)",
         "addDenoiseLimit": "Aggiungi $t(controlLayers.denoiseLimit)",
-        "imageNoise": "Rumore dell'immagine"
+        "imageNoise": "Rumore dell'immagine",
+        "exportCanvasToPSD": "Esporta la tela in PSD",
+        "ruleOfThirds": "Mostra la regola dei terzi",
+        "showNonRasterLayers": "Mostra livelli non raster (Shift+H)",
+        "hideNonRasterLayers": "Nascondi livelli non raster (Shift+H)",
+        "referenceImageEmptyStateWithCanvasOptions": "<UploadButton>Carica un'immagine</UploadButton>, trascina un'immagine dalla galleria su questa immagine di riferimento o <PullBboxButton>trascina il riquadro di delimitazione in questa immagine di riferimento</PullBboxButton> per iniziare.",
+        "uploadOrDragAnImage": "Trascina un'immagine dalla galleria o <UploadButton>carica un'immagine</UploadButton>.",
+        "autoSwitch": {
+            "switchOnStart": "All'inizio",
+            "switchOnFinish": "Alla fine",
+            "off": "Spento"
+        },
+        "invertMask": "Inverti maschera",
+        "fitBboxToMasks": "Adatta il riquadro di delimitazione alle maschere"
     },
     "ui": {
         "tabs": {
@@ -2366,6 +2509,55 @@
             "upscaling": "Amplia",
             "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)",
             "gallery": "Galleria"
+        },
+        "launchpad": {
+            "workflowsTitle": "Approfondisci i flussi di lavoro.",
+            "upscalingTitle": "Amplia e aggiungi dettagli.",
+            "canvasTitle": "Modifica e perfeziona sulla tela.",
+            "generateTitle": "Genera immagini da prompt testuali.",
+            "modelGuideText": "Vuoi scoprire quali prompt funzionano meglio per ciascun modello?",
+            "modelGuideLink": "Consulta la nostra guida ai modelli.",
+            "workflows": {
+                "description": "I flussi di lavoro sono modelli riutilizzabili che automatizzano le attività di generazione delle immagini, consentendo di eseguire rapidamente operazioni complesse e di ottenere risultati coerenti.",
+                "learnMoreLink": "Scopri di più sulla creazione di flussi di lavoro",
+                "browseTemplates": {
+                    "title": "Sfoglia i modelli di flusso di lavoro",
+                    "description": "Scegli tra flussi di lavoro predefiniti per le attività comuni"
+                },
+                "createNew": {
+                    "title": "Crea un nuovo flusso di lavoro",
+                    "description": "Avvia un nuovo flusso di lavoro da zero"
+                },
+                "loadFromFile": {
+                    "title": "Carica flusso di lavoro da file",
+                    "description": "Carica un flusso di lavoro per iniziare con una configurazione esistente"
+                }
+            },
+            "upscaling": {
+                "uploadImage": {
+                    "title": "Carica l'immagine da ampliare",
+                    "description": "Fai clic o trascina un'immagine per ingrandirla (JPG, PNG, WebP fino a 100 MB)"
+                },
+                "replaceImage": {
+                    "title": "Sostituisci l'immagine corrente",
+                    "description": "Fai clic o trascina una nuova immagine per sostituire quella corrente"
+                },
+                "imageReady": {
+                    "title": "Immagine pronta",
+                    "description": "Premere Invoke per iniziare l'ampliamento"
+                },
+                "readyToUpscale": {
+                    "title": "Pronto per ampliare!",
+                    "description": "Configura le impostazioni qui sotto, quindi fai clic sul pulsante Invoke per iniziare ad ampliare l'immagine."
+                },
+                "upscaleModel": "Modello per l'ampliamento",
+                "model": "Modello",
+                "scale": "Scala",
+                "helpText": {
+                    "promptAdvice": "Durante l'ampliamento, utilizza un prompt che descriva il mezzo e lo stile. Evita di descrivere dettagli specifici del contenuto dell'immagine.",
+                    "styleAdvice": "L'ampliamento funziona meglio con lo stile generale dell'immagine."
+                }
+            }
         }
     },
     "upscaling": {
@@ -2386,7 +2578,10 @@
         "exceedsMaxSizeDetails": "Il limite massimo di ampliamento è {{maxUpscaleDimension}}x{{maxUpscaleDimension}} pixel. Prova un'immagine più piccola o diminuisci la scala selezionata.",
         "upscale": "Amplia",
         "incompatibleBaseModel": "Architettura del modello principale non supportata per l'ampliamento",
-        "incompatibleBaseModelDesc": "L'ampliamento è supportato solo per i modelli di architettura SD1.5 e SDXL. Cambia il modello principale per abilitare l'ampliamento."
+        "incompatibleBaseModelDesc": "L'ampliamento è supportato solo per i modelli di architettura SD1.5 e SDXL. Cambia il modello principale per abilitare l'ampliamento.",
+        "tileControl": "Controllo del riquadro",
+        "tileSize": "Dimensione del riquadro",
+        "tileOverlap": "Sovrapposizione riquadro"
     },
     "upsell": {
         "inviteTeammates": "Invita collaboratori",
@@ -2436,7 +2631,8 @@
         "positivePromptColumn": "'prompt' o 'positive_prompt'",
         "noTemplates": "Nessun modello",
         "acceptedColumnsKeys": "Colonne/chiavi accettate:",
-        "promptTemplateCleared": "Modello di prompt cancellato"
+        "promptTemplateCleared": "Modello di prompt cancellato",
+        "togglePromptPreviews": "Attiva/disattiva le anteprime dei prompt"
     },
     "newUserExperience": {
         "gettingStartedSeries": "Desideri maggiori informazioni? Consulta la nostra <LinkComponent>Getting Started Series</LinkComponent> per suggerimenti su come sfruttare appieno il potenziale di Invoke Studio.",
@@ -2452,8 +2648,10 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "Inpainting: livelli di rumore per maschera e limiti di denoise.",
-            "Canvas: proporzioni più intelligenti per SDXL e scorrimento e zoom migliorati."
+            "Nuova impostazione per inviare tutte le generazioni della Tela direttamente alla Galleria.",
+            "Nuove funzionalità Inverti maschera (Maiusc+V) e Adatta il Riquadro di delimitazione alla maschera (Maiusc+B).",
+            "Supporto esteso per miniature e configurazioni dei modelli.",
+            "Vari altri aggiornamenti e correzioni per la qualità della vita"
         ]
     },
     "system": {
@@ -2485,64 +2683,18 @@
     "supportVideos": {
         "gettingStarted": "Iniziare",
         "supportVideos": "Video di supporto",
-        "videos": {
-            "usingControlLayersAndReferenceGuides": {
-                "title": "Utilizzo di livelli di controllo e guide di riferimento",
-                "description": "Scopri come guidare la creazione delle tue immagini con livelli di controllo e immagini di riferimento."
-            },
-            "creatingYourFirstImage": {
-                "description": "Introduzione alla creazione di un'immagine da zero utilizzando gli strumenti di Invoke.",
-                "title": "Creazione della tua prima immagine"
-            },
-            "understandingImageToImageAndDenoising": {
-                "description": "Panoramica delle trasformazioni immagine-a-immagine e della riduzione del rumore in Invoke.",
-                "title": "Comprendere immagine-a-immagine e riduzione del rumore"
-            },
-            "howDoIDoImageToImageTransformation": {
-                "description": "Tutorial su come eseguire trasformazioni da immagine a immagine in Invoke.",
-                "title": "Come si esegue la trasformazione da immagine-a-immagine?"
-            },
-            "howDoIUseInpaintMasks": {
-                "title": "Come si usano le maschere Inpaint?",
-                "description": "Come applicare maschere inpaint per la correzione e la variazione delle immagini."
-            },
-            "howDoIOutpaint": {
-                "description": "Guida all'outpainting oltre i confini dell'immagine originale.",
-                "title": "Come posso eseguire l'outpainting?"
-            },
-            "exploringAIModelsAndConceptAdapters": {
-                "description": "Approfondisci i modelli di intelligenza artificiale e scopri come utilizzare gli adattatori concettuali per il controllo creativo.",
-                "title": "Esplorazione dei modelli di IA e degli adattatori concettuali"
-            },
-            "upscaling": {
-                "title": "Ampliamento",
-                "description": "Come ampliare le immagini con gli strumenti di Invoke per migliorarne la risoluzione."
-            },
-            "creatingAndComposingOnInvokesControlCanvas": {
-                "description": "Impara a comporre immagini utilizzando la tela di controllo di Invoke.",
-                "title": "Creare e comporre sulla tela di controllo di Invoke"
-            },
-            "howDoIGenerateAndSaveToTheGallery": {
-                "description": "Passaggi per generare e salvare le immagini nella galleria.",
-                "title": "Come posso generare e salvare nella Galleria?"
-            },
-            "howDoIEditOnTheCanvas": {
-                "title": "Come posso apportare modifiche sulla tela?",
-                "description": "Guida alla modifica delle immagini direttamente sulla tela."
-            },
-            "howDoIUseControlNetsAndControlLayers": {
-                "title": "Come posso utilizzare le Reti di Controllo e i Livelli di Controllo?",
-                "description": "Impara ad applicare livelli di controllo e reti di controllo alle tue immagini."
-            },
-            "howDoIUseGlobalIPAdaptersAndReferenceImages": {
-                "title": "Come si utilizzano gli adattatori IP globali e le immagini di riferimento?",
-                "description": "Introduzione all'aggiunta di immagini di riferimento e adattatori IP globali."
-            }
-        },
-        "controlCanvas": "Tela di Controllo",
         "watch": "Guarda",
-        "studioSessionsDesc1": "Dai un'occhiata a <StudioSessionsPlaylistLink /> per approfondimenti su Invoke.",
-        "studioSessionsDesc2": "Unisciti al nostro <DiscordLink /> per partecipare alle sessioni live e fare domande. Le sessioni vengono caricate sulla playlist la settimana successiva."
+        "studioSessionsDesc": "Unisciti al nostro <DiscordLink /> per partecipare alle sessioni live e porre domande. Le sessioni vengono caricate nella playlist la settimana successiva.",
+        "videos": {
+            "gettingStarted": {
+                "title": "Introduzione a Invoke",
+                "description": "Serie video completa che copre tutto ciò che devi sapere per iniziare a usare Invoke, dalla creazione della tua prima immagine alle tecniche avanzate."
+            },
+            "studioSessions": {
+                "title": "Sessioni in studio",
+                "description": "Sessioni approfondite che esplorano le funzionalità avanzate di Invoke, i flussi di lavoro creativi e le discussioni della community."
+            }
+        }
     },
     "modelCache": {
         "clear": "Cancella la cache del modello",

@@ -3,6 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
+import { InvocationNodeContextProvider } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { TemplateGate } from 'features/nodes/components/sidePanel/inspector/NodeTemplateGate';
 import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { useNodeTemplateOrThrow } from 'features/nodes/hooks/useNodeTemplateOrThrow';
@@ -22,12 +23,14 @@ const InspectorOutputsTab = () => {
   }
 
   return (
-    <TemplateGate
-      nodeId={lastSelectedNodeId}
-      fallback={<IAINoContentFallback label={t('nodes.noNodeSelected')} icon={null} />}
-    >
-      <Content nodeId={lastSelectedNodeId} />
-    </TemplateGate>
+    <InvocationNodeContextProvider nodeId={lastSelectedNodeId}>
+      <TemplateGate
+        nodeId={lastSelectedNodeId}
+        fallback={<IAINoContentFallback label={t('nodes.noNodeSelected')} icon={null} />}
+      >
+        <Content nodeId={lastSelectedNodeId} />
+      </TemplateGate>
+    </InvocationNodeContextProvider>
   );
 };
 
@@ -37,7 +40,7 @@ const getKey = (result: AnyInvocationOutput, i: number) => `${result.type}-${i}`
 
 const Content = memo(({ nodeId }: { nodeId: string }) => {
   const { t } = useTranslation();
-  const template = useNodeTemplateOrThrow(nodeId);
+  const template = useNodeTemplateOrThrow();
   const nes = useNodeExecutionState(nodeId);
 
   if (!nes || nes.outputs.length === 0) {

@@ -165,9 +165,9 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children, entityI
 
           <Spacer />
         </Flex>
+        {type === 'raster_layer' && <RasterLayerExportPSDButton />}
         <CanvasEntityMergeVisibleButton type={type} />
         <CanvasEntityTypeIsHiddenToggle type={type} />
-        {type === 'raster_layer' && <RasterLayerExportPSDButton />}
         <CanvasEntityAddOfTypeButton type={type} />
       </Flex>
       <Collapse in={collapse.isTrue} style={fixTooltipCloseOnScrollStyles}>

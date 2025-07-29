@@ -26,7 +26,7 @@ export const WorkflowThumbnailField = ({
         const file = new File([blob], 'workflow.png', { type: 'image/png' });
         setThumbnail(file);
       }
-    } catch (error) {
+    } catch {
       setThumbnail(null);
     }
   }, []);

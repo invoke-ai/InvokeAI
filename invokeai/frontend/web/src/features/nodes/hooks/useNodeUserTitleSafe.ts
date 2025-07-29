@@ -1,18 +1,10 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectNodesSlice } from 'features/nodes/store/selectors';
+import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { useMemo } from 'react';
 
-export const useNodeUserTitleSafe = (nodeId: string) => {
-  const selector = useMemo(
-    () =>
-      createSelector(selectNodesSlice, (nodesSlice) => {
-        const node = nodesSlice.nodes.find((node) => node.id === nodeId);
-        return node?.data.label ?? null;
-      }),
-    [nodeId]
-  );
-
-  const title = useAppSelector(selector);
-  return title;
+export const useNodeUserTitleSafe = () => {
+  const ctx = useInvocationNodeContext();
+  const selector = useMemo(() => createSelector(ctx.selectNodeDataSafe, (data) => data?.label ?? ''), [ctx]);
+  return useAppSelector(selector);
 };

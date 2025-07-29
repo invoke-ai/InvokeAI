@@ -1,6 +1,5 @@
 import { logger } from 'app/logging/logger';
-import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import type { AppDispatch, RootState } from 'app/store/store';
+import type { AppDispatch, AppStartListening, RootState } from 'app/store/store';
 import { controlLayerModelChanged, rgRefImageModelChanged } from 'features/controlLayers/store/canvasSlice';
 import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
 import {
@@ -15,7 +14,11 @@ import { refImageModelChanged, selectRefImagesSlice } from 'features/controlLaye
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier, isFLUXReduxConfig, isIPAdapterConfig } from 'features/controlLayers/store/types';
 import { modelSelected } from 'features/parameters/store/actions';
-import { postProcessingModelChanged, upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
+import {
+  postProcessingModelChanged,
+  tileControlnetModelChanged,
+  upscaleModelChanged,
+} from 'features/parameters/store/upscaleSlice';
 import {
   zParameterCLIPEmbedModel,
   zParameterSpandrelImageToImageModel,
@@ -28,6 +31,7 @@ import type { AnyModelConfig } from 'services/api/types';
 import {
   isCLIPEmbedModelConfig,
   isControlLayerModelConfig,
+  isControlNetModelConfig,
   isFluxReduxModelConfig,
   isFluxVAEModelConfig,
   isIPAdapterModelConfig,
@@ -71,6 +75,7 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
       handleControlAdapterModels(models, state, dispatch, log);
       handlePostProcessingModel(models, state, dispatch, log);
       handleUpscaleModel(models, state, dispatch, log);
+      handleTileControlNetModel(models, state, dispatch, log);
       handleIPAdapterModels(models, state, dispatch, log);
       handleT5EncoderModels(models, state, dispatch, log);
       handleCLIPEmbedModels(models, state, dispatch, log);
@@ -342,6 +347,46 @@ const handleUpscaleModel: ModelHandler = (models, state, dispatch, log) => {
   if (selectedUpscaleModel) {
     log.debug({ selectedUpscaleModel }, 'Selected upscale model is not available, clearing');
     dispatch(upscaleModelChanged(null));
+  }
+};
+
+const handleTileControlNetModel: ModelHandler = (models, state, dispatch, log) => {
+  const selectedTileControlNetModel = state.upscale.tileControlnetModel;
+  const controlNetModels = models.filter(isControlNetModelConfig);
+
+  // If the currently selected model is available, we don't need to do anything
+  if (selectedTileControlNetModel && controlNetModels.some((m) => m.key === selectedTileControlNetModel.key)) {
+    return;
+  }
+
+  // The only way we have to identify a model as a tile model is by its name containing 'tile' :)
+  const tileModel = controlNetModels.find((m) => m.name.toLowerCase().includes('tile'));
+
+  // If we have a tile model, select it
+  if (tileModel) {
+    log.debug(
+      { selectedTileControlNetModel, tileModel },
+      'No selected tile ControlNet model or selected model is not available, selecting tile model'
+    );
+    dispatch(tileControlnetModelChanged(tileModel));
+    return;
+  }
+
+  // Otherwise, select the first available ControlNet model
+  const firstModel = controlNetModels[0] || null;
+  if (firstModel) {
+    log.debug(
+      { selectedTileControlNetModel, firstModel },
+      'No tile ControlNet model found, selecting first available ControlNet model'
+    );
+    dispatch(tileControlnetModelChanged(firstModel));
+    return;
+  }
+
+  // No available models, we should clear the selected model - but only if we have one selected
+  if (selectedTileControlNetModel) {
+    log.debug({ selectedTileControlNetModel }, 'Selected tile ControlNet model is not available, clearing');
+    dispatch(tileControlnetModelChanged(null));
   }
 };
 
