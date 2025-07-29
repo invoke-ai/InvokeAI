@@ -127,9 +127,10 @@ const unserialize: UnserializeFunction = (data, key) => {
   let state;
   try {
     const initialState = getInitialState();
+    const parsed = JSON.parse(data);
 
     // strip out old keys
-    const stripped = pick(deepClone(data), keys(initialState));
+    const stripped = pick(deepClone(parsed), keys(initialState));
     /*
      * Merge in initial state as default values, covering any missing keys. You might be tempted to use _.defaultsDeep,
      * but that merges arrays by index and partial objects by key. Using an identity function as the customizer results
@@ -141,7 +142,7 @@ const unserialize: UnserializeFunction = (data, key) => {
 
     log.debug(
       {
-        persistedData: data as JsonObject,
+        persistedData: parsed as JsonObject,
         rehydratedData: migrated as JsonObject,
         diff: diff(data, migrated) as JsonObject,
       },
