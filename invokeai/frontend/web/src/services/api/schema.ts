@@ -24743,7 +24743,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JsonValue"] | null;
+                    "application/json": string | null;
                 };
             };
             /** @description Validation Error */
@@ -24769,7 +24769,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["JsonValue"];
+                "application/json": string;
             };
         };
         responses: {
@@ -24779,7 +24779,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": string;
                 };
             };
             /** @description Validation Error */
