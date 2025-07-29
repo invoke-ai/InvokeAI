@@ -78,7 +78,12 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
         // create the illusion of the progress image "resolving" into the final image. If we cleared the progress image
         // now, there would be a flicker where the progress image disappears before the final image appears, and the
         // last-selected gallery image should be shown for a brief moment.
-        if (data.status === 'canceled' || data.status === 'failed') {
+        //
+        // When gallery auto-switch is disabled, we do not need to create this illusion, because we are not going to
+        // switch to the final image automatically. In this case, we clear the progress image immediately.
+        //
+        // We also clear the progress image if the queue item is canceled or failed, as there is no final image to show.
+        if (data.status === 'canceled' || data.status === 'failed' || !autoSwitch) {
           $progressEvent.set(null);
           $progressImage.set(null);
         }
