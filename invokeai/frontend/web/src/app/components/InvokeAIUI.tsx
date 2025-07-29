@@ -6,7 +6,7 @@ import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
 import { $didStudioInit } from 'app/hooks/useStudioInitAction';
 import type { LoggingOverrides } from 'app/logging/logger';
 import { $loggingOverrides, configureLogging } from 'app/logging/logger';
-import { buildStorageApi } from 'app/store/enhancers/reduxRemember/driver';
+import { buildStorage } from 'app/store/enhancers/reduxRemember/driver';
 import { $accountSettingsLink } from 'app/store/nanostores/accountSettingsLink';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
@@ -319,7 +319,7 @@ const InvokeAIUI = ({
     };
   }, [isDebugging]);
 
-  const storage = useMemo(() => buildStorageApi(storageConfig), [storageConfig]);
+  const storage = useMemo(() => buildStorage(storageConfig), [storageConfig]);
 
   useEffect(() => {
     const storageCleanup = storage.registerListeners();
