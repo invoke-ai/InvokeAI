@@ -319,6 +319,14 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   getPositionGridSize = (): number => {
     const snapToGrid = this.getSettings().snapToGrid;
     if (!snapToGrid) {
+      const overrideSnap = this.$ctrlKey.get() || this.$metaKey.get();
+      if (overrideSnap) {
+        const useFine = this.$shiftKey.get();
+        if (useFine) {
+          return 8;
+        }
+        return 64;
+      }
       return 1;
     }
     const useFine = this.$ctrlKey.get() || this.$metaKey.get();
