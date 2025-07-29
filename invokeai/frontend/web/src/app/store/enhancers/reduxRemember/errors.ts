@@ -33,8 +33,9 @@ export class StorageError extends Error {
   }
 }
 
+const log = logger('system');
+
 export const errorHandler = (err: PersistError | RehydrateError) => {
-  const log = logger('system');
   if (err instanceof PersistError) {
     log.error({ error: serializeError(err) }, 'Problem persisting state');
   } else if (err instanceof RehydrateError) {
