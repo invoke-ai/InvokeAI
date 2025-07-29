@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
 
-from pydantic import JsonValue
-
 
 class ClientStatePersistenceABC(ABC):
     """
@@ -10,26 +8,35 @@ class ClientStatePersistenceABC(ABC):
     """
 
     @abstractmethod
-    def set_by_key(self, key: str, value: JsonValue) -> None:
+    def set_by_key(self, key: str, value: str) -> str:
         """
-        Store the data for the client.
+        Set a key-value pair for the client.
 
-        :param data: The client data to be stored.
+        Args:
+            key (str): The key to set.
+            value (str): The value to set for the key.
+
+        Returns:
+            str: The value that was set.
         """
         pass
 
     @abstractmethod
-    def get_by_key(self, key: str) -> JsonValue | None:
+    def get_by_key(self, key: str) -> str | None:
         """
-        Get the data for the client.
+        Get the value for a specific key of the client.
 
-        :return: The client data.
+        Args:
+            key (str): The key to retrieve the value for.
+
+        Returns:
+            str | None: The value associated with the key, or None if the key does not exist.
         """
         pass
 
     @abstractmethod
     def delete(self) -> None:
         """
-        Delete the data for the client.
+        Delete all client state.
         """
         pass
