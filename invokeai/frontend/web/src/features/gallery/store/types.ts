@@ -3,8 +3,9 @@ import z from 'zod';
 
 const zGalleryView = z.enum(['images', 'assets']);
 export type GalleryView = z.infer<typeof zGalleryView>;
-const zBoardId = z.union([z.literal('none'), z.intersection(z.string(), z.record(z.never(), z.never()))]);
-export type BoardId = z.infer<typeof zBoardId>;
+const zBoardId = z.string();
+// TS hack to get autocomplete for "none" but accept any string
+export type BoardId = 'none' | (string & {});
 const zComparisonMode = z.enum(['slider', 'side-by-side', 'hover']);
 export type ComparisonMode = z.infer<typeof zComparisonMode>;
 const zComparisonFit = z.enum(['contain', 'fill']);
