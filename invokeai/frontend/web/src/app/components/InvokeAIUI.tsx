@@ -1,12 +1,11 @@
 import 'i18n';
 
 import type { Middleware } from '@reduxjs/toolkit';
-import { ClearStorageProvider } from 'app/contexts/clear-storage-context';
 import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
 import { $didStudioInit } from 'app/hooks/useStudioInitAction';
 import type { LoggingOverrides } from 'app/logging/logger';
 import { $loggingOverrides, configureLogging } from 'app/logging/logger';
-import { buildStorage } from 'app/store/enhancers/reduxRemember/driver';
+import { addStorageListeners } from 'app/store/enhancers/reduxRemember/driver';
 import { $accountSettingsLink } from 'app/store/nanostores/accountSettingsLink';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
@@ -72,14 +71,7 @@ interface Props extends PropsWithChildren {
    * If provided, overrides in-app navigation to the model manager
    */
   onClickGoToModelManager?: () => void;
-  storageConfig?: {
-    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-    getItem: (key: string) => Promise<any>;
-    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-    setItem: (key: string, value: any) => Promise<any>;
-    clear: () => Promise<void>;
-    persistThrottle: number;
-  };
+  storagePersistThrottle?: number;
 }
 
 const InvokeAIUI = ({
@@ -106,7 +98,7 @@ const InvokeAIUI = ({
   loggingOverrides,
   onClickGoToModelManager,
   whatsNew,
-  storageConfig,
+  storagePersistThrottle = 2000,
 }: Props) => {
   useLayoutEffect(() => {
     /*
@@ -319,21 +311,13 @@ const InvokeAIUI = ({
     };
   }, [isDebugging]);
 
-  const storage = useMemo(() => buildStorage(storageConfig), [storageConfig]);
-
-  useEffect(() => {
-    const storageCleanup = storage.registerListeners();
-    return () => {
-      storageCleanup();
-    };
-  }, [storage]);
+  useEffect(() => addStorageListeners(), []);
 
   const store = useMemo(() => {
     return createStore({
-      driver: storage.reduxRememberDriver,
-      persistThrottle: storageConfig?.persistThrottle ?? 2000,
+      persistThrottle: storagePersistThrottle,
     });
-  }, [storage.reduxRememberDriver, storageConfig?.persistThrottle]);
+  }, [storagePersistThrottle]);
 
   useEffect(() => {
     $store.set(store);
@@ -350,13 +334,11 @@ const InvokeAIUI = ({
 
   return (
     <React.StrictMode>
-      <ClearStorageProvider value={storage.clearStorage}>
-        <Provider store={store}>
-          <React.Suspense fallback={<Loading />}>
-            <App config={config} studioInitAction={studioInitAction} />
-          </React.Suspense>
-        </Provider>
-      </ClearStorageProvider>
+      <Provider store={store}>
+        <React.Suspense fallback={<Loading />}>
+          <App config={config} studioInitAction={studioInitAction} />
+        </React.Suspense>
+      </Provider>
     </React.StrictMode>
   );
 };

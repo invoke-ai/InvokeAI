@@ -14,7 +14,7 @@ import {
   Switch,
   Text,
 } from '@invoke-ai/ui-library';
-import { useClearStorage } from 'app/contexts/clear-storage-context';
+import { clearStorage } from 'app/store/enhancers/reduxRemember/driver';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
@@ -115,8 +115,6 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
     dispatch(shouldConfirmOnNewSessionToggled());
   }, [dispatch]);
 
-  const clearStorage = useClearStorage();
-
   useEffect(() => {
     if (settingsModal.isTrue && Boolean(config?.shouldShowClearIntermediates)) {
       refetchIntermediatesCount();
@@ -127,7 +125,7 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
     clearStorage();
     settingsModal.setFalse();
     refreshModal.setTrue();
-  }, [clearStorage, settingsModal, refreshModal]);
+  }, [settingsModal, refreshModal]);
 
   const handleChangeShouldConfirmOnDelete = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
