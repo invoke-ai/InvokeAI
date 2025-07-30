@@ -32,7 +32,7 @@ class ClientStatePersistenceSqlite(ClientStatePersistenceABC):
                 return None
             return json.loads(row[0])
 
-    def set_by_key(self, key: str, value: str) -> str:
+    def set_by_key(self, queue_id: str, key: str, value: str) -> str:
         state = self._get() or {}
         state.update({key: value})
 
@@ -49,13 +49,13 @@ class ClientStatePersistenceSqlite(ClientStatePersistenceABC):
 
         return value
 
-    def get_by_key(self, key: str) -> str | None:
+    def get_by_key(self, queue_id: str, key: str) -> str | None:
         state = self._get()
         if state is None:
             return None
         return state.get(key, None)
 
-    def delete(self) -> None:
+    def delete(self, queue_id: str) -> None:
         with self._db.transaction() as cursor:
             cursor.execute(
                 f"""
