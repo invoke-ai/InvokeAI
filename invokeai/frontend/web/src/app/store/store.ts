@@ -49,7 +49,6 @@ import { authToastMiddleware } from 'services/api/authToastMiddleware';
 import type { JsonObject } from 'type-fest';
 
 import { reduxRememberDriver } from './enhancers/reduxRemember/driver';
-import { getDebugLoggerMiddleware } from './middleware/debugLoggerMiddleware';
 import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
@@ -198,7 +197,7 @@ export const createStore = (options?: { persist?: boolean; persistThrottle?: num
         .concat(api.middleware)
         .concat(dynamicMiddlewares)
         .concat(authToastMiddleware)
-        .concat(getDebugLoggerMiddleware({ withDiff: true, withNextState: true }))
+        // .concat(getDebugLoggerMiddleware({ withDiff: true, withNextState: true }))
         .prepend(listenerMiddleware.middleware),
     enhancers: (getDefaultEnhancers) => {
       const enhancers = getDefaultEnhancers();
