@@ -282,7 +282,8 @@ const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
 
   // Flux Kontext only supports 1x Reference Image at a time.
   if (
-    (model?.base === 'flux-kontext' || (model?.base === 'flux' && model?.name?.toLowerCase().includes('kontext'))) &&
+    model?.base === 'flux-kontext' &&
+    // (model?.base === 'flux-kontext' || (model?.base === 'flux' && model?.name?.toLowerCase().includes('kontext'))) &&
     referenceImageCount > 1
   ) {
     reasons.push({ content: i18n.t('parameters.invoke.fluxKontextMultipleReferenceImages') });
@@ -640,7 +641,8 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
 
   // Flux Kontext only supports 1x Reference Image at a time.
   if (
-    (model?.base === 'flux-kontext' || (model?.base === 'flux' && model?.name?.toLowerCase().includes('kontext'))) &&
+    model?.base === 'flux-kontext' &&
+    // (model?.base === 'flux-kontext' || (model?.base === 'flux' && model?.name?.toLowerCase().includes('kontext'))) &&
     referenceImageCount > 1
   ) {
     reasons.push({ content: i18n.t('parameters.invoke.fluxKontextMultipleReferenceImages') });
