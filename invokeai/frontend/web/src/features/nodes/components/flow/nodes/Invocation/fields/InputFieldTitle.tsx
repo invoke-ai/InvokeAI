@@ -1,5 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Input, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Icon, Input, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useEditable } from 'common/hooks/useEditable';
 import { InputFieldTooltipContent } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldTooltipContent';
@@ -8,6 +8,7 @@ import {
   useIsConnectionInProgress,
   useIsConnectionStartField,
 } from 'features/nodes/hooks/useFieldConnectionState';
+import { useInputFieldIsAddedToForm } from 'features/nodes/hooks/useInputFieldIsAddedToForm';
 import { useInputFieldIsConnected } from 'features/nodes/hooks/useInputFieldIsConnected';
 import { useInputFieldTemplateTitleOrThrow } from 'features/nodes/hooks/useInputFieldTemplateTitleOrThrow';
 import { useInputFieldUserTitleSafe } from 'features/nodes/hooks/useInputFieldUserTitleSafe';
@@ -16,9 +17,13 @@ import { HANDLE_TOOLTIP_OPEN_DELAY, NO_FIT_ON_DOUBLE_CLICK_CLASS } from 'feature
 import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiLinkBold } from 'react-icons/pi';
 
 const labelSx: SystemStyleObject = {
   p: 0,
+  display: 'flex',
+  gap: 1,
+  alignItems: 'center',
   fontWeight: 'semibold',
   textAlign: 'left',
   color: 'base.300',
@@ -27,6 +32,9 @@ const labelSx: SystemStyleObject = {
   },
   '&[data-is-invalid="true"]': {
     color: 'error.300',
+  },
+  '&[data-is-added-to-form="true"]': {
+    color: 'blue.300',
   },
   '&[data-is-disabled="true"]': {
     opacity: 0.5,
@@ -47,6 +55,7 @@ export const InputFieldTitle = memo((props: Props) => {
   const fieldTemplateTitle = useInputFieldTemplateTitleOrThrow(fieldName);
   const { t } = useTranslation();
   const isConnected = useInputFieldIsConnected(fieldName);
+  const isAddedToForm = useInputFieldIsAddedToForm(fieldName);
   const isConnectionStartField = useIsConnectionStartField(nodeId, fieldName, 'target');
   const isConnectionInProgress = useIsConnectionInProgress();
   const connectionError = useConnectionErrorTKey(nodeId, fieldName, 'target');
@@ -93,9 +102,11 @@ export const InputFieldTitle = memo((props: Props) => {
           noOfLines={1}
           data-is-invalid={isInvalid}
           data-is-disabled={isDisabled}
+          data-is-added-to-form={isAddedToForm}
           onDoubleClick={onDoubleClick}
         >
           {editable.value}
+          {isAddedToForm && <Icon as={PiLinkBold} color="blue.200" ml={1} />}
         </Text>
       </Tooltip>
     );
