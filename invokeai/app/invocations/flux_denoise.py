@@ -63,7 +63,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX Denoise",
     tags=["image", "flux"],
     category="image",
-    version="4.0.0",
+    version="4.1.0",
 )
 class FluxDenoiseInvocation(BaseInvocation):
     """Run denoising process with a FLUX transformer model."""
@@ -153,7 +153,7 @@ class FluxDenoiseInvocation(BaseInvocation):
         description=FieldDescriptions.ip_adapter, title="IP-Adapter", default=None, input=Input.Connection
     )
 
-    kontext_conditioning: Optional[FluxKontextConditioningField] = InputField(
+    kontext_conditioning: FluxKontextConditioningField | list[FluxKontextConditioningField] | None = InputField(
         default=None,
         description="FLUX Kontext conditioning (reference image).",
         input=Input.Connection,
@@ -386,13 +386,15 @@ class FluxDenoiseInvocation(BaseInvocation):
             )
 
             kontext_extension = None
-            if self.kontext_conditioning is not None:
+            if self.kontext_conditioning:
                 if not self.controlnet_vae:
                     raise ValueError("A VAE (e.g., controlnet_vae) must be provided to use Kontext conditioning.")
 
                 kontext_extension = KontextExtension(
                     context=context,
-                    kontext_conditioning=self.kontext_conditioning,
+                    kontext_conditioning=self.kontext_conditioning
+                    if isinstance(self.kontext_conditioning, list)
+                    else [self.kontext_conditioning],
                     vae_field=self.controlnet_vae,
                     device=TorchDevice.choose_torch_device(),
                     dtype=inference_dtype,
