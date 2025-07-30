@@ -60,7 +60,7 @@ export const CompareToolbar = memo(() => {
   useRegisteredHotkeys({ id: 'nextComparisonMode', category: 'viewer', callback: nextMode, dependencies: [nextMode] });
 
   return (
-    <Flex w="full" px={2} gap={2} bg="base.750" borderTopRadius="base" h={12}>
+    <Flex w="full" justifyContent="center" h={8}>
       <Flex flex={1} justifyContent="center">
         <Flex marginInlineEnd="auto" alignItems="center">
           <IconButton
@@ -85,7 +85,7 @@ export const CompareToolbar = memo(() => {
         </Flex>
       </Flex>
       <Flex flex={1} justifyContent="center">
-        <ButtonGroup variant="outline" alignItems="center">
+        <ButtonGroup size="sm" variant="outline" alignItems="center">
           <Button
             flexShrink={0}
             onClick={setComparisonModeSlider}
@@ -117,6 +117,7 @@ export const CompareToolbar = memo(() => {
             </Flex>
           </Tooltip>
           <Button
+            size="sm"
             variant="link"
             alignSelf="stretch"
             px={2}

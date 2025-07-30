@@ -7,10 +7,16 @@ import type { ImageDTO } from 'services/api/types';
 
 export const DROP_SHADOW = 'drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 4px rgba(0, 0, 0, 0.3))';
 
+export type ComparisonWrapperProps = {
+  firstImage: ImageDTO | null;
+  secondImage: ImageDTO | null;
+  rect: DOMRect | null;
+};
+
 export type ComparisonProps = {
   firstImage: ImageDTO;
   secondImage: ImageDTO;
-  containerDims: Dimensions;
+  rect: DOMRect | null;
 };
 
 export const fitDimsToContainer = (containerDims: Dimensions, imageDims: Dimensions): Dimensions => {
