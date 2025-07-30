@@ -11,14 +11,16 @@ import { memo, useMemo, useRef } from 'react';
 import type { ComparisonProps } from './common';
 import { fitDimsToContainer, getSecondImageDims } from './common';
 
-export const ImageComparisonHover = memo(({ firstImage, secondImage, containerDims }: ComparisonProps) => {
+export const ImageComparisonHover = memo(({ firstImage, secondImage, rect }: ComparisonProps) => {
   const comparisonFit = useAppSelector(selectComparisonFit);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const mouseOver = useBoolean(false);
-  const fittedDims = useMemo<Dimensions>(
-    () => fitDimsToContainer(containerDims, firstImage),
-    [containerDims, firstImage]
-  );
+  const fittedDims = useMemo<Dimensions>(() => {
+    if (!rect) {
+      return { width: 0, height: 0 };
+    }
+    return fitDimsToContainer(rect, firstImage);
+  }, [firstImage, rect]);
   const compareImageDims = useMemo<Dimensions>(
     () => getSecondImageDims(comparisonFit, fittedDims, firstImage, secondImage),
     [comparisonFit, fittedDims, firstImage, secondImage]

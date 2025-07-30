@@ -19,7 +19,7 @@ const HANDLE_HITBOX_PX = `${HANDLE_HITBOX}px`;
 const HANDLE_INNER_LEFT_PX = `${HANDLE_HITBOX / 2 - HANDLE_WIDTH / 2}px`;
 const HANDLE_LEFT_INITIAL_PX = `calc(${INITIAL_POS} - ${HANDLE_HITBOX / 2}px)`;
 
-export const ImageComparisonSlider = memo(({ firstImage, secondImage, containerDims }: ComparisonProps) => {
+export const ImageComparisonSlider = memo(({ firstImage, secondImage, rect }: ComparisonProps) => {
   const comparisonFit = useAppSelector(selectComparisonFit);
 
   // How far the handle is from the left - this will be a CSS calculation that takes into account the handle width
@@ -33,10 +33,12 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage, containerD
   const rafRef = useRef<number | null>(null);
   const lastMoveTimeRef = useRef<number>(0);
 
-  const fittedDims = useMemo<Dimensions>(
-    () => fitDimsToContainer(containerDims, firstImage),
-    [containerDims, firstImage]
-  );
+  const fittedDims = useMemo<Dimensions>(() => {
+    if (!rect) {
+      return { width: 0, height: 0 };
+    }
+    return fitDimsToContainer(rect, firstImage);
+  }, [firstImage, rect]);
 
   const compareImageDims = useMemo<Dimensions>(
     () => getSecondImageDims(comparisonFit, fittedDims, firstImage, secondImage),
