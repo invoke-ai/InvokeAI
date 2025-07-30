@@ -3,7 +3,7 @@ import type { Selector } from '@reduxjs/toolkit';
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import { $templates } from 'features/nodes/store/nodesSlice';
-import { selectEdges, selectNodes } from 'features/nodes/store/selectors';
+import { selectEdges, selectNodeFieldElements, selectNodes } from 'features/nodes/store/selectors';
 import type { InvocationNode, InvocationTemplate } from 'features/nodes/types/invocation';
 import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
 import type { PropsWithChildren } from 'react';
@@ -27,6 +27,7 @@ type InvocationNodeContextValue = {
   buildSelectOutputFieldTemplateSafe: (
     fieldName: string
   ) => Selector<RootState, InvocationTemplate['outputs'][string] | null>;
+  buildSelectIsInputFieldAddedToForm: (fieldName: string) => Selector<RootState, boolean>;
 
   selectNodeOrThrow: Selector<RootState, InvocationNode>;
   selectNodeDataOrThrow: Selector<RootState, InvocationNode['data']>;
@@ -181,6 +182,15 @@ export const InvocationNodeContextProvider = memo(({ nodeId, children }: PropsWi
         })
       );
 
+    const buildSelectIsInputFieldAddedToForm = (fieldName: string) =>
+      getSelectorFromCache(cache, `buildSelectIsInputFieldAddedToForm-${fieldName}`, () =>
+        createSelector(selectNodeFieldElements, (nodeFieldElements) => {
+          return nodeFieldElements.some(
+            (el) => el.data.fieldIdentifier.nodeId === nodeId && el.data.fieldIdentifier.fieldName === fieldName
+          );
+        })
+      );
+
     const selectNodeNeedsUpdate = getSelectorFromCache(cache, 'selectNodeNeedsUpdate', () =>
       createSelector([selectNodeDataSafe, selectNodeTemplateSafe], (data, template) => {
         if (!data || !template) {
@@ -202,6 +212,7 @@ export const InvocationNodeContextProvider = memo(({ nodeId, children }: PropsWi
       buildSelectInputFieldSafe,
       buildSelectInputFieldTemplateSafe,
       buildSelectOutputFieldTemplateSafe,
+      buildSelectIsInputFieldAddedToForm,
 
       selectNodeOrThrow,
       selectNodeDataOrThrow,
