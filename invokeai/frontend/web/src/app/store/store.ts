@@ -40,7 +40,7 @@ import { systemSliceConfig } from 'features/system/store/systemSlice';
 import { uiSliceConfig } from 'features/ui/store/uiSlice';
 import { diff } from 'jsondiffpatch';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
-import type { Driver, SerializeFunction, UnserializeFunction } from 'redux-remember';
+import type { SerializeFunction, UnserializeFunction } from 'redux-remember';
 import { rememberEnhancer, rememberReducer } from 'redux-remember';
 import undoable, { newHistory } from 'redux-undo';
 import { serializeError } from 'serialize-error';
@@ -48,6 +48,7 @@ import { api } from 'services/api';
 import { authToastMiddleware } from 'services/api/authToastMiddleware';
 import type { JsonObject } from 'type-fest';
 
+import { reduxRememberDriver } from './enhancers/reduxRemember/driver';
 import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
@@ -183,7 +184,7 @@ const PERSISTED_KEYS = Object.values(SLICE_CONFIGS)
   .filter((sliceConfig) => !!sliceConfig.persistConfig)
   .map((sliceConfig) => sliceConfig.slice.reducerPath);
 
-export const createStore = (reduxRememberOptions: { driver: Driver; persistThrottle: number }) =>
+export const createStore = (options: { persistThrottle: number }) =>
   configureStore({
     reducer: rememberedRootReducer,
     middleware: (getDefaultMiddleware) =>
@@ -201,8 +202,8 @@ export const createStore = (reduxRememberOptions: { driver: Driver; persistThrot
     enhancers: (getDefaultEnhancers) => {
       const enhancers = getDefaultEnhancers();
       return enhancers.prepend(
-        rememberEnhancer(reduxRememberOptions.driver, PERSISTED_KEYS, {
-          persistThrottle: reduxRememberOptions.persistThrottle,
+        rememberEnhancer(reduxRememberDriver, PERSISTED_KEYS, {
+          persistThrottle: options.persistThrottle,
           serialize,
           unserialize,
           prefix: '',

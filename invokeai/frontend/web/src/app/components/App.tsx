@@ -2,8 +2,8 @@ import { Box } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { GlobalHookIsolator } from 'app/components/GlobalHookIsolator';
 import { GlobalModalIsolator } from 'app/components/GlobalModalIsolator';
-import { useClearStorage } from 'app/contexts/clear-storage-context';
 import { $didStudioInit, type StudioInitAction } from 'app/hooks/useStudioInitAction';
+import { clearStorage } from 'app/store/enhancers/reduxRemember/driver';
 import type { PartialAppConfig } from 'app/types/invokeai';
 import Loading from 'common/components/Loading/Loading';
 import { AppContent } from 'features/ui/components/AppContent';
@@ -21,13 +21,12 @@ interface Props {
 
 const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
   const didStudioInit = useStore($didStudioInit);
-  const clearStorage = useClearStorage();
 
   const handleReset = useCallback(() => {
     clearStorage();
     location.reload();
     return false;
-  }, [clearStorage]);
+  }, []);
 
   return (
     <ThemeLocaleProvider>
