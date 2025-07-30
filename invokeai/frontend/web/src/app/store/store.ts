@@ -1,5 +1,5 @@
 import type { ThunkDispatch, TypedStartListening, UnknownAction } from '@reduxjs/toolkit';
-import { addListener, combineReducers, configureStore, createListenerMiddleware } from '@reduxjs/toolkit';
+import { addListener, combineReducers, configureStore, createAction, createListenerMiddleware } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { errorHandler } from 'app/store/enhancers/reduxRemember/errors';
 import { addAdHocPostProcessingRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
@@ -41,7 +41,7 @@ import { uiSliceConfig } from 'features/ui/store/uiSlice';
 import { diff } from 'jsondiffpatch';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
 import type { SerializeFunction, UnserializeFunction } from 'redux-remember';
-import { rememberEnhancer, rememberReducer } from 'redux-remember';
+import { REMEMBER_REHYDRATED, rememberEnhancer, rememberReducer } from 'redux-remember';
 import undoable, { newHistory } from 'redux-undo';
 import { serializeError } from 'serialize-error';
 import { api } from 'services/api';
@@ -49,6 +49,7 @@ import { authToastMiddleware } from 'services/api/authToastMiddleware';
 import type { JsonObject } from 'type-fest';
 
 import { reduxRememberDriver } from './enhancers/reduxRemember/driver';
+import { getDebugLoggerMiddleware } from './middleware/debugLoggerMiddleware';
 import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
@@ -184,8 +185,8 @@ const PERSISTED_KEYS = Object.values(SLICE_CONFIGS)
   .filter((sliceConfig) => !!sliceConfig.persistConfig)
   .map((sliceConfig) => sliceConfig.slice.reducerPath);
 
-export const createStore = (options: { persistThrottle: number }) =>
-  configureStore({
+export const createStore = (options?: { persist?: boolean; persistThrottle?: number; onRehydrated?: () => void }) => {
+  const store = configureStore({
     reducer: rememberedRootReducer,
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({
@@ -197,19 +198,23 @@ export const createStore = (options: { persistThrottle: number }) =>
         .concat(api.middleware)
         .concat(dynamicMiddlewares)
         .concat(authToastMiddleware)
-        // .concat(getDebugLoggerMiddleware())
+        .concat(getDebugLoggerMiddleware({ withDiff: true, withNextState: true }))
         .prepend(listenerMiddleware.middleware),
     enhancers: (getDefaultEnhancers) => {
       const enhancers = getDefaultEnhancers();
-      return enhancers.prepend(
-        rememberEnhancer(reduxRememberDriver, PERSISTED_KEYS, {
-          persistThrottle: options.persistThrottle,
-          serialize,
-          unserialize,
-          prefix: '',
-          errorHandler,
-        })
-      );
+      if (options?.persist) {
+        return enhancers.prepend(
+          rememberEnhancer(reduxRememberDriver, PERSISTED_KEYS, {
+            persistThrottle: options?.persistThrottle ?? 2000,
+            serialize,
+            unserialize,
+            prefix: '',
+            errorHandler,
+          })
+        );
+      } else {
+        return enhancers;
+      }
     },
     devTools: {
       actionSanitizer,
@@ -223,6 +228,18 @@ export const createStore = (options: { persistThrottle: number }) =>
       },
     },
   });
+
+  // Once-off listener to support waiting for rehydration before rendering the app
+  startAppListening({
+    actionCreator: createAction(REMEMBER_REHYDRATED),
+    effect: (action, { unsubscribe }) => {
+      unsubscribe();
+      options?.onRehydrated?.();
+    },
+  });
+
+  return store;
+};
 
 export type AppStore = ReturnType<typeof createStore>;
 export type RootState = ReturnType<AppStore['getState']>;

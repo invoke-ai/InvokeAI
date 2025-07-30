@@ -36,7 +36,7 @@ import {
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
 import type { ToastConfig } from 'features/toast/toast';
 import type { PropsWithChildren, ReactNode } from 'react';
-import React, { lazy, memo, useEffect, useLayoutEffect, useMemo } from 'react';
+import React, { lazy, memo, useEffect, useLayoutEffect, useState } from 'react';
 import { Provider } from 'react-redux';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
 import { $socketOptions } from 'services/events/stores';
@@ -100,6 +100,9 @@ const InvokeAIUI = ({
   whatsNew,
   storagePersistThrottle = 2000,
 }: Props) => {
+  const [store, setStore] = useState<ReturnType<typeof createStore> | undefined>(undefined);
+  const [didRehydrate, setDidRehydrate] = useState(false);
+
   useLayoutEffect(() => {
     /*
      * We need to configure logging before anything else happens - useLayoutEffect ensures we set this at the first
@@ -311,26 +314,30 @@ const InvokeAIUI = ({
     };
   }, [isDebugging]);
 
-  useEffect(() => addStorageListeners(), []);
-
-  const store = useMemo(() => {
-    return createStore({
-      persistThrottle: storagePersistThrottle,
-    });
-  }, [storagePersistThrottle]);
-
   useEffect(() => {
+    const onRehydrated = () => {
+      setDidRehydrate(true);
+    };
+    const store = createStore({ persist: true, persistThrottle: storagePersistThrottle, onRehydrated });
+    setStore(store);
     $store.set(store);
     if (import.meta.env.MODE === 'development') {
       window.$store = $store;
     }
+    const removeStorageListeners = addStorageListeners();
     return () => {
+      removeStorageListeners();
+      setStore(undefined);
       $store.set(undefined);
       if (import.meta.env.MODE === 'development') {
         window.$store = undefined;
       }
     };
-  }, [store]);
+  }, [storagePersistThrottle]);
+
+  if (!store || !didRehydrate) {
+    return <Loading />;
+  }
 
   return (
     <React.StrictMode>

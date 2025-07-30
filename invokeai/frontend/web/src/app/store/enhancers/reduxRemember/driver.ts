@@ -1,5 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { StorageError } from 'app/store/enhancers/reduxRemember/errors';
+import { $authToken } from 'app/store/nanostores/authToken';
 import { $projectId } from 'app/store/nanostores/projectId';
 import { $queueId } from 'app/store/nanostores/queueId';
 import type { Driver } from 'redux-remember';
@@ -7,15 +8,29 @@ import { buildV1Url, getBaseUrl } from 'services/api';
 
 const log = logger('system');
 
-const getClientStateStorageURL = (operation: 'get_by_key' | 'set_by_key' | 'delete', key?: string) => {
+const getUrl = (endpoint: 'get_by_key' | 'set_by_key' | 'delete', key?: string) => {
   const baseUrl = getBaseUrl();
   const query: Record<string, string> = {};
   if (key) {
     query['key'] = key;
   }
-  const path = buildV1Url(`client_state/${$queueId.get()}/${operation}`, query);
+
+  const path = buildV1Url(`client_state/${$queueId.get()}/${endpoint}`, query);
   const url = `${baseUrl}/${path}`;
   return url;
+};
+
+const getHeaders = () => {
+  const headers = new Headers();
+  const authToken = $authToken.get();
+  const projectId = $projectId.get();
+  if (authToken) {
+    headers.set('Authorization', `Bearer ${authToken}`);
+  }
+  if (projectId) {
+    headers.set('project-id', projectId);
+  }
+  return headers;
 };
 
 // Persistence happens per slice. To track when persistence is in progress, maintain a ref count, incrementing
@@ -44,8 +59,9 @@ const lastPersistedState = new Map<string, string | undefined>();
 export const reduxRememberDriver: Driver = {
   getItem: async (key: string) => {
     try {
-      const url = getClientStateStorageURL('get_by_key', key);
-      const res = await fetch(url, { method: 'GET' });
+      const url = getUrl('get_by_key', key);
+      const headers = getHeaders();
+      const res = await fetch(url, { method: 'GET', headers });
       if (!res.ok) {
         throw new Error(`Response status: ${res.status}`);
       }
@@ -72,8 +88,9 @@ export const reduxRememberDriver: Driver = {
         return value;
       }
       log.trace({ key, last: lastPersistedState.get(key), next: value }, `Persisting state for ${key}`);
-      const url = getClientStateStorageURL('set_by_key', key);
-      const res = await fetch(url, { method: 'POST', body: value });
+      const url = getUrl('set_by_key', key);
+      const headers = getHeaders();
+      const res = await fetch(url, { method: 'POST', headers, body: value });
       if (!res.ok) {
         throw new Error(`Response status: ${res.status}`);
       }
@@ -100,8 +117,9 @@ export const reduxRememberDriver: Driver = {
 export const clearStorage = async () => {
   try {
     persistRefCount++;
-    const url = getClientStateStorageURL('delete');
-    const res = await fetch(url, { method: 'POST' });
+    const url = getUrl('delete');
+    const headers = getHeaders();
+    const res = await fetch(url, { method: 'POST', headers });
     if (!res.ok) {
       throw new Error(`Response status: ${res.status}`);
     }
