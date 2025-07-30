@@ -5,8 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 import torch
-from fastapi import Body, HTTPException, Query
-from fastapi import Path as FastAPIPath
+from fastapi import Body
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 
