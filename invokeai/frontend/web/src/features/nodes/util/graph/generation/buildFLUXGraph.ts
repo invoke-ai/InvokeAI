@@ -154,22 +154,27 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       .filter((entity) => isFluxKontextReferenceImageConfig(entity.config))
       .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0);
 
-    // FLUX Kontext supports only a single conditioning image - we'll just take the first one.
-    // In the future, we can explore concatenating multiple conditioning images in image or latent space.
-    const firstValidFLUXKontextConfig = validFLUXKontextConfigs[0];
-
-    if (firstValidFLUXKontextConfig) {
-      const { image } = firstValidFLUXKontextConfig.config;
-
-      assert(image, 'getGlobalReferenceImageWarnings checks if the image is there, this should never raise');
-
-      const kontextConditioning = g.addNode({
-        type: 'flux_kontext',
-        id: getPrefixedId('flux_kontext'),
-        image,
+    if (validFLUXKontextConfigs.length > 0) {
+      const kontextCollector = g.addNode({
+        id: getPrefixedId('flux_kontext_collector'),
+        type: 'collect',
       });
-      g.addEdge(kontextConditioning, 'kontext_cond', denoise, 'kontext_conditioning');
-      g.upsertMetadata({ ref_images: [firstValidFLUXKontextConfig] }, 'merge');
+      g.addEdge(kontextCollector, 'collection', denoise, 'kontext_conditioning');
+
+      for (const kontextConfig of validFLUXKontextConfigs) {
+        const { image } = kontextConfig.config;
+
+        assert(image, 'getGlobalReferenceImageWarnings checks if the image is there, this should never raise');
+
+        const kontextConditioning = g.addNode({
+          type: 'flux_kontext',
+          id: getPrefixedId(`flux_kontext_${kontextConfig.id}`),
+          image,
+        });
+        g.addEdge(kontextConditioning, 'kontext_cond', kontextCollector, 'item');
+      }
+
+      g.upsertMetadata({ ref_images: [validFLUXKontextConfigs] }, 'merge');
     }
   }
 
