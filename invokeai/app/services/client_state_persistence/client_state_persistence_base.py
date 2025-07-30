@@ -8,7 +8,7 @@ class ClientStatePersistenceABC(ABC):
     """
 
     @abstractmethod
-    def set_by_key(self, key: str, value: str) -> str:
+    def set_by_key(self, queue_id: str, key: str, value: str) -> str:
         """
         Set a key-value pair for the client.
 
@@ -22,7 +22,7 @@ class ClientStatePersistenceABC(ABC):
         pass
 
     @abstractmethod
-    def get_by_key(self, key: str) -> str | None:
+    def get_by_key(self, queue_id: str, key: str) -> str | None:
         """
         Get the value for a specific key of the client.
 
@@ -35,7 +35,7 @@ class ClientStatePersistenceABC(ABC):
         pass
 
     @abstractmethod
-    def delete(self) -> None:
+    def delete(self, queue_id: str) -> None:
         """
         Delete all client state.
         """
