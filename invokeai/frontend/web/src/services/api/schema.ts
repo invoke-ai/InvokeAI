@@ -7921,10 +7921,11 @@ export type components = {
              */
             ip_adapter?: components["schemas"]["IPAdapterField"] | components["schemas"]["IPAdapterField"][] | null;
             /**
+             * Kontext Conditioning
              * @description FLUX Kontext conditioning (reference image).
              * @default null
              */
-            kontext_conditioning?: components["schemas"]["FluxKontextConditioningField"] | null;
+            kontext_conditioning?: components["schemas"]["FluxKontextConditioningField"] | components["schemas"]["FluxKontextConditioningField"][] | null;
             /**
              * type
              * @default flux_denoise
@@ -8088,10 +8089,11 @@ export type components = {
              */
             ip_adapter?: components["schemas"]["IPAdapterField"] | components["schemas"]["IPAdapterField"][] | null;
             /**
+             * Kontext Conditioning
              * @description FLUX Kontext conditioning (reference image).
              * @default null
              */
-            kontext_conditioning?: components["schemas"]["FluxKontextConditioningField"] | null;
+            kontext_conditioning?: components["schemas"]["FluxKontextConditioningField"] | components["schemas"]["FluxKontextConditioningField"][] | null;
             /**
              * type
              * @default flux_denoise_meta
