@@ -1,6 +1,7 @@
 import { Flex, Heading, Icon, Text } from '@invoke-ai/ui-library';
 import { LaunchpadButton } from 'features/ui/layouts/LaunchpadButton';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiCursorTextBold, PiTextAaBold } from 'react-icons/pi';
 
 const focusOnPrompt = () => {
@@ -12,6 +13,7 @@ const focusOnPrompt = () => {
 };
 
 export const LaunchpadGenerateFromTextButton = memo((props: { extraAction?: () => void }) => {
+  const { t } = useTranslation();
   const onClick = useCallback(() => {
     focusOnPrompt();
     props.extraAction?.();
@@ -20,8 +22,8 @@ export const LaunchpadGenerateFromTextButton = memo((props: { extraAction?: () =
     <LaunchpadButton onClick={onClick} position="relative" gap={8}>
       <Icon as={PiTextAaBold} boxSize={8} color="base.500" />
       <Flex flexDir="column" alignItems="flex-start" gap={2}>
-        <Heading size="sm">Generate from Text</Heading>
-        <Text color="base.300">Enter a prompt and Invoke.</Text>
+        <Heading size="sm">{t('ui.launchpad.generateFromText.title')}</Heading>
+        <Text color="base.300">{t('ui.launchpad.generateFromText.description')}</Text>
       </Flex>
       <Flex position="absolute" right={3} bottom={3}>
         <PiCursorTextBold />

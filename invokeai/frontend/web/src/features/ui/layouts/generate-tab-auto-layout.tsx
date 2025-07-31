@@ -14,6 +14,7 @@ import type {
 import { AutoLayoutProvider, useAutoLayoutContext, withPanelContainer } from 'features/ui/layouts/auto-layout-context';
 import type { TabName } from 'features/ui/store/uiTypes';
 import { dockviewTheme } from 'features/ui/styles/theme';
+import { t } from 'i18next';
 import { memo, useCallback, useEffect } from 'react';
 
 import { DockviewTab } from './DockviewTab';
@@ -59,7 +60,7 @@ const initializeMainPanelLayout = (tab: TabName, api: DockviewApi) => {
     const launchpad = api.addPanel<PanelParameters>({
       id: LAUNCHPAD_PANEL_ID,
       component: LAUNCHPAD_PANEL_ID,
-      title: 'Launchpad',
+      title: t('ui.panels.launchpad'),
       tabComponent: DOCKVIEW_TAB_LAUNCHPAD_ID,
       params: {
         tab,
@@ -70,7 +71,7 @@ const initializeMainPanelLayout = (tab: TabName, api: DockviewApi) => {
     api.addPanel<PanelParameters>({
       id: VIEWER_PANEL_ID,
       component: VIEWER_PANEL_ID,
-      title: 'Image Viewer',
+      title: t('ui.panels.imageViewer'),
       tabComponent: DOCKVIEW_TAB_PROGRESS_ID,
       params: {
         tab,

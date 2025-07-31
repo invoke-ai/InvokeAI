@@ -117,7 +117,7 @@ export const UpscalingLaunchpadPanel = memo(() => {
         {/* Left Column: Creativity and Structural Defaults */}
         <Box>
           <Text fontWeight="semibold" fontSize="sm" mb={3}>
-            Creativity & Structure Defaults
+            {t('ui.launchpad.upscaling.creativityAndStructure.title')}
           </Text>
           <ButtonGroup size="sm" orientation="vertical" variant="outline" w="full">
             <Button
@@ -126,7 +126,7 @@ export const UpscalingLaunchpadPanel = memo(() => {
               onClick={onConservativeClick}
               leftIcon={<PiShieldCheckBold />}
             >
-              Conservative
+              {t('ui.launchpad.upscaling.creativityAndStructure.conservative')}
             </Button>
             <Button
               colorScheme={creativity === 0 && structure === 0 ? 'invokeBlue' : undefined}
@@ -134,7 +134,7 @@ export const UpscalingLaunchpadPanel = memo(() => {
               onClick={onBalancedClick}
               leftIcon={<PiScalesBold />}
             >
-              Balanced
+              {t('ui.launchpad.upscaling.creativityAndStructure.balanced')}
             </Button>
             <Button
               colorScheme={creativity === 5 && structure === -2 ? 'invokeBlue' : undefined}
@@ -142,7 +142,7 @@ export const UpscalingLaunchpadPanel = memo(() => {
               onClick={onCreativeClick}
               leftIcon={<PiPaletteBold />}
             >
-              Creative
+              {t('ui.launchpad.upscaling.creativityAndStructure.creative')}
             </Button>
             <Button
               colorScheme={creativity === 8 && structure === -5 ? 'invokeBlue' : undefined}
@@ -150,7 +150,7 @@ export const UpscalingLaunchpadPanel = memo(() => {
               onClick={onArtisticClick}
               leftIcon={<PiSparkleBold />}
             >
-              Artistic
+              {t('ui.launchpad.upscaling.creativityAndStructure.artistic')}
             </Button>
           </ButtonGroup>
         </Box>

@@ -42,7 +42,7 @@ export const VerticalNavBar = memo(() => {
     <Flex flexDir="column" alignItems="center" py={6} ps={4} pe={2} gap={4} minW={0} flexShrink={0}>
       <InvokeAILogoComponent />
       <Flex gap={6} pt={6} h="full" flexDir="column">
-        {withGenerateTab && <TabButton tab="generate" icon={<PiTextAaBold />} label="Generate" />}
+        {withGenerateTab && <TabButton tab="generate" icon={<PiTextAaBold />} label={t('ui.tabs.generate')} />}
         {withCanvasTab && <TabButton tab="canvas" icon={<PiBoundingBoxBold />} label={t('ui.tabs.canvas')} />}
         {withUpscalingTab && <TabButton tab="upscaling" icon={<PiFrameCornersBold />} label={t('ui.tabs.upscaling')} />}
         {withWorkflowsTab && <TabButton tab="workflows" icon={<PiFlowArrowBold />} label={t('ui.tabs.workflows')} />}

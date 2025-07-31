@@ -59,7 +59,7 @@ export const BoardsPanel = memo(() => {
             onClick={collapsibleApi.toggle}
             leftIcon={isCollapsed ? <PiCaretDownBold /> : <PiCaretUpBold />}
           >
-            Boards
+            {t('boards.boards')}
           </Button>
         </Flex>
         <Flex>

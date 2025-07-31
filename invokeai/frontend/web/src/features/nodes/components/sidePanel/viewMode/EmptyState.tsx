@@ -35,7 +35,7 @@ const CleanEditorContent = () => {
           <Flex flexDir="column" alignItems="flex-start" gap={2}>
             <Heading size="sm">{t('nodes.newWorkflow')}</Heading>
             <Text color="base.300" fontSize="sm">
-              Create a new workflow from scratch
+              {t('ui.launchpad.createNewWorkflowFromScratch')}
             </Text>
           </Flex>
         </LaunchpadButton>
@@ -44,7 +44,7 @@ const CleanEditorContent = () => {
           <Flex flexDir="column" alignItems="flex-start" gap={2}>
             <Heading size="sm">{t('nodes.loadWorkflow')}</Heading>
             <Text color="base.300" fontSize="sm">
-              Browse and load existing workflows
+              {t('ui.launchpad.browseAndLoadWorkflows')}
             </Text>
           </Flex>
         </LaunchpadButton>
