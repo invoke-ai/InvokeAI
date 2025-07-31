@@ -80,6 +80,9 @@ importers:
       i18next-http-backend:
         specifier: ^3.0.2
         version: 3.0.2
+      idb-keyval:
+        specifier: 6.2.1
+        version: 6.2.1
       jsondiffpatch:
         specifier: ^0.7.3
         version: 0.7.3
@@ -2774,6 +2777,9 @@ packages:
     peerDependenciesMeta:
       typescript:
         optional: true
+
+  idb-keyval@6.2.1:
+    resolution: {integrity: sha512-8Sb3veuYCyrZL+VBt9LJfZjLUPWVvqn8tG28VqYNFCo43KHcKuq+b4EiXGeuaLAQWL2YmyDgMp2aSpH9JHsEQg==}
 
   ieee754@1.2.1:
     resolution: {integrity: sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==}
@@ -7268,6 +7274,8 @@ snapshots:
       '@babel/runtime': 7.27.6
     optionalDependencies:
       typescript: 5.8.3
+
+  idb-keyval@6.2.1: {}
 
   ieee754@1.2.1: {}
 
