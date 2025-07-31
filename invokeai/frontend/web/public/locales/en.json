@@ -2631,10 +2631,8 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "New setting to send all Canvas generations directly to the Gallery.",
-            "New Invert Mask (Shift+V) and Fit BBox to Mask (Shift+B) capabilities.",
-            "Expanded support for Model Thumbnails and configurations.",
-            "Various other quality of life updates and fixes"
+            "Studio state is saved to the server, allowing you to continue your work on any device.",
+            "Support for multiple reference images for FLUX Kontext (local model only)."
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
