@@ -59,7 +59,7 @@ const ImageAtPosition = memo(({ imageName }: { index: number; imageName: string 
   imagesApi.endpoints.getImageDTO.useQuerySubscription(imageName, { skip: isUninitialized });
 
   if (!imageDTO) {
-    return <GalleryImagePlaceholder />;
+    return <GalleryImagePlaceholder data-image-name={imageName} />;
   }
 
   return <GalleryImage imageDTO={imageDTO} />;
