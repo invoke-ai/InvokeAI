@@ -63,6 +63,7 @@ RefImageList.displayName = 'RefImageList';
 const dndTargetData = addGlobalReferenceImageDndTarget.getData();
 
 const MaxRefImages = memo(() => {
+  const { t } = useTranslation();
   return (
     <Button
       position="relative"
@@ -75,7 +76,7 @@ const MaxRefImages = memo(() => {
       borderRadius="base"
       isDisabled
     >
-      Max Ref Images
+      {t('controlLayers.maxRefImages')}
     </Button>
   );
 });
@@ -83,6 +84,7 @@ MaxRefImages.displayName = 'MaxRefImages';
 
 const AddRefImageDropTargetAndButton = memo(() => {
   const { dispatch, getState } = useAppStore();
+  const { t } = useTranslation();
   const tab = useAppSelector(selectActiveTab);
 
   const uploadOptions = useMemo(
@@ -114,7 +116,7 @@ const AddRefImageDropTargetAndButton = memo(() => {
         leftIcon={<PiUploadBold />}
         {...uploadApi.getUploadButtonProps()}
       >
-        Reference Image
+        {t('controlLayers.referenceImage')}
         <input {...uploadApi.getUploadInputProps()} />
         <DndDropTarget label="Drop" dndTarget={addGlobalReferenceImageDndTarget} dndTargetData={dndTargetData} />
       </Button>

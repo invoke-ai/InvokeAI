@@ -28,7 +28,7 @@ export const ImageMenuItemUseAsRefImage = memo(() => {
 
   return (
     <MenuItem icon={<PiImageBold />} onClickCapture={onClickNewGlobalReferenceImageFromImage}>
-      Use as Reference Image
+      {t('controlLayers.useAsReferenceImage')}
     </MenuItem>
   );
 });

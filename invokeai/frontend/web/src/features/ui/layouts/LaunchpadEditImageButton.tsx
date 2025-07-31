@@ -6,6 +6,7 @@ import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { newCanvasFromImage } from 'features/imageActions/actions';
 import { LaunchpadButton } from 'features/ui/layouts/LaunchpadButton';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiPencilBold, PiUploadBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
@@ -14,6 +15,7 @@ const NEW_CANVAS_OPTIONS = { type: 'raster_layer', withInpaintMask: true } as co
 const dndTargetData = newCanvasFromImageDndTarget.getData(NEW_CANVAS_OPTIONS);
 
 export const LaunchpadEditImageButton = memo((props: { extraAction?: () => void }) => {
+  const { t } = useTranslation();
   const { getState, dispatch } = useAppStore();
 
   const onUpload = useCallback(
@@ -29,8 +31,8 @@ export const LaunchpadEditImageButton = memo((props: { extraAction?: () => void 
     <LaunchpadButton {...uploadApi.getUploadButtonProps()} position="relative" gap={8}>
       <Icon as={PiPencilBold} boxSize={8} color="base.500" />
       <Flex flexDir="column" alignItems="flex-start" gap={2}>
-        <Heading size="sm">Edit Image</Heading>
-        <Text color="base.300">Add an image to refine.</Text>
+        <Heading size="sm">{t('ui.launchpad.editImage.title')}</Heading>
+        <Text color="base.300">{t('ui.launchpad.editImage.description')}</Text>
       </Flex>
       <Flex position="absolute" right={3} bottom={3}>
         <PiUploadBold />

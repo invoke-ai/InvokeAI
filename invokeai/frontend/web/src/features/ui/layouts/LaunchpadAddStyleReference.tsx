@@ -8,12 +8,14 @@ import { addGlobalReferenceImageDndTarget, newCanvasFromImageDndTarget } from 'f
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { LaunchpadButton } from 'features/ui/layouts/LaunchpadButton';
 import { memo, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiUploadBold, PiUserCircleGearBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
 const dndTargetData = addGlobalReferenceImageDndTarget.getData();
 
 export const LaunchpadAddStyleReference = memo((props: { extraAction?: () => void }) => {
+  const { t } = useTranslation();
   const { dispatch, getState } = useAppStore();
 
   const uploadOptions = useMemo(
@@ -36,8 +38,8 @@ export const LaunchpadAddStyleReference = memo((props: { extraAction?: () => voi
     <LaunchpadButton {...uploadApi.getUploadButtonProps()} position="relative" gap={8}>
       <Icon as={PiUserCircleGearBold} boxSize={8} color="base.500" />
       <Flex flexDir="column" alignItems="flex-start" gap={2}>
-        <Heading size="sm">Add a Style Reference</Heading>
-        <Text color="base.300">Add an image to transfer its look.</Text>
+        <Heading size="sm">{t('ui.launchpad.addStyleRef.title')}</Heading>
+        <Text color="base.300">{t('ui.launchpad.addStyleRef.description')}</Text>
       </Flex>
       <Flex position="absolute" right={3} bottom={3}>
         <PiUploadBold />
