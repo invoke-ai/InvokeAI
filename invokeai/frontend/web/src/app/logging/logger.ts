@@ -93,5 +93,7 @@ export const configureLogging = (
     localStorage.setItem('ROARR_FILTER', filter);
   }
 
-  ROARR.write = createLogWriter();
+  const styleOutput = localStorage.getItem('ROARR_STYLE_OUTPUT') === 'false' ? false : true;
+
+  ROARR.write = createLogWriter({ styleOutput });
 };
