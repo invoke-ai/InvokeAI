@@ -1783,7 +1783,6 @@
             "workflows": "ワークフロー",
             "models": "モデル",
             "gallery": "ギャラリー",
-            "generation": "生成",
             "workflowsTab": "$t(ui.tabs.workflows) $t(common.tab)",
             "modelsTab": "$t(ui.tabs.models) $t(common.tab)",
             "upscaling": "アップスケーリング",
