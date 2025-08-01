@@ -1820,7 +1820,6 @@
             "upscaling": "Agrandissement",
             "gallery": "Galerie",
             "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)",
-            "generation": "Génération",
             "workflows": "Workflows",
             "workflowsTab": "$t(ui.tabs.workflows) $t(common.tab)",
             "models": "Modèles",

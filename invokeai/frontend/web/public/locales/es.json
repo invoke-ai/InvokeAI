@@ -399,7 +399,6 @@
     "ui": {
         "tabs": {
             "canvas": "Lienzo",
-            "generation": "Generación",
             "queue": "Cola",
             "workflows": "Flujos de trabajo",
             "models": "Modelos",

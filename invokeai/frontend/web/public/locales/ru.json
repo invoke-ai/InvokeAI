@@ -1931,7 +1931,6 @@
     },
     "ui": {
         "tabs": {
-            "generation": "Генерация",
             "canvas": "Холст",
             "workflowsTab": "$t(ui.tabs.workflows) $t(common.tab)",
             "models": "Модели",
