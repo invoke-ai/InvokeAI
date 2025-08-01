@@ -1470,7 +1470,6 @@
     "ui": {
         "tabs": {
             "queue": "Warteschlange",
-            "generation": "Erzeugung",
             "gallery": "Galerie",
             "models": "Modelle",
             "upscaling": "Hochskalierung",

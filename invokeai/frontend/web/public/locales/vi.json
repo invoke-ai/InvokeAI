@@ -2238,7 +2238,9 @@
             "switchOnFinish": "Khi Kết Thúc"
         },
         "fitBboxToMasks": "Xếp Vừa Hộp Giới Hạn Vào Lớp Phủ",
-        "invertMask": "Đảo Ngược Lớp Phủ"
+        "invertMask": "Đảo Ngược Lớp Phủ",
+        "maxRefImages": "Ảnh Mẫu Tối Đa",
+        "useAsReferenceImage": "Dùng Làm Ảnh Mẫu"
     },
     "stylePresets": {
         "negativePrompt": "Lệnh Tiêu Cực",
@@ -2414,14 +2416,14 @@
         "tabs": {
             "gallery": "Thư Viện Ảnh",
             "models": "Models",
-            "generation": "Generation (Máy Tạo Sinh)",
             "upscaling": "Upscale (Nâng Cấp Chất Lượng Hình Ảnh)",
             "canvas": "Canvas (Vùng Ảnh)",
             "upscalingTab": "$t(common.tab) $t(ui.tabs.upscaling)",
             "modelsTab": "$t(common.tab) $t(ui.tabs.models)",
             "queue": "Queue (Hàng Đợi)",
             "workflows": "Workflow (Luồng Làm Việc)",
-            "workflowsTab": "$t(common.tab) $t(ui.tabs.workflows)"
+            "workflowsTab": "$t(common.tab) $t(ui.tabs.workflows)",
+            "generate": "Tạo Sinh"
         },
         "launchpad": {
             "workflowsTitle": "Đi sâu hơn với Workflow.",
@@ -2469,8 +2471,43 @@
                     "promptAdvice": "Khi upscale, dùng lệnh để mô tả phương thức và phong cách. Tránh mô tả các chi tiết cụ thể trong ảnh.",
                     "styleAdvice": "Upscale thích hợp nhất cho phong cách chung của ảnh."
                 },
-                "scale": "Kích Thước"
+                "scale": "Kích Thước",
+                "creativityAndStructure": {
+                    "title": "Độ Sáng Tạo & Cấu Trúc Mặc Định",
+                    "conservative": "Bảo toàn",
+                    "balanced": "Cân bằng",
+                    "creative": "Sáng tạo",
+                    "artistic": "Thẩm mỹ"
+                }
+            },
+            "createNewWorkflowFromScratch": "Tạo workflow mới từ đầu",
+            "browseAndLoadWorkflows": "Duyệt và tải workflow có sẵn",
+            "addStyleRef": {
+                "title": "Thêm Phong Cách Mẫu",
+                "description": "Thêm ảnh để chuyển đổi diện mạo của nó."
+            },
+            "editImage": {
+                "title": "Biên Tập Ảnh",
+                "description": "Thêm ảnh để chỉnh sửa."
+            },
+            "generateFromText": {
+                "title": "Tạo Sinh Từ Chữ",
+                "description": "Nhập lệnh vào và Kích Hoạt."
+            },
+            "useALayoutImage": {
+                "title": "Dùng Bố Cục Ảnh",
+                "description": "Thêm ảnh để điều khiển bố cục."
+            },
+            "generate": {
+                "canvasCalloutTitle": "Đang tìm cách để điều khiển, chỉnh sửa, và làm lại ảnh?",
+                "canvasCalloutLink": "Vào Canvas cho nhiều tính năng hơn."
             }
+        },
+        "panels": {
+            "launchpad": "Launchpad",
+            "workflowEditor": "Trình Biên Tập Workflow",
+            "imageViewer": "Trình Xem Ảnh",
+            "canvas": "Canvas"
         }
     },
     "workflows": {
@@ -2642,10 +2679,8 @@
         "watchRecentReleaseVideos": "Xem Video Phát Hành Mới Nhất",
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
         "items": [
-            "Thiết lập mới để gửi các sản phẩm tạo sinh từ Canvas trực tiếp đến Thư Viện Ảnh.",
-            "Chức năng mới Đảo Ngược Lớp Phủ (Shift+V) và khả năng Xếp Vừa Hộp Giới Hạn Vào Lớp Phủ (Shift+B).",
-            "Mở rộng hỗ trợ cho Ảnh Minh Hoạ và thiết lập model.",
-            "Nhiều bản cập nhật và sửa lỗi chất lượng"
+            "Trạng thái Studio được lưu vào server, giúp bạn tiếp tục công việc ở mọi thiết bị.",
+            "Hỗ trợ nhiều ảnh mẫu cho FLUX KONTEXT (chỉ cho model trên máy)."
         ]
     },
     "upsell": {

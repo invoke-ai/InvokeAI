@@ -1772,7 +1772,6 @@
     },
     "ui": {
         "tabs": {
-            "generation": "生成",
             "queue": "队列",
             "canvas": "画布",
             "upscaling": "放大中",
