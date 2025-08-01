@@ -45,6 +45,9 @@ jobs:
     steps:
       - name: Free up more disk space on the runner
         # https://github.com/actions/runner-images/issues/2840#issuecomment-1284059930
+        # the /mnt dir has 70GBs of free space
+        # /dev/sda1        74G   28K   70G   1% /mnt
+        # According to some online posts the /mnt is not always there, so checking before setting docker to use it
         run: |
           echo "----- Free space before cleanup"
           df -h
@@ -52,6 +55,11 @@ jobs:
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
           sudo swapoff /mnt/swapfile
           sudo rm -rf /mnt/swapfile
+          if [ -d /mnt ]; then
+            sudo chmod -R 777 /mnt
+            echo '{"data-root": "/mnt/docker-root"}' | sudo tee /etc/docker/daemon.json
+            sudo systemctl restart docker
+          fi
           echo "----- Free space after cleanup"
           df -h
 
