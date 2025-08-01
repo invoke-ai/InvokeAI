@@ -2414,7 +2414,6 @@
         "tabs": {
             "gallery": "Thư Viện Ảnh",
             "models": "Models",
-            "generation": "Generation (Máy Tạo Sinh)",
             "upscaling": "Upscale (Nâng Cấp Chất Lượng Hình Ảnh)",
             "canvas": "Canvas (Vùng Ảnh)",
             "upscalingTab": "$t(common.tab) $t(ui.tabs.upscaling)",
@@ -2643,9 +2642,7 @@
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
         "items": [
             "Thiết lập mới để gửi các sản phẩm tạo sinh từ Canvas trực tiếp đến Thư Viện Ảnh.",
-            "Chức năng mới Đảo Ngược Lớp Phủ (Shift+V) và khả năng Xếp Vừa Hộp Giới Hạn Vào Lớp Phủ (Shift+B).",
-            "Mở rộng hỗ trợ cho Ảnh Minh Hoạ và thiết lập model.",
-            "Nhiều bản cập nhật và sửa lỗi chất lượng"
+            "Chức năng mới Đảo Ngược Lớp Phủ (Shift+V) và khả năng Xếp Vừa Hộp Giới Hạn Vào Lớp Phủ (Shift+B)."
         ]
     },
     "upsell": {

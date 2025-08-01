@@ -2499,7 +2499,6 @@
     },
     "ui": {
         "tabs": {
-            "generation": "Generazione",
             "canvas": "Tela",
             "workflows": "Flussi di lavoro",
             "workflowsTab": "$t(ui.tabs.workflows) $t(common.tab)",
@@ -2649,9 +2648,7 @@
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
             "Nuova impostazione per inviare tutte le generazioni della Tela direttamente alla Galleria.",
-            "Nuove funzionalità Inverti maschera (Maiusc+V) e Adatta il Riquadro di delimitazione alla maschera (Maiusc+B).",
-            "Supporto esteso per miniature e configurazioni dei modelli.",
-            "Vari altri aggiornamenti e correzioni per la qualità della vita"
+            "Nuove funzionalità Inverti maschera (Maiusc+V) e Adatta il Riquadro di delimitazione alla maschera (Maiusc+B)."
         ]
     },
     "system": {
