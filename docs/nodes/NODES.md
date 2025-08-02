@@ -41,7 +41,7 @@ Nodes have a "Use Cache" option in their footer. This allows for performance imp
 
 There are several node grouping concepts that can be examined with a narrow focus. These (and other) groupings can be pieced together to make up functional graph setups, and are important to understanding how groups of nodes work together as part of a whole. Note that the screenshots below aren't examples of complete functioning node graphs (see Examples).
 
-### Noise
+### Create Latent Noise
 
 An initial noise tensor is necessary for the latent diffusion process. As a result, the Denoising node requires a noise node input.  
 
