@@ -26,8 +26,8 @@ class BriaLatentNoiseOutput(BaseModel):
 class BriaLatentNoiseInvocationOutput(BaseInvocationOutput):
     """Base class for nodes that output Bria latent tensors."""
     latent_noise: BriaLatentNoiseOutput = OutputField(description="The latent noise, containing latents and latent image ids.")
-    height: int = OutputField(description="The height of the output image", default=1024)
-    width: int = OutputField(description="The width of the output image", default=1024)
+    height: int = OutputField(description="The height of the output image")
+    width: int = OutputField(description="The width of the output image")
 
 @invocation(
     "bria_latent_noise",

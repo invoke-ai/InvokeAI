@@ -29,11 +29,19 @@ class BriaDecoderInvocation(BaseInvocation):
         description=FieldDescriptions.latents,
         input=Input.Connection,
     )
+    height: int = InputField(
+        title="Height",
+        description="The height of the output image",
+    )
+    width: int = InputField(
+        title="Width",
+        description="The width of the output image",
+    )
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.tensors.load(self.latents.latents_name)
-        latents = latents.view(1, 64, 64, 4, 2, 2).permute(0, 3, 1, 4, 2, 5).reshape(1, 4, 128, 128)
+        latents = _unpack_latents(latents, self.height, self.width)
 
         with context.models.load(self.vae.vae) as vae:
             assert isinstance(vae, AutoencoderKL)
@@ -48,3 +56,17 @@ class BriaDecoderInvocation(BaseInvocation):
         img = Image.fromarray(image)
         image_dto = context.images.save(image=img)
         return ImageOutput.build(image_dto)
+
+
+def _unpack_latents(latents, height, width, vae_scale_factor=16):
+    batch_size, num_patches, channels = latents.shape
+
+    height = height // vae_scale_factor
+    width = width // vae_scale_factor
+
+    latents = latents.view(batch_size, height, width, channels // 4, 2, 2)
+    latents = latents.permute(0, 3, 1, 4, 2, 5)
+
+    latents = latents.reshape(batch_size, channels // (2 * 2), height * 2, width * 2)
+
+    return latents

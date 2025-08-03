@@ -236,7 +236,6 @@ class BriaPipeline(FluxPipeline):
         prompt_embeds=None,
         negative_prompt_embeds=None,
         callback_on_step_end_tensor_inputs=None,
-        max_sequence_length=None,
     ):
         if height % 8 != 0 or width % 8 != 0:
             raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
@@ -266,8 +265,6 @@ class BriaPipeline(FluxPipeline):
                 f" {negative_prompt_embeds}. Please make sure to only forward one of the two."
             )
 
-        if max_sequence_length is not None and max_sequence_length > 512:
-            raise ValueError(f"`max_sequence_length` cannot be greater than 512 but is {max_sequence_length}")
 
     def to(self, *args, **kwargs):
         DiffusionPipeline.to(self, *args, **kwargs)

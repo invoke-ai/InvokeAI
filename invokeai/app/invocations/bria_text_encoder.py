@@ -19,6 +19,7 @@ from invokeai.invocation_api import (
     invocation_output,
 )
 
+DEFAULT_NEGATIVE_PROMPT = "Logo,Watermark,Text,Ugly,Morbid,Extra fingers,Poorly drawn hands,Mutation,Blurry,Extra limbs,Gross proportions,Missing arms,Mutated hands,Long neck,Duplicate"
 
 @invocation_output("bria_text_encoder_output")
 class BriaTextEncoderInvocationOutput(BaseInvocationOutput):
@@ -48,7 +49,7 @@ class BriaTextEncoderInvocation(BaseInvocation):
     negative_prompt: Optional[str] = InputField(
         title="Negative Prompt",
         description="The negative prompt to encode",
-        default="Logo,Watermark,Text,Ugly,Morbid,Extra fingers,Poorly drawn hands,Mutation,Blurry,Extra limbs,Gross proportions,Missing arms,Mutated hands,Long neck,Duplicate",
+        default="",
     )
     max_length: int = InputField(
         default=256,
@@ -74,11 +75,12 @@ class BriaTextEncoderInvocation(BaseInvocation):
             assert isinstance(tokenizer, T5TokenizerFast)
             assert isinstance(text_encoder, T5EncoderModel)
 
+        negative_prompt = f"{DEFAULT_NEGATIVE_PROMPT}, {self.negative_prompt}"
         prompt_embeds, negative_prompt_embeds = encode_prompt(
             prompt=self.prompt,
             tokenizer=tokenizer,
             text_encoder=text_encoder,
-            negative_prompt=self.negative_prompt,
+            negative_prompt=negative_prompt,
             device=text_encoder.device,
             num_images_per_prompt=1,
             max_sequence_length=self.max_length,
