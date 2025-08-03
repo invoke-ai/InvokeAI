@@ -63,7 +63,7 @@ class GenericDiffusersLoader(ModelLoader):
             try:
                 config = self._load_diffusers_config(model_path, config_name="config.json")
                 if class_name := config.get("_class_name"):
-                    result = self._hf_definition_to_type(module="diffusers", class_name=class_name)
+                    result = self._hf_definition_to_type(module="diffusers", class_name=class_name, model_name=model_path.name)
                 elif class_name := config.get("architectures"):
                     result = self._hf_definition_to_type(module="transformers", class_name=class_name[0])
                 else:
@@ -74,7 +74,7 @@ class GenericDiffusersLoader(ModelLoader):
         return result
 
     # TO DO: Add exception handling
-    def _hf_definition_to_type(self, module: str, class_name: str) -> ModelMixin:  # fix with correct type
+    def _hf_definition_to_type(self, module: str, class_name: str, model_name: Optional[str] = None) -> ModelMixin:  # fix with correct type
         if module in [
             "diffusers",
             "transformers",
@@ -82,11 +82,11 @@ class GenericDiffusersLoader(ModelLoader):
             "invokeai.backend.quantization.fast_quantized_diffusion_model",
             "transformer_bria",
         ]:
-            if module == "transformer_bria":
-                module = "invokeai.backend.bria.transformer_bria"
-            elif class_name == "BriaTransformer2DModel":
+            if model_name == "BRIA-3.2-ControlNet-Union":
                 class_name = "BriaControlNetModel"
                 module = "invokeai.backend.bria.controlnet_bria"
+            elif module == "transformer_bria" or class_name == "BriaTransformer2DModel":
+                module = "invokeai.backend.bria.transformer_bria"
             res_type = sys.modules[module]
         else:
             res_type = sys.modules["diffusers"].pipelines
