@@ -22,6 +22,8 @@ from invokeai.invocation_api import BaseInvocation, Classification, invocation, 
 @invocation_output("bria_denoise_output")
 class BriaDenoiseInvocationOutput(BaseInvocationOutput):
     latents: LatentsField = OutputField(description=FieldDescriptions.latents)
+    height: int = OutputField(description="The height of the output image")
+    width: int = OutputField(description="The width of the output image")
 
 
 @invocation(
@@ -144,7 +146,6 @@ class BriaDenoiseInvocation(BaseInvocation):
                 height=self.height,
                 controlnet_conditioning_scale=control_scales,
                 num_inference_steps=self.num_steps,
-                max_sequence_length=128,
                 guidance_scale=self.guidance_scale,
                 latents=latents,
                 latent_image_ids=latent_image_ids,
@@ -158,7 +159,7 @@ class BriaDenoiseInvocation(BaseInvocation):
 
         assert isinstance(output_latents, torch.Tensor)
         saved_input_latents_tensor = context.tensors.save(output_latents)
-        return BriaDenoiseInvocationOutput(latents=LatentsField(latents_name=saved_input_latents_tensor))
+        return BriaDenoiseInvocationOutput(latents=LatentsField(latents_name=saved_input_latents_tensor), height=self.height, width=self.width)
 
     def _prepare_multi_control(
         self, context: InvocationContext, vae: AutoencoderKL, width: int, height: int, device: torch.device
@@ -191,7 +192,6 @@ class BriaDenoiseInvocation(BaseInvocation):
 
 def _build_step_callback(context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
     def step_callback(state: PipelineIntermediateState) -> None:
-        return 
         context.util.sd_step_callback(state, BaseModelType.Bria)
 
     return step_callback

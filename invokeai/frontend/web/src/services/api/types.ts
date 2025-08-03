@@ -309,11 +309,11 @@ export const isFluxMainModelModelConfig = (config: AnyModelConfig): config is Ma
 };
 
 export const isBriaMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
-  return config.type === 'main' && config.base === 'bria';
+  return config.type === 'main' && config.base === 'bria-3';
 };
 
 export const isBriaControlNetModelConfig = (config: AnyModelConfig): config is ControlNetModelConfig => {
-  return config.type === 'controlnet' && config.base === 'bria';
+  return config.type === 'controlnet' && config.base === 'bria-3';
 };
 
 export const isFluxFillMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {

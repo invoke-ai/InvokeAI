@@ -442,27 +442,6 @@ class LoRADiffusersConfig(LoRAConfigBase, ModelConfigBase):
             "base": cls.base_model(mod),
         }
 
-class BriaDiffusersConfig(LoRAConfigBase, ModelConfigBase):
-    """Model config for Bria/Diffusers models."""
-
-    format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
-
-    @classmethod
-    def matches(cls, mod: ModelOnDisk) -> bool:
-        if mod.path.is_file():
-            return cls.flux_lora_format(mod) == FluxLoRAFormat.Diffusers
-
-        suffixes = ["bin", "safetensors"]
-        weight_files = [mod.path / f"pytorch_lora_weights.{sfx}" for sfx in suffixes]
-        return any(wf.exists() for wf in weight_files)
-
-    @classmethod
-    def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
-        return {
-            "base": cls.base_model(mod),
-        }
-
-
 class VAECheckpointConfig(CheckpointConfigBase, LegacyProbeMixin, ModelConfigBase):
     """Model config for standalone VAE models."""
 
@@ -539,6 +518,35 @@ class MainDiffusersConfig(DiffusersConfigBase, MainConfigBase, LegacyProbeMixin,
     """Model config for main diffusers models."""
 
     pass
+
+class BriaDiffusersConfig(DiffusersConfigBase, MainConfigBase, ModelConfigBase):
+    """Model config for Bria/Diffusers models."""
+
+    format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+    base: Literal[BaseModelType.Bria] = BaseModelType.Bria
+
+    @classmethod
+    def matches(cls, mod: ModelOnDisk) -> bool:
+        if mod.path.is_file():
+            return False
+
+        config_path = mod.path / "transformer" / "config.json"
+        if config_path.exists():
+            with open(config_path) as file:
+                transformer_conf = json.load(file)
+            if transformer_conf["_class_name"] == "BriaTransformer2DModel":
+                return True
+
+        return False
+
+    @classmethod
+    def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
+        return {}
+
+    @classmethod
+    def get_tag(cls) -> Tag:
+        return Tag(f"{ModelType.Main.value}.{ModelFormat.Diffusers.value}.{BaseModelType.Bria.value}")
+
 
 
 class IPAdapterConfigBase(ABC, BaseModel):

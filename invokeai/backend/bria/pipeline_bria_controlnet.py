@@ -251,7 +251,6 @@ class BriaControlNetPipeline(BriaPipeline):
         joint_attention_kwargs: Optional[Dict[str, Any]] = None,
         callback_on_step_end: Optional[Callable[[int, int, Dict], None]] = None,
         callback_on_step_end_tensor_inputs: Optional[List[str]] = None,
-        max_sequence_length: int = 128,
         step_callback: Callable[[PipelineIntermediateState], None] = None,
     ):
         r"""
@@ -342,7 +341,6 @@ class BriaControlNetPipeline(BriaPipeline):
             prompt_embeds=prompt_embeds,
             negative_prompt_embeds=negative_prompt_embeds,
             callback_on_step_end_tensor_inputs=callback_on_step_end_tensor_inputs,
-            max_sequence_length=max_sequence_length,
         )
 
         self._guidance_scale = guidance_scale
@@ -416,15 +414,15 @@ class BriaControlNetPipeline(BriaPipeline):
             prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds], dim=0)
 
         # Init Invoke step callback
-        # step_callback(
-        #     PipelineIntermediateState(
-        #         step=0,
-        #         order=1,
-        #         total_steps=num_inference_steps,
-        #         timestep=int(timesteps[0]),
-        #         latents=latents,
-        #     ),
-        # )
+        step_callback(
+            PipelineIntermediateState(
+                step=0,
+                order=1,
+                total_steps=num_inference_steps,
+                timestep=int(timesteps[0]),
+                latents=latents.view(1, 64, 64, 4, 2, 2).permute(0, 3, 1, 4, 2, 5).reshape(1, 4, 128, 128),
+            ),
+        )
 
         # EYAL - added the CFG loop
         # 7. Denoising loop
@@ -513,15 +511,15 @@ class BriaControlNetPipeline(BriaPipeline):
                 # call the callback, if provided
                 if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
                     progress_bar.update()
-                    # step_callback(
-                    #     PipelineIntermediateState(
-                    #         step=i + 1,
-                    #         order=1,
-                    #         total_steps=num_inference_steps,
-                    #         timestep=int(t),
-                    #         latents=latents,
-                    #     ),
-                    # )
+                    step_callback(
+                        PipelineIntermediateState(
+                            step=i + 1,
+                            order=1,
+                            total_steps=num_inference_steps,
+                            timestep=int(t),
+                            latents=latents.view(1, 64, 64, 4, 2, 2).permute(0, 3, 1, 4, 2, 5).reshape(1, 4, 128, 128),
+                        ),
+                    )
 
         if output_type == "latent":
             image = latents
