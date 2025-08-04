@@ -133,7 +133,8 @@ class KontextExtension:
             image = image.convert("RGB")
             final_width = 8 * scaled_width
             final_height = 8 * scaled_height
-            image = image.resize((final_width, final_height), Image.Resampling.LANCZOS)
+            # Use BICUBIC for smoother resizing to reduce artifacts
+            image = image.resize((final_width, final_height), Image.Resampling.BICUBIC)
 
             # Convert to tensor with same normalization as BFL
             image_np = np.array(image)
