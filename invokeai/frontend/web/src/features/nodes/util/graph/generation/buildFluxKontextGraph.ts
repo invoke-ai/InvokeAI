@@ -79,11 +79,11 @@ export const buildFluxKontextGraph = (arg: GraphBuilderArg): GraphBuilderReturn 
         model: zModelIdentifierField.parse(model),
         aspect_ratio: aspectRatio.id,
         prompt_upsampling: true,
-        input_image: {
-          image_name: kontextConcatenator.id,
-        },
+
         ...selectCanvasOutputFields(state),
       });
+      // @ts-expect-error: These nodes are not available in the OSS application
+      g.addEdge(kontextConcatenator, 'image', fluxKontextImage, 'input_image');
     }
   } else {
     fluxKontextImage = g.addNode({
