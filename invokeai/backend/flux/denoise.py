@@ -112,7 +112,7 @@ def denoise(
         )
 
         # Slice prediction to only include the main image tokens
-        if img_input_ids is not None:
+        if img_cond_seq is not None:
             pred = pred[:, :original_seq_len]
 
         step_cfg_scale = cfg_scale[step_index]
