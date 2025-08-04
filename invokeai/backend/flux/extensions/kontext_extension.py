@@ -1,14 +1,13 @@
 import torch
+import torch.nn.functional as F
 import torchvision.transforms as T
 from einops import repeat
-from PIL import Image
 
 from invokeai.app.invocations.fields import FluxKontextConditioningField
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.flux.sampling_utils import pack
-from invokeai.backend.flux.util import PREFERED_KONTEXT_RESOLUTIONS
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -115,29 +114,10 @@ class KontextExtension:
         for idx, kontext_field in enumerate(self.kontext_conditioning):
             image = self._context.images.get_pil(kontext_field.image.image_name)
 
-            # Calculate aspect ratio of input image
-            width, height = image.size
-            aspect_ratio = width / height
-
-            # Find the closest preferred resolution by aspect ratio
-            _, target_width, target_height = min(
-                ((abs(aspect_ratio - w / h), w, h) for w, h in PREFERED_KONTEXT_RESOLUTIONS), key=lambda x: x[0]
-            )
-
-            # Apply BFL's scaling formula
-            # This ensures compatibility with the model's training
-            scaled_width = 2 * int(target_width / 16)
-            scaled_height = 2 * int(target_height / 16)
-
-            # Resize to the exact resolution used during training
+            # Convert to RGB
             image = image.convert("RGB")
-            final_width = 8 * scaled_width
-            final_height = 8 * scaled_height
-            # Use BICUBIC for smoother resizing to reduce artifacts
-            image = image.resize((final_width, final_height), Image.Resampling.BICUBIC)
 
             # Convert to tensor using torchvision transforms for consistency
-            # This matches the normalization used in image_resized_to_grid_as_tensor
             transformation = T.Compose(
                 [
                     T.ToTensor(),  # Converts PIL image to tensor and scales to [0, 1]
@@ -160,6 +140,15 @@ class KontextExtension:
 
             # Extract tensor dimensions
             batch_size, _, latent_height, latent_width = kontext_latents_unpacked.shape
+
+            # Pad latents to be compatible with patch_size=2
+            # This ensures dimensions are even for the pack() function
+            pad_h = (2 - latent_height % 2) % 2
+            pad_w = (2 - latent_width % 2) % 2
+            if pad_h > 0 or pad_w > 0:
+                kontext_latents_unpacked = F.pad(kontext_latents_unpacked, (0, pad_w, 0, pad_h), mode="circular")
+                # Update dimensions after padding
+                _, _, latent_height, latent_width = kontext_latents_unpacked.shape
 
             # Pack the latents
             kontext_latents_packed = pack(kontext_latents_unpacked).to(self._device, self._dtype)
