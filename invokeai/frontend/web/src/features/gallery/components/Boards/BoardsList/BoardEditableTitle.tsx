@@ -53,6 +53,7 @@ export const BoardEditableTitle = memo(({ board, isSelected }: Props) => {
           color={isSelected ? 'base.100' : 'base.300'}
           onDoubleClick={editable.startEditing}
           cursor="text"
+          noOfLines={1}
         >
           {editable.value}
         </Text>
