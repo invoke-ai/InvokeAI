@@ -369,14 +369,16 @@ const slice = createSlice({
 const resetState = (state: ParamsState): ParamsState => {
   // When a new session is requested, we need to keep the current model selections, plus dependent state
   // like VAE precision. Everything else gets reset to default.
+  const oldState = deepClone(state);
   const newState = getInitialParamsState();
-  newState.model = state.model;
-  newState.vae = state.vae;
-  newState.fluxVAE = state.fluxVAE;
-  newState.vaePrecision = state.vaePrecision;
-  newState.t5EncoderModel = state.t5EncoderModel;
-  newState.clipEmbedModel = state.clipEmbedModel;
-  newState.refinerModel = state.refinerModel;
+  newState.dimensions = oldState.dimensions;
+  newState.model = oldState.model;
+  newState.vae = oldState.vae;
+  newState.fluxVAE = oldState.fluxVAE;
+  newState.vaePrecision = oldState.vaePrecision;
+  newState.t5EncoderModel = oldState.t5EncoderModel;
+  newState.clipEmbedModel = oldState.clipEmbedModel;
+  newState.refinerModel = oldState.refinerModel;
   return newState;
 };
 
