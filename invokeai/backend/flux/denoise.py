@@ -125,9 +125,26 @@ def denoise(
             if neg_regional_prompting_extension is None:
                 raise ValueError("Negative text conditioning is required when cfg_scale is not 1.0.")
 
+            # For negative prediction with Kontext, we need to include the reference images
+            # to maintain consistency between positive and negative passes. Without this,
+            # CFG would create artifacts as the attention mechanism would see different
+            # spatial structures in each pass
+            neg_img_input = img
+            neg_img_input_ids = img_ids
+
+            # Add channel-wise conditioning for negative pass if present
+            if img_cond is not None:
+                neg_img_input = torch.cat((neg_img_input, img_cond), dim=-1)
+
+            # Add sequence-wise conditioning (Kontext) for negative pass
+            # This ensures reference images are processed consistently
+            if img_cond_seq is not None:
+                neg_img_input = torch.cat((neg_img_input, img_cond_seq), dim=1)
+                neg_img_input_ids = torch.cat((neg_img_input_ids, img_cond_seq_ids), dim=1)
+
             neg_pred = model(
-                img=img,
-                img_ids=img_ids,
+                img=neg_img_input,
+                img_ids=neg_img_input_ids,
                 txt=neg_regional_prompting_extension.regional_text_conditioning.t5_embeddings,
                 txt_ids=neg_regional_prompting_extension.regional_text_conditioning.t5_txt_ids,
                 y=neg_regional_prompting_extension.regional_text_conditioning.clip_embeddings,
@@ -140,6 +157,10 @@ def denoise(
                 ip_adapter_extensions=neg_ip_adapter_extensions,
                 regional_prompting_extension=neg_regional_prompting_extension,
             )
+
+            # Slice negative prediction to match main image tokens
+            if img_cond_seq is not None:
+                neg_pred = neg_pred[:, :original_seq_len]
             pred = neg_pred + step_cfg_scale * (pred - neg_pred)
 
         preview_img = img - t_curr * pred
