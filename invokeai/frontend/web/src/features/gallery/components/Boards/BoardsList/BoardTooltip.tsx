@@ -37,6 +37,7 @@ export const BoardTooltip = ({ board }: Props) => {
         />
       )}
       <Flex flexDir="column" alignItems="center">
+        {board && <Text fontWeight="semibold">{board.board_name}</Text>}
         <Text noOfLines={1}>
           {t('boards.imagesWithCount', { count: imagesTotal })}, {t('boards.assetsWithCount', { count: assetsTotal })}
         </Text>
