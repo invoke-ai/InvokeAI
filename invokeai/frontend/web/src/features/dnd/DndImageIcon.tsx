@@ -27,6 +27,7 @@ export const DndImageIcon = memo((props: Props) => {
   return (
     <IconButton
       onClick={onClick}
+      tooltip={tooltip}
       aria-label={tooltip}
       icon={icon}
       variant="link"
