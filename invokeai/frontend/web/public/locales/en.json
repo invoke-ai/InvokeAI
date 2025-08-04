@@ -610,6 +610,10 @@
                 "title": "Toggle Non-Raster Layers",
                 "desc": "Show or hide all non-raster layer categories (Control Layers, Inpaint Masks, Regional Guidance)."
             },
+            "fitBboxToLayers": {
+                "title": "Fit Bbox To Layers",
+                "desc": "Automatically adjust the generation bounding box to fit visible layers"
+            },
             "fitBboxToMasks": {
                 "title": "Fit Bbox To Masks",
                 "desc": "Automatically adjust the generation bounding box to fit visible inpaint masks"
