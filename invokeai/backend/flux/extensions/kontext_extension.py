@@ -174,7 +174,7 @@ class KontextExtension:
                 batch_size=batch_size,
                 device=self._device,
                 dtype=self._dtype,
-                idx_offset=idx + 1,  # Each image gets a unique offset
+                idx_offset=1,  # All reference images use index=1 (matching ComfyUI implementation)
                 h_offset=h_offset,
                 w_offset=w_offset,
             )
