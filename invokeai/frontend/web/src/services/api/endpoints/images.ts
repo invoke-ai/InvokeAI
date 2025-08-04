@@ -479,6 +479,7 @@ export const {
   useDeleteBoardAndImagesMutation,
   useDeleteUncategorizedImagesMutation,
   useDeleteBoardMutation,
+  useDeleteImagesMutation,
   useStarImagesMutation,
   useUnstarImagesMutation,
   useBulkDownloadImagesMutation,

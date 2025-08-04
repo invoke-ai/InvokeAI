@@ -1,8 +1,10 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import type { RootState } from 'app/store/store';
 import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
-import type { GetImageNamesArgs, ListBoardsArgs } from 'services/api/types';
+import { imagesApi } from 'services/api/endpoints/images';
+import type { GetImageNamesArgs, ImageDTO, ListBoardsArgs } from 'services/api/types';
 
 export const selectFirstSelectedImage = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(0));
 export const selectLastSelectedImage = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(-1));
@@ -67,3 +69,15 @@ export const selectAlwaysShouldImageSizeBadge = createSelector(
   selectGallerySlice,
   (gallery) => gallery.alwaysShowImageSizeBadge
 );
+
+/**
+ * gets an ImageDTO for a given image_name from the RTK-Query cache
+ * thus we can get a bit more full image data without the need for additional queries over the net
+ */
+export const selectImageByName = (state: RootState, image_name: string | null | undefined): ImageDTO | null => {
+  if (!image_name) {
+    return null;
+  }
+  const { data } = imagesApi.endpoints.getImageDTO.select(image_name)(state);
+  return data ?? null;
+};

@@ -11,7 +11,7 @@ import {
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasState, RefImagesState } from 'features/controlLayers/store/types';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
-import { selectGetImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { selectGetImageNamesQueryArgs, selectImageByName } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { fieldImageCollectionValueChanged, fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
@@ -19,7 +19,12 @@ import type { NodesState } from 'features/nodes/store/types';
 import { isImageFieldCollectionInputInstance, isImageFieldInputInstance } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { selectUpscaleSlice, type UpscaleState } from 'features/parameters/store/upscaleSlice';
-import { selectSystemShouldConfirmOnDelete } from 'features/system/store/systemSlice';
+import {
+  selectSystemShouldConfirmOnDelete,
+  selectSystemShouldProtectStarredImages,
+} from 'features/system/store/systemSlice';
+import { toast } from 'features/toast/toast';
+import { t } from 'i18next';
 import { atom } from 'nanostores';
 import { useMemo } from 'react';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -57,6 +62,26 @@ const deleteImagesWithDialog = async (image_names: string[], store: AppStore): P
   const { getState } = store;
   const imageUsage = getImageUsageFromImageNames(image_names, getState());
   const shouldConfirmOnDelete = selectSystemShouldConfirmOnDelete(getState());
+  const shouldProtectStarred = selectSystemShouldProtectStarredImages(getState());
+
+  if (shouldProtectStarred) {
+    // find which of the incoming names are starred
+    const starred = image_names.filter((name) => selectImageByName(getState(), name)?.starred);
+    if (starred.length) {
+      if (selectSystemShouldConfirmOnDelete(getState())) {
+        // show toast explaining why we refuse only if we are not in "silent mode"
+        toast({
+          status: 'warning',
+          title: t('gallery.cannotDeleteStarred'),
+        });
+      }
+
+      image_names = image_names.filter((n) => !starred.includes(n));
+      if (!image_names.length) {
+        return;
+      }
+    }
+  }
 
   if (!shouldConfirmOnDelete && !isAnyImageInUse(imageUsage)) {
     // If we don't need to confirm and the images are not in use, delete them directly
