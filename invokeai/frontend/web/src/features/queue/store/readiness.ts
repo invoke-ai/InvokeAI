@@ -278,12 +278,6 @@ const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   }
 
   const enabledRefImages = refImages.entities.filter(({ isEnabled }) => isEnabled);
-  const referenceImageCount = enabledRefImages.length;
-
-  // FLUX Kontext via BFL API only supports 1x Reference Image at a time.
-  if (model?.base === 'flux-kontext' && referenceImageCount > 1) {
-    reasons.push({ content: i18n.t('parameters.invoke.fluxKontextMultipleReferenceImages') });
-  }
 
   enabledRefImages.forEach((entity, i) => {
     const layerNumber = i + 1;
@@ -633,12 +627,6 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   });
 
   const enabledRefImages = refImages.entities.filter(({ isEnabled }) => isEnabled);
-  const referenceImageCount = enabledRefImages.length;
-
-  // FLUX Kontext via BFL API only supports 1x Reference Image at a time.
-  if (model?.base === 'flux-kontext' && referenceImageCount > 1) {
-    reasons.push({ content: i18n.t('parameters.invoke.fluxKontextMultipleReferenceImages') });
-  }
 
   enabledRefImages.forEach((entity, i) => {
     const layerNumber = i + 1;
