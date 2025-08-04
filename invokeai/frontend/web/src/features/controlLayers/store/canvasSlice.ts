@@ -1091,6 +1091,15 @@ const slice = createSlice({
 
       syncScaledSize(state);
     },
+    bboxSizeRecalled: (state, action: PayloadAction<{ width: number; height: number }>) => {
+      const { width, height } = action.payload;
+      const gridSize = getGridSize(state.bbox.modelBase);
+      state.bbox.rect.width = Math.max(roundDownToMultiple(width, gridSize), 64);
+      state.bbox.rect.height = Math.max(roundDownToMultiple(height, gridSize), 64);
+      state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
+      state.bbox.aspectRatio.id = 'Free';
+      state.bbox.aspectRatio.isLocked = true;
+    },
     bboxAspectRatioLockToggled: (state) => {
       state.bbox.aspectRatio.isLocked = !state.bbox.aspectRatio.isLocked;
       syncScaledSize(state);
@@ -1627,6 +1636,7 @@ export const {
   bboxScaledWidthChanged,
   bboxScaledHeightChanged,
   bboxScaleMethodChanged,
+  bboxSizeRecalled,
   bboxWidthChanged,
   bboxHeightChanged,
   bboxAspectRatioLockToggled,
