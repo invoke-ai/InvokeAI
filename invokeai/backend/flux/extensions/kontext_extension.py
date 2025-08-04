@@ -4,11 +4,12 @@ from einops import repeat
 from PIL import Image
 
 from invokeai.app.invocations.fields import FluxKontextConditioningField
-from invokeai.app.invocations.flux_vae_encode import FluxVaeEncodeInvocation
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.flux.sampling_utils import pack
 from invokeai.backend.flux.util import PREFERED_KONTEXT_RESOLUTIONS
+from invokeai.backend.util.devices import TorchDevice
 
 
 def generate_img_ids_with_offset(
@@ -149,7 +150,13 @@ class KontextExtension:
             image_tensor = image_tensor.to(self._device)
 
             # Continue with VAE encoding
-            kontext_latents_unpacked = FluxVaeEncodeInvocation.vae_encode(vae_info=vae_info, image_tensor=image_tensor)
+            # Don't sample from the distribution for reference images - use the mean (matching ComfyUI)
+            with vae_info as vae:
+                assert isinstance(vae, AutoEncoder)
+                vae_dtype = next(iter(vae.parameters())).dtype
+                image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=vae_dtype)
+                # Use sample=False to get the distribution mean without noise
+                kontext_latents_unpacked = vae.encode(image_tensor, sample=False)
 
             # Extract tensor dimensions
             batch_size, _, latent_height, latent_width = kontext_latents_unpacked.shape
