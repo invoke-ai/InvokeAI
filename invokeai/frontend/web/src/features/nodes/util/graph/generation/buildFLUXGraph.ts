@@ -5,6 +5,7 @@ import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlic
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { isFluxKontextReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
+import { zImageField } from 'features/nodes/types/common';
 import { addFLUXFill } from 'features/nodes/util/graph/generation/addFLUXFill';
 import { addFLUXLoRAs } from 'features/nodes/util/graph/generation/addFLUXLoRAs';
 import { addFLUXReduxes } from 'features/nodes/util/graph/generation/addFLUXRedux';
@@ -155,24 +156,17 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0);
 
     if (validFLUXKontextConfigs.length > 0) {
-      const kontextCollector = g.addNode({
-        id: getPrefixedId('flux_kontext_collector'),
-        type: 'collect',
+      const kontextConcatenator = g.addNode({
+        id: getPrefixedId('flux_kontext_image_prep'),
+        type: 'flux_kontext_image_prep',
+        images: validFLUXKontextConfigs.map(({ config }) => zImageField.parse(config.image)),
       });
-      g.addEdge(kontextCollector, 'collection', denoise, 'kontext_conditioning');
-
-      for (const kontextConfig of validFLUXKontextConfigs) {
-        const { image } = kontextConfig.config;
-
-        assert(image, 'getGlobalReferenceImageWarnings checks if the image is there, this should never raise');
-
-        const kontextConditioning = g.addNode({
-          type: 'flux_kontext',
-          id: getPrefixedId(`flux_kontext_${kontextConfig.id}`),
-          image,
-        });
-        g.addEdge(kontextConditioning, 'kontext_cond', kontextCollector, 'item');
-      }
+      const kontextConditioning = g.addNode({
+        type: 'flux_kontext',
+        id: getPrefixedId('flux_kontext'),
+      });
+      g.addEdge(kontextConcatenator, 'image', kontextConditioning, 'image');
+      g.addEdge(kontextConditioning, 'kontext_cond', denoise, 'kontext_conditioning');
 
       g.upsertMetadata({ ref_images: [validFLUXKontextConfigs] }, 'merge');
     }
