@@ -1,5 +1,6 @@
 import { ContextMenu, Divider, Flex, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { CanvasAlertsBboxVisibility } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsBboxVisibility';
 import { CanvasAlertsInvocationProgress } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsInvocationProgress';
 import { CanvasAlertsPreserveMask } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsPreserveMask';
 import { CanvasAlertsSaveAllImagesToGallery } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSaveAllImagesToGallery';
@@ -92,6 +93,7 @@ export const CanvasWorkspacePanel = memo(() => {
                   <CanvasAlertsSelectedEntityStatus />
                   <CanvasAlertsPreserveMask />
                   <CanvasAlertsInvocationProgress />
+                  <CanvasAlertsBboxVisibility />
                 </Flex>
                 <Flex position="absolute" top={1} insetInlineEnd={1}>
                   <Menu>

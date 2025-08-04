@@ -2180,7 +2180,8 @@
             "rgReferenceImagesNotSupported": "regional Reference Images not supported for selected base model",
             "rgAutoNegativeNotSupported": "Auto-Negative not supported for selected base model",
             "rgNoRegion": "no region drawn",
-            "fluxFillIncompatibleWithControlLoRA": "Control LoRA is not compatible with FLUX Fill"
+            "fluxFillIncompatibleWithControlLoRA": "Control LoRA is not compatible with FLUX Fill",
+            "bboxHidden": "Bounding box is hidden"
         },
         "errors": {
             "unableToFindImage": "Unable to find image",

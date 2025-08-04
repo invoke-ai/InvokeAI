@@ -15,6 +15,7 @@ import { useCanvasEntityQuickSwitchHotkey } from 'features/controlLayers/hooks/u
 import { useCanvasFilterHotkey } from 'features/controlLayers/hooks/useCanvasFilterHotkey';
 import { useCanvasInvertMaskHotkey } from 'features/controlLayers/hooks/useCanvasInvertMaskHotkey';
 import { useCanvasResetLayerHotkey } from 'features/controlLayers/hooks/useCanvasResetLayerHotkey';
+import { useCanvasToggleBboxHotkey } from 'features/controlLayers/hooks/useCanvasToggleBboxHotkey';
 import { useCanvasToggleNonRasterLayersHotkey } from 'features/controlLayers/hooks/useCanvasToggleNonRasterLayersHotkey';
 import { useCanvasTransformHotkey } from 'features/controlLayers/hooks/useCanvasTransformHotkey';
 import { useCanvasUndoRedoHotkeys } from 'features/controlLayers/hooks/useCanvasUndoRedoHotkeys';
@@ -31,6 +32,7 @@ export const CanvasToolbar = memo(() => {
   useCanvasFilterHotkey();
   useCanvasInvertMaskHotkey();
   useCanvasToggleNonRasterLayersHotkey();
+  useCanvasToggleBboxHotkey();
 
   return (
     <Flex w="full" gap={2} alignItems="center" px={2}>
