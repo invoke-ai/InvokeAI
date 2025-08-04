@@ -87,9 +87,21 @@ class ModelLoadService(ModelLoadServiceBase):
         def torch_load_file(checkpoint: Path) -> AnyModel:
             scan_result = scan_file_path(checkpoint)
             if scan_result.infected_files != 0:
-                raise Exception(f"The model at {checkpoint} is potentially infected by malware. Aborting load.")
+                if self._app_config.unsafe_disable_picklescan:
+                    self._logger.warning(
+                        f"Model at {checkpoint} is potentially infected by malware, but picklescan is disabled. "
+                        "Proceeding with caution."
+                    )
+                else:
+                    raise Exception(f"The model at {checkpoint} is potentially infected by malware. Aborting load.")
             if scan_result.scan_err:
-                raise Exception(f"Error scanning model at {checkpoint} for malware. Aborting load.")
+                if self._app_config.unsafe_disable_picklescan:
+                    self._logger.warning(
+                        f"Error scanning model at {checkpoint} for malware, but picklescan is disabled. "
+                        "Proceeding with caution."
+                    )
+                else:
+                    raise Exception(f"Error scanning model at {checkpoint} for malware. Aborting load.")
 
             result = torch_load(checkpoint, map_location="cpu")
             return result

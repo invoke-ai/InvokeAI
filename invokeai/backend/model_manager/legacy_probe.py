@@ -9,6 +9,7 @@ import spandrel
 import torch
 
 import invokeai.backend.util.logging as logger
+from invokeai.app.services.config.config_default import get_config
 from invokeai.app.util.misc import uuid_string
 from invokeai.backend.flux.controlnet.state_dict_utils import (
     is_state_dict_instantx_controlnet,
@@ -493,9 +494,21 @@ class ModelProbe(object):
         # scan model
         scan_result = pscan.scan_file_path(checkpoint)
         if scan_result.infected_files != 0:
-            raise Exception(f"The model {model_name} is potentially infected by malware. Aborting import.")
+            if get_config().unsafe_disable_picklescan:
+                logger.warning(
+                    f"The model {model_name} is potentially infected by malware, but picklescan is disabled. "
+                    "Proceeding with caution."
+                )
+            else:
+                raise RuntimeError(f"The model {model_name} is potentially infected by malware. Aborting import.")
         if scan_result.scan_err:
-            raise Exception(f"Error scanning model {model_name} for malware. Aborting import.")
+            if get_config().unsafe_disable_picklescan:
+                logger.warning(
+                    f"Error scanning the model at {model_name} for malware, but picklescan is disabled. "
+                    "Proceeding with caution."
+                )
+            else:
+                raise RuntimeError(f"Error scanning the model at {model_name} for malware. Aborting import.")
 
 
 # Probing utilities

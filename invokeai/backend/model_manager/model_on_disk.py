@@ -6,12 +6,16 @@ import torch
 from picklescan.scanner import scan_file_path
 from safetensors import safe_open
 
+from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
+from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 StateDict: TypeAlias = dict[str | int, Any]  # When are the keys int?
+
+logger = InvokeAILogger.get_logger()
 
 
 class ModelOnDisk:
@@ -79,8 +83,24 @@ class ModelOnDisk:
         with SilenceWarnings():
             if path.suffix.endswith((".ckpt", ".pt", ".pth", ".bin")):
                 scan_result = scan_file_path(path)
-                if scan_result.infected_files != 0 or scan_result.scan_err:
-                    raise RuntimeError(f"The model {path.stem} is potentially infected by malware. Aborting import.")
+                if scan_result.infected_files != 0:
+                    if get_config().unsafe_disable_picklescan:
+                        logger.warning(
+                            f"The model {path.stem} is potentially infected by malware, but picklescan is disabled. "
+                            "Proceeding with caution."
+                        )
+                    else:
+                        raise RuntimeError(
+                            f"The model {path.stem} is potentially infected by malware. Aborting import."
+                        )
+                if scan_result.scan_err:
+                    if get_config().unsafe_disable_picklescan:
+                        logger.warning(
+                            f"Error scanning the model at {path.stem} for malware, but picklescan is disabled. "
+                            "Proceeding with caution."
+                        )
+                    else:
+                        raise RuntimeError(f"Error scanning the model at {path.stem} for malware. Aborting import.")
                 checkpoint = torch.load(path, map_location="cpu")
                 assert isinstance(checkpoint, dict)
             elif path.suffix.endswith(".gguf"):
