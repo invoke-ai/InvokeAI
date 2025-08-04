@@ -4,8 +4,7 @@ import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice'
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { isFluxKontextAspectRatioID, isFluxKontextReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
-import type { ImageField } from 'features/nodes/types/common';
-import { zModelIdentifierField } from 'features/nodes/types/common';
+import { zImageField, zModelIdentifierField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   getOriginalAndScaledSizesForTextToImage,
@@ -39,34 +38,63 @@ export const buildFluxKontextGraph = (arg: GraphBuilderArg): GraphBuilderReturn 
   const validRefImages = refImages.entities
     .filter((entity) => entity.isEnabled)
     .filter((entity) => isFluxKontextReferenceImageConfig(entity.config))
-    .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0)
-    .toReversed(); // sends them in order they are displayed in the list
-
-  let input_image: ImageField | undefined = undefined;
-
-  if (validRefImages[0]) {
-    assert(validRefImages.length === 1, 'Flux Kontext can have at most one reference image');
-
-    assert(validRefImages[0].config.image, 'Image is required for reference image');
-    input_image = {
-      image_name: validRefImages[0].config.image.image_name,
-    };
-  }
+    .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0);
 
   const g = new Graph(getPrefixedId('flux_kontext_txt2img_graph'));
   const positivePrompt = g.addNode({
     id: getPrefixedId('positive_prompt'),
     type: 'string',
   });
-  const fluxKontextImage = g.addNode({
-    // @ts-expect-error: These nodes are not available in the OSS application
-    type: input_image ? 'flux_kontext_edit_image' : 'flux_kontext_generate_image',
-    model: zModelIdentifierField.parse(model),
-    aspect_ratio: aspectRatio.id,
-    input_image,
-    prompt_upsampling: true,
-    ...selectCanvasOutputFields(state),
-  });
+
+  let fluxKontextImage;
+
+  if (validRefImages.length > 0) {
+    if (validRefImages.length === 1) {
+      // Single reference image - use it directly
+      const firstImage = validRefImages[0]?.config.image;
+      assert(firstImage, 'First image should exist when validRefImages.length > 0');
+
+      fluxKontextImage = g.addNode({
+        // @ts-expect-error: These nodes are not available in the OSS application
+        type: 'flux_kontext_edit_image',
+        model: zModelIdentifierField.parse(model),
+        aspect_ratio: aspectRatio.id,
+        prompt_upsampling: true,
+        input_image: {
+          image_name: firstImage.image_name,
+        },
+        ...selectCanvasOutputFields(state),
+      });
+    } else {
+      // Multiple reference images - use concatenation
+      const kontextConcatenator = g.addNode({
+        id: getPrefixedId('flux_kontext_image_prep'),
+        type: 'flux_kontext_image_prep',
+        images: validRefImages.map(({ config }) => zImageField.parse(config.image)),
+      });
+
+      fluxKontextImage = g.addNode({
+        // @ts-expect-error: These nodes are not available in the OSS application
+        type: 'flux_kontext_edit_image',
+        model: zModelIdentifierField.parse(model),
+        aspect_ratio: aspectRatio.id,
+        prompt_upsampling: true,
+        input_image: {
+          image_name: kontextConcatenator.id,
+        },
+        ...selectCanvasOutputFields(state),
+      });
+    }
+  } else {
+    fluxKontextImage = g.addNode({
+      // @ts-expect-error: These nodes are not available in the OSS application
+      type: 'flux_kontext_generate_image',
+      model: zModelIdentifierField.parse(model),
+      aspect_ratio: aspectRatio.id,
+      prompt_upsampling: true,
+      ...selectCanvasOutputFields(state),
+    });
+  }
 
   g.addEdge(
     positivePrompt,
@@ -82,6 +110,10 @@ export const buildFluxKontextGraph = (arg: GraphBuilderArg): GraphBuilderReturn 
     width: originalSize.width,
     height: originalSize.height,
   });
+
+  if (validRefImages.length > 0) {
+    g.upsertMetadata({ ref_images: [validRefImages] }, 'merge');
+  }
 
   g.setMetadataReceivingNode(fluxKontextImage);
 
