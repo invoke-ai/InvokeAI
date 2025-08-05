@@ -56,6 +56,9 @@ export const containerSx: SystemStyleObject = {
     display: 'block',
     shadow: '0 0 0 2px var(--border-color-selected)',
   },
+  '&[data-is-invalid="true"]': {
+    color: 'error.300',
+  },
   '&[data-is-editor-locked="true"]': {
     '& *': {
       cursor: 'not-allowed',
