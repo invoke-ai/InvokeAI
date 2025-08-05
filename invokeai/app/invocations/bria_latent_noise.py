@@ -18,14 +18,11 @@ from invokeai.invocation_api import (
 )
 
 
-class BriaLatentNoiseOutput(BaseModel):
-    latents: LatentsField
-    latent_image_ids: LatentsField
-
 @invocation_output("bria_latent_noise_output")
 class BriaLatentNoiseInvocationOutput(BaseInvocationOutput):
     """Base class for nodes that output Bria latent tensors."""
-    latent_noise: BriaLatentNoiseOutput = OutputField(description="The latent noise, containing latents and latent image ids.")
+    latents: LatentsField = OutputField(description="The latent noise")
+    latent_image_ids: LatentsField = OutputField(description="The latent image ids.")
     height: int = OutputField(description="The height of the output image")
     width: int = OutputField(description="The width of the output image")
 
@@ -86,10 +83,8 @@ class BriaLatentNoiseInvocation(BaseInvocation):
         latent_image_ids_output = LatentsField(latents_name=saved_latent_image_ids_tensor)
 
         return BriaLatentNoiseInvocationOutput(
-            latent_noise=BriaLatentNoiseOutput(
-                latents=latents_output,
-                latent_image_ids=latent_image_ids_output,
-            ),
+            latents=latents_output,
+            latent_image_ids=latent_image_ids_output,
             height=self.height,
             width=self.width,
         )

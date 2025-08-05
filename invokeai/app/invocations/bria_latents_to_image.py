@@ -9,14 +9,14 @@ from invokeai.invocation_api import BaseInvocation, Classification, ImageOutput,
 
 
 @invocation(
-    "bria_decoder",
-    title="Decoder - Bria",
+    "bria_latents_to_image",
+    title="Latents to Image - Bria",
     tags=["image", "bria"],
     category="image",
     version="1.0.0",
     classification=Classification.Prototype,
 )
-class BriaDecoderInvocation(BaseInvocation):
+class BriaLatentsToImageInvocation(BaseInvocation):
     """
     Decode Bria latents to an image.
     """

@@ -5,7 +5,6 @@ from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
 
 from invokeai.app.invocations.bria_controlnet import BriaControlNetField
-from invokeai.app.invocations.bria_latent_noise import BriaLatentNoiseOutput
 from invokeai.app.invocations.fields import FluxConditioningField, Input, InputField, LatentsField, OutputField
 from invokeai.app.invocations.model import SubModelType, T5EncoderField, TransformerField, VAEField
 from invokeai.app.invocations.primitives import BaseInvocationOutput, FieldDescriptions
@@ -72,11 +71,6 @@ class BriaDenoiseInvocation(BaseInvocation):
         title="Width",
         description="The width of the output image",
     )
-    latent_noise: BriaLatentNoiseOutput = InputField(
-        description="Latent noise to denoise",
-        input=Input.Connection,
-        title="Latent Noise",
-    )
     pos_embeds: FluxConditioningField = InputField(
         description="Positive Prompt Embeds",
         input=Input.Connection,
@@ -87,6 +81,16 @@ class BriaDenoiseInvocation(BaseInvocation):
         input=Input.Connection,
         title="Negative Prompt Embeds",
     )
+    latents: LatentsField = InputField(
+        description="Latent noise with latent image ids to denoise",
+        input=Input.Connection,
+        title="Latent Noise",
+    )
+    latent_image_ids: LatentsField = InputField(
+        description="Latent image ids to denoise",
+        input=Input.Connection,
+        title="Latent Image IDs",
+    )
     control: BriaControlNetField | list[BriaControlNetField] | None = InputField(
         description="ControlNet",
         input=Input.Connection,
@@ -96,10 +100,10 @@ class BriaDenoiseInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> BriaDenoiseInvocationOutput:
-        latents = context.tensors.load(self.latent_noise.latents.latents_name)
+        latents = context.tensors.load(self.latents.latents_name)
+        latent_image_ids = context.tensors.load(self.latent_image_ids.latents_name)
         pos_embeds = context.tensors.load(self.pos_embeds.conditioning_name)
         neg_embeds = context.tensors.load(self.neg_embeds.conditioning_name)
-        latent_image_ids = context.tensors.load(self.latent_noise.latent_image_ids.latents_name)
         scheduler_identifier = self.transformer.transformer.model_copy(update={"submodel_type": SubModelType.Scheduler})
 
         device = None
