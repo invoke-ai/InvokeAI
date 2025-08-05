@@ -259,10 +259,6 @@ class BriaControlNetPipeline(BriaPipeline):
             prompt (`str` or `List[str]`, *optional*):
                 The prompt or prompts to guide the image generation. If not defined, one has to pass `prompt_embeds`.
                 instead.
-            height (`int`, *optional*, defaults to self.unet.config.sample_size * self.vae_scale_factor):
-                The height in pixels of the generated image. This is set to 1024 by default for the best results.
-            width (`int`, *optional*, defaults to self.unet.config.sample_size * self.vae_scale_factor):
-                The width in pixels of the generated image. This is set to 1024 by default for the best results.
             num_inference_steps (`int`, *optional*, defaults to 50):
                 The number of denoising steps. More denoising steps usually lead to a higher quality image at the
                 expense of slower inference.
@@ -323,8 +319,6 @@ class BriaControlNetPipeline(BriaPipeline):
             `tuple`. When returning a tuple, the first element is a list with the generated images.
         """
 
-        height = height or self.default_sample_size * self.vae_scale_factor
-        width = width or self.default_sample_size * self.vae_scale_factor
         control_guidance_start, control_guidance_end = self.get_control_start_end(
             control_guidance_start=control_guidance_start, control_guidance_end=control_guidance_end
         )
@@ -335,8 +329,8 @@ class BriaControlNetPipeline(BriaPipeline):
         )
         self.check_inputs(
             prompt,
-            height,
-            width,
+            height=height,
+            width=width,
             negative_prompt=negative_prompt,
             prompt_embeds=prompt_embeds,
             negative_prompt_embeds=negative_prompt_embeds,
@@ -517,7 +511,7 @@ class BriaControlNetPipeline(BriaPipeline):
                             order=1,
                             total_steps=num_inference_steps,
                             timestep=int(t),
-                            latents=latents.view(1, 64, 64, 4, 2, 2).permute(0, 3, 1, 4, 2, 5).reshape(1, 4, 128, 128),
+                            latents=self._unpack_latents(latents, height, width, self.vae_scale_factor),
                         ),
                     )
 
