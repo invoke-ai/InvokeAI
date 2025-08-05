@@ -1,3 +1,4 @@
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, Input, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useEditable } from 'common/hooks/useEditable';
@@ -10,12 +11,20 @@ import { NO_FIT_ON_DOUBLE_CLICK_CLASS } from 'features/nodes/types/constants';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+const labelSx: SystemStyleObject = {
+  fontWeight: 'semibold',
+  '&[data-is-invalid="true"]': {
+    color: 'error.300',
+  },
+};
+
 type Props = {
   nodeId: string;
   title?: string;
+  isInvalid?: boolean;
 };
 
-const NodeTitle = ({ nodeId, title }: Props) => {
+const NodeTitle = ({ nodeId, title, isInvalid }: Props) => {
   const dispatch = useAppDispatch();
   const label = useNodeUserTitleSafe();
   const batchGroupId = useBatchGroupId(nodeId);
@@ -53,10 +62,11 @@ const NodeTitle = ({ nodeId, title }: Props) => {
       {!editable.isEditing && (
         <Text
           className={NO_FIT_ON_DOUBLE_CLICK_CLASS}
-          fontWeight="semibold"
-          color={batchGroupColorToken}
-          onDoubleClick={editable.startEditing}
+          sx={labelSx}
           noOfLines={1}
+          color={batchGroupColorToken}
+          data-is-invalid={isInvalid}
+          onDoubleClick={editable.startEditing}
         >
           {titleWithBatchGroupId}
         </Text>
