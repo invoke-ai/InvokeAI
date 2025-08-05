@@ -106,7 +106,7 @@ export const InputFieldTitle = memo((props: Props) => {
           onDoubleClick={onDoubleClick}
         >
           {editable.value}
-          {isAddedToForm && <Icon as={PiLinkBold} color="blue.200" ml={1} />}
+          {isAddedToForm && <Icon as={PiLinkBold} color={isInvalid ? 'error.300' : 'blue.200'} ml={1} />}
         </Text>
       </Tooltip>
     );
