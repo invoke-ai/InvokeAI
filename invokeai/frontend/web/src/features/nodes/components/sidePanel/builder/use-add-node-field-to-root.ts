@@ -2,15 +2,20 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useInputFieldInstance } from 'features/nodes/hooks/useInputFieldInstance';
 import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
 import { formElementAdded } from 'features/nodes/store/nodesSlice';
-import { selectFormRootElementId } from 'features/nodes/store/selectors';
+import { buildSelectWorkflowFormNodeExists, selectFormRootElementId } from 'features/nodes/store/selectors';
 import { buildNodeFieldElement } from 'features/nodes/types/workflow';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 
 export const useAddNodeFieldToRoot = (nodeId: string, fieldName: string) => {
   const dispatch = useAppDispatch();
   const rootElementId = useAppSelector(selectFormRootElementId);
   const fieldTemplate = useInputFieldTemplateOrThrow(fieldName);
   const field = useInputFieldInstance(fieldName);
+  const selectWorkflowFormNodeExists = useMemo(
+    () => buildSelectWorkflowFormNodeExists(nodeId, fieldName),
+    [nodeId, fieldName]
+  );
+  const isAddedToRoot = useAppSelector(selectWorkflowFormNodeExists);
 
   const addNodeFieldToRoot = useCallback(() => {
     const element = buildNodeFieldElement(nodeId, fieldName, fieldTemplate.type);
@@ -23,5 +28,5 @@ export const useAddNodeFieldToRoot = (nodeId: string, fieldName: string) => {
     );
   }, [nodeId, fieldName, fieldTemplate.type, dispatch, rootElementId, field.value]);
 
-  return addNodeFieldToRoot;
+  return { isAddedToRoot, addNodeFieldToRoot };
 };

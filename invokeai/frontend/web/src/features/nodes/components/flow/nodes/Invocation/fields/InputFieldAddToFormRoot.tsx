@@ -11,7 +11,7 @@ type Props = {
 
 export const InputFieldAddToFormRoot = memo(({ nodeId, fieldName }: Props) => {
   const { t } = useTranslation();
-  const addToRoot = useAddNodeFieldToRoot(nodeId, fieldName);
+  const { isAddedToRoot, addNodeFieldToRoot } = useAddNodeFieldToRoot(nodeId, fieldName);
 
   return (
     <IconButton
@@ -21,7 +21,8 @@ export const InputFieldAddToFormRoot = memo(({ nodeId, fieldName }: Props) => {
       icon={<PiPlusBold />}
       pointerEvents="auto"
       size="xs"
-      onClick={addToRoot}
+      onClick={addNodeFieldToRoot}
+      isDisabled={isAddedToRoot}
     />
   );
 });
