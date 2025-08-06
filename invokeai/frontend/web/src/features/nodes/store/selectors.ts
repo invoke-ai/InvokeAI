@@ -1,7 +1,6 @@
 import type { Selector } from '@reduxjs/toolkit';
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import { uniqBy } from 'es-toolkit/compat';
 import { getElement } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import type { NodesState } from 'features/nodes/store/types';
 import type { FieldInputInstance } from 'features/nodes/types/field';
@@ -94,12 +93,13 @@ export const selectFormInitialValues = createNodesSelector((workflow) => workflo
 export const selectNodeFieldElements = createNodesSelector((workflow) =>
   Object.values(workflow.form.elements).filter(isNodeFieldElement)
 );
-export const selectWorkflowFormNodeFieldFieldIdentifiersDeduped = createSelector(
+export const selectWorkflowFormNodeFieldFieldIdentifiers = createSelector(
   selectNodeFieldElements,
-  (nodeFieldElements) =>
-    uniqBy(nodeFieldElements, (el) => `${el.data.fieldIdentifier.nodeId}-${el.data.fieldIdentifier.fieldName}`).map(
-      (el) => el.data.fieldIdentifier
-    )
+  (nodeFieldElements) => nodeFieldElements.map((el) => el.data.fieldIdentifier)
 );
 
 export const buildSelectElement = (id: string) => createNodesSelector((workflow) => workflow.form?.elements[id]);
+export const buildSelectWorkflowFormNodeExists = (nodeId: string, fieldName: string) =>
+  createSelector(selectWorkflowFormNodeFieldFieldIdentifiers, (identifiers) =>
+    identifiers.some((identifier) => identifier.nodeId === nodeId && identifier.fieldName === fieldName)
+  );
