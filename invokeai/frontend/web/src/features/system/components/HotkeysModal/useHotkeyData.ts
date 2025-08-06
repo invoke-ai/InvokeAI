@@ -103,6 +103,7 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('canvas', 'setFillToWhite', ['d']);
     addHotkey('canvas', 'fitLayersToCanvas', ['mod+0']);
     addHotkey('canvas', 'fitBboxToCanvas', ['mod+shift+0']);
+    addHotkey('canvas', 'fitBboxToLayers', ['shift+n']);
     addHotkey('canvas', 'setZoomTo100Percent', ['mod+1']);
     addHotkey('canvas', 'setZoomTo200Percent', ['mod+2']);
     addHotkey('canvas', 'setZoomTo400Percent', ['mod+3']);

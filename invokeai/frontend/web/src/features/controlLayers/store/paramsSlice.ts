@@ -241,6 +241,15 @@ const slice = createSlice({
     },
 
     //#region Dimensions
+    sizeRecalled: (state, action: PayloadAction<{ width: number; height: number }>) => {
+      const { width, height } = action.payload;
+      const gridSize = getGridSize(state.model?.base);
+      state.dimensions.rect.width = Math.max(roundDownToMultiple(width, gridSize), 64);
+      state.dimensions.rect.height = Math.max(roundDownToMultiple(height, gridSize), 64);
+      state.dimensions.aspectRatio.value = state.dimensions.rect.width / state.dimensions.rect.height;
+      state.dimensions.aspectRatio.id = 'Free';
+      state.dimensions.aspectRatio.isLocked = true;
+    },
     widthChanged: (state, action: PayloadAction<{ width: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
       const { width, updateAspectRatio, clamp } = action.payload;
       const gridSize = getGridSize(state.model?.base);
@@ -369,14 +378,16 @@ const slice = createSlice({
 const resetState = (state: ParamsState): ParamsState => {
   // When a new session is requested, we need to keep the current model selections, plus dependent state
   // like VAE precision. Everything else gets reset to default.
+  const oldState = deepClone(state);
   const newState = getInitialParamsState();
-  newState.model = state.model;
-  newState.vae = state.vae;
-  newState.fluxVAE = state.fluxVAE;
-  newState.vaePrecision = state.vaePrecision;
-  newState.t5EncoderModel = state.t5EncoderModel;
-  newState.clipEmbedModel = state.clipEmbedModel;
-  newState.refinerModel = state.refinerModel;
+  newState.dimensions = oldState.dimensions;
+  newState.model = oldState.model;
+  newState.vae = oldState.vae;
+  newState.fluxVAE = oldState.fluxVAE;
+  newState.vaePrecision = oldState.vaePrecision;
+  newState.t5EncoderModel = oldState.t5EncoderModel;
+  newState.clipEmbedModel = oldState.clipEmbedModel;
+  newState.refinerModel = oldState.refinerModel;
   return newState;
 };
 
@@ -427,6 +438,7 @@ export const {
   modelChanged,
 
   // Dimensions
+  sizeRecalled,
   widthChanged,
   heightChanged,
   aspectRatioLockToggled,

@@ -1173,8 +1173,8 @@
             "layeringStrategy": "Strategia livelli",
             "longestPath": "Percorso più lungo",
             "layoutDirection": "Direzione schema",
-            "layoutDirectionRight": "Orizzontale",
-            "layoutDirectionDown": "Verticale",
+            "layoutDirectionRight": "A destra",
+            "layoutDirectionDown": "In basso",
             "alignment": "Allineamento nodi",
             "alignmentUL": "In alto a sinistra",
             "alignmentDL": "In basso a sinistra",
@@ -1728,7 +1728,7 @@
         "structure": {
             "heading": "Struttura",
             "paragraphs": [
-                "La struttura determina quanto l'immagine finale rispecchierà il layout dell'originale. Un valore struttura basso permette cambiamenti significativi, mentre un valore struttura alto conserva la composizione e lo schema originali."
+                "La struttura determina quanto l'immagine finale rispecchierà lo schema dell'originale. Un valore struttura basso permette cambiamenti significativi, mentre un valore struttura alto conserva la composizione e lo schema originali."
             ]
         },
         "fluxDevLicense": {
@@ -2495,11 +2495,12 @@
             "off": "Spento"
         },
         "invertMask": "Inverti maschera",
-        "fitBboxToMasks": "Adatta il riquadro di delimitazione alle maschere"
+        "fitBboxToMasks": "Adatta il riquadro di delimitazione alle maschere",
+        "maxRefImages": "Max Immagini di rif.to",
+        "useAsReferenceImage": "Usa come immagine di riferimento"
     },
     "ui": {
         "tabs": {
-            "generation": "Generazione",
             "canvas": "Tela",
             "workflows": "Flussi di lavoro",
             "workflowsTab": "$t(ui.tabs.workflows) $t(common.tab)",
@@ -2508,7 +2509,8 @@
             "queue": "Coda",
             "upscaling": "Amplia",
             "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)",
-            "gallery": "Galleria"
+            "gallery": "Galleria",
+            "generate": "Genera"
         },
         "launchpad": {
             "workflowsTitle": "Approfondisci i flussi di lavoro.",
@@ -2556,8 +2558,43 @@
                 "helpText": {
                     "promptAdvice": "Durante l'ampliamento, utilizza un prompt che descriva il mezzo e lo stile. Evita di descrivere dettagli specifici del contenuto dell'immagine.",
                     "styleAdvice": "L'ampliamento funziona meglio con lo stile generale dell'immagine."
+                },
+                "creativityAndStructure": {
+                    "title": "Creatività e struttura predefinite",
+                    "conservative": "Conservativo",
+                    "balanced": "Bilanciato",
+                    "creative": "Creativo",
+                    "artistic": "Artistico"
                 }
+            },
+            "createNewWorkflowFromScratch": "Crea un nuovo flusso di lavoro da zero",
+            "browseAndLoadWorkflows": "Sfoglia e carica i flussi di lavoro esistenti",
+            "addStyleRef": {
+                "title": "Aggiungi un riferimento di stile",
+                "description": "Aggiungi un'immagine per trasferirne l'aspetto."
+            },
+            "editImage": {
+                "title": "Modifica immagine",
+                "description": "Aggiungi un'immagine da perfezionare."
+            },
+            "generateFromText": {
+                "title": "Genera da testo",
+                "description": "Inserisci un prompt e genera."
+            },
+            "useALayoutImage": {
+                "description": "Aggiungi un'immagine per controllare la composizione.",
+                "title": "Usa una immagine guida"
+            },
+            "generate": {
+                "canvasCalloutTitle": "Vuoi avere più controllo, modificare e affinare le tue immagini?",
+                "canvasCalloutLink": "Per ulteriori funzionalità, vai su Tela."
             }
+        },
+        "panels": {
+            "launchpad": "Rampa di lancio",
+            "workflowEditor": "Editor del flusso di lavoro",
+            "imageViewer": "Visualizzatore immagini",
+            "canvas": "Tela"
         }
     },
     "upscaling": {
@@ -2648,10 +2685,8 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "Nuova impostazione per inviare tutte le generazioni della Tela direttamente alla Galleria.",
-            "Nuove funzionalità Inverti maschera (Maiusc+V) e Adatta il Riquadro di delimitazione alla maschera (Maiusc+B).",
-            "Supporto esteso per miniature e configurazioni dei modelli.",
-            "Vari altri aggiornamenti e correzioni per la qualità della vita"
+            "Lo stato dello studio viene salvato sul server, consentendoti di continuare a lavorare su qualsiasi dispositivo.",
+            "Supporto per più immagini di riferimento per FLUX Kontext (solo modello locale)."
         ]
     },
     "system": {

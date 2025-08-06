@@ -1347,3 +1347,96 @@ class PasteImageIntoBoundingBoxInvocation(BaseInvocation, WithMetadata, WithBoar
 
         image_dto = context.images.save(image=target_image)
         return ImageOutput.build(image_dto)
+
+
+@invocation(
+    "flux_kontext_image_prep",
+    title="FLUX Kontext Image Prep",
+    tags=["image", "concatenate", "flux", "kontext"],
+    category="image",
+    version="1.0.0",
+)
+class FluxKontextConcatenateImagesInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Prepares an image or images for use with FLUX Kontext. The first/single image is resized to the nearest
+    preferred Kontext resolution. All other images are concatenated horizontally, maintaining their aspect ratio."""
+
+    images: list[ImageField] = InputField(
+        description="The images to concatenate",
+        min_length=1,
+        max_length=10,
+    )
+
+    use_preferred_resolution: bool = InputField(
+        default=True, description="Use FLUX preferred resolutions for the first image"
+    )
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        from invokeai.backend.flux.util import PREFERED_KONTEXT_RESOLUTIONS
+
+        # Step 1: Load all images
+        pil_images = []
+        for image_field in self.images:
+            image = context.images.get_pil(image_field.image_name, mode="RGBA")
+            pil_images.append(image)
+
+        # Step 2: Determine target resolution for the first image
+        first_image = pil_images[0]
+        width, height = first_image.size
+
+        if self.use_preferred_resolution:
+            aspect_ratio = width / height
+
+            # Find the closest preferred resolution for the first image
+            _, target_width, target_height = min(
+                ((abs(aspect_ratio - w / h), w, h) for w, h in PREFERED_KONTEXT_RESOLUTIONS), key=lambda x: x[0]
+            )
+
+            # Apply BFL's scaling formula
+            scaled_height = 2 * int(target_height / 16)
+            final_height = 8 * scaled_height  # This will be consistent for all images
+            scaled_width = 2 * int(target_width / 16)
+            first_width = 8 * scaled_width
+        else:
+            # Use original dimensions of first image, ensuring divisibility by 16
+            final_height = 16 * (height // 16)
+            first_width = 16 * (width // 16)
+            # Ensure minimum dimensions
+            if final_height < 16:
+                final_height = 16
+            if first_width < 16:
+                first_width = 16
+
+        # Step 3: Process and resize all images with consistent height
+        processed_images = []
+        total_width = 0
+
+        for i, image in enumerate(pil_images):
+            if i == 0:
+                # First image uses the calculated dimensions
+                final_width = first_width
+            else:
+                # Subsequent images maintain aspect ratio with the same height
+                img_aspect_ratio = image.width / image.height
+                # Calculate width that maintains aspect ratio at the target height
+                calculated_width = int(final_height * img_aspect_ratio)
+                # Ensure width is divisible by 16 for proper VAE encoding
+                final_width = 16 * (calculated_width // 16)
+                # Ensure minimum width
+                if final_width < 16:
+                    final_width = 16
+
+            # Resize image to calculated dimensions
+            resized_image = image.resize((final_width, final_height), Image.Resampling.LANCZOS)
+            processed_images.append(resized_image)
+            total_width += final_width
+
+        # Step 4: Concatenate images horizontally
+        concatenated_image = Image.new("RGB", (total_width, final_height))
+        x_offset = 0
+        for img in processed_images:
+            concatenated_image.paste(img, (x_offset, 0))
+            x_offset += img.width
+
+        # Save the concatenated image
+        image_dto = context.images.save(image=concatenated_image)
+        return ImageOutput.build(image_dto)

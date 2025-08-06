@@ -75,6 +75,7 @@ export const GalleryPanel = memo(() => {
           variant="ghost"
           onClick={collapsibleApi.toggle}
           leftIcon={isCollapsed ? <PiCaretDownBold /> : <PiCaretUpBold />}
+          noOfLines={1}
         >
           {boardName}
         </Button>

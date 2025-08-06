@@ -157,6 +157,12 @@ def overridden_redoc() -> HTMLResponse:
 
 web_root_path = Path(list(web_dir.__path__)[0])
 
+if app_config.unsafe_disable_picklescan:
+    logger.warning(
+        "The unsafe_disable_picklescan option is enabled. This disables malware scanning while installing and"
+        "loading models, which may allow malicious code to be executed. Use at your own risk."
+    )
+
 try:
     app.mount("/", NoCacheStaticFiles(directory=Path(web_root_path, "dist"), html=True), name="ui")
 except RuntimeError:
