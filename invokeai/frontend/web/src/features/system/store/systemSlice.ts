@@ -12,10 +12,11 @@ import { assert } from 'tsafe';
 import { type Language, type SystemState, zSystemState } from './types';
 
 const getInitialState = (): SystemState => ({
-  _version: 2,
+  _version: 3,
   shouldConfirmOnDelete: true,
   shouldAntialiasProgressImage: false,
   shouldConfirmOnNewSession: true,
+  shouldProtectStarredImages: false,
   language: 'en',
   shouldUseNSFWChecker: false,
   shouldUseWatermarker: false,
@@ -75,6 +76,9 @@ const slice = createSlice({
     setShouldHighlightFocusedRegions(state, action: PayloadAction<boolean>) {
       state.shouldHighlightFocusedRegions = action.payload;
     },
+    setShouldProtectStarredImages(state, action: PayloadAction<boolean>) {
+      state.shouldProtectStarredImages = action.payload;
+    },
   },
 });
 
@@ -92,6 +96,7 @@ export const {
   shouldConfirmOnNewSessionToggled,
   setShouldShowInvocationProgressDetail,
   setShouldHighlightFocusedRegions,
+  setShouldProtectStarredImages,
 } = slice.actions;
 
 export const systemSliceConfig: SliceConfig<typeof slice> = {
@@ -107,6 +112,12 @@ export const systemSliceConfig: SliceConfig<typeof slice> = {
       if (state._version === 1) {
         state.language = (state as SystemState).language.replace('_', '-');
         state._version = 2;
+      }
+      // we could be leaving schema version as 2 as long as we are defaulting this new option anyway,
+      // but I feel this is more robust
+      if (state._version === 2) {
+        state.shouldProtectStarredImages = false;
+        state._version = 3;
       }
       return zSystemState.parse(state);
     },
@@ -140,3 +151,4 @@ export const selectSystemShouldConfirmOnNewSession = createSystemSelector((syste
 export const selectSystemShouldShowInvocationProgressDetail = createSystemSelector(
   (system) => system.shouldShowInvocationProgressDetail
 );
+export const selectSystemShouldProtectStarredImages = createSystemSelector((s) => s.shouldProtectStarredImages);
