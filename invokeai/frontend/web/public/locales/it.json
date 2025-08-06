@@ -410,6 +410,10 @@
             "cancelSegmentAnything": {
                 "title": "Annulla Segment Anything",
                 "desc": "Annulla l'operazione Segment Anything corrente."
+            },
+            "fitBboxToLayers": {
+                "title": "Adatta il riquadro di delimitazione ai livelli",
+                "desc": "Regola automaticamente il riquadro di delimitazione della generazione per adattarlo ai livelli visibili"
             }
         },
         "workflows": {
