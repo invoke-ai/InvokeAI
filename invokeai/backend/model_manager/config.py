@@ -442,6 +442,7 @@ class LoRADiffusersConfig(LoRAConfigBase, ModelConfigBase):
             "base": cls.base_model(mod),
         }
 
+
 class VAECheckpointConfig(CheckpointConfigBase, LegacyProbeMixin, ModelConfigBase):
     """Model config for standalone VAE models."""
 
@@ -519,6 +520,7 @@ class MainDiffusersConfig(DiffusersConfigBase, MainConfigBase, LegacyProbeMixin,
 
     pass
 
+
 class BriaDiffusersConfig(DiffusersConfigBase, MainConfigBase, ModelConfigBase):
     """Model config for Bria/Diffusers models."""
 
@@ -546,6 +548,7 @@ class BriaDiffusersConfig(DiffusersConfigBase, MainConfigBase, ModelConfigBase):
     @classmethod
     def get_tag(cls) -> Tag:
         return Tag(f"{ModelType.Main.value}.{ModelFormat.Diffusers.value}.{BaseModelType.Bria.value}")
+
 
 class BriaControlNetDiffusersConfig(DiffusersConfigBase, ControlAdapterConfigBase, ModelConfigBase):
     """Model config for Bria/Diffusers ControlNet models."""

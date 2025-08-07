@@ -1,11 +1,9 @@
 import torch
-from pydantic import BaseModel, Field 
 
 from invokeai.app.invocations.fields import Input, InputField, OutputField
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import (
     BaseInvocationOutput,
-    FieldDescriptions,
     LatentsField,
 )
 from invokeai.backend.bria.pipeline_bria_controlnet import prepare_latents
@@ -21,10 +19,12 @@ from invokeai.invocation_api import (
 @invocation_output("bria_latent_noise_output")
 class BriaLatentNoiseInvocationOutput(BaseInvocationOutput):
     """Base class for nodes that output Bria latent tensors."""
+
     latents: LatentsField = OutputField(description="The latent noise")
     latent_image_ids: LatentsField = OutputField(description="The latent image ids.")
     height: int = OutputField(description="The height of the output image")
     width: int = OutputField(description="The width of the output image")
+
 
 @invocation(
     "bria_latent_noise",
@@ -35,7 +35,7 @@ class BriaLatentNoiseInvocationOutput(BaseInvocationOutput):
     classification=Classification.Prototype,
 )
 class BriaLatentNoiseInvocation(BaseInvocation):
-    """ Generate latent noise for Bria. """
+    """Generate latent noise for Bria."""
 
     seed: int = InputField(
         default=42,

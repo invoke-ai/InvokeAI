@@ -1,19 +1,15 @@
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import List, Optional, Union
 
-import diffusers
-import numpy as np
 import torch
-from diffusers import AutoencoderKL, DDIMScheduler, EulerAncestralDiscreteScheduler
+from diffusers import AutoencoderKL
 from diffusers.image_processor import VaeImageProcessor
 from diffusers.loaders import FluxLoraLoaderMixin
-from diffusers.pipelines.flux.pipeline_flux import FluxPipeline, calculate_shift, retrieve_timesteps
-from diffusers.pipelines.flux.pipeline_output import FluxPipelineOutput
+from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
 from diffusers.pipelines.pipeline_utils import DiffusionPipeline
 from diffusers.schedulers import FlowMatchEulerDiscreteScheduler, KarrasDiffusionSchedulers
 from diffusers.utils import (
     USE_PEFT_BACKEND,
     logging,
-    replace_example_docstring,
     scale_lora_layers,
     unscale_lora_layers,
 )
@@ -23,7 +19,7 @@ from transformers import (
     T5TokenizerFast,
 )
 
-from invokeai.backend.bria.bria_utils import get_original_sigmas, get_t5_prompt_embeds, is_ng_none
+from invokeai.backend.bria.bria_utils import get_t5_prompt_embeds, is_ng_none
 from invokeai.backend.bria.transformer_bria import BriaTransformer2DModel
 
 logger = logging.get_logger(__name__)
@@ -226,7 +222,6 @@ class BriaPipeline(FluxPipeline):
     def interrupt(self):
         return self._interrupt
 
-
     def check_inputs(
         self,
         prompt,
@@ -264,7 +259,6 @@ class BriaPipeline(FluxPipeline):
                 f"Cannot forward both `negative_prompt`: {negative_prompt} and `negative_prompt_embeds`:"
                 f" {negative_prompt_embeds}. Please make sure to only forward one of the two."
             )
-
 
     def to(self, *args, **kwargs):
         DiffusionPipeline.to(self, *args, **kwargs)

@@ -40,9 +40,9 @@ logger = logging.get_logger(__name__)
 
 
 class BriaControlNetPipeline(BriaPipeline):
-    r"""
+    """
     Bria pipeline that supports optional ControlNet models.
-    
+
     Args:
         transformer ([`SD3Transformer2DModel`]):
             Conditional Transformer (MMDiT) architecture to denoise the encoded image latents.
@@ -624,7 +624,6 @@ def encode_prompt(
         if USE_PEFT_BACKEND:
             # Retrieve the original scale by scaling back the LoRA layers
             unscale_lora_layers(text_encoder, lora_scale)
-
 
     return prompt_embeds, negative_prompt_embeds
 

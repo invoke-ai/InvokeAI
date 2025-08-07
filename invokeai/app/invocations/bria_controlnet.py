@@ -19,7 +19,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.bria.controlnet_bria import BRIA_CONTROL_MODES
-from invokeai.invocation_api import Classification, ImageOutput
+from invokeai.invocation_api import Classification
 
 DEPTH_SMALL_V2_URL = "depth-anything/Depth-Anything-V2-Small-hf"
 HF_LLLYASVIEL = "https://huggingface.co/lllyasviel/Annotators/resolve/main/"
@@ -93,7 +93,6 @@ RATIO_CONFIGS_1024 = {
     1.62: {"width": 1296, "height": 800},
     1.7708333333333333: {"width": 1360, "height": 768},
 }
-
 
 
 def convert_to_grayscale(image: Image.Image) -> Image.Image:

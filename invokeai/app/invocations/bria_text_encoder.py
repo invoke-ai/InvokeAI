@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Optional
 
 import torch
 from transformers import (
@@ -13,13 +13,14 @@ from invokeai.backend.bria.pipeline_bria_controlnet import encode_prompt
 from invokeai.invocation_api import (
     BaseInvocation,
     Classification,
-    InputField,
     FluxConditioningField,
+    InputField,
     invocation,
     invocation_output,
 )
 
 DEFAULT_NEGATIVE_PROMPT = "Logo,Watermark,Text,Ugly,Morbid,Extra fingers,Poorly drawn hands,Mutation,Blurry,Extra limbs,Gross proportions,Missing arms,Mutated hands,Long neck,Duplicate"
+
 
 @invocation_output("bria_text_encoder_output")
 class BriaTextEncoderInvocationOutput(BaseInvocationOutput):

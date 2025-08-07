@@ -1,15 +1,9 @@
-import math
-import os
 from typing import List, Optional, Union
 
 import numpy as np
 import torch
-import torch.distributed as dist
 from diffusers.utils import logging
 from transformers import (
-    CLIPTextModel,
-    CLIPTextModelWithProjection,
-    CLIPTokenizer,
     T5EncoderModel,
     T5TokenizerFast,
 )
@@ -89,7 +83,6 @@ def is_ng_none(negative_prompt):
         or (isinstance(negative_prompt, list) and negative_prompt[0] is None)
         or (isinstance(negative_prompt, list) and negative_prompt[0] == "")
     )
-
 
 
 def get_1d_rotary_pos_embed(
