@@ -93,6 +93,13 @@ COGVIEW4_LATENT_RGB_FACTORS = [
     [-0.00955853, -0.00980067, -0.00977842],
 ]
 
+BRIA_LATENT_RGB_FACTORS = [
+    [0.31115174, 0.38229316, 0.43620577],
+    [-0.26867455, 0.05353606, 0.1088054],
+    [0.09892498, 0.17854956, -0.12029117],
+    [-0.37774912, -0.17128916, -0.25255626],
+]
+
 
 def sample_to_lowres_estimated_image(
     samples: torch.Tensor, latent_rgb_factors: torch.Tensor, smooth_matrix: Optional[torch.Tensor] = None
@@ -164,6 +171,8 @@ def diffusion_step_callback(
         latent_rgb_factors = COGVIEW4_LATENT_RGB_FACTORS
     elif base_model == BaseModelType.Flux:
         latent_rgb_factors = FLUX_LATENT_RGB_FACTORS
+    elif base_model == BaseModelType.Bria:
+        latent_rgb_factors = BRIA_LATENT_RGB_FACTORS
     else:
         raise ValueError(f"Unsupported base model: {base_model}")
 
