@@ -30,11 +30,11 @@ const labelSx: SystemStyleObject = {
   _hover: {
     fontWeight: 'semibold !important',
   },
-  '&[data-is-invalid="true"]': {
-    color: 'error.300',
-  },
   '&[data-is-added-to-form="true"]': {
     color: 'blue.300',
+  },
+  '&[data-is-invalid="true"]': {
+    color: 'error.300',
   },
   '&[data-is-disabled="true"]': {
     opacity: 0.5,
@@ -106,7 +106,7 @@ export const InputFieldTitle = memo((props: Props) => {
           onDoubleClick={onDoubleClick}
         >
           {editable.value}
-          {isAddedToForm && <Icon as={PiLinkBold} color="blue.200" ml={1} />}
+          {isAddedToForm && <Icon as={PiLinkBold} color={isInvalid ? 'error.300' : 'blue.200'} ml={1} />}
         </Text>
       </Tooltip>
     );
