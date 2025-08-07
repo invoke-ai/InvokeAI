@@ -7,6 +7,7 @@ from invokeai.app.invocations.primitives import (
     LatentsField,
 )
 from invokeai.backend.bria.pipeline_bria_controlnet import prepare_latents
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.invocation_api import (
     BaseInvocation,
     Classification,
@@ -42,11 +43,6 @@ class BriaLatentNoiseInvocation(BaseInvocation):
         title="Seed",
         description="The seed to use for the latent sampler",
     )
-    transformer: TransformerField = InputField(
-        description="Bria model (Transformer) to load",
-        input=Input.Connection,
-        title="Transformer",
-    )
     height: int = InputField(
         default=1024,
         title="Height",
@@ -60,9 +56,8 @@ class BriaLatentNoiseInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> BriaLatentNoiseInvocationOutput:
-        with context.models.load(self.transformer.transformer) as transformer:
-            device = transformer.device
-            dtype = transformer.dtype
+        device = TorchDevice.choose_torch_device()
+        dtype = TorchDevice.choose_torch_dtype()
 
         generator = torch.Generator(device=device).manual_seed(self.seed)
 
