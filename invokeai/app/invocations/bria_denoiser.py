@@ -34,7 +34,6 @@ class BriaDenoiseInvocationOutput(BaseInvocationOutput):
     classification=Classification.Prototype,
 )
 class BriaDenoiseInvocation(BaseInvocation):
-
     """
     Denoise Bria latents using a Bria Pipeline.
     """
@@ -132,7 +131,6 @@ class BriaDenoiseInvocation(BaseInvocation):
                     device=vae.device,
                 )
 
-
             pipeline = BriaControlNetPipeline(
                 transformer=transformer,
                 scheduler=scheduler,
@@ -159,11 +157,11 @@ class BriaDenoiseInvocation(BaseInvocation):
                 step_callback=_build_step_callback(context),
             )[0]
 
-            
-
         assert isinstance(output_latents, torch.Tensor)
         saved_input_latents_tensor = context.tensors.save(output_latents)
-        return BriaDenoiseInvocationOutput(latents=LatentsField(latents_name=saved_input_latents_tensor), height=self.height, width=self.width)
+        return BriaDenoiseInvocationOutput(
+            latents=LatentsField(latents_name=saved_input_latents_tensor), height=self.height, width=self.width
+        )
 
     def _prepare_multi_control(
         self, context: InvocationContext, vae: AutoencoderKL, width: int, height: int, device: torch.device
