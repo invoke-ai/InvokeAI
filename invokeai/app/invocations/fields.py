@@ -71,6 +71,7 @@ class UIType(str, Enum, metaclass=MetaEnum):
     # region Misc Field Types
     Scheduler = "SchedulerField"
     Any = "AnyField"
+    Video = "VideoField"
     # endregion
 
     # region Internal Field Types
@@ -223,6 +224,12 @@ class ImageField(BaseModel):
     """An image primitive field"""
 
     image_name: str = Field(description="The name of the image")
+
+
+class VideoField(BaseModel):
+    """A video primitive field"""
+
+    video_name: str = Field(description="The name of the video")
 
 
 class BoardField(BaseModel):
