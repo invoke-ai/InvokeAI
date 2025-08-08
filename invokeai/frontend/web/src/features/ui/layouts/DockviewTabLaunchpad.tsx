@@ -14,6 +14,7 @@ import {
   PiFrameCornersBold,
   PiQueueBold,
   PiTextAaBold,
+  PiVideoBold,
 } from 'react-icons/pi';
 
 const TAB_ICONS: Record<TabName, IconType> = {
@@ -23,6 +24,7 @@ const TAB_ICONS: Record<TabName, IconType> = {
   workflows: PiFlowArrowBold,
   models: PiCubeBold,
   queue: PiQueueBold,
+  video: PiVideoBold,
 };
 
 export const DockviewTabLaunchpad = memo((props: IDockviewPanelHeaderProps) => {

@@ -1,7 +1,7 @@
 import { isPlainObject } from 'es-toolkit';
 import { z } from 'zod';
 
-export const zTabName = z.enum(['generate', 'canvas', 'upscaling', 'workflows', 'models', 'queue']);
+export const zTabName = z.enum(['generate', 'canvas', 'upscaling', 'workflows', 'models', 'queue', 'video']);
 export type TabName = z.infer<typeof zTabName>;
 
 const zPartialDimensions = z.object({

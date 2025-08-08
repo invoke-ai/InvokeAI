@@ -13,19 +13,18 @@ import { ImageMenuItemOpenInNewTab } from 'features/gallery/components/ImageCont
 import { ImageMenuItemOpenInViewer } from 'features/gallery/components/ImageContextMenu/ImageMenuItemOpenInViewer';
 import { ImageMenuItemSelectForCompare } from 'features/gallery/components/ImageContextMenu/ImageMenuItemSelectForCompare';
 import { ImageMenuItemSendToUpscale } from 'features/gallery/components/ImageContextMenu/ImageMenuItemSendToUpscale';
+import { ImageMenuItemSendToVideo } from 'features/gallery/components/ImageContextMenu/ImageMenuItemSendToVideo';
 import { ImageMenuItemStarUnstar } from 'features/gallery/components/ImageContextMenu/ImageMenuItemStarUnstar';
+import { ImageMenuItemUseAsPromptTemplate } from 'features/gallery/components/ImageContextMenu/ImageMenuItemUseAsPromptTemplate';
 import { ImageMenuItemUseAsRefImage } from 'features/gallery/components/ImageContextMenu/ImageMenuItemUseAsRefImage';
 import { ImageMenuItemUseForPromptGeneration } from 'features/gallery/components/ImageContextMenu/ImageMenuItemUseForPromptGeneration';
 import { ImageDTOContextProvider } from 'features/gallery/contexts/ImageDTOContext';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import { memo } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
-import { ImageMenuItemUseAsPromptTemplate } from './ImageMenuItemUseAsPromptTemplate';
-
-type SingleSelectionMenuItemsProps = {
+interface SingleSelectionMenuItemsProps {
   imageDTO: ImageDTO;
-};
+}
 
 const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) => {
   const tab = useAppSelector(selectActiveTab);
@@ -45,6 +44,7 @@ const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) =
       {(tab === 'canvas' || tab === 'generate') && <ImageMenuItemMetadataRecallActions />}
       <MenuDivider />
       <ImageMenuItemSendToUpscale />
+      <ImageMenuItemSendToVideo />
       <ImageMenuItemUseForPromptGeneration />
       {(tab === 'canvas' || tab === 'generate') && <ImageMenuItemUseAsRefImage />}
       <ImageMenuItemUseAsPromptTemplate />
@@ -57,4 +57,4 @@ const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) =
   );
 };
 
-export default memo(SingleSelectionMenuItems);
+export default SingleSelectionMenuItems;

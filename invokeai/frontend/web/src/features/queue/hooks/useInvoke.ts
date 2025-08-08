@@ -16,6 +16,7 @@ import { enqueueMutationFixedCacheKeyOptions, useEnqueueBatchMutation } from 'se
 import { useEnqueueCanvas } from './useEnqueueCanvas';
 import { useEnqueueGenerate } from './useEnqueueGenerate';
 import { useEnqueueUpscaling } from './useEnqueueUpscaling';
+import { useEnqueueVideo } from './useEnqueueVideo';
 
 const log = logger('generation');
 
@@ -27,6 +28,7 @@ export const useInvoke = () => {
   const enqueueCanvas = useEnqueueCanvas();
   const enqueueGenerate = useEnqueueGenerate();
   const enqueueUpscaling = useEnqueueUpscaling();
+  const enqueueVideo = useEnqueueVideo();
   const saveAllImagesToGallery = useAppSelector(selectSaveAllImagesToGallery);
 
   const [_, { isLoading }] = useEnqueueBatchMutation({
@@ -50,6 +52,8 @@ export const useInvoke = () => {
             return await enqueueGenerate(prepend);
           case 'upscaling':
             return await enqueueUpscaling(prepend);
+          case 'video':
+            return await enqueueVideo(prepend);
           default:
             throw new Error(`No enqueue handler for tab: ${tabName}`);
         }
@@ -59,7 +63,7 @@ export const useInvoke = () => {
         log.error({ error: serializeError(result.error) }, 'Failed to enqueue batch');
       }
     },
-    [enqueueCanvas, enqueueGenerate, enqueueUpscaling, enqueueWorkflows, isReady, tabName]
+    [enqueueCanvas, enqueueGenerate, enqueueUpscaling, enqueueVideo, enqueueWorkflows, isReady, tabName]
   );
 
   const enqueueBack = useCallback(() => {
