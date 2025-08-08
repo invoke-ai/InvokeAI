@@ -9,6 +9,7 @@ import { memo } from 'react';
 export const Prompts = memo(() => {
   const modelSupportsNegativePrompt = useAppSelector(selectModelSupportsNegativePrompt);
   const hasNegativePrompt = useAppSelector(selectHasNegativePrompt);
+
   return (
     <Flex flexDir="column" gap={2}>
       <ParamPositivePrompt />
