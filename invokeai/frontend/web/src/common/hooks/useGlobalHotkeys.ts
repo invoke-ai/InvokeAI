@@ -122,6 +122,7 @@ export const useGlobalHotkeys = () => {
     dependencies: [dispatch, isModelManagerEnabled],
   });
 
+
   const deleteImageModalApi = useDeleteImageModalApi();
   useRegisteredHotkeys({
     id: 'deleteSelection',
