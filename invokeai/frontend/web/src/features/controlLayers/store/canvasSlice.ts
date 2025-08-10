@@ -1410,12 +1410,6 @@ const slice = createSlice({
       switch (newEntity.type) {
         case 'raster_layer':
           newEntity.id = getPrefixedId('raster_layer');
-          // Bake-on-copy semantics: adjustments should not carry over as live settings.
-          // TODO: Actually bake adjustments into pixels before cloning; for now, drop them on the copy.
-          if ('adjustments' in newEntity) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (newEntity as any).adjustments = null;
-          }
           state.rasterLayers.entities.push(newEntity);
           break;
         case 'control_layer':
