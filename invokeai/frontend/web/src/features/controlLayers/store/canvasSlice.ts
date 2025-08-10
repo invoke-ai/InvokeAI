@@ -104,6 +104,165 @@ const slice = createSlice({
   reducers: {
     // undoable canvas state
     //#region Raster layers
+    rasterLayerAdjustmentsSet: (
+      state,
+      action: PayloadAction<
+        EntityIdentifierPayload<
+          {
+            adjustments:
+              | NonNullable<CanvasRasterLayerState['adjustments']>
+              | { enabled?: boolean; collapsed?: boolean; mode?: 'simple' | 'curves' }
+              | null;
+          },
+          'raster_layer'
+        >
+      >
+    ) => {
+      const { entityIdentifier, adjustments } = action.payload;
+      const layer = selectEntity(state, entityIdentifier);
+      if (!layer) {
+        return;
+      }
+      if (adjustments === null) {
+        layer.adjustments = null;
+        return;
+      }
+      if (layer.adjustments === null) {
+        layer.adjustments = {
+          version: 1,
+          enabled: true,
+          collapsed: false,
+          mode: 'simple',
+          simple: { brightness: 0, contrast: 0, saturation: 0, temperature: 0, tint: 0, sharpness: 0 },
+          curves: {
+            master: [
+              [0, 0],
+              [255, 255],
+            ],
+            r: [
+              [0, 0],
+              [255, 255],
+            ],
+            g: [
+              [0, 0],
+              [255, 255],
+            ],
+            b: [
+              [0, 0],
+              [255, 255],
+            ],
+          },
+        };
+      }
+      if (typeof adjustments === 'object' && adjustments !== null && 'version' in adjustments) {
+        layer.adjustments = merge(layer.adjustments, adjustments as NonNullable<CanvasRasterLayerState['adjustments']>);
+      } else {
+        // Shallow toggles only
+        const partial = adjustments as { enabled?: boolean; collapsed?: boolean; mode?: 'simple' | 'curves' };
+        layer.adjustments = merge(layer.adjustments, partial);
+      }
+    },
+    rasterLayerAdjustmentsReset: (state, action: PayloadAction<EntityIdentifierPayload<void, 'raster_layer'>>) => {
+      const { entityIdentifier } = action.payload;
+      const layer = selectEntity(state, entityIdentifier);
+      if (!layer) {
+        return;
+      }
+      layer.adjustments = null;
+    },
+    rasterLayerAdjustmentsSimpleUpdated: (
+      state,
+      action: PayloadAction<
+        EntityIdentifierPayload<
+          {
+            simple: Partial<NonNullable<NonNullable<CanvasRasterLayerState['adjustments']>['simple']>>;
+          },
+          'raster_layer'
+        >
+      >
+    ) => {
+      const { entityIdentifier, simple } = action.payload;
+      const layer = selectEntity(state, entityIdentifier);
+      if (!layer) {
+        return;
+      }
+      if (!layer.adjustments) {
+        // initialize baseline
+        layer.adjustments = {
+          version: 1,
+          enabled: true,
+          collapsed: false,
+          mode: 'simple',
+          simple: { brightness: 0, contrast: 0, saturation: 0, temperature: 0, tint: 0, sharpness: 0 },
+          curves: {
+            master: [
+              [0, 0],
+              [255, 255],
+            ],
+            r: [
+              [0, 0],
+              [255, 255],
+            ],
+            g: [
+              [0, 0],
+              [255, 255],
+            ],
+            b: [
+              [0, 0],
+              [255, 255],
+            ],
+          },
+        };
+      }
+      layer.adjustments.simple = merge(layer.adjustments.simple, simple);
+    },
+    rasterLayerAdjustmentsCurvesUpdated: (
+      state,
+      action: PayloadAction<
+        EntityIdentifierPayload<
+          {
+            channel: 'master' | 'r' | 'g' | 'b';
+            points: Array<[number, number]>;
+          },
+          'raster_layer'
+        >
+      >
+    ) => {
+      const { entityIdentifier, channel, points } = action.payload;
+      const layer = selectEntity(state, entityIdentifier);
+      if (!layer) {
+        return;
+      }
+      if (!layer.adjustments) {
+        // initialize baseline
+        layer.adjustments = {
+          version: 1,
+          enabled: true,
+          collapsed: false,
+          mode: 'curves',
+          simple: { brightness: 0, contrast: 0, saturation: 0, temperature: 0, tint: 0, sharpness: 0 },
+          curves: {
+            master: [
+              [0, 0],
+              [255, 255],
+            ],
+            r: [
+              [0, 0],
+              [255, 255],
+            ],
+            g: [
+              [0, 0],
+              [255, 255],
+            ],
+            b: [
+              [0, 0],
+              [255, 255],
+            ],
+          },
+        };
+      }
+      layer.adjustments.curves[channel] = points;
+    },
     rasterLayerAdded: {
       reducer: (
         state,
@@ -1658,6 +1817,11 @@ export const {
   entityBrushLineAdded,
   entityEraserLineAdded,
   entityRectAdded,
+  // Raster layer adjustments
+  rasterLayerAdjustmentsSet,
+  rasterLayerAdjustmentsReset,
+  rasterLayerAdjustmentsSimpleUpdated,
+  rasterLayerAdjustmentsCurvesUpdated,
   entityDeleted,
   entityArrangedForwardOne,
   entityArrangedToFront,
