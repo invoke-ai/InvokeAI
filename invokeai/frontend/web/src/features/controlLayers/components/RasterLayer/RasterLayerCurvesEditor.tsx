@@ -48,6 +48,31 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
 
   const width = 256;
   const height = 160;
+  // inner margins to keep a small buffer from edges (left/right/bottom) and space for title at top
+  const MARGIN_LEFT = 8;
+  const MARGIN_RIGHT = 8;
+  const MARGIN_TOP = 14;
+  const MARGIN_BOTTOM = 10;
+  const INNER_WIDTH = width - MARGIN_LEFT - MARGIN_RIGHT;
+  const INNER_HEIGHT = height - MARGIN_TOP - MARGIN_BOTTOM;
+
+  // helpers to map value-space [0..255] to canvas pixels (respecting inner margins)
+  const valueToCanvasX = useCallback(
+    (x: number) => MARGIN_LEFT + (clamp(x, 0, 255) / 255) * INNER_WIDTH,
+    [INNER_WIDTH]
+  );
+  const valueToCanvasY = useCallback(
+    (y: number) => MARGIN_TOP + INNER_HEIGHT - (clamp(y, 0, 255) / 255) * INNER_HEIGHT,
+    [INNER_HEIGHT]
+  );
+  const canvasToValueX = useCallback(
+    (cx: number) => clamp(Math.round(((cx - MARGIN_LEFT) / INNER_WIDTH) * 255), 0, 255),
+    [INNER_WIDTH]
+  );
+  const canvasToValueY = useCallback(
+    (cy: number) => clamp(Math.round(255 - ((cy - MARGIN_TOP) / INNER_HEIGHT) * 255), 0, 255),
+    [INNER_HEIGHT]
+  );
 
   const draw = useCallback(() => {
     const c = canvasRef.current;
@@ -66,32 +91,37 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
     ctx.fillStyle = '#111';
     ctx.fillRect(0, 0, width, height);
 
-    // grid
+    // grid inside inner rect
     ctx.strokeStyle = '#2a2a2a';
     ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
-      const y = (i * height) / 4;
+      const y = MARGIN_TOP + (i * INNER_HEIGHT) / 4;
       ctx.beginPath();
-      ctx.moveTo(0, y + 0.5);
-      ctx.lineTo(width, y + 0.5);
+      ctx.moveTo(MARGIN_LEFT + 0.5, y + 0.5);
+      ctx.lineTo(MARGIN_LEFT + INNER_WIDTH - 0.5, y + 0.5);
       ctx.stroke();
     }
     for (let i = 0; i <= 4; i++) {
-      const x = (i * width) / 4;
+      const x = MARGIN_LEFT + (i * INNER_WIDTH) / 4;
       ctx.beginPath();
-      ctx.moveTo(x + 0.5, 0);
-      ctx.lineTo(x + 0.5, height);
+      ctx.moveTo(x + 0.5, MARGIN_TOP + 0.5);
+      ctx.lineTo(x + 0.5, MARGIN_TOP + INNER_HEIGHT - 0.5);
       ctx.stroke();
     }
 
     // histogram
     if (histogram) {
-      const max = Math.max(1, ...histogram);
+      // logarithmic histogram for readability when values vary widely
+      const logHist = histogram.map((v) => Math.log10((v ?? 0) + 1));
+      const max = Math.max(1e-6, ...logHist);
       ctx.fillStyle = '#5557';
-      for (let x = 0; x < 256; x++) {
-        const v = histogram[x] ?? 0;
-        const h = Math.round((v / max) * (height - 4));
-        ctx.fillRect(x, height - h, 1, h);
+      const binW = Math.max(1, INNER_WIDTH / 256);
+      for (let i = 0; i < 256; i++) {
+        const v = logHist[i] ?? 0;
+        const h = Math.round((v / max) * (INNER_HEIGHT - 2));
+        const x = MARGIN_LEFT + Math.floor(i * binW);
+        const y = MARGIN_TOP + INNER_HEIGHT - h;
+        ctx.fillRect(x, y, Math.ceil(binW), h);
       }
     }
 
@@ -102,8 +132,8 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
     ctx.beginPath();
     for (let i = 0; i < pts.length; i++) {
       const [x, y] = pts[i]!;
-      const cx = x;
-      const cy = height - (y / 255) * height;
+      const cx = valueToCanvasX(x);
+      const cy = valueToCanvasY(y);
       if (i === 0) {
         ctx.moveTo(cx, cy);
       } else {
@@ -115,8 +145,8 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
     // control points
     for (let i = 0; i < pts.length; i++) {
       const [x, y] = pts[i]!;
-      const cx = x;
-      const cy = height - (y / 255) * height;
+      const cx = valueToCanvasX(x);
+      const cy = valueToCanvasY(y);
       ctx.fillStyle = '#000';
       ctx.beginPath();
       ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
@@ -129,18 +159,31 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
     // title
     ctx.fillStyle = '#bbb';
     ctx.font = '12px sans-serif';
-    ctx.fillText(title, 6, 14);
-  }, [channel, height, histogram, localPoints, title, width]);
+    ctx.fillText(title, MARGIN_LEFT + 2, Math.max(12, MARGIN_TOP - 2));
+  }, [
+    MARGIN_LEFT,
+    MARGIN_TOP,
+    INNER_HEIGHT,
+    INNER_WIDTH,
+    channel,
+    height,
+    histogram,
+    localPoints,
+    title,
+    valueToCanvasX,
+    valueToCanvasY,
+    width,
+  ]);
 
   useEffect(() => {
     draw();
   }, [draw]);
 
   const getNearestPointIndex = useCallback(
-    (mx: number, my: number) => {
-      // map canvas y to [0..255]
-      const yVal = clamp(Math.round(255 - (my / height) * 255), 0, 255);
-      const xVal = clamp(Math.round(mx), 0, 255);
+    (mxCanvas: number, myCanvas: number) => {
+      // convert canvas px to value-space [0..255]
+      const xVal = canvasToValueX(mxCanvas);
+      const yVal = canvasToValueY(myCanvas);
       let best = -1;
       let bestDist = 9999;
       for (let i = 0; i < localPoints.length; i++) {
@@ -158,29 +201,35 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
       }
       return -1;
     },
-    [height, localPoints]
+    [canvasToValueX, canvasToValueY, localPoints]
   );
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
       e.preventDefault();
       e.stopPropagation();
-      const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-      const idx = getNearestPointIndex(mx, my);
+      const c = canvasRef.current;
+      if (!c) {
+        return;
+      }
+      const rect = c.getBoundingClientRect();
+      const scaleX = c.width / rect.width;
+      const scaleY = c.height / rect.height;
+      const mxCanvas = (e.clientX - rect.left) * scaleX;
+      const myCanvas = (e.clientY - rect.top) * scaleY;
+      const idx = getNearestPointIndex(mxCanvas, myCanvas);
       if (idx !== -1 && idx !== 0 && idx !== localPoints.length - 1) {
         setDragIndex(idx);
         return;
       }
       // add new point
-      const xVal = clamp(Math.round(mx), 0, 255);
-      const yVal = clamp(Math.round(255 - (my / height) * 255), 0, 255);
+      const xVal = canvasToValueX(mxCanvas);
+      const yVal = canvasToValueY(myCanvas);
       const next = sortPoints([...localPoints, [xVal, yVal]]);
       setLocalPoints(next);
       setDragIndex(next.findIndex(([x, y]) => x === xVal && y === yVal));
     },
-    [getNearestPointIndex, height, localPoints]
+    [canvasToValueX, canvasToValueY, getNearestPointIndex, localPoints]
   );
 
   const handlePointerMove = useCallback(
@@ -190,9 +239,17 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
       if (dragIndex === null) {
         return;
       }
-      const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
-      const mx = clamp(Math.round(e.clientX - rect.left), 0, 255);
-      const myPx = clamp(Math.round(255 - ((e.clientY - rect.top) / height) * 255), 0, 255);
+      const c = canvasRef.current;
+      if (!c) {
+        return;
+      }
+      const rect = c.getBoundingClientRect();
+      const scaleX = c.width / rect.width;
+      const scaleY = c.height / rect.height;
+      const mxCanvas = (e.clientX - rect.left) * scaleX;
+      const myCanvas = (e.clientY - rect.top) * scaleY;
+      const mxVal = canvasToValueX(mxCanvas);
+      const myVal = canvasToValueY(myCanvas);
       setLocalPoints((prev) => {
         const next = [...prev];
         // clamp endpoints to ends and keep them immutable
@@ -202,11 +259,11 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
         if (dragIndex === prev.length - 1) {
           return prev;
         }
-        next[dragIndex] = [mx, myPx];
+        next[dragIndex] = [mxVal, myVal];
         return sortPoints(next);
       });
     },
-    [dragIndex, height]
+    [canvasToValueX, canvasToValueY, dragIndex]
   );
 
   const commit = useCallback(
@@ -225,10 +282,16 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       e.preventDefault();
       e.stopPropagation();
-      const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-      const idx = getNearestPointIndex(mx, my);
+      const c = canvasRef.current;
+      if (!c) {
+        return;
+      }
+      const rect = c.getBoundingClientRect();
+      const scaleX = c.width / rect.width;
+      const scaleY = c.height / rect.height;
+      const mxCanvas = (e.clientX - rect.left) * scaleX;
+      const myCanvas = (e.clientY - rect.top) * scaleY;
+      const idx = getNearestPointIndex(mxCanvas, myCanvas);
       if (idx > 0 && idx < localPoints.length - 1) {
         const next = localPoints.filter((_, i) => i !== idx);
         setLocalPoints(next);
