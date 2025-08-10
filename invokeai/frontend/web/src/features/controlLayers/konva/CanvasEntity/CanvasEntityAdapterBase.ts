@@ -475,7 +475,7 @@ export abstract class CanvasEntityAdapterBase<T extends CanvasEntityState, U ext
        * to hide this entity.
        */
       const filteringAdapter = this.manager.stateApi.$filteringAdapter.get();
-      if (filteringAdapter && filteringAdapter !== this) {
+      if (filteringAdapter && filteringAdapter.id !== this.id) {
         this.setVisibility(false);
         return;
       }
@@ -492,7 +492,7 @@ export abstract class CanvasEntityAdapterBase<T extends CanvasEntityState, U ext
       }
 
       const segmentingAdapter = this.manager.stateApi.$segmentingAdapter.get();
-      if (segmentingAdapter && segmentingAdapter !== this) {
+      if (segmentingAdapter && segmentingAdapter.id !== this.id) {
         this.setVisibility(false);
         return;
       }
