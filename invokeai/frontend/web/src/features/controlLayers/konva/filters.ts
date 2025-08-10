@@ -61,9 +61,12 @@ export const AdjustmentsSimpleFilter = function (this: KonvaFilterThis, imageDat
   const tintK = 0.5;
   const rTempMul = 1 + temperature * tempK;
   const bTempMul = 1 - temperature * tempK;
-  const rTintMul = 1 + (tint > 0 ? tint * tintK : -tint * 0);
-  const gTintMul = 1 - Math.abs(tint) * tintK;
-  const bTintMul = 1 + (tint > 0 ? tint * tintK : -tint * 0);
+  // Tint: green <-> magenta. Positive = magenta (R/B up, G down). Negative = green (G up, R/B down).
+  const t = clamp(tint, -1, 1) * tintK;
+  const mag = Math.abs(t);
+  const rTintMul = t >= 0 ? 1 + mag : 1 - mag;
+  const gTintMul = t >= 0 ? 1 - mag : 1 + mag;
+  const bTintMul = t >= 0 ? 1 + mag : 1 - mag;
 
   // Saturation matrix (HSL-based approximation via luma coefficients)
   const lumaR = 0.2126;
