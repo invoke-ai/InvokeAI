@@ -44,9 +44,8 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
 
   const onToggleEnabled = useCallback(
     (v: boolean) => {
-      dispatch(
-        rasterLayerAdjustmentsSet({ entityIdentifier, adjustments: { enabled: v, collapsed: false, mode: 'simple' } })
-      );
+      // Only toggle the enabled state; preserve current mode/collapsed so users can A/B compare
+      dispatch(rasterLayerAdjustmentsSet({ entityIdentifier, adjustments: { enabled: v } }));
     },
     [dispatch, entityIdentifier]
   );
