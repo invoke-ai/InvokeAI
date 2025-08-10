@@ -1,5 +1,6 @@
 import {
   Button,
+  ButtonGroup,
   CompositeNumberInput,
   CompositeSlider,
   Flex,
@@ -10,6 +11,7 @@ import {
   Text,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { RasterLayerCurvesEditor } from 'features/controlLayers/components/RasterLayer/RasterLayerCurvesEditor';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import {
   rasterLayerAdjustmentsCurvesUpdated,
@@ -30,6 +32,7 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
   const hasAdjustments = Boolean(layer?.adjustments);
   const enabled = Boolean(layer?.adjustments?.enabled);
   const collapsed = Boolean(layer?.adjustments?.collapsed);
+  const mode = layer?.adjustments?.mode ?? 'simple';
   const simple = layer?.adjustments?.simple ?? {
     brightness: 0,
     contrast: 0,
@@ -81,6 +84,28 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
       })
     );
   }, [dispatch, entityIdentifier, collapsed]);
+
+  const onSetMode = useCallback(
+    (nextMode: 'simple' | 'curves') => {
+      if (!layer?.adjustments) {
+        return;
+      }
+      if (nextMode === mode) {
+        return;
+      }
+      dispatch(
+        rasterLayerAdjustmentsSet({
+          entityIdentifier,
+          adjustments: { mode: nextMode },
+        })
+      );
+    },
+    [dispatch, entityIdentifier, layer?.adjustments, mode]
+  );
+
+  // Memoized click handlers to avoid inline arrow functions in JSX
+  const onClickModeSimple = useCallback(() => onSetMode('simple'), [onSetMode]);
+  const onClickModeCurves = useCallback(() => onSetMode('curves'), [onSetMode]);
 
   const slider = useMemo(
     () =>
@@ -152,13 +177,21 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
         <Text fontWeight={600} flex={1}>
           Adjustments
         </Text>
+        <ButtonGroup size="sm" isAttached variant="outline">
+          <Button onClick={onClickModeSimple} isActive={mode === 'simple'}>
+            {t('controlLayers.adjustments.simple', { defaultValue: 'Simple' })}
+          </Button>
+          <Button onClick={onClickModeCurves} isActive={mode === 'curves'}>
+            {t('controlLayers.adjustments.curves', { defaultValue: 'Curves' })}
+          </Button>
+        </ButtonGroup>
         <Switch isChecked={enabled} onChange={handleToggleEnabled} />
         <Button size="sm" onClick={onReset} isDisabled={!layer?.adjustments}>
           Reset
         </Button>
       </Flex>
 
-      {!collapsed && (
+      {!collapsed && mode === 'simple' && (
         <>
           {slider.row(t('controlLayers.adjustments.brightness'), simple.brightness, onBrightness)}
           {slider.row(t('controlLayers.adjustments.contrast'), simple.contrast, onContrast)}
@@ -168,6 +201,8 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
           {slider.row(t('controlLayers.adjustments.sharpness'), simple.sharpness, onSharpness, 0, 1, 0.01)}
         </>
       )}
+
+      {!collapsed && mode === 'curves' && <RasterLayerCurvesEditor />}
     </>
   );
 });
