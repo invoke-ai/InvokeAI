@@ -114,6 +114,8 @@
         "t2iAdapter": "T2I Adapter",
         "positivePrompt": "Positive Prompt",
         "negativePrompt": "Negative Prompt",
+        "removeNegativePrompt": "Remove Negative Prompt",
+        "addNegativePrompt": "Add Negative Prompt",
         "discordLabel": "Discord",
         "dontAskMeAgain": "Don't ask me again",
         "dontShowMeThese": "Don't show me these",
