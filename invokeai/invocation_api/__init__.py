@@ -68,6 +68,7 @@ from invokeai.app.invocations.primitives import (
     LatentsOutput,
     StringCollectionOutput,
     StringOutput,
+    RunwayVideoOutput,
     VideoOutput,
 )
 from invokeai.app.invocations.scheduler import SchedulerOutput
@@ -157,6 +158,7 @@ __all__ = [
     "LatentsOutput",
     "StringCollectionOutput",
     "StringOutput",
+    "RunwayVideoOutput",
     "VideoOutput",
     # invokeai.app.services.image_records.image_records_common
     "ImageCategory",
