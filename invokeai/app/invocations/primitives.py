@@ -299,7 +299,6 @@ class RunwayVideoOutput(BaseInvocationOutput):
 
     video_url: str = OutputField(description="The output video url")
     runway_task_id: str = OutputField(description="The runway task id")
-    
 
     @classmethod
     def build(cls, video_url: str, runway_task_id: str) -> "RunwayVideoOutput":
@@ -312,19 +311,12 @@ class RunwayVideoOutput(BaseInvocationOutput):
 class VideoOutput(BaseInvocationOutput):
     """Base class for nodes that output a video"""
 
-    video_id: str = OutputField(description="The output video id")
-    width: int = OutputField(description="The width of the video in pixels")
-    height: int = OutputField(description="The height of the video in pixels")
-    duration_seconds: float = OutputField(description="The duration of the video in seconds")
+    video: VideoField = OutputField(description="The output video")
     
-
     @classmethod
     def build(cls, video_id: str, width: int, height: int, duration_seconds: float) -> "VideoOutput":
         return cls(
-            video_id=video_id,
-            width=width,
-            height=height,
-            duration_seconds=duration_seconds,
+            video=VideoField(video_id=video_id, width=width, height=height, duration_seconds=duration_seconds),
         )
 
 
