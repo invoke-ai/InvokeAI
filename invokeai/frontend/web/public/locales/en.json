@@ -116,6 +116,7 @@
         "negativePrompt": "Negative Prompt",
         "removeNegativePrompt": "Remove Negative Prompt",
         "addNegativePrompt": "Add Negative Prompt",
+        "selectYourModel": "Select Your Model",
         "discordLabel": "Discord",
         "dontAskMeAgain": "Don't ask me again",
         "dontShowMeThese": "Don't show me these",

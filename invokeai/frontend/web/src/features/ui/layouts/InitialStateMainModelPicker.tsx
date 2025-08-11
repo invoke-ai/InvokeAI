@@ -4,12 +4,14 @@ import { InformationalPopover } from 'common/components/InformationalPopover/Inf
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
 import { modelSelected } from 'features/parameters/store/actions';
 import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MdMoneyOff } from 'react-icons/md';
 import { useMainModels } from 'services/api/hooks/modelsByType';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
 import { type AnyModelConfig, isCheckpointMainModelConfig } from 'services/api/types';
 
 export const InitialStateMainModelPicker = memo(() => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const [modelConfigs] = useMainModels();
   const selectedModelConfig = useSelectedModelConfig();
@@ -31,7 +33,7 @@ export const InitialStateMainModelPicker = memo(() => {
   return (
     <FormControl orientation="vertical" alignItems="unset">
       <FormLabel display="flex" fontSize="md" gap={2}>
-        Select your Model{' '}
+        {t('common.selectYourModel')}{' '}
         {isFluxDevSelected && (
           <InformationalPopover feature="fluxDevLicense" hideDisable={true}>
             <Flex justifyContent="flex-start">
