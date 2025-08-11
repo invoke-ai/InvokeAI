@@ -8,7 +8,6 @@ import {
   useInputFieldNamesConnection,
   useInputFieldNamesMissing,
 } from 'features/nodes/hooks/useInputFieldNamesByStatus';
-import { useNodeHasErrors } from 'features/nodes/hooks/useNodeIsInvalid';
 import { useOutputFieldNames } from 'features/nodes/hooks/useOutputFieldNames';
 import { useWithFooter } from 'features/nodes/hooks/useWithFooter';
 import { memo } from 'react';
@@ -38,12 +37,11 @@ const sx: SystemStyleObject = {
 };
 
 const InvocationNode = ({ nodeId, isOpen }: Props) => {
-  const isInvalid = useNodeHasErrors();
   const withFooter = useWithFooter();
 
   return (
     <>
-      <InvocationNodeHeader nodeId={nodeId} isOpen={isOpen} isInvalid={isInvalid} />
+      <InvocationNodeHeader nodeId={nodeId} isOpen={isOpen} />
       {isOpen && (
         <>
           <Flex layerStyle="nodeBody" sx={sx} data-with-footer={withFooter}>
