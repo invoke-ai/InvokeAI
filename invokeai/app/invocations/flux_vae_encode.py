@@ -71,7 +71,9 @@ class FluxVaeEncodeInvocation(BaseInvocation):
 
         context.util.signal_progress("Running VAE")
         estimated_working_memory = self._estimate_working_memory(image_tensor, vae_info.model)
-        latents = self.vae_encode(vae_info=vae_info, image_tensor=image_tensor, estimated_working_memory=estimated_working_memory)
+        latents = self.vae_encode(
+            vae_info=vae_info, image_tensor=image_tensor, estimated_working_memory=estimated_working_memory
+        )
 
         latents = latents.to("cpu")
         name = context.tensors.save(tensor=latents)
