@@ -4,6 +4,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { useEditable } from 'common/hooks/useEditable';
 import { useBatchGroupColorToken } from 'features/nodes/hooks/useBatchGroupColorToken';
 import { useBatchGroupId } from 'features/nodes/hooks/useBatchGroupId';
+import { useNodeHasErrors } from 'features/nodes/hooks/useNodeIsInvalid';
 import { useNodeTemplateTitleSafe } from 'features/nodes/hooks/useNodeTemplateTitleSafe';
 import { useNodeUserTitleSafe } from 'features/nodes/hooks/useNodeUserTitleSafe';
 import { nodeLabelChanged } from 'features/nodes/store/nodesSlice';
@@ -21,11 +22,11 @@ const labelSx: SystemStyleObject = {
 type Props = {
   nodeId: string;
   title?: string;
-  isInvalid?: boolean;
 };
 
-const NodeTitle = ({ nodeId, title, isInvalid }: Props) => {
+const InvocationNodeTitle = ({ nodeId, title }: Props) => {
   const dispatch = useAppDispatch();
+  const isInvalid = useNodeHasErrors();
   const label = useNodeUserTitleSafe();
   const batchGroupId = useBatchGroupId(nodeId);
   const batchGroupColorToken = useBatchGroupColorToken(batchGroupId);
@@ -83,4 +84,4 @@ const NodeTitle = ({ nodeId, title, isInvalid }: Props) => {
   );
 };
 
-export default memo(NodeTitle);
+export default memo(InvocationNodeTitle);

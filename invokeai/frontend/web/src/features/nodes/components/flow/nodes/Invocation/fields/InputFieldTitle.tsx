@@ -30,11 +30,11 @@ const labelSx: SystemStyleObject = {
   _hover: {
     fontWeight: 'semibold !important',
   },
-  '&[data-is-added-to-form="true"]': {
-    color: 'blue.300',
-  },
   '&[data-is-invalid="true"]': {
     color: 'error.300',
+  },
+  '&[data-is-added-to-form="true"]': {
+    color: 'blue.300',
   },
   '&[data-is-disabled="true"]': {
     opacity: 0.5,
