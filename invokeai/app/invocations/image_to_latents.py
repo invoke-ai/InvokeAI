@@ -86,7 +86,12 @@ class ImageToLatentsInvocation(BaseInvocation):
 
     @staticmethod
     def vae_encode(
-        vae_info: LoadedModel, upcast: bool, tiled: bool, image_tensor: torch.Tensor, tile_size: int = 0, estimated_working_memory: int = 0
+        vae_info: LoadedModel,
+        upcast: bool,
+        tiled: bool,
+        image_tensor: torch.Tensor,
+        tile_size: int = 0,
+        estimated_working_memory: int = 0,
     ) -> torch.Tensor:
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             assert isinstance(vae, (AutoencoderKL, AutoencoderTiny))
@@ -156,7 +161,12 @@ class ImageToLatentsInvocation(BaseInvocation):
 
         context.util.signal_progress("Running VAE encoder")
         latents = self.vae_encode(
-            vae_info=vae_info, upcast=self.fp32, tiled=self.tiled, image_tensor=image_tensor, tile_size=self.tile_size, estimated_working_memory=estimated_working_memory
+            vae_info=vae_info,
+            upcast=self.fp32,
+            tiled=self.tiled,
+            image_tensor=image_tensor,
+            tile_size=self.tile_size,
+            estimated_working_memory=estimated_working_memory,
         )
 
         latents = latents.to("cpu")
