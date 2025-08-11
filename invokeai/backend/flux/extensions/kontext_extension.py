@@ -131,7 +131,14 @@ class KontextExtension:
 
             # Continue with VAE encoding
             # Don't sample from the distribution for reference images - use the mean (matching ComfyUI)
-            with vae_info as vae:
+            # Estimate working memory for encode operation (50% of decode memory requirements)
+            h = image_tensor.shape[-2]
+            w = image_tensor.shape[-1]
+            element_size = next(vae_info.model.parameters()).element_size()
+            scaling_constant = 1100  # 50% of decode scaling constant (2200)
+            estimated_working_memory = int(h * w * element_size * scaling_constant)
+
+            with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
                 assert isinstance(vae, AutoEncoder)
                 vae_dtype = next(iter(vae.parameters())).dtype
                 image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=vae_dtype)

@@ -36,9 +36,19 @@ class CogView4ImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
     image: ImageField = InputField(description="The image to encode.")
     vae: VAEField = InputField(description=FieldDescriptions.vae, input=Input.Connection)
 
+    def _estimate_working_memory(self, image_tensor: torch.Tensor, vae: AutoencoderKL) -> int:
+        """Estimate the working memory required by the invocation in bytes."""
+        # Encode operations use approximately 50% of the memory required for decode operations
+        h = image_tensor.shape[-2]
+        w = image_tensor.shape[-1]
+        element_size = next(vae.parameters()).element_size()
+        scaling_constant = 1100  # 50% of decode scaling constant (2200)
+        working_memory = h * w * element_size * scaling_constant
+        return int(working_memory)
+
     @staticmethod
-    def vae_encode(vae_info: LoadedModel, image_tensor: torch.Tensor) -> torch.Tensor:
-        with vae_info as vae:
+    def vae_encode(vae_info: LoadedModel, image_tensor: torch.Tensor, estimated_working_memory: int) -> torch.Tensor:
+        with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             assert isinstance(vae, AutoencoderKL)
 
             vae.disable_tiling()
@@ -62,7 +72,10 @@ class CogView4ImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
             image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
 
         vae_info = context.models.load(self.vae.vae)
-        latents = self.vae_encode(vae_info=vae_info, image_tensor=image_tensor)
+        assert isinstance(vae_info.model, AutoencoderKL)
+
+        estimated_working_memory = self._estimate_working_memory(image_tensor, vae_info.model)
+        latents = self.vae_encode(vae_info=vae_info, image_tensor=image_tensor, estimated_working_memory=estimated_working_memory)
 
         latents = latents.to("cpu")
         name = context.tensors.save(tensor=latents)
