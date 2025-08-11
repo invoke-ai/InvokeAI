@@ -6,7 +6,7 @@ import { $templates } from 'features/nodes/store/nodesSlice';
 import {
   selectNodes,
   selectNodesSlice,
-  selectWorkflowFormNodeFieldFieldIdentifiers,
+  selectWorkflowFormNodeFieldFieldIdentifiersDeduped,
   selectWorkflowId,
 } from 'features/nodes/store/selectors';
 import type { Templates } from 'features/nodes/store/types';
@@ -54,7 +54,7 @@ export const useIsValidationRunInProgress = () => {
 };
 
 export const selectFieldIdentifiersWithInvocationTypes = createSelector(
-  selectWorkflowFormNodeFieldFieldIdentifiers,
+  selectWorkflowFormNodeFieldFieldIdentifiersDeduped,
   selectNodesSlice,
   (fieldIdentifiers, nodes) => {
     const result: FieldIdentiferWithLabelAndType[] = [];
