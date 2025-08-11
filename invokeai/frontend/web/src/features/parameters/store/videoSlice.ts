@@ -12,7 +12,10 @@ const zVideoState = z.object({
   _version: z.literal(1),
   videoFirstFrameImage: zImageWithDims.nullable(),
   videoLastFrameImage: zImageWithDims.nullable(),
-  generatedVideoUrl: z.string().nullable(),
+  generatedVideo: z.object({
+    url: z.string(),
+    taskId: z.number(),
+  }).nullable(),
 });
 
 export type VideoState = z.infer<typeof zVideoState>;
@@ -21,7 +24,7 @@ const getInitialState = (): VideoState => ({
   _version: 1,
   videoFirstFrameImage: null,
   videoLastFrameImage: null,
-  generatedVideoUrl: null,
+  generatedVideo: null,
 });
 
 const slice = createSlice({
@@ -36,8 +39,8 @@ const slice = createSlice({
       state.videoLastFrameImage = action.payload;
     },
 
-    generatedVideoUrlChanged: (state, action: PayloadAction<string | null>) => {
-      state.generatedVideoUrl = action.payload;
+    generatedVideoChanged: (state, action: PayloadAction<{ url: string, taskId: number } | null>) => {
+      state.generatedVideo = action.payload;
     },
 
   },
@@ -46,7 +49,7 @@ const slice = createSlice({
 export const {
   videoFirstFrameImageChanged,
   videoLastFrameImageChanged,
-  generatedVideoUrlChanged,
+  generatedVideoChanged,
 } = slice.actions;
 
 export const videoSliceConfig: SliceConfig<typeof slice> = {
@@ -69,4 +72,4 @@ const createVideoSelector = <T>(selector: Selector<VideoState, T>) => createSele
 
 export const selectVideoFirstFrameImage = createVideoSelector((video) => video.videoFirstFrameImage);
 export const selectVideoLastFrameImage = createVideoSelector((video) => video.videoLastFrameImage);
-export const selectGeneratedVideoUrl = createVideoSelector((video) => video.generatedVideoUrl);
+export const selectGeneratedVideo = createVideoSelector((video) => video.generatedVideo);

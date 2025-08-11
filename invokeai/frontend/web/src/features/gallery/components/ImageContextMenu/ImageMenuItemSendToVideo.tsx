@@ -1,21 +1,21 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
+import { selectVideoFirstFrameImage, videoFirstFrameImageChanged } from 'features/parameters/store/videoSlice';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
-import { setCurrentVideo } from 'features/ui/layouts/video-store';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiVideoBold } from 'react-icons/pi';
+import { useDispatch } from 'react-redux';
 
 export const ImageMenuItemSendToVideo = memo(() => {
   const { t } = useTranslation();
   const imageDTO = useImageDTOContext();
+  const dispatch = useDispatch();
 
   const onClick = useCallback(() => {
-    // For now, we'll use the image URL as a video source
-    // In a real implementation, you might want to convert the image to video or use a different approach
-    setCurrentVideo(imageDTO.image_url);
+    dispatch(videoFirstFrameImageChanged(imageDTO));
     navigationApi.switchToTab('video');
-  }, [imageDTO.image_url]);
+  }, [imageDTO]);
 
   return (
     <MenuItem
