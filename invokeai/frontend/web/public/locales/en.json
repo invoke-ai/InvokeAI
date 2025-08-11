@@ -2181,7 +2181,7 @@
             "rgAutoNegativeNotSupported": "Auto-Negative not supported for selected base model",
             "rgNoRegion": "no region drawn",
             "fluxFillIncompatibleWithControlLoRA": "Control LoRA is not compatible with FLUX Fill",
-            "bboxHidden": "Bounding box is hidden"
+            "bboxHidden": "Bounding box is hidden (shift+o to toggle)"
         },
         "errors": {
             "unableToFindImage": "Unable to find image",
