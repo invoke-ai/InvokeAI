@@ -169,10 +169,8 @@ class KontextExtension:
                 # Calculate potential canvas dimensions for each tiling option
                 # Option 1: Tile vertically (below existing content)
                 potential_h_vertical = canvas_h + latent_height
-                potential_w_vertical = max(canvas_w, latent_width)
 
                 # Option 2: Tile horizontally (to the right of existing content)
-                potential_h_horizontal = max(canvas_h, latent_height)
                 potential_w_horizontal = canvas_w + latent_width
 
                 # Choose arrangement that minimizes the maximum dimension
