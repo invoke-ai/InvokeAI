@@ -33,8 +33,6 @@ const ImageMetadataActions = (props: Props) => {
       <UnrecallableMetadataDatum metadata={metadata} handler={MetadataHandlers.GenerationMode} />
       <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.PositivePrompt} />
       <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.NegativePrompt} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.PositiveStylePrompt} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.NegativeStylePrompt} />
       <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.MainModel} />
       <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.VAEModel} />
       <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.Width} />

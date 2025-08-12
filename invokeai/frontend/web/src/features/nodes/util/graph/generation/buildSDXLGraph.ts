@@ -78,7 +78,7 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     type: 'sdxl_compel_prompt',
     id: getPrefixedId('neg_cond'),
     prompt: prompts.negative,
-    style: prompts.useMainPromptsForStyle ? prompts.negative : prompts.negativeStyle,
+    style: prompts.negative,
   });
   const negCondCollect = g.addNode({
     type: 'collect',
@@ -123,6 +123,8 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   g.addEdge(modelLoader, 'clip2', negCond, 'clip2');
 
   g.addEdge(positivePrompt, 'value', posCond, 'prompt');
+  g.addEdge(positivePrompt, 'value', posCond, 'style');
+
   g.addEdge(posCond, 'conditioning', posCondCollect, 'item');
   g.addEdge(posCondCollect, 'collection', denoise, 'positive_conditioning');
 
@@ -141,19 +143,12 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     rand_device: shouldUseCpuNoise ? 'cpu' : 'cuda',
     scheduler,
     negative_prompt: prompts.negative,
-    negative_style_prompt: prompts.useMainPromptsForStyle ? prompts.negative : prompts.negativeStyle,
     vae: vae ?? undefined,
   });
   g.addEdgeToMetadata(seed, 'value', 'seed');
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
 
-  if (prompts.useMainPromptsForStyle) {
-    g.addEdge(positivePrompt, 'value', posCond, 'style');
-    g.addEdgeToMetadata(positivePrompt, 'value', 'positive_style_prompt');
-  } else {
-    posCond.style = prompts.positiveStyle;
-    g.upsertMetadata({ positive_style_prompt: prompts.positiveStyle });
-  }
+  g.addEdgeToMetadata(positivePrompt, 'value', 'positive_style_prompt');
 
   const seamless = addSeamless(state, g, denoise, modelLoader, vaeLoader);
 
