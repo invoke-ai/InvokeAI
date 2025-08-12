@@ -85,7 +85,7 @@ export const selectPresetModifiedPrompts = createSelector(
   selectListStylePresetsRequestState,
   (params, stylePresetSlice, listStylePresetsRequestState) => {
     const negativePrompt = params.negativePrompt ?? '';
-    const { positivePrompt, positivePrompt2, negativePrompt2, shouldConcatPrompts } = params;
+    const { positivePrompt } = params;
     const { activeStylePresetId } = stylePresetSlice;
 
     if (activeStylePresetId) {
@@ -107,9 +107,6 @@ export const selectPresetModifiedPrompts = createSelector(
         return {
           positive: presetModifiedPositivePrompt,
           negative: presetModifiedNegativePrompt,
-          positiveStyle: positivePrompt2,
-          negativeStyle: negativePrompt2,
-          useMainPromptsForStyle: shouldConcatPrompts,
         };
       }
     }
@@ -117,9 +114,6 @@ export const selectPresetModifiedPrompts = createSelector(
     return {
       positive: positivePrompt,
       negative: negativePrompt,
-      positiveStyle: positivePrompt2,
-      negativeStyle: negativePrompt2,
-      useMainPromptsForStyle: shouldConcatPrompts,
     };
   }
 );

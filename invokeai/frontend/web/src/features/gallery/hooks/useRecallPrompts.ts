@@ -22,12 +22,7 @@ export const useRecallPrompts = (imageDTO: ImageDTO) => {
     const parse = async () => {
       try {
         const result = await MetadataUtils.hasMetadataByHandlers({
-          handlers: [
-            MetadataHandlers.PositivePrompt,
-            MetadataHandlers.NegativePrompt,
-            MetadataHandlers.PositiveStylePrompt,
-            MetadataHandlers.NegativeStylePrompt,
-          ],
+          handlers: [MetadataHandlers.PositivePrompt, MetadataHandlers.NegativePrompt],
           metadata,
           store,
           require: 'some',
