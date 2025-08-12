@@ -66,6 +66,11 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
    */
   $aspectRatioBuffer = atom(1);
 
+  /**
+   * Buffer to store the visibility of the bbox.
+   */
+  $isBboxHidden = atom(false);
+
   constructor(parent: CanvasToolModule) {
     super();
     this.id = getPrefixedId(this.type);
@@ -191,6 +196,9 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
 
     // Update on busy state changes
     this.subscriptions.add(this.manager.$isBusy.listen(this.render));
+
+    // Listen for stage changes to update the bbox's visibility
+    this.subscriptions.add(this.$isBboxHidden.listen(this.render));
   }
 
   // This is a noop. The cursor is changed when the cursor enters or leaves the bbox.
@@ -206,12 +214,14 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
   };
 
   /**
-   * Renders the bbox. The bbox is only visible when the tool is set to 'bbox'.
+   * Renders the bbox.
    */
   render = () => {
     const tool = this.manager.tool.$tool.get();
 
     const { x, y, width, height } = this.manager.stateApi.runSelector(selectBbox).rect;
+
+    this.konva.group.visible(!this.$isBboxHidden.get());
 
     // We need to reach up to the preview layer to enable/disable listening so that the bbox can be interacted with.
     // If the mangaer is busy, we disable listening so the bbox cannot be interacted with.
@@ -477,5 +487,9 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.subscriptions.clear();
     this.konva.group.destroy();
+  };
+
+  toggleBboxVisibility = () => {
+    this.$isBboxHidden.set(!this.$isBboxHidden.get());
   };
 }

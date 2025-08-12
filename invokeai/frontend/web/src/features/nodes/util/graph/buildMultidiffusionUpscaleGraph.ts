@@ -138,6 +138,8 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
       negative_style_prompt: prompts.negativeStyle,
     });
 
+    g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
+
     if (prompts.useMainPromptsForStyle) {
       g.addEdge(positivePrompt, 'value', posCond, 'style');
       g.addEdgeToMetadata(positivePrompt, 'value', 'positive_style_prompt');
@@ -179,6 +181,8 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
     g.upsertMetadata({
       negative_prompt: prompts.negative,
     });
+
+    g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
   }
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);

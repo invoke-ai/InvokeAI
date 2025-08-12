@@ -1,8 +1,10 @@
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, Input, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useEditable } from 'common/hooks/useEditable';
 import { useBatchGroupColorToken } from 'features/nodes/hooks/useBatchGroupColorToken';
 import { useBatchGroupId } from 'features/nodes/hooks/useBatchGroupId';
+import { useNodeHasErrors } from 'features/nodes/hooks/useNodeIsInvalid';
 import { useNodeTemplateTitleSafe } from 'features/nodes/hooks/useNodeTemplateTitleSafe';
 import { useNodeUserTitleSafe } from 'features/nodes/hooks/useNodeUserTitleSafe';
 import { nodeLabelChanged } from 'features/nodes/store/nodesSlice';
@@ -10,13 +12,21 @@ import { NO_FIT_ON_DOUBLE_CLICK_CLASS } from 'features/nodes/types/constants';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+const labelSx: SystemStyleObject = {
+  fontWeight: 'semibold',
+  '&[data-is-invalid="true"]': {
+    color: 'error.300',
+  },
+};
+
 type Props = {
   nodeId: string;
   title?: string;
 };
 
-const NodeTitle = ({ nodeId, title }: Props) => {
+const InvocationNodeTitle = ({ nodeId, title }: Props) => {
   const dispatch = useAppDispatch();
+  const isInvalid = useNodeHasErrors();
   const label = useNodeUserTitleSafe();
   const batchGroupId = useBatchGroupId(nodeId);
   const batchGroupColorToken = useBatchGroupColorToken(batchGroupId);
@@ -53,10 +63,11 @@ const NodeTitle = ({ nodeId, title }: Props) => {
       {!editable.isEditing && (
         <Text
           className={NO_FIT_ON_DOUBLE_CLICK_CLASS}
-          fontWeight="semibold"
-          color={batchGroupColorToken}
-          onDoubleClick={editable.startEditing}
+          sx={labelSx}
           noOfLines={1}
+          color={batchGroupColorToken}
+          data-is-invalid={isInvalid}
+          onDoubleClick={editable.startEditing}
         >
           {titleWithBatchGroupId}
         </Text>
@@ -73,4 +84,4 @@ const NodeTitle = ({ nodeId, title }: Props) => {
   );
 };
 
-export default memo(NodeTitle);
+export default memo(InvocationNodeTitle);

@@ -186,8 +186,9 @@ class ModelInstallService(ModelInstallServiceBase):
         info: AnyModelConfig = self._probe(Path(model_path), config)  # type: ignore
 
         if preferred_name := config.name:
-            # Careful! Don't use pathlib.Path(...).with_suffix - it can will strip everything after the first dot.
-            preferred_name = f"{preferred_name}{model_path.suffix}"
+            if Path(model_path).is_file():
+                # Careful! Don't use pathlib.Path(...).with_suffix - it can will strip everything after the first dot.
+                preferred_name = f"{preferred_name}{model_path.suffix}"
 
         dest_path = (
             self.app_config.models_path / info.base.value / info.type.value / (preferred_name or model_path.name)
