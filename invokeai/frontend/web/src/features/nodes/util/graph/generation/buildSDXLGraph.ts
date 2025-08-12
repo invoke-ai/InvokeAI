@@ -148,8 +148,6 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   g.addEdgeToMetadata(seed, 'value', 'seed');
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
 
-  g.addEdgeToMetadata(positivePrompt, 'value', 'positive_style_prompt');
-
   const seamless = addSeamless(state, g, denoise, modelLoader, vaeLoader);
 
   addSDXLLoRAs(state, g, denoise, modelLoader, seamless, posCond, negCond);
