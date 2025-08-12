@@ -4,6 +4,8 @@ import { buildZodTypeGuard } from 'common/util/zodUtils';
 import { zModelIdentifierField, zSchedulerField } from 'features/nodes/types/common';
 import { z } from 'zod';
 
+import { CLIP_SKIP_MAP } from './constants';
+
 /**
  * Schemas, types and type guards for parameters.
  *
@@ -192,4 +194,22 @@ export type ParameterCanvasCoherenceMode = z.infer<typeof zParameterCanvasCohere
 // #region LoRA weight
 export const [zLoRAWeight, isParameterLoRAWeight] = buildParameter(z.number());
 export type ParameterLoRAWeight = z.infer<typeof zLoRAWeight>;
+// #endregion
+
+// #region Max. CLIP
+export const [zParameterMaxCLIP, isParameterMaxCLIP] = buildParameter(
+  z.union([
+    z.discriminatedUnion('model', [
+      z.object({ model: z.literal('sd-1'), maxClip: z.number().min(0).max(CLIP_SKIP_MAP['sd-1'].maxClip) }),
+      z.object({ model: z.literal('sd-2'), maxClip: z.number().min(0).max(CLIP_SKIP_MAP['sd-2'].maxClip) }),
+      z.object({ model: z.literal('sdxl'), maxClip: z.number().min(0).max(CLIP_SKIP_MAP['sdxl'].maxClip) }),
+      z.object({
+        model: z.literal('sdxl-refiner'),
+        maxClip: z.number().min(0).max(CLIP_SKIP_MAP['sdxl-refiner'].maxClip),
+      }),
+    ]),
+    z.object({ model: z.string(), maxClip: z.number().min(0).max(0) }),
+  ])
+);
+export type ParameterMaxCLIP = z.infer<typeof zParameterMaxCLIP>;
 // #endregion
