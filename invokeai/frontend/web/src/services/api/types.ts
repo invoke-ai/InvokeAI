@@ -373,6 +373,7 @@ export type OutputFields<T extends AnyInvocation> = Extract<
 
 // Node Outputs
 export type ImageOutput = S['ImageOutput'];
+export type VideoOutput = S['VideoOutput'];
 
 export type BoardRecordOrderBy = S['BoardRecordOrderBy'];
 export type StarterModel = S['StarterModel'];
