@@ -2086,6 +2086,8 @@
         "addAdjustments": "Add Adjustments",
         "removeAdjustments": "Remove Adjustments",
         "adjustments": {
+            "simple": "Simple",
+            "curves": "Curves",
             "heading": "Adjustments",
             "expand": "Expand adjustments",
             "collapse": "Collapse adjustments",
@@ -2094,7 +2096,13 @@
             "saturation": "Saturation",
             "temperature": "Temperature",
             "tint": "Tint",
-            "sharpness": "Sharpness"
+            "sharpness": "Sharpness",
+            "finish": "Finish",
+            "reset": "Reset",
+            "master": "Master",
+            "red": "Red",
+            "green": "Green",
+            "blue": "Blue"
         },
         "regionIsEmpty": "Selected region is empty",
         "mergeVisible": "Merge Visible",
