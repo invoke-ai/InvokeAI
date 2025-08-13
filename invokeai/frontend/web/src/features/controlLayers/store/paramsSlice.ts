@@ -484,7 +484,7 @@ export const selectCFGScale = createParamsSelector((params) => params.cfgScale);
 export const selectGuidance = createParamsSelector((params) => params.guidance);
 export const selectSteps = createParamsSelector((params) => params.steps);
 export const selectCFGRescaleMultiplier = createParamsSelector((params) => params.cfgRescaleMultiplier);
-export const selectCLIPSKip = createParamsSelector((params) => params.clipSkip);
+export const selectCLIPSkip = createParamsSelector((params) => params.clipSkip);
 export const selectCanvasCoherenceEdgeSize = createParamsSelector((params) => params.canvasCoherenceEdgeSize);
 export const selectCanvasCoherenceMinDenoise = createParamsSelector((params) => params.canvasCoherenceMinDenoise);
 export const selectCanvasCoherenceMode = createParamsSelector((params) => params.canvasCoherenceMode);

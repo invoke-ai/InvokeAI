@@ -15,6 +15,7 @@ import {
   selectBase,
   setCfgRescaleMultiplier,
   setCfgScale,
+  setClipSkip,
   setGuidance,
   setImg2imgStrength,
   setRefinerCFGScale,
@@ -41,6 +42,7 @@ import { modelSelected } from 'features/parameters/store/actions';
 import type {
   ParameterCFGRescaleMultiplier,
   ParameterCFGScale,
+  ParameterCLIPSkip,
   ParameterGuidance,
   ParameterHeight,
   ParameterModel,
@@ -63,6 +65,7 @@ import {
   zLoRAWeight,
   zParameterCFGRescaleMultiplier,
   zParameterCFGScale,
+  zParameterCLIPSkip,
   zParameterGuidance,
   zParameterImageDimension,
   zParameterNegativePrompt,
@@ -320,6 +323,24 @@ const CFGRescaleMultiplier: SingleMetadataHandler<ParameterCFGRescaleMultiplier>
   ),
 };
 //#endregion CFG Rescale Multiplier
+
+//#region CLIP Skip
+const CLIPSkip: SingleMetadataHandler<ParameterCLIPSkip> = {
+  [SingleMetadataKey]: true,
+  type: 'CLIPSkip',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'clip_skip');
+    const parsed = zParameterCLIPSkip.parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setClipSkip(value));
+  },
+  i18nKey: 'metadata.clipSkip',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ParameterCLIPSkip>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion CLIP Skip
 
 //#region Guidance
 const Guidance: SingleMetadataHandler<ParameterGuidance> = {
@@ -883,6 +904,7 @@ export const MetadataHandlers = {
   NegativePrompt,
   CFGScale,
   CFGRescaleMultiplier,
+  CLIPSkip,
   Guidance,
   Scheduler,
   Width,

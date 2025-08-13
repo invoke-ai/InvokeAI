@@ -10292,6 +10292,11 @@ export type components = {
              * @description The id of the board the image belongs to, if one exists.
              */
             board_id?: string | null;
+            /**
+             * Clip Skip
+             * @description The number of skipped CLIP layers
+             */
+            clip_skip?: number | null;
         };
         /**
          * ImageField
