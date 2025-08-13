@@ -2035,10 +2035,7 @@
             "sharpness": "Sharpness",
             "finish": "Finish",
             "reset": "Reset",
-            "master": "Master",
-            "red": "Red",
-            "green": "Green",
-            "blue": "Blue"
+            "master": "Master"
         },
         "regionIsEmpty": "Selected region is empty",
         "mergeVisible": "Merge Visible",
