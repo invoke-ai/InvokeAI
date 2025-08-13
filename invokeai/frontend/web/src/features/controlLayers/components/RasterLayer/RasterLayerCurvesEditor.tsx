@@ -410,9 +410,6 @@ export const RasterLayerCurvesEditor = memo(() => {
 
   return (
     <Flex direction="column" gap={2}>
-      <Text fontSize="sm" color="base.300">
-        {t('controlLayers.adjustments.curves')}
-      </Text>
       <div style={gridStyles}>
         <CurveGraph
           title={t('controlLayers.adjustments.master')}
@@ -421,27 +418,9 @@ export const RasterLayerCurvesEditor = memo(() => {
           histogram={histMaster}
           onChange={onChangeMaster}
         />
-        <CurveGraph
-          title={t('common.red')}
-          channel="r"
-          points={pointsR}
-          histogram={histR}
-          onChange={onChangeR}
-        />
-        <CurveGraph
-          title={t('common.green')}
-          channel="g"
-          points={pointsG}
-          histogram={histG}
-          onChange={onChangeG}
-        />
-        <CurveGraph
-          title={t('common.blue')}
-          channel="b"
-          points={pointsB}
-          histogram={histB}
-          onChange={onChangeB}
-        />
+        <CurveGraph title={t('common.red')} channel="r" points={pointsR} histogram={histR} onChange={onChangeR} />
+        <CurveGraph title={t('common.green')} channel="g" points={pointsG} histogram={histG} onChange={onChangeG} />
+        <CurveGraph title={t('common.blue')} channel="b" points={pointsB} histogram={histB} onChange={onChangeB} />
       </div>
     </Flex>
   );
