@@ -105,6 +105,10 @@ export const uiSliceConfig: SliceConfig<typeof slice> = {
         state.activeTab = 'canvas';
         state._version = 3;
       }
+      if (state._version === 3) {
+        state.panels = {};
+        state._version = 4;
+      }
       return zUIState.parse(state);
     },
     persistDenylist: ['shouldShowImageDetails'],

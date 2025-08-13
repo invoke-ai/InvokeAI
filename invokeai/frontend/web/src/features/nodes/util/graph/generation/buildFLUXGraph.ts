@@ -156,17 +156,24 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0);
 
     if (validFLUXKontextConfigs.length > 0) {
-      const kontextConcatenator = g.addNode({
-        id: getPrefixedId('flux_kontext_image_prep'),
-        type: 'flux_kontext_image_prep',
-        images: validFLUXKontextConfigs.map(({ config }) => zImageField.parse(config.image)),
+      const fluxKontextCollect = g.addNode({
+        type: 'collect',
+        id: getPrefixedId('flux_kontext_collect'),
       });
-      const kontextConditioning = g.addNode({
-        type: 'flux_kontext',
-        id: getPrefixedId('flux_kontext'),
-      });
-      g.addEdge(kontextConcatenator, 'image', kontextConditioning, 'image');
-      g.addEdge(kontextConditioning, 'kontext_cond', denoise, 'kontext_conditioning');
+      for (const { config } of validFLUXKontextConfigs) {
+        const kontextImagePrep = g.addNode({
+          id: getPrefixedId('flux_kontext_image_prep'),
+          type: 'flux_kontext_image_prep',
+          images: [zImageField.parse(config.image)],
+        });
+        const kontextConditioning = g.addNode({
+          type: 'flux_kontext',
+          id: getPrefixedId('flux_kontext'),
+        });
+        g.addEdge(kontextImagePrep, 'image', kontextConditioning, 'image');
+        g.addEdge(kontextConditioning, 'kontext_cond', fluxKontextCollect, 'item');
+      }
+      g.addEdge(fluxKontextCollect, 'collection', denoise, 'kontext_conditioning');
 
       g.upsertMetadata({ ref_images: [validFLUXKontextConfigs] }, 'merge');
     }

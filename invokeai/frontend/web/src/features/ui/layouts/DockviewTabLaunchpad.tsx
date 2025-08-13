@@ -6,6 +6,7 @@ import type { IDockviewPanelHeaderProps } from 'dockview';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
 import { memo, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { IconType } from 'react-icons';
 import {
   PiBoundingBoxBold,
@@ -16,6 +17,8 @@ import {
   PiTextAaBold,
 } from 'react-icons/pi';
 
+import type { DockviewPanelParameters } from './auto-layout-context';
+
 const TAB_ICONS: Record<TabName, IconType> = {
   generate: PiTextAaBold,
   canvas: PiBoundingBoxBold,
@@ -25,7 +28,8 @@ const TAB_ICONS: Record<TabName, IconType> = {
   queue: PiQueueBold,
 };
 
-export const DockviewTabLaunchpad = memo((props: IDockviewPanelHeaderProps) => {
+export const DockviewTabLaunchpad = memo((props: IDockviewPanelHeaderProps<DockviewPanelParameters>) => {
+  const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   const activeTab = useAppSelector(selectActiveTab);
 
@@ -44,7 +48,7 @@ export const DockviewTabLaunchpad = memo((props: IDockviewPanelHeaderProps) => {
   return (
     <Flex ref={ref} alignItems="center" h="full" px={4} gap={3} onPointerDown={onPointerDown}>
       <Icon as={TAB_ICONS[activeTab]} color="invokeYellow.300" boxSize={5} />
-      <Text userSelect="none">{props.api.title ?? props.api.id}</Text>
+      <Text userSelect="none">{t(props.params.i18nKey)}</Text>
     </Flex>
   );
 });

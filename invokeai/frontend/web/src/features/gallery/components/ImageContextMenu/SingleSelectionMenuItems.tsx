@@ -6,7 +6,7 @@ import { ImageMenuItemCopy } from 'features/gallery/components/ImageContextMenu/
 import { ImageMenuItemDelete } from 'features/gallery/components/ImageContextMenu/ImageMenuItemDelete';
 import { ImageMenuItemDownload } from 'features/gallery/components/ImageContextMenu/ImageMenuItemDownload';
 import { ImageMenuItemLoadWorkflow } from 'features/gallery/components/ImageContextMenu/ImageMenuItemLoadWorkflow';
-import { ImageMenuItemMetadataRecallActions } from 'features/gallery/components/ImageContextMenu/ImageMenuItemMetadataRecallActions';
+import { ImageMenuItemMetadataRecallActionsCanvasGenerateTabs } from 'features/gallery/components/ImageContextMenu/ImageMenuItemMetadataRecallActionsCanvasGenerateTabs';
 import { ImageMenuItemNewCanvasFromImageSubMenu } from 'features/gallery/components/ImageContextMenu/ImageMenuItemNewCanvasFromImageSubMenu';
 import { ImageMenuItemNewLayerFromImageSubMenu } from 'features/gallery/components/ImageContextMenu/ImageMenuItemNewLayerFromImageSubMenu';
 import { ImageMenuItemOpenInNewTab } from 'features/gallery/components/ImageContextMenu/ImageMenuItemOpenInNewTab';
@@ -21,6 +21,7 @@ import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
+import { ImageMenuItemMetadataRecallActionsUpscaleTab } from './ImageMenuItemMetadataRecallActionsUpscaleTab';
 import { ImageMenuItemUseAsPromptTemplate } from './ImageMenuItemUseAsPromptTemplate';
 
 type SingleSelectionMenuItemsProps = {
@@ -42,7 +43,8 @@ const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) =
       </IconMenuItemGroup>
       <MenuDivider />
       <ImageMenuItemLoadWorkflow />
-      {(tab === 'canvas' || tab === 'generate') && <ImageMenuItemMetadataRecallActions />}
+      {(tab === 'canvas' || tab === 'generate') && <ImageMenuItemMetadataRecallActionsCanvasGenerateTabs />}
+      {tab === 'upscaling' && <ImageMenuItemMetadataRecallActionsUpscaleTab />}
       <MenuDivider />
       <ImageMenuItemSendToUpscale />
       <ImageMenuItemUseForPromptGeneration />

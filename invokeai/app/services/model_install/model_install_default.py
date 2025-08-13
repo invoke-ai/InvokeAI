@@ -186,8 +186,9 @@ class ModelInstallService(ModelInstallServiceBase):
         info: AnyModelConfig = self._probe(Path(model_path), config)  # type: ignore
 
         if preferred_name := config.name:
-            # Careful! Don't use pathlib.Path(...).with_suffix - it can will strip everything after the first dot.
-            preferred_name = f"{preferred_name}{model_path.suffix}"
+            if Path(model_path).is_file():
+                # Careful! Don't use pathlib.Path(...).with_suffix - it can will strip everything after the first dot.
+                preferred_name = f"{preferred_name}{model_path.suffix}"
 
         dest_path = (
             self.app_config.models_path / info.base.value / info.type.value / (preferred_name or model_path.name)
@@ -622,16 +623,13 @@ class ModelInstallService(ModelInstallServiceBase):
         if old_path == new_path:
             return old_path
 
+        if new_path.exists():
+            raise FileExistsError(f"Cannot move {old_path} to {new_path}: destination already exists")
+
         new_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # if path already exists then we jigger the name to make it unique
-        counter: int = 1
-        while new_path.exists():
-            path = new_path.with_stem(new_path.stem + f"_{counter:02d}")
-            if not path.exists():
-                new_path = path
-            counter += 1
         move(old_path, new_path)
+
         return new_path
 
     def _probe(self, model_path: Path, config: Optional[ModelRecordChanges] = None):

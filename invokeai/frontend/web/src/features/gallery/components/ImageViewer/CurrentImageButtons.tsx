@@ -31,6 +31,7 @@ export const CurrentImageButtons = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
   const { t } = useTranslation();
   const tab = useAppSelector(selectActiveTab);
   const isCanvasOrGenerateTab = tab === 'canvas' || tab === 'generate';
+  const isCanvasOrGenerateOrUpscalingTab = tab === 'canvas' || tab === 'generate' || tab === 'upscaling';
 
   const isUpscalingEnabled = useFeatureStatus('upscaling');
 
@@ -94,7 +95,7 @@ export const CurrentImageButtons = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
           onClick={recallRemix.recall}
         />
       )}
-      {isCanvasOrGenerateTab && (
+      {isCanvasOrGenerateOrUpscalingTab && (
         <IconButton
           icon={<PiQuotesBold />}
           tooltip={`${t('parameters.usePrompt')} (P)`}
@@ -105,7 +106,7 @@ export const CurrentImageButtons = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
           onClick={recallPrompts.recall}
         />
       )}
-      {isCanvasOrGenerateTab && (
+      {isCanvasOrGenerateOrUpscalingTab && (
         <IconButton
           icon={<PiPlantBold />}
           tooltip={`${t('parameters.useSeed')} (S)`}

@@ -1,7 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex } from '@invoke-ai/ui-library';
+import InvocationNodeTitle from 'features/nodes/components/flow/nodes/common/InvocationNodeTitle';
 import NodeCollapseButton from 'features/nodes/components/flow/nodes/common/NodeCollapseButton';
-import NodeTitle from 'features/nodes/components/flow/nodes/common/NodeTitle';
 import InvocationNodeClassificationIcon from 'features/nodes/components/flow/nodes/Invocation/InvocationNodeClassificationIcon';
 import { useNodeHasErrors } from 'features/nodes/hooks/useNodeIsInvalid';
 import { memo } from 'react';
@@ -35,7 +35,7 @@ const InvocationNodeHeader = ({ nodeId, isOpen }: Props) => {
     <Flex sx={sx} data-is-open={isOpen} data-is-invalid={isInvalid}>
       <NodeCollapseButton nodeId={nodeId} isOpen={isOpen} />
       <InvocationNodeClassificationIcon nodeId={nodeId} />
-      <NodeTitle nodeId={nodeId} />
+      <InvocationNodeTitle nodeId={nodeId} />
       <Flex alignItems="center">
         <InvocationNodeStatusIndicator nodeId={nodeId} />
         <InvocationNodeInfoIcon nodeId={nodeId} />

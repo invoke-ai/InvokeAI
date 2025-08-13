@@ -3,7 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
 import type { IDockviewPanelProps, IGridviewPanelProps } from 'dockview';
 import { selectSystemShouldEnableHighlightFocusedRegions } from 'features/system/store/systemSlice';
-import type { PanelParameters } from 'features/ui/layouts/auto-layout-context';
+import type { DockviewPanelParameters, GridviewPanelParameters } from 'features/ui/layouts/auto-layout-context';
 import type { PropsWithChildren } from 'react';
 import { memo, useRef } from 'react';
 
@@ -30,8 +30,8 @@ const sx: SystemStyleObject = {
 export const AutoLayoutPanelContainer = memo(
   (
     props:
-      | PropsWithChildren<IDockviewPanelProps<PanelParameters>>
-      | PropsWithChildren<IGridviewPanelProps<PanelParameters>>
+      | PropsWithChildren<IDockviewPanelProps<DockviewPanelParameters>>
+      | PropsWithChildren<IGridviewPanelProps<GridviewPanelParameters>>
   ) => {
     const ref = useRef<HTMLDivElement>(null);
     const shouldHighlightFocusedRegions = useAppSelector(selectSystemShouldEnableHighlightFocusedRegions);

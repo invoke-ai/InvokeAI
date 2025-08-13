@@ -27,15 +27,30 @@ export const useAutoLayoutContext = () => {
   return value;
 };
 
-export type PanelParameters = {
+export type DockviewPanelParameters = {
+  tab: TabName;
+  focusRegion: FocusRegionName;
+  i18nKey: string;
+};
+
+export type GridviewPanelParameters = {
   tab: TabName;
   focusRegion: FocusRegionName;
 };
 
-export type AutoLayoutGridviewComponents = Record<string, FunctionComponent<IGridviewPanelProps<PanelParameters>>>;
-export type AutoLayoutDockviewComponents = Record<string, FunctionComponent<IDockviewPanelProps<PanelParameters>>>;
-export type RootLayoutGridviewComponents = Record<string, FunctionComponent<IGridviewPanelProps<PanelParameters>>>;
-type PanelProps = IDockviewPanelProps<PanelParameters> | IGridviewPanelProps<PanelParameters>;
+export type AutoLayoutGridviewComponents = Record<
+  string,
+  FunctionComponent<IGridviewPanelProps<GridviewPanelParameters>>
+>;
+export type AutoLayoutDockviewComponents = Record<
+  string,
+  FunctionComponent<IDockviewPanelProps<DockviewPanelParameters>>
+>;
+export type RootLayoutGridviewComponents = Record<
+  string,
+  FunctionComponent<IGridviewPanelProps<GridviewPanelParameters>>
+>;
+type PanelProps = IDockviewPanelProps<DockviewPanelParameters> | IGridviewPanelProps<GridviewPanelParameters>;
 
 export const withPanelContainer = (Component: FunctionComponent) =>
   /* eslint-disable-next-line  react/display-name */

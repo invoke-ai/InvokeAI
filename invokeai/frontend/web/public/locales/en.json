@@ -114,6 +114,9 @@
         "t2iAdapter": "T2I Adapter",
         "positivePrompt": "Positive Prompt",
         "negativePrompt": "Negative Prompt",
+        "removeNegativePrompt": "Remove Negative Prompt",
+        "addNegativePrompt": "Add Negative Prompt",
+        "selectYourModel": "Select Your Model",
         "discordLabel": "Discord",
         "dontAskMeAgain": "Don't ask me again",
         "dontShowMeThese": "Don't show me these",
@@ -2198,7 +2201,8 @@
             "rgReferenceImagesNotSupported": "regional Reference Images not supported for selected base model",
             "rgAutoNegativeNotSupported": "Auto-Negative not supported for selected base model",
             "rgNoRegion": "no region drawn",
-            "fluxFillIncompatibleWithControlLoRA": "Control LoRA is not compatible with FLUX Fill"
+            "fluxFillIncompatibleWithControlLoRA": "Control LoRA is not compatible with FLUX Fill",
+            "bboxHidden": "Bounding box is hidden (shift+o to toggle)"
         },
         "errors": {
             "unableToFindImage": "Unable to find image",

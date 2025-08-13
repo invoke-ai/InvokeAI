@@ -40,7 +40,7 @@ export const GallerySettingsPopover = memo(() => {
           <PopoverBody>
             <Flex direction="column" gap={2}>
               <Text fontWeight="semibold" color="base.300">
-                Gallery Settings
+                {t('gallery.gallerySettings')}
               </Text>
 
               <Divider />

@@ -71,7 +71,7 @@ interface Props extends PropsWithChildren {
    * If provided, overrides in-app navigation to the model manager
    */
   onClickGoToModelManager?: () => void;
-  storagePersistThrottle?: number;
+  storagePersistDebounce?: number;
 }
 
 const InvokeAIUI = ({
@@ -98,7 +98,7 @@ const InvokeAIUI = ({
   loggingOverrides,
   onClickGoToModelManager,
   whatsNew,
-  storagePersistThrottle = 2000,
+  storagePersistDebounce = 2000,
 }: Props) => {
   const [store, setStore] = useState<ReturnType<typeof createStore> | undefined>(undefined);
   const [didRehydrate, setDidRehydrate] = useState(false);
@@ -318,7 +318,7 @@ const InvokeAIUI = ({
     const onRehydrated = () => {
       setDidRehydrate(true);
     };
-    const store = createStore({ persist: true, persistThrottle: storagePersistThrottle, onRehydrated });
+    const store = createStore({ persist: true, persistDebounce: storagePersistDebounce, onRehydrated });
     setStore(store);
     $store.set(store);
     if (import.meta.env.MODE === 'development') {
@@ -333,7 +333,7 @@ const InvokeAIUI = ({
         window.$store = undefined;
       }
     };
-  }, [storagePersistThrottle]);
+  }, [storagePersistDebounce]);
 
   if (!store || !didRehydrate) {
     return <Loading />;

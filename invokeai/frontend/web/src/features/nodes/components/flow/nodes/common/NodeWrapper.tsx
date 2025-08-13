@@ -5,6 +5,7 @@ import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/I
 import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { useMouseOverFormField, useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
+import { useNodeHasErrors } from 'features/nodes/hooks/useNodeIsInvalid';
 import { useZoomToNode } from 'features/nodes/hooks/useZoomToNode';
 import { selectNodeOpacity } from 'features/nodes/store/workflowSettingsSlice';
 import { DRAG_HANDLE_CLASSNAME, NO_FIT_ON_DOUBLE_CLICK_CLASS, NODE_WIDTH } from 'features/nodes/types/constants';
@@ -29,6 +30,8 @@ const NodeWrapper = (props: NodeWrapperProps) => {
   const mouseOverFormField = useMouseOverFormField(nodeId);
   const zoomToNode = useZoomToNode(nodeId);
   const isLocked = useIsWorkflowEditorLocked();
+  const isInvalid = useNodeHasErrors();
+  const hasError = isMissingTemplate || isInvalid;
 
   const executionState = useNodeExecutionState(nodeId);
   const isInProgress = executionState?.status === zNodeStatus.enum.IN_PROGRESS;
@@ -74,7 +77,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
       data-is-editor-locked={isLocked}
       data-is-selected={selected}
       data-is-mouse-over-form-field={mouseOverFormField.isMouseOverFormField}
-      data-status={isMissingTemplate ? 'error' : needsUpdate ? 'warning' : undefined}
+      data-status={hasError ? 'error' : needsUpdate ? 'warning' : undefined}
     >
       <Box sx={shadowsSx} />
       <Box sx={inProgressSx} data-is-in-progress={isInProgress} />
