@@ -6,6 +6,7 @@ import { rasterLayerAdjustmentsCurvesUpdated } from 'features/controlLayers/stor
 import { selectEntity } from 'features/controlLayers/store/selectors';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const DEFAULT_POINTS: Array<[number, number]> = [
   [0, 0],
@@ -48,10 +49,10 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
 
   const width = 256;
   const height = 160;
-  // inner margins to keep a small buffer from edges (left/right/bottom) and space for title at top
+  // inner margins to keep a small buffer from edges (left/right/bottom)
   const MARGIN_LEFT = 8;
   const MARGIN_RIGHT = 8;
-  const MARGIN_TOP = 14;
+  const MARGIN_TOP = 8;
   const MARGIN_BOTTOM = 10;
   const INNER_WIDTH = width - MARGIN_LEFT - MARGIN_RIGHT;
   const INNER_HEIGHT = height - MARGIN_TOP - MARGIN_BOTTOM;
@@ -155,11 +156,6 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
       ctx.lineWidth = 1.5;
       ctx.stroke();
     }
-
-    // title
-    ctx.fillStyle = '#bbb';
-    ctx.font = '12px sans-serif';
-    ctx.fillText(title, MARGIN_LEFT + 2, Math.max(12, MARGIN_TOP - 2));
   }, [
     MARGIN_LEFT,
     MARGIN_TOP,
@@ -169,7 +165,6 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
     height,
     histogram,
     localPoints,
-    title,
     valueToCanvasX,
     valueToCanvasY,
     width,
@@ -307,16 +302,21 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
   );
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={width}
-      height={height}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onDoubleClick={handleDoubleClick}
-      style={canvasStyle}
-    />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <Text fontSize="xs" color={channelColor[channel]}>
+        {title}
+      </Text>
+      <canvas
+        ref={canvasRef}
+        width={width}
+        height={height}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onDoubleClick={handleDoubleClick}
+        style={canvasStyle}
+      />
+    </div>
   );
 });
 
@@ -324,6 +324,7 @@ export const RasterLayerCurvesEditor = memo(() => {
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext<'raster_layer'>();
   const adapter = useEntityAdapterContext<'raster_layer'>('raster_layer');
+  const { t } = useTranslation();
   const layer = useAppSelector((s) => selectEntity(s.canvas.present, entityIdentifier)) as
     | CanvasRasterLayerState
     | undefined;
@@ -410,19 +411,37 @@ export const RasterLayerCurvesEditor = memo(() => {
   return (
     <Flex direction="column" gap={2}>
       <Text fontSize="sm" color="base.300">
-        Curves
+        {t('controlLayers.adjustments.curves')}
       </Text>
       <div style={gridStyles}>
         <CurveGraph
-          title="Master"
+          title={t('controlLayers.adjustments.master')}
           channel="master"
           points={pointsMaster}
           histogram={histMaster}
           onChange={onChangeMaster}
         />
-        <CurveGraph title="Red" channel="r" points={pointsR} histogram={histR} onChange={onChangeR} />
-        <CurveGraph title="Green" channel="g" points={pointsG} histogram={histG} onChange={onChangeG} />
-        <CurveGraph title="Blue" channel="b" points={pointsB} histogram={histB} onChange={onChangeB} />
+        <CurveGraph
+          title={t('common.red')}
+          channel="r"
+          points={pointsR}
+          histogram={histR}
+          onChange={onChangeR}
+        />
+        <CurveGraph
+          title={t('common.green')}
+          channel="g"
+          points={pointsG}
+          histogram={histG}
+          onChange={onChangeG}
+        />
+        <CurveGraph
+          title={t('common.blue')}
+          channel="b"
+          points={pointsB}
+          histogram={histB}
+          onChange={onChangeB}
+        />
       </div>
     </Flex>
   );

@@ -40,7 +40,6 @@ export const RasterLayer = memo(({ id }: Props) => {
               <Spacer />
               <CanvasEntityHeaderCommonActions />
             </CanvasEntityHeader>
-            {/* Show adjustments UI only when adjustments exist */}
             <RasterLayerAdjustmentsPanel />
             <DndDropTarget
               dndTarget={replaceCanvasEntityObjectsWithImageDndTarget}
