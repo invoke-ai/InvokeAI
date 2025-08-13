@@ -12,6 +12,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { RasterLayerCurvesEditor } from 'features/controlLayers/components/RasterLayer/RasterLayerCurvesEditor';
+import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import {
   rasterLayerAdjustmentsCurvesUpdated,
@@ -26,6 +27,7 @@ import { PiCaretDownBold } from 'react-icons/pi';
 export const RasterLayerAdjustmentsPanel = memo(() => {
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext<'raster_layer'>();
+  const canvasManager = useCanvasManager();
   const layer = useAppSelector((s) => selectEntity(s.canvas.present, entityIdentifier));
   const { t } = useTranslation();
 
@@ -154,6 +156,22 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
     [onToggleEnabled]
   );
 
+  const onFinish = useCallback(async () => {
+    // Bake current visual into layer pixels, then clear adjustments
+    const adapter = canvasManager.getAdapter(entityIdentifier);
+    if (!adapter || adapter.type !== 'raster_layer_adapter') {
+      return;
+    }
+    const rect = adapter.transformer.getRelativeRect();
+    try {
+      await adapter.renderer.rasterize({ rect, replaceObjects: true });
+      // Clear adjustments after baking
+      dispatch(rasterLayerAdjustmentsSet({ entityIdentifier, adjustments: null }));
+    } catch {
+      // no-op; leave state unchanged on failure
+    }
+  }, [canvasManager, entityIdentifier, dispatch]);
+
   // Hide the panel entirely until adjustments are added via context menu
   if (!hasAdjustments) {
     return null;
@@ -178,15 +196,18 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
         </Text>
         <ButtonGroup size="sm" isAttached variant="outline">
           <Button onClick={onClickModeSimple} isActive={mode === 'simple'}>
-            {t('controlLayers.adjustments.simple', { defaultValue: 'Simple' })}
+            {t('controlLayers.adjustments.simple')}
           </Button>
           <Button onClick={onClickModeCurves} isActive={mode === 'curves'}>
-            {t('controlLayers.adjustments.curves', { defaultValue: 'Curves' })}
+            {t('controlLayers.adjustments.curves')}
           </Button>
         </ButtonGroup>
         <Switch isChecked={enabled} onChange={handleToggleEnabled} />
-        <Button size="sm" onClick={onReset} isDisabled={!layer?.adjustments}>
-          Reset
+        <Button size="sm" onClick={onReset} isDisabled={!layer?.adjustments} colorScheme="red">
+          {t('controlLayers.adjustments.reset')}
+        </Button>
+        <Button size="sm" onClick={onFinish} isDisabled={!layer?.adjustments} colorScheme="green">
+          {t('controlLayers.adjustments.finish')}
         </Button>
       </Flex>
 
