@@ -1,31 +1,24 @@
-import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
-import { draggable, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { FlexProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, Icon, Image } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { uniq } from 'es-toolkit';
-import { multipleImageDndSource, singleImageDndSource } from 'features/dnd/dnd';
 import type { DndDragPreviewMultipleImageState } from 'features/dnd/DndDragPreviewMultipleImage';
-import { createMultipleImageDragPreview, setMultipleImageDragPreview } from 'features/dnd/DndDragPreviewMultipleImage';
+import { createMultipleImageDragPreview } from 'features/dnd/DndDragPreviewMultipleImage';
 import type { DndDragPreviewSingleImageState } from 'features/dnd/DndDragPreviewSingleImage';
-import { createSingleImageDragPreview, setSingleImageDragPreview } from 'features/dnd/DndDragPreviewSingleImage';
-import { firefoxDndFix } from 'features/dnd/util';
-import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
+import { createSingleImageDragPreview } from 'features/dnd/DndDragPreviewSingleImage';
 import {
   selectGetImageNamesQueryArgs,
-  selectSelectedBoardId,
-  selectSelection,
 } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectGallerySlice, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import type { MouseEvent, MouseEventHandler } from 'react';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { PiImageBold } from 'react-icons/pi';
 import { imagesApi } from 'services/api/endpoints/images';
-import type { ImageDTO } from 'services/api/types';
+import type { VideoDTO } from 'services/api/types';
 import { GalleryResourceHoverIcons } from './GalleryResourceHoverIcons';
 
 const galleryImageContainerSX = {
@@ -80,7 +73,7 @@ const galleryImageContainerSX = {
 } satisfies SystemStyleObject;
 
 interface Props {
-  imageDTO: ImageDTO;
+  videoDTO: VideoDTO;
 }
 
 const buildOnClick =
@@ -131,7 +124,7 @@ const buildOnClick =
     }
   };
 
-export const GalleryImage = memo(({ imageDTO }: Props) => {
+export const GalleryVideo = memo(({ videoDTO }: Props) => {
   const store = useAppStore();
   const [isDragging, setIsDragging] = useState(false);
   const [dragPreviewState, setDragPreviewState] = useState<
@@ -139,84 +132,15 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
   >(null);
   const ref = useRef<HTMLDivElement>(null);
   const selectIsSelectedForCompare = useMemo(
-    () => createSelector(selectGallerySlice, (gallery) => gallery.imageToCompare === imageDTO.image_name),
-    [imageDTO.image_name]
+    () => createSelector(selectGallerySlice, (gallery) => gallery.imageToCompare === videoDTO.video_id),
+    [videoDTO.video_id]
   );
   const isSelectedForCompare = useAppSelector(selectIsSelectedForCompare);
   const selectIsSelected = useMemo(
-    () => createSelector(selectGallerySlice, (gallery) => gallery.selection.includes(imageDTO.image_name)),
-    [imageDTO.image_name]
+    () => createSelector(selectGallerySlice, (gallery) => gallery.selection.includes(videoDTO.video_id)),
+    [videoDTO.video_id]
   );
   const isSelected = useAppSelector(selectIsSelected);
-
-  useEffect(() => {
-    const element = ref.current;
-    if (!element) {
-      return;
-    }
-    return combine(
-      firefoxDndFix(element),
-      draggable({
-        element,
-        getInitialData: () => {
-          const selection = selectSelection(store.getState());
-          const boardId = selectSelectedBoardId(store.getState());
-          // When we have multiple images selected, and the dragged image is part of the selection, initiate a
-          // multi-image drag.
-          if (selection.length > 1 && selection.includes(imageDTO.image_name)) {
-            return multipleImageDndSource.getData({
-              image_names: selection,
-              board_id: boardId,
-            });
-          }
-
-          // Otherwise, initiate a single-image drag
-          return singleImageDndSource.getData({ imageDTO }, imageDTO.image_name);
-        },
-        // This is a "local" drag start event, meaning that it is only called when this specific image is dragged.
-        onDragStart: ({ source }) => {
-          // When we start dragging a single image, set the dragging state to true. This is only called when this
-          // specific image is dragged.
-          if (singleImageDndSource.typeGuard(source.data)) {
-            setIsDragging(true);
-            return;
-          }
-        },
-        onGenerateDragPreview: (args) => {
-          if (multipleImageDndSource.typeGuard(args.source.data)) {
-            setMultipleImageDragPreview({
-              multipleImageDndData: args.source.data,
-              onGenerateDragPreviewArgs: args,
-              setDragPreviewState,
-            });
-          } else if (singleImageDndSource.typeGuard(args.source.data)) {
-            setSingleImageDragPreview({
-              singleImageDndData: args.source.data,
-              onGenerateDragPreviewArgs: args,
-              setDragPreviewState,
-            });
-          }
-        },
-      }),
-      monitorForElements({
-        // This is a "global" drag start event, meaning that it is called for all drag events.
-        onDragStart: ({ source }) => {
-          // When we start dragging multiple images, set the dragging state to true if the dragged image is part of the
-          // selection. This is called for all drag events.
-          if (
-            multipleImageDndSource.typeGuard(source.data) &&
-            source.data.payload.image_names.includes(imageDTO.image_name)
-          ) {
-            setIsDragging(true);
-          }
-        },
-        onDrop: () => {
-          // Always set the dragging state to false when a drop event occurs.
-          setIsDragging(false);
-        },
-      })
-    );
-  }, [imageDTO, store]);
 
   const [isHovered, setIsHovered] = useState(false);
 
@@ -228,14 +152,12 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
     setIsHovered(false);
   }, []);
 
-  const onClick = useMemo(() => buildOnClick(imageDTO.image_name, store.dispatch, store.getState), [imageDTO, store]);
+  const onClick = useMemo(() => buildOnClick(videoDTO.video_id, store.dispatch, store.getState), [videoDTO, store]);
 
   const onDoubleClick = useCallback<MouseEventHandler<HTMLDivElement>>(() => {
     store.dispatch(imageToCompareChanged(null));
     navigationApi.focusPanelInActiveTab(VIEWER_PANEL_ID);
   }, [store]);
-
-  useImageContextMenu(imageDTO, ref);
 
   return (
     <>
@@ -243,7 +165,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
         ref={ref}
         sx={galleryImageContainerSX}
         data-is-dragging={isDragging}
-        data-image-name={imageDTO.image_name}
+        data-video-id={videoDTO.video_id}
         role="button"
         onMouseOver={onMouseOver}
         onMouseOut={onMouseOut}
@@ -254,15 +176,15 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
       >
         <Image
           pointerEvents="none"
-          src={imageDTO.thumbnail_url}
-          w={imageDTO.width}
-          fallback={<GalleryImagePlaceholder />}
+          src={""} // TODO: Add video thumbnail
+          w={videoDTO.width}
+          fallback={<GalleryVideoPlaceholder />}
           objectFit="contain"
           maxW="full"
           maxH="full"
           borderRadius="base"
         />
-        <GalleryResourceHoverIcons resource={imageDTO} isHovered={isHovered} />
+        <GalleryResourceHoverIcons resource={videoDTO} isHovered={isHovered} />
       </Flex>
       {dragPreviewState?.type === 'multiple-image' ? createMultipleImageDragPreview(dragPreviewState) : null}
       {dragPreviewState?.type === 'single-image' ? createSingleImageDragPreview(dragPreviewState) : null}
@@ -270,12 +192,12 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
   );
 });
 
-GalleryImage.displayName = 'GalleryImage';
+GalleryVideo.displayName = 'GalleryVideo';
 
-export const GalleryImagePlaceholder = memo((props: FlexProps) => (
+export const GalleryVideoPlaceholder = memo((props: FlexProps) => (
   <Flex w="full" h="full" bg="base.850" borderRadius="base" alignItems="center" justifyContent="center" {...props}>
     <Icon as={PiImageBold} boxSize={16} color="base.800" />
   </Flex>
 ));
 
-GalleryImagePlaceholder.displayName = 'GalleryImagePlaceholder';
+GalleryVideoPlaceholder.displayName = 'GalleryVideoPlaceholder';

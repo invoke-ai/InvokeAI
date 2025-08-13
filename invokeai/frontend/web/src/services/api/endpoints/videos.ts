@@ -48,7 +48,7 @@ export const videosApi = api.injectEndpoints({
       ],
     }),
 
-    getVideoNames: build.query<
+    getVideoIds: build.query<
       paths['/api/v1/videos/ids']['get']['responses']['200']['content']['application/json'],
       paths['/api/v1/videos/ids']['get']['parameters']['query']
     >({
@@ -102,7 +102,7 @@ export const videosApi = api.injectEndpoints({
 export const {
   useListVideosQuery,
   useGetVideoDTOQuery,
-  useGetVideoNamesQuery,
+  useGetVideoIdsQuery,
   useGetVideosByIdsQuery,
   useUpdateVideoMutation,
 } = videosApi;

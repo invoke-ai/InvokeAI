@@ -960,30 +960,6 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/board_resources/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add Resource To Board
-         * @description Creates a board_resource relationship
-         */
-        post: operations["add_resource_to_board"];
-        /**
-         * Remove Resource From Board
-         * @description Removes a resource from its board, if it had one
-         */
-        delete: operations["remove_resource_from_board"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/board_resources/batch": {
         parameters: {
             query?: never;
@@ -2669,6 +2645,11 @@ export type components = {
              * @description The number of images in the board.
              */
             image_count: number;
+            /**
+             * Video Count
+             * @description The number of videos in the board.
+             */
+            video_count: number;
         };
         /**
          * BoardField
@@ -2687,21 +2668,6 @@ export type components = {
          * @enum {string}
          */
         BoardRecordOrderBy: "created_at" | "board_name";
-        /** Body_add_resource_to_board */
-        Body_add_resource_to_board: {
-            /**
-             * Board Id
-             * @description The id of the board to add to
-             */
-            board_id: string;
-            /**
-             * Resource Id
-             * @description The id of the resource to add
-             */
-            resource_id: string;
-            /** @description The type of resource */
-            resource_type: components["schemas"]["ResourceType"];
-        };
         /** Body_add_resources_to_board */
         Body_add_resources_to_board: {
             /**
@@ -2877,16 +2843,6 @@ export type components = {
              * @description The seed to use for random generation. Only used if not combinatorial
              */
             seed?: number | null;
-        };
-        /** Body_remove_resource_from_board */
-        Body_remove_resource_from_board: {
-            /**
-             * Resource Id
-             * @description The id of the resource to remove
-             */
-            resource_id: string;
-            /** @description The type of resource */
-            resource_type: components["schemas"]["ResourceType"];
         };
         /** Body_remove_resources_from_board */
         Body_remove_resources_from_board: {
@@ -22007,7 +21963,7 @@ export type components = {
              * Video Id
              * @description The id of the board the video belongs to, if one exists.
              */
-            video_id?: string | null;
+            video_id: string;
             /**
              * Width
              * @description The width of the video.
@@ -24591,72 +24547,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResourceIdentifier"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    add_resource_to_board: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Body_add_resource_to_board"];
-            };
-        };
-        responses: {
-            /** @description The resource was added to a board successfully */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AddResourcesToBoardResult"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    remove_resource_from_board: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Body_remove_resource_from_board"];
-            };
-        };
-        responses: {
-            /** @description The resource was removed from the board successfully */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RemoveResourcesFromBoardResult"];
                 };
             };
             /** @description Validation Error */

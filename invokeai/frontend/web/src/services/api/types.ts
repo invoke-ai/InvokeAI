@@ -65,7 +65,7 @@ export type ImageDTO = z.infer<typeof _zImageDTO>;
 assert<Equals<ImageDTO, S['ImageDTO']>>();
 
 const _zVideoDTO = z.object({
-  video_id: z.string().nullish(),
+  video_id: z.string(),
   width: z.number().int().gt(0),
   height: z.number().int().gt(0),
   board_id: z.string().nullish(),

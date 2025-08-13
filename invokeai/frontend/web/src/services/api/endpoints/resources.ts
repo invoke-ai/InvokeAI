@@ -3,6 +3,8 @@ import type { paths } from 'services/api/schema';
 import { api, buildV1Url, LIST_TAG } from '..';
 import { getTagsToInvalidateForImageMutation, getTagsToInvalidateForBoardAffectingMutation } from './images';
 import { getTagsToInvalidateForVideoMutation } from './videos';
+import stableHash from 'stable-hash';
+import { Param0 } from 'tsafe';
 
 /**
  * Builds an endpoint URL for the resources router

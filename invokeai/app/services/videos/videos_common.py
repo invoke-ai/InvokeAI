@@ -9,8 +9,8 @@ from invokeai.app.services.video_records.video_records_common import VideoRecord
 class VideoDTO(BaseModel):
     """Deserialized video record, enriched for the frontend."""
 
-    video_id: Optional[str] = Field(
-        default=None, description="The id of the board the video belongs to, if one exists."
+    video_id: str = Field(
+        description="The id of the board the video belongs to, if one exists."
     )
     """The id of the board the video belongs to, if one exists."""
     width: int = Field(description="The width of the video.")

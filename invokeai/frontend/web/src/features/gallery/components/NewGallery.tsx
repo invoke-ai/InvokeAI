@@ -28,10 +28,11 @@ import { VirtuosoGrid } from 'react-virtuoso';
 import { imagesApi, useImageDTO,  } from 'services/api/endpoints/images';
 import { useDebounce } from 'use-debounce';
 
-import { GalleryImage, GalleryImagePlaceholder } from './ImageGrid/GalleryImage';
+import {  GalleryImagePlaceholder } from './ImageGrid/GalleryImage';
 import { GallerySelectionCountTag } from './ImageGrid/GallerySelectionCountTag';
 import { useGalleryImageNames } from './use-gallery-image-names';
 import { useStarResourcesMutation, useUnstarResourcesMutation } from 'services/api/endpoints/resources';
+import { GalleryItem } from './ImageGrid/GalleryItem';
 
 const log = logger('gallery');
 
@@ -63,7 +64,7 @@ const ImageAtPosition = memo(({ imageName }: { index: number; imageName: string 
     return <GalleryImagePlaceholder data-image-name={imageName} />;
   }
 
-  return <GalleryImage imageDTO={imageDTO} />;
+  return <GalleryItem item={imageDTO} />;
 });
 ImageAtPosition.displayName = 'ImageAtPosition';
 

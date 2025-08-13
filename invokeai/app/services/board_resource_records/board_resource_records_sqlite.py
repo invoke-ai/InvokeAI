@@ -20,14 +20,17 @@ class SqliteBoardResourceRecordStorage(BoardResourceRecordStorageBase):
         resource_type: ResourceType,
     ) -> None:
         with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                INSERT INTO board_images (board_id, image_name)
-                VALUES (?, ?)
-                ON CONFLICT (image_name) DO UPDATE SET board_id = ?;
-                """,
-                (board_id, resource_id, board_id),
-            )
+            if resource_type == ResourceType.IMAGE:
+                cursor.execute(
+                    """--sql
+                    INSERT INTO board_images (board_id, image_name)
+                    VALUES (?, ?)
+                    ON CONFLICT (image_name) DO UPDATE SET board_id = ?;
+                    """,
+                    (board_id, resource_id, board_id),
+                )
+            elif resource_type == ResourceType.VIDEO:
+                raise NotImplementedError("Video resource type is not supported in OSS")
 
     def remove_resource_from_board(
         self,
@@ -35,13 +38,16 @@ class SqliteBoardResourceRecordStorage(BoardResourceRecordStorageBase):
         resource_type: ResourceType,
     ) -> None:
         with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                DELETE FROM board_images
-                WHERE image_name = ?;
-                """,
-                (resource_id,),
-            )
+            if resource_type == ResourceType.IMAGE:
+                cursor.execute(
+                    """--sql
+                    DELETE FROM board_images
+                    WHERE image_name = ?;
+                    """,
+                    (resource_id,),
+                )
+            elif resource_type == ResourceType.VIDEO:
+                raise NotImplementedError("Video resource type is not supported in OSS")
 
 
     def get_all_board_resource_ids_for_board(
@@ -131,10 +137,11 @@ class SqliteBoardResourceRecordStorage(BoardResourceRecordStorageBase):
 
     def get_resource_count_for_board(self, board_id: str, resource_type: Optional[ResourceType] = None) -> int:
         with self._db.transaction() as cursor:
+            # only images are supported in OSS
             cursor.execute(
                 """--sql
                     SELECT COUNT(*)
-                    FROM board_images
+                    FROM board_images 
                     INNER JOIN images ON board_images.image_name = images.image_name
                     WHERE images.is_intermediate = FALSE
                     AND board_images.board_id = ?;

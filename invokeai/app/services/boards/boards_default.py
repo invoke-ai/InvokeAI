@@ -18,7 +18,7 @@ class BoardService(BoardServiceABC):
         board_name: str,
     ) -> BoardDTO:
         board_record = self.__invoker.services.board_records.save(board_name)
-        return board_record_to_dto(board_record, None, 0)
+        return board_record_to_dto(board_record, None, 0, 0)
 
     def get_dto(self, board_id: str) -> BoardDTO:
         board_record = self.__invoker.services.board_records.get(board_id)
@@ -28,7 +28,8 @@ class BoardService(BoardServiceABC):
         else:
             cover_image_name = None
         image_count = self.__invoker.services.board_resource_records.get_resource_count_for_board(board_id, ResourceType.IMAGE)
-        return board_record_to_dto(board_record, cover_image_name, image_count)
+        video_count = self.__invoker.services.board_resource_records.get_resource_count_for_board(board_id, ResourceType.VIDEO)
+        return board_record_to_dto(board_record, cover_image_name, image_count, video_count)
 
     def update(
         self,
@@ -43,7 +44,8 @@ class BoardService(BoardServiceABC):
             cover_image_name = None
 
         image_count = self.__invoker.services.board_resource_records.get_resource_count_for_board(board_id, ResourceType.IMAGE)
-        return board_record_to_dto(board_record, cover_image_name, image_count)
+        video_count = self.__invoker.services.board_resource_records.get_resource_count_for_board(board_id, ResourceType.VIDEO)
+        return board_record_to_dto(board_record, cover_image_name, image_count, video_count)
 
     def delete(self, board_id: str) -> None:
         self.__invoker.services.board_records.delete(board_id)
@@ -68,7 +70,8 @@ class BoardService(BoardServiceABC):
                 cover_image_name = None
 
             image_count = self.__invoker.services.board_resource_records.get_resource_count_for_board(r.board_id, ResourceType.IMAGE)
-            board_dtos.append(board_record_to_dto(r, cover_image_name, image_count))
+            video_count = self.__invoker.services.board_resource_records.get_resource_count_for_board(r.board_id, ResourceType.VIDEO)
+            board_dtos.append(board_record_to_dto(r, cover_image_name, image_count, video_count))
 
         return OffsetPaginatedResults[BoardDTO](items=board_dtos, offset=offset, limit=limit, total=len(board_dtos))
 
@@ -85,6 +88,7 @@ class BoardService(BoardServiceABC):
                 cover_image_name = None
 
             image_count = self.__invoker.services.board_resource_records.get_resource_count_for_board(r.board_id, ResourceType.IMAGE)
-            board_dtos.append(board_record_to_dto(r, cover_image_name, image_count))
+            video_count = self.__invoker.services.board_resource_records.get_resource_count_for_board(r.board_id, ResourceType.VIDEO)
+            board_dtos.append(board_record_to_dto(r, cover_image_name, image_count, video_count))
 
         return board_dtos
