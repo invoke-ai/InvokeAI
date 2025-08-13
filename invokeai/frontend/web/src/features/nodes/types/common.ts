@@ -189,10 +189,3 @@ export const zImageOutput = z.object({
 export type ImageOutput = z.infer<typeof zImageOutput>;
 // #endregion
 
-// #region ImageOutput
-export const zVideoOutput = z.object({
-  video_id: z.string().trim().min(1),
-  type: z.literal('video_output'),
-});
-export type VideoOutput = z.infer<typeof zVideoOutput>;
-// #endregion

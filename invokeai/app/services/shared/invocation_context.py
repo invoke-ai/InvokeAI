@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Optional, Union
 
 from PIL.Image import Image
+from invokeai.app.services.resources.resources_common import ResourceType
 from pydantic.networks import AnyHttpUrl
 from torch import Tensor
 
@@ -112,7 +113,7 @@ class BoardsInterface(InvocationContextInterface):
             board_id: The ID of the board to add the image to.
             image_name: The name of the image to add to the board.
         """
-        return self._services.board_images.add_image_to_board(board_id, image_name)
+        return self._services.board_resources.add_resource_to_board(board_id, image_name, ResourceType.IMAGE)
 
     def get_all_image_names_for_board(self, board_id: str) -> list[str]:
         """Gets all image names for a board.
@@ -123,11 +124,11 @@ class BoardsInterface(InvocationContextInterface):
         Returns:
             A list of all image names for the board.
         """
-        return self._services.board_images.get_all_board_image_names_for_board(
+        resource_ids = self._services.board_resources.get_all_board_resource_ids_for_board(
             board_id,
-            categories=None,
-            is_intermediate=None,
+            resource_type=ResourceType.IMAGE,
         )
+        return [resource_id.resource_id for resource_id in resource_ids]
 
 
 class LoggerInterface(InvocationContextInterface):

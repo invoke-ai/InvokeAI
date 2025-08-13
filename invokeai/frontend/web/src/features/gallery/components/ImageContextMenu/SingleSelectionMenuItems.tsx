@@ -13,7 +13,6 @@ import { ImageMenuItemOpenInNewTab } from 'features/gallery/components/ImageCont
 import { ImageMenuItemOpenInViewer } from 'features/gallery/components/ImageContextMenu/ImageMenuItemOpenInViewer';
 import { ImageMenuItemSelectForCompare } from 'features/gallery/components/ImageContextMenu/ImageMenuItemSelectForCompare';
 import { ImageMenuItemSendToUpscale } from 'features/gallery/components/ImageContextMenu/ImageMenuItemSendToUpscale';
-import { ImageMenuItemSendToVideo } from 'features/gallery/components/ImageContextMenu/ImageMenuItemSendToVideo';
 import { ImageMenuItemStarUnstar } from 'features/gallery/components/ImageContextMenu/ImageMenuItemStarUnstar';
 import { ImageMenuItemUseAsPromptTemplate } from 'features/gallery/components/ImageContextMenu/ImageMenuItemUseAsPromptTemplate';
 import { ImageMenuItemUseAsRefImage } from 'features/gallery/components/ImageContextMenu/ImageMenuItemUseAsRefImage';
@@ -47,7 +46,6 @@ const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) =
       {tab === 'upscaling' && <ImageMenuItemMetadataRecallActionsUpscaleTab />}
       <MenuDivider />
       <ImageMenuItemSendToUpscale />
-      <ImageMenuItemSendToVideo />
       <ImageMenuItemUseForPromptGeneration />
       {(tab === 'canvas' || tab === 'generate') && <ImageMenuItemUseAsRefImage />}
       <ImageMenuItemUseAsPromptTemplate />

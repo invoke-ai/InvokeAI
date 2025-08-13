@@ -474,11 +474,7 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /**
-         * List Image Dtos
-         * @description Gets a list of image DTOs
-         */
-        get: operations["list_image_dtos"];
+        get?: never;
         put?: never;
         /**
          * Create Image Upload Entry
@@ -489,34 +485,6 @@ export type paths = {
         options?: never;
         head?: never;
         patch?: never;
-        trace?: never;
-    };
-    "/api/v1/images/i/{image_name}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Image Dto
-         * @description Gets an image's DTO
-         */
-        get: operations["get_image_dto"];
-        put?: never;
-        post?: never;
-        /**
-         * Delete Image
-         * @description Deletes an image
-         */
-        delete: operations["delete_image"];
-        options?: never;
-        head?: never;
-        /**
-         * Update Image
-         * @description Updates an image
-         */
-        patch: operations["update_image"];
         trace?: never;
     };
     "/api/v1/images/intermediates": {
@@ -541,6 +509,30 @@ export type paths = {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/images/i/{image_name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Image Dto
+         * @description Gets an image's DTO
+         */
+        get: operations["get_image_dto"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Image
+         * @description Updates an image
+         */
+        patch: operations["update_image"];
         trace?: never;
     };
     "/api/v1/images/i/{image_name}/metadata": {
@@ -644,77 +636,6 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/images/delete": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Delete Images From List */
-        post: operations["delete_images_from_list"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/images/uncategorized": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Delete Uncategorized Images
-         * @description Deletes all images that are uncategorized
-         */
-        delete: operations["delete_uncategorized_images"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/images/star": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Star Images In List */
-        post: operations["star_images_in_list"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/images/unstar": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Unstar Images In List */
-        post: operations["unstar_images_in_list"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/images/download": {
         parameters: {
             query?: never;
@@ -792,6 +713,181 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/videos/i/{video_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Video Dto
+         * @description Gets a video's DTO
+         */
+        get: operations["get_video_dto"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Video
+         * @description Updates a video
+         */
+        patch: operations["update_video"];
+        trace?: never;
+    };
+    "/api/v1/videos/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Video Dtos
+         * @description Gets a list of video DTOs
+         */
+        get: operations["list_video_dtos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Video Ids
+         * @description Gets ordered list of video names with metadata for optimistic updates
+         */
+        get: operations["get_video_ids"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/videos_by_ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Videos By Ids
+         * @description Gets video DTOs for the specified video ids. Maintains order of input ids.
+         */
+        post: operations["get_videos_by_ids"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/i/{video_id}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Video Thumbnail
+         * @description Gets a video thumbnail file
+         */
+        get: operations["get_video_thumbnail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/resources/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Delete Resources From List */
+        post: operations["delete_resources_from_list"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/resources/uncategorized": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Uncategorized Resources
+         * @description Deletes all resources that are uncategorized
+         */
+        delete: operations["delete_uncategorized_resources"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/resources/star": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Star Resources In List */
+        post: operations["star_resources_in_list"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/resources/unstar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unstar Resources In List */
+        post: operations["unstar_resources_in_list"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/boards/": {
         parameters: {
             query?: never;
@@ -844,7 +940,7 @@ export type paths = {
         patch: operations["update_board"];
         trace?: never;
     };
-    "/api/v1/boards/{board_id}/image_names": {
+    "/api/v1/boards/{board_id}/resource_ids": {
         parameters: {
             query?: never;
             header?: never;
@@ -852,10 +948,10 @@ export type paths = {
             cookie?: never;
         };
         /**
-         * List All Board Image Names
+         * List All Board Resource Ids
          * @description Gets a list of images for a board
          */
-        get: operations["list_all_board_image_names"];
+        get: operations["list_all_board_resource_ids"];
         put?: never;
         post?: never;
         delete?: never;
@@ -864,7 +960,7 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/board_images/": {
+    "/api/v1/board_resources/": {
         parameters: {
             query?: never;
             header?: never;
@@ -874,21 +970,21 @@ export type paths = {
         get?: never;
         put?: never;
         /**
-         * Add Image To Board
-         * @description Creates a board_image
+         * Add Resource To Board
+         * @description Creates a board_resource relationship
          */
-        post: operations["add_image_to_board"];
+        post: operations["add_resource_to_board"];
         /**
-         * Remove Image From Board
-         * @description Removes an image from its board, if it had one
+         * Remove Resource From Board
+         * @description Removes a resource from its board, if it had one
          */
-        delete: operations["remove_image_from_board"];
+        delete: operations["remove_resource_from_board"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/board_images/batch": {
+    "/api/v1/board_resources/batch": {
         parameters: {
             query?: never;
             header?: never;
@@ -898,17 +994,17 @@ export type paths = {
         get?: never;
         put?: never;
         /**
-         * Add Images To Board
-         * @description Adds a list of images to a board
+         * Add Resources To Board
+         * @description Adds a list of resources to a board
          */
-        post: operations["add_images_to_board"];
+        post: operations["add_resources_to_board"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/board_images/batch/delete": {
+    "/api/v1/board_resources/batch/delete": {
         parameters: {
             query?: never;
             header?: never;
@@ -918,10 +1014,10 @@ export type paths = {
         get?: never;
         put?: never;
         /**
-         * Remove Images From Board
-         * @description Removes a list of images from their board, if they had one
+         * Remove Resources From Board
+         * @description Removes a list of resources from their board, if they had one
          */
-        post: operations["remove_images_from_board"];
+        post: operations["remove_resources_from_board"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1878,19 +1974,6 @@ export type paths = {
 export type webhooks = Record<string, never>;
 export type components = {
     schemas: {
-        /** AddImagesToBoardResult */
-        AddImagesToBoardResult: {
-            /**
-             * Affected Boards
-             * @description The ids of boards affected by the delete operation
-             */
-            affected_boards: string[];
-            /**
-             * Added Images
-             * @description The image names that were added to the board
-             */
-            added_images: string[];
-        };
         /**
          * Add Integers
          * @description Adds two numbers
@@ -1931,6 +2014,19 @@ export type components = {
              * @constant
              */
             type: "add";
+        };
+        /** AddResourcesToBoardResult */
+        AddResourcesToBoardResult: {
+            /**
+             * Affected Boards
+             * @description The ids of boards affected by the delete operation
+             */
+            affected_boards: string[];
+            /**
+             * Added Resources
+             * @description The resources that were added to the board
+             */
+            added_resources: components["schemas"]["ResourceIdentifier"][];
         };
         /**
          * Alpha Mask to Tensor
@@ -2591,31 +2687,35 @@ export type components = {
          * @enum {string}
          */
         BoardRecordOrderBy: "created_at" | "board_name";
-        /** Body_add_image_to_board */
-        Body_add_image_to_board: {
+        /** Body_add_resource_to_board */
+        Body_add_resource_to_board: {
             /**
              * Board Id
              * @description The id of the board to add to
              */
             board_id: string;
             /**
-             * Image Name
-             * @description The name of the image to add
+             * Resource Id
+             * @description The id of the resource to add
              */
-            image_name: string;
+            resource_id: string;
+            /** @description The type of resource */
+            resource_type: components["schemas"]["ResourceType"];
         };
-        /** Body_add_images_to_board */
-        Body_add_images_to_board: {
+        /** Body_add_resources_to_board */
+        Body_add_resources_to_board: {
             /**
              * Board Id
              * @description The id of the board to add to
              */
             board_id: string;
             /**
-             * Image Names
-             * @description The names of the images to add
+             * Resource Ids
+             * @description The ids of the resources to add
              */
-            image_names: string[];
+            resource_ids: string[];
+            /** @description The type of resources */
+            resource_type: components["schemas"]["ResourceType"];
         };
         /** Body_cancel_by_batch_ids */
         Body_cancel_by_batch_ids: {
@@ -2661,13 +2761,13 @@ export type components = {
             /** @description The workflow to create */
             workflow: components["schemas"]["WorkflowWithoutID"];
         };
-        /** Body_delete_images_from_list */
-        Body_delete_images_from_list: {
+        /** Body_delete_resources_from_list */
+        Body_delete_resources_from_list: {
             /**
-             * Image Names
-             * @description The list of names of images to delete
+             * Resources
+             * @description The list of resources to delete
              */
-            image_names: string[];
+            resources: components["schemas"]["ResourceIdentifier"][];
         };
         /** Body_do_hf_login */
         Body_do_hf_login: {
@@ -2736,6 +2836,14 @@ export type components = {
              */
             image_names: string[];
         };
+        /** Body_get_videos_by_ids */
+        Body_get_videos_by_ids: {
+            /**
+             * Video Ids
+             * @description Object containing list of video ids to fetch DTOs for
+             */
+            video_ids: string[];
+        };
         /** Body_import_style_presets */
         Body_import_style_presets: {
             /**
@@ -2770,21 +2878,25 @@ export type components = {
              */
             seed?: number | null;
         };
-        /** Body_remove_image_from_board */
-        Body_remove_image_from_board: {
+        /** Body_remove_resource_from_board */
+        Body_remove_resource_from_board: {
             /**
-             * Image Name
-             * @description The name of the image to remove
+             * Resource Id
+             * @description The id of the resource to remove
              */
-            image_name: string;
+            resource_id: string;
+            /** @description The type of resource */
+            resource_type: components["schemas"]["ResourceType"];
         };
-        /** Body_remove_images_from_board */
-        Body_remove_images_from_board: {
+        /** Body_remove_resources_from_board */
+        Body_remove_resources_from_board: {
             /**
-             * Image Names
-             * @description The names of the images to remove
+             * Resource Ids
+             * @description The ids of the resources to remove
              */
-            image_names: string[];
+            resource_ids: string[];
+            /** @description The type of resources */
+            resource_type: components["schemas"]["ResourceType"];
         };
         /** Body_set_workflow_thumbnail */
         Body_set_workflow_thumbnail: {
@@ -2795,21 +2907,21 @@ export type components = {
              */
             image: Blob;
         };
-        /** Body_star_images_in_list */
-        Body_star_images_in_list: {
+        /** Body_star_resources_in_list */
+        Body_star_resources_in_list: {
             /**
-             * Image Names
-             * @description The list of names of images to star
+             * Resources
+             * @description The list of resources to star
              */
-            image_names: string[];
+            resources: components["schemas"]["ResourceIdentifier"][];
         };
-        /** Body_unstar_images_in_list */
-        Body_unstar_images_in_list: {
+        /** Body_unstar_resources_in_list */
+        Body_unstar_resources_in_list: {
             /**
-             * Image Names
-             * @description The list of names of images to unstar
+             * Resources
+             * @description The list of resources to unstar
              */
-            image_names: string[];
+            resources: components["schemas"]["ResourceIdentifier"][];
         };
         /** Body_update_model_image */
         Body_update_model_image: {
@@ -6032,15 +6144,15 @@ export type components = {
              */
             board_id: string;
             /**
-             * Deleted Board Images
-             * @description The image names of the board-images relationships that were deleted.
+             * Deleted Board Resources
+             * @description The resource ids of the board-resources relationships that were deleted.
              */
-            deleted_board_images: string[];
+            deleted_board_resources: string[];
             /**
-             * Deleted Images
-             * @description The names of the images that were deleted.
+             * Deleted Resources
+             * @description The names of the resources that were deleted.
              */
-            deleted_images: string[];
+            deleted_resources: string[];
         };
         /**
          * DeleteByDestinationResult
@@ -6053,18 +6165,18 @@ export type components = {
              */
             deleted: number;
         };
-        /** DeleteImagesResult */
-        DeleteImagesResult: {
+        /** DeleteResourcesResult */
+        DeleteResourcesResult: {
             /**
              * Affected Boards
              * @description The ids of boards affected by the delete operation
              */
             affected_boards: string[];
             /**
-             * Deleted Images
-             * @description The names of the images that were deleted
+             * Deleted Resources
+             * @description The ids of the resources that were deleted
              */
-            deleted_images: string[];
+            deleted_resources: components["schemas"]["ResourceIdentifier"][];
         };
         /**
          * Denoise - SD1.5, SDXL
@@ -9094,7 +9206,7 @@ export type components = {
              * @description The results of node executions
              */
             results: {
-                [key: string]: components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["BoundingBoxCollectionOutput"] | components["schemas"]["BoundingBoxOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["CogView4ConditioningOutput"] | components["schemas"]["CogView4ModelLoaderOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["FloatGeneratorOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["FluxConditioningCollectionOutput"] | components["schemas"]["FluxConditioningOutput"] | components["schemas"]["FluxControlLoRALoaderOutput"] | components["schemas"]["FluxControlNetOutput"] | components["schemas"]["FluxFillOutput"] | components["schemas"]["FluxKontextOutput"] | components["schemas"]["FluxLoRALoaderOutput"] | components["schemas"]["FluxModelLoaderOutput"] | components["schemas"]["FluxReduxOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ImageGeneratorOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ImagePanelCoordinateOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IntegerGeneratorOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["LatentsMetaOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["MDControlListOutput"] | components["schemas"]["MDIPAdapterListOutput"] | components["schemas"]["MDT2IAdapterListOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["MetadataToLorasCollectionOutput"] | components["schemas"]["MetadataToModelOutput"] | components["schemas"]["MetadataToSDXLModelOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["RunwayVideoOutput"] | components["schemas"]["SD3ConditioningOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["Sd3ModelLoaderOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["String2Output"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringGeneratorOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["VideoOutput"];
+                [key: string]: components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["BoundingBoxCollectionOutput"] | components["schemas"]["BoundingBoxOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["CogView4ConditioningOutput"] | components["schemas"]["CogView4ModelLoaderOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["FloatGeneratorOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["FluxConditioningCollectionOutput"] | components["schemas"]["FluxConditioningOutput"] | components["schemas"]["FluxControlLoRALoaderOutput"] | components["schemas"]["FluxControlNetOutput"] | components["schemas"]["FluxFillOutput"] | components["schemas"]["FluxKontextOutput"] | components["schemas"]["FluxLoRALoaderOutput"] | components["schemas"]["FluxModelLoaderOutput"] | components["schemas"]["FluxReduxOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ImageGeneratorOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ImagePanelCoordinateOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IntegerGeneratorOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["LatentsMetaOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["MDControlListOutput"] | components["schemas"]["MDIPAdapterListOutput"] | components["schemas"]["MDT2IAdapterListOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["MetadataToLorasCollectionOutput"] | components["schemas"]["MetadataToModelOutput"] | components["schemas"]["MetadataToSDXLModelOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["SD3ConditioningOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["Sd3ModelLoaderOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["String2Output"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringGeneratorOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["VAEOutput"];
             };
             /**
              * Errors
@@ -11880,7 +11992,7 @@ export type components = {
              * Result
              * @description The result of the invocation
              */
-            result: components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["BoundingBoxCollectionOutput"] | components["schemas"]["BoundingBoxOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["CogView4ConditioningOutput"] | components["schemas"]["CogView4ModelLoaderOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["FloatGeneratorOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["FluxConditioningCollectionOutput"] | components["schemas"]["FluxConditioningOutput"] | components["schemas"]["FluxControlLoRALoaderOutput"] | components["schemas"]["FluxControlNetOutput"] | components["schemas"]["FluxFillOutput"] | components["schemas"]["FluxKontextOutput"] | components["schemas"]["FluxLoRALoaderOutput"] | components["schemas"]["FluxModelLoaderOutput"] | components["schemas"]["FluxReduxOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ImageGeneratorOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ImagePanelCoordinateOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IntegerGeneratorOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["LatentsMetaOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["MDControlListOutput"] | components["schemas"]["MDIPAdapterListOutput"] | components["schemas"]["MDT2IAdapterListOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["MetadataToLorasCollectionOutput"] | components["schemas"]["MetadataToModelOutput"] | components["schemas"]["MetadataToSDXLModelOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["RunwayVideoOutput"] | components["schemas"]["SD3ConditioningOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["Sd3ModelLoaderOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["String2Output"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringGeneratorOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["VideoOutput"];
+            result: components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["BoundingBoxCollectionOutput"] | components["schemas"]["BoundingBoxOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["CogView4ConditioningOutput"] | components["schemas"]["CogView4ModelLoaderOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["FloatGeneratorOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["FluxConditioningCollectionOutput"] | components["schemas"]["FluxConditioningOutput"] | components["schemas"]["FluxControlLoRALoaderOutput"] | components["schemas"]["FluxControlNetOutput"] | components["schemas"]["FluxFillOutput"] | components["schemas"]["FluxKontextOutput"] | components["schemas"]["FluxLoRALoaderOutput"] | components["schemas"]["FluxModelLoaderOutput"] | components["schemas"]["FluxReduxOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ImageGeneratorOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ImagePanelCoordinateOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IntegerGeneratorOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["LatentsMetaOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["MDControlListOutput"] | components["schemas"]["MDIPAdapterListOutput"] | components["schemas"]["MDT2IAdapterListOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["MetadataToLorasCollectionOutput"] | components["schemas"]["MetadataToModelOutput"] | components["schemas"]["MetadataToSDXLModelOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["SD3ConditioningOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["Sd3ModelLoaderOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["String2Output"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringGeneratorOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["VAEOutput"];
         };
         /**
          * InvocationErrorEvent
@@ -17342,8 +17454,8 @@ export type components = {
              */
             items: components["schemas"]["BoardDTO"][];
         };
-        /** OffsetPaginatedResults[ImageDTO] */
-        OffsetPaginatedResults_ImageDTO_: {
+        /** OffsetPaginatedResults[VideoDTO] */
+        OffsetPaginatedResults_VideoDTO_: {
             /**
              * Limit
              * @description Limit of items to get
@@ -17363,7 +17475,7 @@ export type components = {
              * Items
              * @description Items
              */
-            items: components["schemas"]["ImageDTO"][];
+            items: components["schemas"]["VideoDTO"][];
         };
         /**
          * OutputFieldJSONSchemaExtra
@@ -18149,18 +18261,18 @@ export type components = {
              */
             sha256?: string | null;
         };
-        /** RemoveImagesFromBoardResult */
-        RemoveImagesFromBoardResult: {
+        /** RemoveResourcesFromBoardResult */
+        RemoveResourcesFromBoardResult: {
             /**
              * Affected Boards
              * @description The ids of boards affected by the delete operation
              */
             affected_boards: string[];
             /**
-             * Removed Images
-             * @description The image names that were removed from their board
+             * Removed Resources
+             * @description The resources that were removed from their board
              */
-            removed_images: string[];
+            removed_resources: components["schemas"]["ResourceIdentifier"][];
         };
         /**
          * Resize Latents
@@ -18221,6 +18333,16 @@ export type components = {
              */
             type: "lresize";
         };
+        /** ResourceIdentifier */
+        ResourceIdentifier: {
+            /**
+             * Resource Id
+             * @description The id of the resource to delete
+             */
+            resource_id: string;
+            /** @description The type of the resource to delete */
+            resource_type: components["schemas"]["ResourceType"];
+        };
         /**
          * ResourceOrigin
          * @description The origin of a resource (eg image).
@@ -18231,6 +18353,12 @@ export type components = {
          * @enum {string}
          */
         ResourceOrigin: "internal" | "external";
+        /**
+         * ResourceType
+         * @description The type of resource that can be associated with a board.
+         * @enum {string}
+         */
+        ResourceType: "image" | "video";
         /** RetryItemsResult */
         RetryItemsResult: {
             /**
@@ -18284,28 +18412,6 @@ export type components = {
              * @constant
              */
             type: "round_float";
-        };
-        /**
-         * RunwayVideoOutput
-         * @description Base class for nodes that output a runway result
-         */
-        RunwayVideoOutput: {
-            /**
-             * Video Url
-             * @description The output video url
-             */
-            video_url: string;
-            /**
-             * Runway Task Id
-             * @description The runway task id
-             */
-            runway_task_id: string;
-            /**
-             * type
-             * @default runway_video_output
-             * @constant
-             */
-            type: "runway_video_output";
         };
         /** SAMPoint */
         SAMPoint: {
@@ -19983,18 +20089,18 @@ export type components = {
              */
             type: "spandrel_image_to_image";
         };
-        /** StarredImagesResult */
-        StarredImagesResult: {
+        /** StarredResourcesResult */
+        StarredResourcesResult: {
             /**
              * Affected Boards
              * @description The ids of boards affected by the delete operation
              */
             affected_boards: string[];
             /**
-             * Starred Images
-             * @description The names of the images that were starred
+             * Starred Resources
+             * @description The resources that were starred
              */
-            starred_images: string[];
+            starred_resources: components["schemas"]["ResourceIdentifier"][];
         };
         /** StarterModel */
         StarterModel: {
@@ -21481,7 +21587,7 @@ export type components = {
          *     used, and the type will be ignored. They are included here for backwards compatibility.
          * @enum {string}
          */
-        UIType: "MainModelField" | "CogView4MainModelField" | "FluxMainModelField" | "SD3MainModelField" | "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VAEModelField" | "FluxVAEModelField" | "LoRAModelField" | "ControlNetModelField" | "IPAdapterModelField" | "T2IAdapterModelField" | "T5EncoderModelField" | "CLIPEmbedModelField" | "CLIPLEmbedModelField" | "CLIPGEmbedModelField" | "SpandrelImageToImageModelField" | "ControlLoRAModelField" | "SigLipModelField" | "FluxReduxModelField" | "LLaVAModelField" | "Imagen3ModelField" | "Imagen4ModelField" | "ChatGPT4oModelField" | "FluxKontextModelField" | "SchedulerField" | "AnyField" | "VideoField" | "CollectionField" | "CollectionItemField" | "DEPRECATED_Boolean" | "DEPRECATED_Color" | "DEPRECATED_Conditioning" | "DEPRECATED_Control" | "DEPRECATED_Float" | "DEPRECATED_Image" | "DEPRECATED_Integer" | "DEPRECATED_Latents" | "DEPRECATED_String" | "DEPRECATED_BooleanCollection" | "DEPRECATED_ColorCollection" | "DEPRECATED_ConditioningCollection" | "DEPRECATED_ControlCollection" | "DEPRECATED_FloatCollection" | "DEPRECATED_ImageCollection" | "DEPRECATED_IntegerCollection" | "DEPRECATED_LatentsCollection" | "DEPRECATED_StringCollection" | "DEPRECATED_BooleanPolymorphic" | "DEPRECATED_ColorPolymorphic" | "DEPRECATED_ConditioningPolymorphic" | "DEPRECATED_ControlPolymorphic" | "DEPRECATED_FloatPolymorphic" | "DEPRECATED_ImagePolymorphic" | "DEPRECATED_IntegerPolymorphic" | "DEPRECATED_LatentsPolymorphic" | "DEPRECATED_StringPolymorphic" | "DEPRECATED_UNet" | "DEPRECATED_Vae" | "DEPRECATED_CLIP" | "DEPRECATED_Collection" | "DEPRECATED_CollectionItem" | "DEPRECATED_Enum" | "DEPRECATED_WorkflowField" | "DEPRECATED_IsIntermediate" | "DEPRECATED_BoardField" | "DEPRECATED_MetadataItem" | "DEPRECATED_MetadataItemCollection" | "DEPRECATED_MetadataItemPolymorphic" | "DEPRECATED_MetadataDict";
+        UIType: "MainModelField" | "CogView4MainModelField" | "FluxMainModelField" | "SD3MainModelField" | "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VAEModelField" | "FluxVAEModelField" | "LoRAModelField" | "ControlNetModelField" | "IPAdapterModelField" | "T2IAdapterModelField" | "T5EncoderModelField" | "CLIPEmbedModelField" | "CLIPLEmbedModelField" | "CLIPGEmbedModelField" | "SpandrelImageToImageModelField" | "ControlLoRAModelField" | "SigLipModelField" | "FluxReduxModelField" | "LLaVAModelField" | "Imagen3ModelField" | "Imagen4ModelField" | "ChatGPT4oModelField" | "FluxKontextModelField" | "SchedulerField" | "AnyField" | "CollectionField" | "CollectionItemField" | "DEPRECATED_Boolean" | "DEPRECATED_Color" | "DEPRECATED_Conditioning" | "DEPRECATED_Control" | "DEPRECATED_Float" | "DEPRECATED_Image" | "DEPRECATED_Integer" | "DEPRECATED_Latents" | "DEPRECATED_String" | "DEPRECATED_BooleanCollection" | "DEPRECATED_ColorCollection" | "DEPRECATED_ConditioningCollection" | "DEPRECATED_ControlCollection" | "DEPRECATED_FloatCollection" | "DEPRECATED_ImageCollection" | "DEPRECATED_IntegerCollection" | "DEPRECATED_LatentsCollection" | "DEPRECATED_StringCollection" | "DEPRECATED_BooleanPolymorphic" | "DEPRECATED_ColorPolymorphic" | "DEPRECATED_ConditioningPolymorphic" | "DEPRECATED_ControlPolymorphic" | "DEPRECATED_FloatPolymorphic" | "DEPRECATED_ImagePolymorphic" | "DEPRECATED_IntegerPolymorphic" | "DEPRECATED_LatentsPolymorphic" | "DEPRECATED_StringPolymorphic" | "DEPRECATED_UNet" | "DEPRECATED_Vae" | "DEPRECATED_CLIP" | "DEPRECATED_Collection" | "DEPRECATED_CollectionItem" | "DEPRECATED_Enum" | "DEPRECATED_WorkflowField" | "DEPRECATED_IsIntermediate" | "DEPRECATED_BoardField" | "DEPRECATED_MetadataItem" | "DEPRECATED_MetadataItemCollection" | "DEPRECATED_MetadataItemPolymorphic" | "DEPRECATED_MetadataDict";
         /** UNetField */
         UNetField: {
             /** @description Info to load unet submodel */
@@ -21608,18 +21714,18 @@ export type components = {
              */
             type: "unsharp_mask";
         };
-        /** UnstarredImagesResult */
-        UnstarredImagesResult: {
+        /** UnstarredResourcesResult */
+        UnstarredResourcesResult: {
             /**
              * Affected Boards
              * @description The ids of boards affected by the delete operation
              */
             affected_boards: string[];
             /**
-             * Unstarred Images
-             * @description The names of the images that were unstarred
+             * Unstarred Resources
+             * @description The resources that were unstarred
              */
-            unstarred_images: string[];
+            unstarred_resources: components["schemas"]["ResourceIdentifier"][];
         };
         /** Upscaler */
         Upscaler: {
@@ -21893,36 +21999,55 @@ export type components = {
             output_fields: components["schemas"]["FieldIdentifier"][];
         };
         /**
-         * VideoOutput
-         * @description Base class for nodes that output a video
+         * VideoDTO
+         * @description Deserialized video record, enriched for the frontend.
          */
-        VideoOutput: {
+        VideoDTO: {
             /**
              * Video Id
-             * @description The output video id
+             * @description The id of the board the video belongs to, if one exists.
              */
-            video_id: string;
+            video_id?: string | null;
             /**
              * Width
-             * @description The width of the video in pixels
+             * @description The width of the video.
              */
             width: number;
             /**
              * Height
-             * @description The height of the video in pixels
+             * @description The height of the video.
              */
             height: number;
             /**
-             * Duration Seconds
-             * @description The duration of the video in seconds
+             * Board Id
+             * @description The id of the board the video belongs to, if one exists.
              */
-            duration_seconds: number;
+            board_id?: string | null;
+        };
+        /**
+         * VideoNamesResult
+         * @description Result of fetching video names.
+         */
+        VideoNamesResult: {
             /**
-             * type
-             * @default video_output
-             * @constant
+             * Video Ids
+             * @description The video IDs
              */
-            type: "video_output";
+            video_ids: string[];
+        };
+        /**
+         * VideoRecordChanges
+         * @description A set of changes to apply to a video record.
+         *
+         *     Only limited changes are allowed:
+         *     - `starred` - Whether the video is starred.
+         */
+        VideoRecordChanges: {
+            /**
+             * Starred
+             * @description Whether the video is starred.
+             */
+            starred?: boolean | null;
         };
         /** Workflow */
         Workflow: {
@@ -23419,54 +23544,6 @@ export interface operations {
             };
         };
     };
-    list_image_dtos: {
-        parameters: {
-            query?: {
-                /** @description The origin of images to list. */
-                image_origin?: components["schemas"]["ResourceOrigin"] | null;
-                /** @description The categories of image to include. */
-                categories?: components["schemas"]["ImageCategory"][] | null;
-                /** @description Whether to list intermediate images. */
-                is_intermediate?: boolean | null;
-                /** @description The board id to filter by. Use 'none' to find images without a board. */
-                board_id?: string | null;
-                /** @description The page offset */
-                offset?: number;
-                /** @description The number of images per page */
-                limit?: number;
-                /** @description The order of sort */
-                order_dir?: components["schemas"]["SQLiteDirection"];
-                /** @description Whether to sort by starred images first */
-                starred_first?: boolean;
-                /** @description The term to search for */
-                search_term?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OffsetPaginatedResults_ImageDTO_"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     create_image_upload_entry: {
         parameters: {
             query?: never;
@@ -23487,106 +23564,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImageUploadEntry"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_image_dto: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The name of image to get */
-                image_name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ImageDTO"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_image: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The name of the image to delete */
-                image_name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DeleteImagesResult"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_image: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The name of the image to update */
-                image_name: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ImageRecordChanges"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ImageDTO"];
                 };
             };
             /** @description Validation Error */
@@ -23636,6 +23613,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": number;
+                };
+            };
+        };
+    };
+    get_image_dto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The name of image to get */
+                image_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_image: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The name of the image to update */
+                image_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImageRecordChanges"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -23853,125 +23898,6 @@ export interface operations {
             };
         };
     };
-    delete_images_from_list: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Body_delete_images_from_list"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DeleteImagesResult"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_uncategorized_images: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DeleteImagesResult"];
-                };
-            };
-        };
-    };
-    star_images_in_list: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Body_star_images_in_list"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StarredImagesResult"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    unstar_images_in_list: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Body_unstar_images_in_list"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UnstarredImagesResult"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     download_images_from_list: {
         parameters: {
             query?: never;
@@ -24121,6 +24047,345 @@ export interface operations {
             };
         };
     };
+    get_video_dto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the video to get */
+                video_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_video: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the video to update */
+                video_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VideoRecordChanges"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_video_dtos: {
+        parameters: {
+            query?: {
+                /** @description The board id to filter by. Use 'none' to find videos without a board. */
+                board_id?: string | null;
+                /** @description The page offset */
+                offset?: number;
+                /** @description The number of videos per page */
+                limit?: number;
+                /** @description The order of sort */
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                /** @description Whether to sort by starred videos first */
+                starred_first?: boolean;
+                /** @description The term to search for */
+                search_term?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OffsetPaginatedResults_VideoDTO_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_video_ids: {
+        parameters: {
+            query?: {
+                /** @description The board id to filter by. Use 'none' to find videos without a board. */
+                board_id?: string | null;
+                /** @description The order of sort */
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                /** @description Whether to sort by starred videos first */
+                starred_first?: boolean;
+                /** @description The term to search for */
+                search_term?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoNamesResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_videos_by_ids: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_get_videos_by_ids"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoDTO"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_video_thumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of video to get thumbnail for */
+                video_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Return the video thumbnail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/webp": unknown;
+                };
+            };
+            /** @description Video not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_resources_from_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_delete_resources_from_list"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteResourcesResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_uncategorized_resources: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteResourcesResult"];
+                };
+            };
+        };
+    };
+    star_resources_in_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_star_resources_in_list"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StarredResourcesResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unstar_resources_in_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_unstar_resources_in_list"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnstarredResourcesResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_boards: {
         parameters: {
             query?: {
@@ -24232,8 +24497,8 @@ export interface operations {
     delete_board: {
         parameters: {
             query?: {
-                /** @description Permanently delete all images on the board */
-                include_images?: boolean | null;
+                /** @description Permanently delete all resources on the board */
+                include_resources?: boolean | null;
             };
             header?: never;
             path: {
@@ -24300,9 +24565,11 @@ export interface operations {
             };
         };
     };
-    list_all_board_image_names: {
+    list_all_board_resource_ids: {
         parameters: {
             query?: {
+                /** @description The type of resource to include. */
+                resource_type?: components["schemas"]["ResourceType"];
                 /** @description The categories of image to include. */
                 categories?: components["schemas"]["ImageCategory"][] | null;
                 /** @description Whether to list intermediate images. */
@@ -24323,7 +24590,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": string[];
+                    "application/json": components["schemas"]["ResourceIdentifier"][];
                 };
             };
             /** @description Validation Error */
@@ -24337,7 +24604,7 @@ export interface operations {
             };
         };
     };
-    add_image_to_board: {
+    add_resource_to_board: {
         parameters: {
             query?: never;
             header?: never;
@@ -24346,17 +24613,17 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Body_add_image_to_board"];
+                "application/json": components["schemas"]["Body_add_resource_to_board"];
             };
         };
         responses: {
-            /** @description The image was added to a board successfully */
+            /** @description The resource was added to a board successfully */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AddImagesToBoardResult"];
+                    "application/json": components["schemas"]["AddResourcesToBoardResult"];
                 };
             };
             /** @description Validation Error */
@@ -24370,7 +24637,7 @@ export interface operations {
             };
         };
     };
-    remove_image_from_board: {
+    remove_resource_from_board: {
         parameters: {
             query?: never;
             header?: never;
@@ -24379,17 +24646,17 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Body_remove_image_from_board"];
+                "application/json": components["schemas"]["Body_remove_resource_from_board"];
             };
         };
         responses: {
-            /** @description The image was removed from the board successfully */
+            /** @description The resource was removed from the board successfully */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RemoveImagesFromBoardResult"];
+                    "application/json": components["schemas"]["RemoveResourcesFromBoardResult"];
                 };
             };
             /** @description Validation Error */
@@ -24403,7 +24670,7 @@ export interface operations {
             };
         };
     };
-    add_images_to_board: {
+    add_resources_to_board: {
         parameters: {
             query?: never;
             header?: never;
@@ -24412,17 +24679,17 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Body_add_images_to_board"];
+                "application/json": components["schemas"]["Body_add_resources_to_board"];
             };
         };
         responses: {
-            /** @description Images were added to board successfully */
+            /** @description Resources were added to board successfully */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AddImagesToBoardResult"];
+                    "application/json": components["schemas"]["AddResourcesToBoardResult"];
                 };
             };
             /** @description Validation Error */
@@ -24436,7 +24703,7 @@ export interface operations {
             };
         };
     };
-    remove_images_from_board: {
+    remove_resources_from_board: {
         parameters: {
             query?: never;
             header?: never;
@@ -24445,17 +24712,17 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Body_remove_images_from_board"];
+                "application/json": components["schemas"]["Body_remove_resources_from_board"];
             };
         };
         responses: {
-            /** @description Images were removed from board successfully */
+            /** @description Resources were removed from board successfully */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RemoveImagesFromBoardResult"];
+                    "application/json": components["schemas"]["RemoveResourcesFromBoardResult"];
                 };
             };
             /** @description Validation Error */

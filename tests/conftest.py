@@ -15,7 +15,7 @@ import safetensors.torch
 import torch
 
 import invokeai.backend.quantization.gguf.loaders as gguf_loaders
-from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
+# from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
 from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
 from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
@@ -39,8 +39,8 @@ def mock_services() -> InvocationServices:
 
     # NOTE: none of these are actually called by the test invocations
     return InvocationServices(
-        board_image_records=SqliteBoardImageRecordStorage(db=db),
-        board_images=None,  # type: ignore
+        # board_image_records=SqliteBoardImageRecordStorage(db=db),
+        # board_images=None,  # type: ignore
         board_records=SqliteBoardRecordStorage(db=db),
         boards=None,  # type: ignore
         bulk_download=BulkDownloadService(),

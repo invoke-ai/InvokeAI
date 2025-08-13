@@ -25,12 +25,13 @@ import type {
   VirtuosoGridHandle,
 } from 'react-virtuoso';
 import { VirtuosoGrid } from 'react-virtuoso';
-import { imagesApi, useImageDTO, useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
+import { imagesApi, useImageDTO,  } from 'services/api/endpoints/images';
 import { useDebounce } from 'use-debounce';
 
 import { GalleryImage, GalleryImagePlaceholder } from './ImageGrid/GalleryImage';
 import { GallerySelectionCountTag } from './ImageGrid/GallerySelectionCountTag';
 import { useGalleryImageNames } from './use-gallery-image-names';
+import { useStarResourcesMutation, useUnstarResourcesMutation } from 'services/api/endpoints/resources';
 
 const log = logger('gallery');
 
@@ -456,8 +457,8 @@ const useStarImageHotkey = () => {
   const selectionCount = useAppSelector(selectSelectionCount);
   const isGalleryFocused = useIsRegionFocused('gallery');
   const imageDTO = useImageDTO(lastSelectedImage);
-  const [starImages] = useStarImagesMutation();
-  const [unstarImages] = useUnstarImagesMutation();
+  const [starResources] = useStarResourcesMutation();
+  const [unstarResources] = useUnstarResourcesMutation();
 
   const handleStarHotkey = useCallback(() => {
     if (!imageDTO) {
@@ -467,11 +468,11 @@ const useStarImageHotkey = () => {
       return;
     }
     if (imageDTO.starred) {
-      unstarImages({ image_names: [imageDTO.image_name] });
+      unstarResources({ resources: [{ resource_id: imageDTO.image_name, resource_type: "image" }] });
     } else {
-      starImages({ image_names: [imageDTO.image_name] });
+      starResources({ resources: [{ resource_id: imageDTO.image_name, resource_type: "image" }] });
     }
-  }, [imageDTO, isGalleryFocused, starImages, unstarImages]);
+  }, [imageDTO, isGalleryFocused, starResources, unstarResources]);
 
   useRegisteredHotkeys({
     id: 'starImage',

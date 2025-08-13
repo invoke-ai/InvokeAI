@@ -10,8 +10,8 @@ import {
 } from 'features/changeBoardModal/store/slice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAddResourcesToBoardMutation, useRemoveResourcesFromBoardMutation } from 'services/api/endpoints/resources';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
-import { useAddImagesToBoardMutation, useRemoveImagesFromBoardMutation } from 'services/api/endpoints/images';
 
 const selectImagesToChange = createSelector(
   selectChangeBoardModalSlice,
@@ -30,8 +30,8 @@ const ChangeBoardModal = () => {
   const { data: boards, isFetching } = useListAllBoardsQuery({ include_archived: true });
   const isModalOpen = useAppSelector(selectIsModalOpen);
   const imagesToChange = useAppSelector(selectImagesToChange);
-  const [addImagesToBoard] = useAddImagesToBoardMutation();
-  const [removeImagesFromBoard] = useRemoveImagesFromBoardMutation();
+  const [addImagesToBoard] = useAddResourcesToBoardMutation();
+  const [removeImagesFromBoard] = useRemoveResourcesFromBoardMutation();
   const { t } = useTranslation();
 
   const options = useMemo<ComboboxOption[]>(() => {
@@ -56,11 +56,12 @@ const ChangeBoardModal = () => {
     }
 
     if (selectedBoard === 'none') {
-      removeImagesFromBoard({ image_names: imagesToChange });
+      removeImagesFromBoard({ resource_ids: imagesToChange, resource_type: 'image' });
     } else {
       addImagesToBoard({
-        image_names: imagesToChange,
+        resource_ids: imagesToChange,
         board_id: selectedBoard,
+        resource_type: 'image',
       });
     }
     setSelectedBoard(null);

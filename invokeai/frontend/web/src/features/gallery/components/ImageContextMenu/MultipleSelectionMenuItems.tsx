@@ -10,9 +10,8 @@ import { useTranslation } from 'react-i18next';
 import { PiDownloadSimpleBold, PiFoldersBold, PiStarBold, PiStarFill, PiTrashSimpleBold } from 'react-icons/pi';
 import {
   useBulkDownloadImagesMutation,
-  useStarImagesMutation,
-  useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
+import { useStarResourcesMutation, useUnstarResourcesMutation } from 'services/api/endpoints/resources';
 
 const MultipleSelectionMenuItems = () => {
   const { t } = useTranslation();
@@ -23,8 +22,8 @@ const MultipleSelectionMenuItems = () => {
 
   const isBulkDownloadEnabled = useFeatureStatus('bulkDownload');
 
-  const [starImages] = useStarImagesMutation();
-  const [unstarImages] = useUnstarImagesMutation();
+  const [starResources] = useStarResourcesMutation();
+  const [unstarResources] = useUnstarResourcesMutation();
   const [bulkDownload] = useBulkDownloadImagesMutation();
 
   const handleChangeBoard = useCallback(() => {
@@ -37,12 +36,12 @@ const MultipleSelectionMenuItems = () => {
   }, [deleteImageModal, selection]);
 
   const handleStarSelection = useCallback(() => {
-    starImages({ image_names: selection });
-  }, [starImages, selection]);
+    starResources({ resources: selection.map(image => ({ resource_id: image, resource_type: "image" })) });
+  }, [starResources, selection]);
 
   const handleUnstarSelection = useCallback(() => {
-    unstarImages({ image_names: selection });
-  }, [unstarImages, selection]);
+    unstarResources({ resources: selection.map(image => ({ resource_id: image, resource_type: "image" })) });
+  }, [unstarResources, selection]);
 
   const handleBulkDownload = useCallback(() => {
     bulkDownload({ image_names: selection });

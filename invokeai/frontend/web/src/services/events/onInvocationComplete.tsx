@@ -11,11 +11,10 @@ import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gal
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { isImageField, isImageFieldCollection } from 'features/nodes/types/common';
 import { zNodeStatus } from 'features/nodes/types/invocation';
-import { generatedVideoChanged } from 'features/parameters/store/videoSlice';
 import type { LRUCache } from 'lru-cache';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
-import type { ImageDTO, S, VideoOutput } from 'services/api/types';
+import type { ImageDTO, S } from 'services/api/types';
 import { getCategories } from 'services/api/util';
 import { insertImageIntoNamesResult } from 'services/api/util/optimisticUpdates';
 import { $lastProgressEvent } from 'services/events/stores';
@@ -196,15 +195,6 @@ export const buildOnInvocationComplete = (
     return imageDTOs;
   };
 
-  const getResultVideoDTOs = async (data: S['InvocationCompleteEvent']): Promise<VideoOutput | null> => {
-    // @ts-expect-error: This is a workaround to get the video name from the result
-    if (data.invocation.type === 'runway_generate_video') {
-      // @ts-expect-error: This is a workaround to get the video name from the result
-      return {videoId: data.result.video_id};
-    }
-    return null;
-  };
-
   return async (data: S['InvocationCompleteEvent']) => {
     if (finishedQueueItemIds.has(data.item_id)) {
       log.trace({ data } as JsonObject, `Received event for already-finished queue item ${data.item_id}`);
@@ -225,11 +215,6 @@ export const buildOnInvocationComplete = (
     }
 
     await addImagesToGallery(data);
-
-    const videoResult = await getResultVideoDTOs(data);
-    if (videoResult) {
-      dispatch(generatedVideoChanged(videoResult));
-    }
 
     $lastProgressEvent.set(null);
   };

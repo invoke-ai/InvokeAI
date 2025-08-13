@@ -37,6 +37,7 @@ import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
 import { imageDTOToFile, imagesApi, uploadImage } from 'services/api/endpoints/images';
+import { resourcesApi } from 'services/api/endpoints/resources';
 import type { ImageDTO } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
@@ -309,12 +310,12 @@ export const replaceCanvasEntityObjectsWithImage = (arg: {
 
 export const addImagesToBoard = (arg: { image_names: string[]; boardId: BoardId; dispatch: AppDispatch }) => {
   const { image_names, boardId, dispatch } = arg;
-  dispatch(imagesApi.endpoints.addImagesToBoard.initiate({ image_names, board_id: boardId }, { track: false }));
+  dispatch(resourcesApi.endpoints.addResourcesToBoard.initiate({ resource_ids: image_names, board_id: boardId, resource_type: 'image' }, { track: false }));
   dispatch(selectionChanged([]));
 };
 
 export const removeImagesFromBoard = (arg: { image_names: string[]; dispatch: AppDispatch }) => {
   const { image_names, dispatch } = arg;
-  dispatch(imagesApi.endpoints.removeImagesFromBoard.initiate({ image_names }, { track: false }));
+  dispatch(resourcesApi.endpoints.removeResourcesFromBoard.initiate({ resource_ids: image_names, resource_type: 'image' }, { track: false }));
   dispatch(selectionChanged([]));
 };

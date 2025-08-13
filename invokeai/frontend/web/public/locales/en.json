@@ -1273,7 +1273,6 @@
         "imageActions": "Image Actions",
         "sendToCanvas": "Send To Canvas",
         "sendToUpscale": "Send To Upscale",
-        "sendToVideo": "Send To Video",
         "showOptionsPanel": "Show Side Panel (O or T)",
         "shuffle": "Shuffle Seed",
         "steps": "Steps",
@@ -2642,10 +2641,6 @@
                 }
             }
         }
-    },
-    "video": {
-        "noVideoSelected": "No video selected",
-        "selectFromGallery": "Select a video from the gallery to play"
     },
     "system": {
         "enableLogging": "Enable Logging",

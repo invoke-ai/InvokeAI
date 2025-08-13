@@ -10,8 +10,6 @@ import type {
   ImageDTO,
   ImageUploadEntryRequest,
   ImageUploadEntryResponse,
-  ListImagesArgs,
-  ListImagesResponse,
   UploadImageArg,
 } from 'services/api/types';
 import { getListImagesUrl } from 'services/api/util';
@@ -32,50 +30,8 @@ import { buildBoardsUrl } from './boards';
 const buildImagesUrl = (path: string = '', query?: Parameters<typeof buildV1Url>[1]) =>
   buildV1Url(`images/${path}`, query);
 
-/**
- * Builds an endpoint URL for the board_images router
- * @example
- * buildBoardImagesUrl('some-path')
- * // '/api/v1/board_images/some-path'
- */
-const buildBoardImagesUrl = (path: string = '') => buildV1Url(`board_images/${path}`);
-
 export const imagesApi = api.injectEndpoints({
   endpoints: (build) => ({
-    /**
-     * Image Queries
-     */
-    listImages: build.query<ListImagesResponse, ListImagesArgs>({
-      query: (queryArgs) => ({
-        // Use the helper to create the URL.
-        url: getListImagesUrl(queryArgs),
-        method: 'GET',
-      }),
-      providesTags: (result, error, queryArgs) => {
-        return [
-          // Make the tags the same as the cache key
-          { type: 'ImageList', id: stableHash(queryArgs) },
-          { type: 'Board', id: queryArgs.board_id ?? 'none' },
-          'FetchOnReconnect',
-        ];
-      },
-      async onQueryStarted(_, { dispatch, queryFulfilled }) {
-        // Populate the getImageDTO cache with these images. This makes image selection smoother, because it doesn't
-        // need to re-fetch image data when the user selects an image. The getImageDTO cache keeps data for the default
-        // of 60s, so this data won't stick around too long.
-        const res = await queryFulfilled;
-        const imageDTOs = res.data.items;
-        const updates: Param0<typeof imagesApi.util.upsertQueryEntries> = [];
-        for (const imageDTO of imageDTOs) {
-          updates.push({
-            endpointName: 'getImageDTO',
-            arg: imageDTO.image_name,
-            value: imageDTO,
-          });
-        }
-        dispatch(imagesApi.util.upsertQueryEntries(updates));
-      },
-    }),
     getIntermediatesCount: build.query<number, void>({
       query: () => ({ url: buildImagesUrl('intermediates') }),
       providesTags: ['IntermediatesCount', 'FetchOnReconnect'],
@@ -101,70 +57,7 @@ export const imagesApi = api.injectEndpoints({
       query: (image_name) => ({ url: buildImagesUrl(`i/${image_name}/workflow`) }),
       providesTags: (result, error, image_name) => [{ type: 'ImageWorkflow', id: image_name }],
     }),
-    deleteImage: build.mutation<
-      paths['/api/v1/images/i/{image_name}']['delete']['responses']['200']['content']['application/json'],
-      paths['/api/v1/images/i/{image_name}']['delete']['parameters']['path']
-    >({
-      query: ({ image_name }) => ({
-        url: buildImagesUrl(`i/${image_name}`),
-        method: 'DELETE',
-      }),
-      invalidatesTags: (result) => {
-        if (!result) {
-          return [];
-        }
-        // We ignore the deleted images when getting tags to invalidate. If we did not, we will invalidate the queries
-        // that fetch image DTOs, metadata, and workflows. But we have just deleted those images! Invalidating the tags
-        // will force those queries to re-fetch, and the requests will of course 404.
-        return [
-          ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
-          'ImageCollectionCounts',
-          { type: 'ImageCollection', id: LIST_TAG },
-        ];
-      },
-    }),
-    deleteImages: build.mutation<
-      paths['/api/v1/images/delete']['post']['responses']['200']['content']['application/json'],
-      paths['/api/v1/images/delete']['post']['requestBody']['content']['application/json']
-    >({
-      query: (body) => ({
-        url: buildImagesUrl('delete'),
-        method: 'POST',
-        body,
-      }),
-      invalidatesTags: (result) => {
-        if (!result) {
-          return [];
-        }
-        // We ignore the deleted images when getting tags to invalidate. If we did not, we will invalidate the queries
-        // that fetch image DTOs, metadata, and workflows. But we have just deleted those images! Invalidating the tags
-        // will force those queries to re-fetch, and the requests will of course 404.
-        return [
-          ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
-          'ImageCollectionCounts',
-          { type: 'ImageCollection', id: LIST_TAG },
-        ];
-      },
-    }),
-    deleteUncategorizedImages: build.mutation<
-      paths['/api/v1/images/uncategorized']['delete']['responses']['200']['content']['application/json'],
-      void
-    >({
-      query: () => ({ url: buildImagesUrl('uncategorized'), method: 'DELETE' }),
-      invalidatesTags: (result) => {
-        if (!result) {
-          return [];
-        }
-        // We ignore the deleted images when getting tags to invalidate. If we did not, we will invalidate the queries
-        // that fetch image DTOs, metadata, and workflows. But we have just deleted those images! Invalidating the tags
-        // will force those queries to re-fetch, and the requests will of course 404.
-        return [
-          ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
-          'ImageCollectionCounts',
-          { type: 'ImageCollection', id: LIST_TAG },
-        ];
-      },
-    }),
+    
     /**
      * Change an image's `is_intermediate` property.
      */
@@ -187,56 +80,7 @@ export const imagesApi = api.injectEndpoints({
         ];
       },
     }),
-    /**
-     * Star a list of images.
-     */
-    starImages: build.mutation<
-      paths['/api/v1/images/star']['post']['responses']['200']['content']['application/json'],
-      paths['/api/v1/images/star']['post']['requestBody']['content']['application/json']
-    >({
-      query: (body) => ({
-        url: buildImagesUrl('star'),
-        method: 'POST',
-        body,
-      }),
-      invalidatesTags: (result) => {
-        if (!result) {
-          return [];
-        }
-        return [
-          ...getTagsToInvalidateForImageMutation(result.starred_images),
-          ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
-          'ImageCollectionCounts',
-          { type: 'ImageCollection', id: 'starred' },
-          { type: 'ImageCollection', id: 'unstarred' },
-        ];
-      },
-    }),
-    /**
-     * Unstar a list of images.
-     */
-    unstarImages: build.mutation<
-      paths['/api/v1/images/unstar']['post']['responses']['200']['content']['application/json'],
-      paths['/api/v1/images/unstar']['post']['requestBody']['content']['application/json']
-    >({
-      query: (body) => ({
-        url: buildImagesUrl('unstar'),
-        method: 'POST',
-        body,
-      }),
-      invalidatesTags: (result) => {
-        if (!result) {
-          return [];
-        }
-        return [
-          ...getTagsToInvalidateForImageMutation(result.unstarred_images),
-          ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
-          'ImageCollectionCounts',
-          { type: 'ImageCollection', id: 'starred' },
-          { type: 'ImageCollection', id: 'unstarred' },
-        ];
-      },
-    }),
+   
     uploadImage: build.mutation<
       paths['/api/v1/images/upload']['post']['responses']['201']['content']['application/json'],
       UploadImageArg
@@ -322,86 +166,6 @@ export const imagesApi = api.injectEndpoints({
       }),
       invalidatesTags: () => [{ type: 'Board', id: LIST_TAG }],
     }),
-    addImageToBoard: build.mutation<
-      paths['/api/v1/board_images/']['post']['responses']['201']['content']['application/json'],
-      paths['/api/v1/board_images/']['post']['requestBody']['content']['application/json']
-    >({
-      query: (body) => {
-        return {
-          url: buildBoardImagesUrl(),
-          method: 'POST',
-          body,
-        };
-      },
-      invalidatesTags: (result) => {
-        if (!result) {
-          return [];
-        }
-        return [
-          ...getTagsToInvalidateForImageMutation(result.added_images),
-          ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
-        ];
-      },
-    }),
-    removeImageFromBoard: build.mutation<
-      paths['/api/v1/board_images/']['delete']['responses']['201']['content']['application/json'],
-      paths['/api/v1/board_images/']['delete']['requestBody']['content']['application/json']
-    >({
-      query: (body) => {
-        return {
-          url: buildBoardImagesUrl(),
-          method: 'DELETE',
-          body,
-        };
-      },
-      invalidatesTags: (result) => {
-        if (!result) {
-          return [];
-        }
-        return [
-          ...getTagsToInvalidateForImageMutation(result.removed_images),
-          ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
-        ];
-      },
-    }),
-    addImagesToBoard: build.mutation<
-      paths['/api/v1/board_images/batch']['post']['responses']['201']['content']['application/json'],
-      paths['/api/v1/board_images/batch']['post']['requestBody']['content']['application/json']
-    >({
-      query: (body) => ({
-        url: buildBoardImagesUrl('batch'),
-        method: 'POST',
-        body,
-      }),
-      invalidatesTags: (result) => {
-        if (!result) {
-          return [];
-        }
-        return [
-          ...getTagsToInvalidateForImageMutation(result.added_images),
-          ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
-        ];
-      },
-    }),
-    removeImagesFromBoard: build.mutation<
-      paths['/api/v1/board_images/batch/delete']['post']['responses']['201']['content']['application/json'],
-      paths['/api/v1/board_images/batch/delete']['post']['requestBody']['content']['application/json']
-    >({
-      query: (body) => ({
-        url: buildBoardImagesUrl('batch/delete'),
-        method: 'POST',
-        body,
-      }),
-      invalidatesTags: (result) => {
-        if (!result) {
-          return [];
-        }
-        return [
-          ...getTagsToInvalidateForImageMutation(result.removed_images),
-          ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
-        ];
-      },
-    }),
     bulkDownloadImages: build.mutation<
       components['schemas']['ImagesDownloaded'],
       components['schemas']['Body_download_images_from_list']
@@ -466,7 +230,6 @@ export const imagesApi = api.injectEndpoints({
 
 export const {
   useGetIntermediatesCountQuery,
-  useListImagesQuery,
   useGetImageDTOQuery,
   useGetImageMetadataQuery,
   useGetImageWorkflowQuery,
@@ -474,13 +237,8 @@ export const {
   useUploadImageMutation,
   useCreateImageUploadEntryMutation,
   useClearIntermediatesMutation,
-  useAddImagesToBoardMutation,
-  useRemoveImagesFromBoardMutation,
   useDeleteBoardAndImagesMutation,
-  useDeleteUncategorizedImagesMutation,
   useDeleteBoardMutation,
-  useStarImagesMutation,
-  useUnstarImagesMutation,
   useBulkDownloadImagesMutation,
   useGetImageNamesQuery,
   useGetImageDTOsByNamesMutation,
@@ -591,7 +349,7 @@ export const useImageDTO = (imageName: string | null | undefined) => {
   return imageDTO ?? null;
 };
 
-const getTagsToInvalidateForImageMutation = (image_names: string[]): ApiTagDescription[] => {
+export const getTagsToInvalidateForImageMutation = (image_names: string[]): ApiTagDescription[] => {
   const tags: ApiTagDescription[] = [];
 
   for (const image_name of image_names) {
@@ -612,7 +370,7 @@ const getTagsToInvalidateForImageMutation = (image_names: string[]): ApiTagDescr
   return tags;
 };
 
-const getTagsToInvalidateForBoardAffectingMutation = (affected_boards: string[]): ApiTagDescription[] => {
+export const getTagsToInvalidateForBoardAffectingMutation = (affected_boards: string[]): ApiTagDescription[] => {
   const tags: ApiTagDescription[] = ['ImageNameList'];
 
   for (const board_id of affected_boards) {

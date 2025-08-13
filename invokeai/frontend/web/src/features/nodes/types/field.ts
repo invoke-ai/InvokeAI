@@ -1771,11 +1771,12 @@ const getImageGeneratorImagesFromBoardValues = async (
     return EMPTY_ARRAY;
   }
   const req = dispatch(
-    boardsApi.endpoints.listAllImageNamesForBoard.initiate(
+    boardsApi.endpoints.listAllResourceIdsForBoard.initiate(
       {
         board_id,
         categories: category === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
         is_intermediate: false,
+        resource_type: 'image',
       },
       { subscribe: false }
     )

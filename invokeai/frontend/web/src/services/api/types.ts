@@ -7,8 +7,7 @@ import z from 'zod';
 
 export type S = components['schemas'];
 
-export type ListImagesArgs = NonNullable<paths['/api/v1/images/']['get']['parameters']['query']>;
-export type ListImagesResponse = paths['/api/v1/images/']['get']['responses']['200']['content']['application/json'];
+export type ListImagesArgs = NonNullable<paths['/api/v1/images/names']['get']['parameters']['query']>;
 
 export type GetImageNamesResult =
   paths['/api/v1/images/names']['get']['responses']['200']['content']['application/json'];
@@ -65,8 +64,17 @@ const _zImageDTO = z.object({
 export type ImageDTO = z.infer<typeof _zImageDTO>;
 assert<Equals<ImageDTO, S['ImageDTO']>>();
 
+const _zVideoDTO = z.object({
+  video_id: z.string().nullish(),
+  width: z.number().int().gt(0),
+  height: z.number().int().gt(0),
+  board_id: z.string().nullish(),
+});
+
+export type VideoDTO = z.infer<typeof _zVideoDTO>;
+assert<Equals<VideoDTO, S['VideoDTO']>>();
+
 export type BoardDTO = S['BoardDTO'];
-export type OffsetPaginatedResults_ImageDTO_ = S['OffsetPaginatedResults_ImageDTO_'];
 
 // Models
 export type ModelType = S['ModelType'];
@@ -373,7 +381,6 @@ export type OutputFields<T extends AnyInvocation> = Extract<
 
 // Node Outputs
 export type ImageOutput = S['ImageOutput'];
-export type VideoOutput = S['VideoOutput'];
 
 export type BoardRecordOrderBy = S['BoardRecordOrderBy'];
 export type StarterModel = S['StarterModel'];
@@ -435,3 +442,5 @@ export type UploadImageArg = {
 
 export type ImageUploadEntryResponse = S['ImageUploadEntry'];
 export type ImageUploadEntryRequest = paths['/api/v1/images/']['post']['requestBody']['content']['application/json'];
+
+export type ResourceType = S['ResourceType'];

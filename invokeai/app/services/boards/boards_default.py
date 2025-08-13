@@ -2,6 +2,7 @@ from invokeai.app.services.board_records.board_records_common import BoardChange
 from invokeai.app.services.boards.boards_base import BoardServiceABC
 from invokeai.app.services.boards.boards_common import BoardDTO, board_record_to_dto
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.resources.resources_common import ResourceType
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
@@ -26,7 +27,7 @@ class BoardService(BoardServiceABC):
             cover_image_name = cover_image.image_name
         else:
             cover_image_name = None
-        image_count = self.__invoker.services.board_image_records.get_image_count_for_board(board_id)
+        image_count = self.__invoker.services.board_resource_records.get_resource_count_for_board(board_id, ResourceType.IMAGE)
         return board_record_to_dto(board_record, cover_image_name, image_count)
 
     def update(
@@ -41,7 +42,7 @@ class BoardService(BoardServiceABC):
         else:
             cover_image_name = None
 
-        image_count = self.__invoker.services.board_image_records.get_image_count_for_board(board_id)
+        image_count = self.__invoker.services.board_resource_records.get_resource_count_for_board(board_id, ResourceType.IMAGE)
         return board_record_to_dto(board_record, cover_image_name, image_count)
 
     def delete(self, board_id: str) -> None:
@@ -58,7 +59,7 @@ class BoardService(BoardServiceABC):
         board_records = self.__invoker.services.board_records.get_many(
             order_by, direction, offset, limit, include_archived
         )
-        board_dtos = []
+        board_dtos: list[BoardDTO] = []
         for r in board_records.items:
             cover_image = self.__invoker.services.image_records.get_most_recent_image_for_board(r.board_id)
             if cover_image:
@@ -66,7 +67,7 @@ class BoardService(BoardServiceABC):
             else:
                 cover_image_name = None
 
-            image_count = self.__invoker.services.board_image_records.get_image_count_for_board(r.board_id)
+            image_count = self.__invoker.services.board_resource_records.get_resource_count_for_board(r.board_id, ResourceType.IMAGE)
             board_dtos.append(board_record_to_dto(r, cover_image_name, image_count))
 
         return OffsetPaginatedResults[BoardDTO](items=board_dtos, offset=offset, limit=limit, total=len(board_dtos))
@@ -75,7 +76,7 @@ class BoardService(BoardServiceABC):
         self, order_by: BoardRecordOrderBy, direction: SQLiteDirection, include_archived: bool = False
     ) -> list[BoardDTO]:
         board_records = self.__invoker.services.board_records.get_all(order_by, direction, include_archived)
-        board_dtos = []
+        board_dtos: list[BoardDTO] = []
         for r in board_records:
             cover_image = self.__invoker.services.image_records.get_most_recent_image_for_board(r.board_id)
             if cover_image:
@@ -83,7 +84,7 @@ class BoardService(BoardServiceABC):
             else:
                 cover_image_name = None
 
-            image_count = self.__invoker.services.board_image_records.get_image_count_for_board(r.board_id)
+            image_count = self.__invoker.services.board_resource_records.get_resource_count_for_board(r.board_id, ResourceType.IMAGE)
             board_dtos.append(board_record_to_dto(r, cover_image_name, image_count))
 
         return board_dtos

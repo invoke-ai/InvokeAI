@@ -23,6 +23,7 @@ import { selectSystemShouldConfirmOnDelete } from 'features/system/store/systemS
 import { atom } from 'nanostores';
 import { useMemo } from 'react';
 import { imagesApi } from 'services/api/endpoints/images';
+import { resourcesApi } from 'services/api/endpoints/resources';
 import type { Param0 } from 'tsafe';
 
 // Implements an awaitable modal dialog for deleting images
@@ -82,11 +83,11 @@ const handleDeletions = async (image_names: string[], store: AppStore) => {
     const state = getState();
     const { data } = imagesApi.endpoints.getImageNames.select(selectGetImageNamesQueryArgs(state))(state);
     const index = data?.image_names.findIndex((name) => name === image_names[0]);
-    const { deleted_images } = await dispatch(
-      imagesApi.endpoints.deleteImages.initiate({ image_names }, { track: false })
+    const { deleted_resources } = await dispatch(
+      resourcesApi.endpoints.deleteResources.initiate({ resources: image_names.map((name) => ({ resource_id: name, resource_type: 'image' })) }, { track: false })
     ).unwrap();
 
-    const newImageNames = data?.image_names.filter((name) => !deleted_images.includes(name)) || [];
+    const newImageNames = data?.image_names.filter((name) => !deleted_resources.map(r => r.resource_id).includes(name)) || [];
     const newSelectedImage = newImageNames[index ?? 0] || null;
 
     if (intersection(state.gallery.selection, image_names).length > 0) {

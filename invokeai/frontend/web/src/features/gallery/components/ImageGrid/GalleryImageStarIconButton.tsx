@@ -3,8 +3,8 @@ import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { DndImageIcon } from 'features/dnd/DndImageIcon';
 import { memo, useCallback } from 'react';
 import { PiStarBold, PiStarFill } from 'react-icons/pi';
-import { useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
+import { useStarResourcesMutation, useUnstarResourcesMutation } from 'services/api/endpoints/resources';
 
 type Props = {
   imageDTO: ImageDTO;
@@ -12,16 +12,16 @@ type Props = {
 
 export const GalleryImageStarIconButton = memo(({ imageDTO }: Props) => {
   const customStarUi = useStore($customStarUI);
-  const [starImages] = useStarImagesMutation();
-  const [unstarImages] = useUnstarImagesMutation();
+  const [starResources] = useStarResourcesMutation();
+  const [unstarResources] = useUnstarResourcesMutation();
 
   const toggleStarredState = useCallback(() => {
     if (imageDTO.starred) {
-      unstarImages({ image_names: [imageDTO.image_name] });
+      unstarResources({ resources: [{ resource_id: imageDTO.image_name, resource_type: "image" }] });
     } else {
-      starImages({ image_names: [imageDTO.image_name] });
+      starResources({ resources: [{ resource_id: imageDTO.image_name, resource_type: "image" }] });
     }
-  }, [starImages, unstarImages, imageDTO]);
+  }, [starResources, unstarResources, imageDTO]);
 
   if (customStarUi) {
     return (

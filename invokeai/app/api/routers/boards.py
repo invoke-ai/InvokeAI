@@ -2,6 +2,7 @@ from typing import Optional, Union
 
 from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
+from invokeai.app.services.resources.resources_common import ResourceIdentifier, ResourceType
 from pydantic import BaseModel, Field
 
 from invokeai.app.api.dependencies import ApiDependencies
@@ -16,10 +17,10 @@ boards_router = APIRouter(prefix="/v1/boards", tags=["boards"])
 
 class DeleteBoardResult(BaseModel):
     board_id: str = Field(description="The id of the board that was deleted.")
-    deleted_board_images: list[str] = Field(
-        description="The image names of the board-images relationships that were deleted."
+    deleted_board_resources: list[str] = Field(
+        description="The resource ids of the board-resources relationships that were deleted."
     )
-    deleted_images: list[str] = Field(description="The names of the images that were deleted.")
+    deleted_resources: list[str] = Field(description="The names of the resources that were deleted.")
 
 
 @boards_router.post(
@@ -82,34 +83,30 @@ async def update_board(
 @boards_router.delete("/{board_id}", operation_id="delete_board", response_model=DeleteBoardResult)
 async def delete_board(
     board_id: str = Path(description="The id of board to delete"),
-    include_images: Optional[bool] = Query(description="Permanently delete all images on the board", default=False),
+    include_resources: Optional[bool] = Query(description="Permanently delete all resources on the board", default=False),
 ) -> DeleteBoardResult:
     """Deletes a board"""
     try:
-        if include_images is True:
-            deleted_images = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
+        if include_resources is True:
+            deleted_resources = ApiDependencies.invoker.services.board_resources.get_all_board_resource_ids_for_board(
                 board_id=board_id,
-                categories=None,
-                is_intermediate=None,
             )
             ApiDependencies.invoker.services.images.delete_images_on_board(board_id=board_id)
             ApiDependencies.invoker.services.boards.delete(board_id=board_id)
             return DeleteBoardResult(
                 board_id=board_id,
-                deleted_board_images=[],
-                deleted_images=deleted_images,
+                deleted_board_resources=[],
+                deleted_resources=deleted_resources,
             )
         else:
-            deleted_board_images = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
+            deleted_board_resources = ApiDependencies.invoker.services.board_resources.get_all_board_resource_ids_for_board(
                 board_id=board_id,
-                categories=None,
-                is_intermediate=None,
             )
             ApiDependencies.invoker.services.boards.delete(board_id=board_id)
             return DeleteBoardResult(
                 board_id=board_id,
-                deleted_board_images=deleted_board_images,
-                deleted_images=[],
+                deleted_board_resources=deleted_board_resources,
+                deleted_resources=[],
             )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to delete board")
@@ -141,20 +138,22 @@ async def list_boards(
 
 
 @boards_router.get(
-    "/{board_id}/image_names",
-    operation_id="list_all_board_image_names",
-    response_model=list[str],
+    "/{board_id}/resource_ids",
+    operation_id="list_all_board_resource_ids",
+    response_model=list[ResourceIdentifier],
 )
-async def list_all_board_image_names(
+async def list_all_board_resource_ids(
     board_id: str = Path(description="The id of the board or 'none' for uncategorized images"),
+    resource_type: ResourceType = Query(default=ResourceType.IMAGE, description="The type of resource to include."),
     categories: list[ImageCategory] | None = Query(default=None, description="The categories of image to include."),
     is_intermediate: bool | None = Query(default=None, description="Whether to list intermediate images."),
-) -> list[str]:
+) -> list[ResourceIdentifier]:
     """Gets a list of images for a board"""
 
-    image_names = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
+    resources = ApiDependencies.invoker.services.board_resources.get_all_board_resource_ids_for_board(
         board_id,
+        resource_type,
         categories,
         is_intermediate,
     )
-    return image_names
+    return resources

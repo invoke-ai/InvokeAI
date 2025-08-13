@@ -23,6 +23,7 @@ from invokeai.app.services.image_records.image_records_common import (
 from invokeai.app.services.images.images_base import ImageServiceABC
 from invokeai.app.services.images.images_common import ImageDTO, image_record_to_dto
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.resources.resources_common import ResourceType
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
@@ -75,8 +76,8 @@ class ImageService(ImageServiceABC):
             )
             if board_id is not None:
                 try:
-                    self.__invoker.services.board_image_records.add_image_to_board(
-                        board_id=board_id, image_name=image_name
+                    self.__invoker.services.board_resource_records.add_resource_to_board(
+                        board_id=board_id, resource_id=image_name, resource_type=ResourceType.IMAGE
                     )
                 except Exception as e:
                     self.__invoker.services.logger.warning(f"Failed to add image to board {board_id}: {str(e)}")
@@ -142,7 +143,7 @@ class ImageService(ImageServiceABC):
                 image_record=image_record,
                 image_url=self.__invoker.services.urls.get_image_url(image_name),
                 thumbnail_url=self.__invoker.services.urls.get_image_url(image_name, True),
-                board_id=self.__invoker.services.board_image_records.get_board_for_image(image_name),
+                board_id=self.__invoker.services.board_resource_records.get_board_for_resource(image_name, ResourceType.IMAGE),
             )
 
             return image_dto
@@ -234,7 +235,7 @@ class ImageService(ImageServiceABC):
                     image_record=r,
                     image_url=self.__invoker.services.urls.get_image_url(r.image_name),
                     thumbnail_url=self.__invoker.services.urls.get_image_url(r.image_name, True),
-                    board_id=self.__invoker.services.board_image_records.get_board_for_image(r.image_name),
+                    board_id=self.__invoker.services.board_resource_records.get_board_for_resource(r.image_name, ResourceType.IMAGE),
                 )
                 for r in results.items
             ]
@@ -266,10 +267,9 @@ class ImageService(ImageServiceABC):
 
     def delete_images_on_board(self, board_id: str):
         try:
-            image_names = self.__invoker.services.board_image_records.get_all_board_image_names_for_board(
+            image_names = self.__invoker.services.board_resource_records.get_all_board_resource_ids_for_board(
                 board_id,
-                categories=None,
-                is_intermediate=None,
+                resource_type=ResourceType.IMAGE,
             )
             for image_name in image_names:
                 self.__invoker.services.image_files.delete(image_name)

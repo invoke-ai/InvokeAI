@@ -3,9 +3,10 @@ import queryString from 'query-string';
 import type {
   BoardDTO,
   CreateBoardArg,
+  GetImageNamesResult,
   ImageCategory,
   ListBoardsArgs,
-  OffsetPaginatedResults_ImageDTO_,
+  ResourceType,
   UpdateBoardArg,
 } from 'services/api/types';
 import { getListImagesUrl } from 'services/api/util';
@@ -49,13 +50,13 @@ export const boardsApi = api.injectEndpoints({
       },
     }),
 
-    listAllImageNamesForBoard: build.query<
+    listAllResourceIdsForBoard: build.query<
       Array<string>,
-      { board_id: string | 'none'; categories: ImageCategory[] | undefined; is_intermediate: boolean | undefined }
+      { board_id: string | 'none'; categories: ImageCategory[] | undefined; is_intermediate: boolean | undefined; resource_type: ResourceType }
     >({
-      query: ({ board_id, categories, is_intermediate }) => ({
+      query: ({ board_id, categories, is_intermediate, resource_type }) => ({
         url: buildBoardsUrl(
-          `${board_id}/image_names?${queryString.stringify({ categories, is_intermediate }, { arrayFormat: 'none' })}`
+          `${board_id}/resource_ids?${queryString.stringify({ categories, is_intermediate, resource_type }, { arrayFormat: 'none' })}`
         ),
       }),
       providesTags: (result, error, arg) => [{ type: 'ImageNameList', id: JSON.stringify(arg) }, 'FetchOnReconnect'],
@@ -67,14 +68,12 @@ export const boardsApi = api.injectEndpoints({
           board_id: board_id ?? 'none',
           categories: IMAGE_CATEGORIES,
           is_intermediate: false,
-          limit: 0,
-          offset: 0,
         }),
         method: 'GET',
       }),
       providesTags: (result, error, arg) => [{ type: 'BoardImagesTotal', id: arg ?? 'none' }, 'FetchOnReconnect'],
-      transformResponse: (response: OffsetPaginatedResults_ImageDTO_) => {
-        return { total: response.total };
+      transformResponse: (response: GetImageNamesResult) => {
+        return { total: response.total_count };
       },
     }),
 
@@ -84,14 +83,12 @@ export const boardsApi = api.injectEndpoints({
           board_id: board_id ?? 'none',
           categories: ASSETS_CATEGORIES,
           is_intermediate: false,
-          limit: 0,
-          offset: 0,
         }),
         method: 'GET',
       }),
       providesTags: (result, error, arg) => [{ type: 'BoardAssetsTotal', id: arg ?? 'none' }, 'FetchOnReconnect'],
-      transformResponse: (response: OffsetPaginatedResults_ImageDTO_) => {
-        return { total: response.total };
+      transformResponse: (response: GetImageNamesResult) => {
+        return { total: response.total_count };
       },
     }),
 
@@ -134,5 +131,5 @@ export const {
   useGetBoardAssetsTotalQuery,
   useCreateBoardMutation,
   useUpdateBoardMutation,
-  useListAllImageNamesForBoardQuery,
+  useListAllResourceIdsForBoardQuery,
 } = boardsApi;

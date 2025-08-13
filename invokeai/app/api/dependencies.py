@@ -3,10 +3,14 @@
 import asyncio
 from logging import Logger
 
+from invokeai.app.services.board_resources.board_resources_default import BoardResourcesService
+from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
+from invokeai.app.services.videos.videos_default import VideoService
+from invokeai.app.services.board_resource_records.board_resource_records_sqlite import SqliteBoardResourceRecordStorage
 import torch
 
-from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
-from invokeai.app.services.board_images.board_images_default import BoardImagesService
+# from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
+# from invokeai.app.services.board_images.board_images_default import BoardImagesService
 from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
 from invokeai.app.services.boards.boards_default import BoardService
 from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
@@ -103,14 +107,18 @@ class ApiDependencies:
         configuration = config
         logger = logger
 
-        board_image_records = SqliteBoardImageRecordStorage(db=db)
-        board_images = BoardImagesService()
+        # board_image_records = SqliteBoardImageRecordStorage(db=db)
+        # board_images = BoardImagesService()
+        board_resource_records = SqliteBoardResourceRecordStorage(db=db)
+        board_resources = BoardResourcesService()
         board_records = SqliteBoardRecordStorage(db=db)
         boards = BoardService()
         events = FastAPIEventService(event_handler_id, loop=loop)
         bulk_download = BulkDownloadService()
         image_records = SqliteImageRecordStorage(db=db)
         images = ImageService()
+        video_records = SqliteVideoRecordStorage(db=db)
+        videos = VideoService()
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
         tensors = ObjectSerializerForwardCache(
             ObjectSerializerDisk[torch.Tensor](
@@ -155,8 +163,10 @@ class ApiDependencies:
         client_state_persistence = ClientStatePersistenceSqlite(db=db)
 
         services = InvocationServices(
-            board_image_records=board_image_records,
-            board_images=board_images,
+            # board_image_records=board_image_records,
+            # board_images=board_images,
+            board_resource_records=board_resource_records,
+            board_resources=board_resources,
             board_records=board_records,
             boards=boards,
             bulk_download=bulk_download,
@@ -177,6 +187,8 @@ class ApiDependencies:
             session_processor=session_processor,
             session_queue=session_queue,
             urls=urls,
+            videos=videos,
+            video_records=video_records,
             workflow_records=workflow_records,
             tensors=tensors,
             conditioning=conditioning,

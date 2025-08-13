@@ -11,7 +11,7 @@ export const addDeleteBoardAndImagesFulfilledListener = (startAppListening: AppS
   startAppListening({
     matcher: imagesApi.endpoints.deleteBoardAndImages.matchFulfilled,
     effect: (action, { dispatch, getState }) => {
-      const { deleted_images } = action.payload;
+      const { deleted_resources } = action.payload;
 
       // Remove all deleted images from the UI
 
@@ -23,8 +23,8 @@ export const addDeleteBoardAndImagesFulfilledListener = (startAppListening: AppS
       const upscale = selectUpscaleSlice(state);
       const refImages = selectRefImagesSlice(state);
 
-      deleted_images.forEach((image_name) => {
-        const imageUsage = getImageUsage(nodes, canvas, upscale, refImages, image_name);
+      deleted_resources.forEach((resource_id) => {
+        const imageUsage = getImageUsage(nodes, canvas, upscale, refImages, resource_id);
 
         if (imageUsage.isNodesImage && !wasNodeEditorReset) {
           dispatch(nodeEditorReset());

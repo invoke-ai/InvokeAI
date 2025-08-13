@@ -12,9 +12,11 @@ if TYPE_CHECKING:
 
     import torch
 
-    from invokeai.app.services.board_image_records.board_image_records_base import BoardImageRecordStorageBase
-    from invokeai.app.services.board_images.board_images_base import BoardImagesServiceABC
+    # from invokeai.app.services.board_image_records.board_image_records_base import BoardImageRecordStorageBase
+    # from invokeai.app.services.board_images.board_images_base import BoardImagesServiceABC
     from invokeai.app.services.board_records.board_records_base import BoardRecordStorageBase
+    from invokeai.app.services.board_resource_records.board_resource_records_base import BoardResourceRecordStorageBase
+    from invokeai.app.services.board_resources.board_resources_base import BoardResourcesServiceABC
     from invokeai.app.services.boards.boards_base import BoardServiceABC
     from invokeai.app.services.bulk_download.bulk_download_base import BulkDownloadBase
     from invokeai.app.services.client_state_persistence.client_state_persistence_base import ClientStatePersistenceABC
@@ -36,6 +38,8 @@ if TYPE_CHECKING:
     from invokeai.app.services.session_processor.session_processor_base import SessionProcessorBase
     from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
     from invokeai.app.services.urls.urls_base import UrlServiceBase
+    from invokeai.app.services.video_records.video_records_base import VideoRecordStorageBase
+    from invokeai.app.services.videos.videos_base import VideoServiceABC
     from invokeai.app.services.workflow_records.workflow_records_base import WorkflowRecordsStorageBase
     from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_base import WorkflowThumbnailServiceBase
     from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
@@ -46,8 +50,10 @@ class InvocationServices:
 
     def __init__(
         self,
-        board_images: "BoardImagesServiceABC",
-        board_image_records: "BoardImageRecordStorageBase",
+        # board_images: "BoardImagesServiceABC",
+        # board_image_records: "BoardImageRecordStorageBase",
+        board_resources: "BoardResourcesServiceABC",
+        board_resource_records: "BoardResourceRecordStorageBase",
         boards: "BoardServiceABC",
         board_records: "BoardRecordStorageBase",
         bulk_download: "BulkDownloadBase",
@@ -68,6 +74,8 @@ class InvocationServices:
         invocation_cache: "InvocationCacheBase",
         names: "NameServiceBase",
         urls: "UrlServiceBase",
+        videos: "VideoServiceABC",
+        video_records: "VideoRecordStorageBase",
         workflow_records: "WorkflowRecordsStorageBase",
         tensors: "ObjectSerializerBase[torch.Tensor]",
         conditioning: "ObjectSerializerBase[ConditioningFieldData]",
@@ -76,8 +84,10 @@ class InvocationServices:
         workflow_thumbnails: "WorkflowThumbnailServiceBase",
         client_state_persistence: "ClientStatePersistenceABC",
     ):
-        self.board_images = board_images
-        self.board_image_records = board_image_records
+        # self.board_images = board_images
+        # self.board_image_records = board_image_records
+        self.board_resources = board_resources
+        self.board_resource_records = board_resource_records
         self.boards = boards
         self.board_records = board_records
         self.bulk_download = bulk_download
@@ -98,6 +108,8 @@ class InvocationServices:
         self.invocation_cache = invocation_cache
         self.names = names
         self.urls = urls
+        self.videos = videos
+        self.video_records = video_records
         self.workflow_records = workflow_records
         self.tensors = tensors
         self.conditioning = conditioning

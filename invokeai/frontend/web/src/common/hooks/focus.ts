@@ -37,7 +37,6 @@ const REGION_NAMES = [
   'workflows',
   'progress',
   'settings',
-  'video',
 ] as const;
 /**
  * The names of the focus regions.

@@ -5,26 +5,26 @@ import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiStarBold, PiStarFill } from 'react-icons/pi';
-import { useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
+import { useStarResourcesMutation, useUnstarResourcesMutation } from 'services/api/endpoints/resources';
 
 export const ImageMenuItemStarUnstar = memo(() => {
   const { t } = useTranslation();
   const imageDTO = useImageDTOContext();
   const customStarUi = useStore($customStarUI);
-  const [starImages] = useStarImagesMutation();
-  const [unstarImages] = useUnstarImagesMutation();
+  const [starResources] = useStarResourcesMutation();
+  const [unstarResources] = useUnstarResourcesMutation();
 
   const starImage = useCallback(() => {
     if (imageDTO) {
-      starImages({ image_names: [imageDTO.image_name] });
+      starResources({ resources: [{ resource_id: imageDTO.image_name, resource_type: "image" }] });
     }
-  }, [starImages, imageDTO]);
+  }, [starResources, imageDTO]);
 
   const unstarImage = useCallback(() => {
     if (imageDTO) {
-      unstarImages({ image_names: [imageDTO.image_name] });
+      unstarResources({ resources: [{ resource_id: imageDTO.image_name, resource_type: "image" }] });
     }
-  }, [unstarImages, imageDTO]);
+  }, [unstarResources, imageDTO]);
 
   if (imageDTO.starred) {
     return (

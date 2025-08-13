@@ -26,12 +26,12 @@ import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { atom } from 'nanostores';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useListAllImageNamesForBoardQuery } from 'services/api/endpoints/boards';
+import { useListAllResourceIdsForBoardQuery } from 'services/api/endpoints/boards';
 import {
   useDeleteBoardAndImagesMutation,
   useDeleteBoardMutation,
-  useDeleteUncategorizedImagesMutation,
 } from 'services/api/endpoints/images';
+import { useDeleteUncategorizedResourcesMutation } from 'services/api/endpoints/resources';
 import type { BoardDTO } from 'services/api/types';
 
 export const $boardToDelete = atom<BoardDTO | 'none' | null>(null);
@@ -43,12 +43,13 @@ const DeleteBoardModal = () => {
 
   const boardId = useMemo(() => (boardToDelete === 'none' ? 'none' : boardToDelete?.board_id), [boardToDelete]);
 
-  const { currentData: boardImageNames, isFetching: isFetchingBoardNames } = useListAllImageNamesForBoardQuery(
+  const { currentData: boardImageNames, isFetching: isFetchingBoardNames } = useListAllResourceIdsForBoardQuery(
     boardId
       ? {
           board_id: boardId,
           categories: undefined,
           is_intermediate: undefined,
+          resource_type: 'image',
         }
       : skipToken
   );
@@ -82,8 +83,8 @@ const DeleteBoardModal = () => {
 
   const [deleteBoardAndImages, { isLoading: isDeleteBoardAndImagesLoading }] = useDeleteBoardAndImagesMutation();
 
-  const [deleteUncategorizedImages, { isLoading: isDeleteUncategorizedImagesLoading }] =
-    useDeleteUncategorizedImagesMutation();
+  const [deleteUncategorizedResources, { isLoading: isDeleteUncategorizedResourcesLoading }] =
+    useDeleteUncategorizedResourcesMutation();
 
   const imageUsageSummary = useAppSelector(selectImageUsageSummary);
 
@@ -103,13 +104,13 @@ const DeleteBoardModal = () => {
     $boardToDelete.set(null);
   }, [boardToDelete, deleteBoardAndImages]);
 
-  const handleDeleteUncategorizedImages = useCallback(() => {
+  const handleDeleteUncategorizedResources = useCallback(() => {
     if (!boardToDelete || boardToDelete !== 'none') {
       return;
     }
-    deleteUncategorizedImages();
+    deleteUncategorizedResources();
     $boardToDelete.set(null);
-  }, [boardToDelete, deleteUncategorizedImages]);
+  }, [boardToDelete, deleteUncategorizedResources]);
 
   const handleClose = useCallback(() => {
     $boardToDelete.set(null);
@@ -122,8 +123,8 @@ const DeleteBoardModal = () => {
       isDeleteBoardAndImagesLoading ||
       isDeleteBoardOnlyLoading ||
       isFetchingBoardNames ||
-      isDeleteUncategorizedImagesLoading,
-    [isDeleteBoardAndImagesLoading, isDeleteBoardOnlyLoading, isFetchingBoardNames, isDeleteUncategorizedImagesLoading]
+      isDeleteUncategorizedResourcesLoading,
+    [isDeleteBoardAndImagesLoading, isDeleteBoardOnlyLoading, isFetchingBoardNames, isDeleteUncategorizedResourcesLoading]
   );
 
   if (!boardToDelete) {
@@ -177,10 +178,10 @@ const DeleteBoardModal = () => {
                 </Button>
               )}
               {boardToDelete === 'none' && (
-                <Button colorScheme="error" isLoading={isLoading} onClick={handleDeleteUncategorizedImages}>
+                <Button colorScheme="error" isLoading={isLoading} onClick={handleDeleteUncategorizedResources}>
                   {t('boards.deleteAllUncategorizedImages')}
                 </Button>
-              )}
+              )}  
             </Flex>
           </AlertDialogFooter>
         </AlertDialogContent>

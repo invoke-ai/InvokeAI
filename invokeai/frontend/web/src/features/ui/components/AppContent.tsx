@@ -11,7 +11,6 @@ import {
   selectWithModelsTab,
   selectWithQueueTab,
   selectWithUpscalingTab,
-  selectWithVideoTab,
   selectWithWorkflowsTab,
 } from 'features/system/store/configSlice';
 import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
@@ -21,7 +20,6 @@ import { ModelsTabAutoLayout } from 'features/ui/layouts/models-tab-auto-layout'
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { QueueTabAutoLayout } from 'features/ui/layouts/queue-tab-auto-layout';
 import { UpscalingTabAutoLayout } from 'features/ui/layouts/upscaling-tab-auto-layout';
-import { VideoTabAutoLayout } from 'features/ui/layouts/video-tab-auto-layout';
 import { WorkflowsTabAutoLayout } from 'features/ui/layouts/workflows-tab-auto-layout';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
@@ -44,7 +42,6 @@ const TabContent = memo(() => {
   const withWorkflowsTab = useAppSelector(selectWithWorkflowsTab);
   const withModelsTab = useAppSelector(selectWithModelsTab);
   const withQueueTab = useAppSelector(selectWithQueueTab);
-  const withVideoTab = useAppSelector(selectWithVideoTab);
 
   return (
     <Flex position="relative" w="full" h="full" overflow="hidden">
@@ -54,7 +51,6 @@ const TabContent = memo(() => {
       {withWorkflowsTab && tab === 'workflows' && <WorkflowsTabAutoLayout />}
       {withModelsTab && tab === 'models' && <ModelsTabAutoLayout />}
       {withQueueTab && tab === 'queue' && <QueueTabAutoLayout />}
-      {withVideoTab && tab === 'video' && <VideoTabAutoLayout />}
       <SwitchingTabsLoader />
     </Flex>
   );
