@@ -54,6 +54,8 @@ const tagTypes = [
   'StylePreset',
   'Schema',
   'QueueCountsByDestination',
+  'Video',
+  'VideoIdList',
   // This is invalidated on reconnect. It should be used for queries that have changing data,
   // especially related to the queue and generation.
   'FetchOnReconnect',

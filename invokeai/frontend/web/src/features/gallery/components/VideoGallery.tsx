@@ -4,13 +4,12 @@ import { logger } from 'app/logging/logger';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { getFocusedRegion, useIsRegionFocused } from 'common/hooks/focus';
 import { useRangeBasedImageFetching } from 'features/gallery/hooks/useRangeBasedImageFetching';
-import type { selectGetImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
+import type { selectGetImageNamesQueryArgs, selectGetVideoIdsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import {
   selectGalleryImageMinimumWidth,
   selectGalleryView,
   selectImageToCompare,
   selectLastSelectedImage,
-  selectSelection,
   selectSelectionCount,
 } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
@@ -27,24 +26,26 @@ import type {
   VirtuosoGridHandle,
 } from 'react-virtuoso';
 import { VirtuosoGrid } from 'react-virtuoso';
-import { imagesApi, useImageDTO, useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
 import { useDebounce } from 'use-debounce';
 
-import { GalleryImage, GalleryImagePlaceholder } from './ImageGrid/GalleryImage';
 import { GallerySelectionCountTag } from './ImageGrid/GallerySelectionCountTag';
 import { useGalleryImageNames } from './use-gallery-image-names';
 import { useGalleryVideoIds } from './use-gallery-video-ids';
+import { videosApi } from 'services/api/endpoints/videos';
+import { GalleryImagePlaceholder } from './ImageGrid/GalleryImage';
+import { useRangeBasedVideoFetching } from '../hooks/useRangeBasedVideoFetching';
+import { GalleryVideo } from './ImageGrid/GalleryVideo';
 
 const log = logger('gallery');
 
-type ListImageNamesQueryArgs = ReturnType<typeof selectGetImageNamesQueryArgs>;
+type ListVideoIdsQueryArgs = ReturnType<typeof selectGetVideoIdsQueryArgs>;
 
 type GridContext = {
-  queryArgs: ListImageNamesQueryArgs;
-  imageNames: string[];
+  queryArgs: ListVideoIdsQueryArgs;
+  videoIds: string[];
 };
 
-const ImageAtPosition = memo(({ imageName }: { index: number; imageName: string }) => {
+const VideoAtPosition = memo(({ videoId }: { index: number; videoId: string }) => {
   /*
    * We rely on the useRangeBasedImageFetching to fetch all image DTOs, caching them with RTK Query.
    *
@@ -58,16 +59,16 @@ const ImageAtPosition = memo(({ imageName }: { index: number; imageName: string 
    */
 
   // Use `currentData` instead of `data` to prevent a flash of previous image rendered at this index
-  const { currentData: imageDTO, isUninitialized } = imagesApi.endpoints.getImageDTO.useQueryState(imageName);
-  imagesApi.endpoints.getImageDTO.useQuerySubscription(imageName, { skip: isUninitialized });
+  const { currentData: videoDTO, isUninitialized } = videosApi.endpoints.getVideoDTO.useQueryState(videoId);
+  videosApi.endpoints.getVideoDTO.useQuerySubscription(videoId, { skip: isUninitialized });
 
-  if (!imageDTO) {
-    return <GalleryImagePlaceholder data-image-name={imageName} />;
+  if (!videoDTO) {
+    return <GalleryImagePlaceholder data-video-id={videoId} />;
   }
 
-  return <GalleryImage imageDTO={imageDTO} />;
+  return <GalleryVideo videoDTO={videoDTO} />;
 });
-ImageAtPosition.displayName = 'ImageAtPosition';
+VideoAtPosition.displayName = 'VideoAtPosition';
 
 const computeItemKey: GridComputeItemKey<string, GridContext> = (index, imageName, { queryArgs }) => {
   return `${JSON.stringify(queryArgs)}-${imageName ?? index}`;
@@ -79,7 +80,7 @@ const computeItemKey: GridComputeItemKey<string, GridContext> = (index, imageNam
  * TODO(psyche): We only need to do this when the gallery width changes, or when the galleryImageMinimumWidth value
  * changes. Cache this calculation.
  */
-const getImagesPerRow = (rootEl: HTMLDivElement): number => {
+const getVideosPerRow = (rootEl: HTMLDivElement): number => {
   // Start from root and find virtuoso grid elements
   const gridElement = rootEl.querySelector('.virtuoso-grid-list');
 
@@ -113,74 +114,56 @@ const getImagesPerRow = (rootEl: HTMLDivElement): number => {
    *
    * Instead, we use a more robust approach that iteratively calculates how many images fit in the row.
    */
-  let imagesPerRow = 0;
+  let videosPerRow = 0;
   let spaceUsed = 0;
 
   // Floating point precision can cause imagesPerRow to be 1 too small. Adding 1px to the container size fixes
   // this, without the possibility of accidentally adding an extra column.
   while (spaceUsed + itemRect.width <= containerRect.width + 1) {
-    imagesPerRow++; // Increment the number of images
+    videosPerRow++; // Increment the number of images
     spaceUsed += itemRect.width; // Add image size to the used space
     if (spaceUsed + gap <= containerRect.width) {
       spaceUsed += gap; // Add gap size to the used space after each image except after the last image
     }
   }
 
-  return Math.max(1, imagesPerRow);
+    return Math.max(1, videosPerRow);
 };
 
 /**
  * Scroll the item at the given index into view if it is not currently visible.
  */
 const scrollIntoView = (
-  targetImageName: string,
-  imageNames: string[],
+  targetVideoId: string,
+  videoIds: string[],
   rootEl: HTMLDivElement,
   virtuosoGridHandle: VirtuosoGridHandle,
   range: ListRange
 ) => {
   if (range.endIndex === 0) {
     // No range is rendered; no need to scroll to anything.
-    log.trace('Not scrolling into view: Range endIdex is 0');
     return;
   }
 
-  const targetIndex = imageNames.findIndex((name) => name === targetImageName);
+  const targetIndex = videoIds.findIndex((id) => id === targetVideoId);
 
   if (targetIndex === -1) {
     // The image isn't in the currently rendered list.
-    log.trace('Not scrolling into view: targetIndex is -1');
     return;
   }
 
   const targetItem = rootEl.querySelector(
-    `.virtuoso-grid-item:has([data-image-name="${targetImageName}"])`
+    `.virtuoso-grid-item:has([data-video-id="${targetVideoId}"])`
   ) as HTMLElement;
 
   if (!targetItem) {
     if (targetIndex > range.endIndex) {
-      log.trace(
-        {
-          index: targetIndex,
-          behavior: 'auto',
-          align: 'start',
-        },
-        'Scrolling into view: not in DOM'
-      );
       virtuosoGridHandle.scrollToIndex({
         index: targetIndex,
         behavior: 'auto',
         align: 'start',
       });
     } else if (targetIndex < range.startIndex) {
-      log.trace(
-        {
-          index: targetIndex,
-          behavior: 'auto',
-          align: 'end',
-        },
-        'Scrolling into view: not in DOM'
-      );
       virtuosoGridHandle.scrollToIndex({
         index: targetIndex,
         behavior: 'auto',
@@ -188,7 +171,7 @@ const scrollIntoView = (
       });
     } else {
       log.debug(
-        `Unable to find image ${targetImageName} at index ${targetIndex} but it is in the rendered range ${range.startIndex}-${range.endIndex}`
+        `Unable to find video ${targetVideoId} at index ${targetIndex} but it is in the rendered range ${range.startIndex}-${range.endIndex}`
       );
     }
     return;
@@ -201,28 +184,12 @@ const scrollIntoView = (
   const rootRect = rootEl.getBoundingClientRect();
 
   if (itemRect.top < rootRect.top) {
-    log.trace(
-      {
-        index: targetIndex,
-        behavior: 'auto',
-        align: 'start',
-      },
-      'Scrolling into view: in overscan'
-    );
     virtuosoGridHandle.scrollToIndex({
       index: targetIndex,
       behavior: 'auto',
       align: 'start',
     });
   } else if (itemRect.bottom > rootRect.bottom) {
-    log.trace(
-      {
-        index: targetIndex,
-        behavior: 'auto',
-        align: 'end',
-      },
-      'Scrolling into view: in overscan'
-    );
     virtuosoGridHandle.scrollToIndex({
       index: targetIndex,
       behavior: 'auto',
@@ -230,7 +197,6 @@ const scrollIntoView = (
     });
   } else {
     // Image is already in view
-    log.debug('Not scrolling into view: Image is already in view');
   }
 
   return;
@@ -241,11 +207,11 @@ const scrollIntoView = (
  * If the image name is not found, return 0.
  * If no image name is provided, return 0.
  */
-const getImageIndex = (imageName: string | undefined | null, imageNames: string[]) => {
-  if (!imageName || imageNames.length === 0) {
+const getVideoIndex = (videoId: string | undefined | null, videoIds: string[]) => {
+  if (!videoId || videoIds.length === 0) {
     return 0;
   }
-  const index = imageNames.findIndex((n) => n === imageName);
+  const index = videoIds.findIndex((n) => n === videoId);
   return index >= 0 ? index : 0;
 };
 
@@ -253,7 +219,7 @@ const getImageIndex = (imageName: string | undefined | null, imageNames: string[
  * Handles keyboard navigation for the gallery.
  */
 const useKeyboardNavigation = (
-  imageNames: string[],
+  videoIds: string[],
   virtuosoRef: React.RefObject<VirtuosoGridHandle>,
   rootRef: React.RefObject<HTMLDivElement>
 ) => {
@@ -281,13 +247,13 @@ const useKeyboardNavigation = (
         return;
       }
 
-      if (imageNames.length === 0) {
+      if (videoIds.length === 0) {
         return;
       }
 
-      const imagesPerRow = getImagesPerRow(rootEl);
+      const videosPerRow = getVideosPerRow(rootEl);
 
-      if (imagesPerRow === 0) {
+      if (videosPerRow === 0) {
         // This can happen if the grid is not yet rendered or has no items
         return;
       }
@@ -295,13 +261,13 @@ const useKeyboardNavigation = (
       event.preventDefault();
 
       const state = getState();
-      const imageName = event.altKey
+      const videoId = event.altKey
         ? // When the user holds alt, we are changing the image to compare - if no image to compare is currently selected,
           // we start from the last selected image
           (selectImageToCompare(state) ?? selectLastSelectedImage(state))
         : selectLastSelectedImage(state);
 
-      const currentIndex = getImageIndex(imageName, imageNames);
+      const currentIndex = getVideoIndex(videoId, videoIds);
 
       let newIndex = currentIndex;
 
@@ -315,7 +281,7 @@ const useKeyboardNavigation = (
           }
           break;
         case 'ArrowRight':
-          if (currentIndex < imageNames.length - 1) {
+          if (currentIndex < videoIds.length - 1) {
             newIndex = currentIndex + 1;
             // } else {
             //   // Wrap to first image
@@ -324,34 +290,32 @@ const useKeyboardNavigation = (
           break;
         case 'ArrowUp':
           // If on first row, stay on current image
-          if (currentIndex < imagesPerRow) {
+          if (currentIndex < videosPerRow) {
             newIndex = currentIndex;
           } else {
-            newIndex = Math.max(0, currentIndex - imagesPerRow);
+            newIndex = Math.max(0, currentIndex - videosPerRow);
           }
           break;
         case 'ArrowDown':
           // If no images below, stay on current image
-          if (currentIndex >= imageNames.length - imagesPerRow) {
+          if (currentIndex >= videoIds.length - videosPerRow) {
             newIndex = currentIndex;
           } else {
-            newIndex = Math.min(imageNames.length - 1, currentIndex + imagesPerRow);
+            newIndex = Math.min(videoIds.length - 1, currentIndex + videosPerRow);
           }
           break;
       }
 
-      if (newIndex !== currentIndex && newIndex >= 0 && newIndex < imageNames.length) {
-        const newImageName = imageNames[newIndex];
-        if (newImageName) {
-          if (event.altKey) {
-            dispatch(imageToCompareChanged(newImageName));
-          } else {
-            dispatch(selectionChanged([newImageName]));
-          }
+      if (newIndex !== currentIndex && newIndex >= 0 && newIndex < videoIds.length) {
+        const newVideoId = videoIds[newIndex];
+        if (newVideoId) {
+         
+          dispatch(selectionChanged([newVideoId]));
+         
         }
       }
     },
-    [rootRef, virtuosoRef, imageNames, getState, dispatch]
+    [rootRef, virtuosoRef, videoIds, getState, dispatch]
   );
 
   useRegisteredHotkeys({
@@ -424,28 +388,24 @@ const useKeyboardNavigation = (
  * This is useful for keyboard navigation and ensuring the user can see their selection.
  * It only tracks the last selected image, not the image to compare.
  */
-const useKeepSelectedImageInView = (
-  imageNames: string[],
+const useKeepSelectedVideoInView = (
+  videoIds: string[],
   virtuosoRef: React.RefObject<VirtuosoGridHandle>,
   rootRef: React.RefObject<HTMLDivElement>,
   rangeRef: MutableRefObject<ListRange>
 ) => {
-  const selection = useAppSelector(selectSelection);
+  const targetVideoId = useAppSelector(selectLastSelectedImage);
 
   useEffect(() => {
-    const targetImageName = selection.at(-1);
     const virtuosoGridHandle = virtuosoRef.current;
     const rootEl = rootRef.current;
     const range = rangeRef.current;
 
-    if (!virtuosoGridHandle || !rootEl || !targetImageName || !imageNames || imageNames.length === 0) {
+    if (!virtuosoGridHandle || !rootEl || !targetVideoId || !videoIds || videoIds.length === 0) {
       return;
     }
-
-    setTimeout(() => {
-      scrollIntoView(targetImageName, imageNames, rootEl, virtuosoGridHandle, range);
-    }, 0);
-  }, [imageNames, rangeRef, rootRef, virtuosoRef, selection]);
+    scrollIntoView(targetVideoId, videoIds, rootEl, virtuosoGridHandle, range);
+  }, [targetVideoId, videoIds, rangeRef, rootRef, virtuosoRef]);
 };
 
 /**
@@ -493,56 +453,25 @@ const useScrollableGallery = (rootRef: RefObject<HTMLDivElement>) => {
   return scrollerRef;
 };
 
-const useStarImageHotkey = () => {
-  const lastSelectedImage = useAppSelector(selectLastSelectedImage);
-  const selectionCount = useAppSelector(selectSelectionCount);
-  const isGalleryFocused = useIsRegionFocused('gallery');
-  const imageDTO = useImageDTO(lastSelectedImage);
-  const [starImages] = useStarImagesMutation();
-  const [unstarImages] = useUnstarImagesMutation();
 
-  const handleStarHotkey = useCallback(() => {
-    if (!imageDTO) {
-      return;
-    }
-    if (!isGalleryFocused) {
-      return;
-    }
-    if (imageDTO.starred) {
-      unstarImages({ image_names: [imageDTO.image_name] });
-    } else {
-      starImages({ image_names: [imageDTO.image_name] });
-    }
-  }, [imageDTO, isGalleryFocused, starImages, unstarImages]);
 
-  useRegisteredHotkeys({
-    id: 'starImage',
-    category: 'gallery',
-    callback: handleStarHotkey,
-    options: { enabled: !!imageDTO && selectionCount === 1 && isGalleryFocused },
-    dependencies: [imageDTO, selectionCount, isGalleryFocused, handleStarHotkey],
-  });
-};
-
-export const NewGallery = memo(() => {
+export const VideoGallery = memo(() => {
   const virtuosoRef = useRef<VirtuosoGridHandle>(null);
   const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
   const rootRef = useRef<HTMLDivElement>(null);
   const galleryView = useAppSelector(selectGalleryView);
 
   // Get the ordered list of image names - this is our primary data source for virtualization
-  const { queryArgs, imageNames, isLoading } = useGalleryImageNames();
-  const { queryArgs: videoQueryArgs, videoIds, isLoading: isLoadingVideos } = useGalleryVideoIds();
+  const { queryArgs, videoIds, isLoading } = useGalleryVideoIds();
 
   // Use range-based fetching for bulk loading image DTOs into cache based on the visible range
-  const { onRangeChanged } = useRangeBasedImageFetching({
-    imageNames,
+  const { onRangeChanged } = useRangeBasedVideoFetching({
+    videoIds,
     enabled: !isLoading,
   });
 
-  useStarImageHotkey();
-  useKeepSelectedImageInView(imageNames, virtuosoRef, rootRef, rangeRef);
-  useKeyboardNavigation(imageNames, virtuosoRef, rootRef);
+  useKeepSelectedVideoInView(videoIds, virtuosoRef, rootRef, rangeRef);
+  useKeyboardNavigation(videoIds, virtuosoRef, rootRef);
   const scrollerRef = useScrollableGallery(rootRef);
 
   /*
@@ -557,7 +486,7 @@ export const NewGallery = memo(() => {
     [onRangeChanged]
   );
 
-  const context = useMemo<GridContext>(() => ({ imageNames, queryArgs, videoIds, videoQueryArgs }), [imageNames, queryArgs, videoIds, videoQueryArgs]);
+  const context = useMemo<GridContext>(() => ({ videoIds, queryArgs }), [videoIds, queryArgs]);
 
   if (isLoading) {
     return (
@@ -566,12 +495,12 @@ export const NewGallery = memo(() => {
         <Text color="base.300">Loading gallery...</Text>
       </Flex>
     );
-  }
+  } 
 
-  if (imageNames.length === 0) {
+  if (videoIds.length === 0) {
     return (
       <Flex w="full" h="full" alignItems="center" justifyContent="center">
-        <Text color="base.300">No images found</Text>
+        <Text color="base.300">No videos found</Text>
       </Flex>
     );
   }
@@ -582,7 +511,7 @@ export const NewGallery = memo(() => {
       <VirtuosoGrid<string, GridContext>
         ref={virtuosoRef}
         context={context}
-        data={galleryView === 'images' ? imageNames : videoIds}
+        data={videoIds}
         increaseViewportBy={4096}
         itemContent={itemContent}
         computeItemKey={computeItemKey}
@@ -597,7 +526,7 @@ export const NewGallery = memo(() => {
   );
 });
 
-NewGallery.displayName = 'NewGallery';
+VideoGallery.displayName = 'VideoGallery';
 
 const scrollSeekConfiguration: ScrollSeekConfiguration = {
   enter: (velocity) => {
@@ -625,8 +554,8 @@ const ListComponent: GridComponents<GridContext>['List'] = forwardRef(({ context
 });
 ListComponent.displayName = 'ListComponent';
 
-const itemContent: GridItemContent<string, GridContext> = (index, imageName) => {
-  return <ImageAtPosition index={index} imageName={imageName} />;
+const itemContent: GridItemContent<string, GridContext> = (index, videoId) => {
+  return <VideoAtPosition index={index} videoId={videoId} />;
 };
 
 const ItemComponent: GridComponents<GridContext>['Item'] = forwardRef(({ context: _, ...rest }, ref) => (
