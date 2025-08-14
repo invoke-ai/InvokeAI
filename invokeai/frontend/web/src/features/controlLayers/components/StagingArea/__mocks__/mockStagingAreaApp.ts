@@ -113,6 +113,7 @@ export const createMockQueueItem = (overrides: PartialDeep<S['SessionQueueItem']
   ) as S['SessionQueueItem'];
 
 export const createMockImageDTO = (overrides: Partial<ImageDTO> = {}): ImageDTO => ({
+  type: 'image',
   image_name: 'test-image.png',
   image_url: 'http://test.com/test-image.png',
   thumbnail_url: 'http://test.com/test-image-thumb.png',
