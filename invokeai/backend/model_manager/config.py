@@ -521,6 +521,65 @@ class MainDiffusersConfig(DiffusersConfigBase, MainConfigBase, LegacyProbeMixin,
     pass
 
 
+class BriaDiffusersConfig(DiffusersConfigBase, MainConfigBase, ModelConfigBase):
+    """Model config for Bria/Diffusers models."""
+
+    format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+    base: Literal[BaseModelType.Bria] = BaseModelType.Bria
+
+    @classmethod
+    def matches(cls, mod: ModelOnDisk) -> bool:
+        if mod.path.is_file():
+            return False
+
+        config_path = mod.path / "transformer" / "config.json"
+        if config_path.exists():
+            with open(config_path) as file:
+                transformer_conf = json.load(file)
+            if transformer_conf["_class_name"] == "BriaTransformer2DModel":
+                return True
+
+        return False
+
+    @classmethod
+    def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
+        return {}
+
+    @classmethod
+    def get_tag(cls) -> Tag:
+        return Tag(f"{ModelType.Main.value}.{ModelFormat.Diffusers.value}.{BaseModelType.Bria.value}")
+
+
+class BriaControlNetDiffusersConfig(DiffusersConfigBase, ControlAdapterConfigBase, ModelConfigBase):
+    """Model config for Bria/Diffusers ControlNet models."""
+
+    type: Literal[ModelType.ControlNet] = ModelType.ControlNet
+    format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+    base: Literal[BaseModelType.Bria] = BaseModelType.Bria
+
+    @classmethod
+    def matches(cls, mod: ModelOnDisk) -> bool:
+        if mod.path.is_file():
+            return False
+
+        config_path = mod.path / "config.json"
+        if config_path.exists():
+            with open(config_path) as file:
+                transformer_conf = json.load(file)
+            if transformer_conf["_class_name"] == "BriaTransformer2DModel":
+                return True
+
+        return False
+
+    @classmethod
+    def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
+        return {}
+
+    @classmethod
+    def get_tag(cls) -> Tag:
+        return Tag(f"{ModelType.ControlNet.value}.{ModelFormat.Diffusers.value}.{BaseModelType.Bria.value}")
+
+
 class IPAdapterConfigBase(ABC, BaseModel):
     type: Literal[ModelType.IPAdapter] = ModelType.IPAdapter
 
@@ -703,6 +762,8 @@ AnyModelConfig = Annotated[
         Annotated[ControlLoRALyCORISConfig, ControlLoRALyCORISConfig.get_tag()],
         Annotated[ControlLoRADiffusersConfig, ControlLoRADiffusersConfig.get_tag()],
         Annotated[LoRADiffusersConfig, LoRADiffusersConfig.get_tag()],
+        Annotated[BriaDiffusersConfig, BriaDiffusersConfig.get_tag()],
+        Annotated[BriaControlNetDiffusersConfig, BriaControlNetDiffusersConfig.get_tag()],
         Annotated[T5EncoderConfig, T5EncoderConfig.get_tag()],
         Annotated[T5EncoderBnbQuantizedLlmInt8bConfig, T5EncoderBnbQuantizedLlmInt8bConfig.get_tag()],
         Annotated[TextualInversionFileConfig, TextualInversionFileConfig.get_tag()],

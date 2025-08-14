@@ -17,6 +17,7 @@ export const MODEL_TYPE_MAP: Record<BaseModelType, string> = {
   imagen4: 'Imagen4',
   'chatgpt-4o': 'ChatGPT 4o',
   'flux-kontext': 'Flux Kontext',
+  'bria-3': 'Bria AI',
 };
 
 /**
@@ -35,6 +36,7 @@ export const MODEL_TYPE_SHORT_MAP: Record<BaseModelType, string> = {
   imagen4: 'Imagen4',
   'chatgpt-4o': 'ChatGPT 4o',
   'flux-kontext': 'Flux Kontext',
+  'bria-3': 'Bria',
 };
 
 /**
@@ -86,6 +88,10 @@ export const CLIP_SKIP_MAP: Record<BaseModelType, { maxClip: number; markers: nu
     markers: [],
   },
   'flux-kontext': {
+    maxClip: 0,
+    markers: [],
+  },
+  'bria-3': {
     maxClip: 0,
     markers: [],
   },
