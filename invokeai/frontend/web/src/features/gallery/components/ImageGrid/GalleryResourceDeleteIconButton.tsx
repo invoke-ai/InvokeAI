@@ -1,6 +1,6 @@
 import { IconButton, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { isImageResource, isVideoResource } from 'features/gallery/store/resourceTypes';
+import { getResourceId, isImageResource, isVideoResource } from 'features/gallery/store/resourceTypes';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold } from 'react-icons/pi';
@@ -14,13 +14,6 @@ type Props = {
 export const GalleryResourceDeleteIconButton = memo(({ resource, isHovered }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const resourceId = useMemo(() => {
-    if (isImageResource(resource)) {
-      return resource.image_name;
-    } else {
-      return resource.video_id ?? '';
-    }
-  }, [resource]);
 
   const onClick = useCallback(() => {
     // For now, we'll use the existing image delete modal for both images and videos
@@ -30,9 +23,9 @@ export const GalleryResourceDeleteIconButton = memo(({ resource, isHovered }: Pr
     } else if (isVideoResource(resource)) {
       // For videos, we'll need to implement video deletion
       // For now, just log that we would delete the video
-      console.log('Would delete video:', resourceId);
+      console.log('Would delete video:', getResourceId(resource));
     }
-  }, [resource, resourceId]);
+  }, [resource]);
 
   const tooltip = useMemo(() => {
     if (isImageResource(resource)) {
