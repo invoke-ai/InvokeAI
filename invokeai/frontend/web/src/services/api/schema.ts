@@ -792,6 +792,161 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/videos/i/{video_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Video Dto
+         * @description Gets a video's DTO
+         */
+        get: operations["get_video_dto"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Video
+         * @description Updates a video
+         */
+        patch: operations["update_video"];
+        trace?: never;
+    };
+    "/api/v1/videos/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Delete Videos From List */
+        post: operations["delete_videos_from_list"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/star": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Star Videos In List */
+        post: operations["star_videos_in_list"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/unstar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unstar Videos In List */
+        post: operations["unstar_videos_in_list"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/uncategorized": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Uncategorized Videos
+         * @description Deletes all videos that are uncategorized
+         */
+        delete: operations["delete_uncategorized_videos"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Video Dtos
+         * @description Lists video DTOs
+         */
+        get: operations["list_video_dtos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Video Ids
+         * @description Gets ordered list of video ids with metadata for optimistic updates
+         */
+        get: operations["get_video_ids"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/videos_by_ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Videos By Ids
+         * @description Gets video DTOs for the specified video ids. Maintains order of input ids.
+         */
+        post: operations["get_videos_by_ids"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/boards/": {
         parameters: {
             query?: never;
@@ -2669,6 +2824,14 @@ export type components = {
              */
             image_names: string[];
         };
+        /** Body_delete_videos_from_list */
+        Body_delete_videos_from_list: {
+            /**
+             * Video Ids
+             * @description The list of ids of videos to delete
+             */
+            video_ids: string[];
+        };
         /** Body_do_hf_login */
         Body_do_hf_login: {
             /**
@@ -2735,6 +2898,14 @@ export type components = {
              * @description Object containing list of image names to fetch DTOs for
              */
             image_names: string[];
+        };
+        /** Body_get_videos_by_ids */
+        Body_get_videos_by_ids: {
+            /**
+             * Video Ids
+             * @description Object containing list of video ids to fetch DTOs for
+             */
+            video_ids: string[];
         };
         /** Body_import_style_presets */
         Body_import_style_presets: {
@@ -2803,6 +2974,14 @@ export type components = {
              */
             image_names: string[];
         };
+        /** Body_star_videos_in_list */
+        Body_star_videos_in_list: {
+            /**
+             * Video Ids
+             * @description The list of ids of videos to star
+             */
+            video_ids: string[];
+        };
         /** Body_unstar_images_in_list */
         Body_unstar_images_in_list: {
             /**
@@ -2810,6 +2989,14 @@ export type components = {
              * @description The list of names of images to unstar
              */
             image_names: string[];
+        };
+        /** Body_unstar_videos_in_list */
+        Body_unstar_videos_in_list: {
+            /**
+             * Video Ids
+             * @description The list of ids of videos to unstar
+             */
+            video_ids: string[];
         };
         /** Body_update_model_image */
         Body_update_model_image: {
@@ -6065,6 +6252,19 @@ export type components = {
              * @description The names of the images that were deleted
              */
             deleted_images: string[];
+        };
+        /** DeleteVideosResult */
+        DeleteVideosResult: {
+            /**
+             * Affected Boards
+             * @description The ids of boards affected by the delete operation
+             */
+            affected_boards: string[];
+            /**
+             * Deleted Videos
+             * @description The ids of the videos that were deleted
+             */
+            deleted_videos: string[];
         };
         /**
          * Denoise - SD1.5, SDXL
@@ -17365,6 +17565,29 @@ export type components = {
              */
             items: components["schemas"]["ImageDTO"][];
         };
+        /** OffsetPaginatedResults[VideoDTO] */
+        OffsetPaginatedResults_VideoDTO_: {
+            /**
+             * Limit
+             * @description Limit of items to get
+             */
+            limit: number;
+            /**
+             * Offset
+             * @description Offset from which to retrieve items
+             */
+            offset: number;
+            /**
+             * Total
+             * @description Total number of items in result
+             */
+            total: number;
+            /**
+             * Items
+             * @description Items
+             */
+            items: components["schemas"]["VideoDTO"][];
+        };
         /**
          * OutputFieldJSONSchemaExtra
          * @description Extra attributes to be added to input fields and their OpenAPI schema. Used by the workflow editor
@@ -19996,6 +20219,19 @@ export type components = {
              */
             starred_images: string[];
         };
+        /** StarredVideosResult */
+        StarredVideosResult: {
+            /**
+             * Affected Boards
+             * @description The ids of boards affected by the delete operation
+             */
+            affected_boards: string[];
+            /**
+             * Starred Videos
+             * @description The ids of the videos that were starred
+             */
+            starred_videos: string[];
+        };
         /** StarterModel */
         StarterModel: {
             /** Description */
@@ -21621,6 +21857,19 @@ export type components = {
              */
             unstarred_images: string[];
         };
+        /** UnstarredVideosResult */
+        UnstarredVideosResult: {
+            /**
+             * Affected Boards
+             * @description The ids of boards affected by the delete operation
+             */
+            affected_boards: string[];
+            /**
+             * Unstarred Videos
+             * @description The ids of the videos that were unstarred
+             */
+            unstarred_videos: string[];
+        };
         /** Upscaler */
         Upscaler: {
             /**
@@ -21893,13 +22142,84 @@ export type components = {
             output_fields: components["schemas"]["FieldIdentifier"][];
         };
         /**
-         * VideoOutput
-         * @description Base class for nodes that output a video
+         * VideoDTO
+         * @description Deserialized video record, enriched for the frontend.
          */
-        VideoOutput: {
+        VideoDTO: {
             /**
              * Video Id
-             * @description The output video id
+             * @description The unique id of the video.
+             */
+            video_id: string;
+            /**
+             * Video Url
+             * @description The URL of the video.
+             */
+            video_url: string;
+            /**
+             * Thumbnail Url
+             * @description The URL of the video's thumbnail.
+             */
+            thumbnail_url: string;
+            /**
+             * Width
+             * @description The width of the video in px.
+             */
+            width: number;
+            /**
+             * Height
+             * @description The height of the video in px.
+             */
+            height: number;
+            /**
+             * Created At
+             * @description The created timestamp of the video.
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * @description The updated timestamp of the video.
+             */
+            updated_at: string;
+            /**
+             * Deleted At
+             * @description The deleted timestamp of the video.
+             */
+            deleted_at?: string | null;
+            /**
+             * Is Intermediate
+             * @description Whether this is an intermediate video.
+             */
+            is_intermediate: boolean;
+            /**
+             * Session Id
+             * @description The session ID that generated this video, if it is a generated video.
+             */
+            session_id?: string | null;
+            /**
+             * Node Id
+             * @description The node ID that generated this video, if it is a generated video.
+             */
+            node_id?: string | null;
+            /**
+             * Starred
+             * @description Whether this video is starred.
+             */
+            starred: boolean;
+            /**
+             * Board Id
+             * @description The id of the board the image belongs to, if one exists.
+             */
+            board_id?: string | null;
+        };
+        /**
+         * VideoField
+         * @description A video primitive field
+         */
+        VideoField: {
+            /**
+             * Video Id
+             * @description The id of the video
              */
             video_id: string;
             /**
@@ -21917,12 +22237,67 @@ export type components = {
              * @description The duration of the video in seconds
              */
             duration_seconds: number;
+        };
+        /**
+         * VideoIdsResult
+         * @description Response containing ordered video ids with metadata for optimistic updates.
+         */
+        VideoIdsResult: {
+            /**
+             * Video Ids
+             * @description Ordered list of video ids
+             */
+            video_ids: string[];
+            /**
+             * Starred Count
+             * @description Number of starred videos (when starred_first=True)
+             */
+            starred_count: number;
+            /**
+             * Total Count
+             * @description Total number of videos matching the query
+             */
+            total_count: number;
+        };
+        /**
+         * VideoOutput
+         * @description Base class for nodes that output a video
+         */
+        VideoOutput: {
+            /** @description The output video */
+            video: components["schemas"]["VideoField"];
             /**
              * type
              * @default video_output
              * @constant
              */
             type: "video_output";
+        };
+        /**
+         * VideoRecordChanges
+         * @description A set of changes to apply to a video record.
+         *
+         *     Only limited changes are valid:
+         *       - `session_id`: change the session associated with a video
+         *       - `is_intermediate`: change the video's `is_intermediate` flag
+         *       - `starred`: change whether the video is starred
+         */
+        VideoRecordChanges: {
+            /**
+             * Session Id
+             * @description The video's new session ID.
+             */
+            session_id?: string | null;
+            /**
+             * Is Intermediate
+             * @description The video's new `is_intermediate` flag.
+             */
+            is_intermediate?: boolean | null;
+            /**
+             * Starred
+             * @description The video's new `starred` state
+             */
+            starred?: boolean | null;
         };
         /** Workflow */
         Workflow: {
@@ -24108,6 +24483,310 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImageDTO"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_video_dto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the video to get */
+                video_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_video: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the video to update */
+                video_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VideoRecordChanges"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_videos_from_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_delete_videos_from_list"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteVideosResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    star_videos_in_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_star_videos_in_list"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StarredVideosResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unstar_videos_in_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_unstar_videos_in_list"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnstarredVideosResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_uncategorized_videos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteVideosResult"];
+                };
+            };
+        };
+    };
+    list_video_dtos: {
+        parameters: {
+            query?: {
+                /** @description Whether to list intermediate videos. */
+                is_intermediate?: boolean | null;
+                /** @description The board id to filter by. Use 'none' to find videos without a board. */
+                board_id?: string | null;
+                /** @description The page offset */
+                offset?: number;
+                /** @description The number of videos per page */
+                limit?: number;
+                /** @description The order of sort */
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                /** @description Whether to sort by starred videos first */
+                starred_first?: boolean;
+                /** @description The term to search for */
+                search_term?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OffsetPaginatedResults_VideoDTO_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_video_ids: {
+        parameters: {
+            query?: {
+                /** @description Whether to list intermediate videos. */
+                is_intermediate?: boolean | null;
+                /** @description The board id to filter by. Use 'none' to find videos without a board. */
+                board_id?: string | null;
+                /** @description The order of sort */
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                /** @description Whether to sort by starred videos first */
+                starred_first?: boolean;
+                /** @description The term to search for */
+                search_term?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoIdsResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_videos_by_ids: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_get_videos_by_ids"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoDTO"][];
                 };
             };
             /** @description Validation Error */
