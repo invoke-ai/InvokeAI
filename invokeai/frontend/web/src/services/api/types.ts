@@ -44,6 +44,7 @@ assert<Equals<ImageCategory, S['ImageCategory']>>();
 
 // Images
 const _zImageDTO = z.object({
+  type: z.literal('image'),
   image_name: z.string(),
   image_url: z.string(),
   thumbnail_url: z.string(),
@@ -65,6 +66,7 @@ export type ImageDTO = z.infer<typeof _zImageDTO>;
 assert<Equals<ImageDTO, S['ImageDTO']>>();
 
 const _zVideoDTO = z.object({
+  type: z.literal('video'),
   video_id: z.string(),
   width: z.number().int().gt(0),
   height: z.number().int().gt(0),

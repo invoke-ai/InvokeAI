@@ -10356,6 +10356,12 @@ export type components = {
              */
             has_workflow: boolean;
             /**
+             * Type
+             * @default image
+             * @constant
+             */
+            type: "image";
+            /**
              * Board Id
              * @description The id of the board the image belongs to, if one exists.
              */
@@ -21959,6 +21965,12 @@ export type components = {
          * @description Deserialized video record, enriched for the frontend.
          */
         VideoDTO: {
+            /**
+             * Type
+             * @default video
+             * @constant
+             */
+            type: "video";
             /**
              * Video Id
              * @description The id of the board the video belongs to, if one exists.

@@ -1,6 +1,6 @@
-from typing import Optional
+from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import ConfigDict, Field
 
 from invokeai.app.services.image_records.image_records_common import ImageRecord
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
@@ -16,14 +16,22 @@ class ImageUrlsDTO(BaseModelExcludeNull):
     thumbnail_url: str = Field(description="The URL of the image's thumbnail.")
     """The URL of the image's thumbnail."""
 
+def make_type_required(s: dict[str, Any]):
+    if "required" in s:
+        s["required"].append("type")
+    else:
+        s["required"] = ["type"]
 
 class ImageDTO(ImageRecord, ImageUrlsDTO):
     """Deserialized image record, enriched for the frontend."""
 
+    type: Literal['image'] = Field(default='image')
     board_id: Optional[str] = Field(
         default=None, description="The id of the board the image belongs to, if one exists."
     )
     """The id of the board the image belongs to, if one exists."""
+
+    model_config = ConfigDict(json_schema_extra=make_type_required)
 
 
 def image_record_to_dto(
@@ -39,4 +47,3 @@ def image_record_to_dto(
         thumbnail_url=thumbnail_url,
         board_id=board_id,
     )
-
