@@ -60,7 +60,7 @@ const _zImageDTO = z.object({
   node_id: z.string().nullish(),
   starred: z.boolean(),
   has_workflow: z.boolean(),
-  board_id: z.string().nullish()
+  board_id: z.string().nullish(),
 });
 export type ImageDTO = z.infer<typeof _zImageDTO>;
 assert<Equals<ImageDTO, S['ImageDTO']>>();
