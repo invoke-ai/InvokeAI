@@ -237,7 +237,7 @@ export const buildOnInvocationComplete = (
 
     const videoResult = await getResultVideoDTOs(data);
     if (videoResult) {
-      dispatch(generatedVideoChanged(videoResult));
+      dispatch(generatedVideoChanged({ video_id: videoResult.video.video_id, type: 'video_output' }));
     }
 
     $lastProgressEvent.set(null);
