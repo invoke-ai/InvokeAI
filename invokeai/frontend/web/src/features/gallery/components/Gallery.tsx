@@ -18,6 +18,7 @@ import { GallerySettingsPopover } from './GallerySettingsPopover/GallerySettings
 import { GalleryUploadButton } from './GalleryUploadButton';
 import { GallerySearch } from './ImageGrid/GallerySearch';
 import { NewGallery } from './NewGallery';
+import { VideoGallery } from './VideoGallery';
 
 const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0, width: '100%' };
 
@@ -40,6 +41,10 @@ export const GalleryPanel = memo(() => {
 
   const handleClickAssets = useCallback(() => {
     dispatch(galleryViewChanged('assets'));
+  }, [dispatch]);
+
+  const handleClickVideos = useCallback(() => {
+    dispatch(galleryViewChanged('videos'));
   }, [dispatch]);
 
   const handleClickSearch = useCallback(() => {
@@ -83,6 +88,14 @@ export const GalleryPanel = memo(() => {
           >
             {t('gallery.assets')}
           </Button>
+          <Button
+            tooltip={t('gallery.videosTab')}
+            onClick={handleClickVideos}
+            data-testid="videos-tab"
+            colorScheme={galleryView === 'videos' ? 'invokeBlue' : undefined}
+          >
+            {t('gallery.videos')}
+          </Button>
         </ButtonGroup>
         <Flex flexGrow={1} flexBasis={0} justifyContent="flex-end">
           <GalleryUploadButton />
@@ -109,7 +122,7 @@ export const GalleryPanel = memo(() => {
       </Collapse>
       <Divider pt={2} />
       <Flex w="full" h="full" pt={2}>
-        <NewGallery />
+        {galleryView === 'images' ? <NewGallery /> : galleryView === 'videos' ? <VideoGallery /> : <NewGallery />}
       </Flex>
     </Flex>
   );
