@@ -11,13 +11,12 @@ def make_type_required(s: dict[str, Any]):
     else:
         s["required"] = ["type"]
 
+
 class VideoDTO(BaseModel):
     """Deserialized video record, enriched for the frontend."""
 
-    type: Literal['video'] = Field(default='video')
-    video_id: str = Field(
-        description="The id of the board the video belongs to, if one exists."
-    )
+    type: Literal["video"] = Field(default="video")
+    video_id: str = Field(description="The id of the board the video belongs to, if one exists.")
     """The id of the board the video belongs to, if one exists."""
     width: int = Field(description="The width of the video.")
     height: int = Field(description="The height of the video.")

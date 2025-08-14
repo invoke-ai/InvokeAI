@@ -2,7 +2,6 @@ import sqlite3
 from typing import Optional, cast
 
 from invokeai.app.services.board_resource_records.board_resource_records_base import BoardResourceRecordStorageBase
-
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.resources.resources_common import ResourceIdentifier, ResourceType
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
@@ -48,7 +47,6 @@ class SqliteBoardResourceRecordStorage(BoardResourceRecordStorageBase):
                 )
             elif resource_type == ResourceType.VIDEO:
                 raise NotImplementedError("Video resource type is not supported in OSS")
-
 
     def get_all_board_resource_ids_for_board(
         self,
@@ -111,10 +109,13 @@ class SqliteBoardResourceRecordStorage(BoardResourceRecordStorageBase):
                 image_name_results = cast(list[sqlite3.Row], cursor.fetchall())
 
             if resource_type == ResourceType.VIDEO or resource_type is None:
-            #    this is not actually a valid code path for OSS, just demonstrating that it could be
+                #    this is not actually a valid code path for OSS, just demonstrating that it could be
                 raise NotImplementedError("Video resource type is not supported in OSS")
 
-            return [ResourceIdentifier(resource_id=image_name, resource_type=ResourceType.IMAGE) for image_name in image_name_results]
+            return [
+                ResourceIdentifier(resource_id=image_name, resource_type=ResourceType.IMAGE)
+                for image_name in image_name_results
+            ]
 
     def get_board_for_resource(
         self,
@@ -141,7 +142,7 @@ class SqliteBoardResourceRecordStorage(BoardResourceRecordStorageBase):
             cursor.execute(
                 """--sql
                     SELECT COUNT(*)
-                    FROM board_images 
+                    FROM board_images
                     INNER JOIN images ON board_images.image_name = images.image_name
                     WHERE images.is_intermediate = FALSE
                     AND board_images.board_id = ?;

@@ -2,15 +2,13 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 from invokeai.app.invocations.fields import MetadataField
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.video_records.video_records_common import (
-
     VideoNamesResult,
     VideoRecord,
     VideoRecordChanges,
-
 )
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
 
 class VideoRecordStorageBase(ABC):
@@ -62,7 +60,6 @@ class VideoRecordStorageBase(ABC):
     def save(
         self,
         video_id: str,
-       
         width: int,
         height: int,
         duration: Optional[float] = None,
@@ -91,7 +88,6 @@ class VideoRecordStorageBase(ABC):
         self,
         starred_first: bool = True,
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
-       
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
     ) -> VideoNamesResult:
@@ -107,4 +103,3 @@ class VideoRecordStorageBase(ABC):
     def delete_intermediates(self) -> int:
         """Deletes all intermediate videos and returns the count of deleted videos."""
         pass
-

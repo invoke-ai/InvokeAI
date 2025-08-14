@@ -32,7 +32,7 @@ async def add_resources_to_board(
                     old_board_id = ApiDependencies.invoker.services.images.get_dto(resource_id).board_id or "none"
                 else:
                     old_board_id = ApiDependencies.invoker.services.videos.get_dto(resource_id).board_id or "none"
-                    
+
                 ApiDependencies.invoker.services.board_resources.add_resource_to_board(
                     board_id=board_id,
                     resource_id=resource_id,
@@ -76,10 +76,9 @@ async def remove_resources_from_board(
                 else:
                     # For videos, we'll need to implement this once video service exists
                     old_board_id = ApiDependencies.invoker.services.videos.get_dto(resource_id).board_id or "none"
-                    
+
                 ApiDependencies.invoker.services.board_resources.remove_resource_from_board(
-                    resource_id=resource_id, 
-                    resource_type=resource_type
+                    resource_id=resource_id, resource_type=resource_type
                 )
                 removed_resources.add(resource_id)
                 affected_boards.add("none")
@@ -92,4 +91,3 @@ async def remove_resources_from_board(
         )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to remove resources from board")
-

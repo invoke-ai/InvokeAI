@@ -47,5 +47,3 @@ class BoardResourcesService(BoardResourcesServiceABC):
         resource_type: ResourceType,
     ) -> Optional[str]:
         return self.__invoker.services.board_resource_records.get_board_for_resource(resource_id, resource_type)
-
-   

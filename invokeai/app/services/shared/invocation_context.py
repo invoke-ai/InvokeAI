@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Optional, Union
 
 from PIL.Image import Image
-from invokeai.app.services.resources.resources_common import ResourceType
 from pydantic.networks import AnyHttpUrl
 from torch import Tensor
 
@@ -17,6 +16,7 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
+from invokeai.app.services.resources.resources_common import ResourceType
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.util.step_callback import diffusion_step_callback

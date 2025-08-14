@@ -50,6 +50,3 @@ class VideoNamesResult(BaseModel):
     """Result of fetching video names."""
 
     video_ids: list[str] = Field(description="The video IDs")
-
-
-

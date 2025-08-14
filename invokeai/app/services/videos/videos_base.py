@@ -2,16 +2,14 @@ from abc import ABC, abstractmethod
 from typing import Callable, Optional
 
 from invokeai.app.invocations.fields import MetadataField
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.video_records.video_records_common import (
-
     VideoNamesResult,
     VideoRecord,
     VideoRecordChanges,
-
 )
 from invokeai.app.services.videos.videos_common import VideoDTO
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
 
 class VideoServiceABC(ABC):
@@ -151,4 +149,3 @@ class VideoServiceABC(ABC):
     ) -> VideoNamesResult:
         """Gets video names with metadata for optimistic updates."""
         pass
-

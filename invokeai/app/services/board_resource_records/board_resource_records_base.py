@@ -55,5 +55,3 @@ class BoardResourceRecordStorageBase(ABC):
     ) -> int:
         """Gets the number of resources for a board."""
         pass
-
-    

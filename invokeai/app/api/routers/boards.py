@@ -2,13 +2,13 @@ from typing import Optional, Union
 
 from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
-from invokeai.app.services.resources.resources_common import ResourceIdentifier, ResourceType
 from pydantic import BaseModel, Field
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecordOrderBy
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.image_records.image_records_common import ImageCategory
+from invokeai.app.services.resources.resources_common import ResourceIdentifier, ResourceType
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
@@ -83,7 +83,9 @@ async def update_board(
 @boards_router.delete("/{board_id}", operation_id="delete_board", response_model=DeleteBoardResult)
 async def delete_board(
     board_id: str = Path(description="The id of board to delete"),
-    include_resources: Optional[bool] = Query(description="Permanently delete all resources on the board", default=False),
+    include_resources: Optional[bool] = Query(
+        description="Permanently delete all resources on the board", default=False
+    ),
 ) -> DeleteBoardResult:
     """Deletes a board"""
     try:
@@ -99,8 +101,10 @@ async def delete_board(
                 deleted_resources=deleted_resources,
             )
         else:
-            deleted_board_resources = ApiDependencies.invoker.services.board_resources.get_all_board_resource_ids_for_board(
-                board_id=board_id,
+            deleted_board_resources = (
+                ApiDependencies.invoker.services.board_resources.get_all_board_resource_ids_for_board(
+                    board_id=board_id,
+                )
             )
             ApiDependencies.invoker.services.boards.delete(board_id=board_id)
             return DeleteBoardResult(

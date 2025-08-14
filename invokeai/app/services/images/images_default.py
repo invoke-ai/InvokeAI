@@ -143,7 +143,9 @@ class ImageService(ImageServiceABC):
                 image_record=image_record,
                 image_url=self.__invoker.services.urls.get_image_url(image_name),
                 thumbnail_url=self.__invoker.services.urls.get_image_url(image_name, True),
-                board_id=self.__invoker.services.board_resource_records.get_board_for_resource(image_name, ResourceType.IMAGE),
+                board_id=self.__invoker.services.board_resource_records.get_board_for_resource(
+                    image_name, ResourceType.IMAGE
+                ),
             )
 
             return image_dto
@@ -235,7 +237,9 @@ class ImageService(ImageServiceABC):
                     image_record=r,
                     image_url=self.__invoker.services.urls.get_image_url(r.image_name),
                     thumbnail_url=self.__invoker.services.urls.get_image_url(r.image_name, True),
-                    board_id=self.__invoker.services.board_resource_records.get_board_for_resource(r.image_name, ResourceType.IMAGE),
+                    board_id=self.__invoker.services.board_resource_records.get_board_for_resource(
+                        r.image_name, ResourceType.IMAGE
+                    ),
                 )
                 for r in results.items
             ]

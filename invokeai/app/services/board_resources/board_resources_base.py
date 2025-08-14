@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.resources.resources_common import ResourceIdentifier, ResourceType
 
@@ -47,5 +46,3 @@ class BoardResourcesServiceABC(ABC):
     ) -> Optional[str]:
         """Gets a resource's board id, if it has one."""
         pass
-
-   

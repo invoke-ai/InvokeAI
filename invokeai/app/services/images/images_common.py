@@ -16,16 +16,18 @@ class ImageUrlsDTO(BaseModelExcludeNull):
     thumbnail_url: str = Field(description="The URL of the image's thumbnail.")
     """The URL of the image's thumbnail."""
 
+
 def make_type_required(s: dict[str, Any]):
     if "required" in s:
         s["required"].append("type")
     else:
         s["required"] = ["type"]
 
+
 class ImageDTO(ImageRecord, ImageUrlsDTO):
     """Deserialized image record, enriched for the frontend."""
 
-    type: Literal['image'] = Field(default='image')
+    type: Literal["image"] = Field(default="image")
     board_id: Optional[str] = Field(
         default=None, description="The id of the board the image belongs to, if one exists."
     )

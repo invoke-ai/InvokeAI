@@ -156,7 +156,6 @@ async def create_image_upload_entry(
     raise HTTPException(status_code=501, detail="Not implemented")
 
 
-
 @images_router.delete("/intermediates", operation_id="clear_intermediates")
 async def clear_intermediates() -> int:
     """Clears all intermediates"""

@@ -1,8 +1,10 @@
 from typing import Optional
 
-from fastapi import  Body,  Path, Query,  Response
+from fastapi import Body, Path, Query, Response
 from fastapi.routing import APIRouter
 
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.video_records.video_records_common import (
     VideoNamesResult,
     VideoRecordChanges,
@@ -10,8 +12,6 @@ from invokeai.app.services.video_records.video_records_common import (
 from invokeai.app.services.videos.videos_common import (
     VideoDTO,
 )
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
 videos_router = APIRouter(prefix="/v1/videos", tags=["videos"])
 
@@ -33,7 +33,6 @@ async def get_video_dto(
     raise NotImplementedError("Not implemented")
 
 
-
 @videos_router.get(
     "/",
     operation_id="list_video_dtos",
@@ -53,8 +52,6 @@ async def list_video_dtos(
     """Gets a list of video DTOs"""
 
     raise NotImplementedError("Not implemented")
-
-
 
 
 @videos_router.get("/ids", operation_id="get_video_ids")
@@ -97,8 +94,6 @@ async def update_video(
     """Updates a video"""
 
     raise NotImplementedError("Not implemented")
-
-
 
 
 @videos_router.get(

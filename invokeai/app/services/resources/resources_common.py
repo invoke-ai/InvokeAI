@@ -1,8 +1,11 @@
 from enum import Enum
+
 from pydantic import BaseModel, Field
+
 
 class ResourceType(str, Enum):
     """The type of resource that can be associated with a board."""
+
     IMAGE = "image"
     VIDEO = "video"
 
@@ -10,6 +13,7 @@ class ResourceType(str, Enum):
 class ResourceIdentifier(BaseModel):
     resource_id: str = Field(description="The id of the resource to delete")
     resource_type: ResourceType = Field(description="The type of the resource to delete")
+
 
 class ResultWithAffectedBoards(BaseModel):
     affected_boards: list[str] = Field(description="The ids of boards affected by the delete operation")

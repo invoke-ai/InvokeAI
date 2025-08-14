@@ -1,18 +1,16 @@
 from typing import Optional
 
 from invokeai.app.invocations.fields import MetadataField
+from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.video_records.video_records_common import (
-
     VideoNamesResult,
     VideoRecord,
     VideoRecordChanges,
-
 )
 from invokeai.app.services.videos.videos_base import VideoServiceABC
-from invokeai.app.services.videos.videos_common import VideoDTO, video_record_to_dto
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
-from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.videos.videos_common import VideoDTO
 
 
 class VideoService(VideoServiceABC):
@@ -103,4 +101,3 @@ class VideoService(VideoServiceABC):
     ) -> VideoNamesResult:
         # Return empty results for now
         return VideoNamesResult(video_ids=[])
-

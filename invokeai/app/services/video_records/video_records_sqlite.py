@@ -1,15 +1,15 @@
-from typing import Optional, cast
+from typing import Optional
 
 from invokeai.app.invocations.fields import MetadataField
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.video_records.video_records_base import VideoRecordStorageBase
 from invokeai.app.services.video_records.video_records_common import (
     VideoNamesResult,
     VideoRecord,
     VideoRecordChanges,
 )
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 
 class SqliteVideoRecordStorage(VideoRecordStorageBase):
@@ -74,7 +74,6 @@ class SqliteVideoRecordStorage(VideoRecordStorageBase):
         self,
         starred_first: bool = True,
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
-
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
     ) -> VideoNamesResult:
@@ -85,4 +84,3 @@ class SqliteVideoRecordStorage(VideoRecordStorageBase):
 
     def delete_intermediates(self) -> int:
         return 0  # Placeholder implementation
-

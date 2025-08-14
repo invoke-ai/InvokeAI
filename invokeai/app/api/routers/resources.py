@@ -1,16 +1,23 @@
-from fastapi import  Body, HTTPException
+from fastapi import Body, HTTPException
 from fastapi.routing import APIRouter
-from invokeai.app.services.resources.resources_common import DeleteResourcesResult, ResourceIdentifier, ResourceType, StarredResourcesResult, UnstarredResourcesResult
-from invokeai.app.services.video_records.video_records_common import VideoRecordChanges
 from pydantic import BaseModel, Field
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.image_records.image_records_common import (
     ImageRecordChanges,
 )
+from invokeai.app.services.resources.resources_common import (
+    DeleteResourcesResult,
+    ResourceIdentifier,
+    ResourceType,
+    StarredResourcesResult,
+    UnstarredResourcesResult,
+)
+from invokeai.app.services.video_records.video_records_common import VideoRecordChanges
 
 # routes that act on both images and videos, possibly together
 resources_router = APIRouter(prefix="/v1/resources", tags=["resources"])
+
 
 @resources_router.post("/delete", operation_id="delete_resources_from_list", response_model=DeleteResourcesResult)
 async def delete_resources_from_list(
@@ -46,13 +53,13 @@ async def delete_resources_from_list(
         raise HTTPException(status_code=500, detail="Failed to delete images")
 
 
-@resources_router.delete("/uncategorized", operation_id="delete_uncategorized_resources", response_model=DeleteResourcesResult)
+@resources_router.delete(
+    "/uncategorized", operation_id="delete_uncategorized_resources", response_model=DeleteResourcesResult
+)
 async def delete_uncategorized_resources() -> DeleteResourcesResult:
     """Deletes all resources that are uncategorized"""
 
-    resources = ApiDependencies.invoker.services.board_resources.get_all_board_resource_ids_for_board(
-        board_id="none"
-    )
+    resources = ApiDependencies.invoker.services.board_resources.get_all_board_resource_ids_for_board(board_id="none")
 
     try:
         deleted_resources: set[ResourceIdentifier] = set()
@@ -150,4 +157,3 @@ async def unstar_resources_in_list(
         )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to unstar images")
-
