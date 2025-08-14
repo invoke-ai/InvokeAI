@@ -40,6 +40,7 @@ const ImageMetadataActions = (props: Props) => {
       <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.Seed} />
       <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.Steps} />
       <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.Scheduler} />
+      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.CLIPSkip} />
       <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.CFGScale} />
       <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.CFGRescaleMultiplier} />
       <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.Guidance} />

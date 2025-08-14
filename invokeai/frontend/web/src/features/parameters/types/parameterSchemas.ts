@@ -195,20 +195,6 @@ export type ParameterLoRAWeight = z.infer<typeof zLoRAWeight>;
 // #endregion
 
 // #region CLIP skip
-// export const [zParameterCLIPSkip, isParameterCLIPSkip] = buildParameter(
-//   z.union([
-//     z.discriminatedUnion('model', [
-//       z.object({ model: z.literal('sd-1'), clipSkip: z.number().min(0).max(CLIP_SKIP_MAP['sd-1'].maxClip) }),
-//       z.object({ model: z.literal('sd-2'), clipSkip: z.number().min(0).max(CLIP_SKIP_MAP['sd-2'].maxClip) }),
-//       z.object({ model: z.literal('sdxl'), clipSkip: z.number().min(0).max(CLIP_SKIP_MAP['sdxl'].maxClip) }),
-//       z.object({
-//         model: z.literal('sdxl-refiner'),
-//         clipSkip: z.number().min(0).max(CLIP_SKIP_MAP['sdxl-refiner'].maxClip),
-//       }),
-//     ]),
-//     z.object({ model: z.string(), clipSkip: z.number().min(0).max(0) }),
-//   ])
-// );
 export const [zParameterCLIPSkip, isParameterCLIPSkip] = buildParameter(z.number().int().min(0));
 export type ParameterCLIPSkip = z.infer<typeof zParameterCLIPSkip>;
 // #endregion

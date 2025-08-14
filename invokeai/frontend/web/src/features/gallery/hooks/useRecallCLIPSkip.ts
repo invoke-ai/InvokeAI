@@ -1,4 +1,5 @@
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { selectHasModelCLIPSkip } from 'features/controlLayers/store/paramsSlice';
 import { MetadataHandlers, MetadataUtils } from 'features/metadata/parsing';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
@@ -10,8 +11,9 @@ const ALLOWED_TABS: TabName[] = ['canvas', 'generate', 'upscaling'];
 
 export const useRecallCLIPSkip = (imageDTO: ImageDTO) => {
   const store = useAppStore();
+  const hasModelCLIPSkip = useAppSelector(selectHasModelCLIPSkip);
   const tab = useAppSelector(selectActiveTab);
-  const [hasCLIPSkip, setCLIPSkip] = useState(false);
+  const [hasCLIPSkip, setHasCLIPSkip] = useState(false);
 
   const { metadata, isLoading } = useDebouncedMetadata(imageDTO.image_name);
 
@@ -19,14 +21,19 @@ export const useRecallCLIPSkip = (imageDTO: ImageDTO) => {
     const parse = async () => {
       try {
         await MetadataHandlers.CLIPSkip.parse(metadata, store);
-        setCLIPSkip(true);
+        setHasCLIPSkip(true);
       } catch {
-        setCLIPSkip(false);
+        setHasCLIPSkip(false);
       }
     };
 
+    if (!hasModelCLIPSkip) {
+      setHasCLIPSkip(false);
+      return;
+    }
+
     parse();
-  }, [metadata, store]);
+  }, [metadata, store, hasModelCLIPSkip]);
 
   const isEnabled = useMemo(() => {
     if (isLoading) {
