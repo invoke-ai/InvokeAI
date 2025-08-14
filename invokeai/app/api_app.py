@@ -28,6 +28,7 @@ from invokeai.app.api.routers import (
     style_presets,
     utilities,
     workflows,
+    videos,
 )
 from invokeai.app.api.sockets import SocketIO
 from invokeai.app.services.config.config_default import get_config
@@ -125,6 +126,7 @@ app.include_router(utilities.utilities_router, prefix="/api")
 app.include_router(model_manager.model_manager_router, prefix="/api")
 app.include_router(download_queue.download_queue_router, prefix="/api")
 app.include_router(images.images_router, prefix="/api")
+app.include_router(videos.videos_router, prefix="/api") 
 app.include_router(boards.boards_router, prefix="/api")
 app.include_router(board_images.board_images_router, prefix="/api")
 app.include_router(model_relationships.model_relationships_router, prefix="/api")
