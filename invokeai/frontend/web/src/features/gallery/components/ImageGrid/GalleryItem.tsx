@@ -1,6 +1,7 @@
 import { GalleryImage } from 'features/gallery/components/ImageGrid/GalleryImage';
 import { memo } from 'react';
 import type { ImageDTO, VideoDTO } from 'services/api/types';
+
 import { GalleryVideo } from './GalleryVideo';
 
 interface GalleryItemProps {

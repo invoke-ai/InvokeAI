@@ -36,7 +36,7 @@ import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSli
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
-import { imageDTOToFile, imagesApi, uploadImage } from 'services/api/endpoints/images';
+import { imageDTOToFile, uploadImage } from 'services/api/endpoints/images';
 import { resourcesApi } from 'services/api/endpoints/resources';
 import type { ImageDTO } from 'services/api/types';
 import type { Equals } from 'tsafe';

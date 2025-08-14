@@ -23,7 +23,6 @@ import {
   PiFrameCornersBold,
   PiQueueBold,
   PiTextAaBold,
-  PiVideoBold,
 } from 'react-icons/pi';
 
 import { Notifications } from './Notifications';

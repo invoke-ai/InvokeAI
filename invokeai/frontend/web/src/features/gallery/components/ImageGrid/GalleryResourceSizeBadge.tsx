@@ -1,7 +1,7 @@
 import { Badge } from '@invoke-ai/ui-library';
 import { isVideoResource } from 'features/gallery/store/resourceTypes';
 import { memo } from 'react';
-import { ImageDTO, VideoDTO } from 'services/api/types';
+import type { ImageDTO, VideoDTO } from 'services/api/types';
 
 type Props = {
   resource: ImageDTO | VideoDTO;

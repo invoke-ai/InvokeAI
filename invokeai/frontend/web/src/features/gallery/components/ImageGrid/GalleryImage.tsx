@@ -26,6 +26,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PiImageBold } from 'react-icons/pi';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
+
 import { GalleryResourceHoverIcons } from './GalleryResourceHoverIcons';
 
 const galleryImageContainerSX = {

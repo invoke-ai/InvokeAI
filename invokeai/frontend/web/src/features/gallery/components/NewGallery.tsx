@@ -26,13 +26,13 @@ import type {
 } from 'react-virtuoso';
 import { VirtuosoGrid } from 'react-virtuoso';
 import { imagesApi, useImageDTO,  } from 'services/api/endpoints/images';
+import { useStarResourcesMutation, useUnstarResourcesMutation } from 'services/api/endpoints/resources';
 import { useDebounce } from 'use-debounce';
 
 import {  GalleryImagePlaceholder } from './ImageGrid/GalleryImage';
+import { GalleryItem } from './ImageGrid/GalleryItem';
 import { GallerySelectionCountTag } from './ImageGrid/GallerySelectionCountTag';
 import { useGalleryImageNames } from './use-gallery-image-names';
-import { useStarResourcesMutation, useUnstarResourcesMutation } from 'services/api/endpoints/resources';
-import { GalleryItem } from './ImageGrid/GalleryItem';
 
 const log = logger('gallery');
 

@@ -10,8 +10,8 @@ import {
 } from 'features/changeBoardModal/store/slice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAddResourcesToBoardMutation, useRemoveResourcesFromBoardMutation } from 'services/api/endpoints/resources';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
+import { useAddResourcesToBoardMutation, useRemoveResourcesFromBoardMutation } from 'services/api/endpoints/resources';
 
 const selectImagesToChange = createSelector(
   selectChangeBoardModalSlice,

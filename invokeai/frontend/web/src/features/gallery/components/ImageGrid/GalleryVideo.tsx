@@ -19,6 +19,7 @@ import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { PiImageBold } from 'react-icons/pi';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { VideoDTO } from 'services/api/types';
+
 import { GalleryResourceHoverIcons } from './GalleryResourceHoverIcons';
 
 const galleryImageContainerSX = {
@@ -176,7 +177,7 @@ export const GalleryVideo = memo(({ videoDTO }: Props) => {
       >
         <Image
           pointerEvents="none"
-          src={""} // TODO: Add video thumbnail
+          src="" // TODO: Add video thumbnail
           w={videoDTO.width}
           fallback={<GalleryVideoPlaceholder />}
           objectFit="contain"

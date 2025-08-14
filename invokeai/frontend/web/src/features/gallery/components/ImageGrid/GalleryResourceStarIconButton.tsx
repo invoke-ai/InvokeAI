@@ -4,7 +4,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiStarBold, PiStarFill } from 'react-icons/pi';
 import { useStarResourcesMutation, useUnstarResourcesMutation } from 'services/api/endpoints/resources';
-import { ImageDTO, VideoDTO } from 'services/api/types';
+import type { ImageDTO, VideoDTO } from 'services/api/types';
 
 type Props = {
   resource: ImageDTO | VideoDTO;

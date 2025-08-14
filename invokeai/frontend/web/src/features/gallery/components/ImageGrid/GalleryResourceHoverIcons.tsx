@@ -5,7 +5,7 @@ import { GalleryResourceSizeBadge } from 'features/gallery/components/ImageGrid/
 import { GalleryResourceStarIconButton } from 'features/gallery/components/ImageGrid/GalleryResourceStarIconButton';
 import { selectAlwaysShouldImageSizeBadge } from 'features/gallery/store/gallerySelectors';
 import { memo } from 'react';
-import { ImageDTO, VideoDTO } from 'services/api/types';
+import type { ImageDTO, VideoDTO } from 'services/api/types';
 
 type Props = {
   resource: ImageDTO | VideoDTO;

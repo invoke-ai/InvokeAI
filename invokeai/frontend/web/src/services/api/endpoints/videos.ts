@@ -1,8 +1,7 @@
 import type { paths } from 'services/api/schema';
 
 import type { ApiTagDescription } from '..';
-import { buildV1Url } from '..';
-import { api, LIST_TAG } from '..';
+import { api, buildV1Url  } from '..';
 
 /**
  * Builds an endpoint URL for the videos router

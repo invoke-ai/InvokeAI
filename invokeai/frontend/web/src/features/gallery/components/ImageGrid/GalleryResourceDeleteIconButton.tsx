@@ -4,7 +4,7 @@ import { isImageResource, isVideoResource } from 'features/gallery/store/resourc
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold } from 'react-icons/pi';
-import { ImageDTO, VideoDTO } from 'services/api/types';
+import type { ImageDTO, VideoDTO } from 'services/api/types';
 
 type Props = {
   resource: ImageDTO | VideoDTO;
@@ -32,7 +32,7 @@ export const GalleryResourceDeleteIconButton = memo(({ resource, isHovered }: Pr
       // For now, just log that we would delete the video
       console.log('Would delete video:', resourceId);
     }
-  }, [dispatch, resourceId]);
+  }, [resource, resourceId]);
 
   const tooltip = useMemo(() => {
     if (isImageResource(resource)) {
@@ -67,4 +67,3 @@ export const GalleryResourceDeleteIconButton = memo(({ resource, isHovered }: Pr
 });
 
 GalleryResourceDeleteIconButton.displayName = 'GalleryResourceDeleteIconButton';
-
