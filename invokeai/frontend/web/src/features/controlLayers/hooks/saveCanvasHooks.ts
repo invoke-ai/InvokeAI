@@ -16,7 +16,6 @@ import {
   rgRefImageImageChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import {
-  selectCLIPSkip,
   selectMainModelConfig,
   selectNegativePrompt,
   selectPositivePrompt,
@@ -82,7 +81,6 @@ const useSaveCanvas = ({ region, saveToGallery, toastOk, toastError, onSave, wit
 
     if (withMetadata) {
       metadata = selectCanvasMetadata(state);
-      metadata.clip_skip = selectCLIPSkip(state);
       metadata.positive_prompt = selectPositivePrompt(state);
       metadata.negative_prompt = selectNegativePrompt(state);
       metadata.seed = selectSeed(state);
