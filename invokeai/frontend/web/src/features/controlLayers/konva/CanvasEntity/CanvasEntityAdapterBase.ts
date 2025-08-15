@@ -571,7 +571,7 @@ export abstract class CanvasEntityAdapterBase<T extends CanvasEntityState, U ext
   cropToBbox = async (): Promise<ImageDTO> => {
     const { rect } = this.manager.stateApi.getBbox();
     const rasterizeResult = await withResultAsync(() =>
-      this.renderer.rasterize({ rect, replaceObjects: true, attrs: { opacity: 1 } })
+      this.renderer.rasterize({ rect, replaceObjects: true, attrs: { opacity: 1, filters: [] } })
     );
     if (rasterizeResult.isErr()) {
       toast({ status: 'error', title: 'Failed to crop to bbox' });
