@@ -20,9 +20,29 @@ import {
   rasterLayerAdjustmentsSimpleUpdated,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectEntity } from 'features/controlLayers/store/selectors';
-import React, { memo, useCallback, useMemo } from 'react';
+import React, { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
+
+type AdjustmentSliderRowProps = {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+};
+const AdjustmentSliderRow = ({ label, value, onChange, min = -1, max = 1, step = 0.01 }: AdjustmentSliderRowProps) => (
+  <FormControl pr={2}>
+    <Flex alignItems="center" gap={3} mb={1}>
+      <FormLabel m={0} flexShrink={0} minW="90px">
+        {label}
+      </FormLabel>
+      <CompositeNumberInput value={value} onChange={onChange} min={min} max={max} step={step} flex="0 0 96px" />
+    </Flex>
+    <CompositeSlider value={value} onChange={onChange} min={min} max={max} step={step} marks />
+  </FormControl>
+);
 
 export const RasterLayerAdjustmentsPanel = memo(() => {
   const dispatch = useAppDispatch();
@@ -107,24 +127,6 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
   // Memoized click handlers to avoid inline arrow functions in JSX
   const onClickModeSimple = useCallback(() => onSetMode('simple'), [onSetMode]);
   const onClickModeCurves = useCallback(() => onSetMode('curves'), [onSetMode]);
-
-  const slider = useMemo(
-    () =>
-      ({
-        row: (label: string, value: number, onChange: (v: number) => void, min = -1, max = 1, step = 0.01) => (
-          <FormControl pr={2}>
-            <Flex alignItems="center" gap={3} mb={1}>
-              <FormLabel m={0} flexShrink={0} minW="90px">
-                {label}
-              </FormLabel>
-              <CompositeNumberInput value={value} onChange={onChange} min={min} max={max} step={step} flex="0 0 96px" />
-            </Flex>
-            <CompositeSlider value={value} onChange={onChange} min={min} max={max} step={step} marks />
-          </FormControl>
-        ),
-      }) as const,
-    []
-  );
 
   const onBrightness = useCallback(
     (v: number) => dispatch(rasterLayerAdjustmentsSimpleUpdated({ entityIdentifier, simple: { brightness: v } })),
@@ -213,12 +215,12 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
 
       {!collapsed && mode === 'simple' && (
         <>
-          {slider.row(t('controlLayers.adjustments.brightness'), simple.brightness, onBrightness)}
-          {slider.row(t('controlLayers.adjustments.contrast'), simple.contrast, onContrast)}
-          {slider.row(t('controlLayers.adjustments.saturation'), simple.saturation, onSaturation)}
-          {slider.row(t('controlLayers.adjustments.temperature'), simple.temperature, onTemperature)}
-          {slider.row(t('controlLayers.adjustments.tint'), simple.tint, onTint)}
-          {slider.row(t('controlLayers.adjustments.sharpness'), simple.sharpness, onSharpness, 0, 1, 0.01)}
+          <AdjustmentSliderRow label={t('controlLayers.adjustments.brightness')} value={simple.brightness} onChange={onBrightness} />
+          <AdjustmentSliderRow label={t('controlLayers.adjustments.contrast')} value={simple.contrast} onChange={onContrast} />
+          <AdjustmentSliderRow label={t('controlLayers.adjustments.saturation')} value={simple.saturation} onChange={onSaturation} />
+          <AdjustmentSliderRow label={t('controlLayers.adjustments.temperature')} value={simple.temperature} onChange={onTemperature} />
+          <AdjustmentSliderRow label={t('controlLayers.adjustments.tint')} value={simple.tint} onChange={onTint} />
+          <AdjustmentSliderRow label={t('controlLayers.adjustments.sharpness')} value={simple.sharpness} onChange={onSharpness} min={0} max={1} step={0.01} />
         </>
       )}
 
