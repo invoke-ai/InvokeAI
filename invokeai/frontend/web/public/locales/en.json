@@ -2682,8 +2682,8 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "Studio state is saved to the server, allowing you to continue your work on any device.",
-            "Support for multiple reference images for FLUX Kontext (local model only)."
+            "Misc QoL: Toggle Bbox visibility, highlight nodes with errors, prevent adding node fields to Builder form multiple times, CLIP Skip metadata recallable",
+            "Reduced VRAM usage for multiple Kontext Ref images and VAE encoding"
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
