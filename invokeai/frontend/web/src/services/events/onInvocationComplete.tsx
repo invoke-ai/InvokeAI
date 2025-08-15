@@ -5,6 +5,7 @@ import {
   selectAutoSwitch,
   selectGalleryView,
   selectGetImageNamesQueryArgs,
+  selectListBoardsQueryArgs,
   selectSelectedBoardId,
 } from 'features/gallery/store/gallerySelectors';
 import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
@@ -75,6 +76,14 @@ export const buildOnInvocationComplete = (
       });
     }
     dispatch(boardsApi.util.upsertQueryEntries(entries));
+
+    dispatch(
+      boardsApi.util.updateQueryData('listAllBoards', selectListBoardsQueryArgs(getState()), (draft) => {
+        for (const board of draft) {
+          board.image_count = board.image_count + (boardTotalAdditions[board.board_id] ?? 0);
+        }
+      })
+    );
 
     /**
      * Optimistic update and cache invalidation for image names queries that match this image's board and categories.
