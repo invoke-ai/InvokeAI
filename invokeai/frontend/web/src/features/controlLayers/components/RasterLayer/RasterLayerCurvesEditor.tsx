@@ -29,6 +29,30 @@ const sortPoints = (pts: Array<[number, number]>) =>
     .sort((a, b) => a[0] - b[0])
     .map(([x, y]) => [clamp(Math.round(x), 0, 255), clamp(Math.round(y), 0, 255)] as [number, number]);
 
+// Extracted canvas constants and helpers out of the component
+const CANVAS_WIDTH = 256;
+const CANVAS_HEIGHT = 160;
+const MARGIN_LEFT = 8;
+const MARGIN_RIGHT = 8;
+const MARGIN_TOP = 8;
+const MARGIN_BOTTOM = 10;
+const INNER_WIDTH = CANVAS_WIDTH - MARGIN_LEFT - MARGIN_RIGHT;
+const INNER_HEIGHT = CANVAS_HEIGHT - MARGIN_TOP - MARGIN_BOTTOM;
+
+const valueToCanvasX = (x: number) => MARGIN_LEFT + (clamp(x, 0, 255) / 255) * INNER_WIDTH;
+const valueToCanvasY = (y: number) => MARGIN_TOP + INNER_HEIGHT - (clamp(y, 0, 255) / 255) * INNER_HEIGHT;
+const canvasToValueX = (cx: number) => clamp(Math.round(((cx - MARGIN_LEFT) / INNER_WIDTH) * 255), 0, 255);
+const canvasToValueY = (cy: number) => clamp(Math.round(255 - ((cy - MARGIN_TOP) / INNER_HEIGHT) * 255), 0, 255);
+
+// Optional: stable canvas style from constants
+const CANVAS_STYLE: React.CSSProperties = {
+  width: '100%',
+  height: CANVAS_HEIGHT,
+  touchAction: 'none',
+  borderRadius: 4,
+  background: '#111',
+};
+
 type CurveGraphProps = {
   title: string;
   channel: Channel;
@@ -47,50 +71,22 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
     setLocalPoints(sortPoints(points ?? DEFAULT_POINTS));
   }, [points]);
 
-  const width = 256;
-  const height = 160;
-  // inner margins to keep a small buffer from edges (left/right/bottom)
-  const MARGIN_LEFT = 8;
-  const MARGIN_RIGHT = 8;
-  const MARGIN_TOP = 8;
-  const MARGIN_BOTTOM = 10;
-  const INNER_WIDTH = width - MARGIN_LEFT - MARGIN_RIGHT;
-  const INNER_HEIGHT = height - MARGIN_TOP - MARGIN_BOTTOM;
-
-  // helpers to map value-space [0..255] to canvas pixels (respecting inner margins)
-  const valueToCanvasX = useCallback(
-    (x: number) => MARGIN_LEFT + (clamp(x, 0, 255) / 255) * INNER_WIDTH,
-    [INNER_WIDTH]
-  );
-  const valueToCanvasY = useCallback(
-    (y: number) => MARGIN_TOP + INNER_HEIGHT - (clamp(y, 0, 255) / 255) * INNER_HEIGHT,
-    [INNER_HEIGHT]
-  );
-  const canvasToValueX = useCallback(
-    (cx: number) => clamp(Math.round(((cx - MARGIN_LEFT) / INNER_WIDTH) * 255), 0, 255),
-    [INNER_WIDTH]
-  );
-  const canvasToValueY = useCallback(
-    (cy: number) => clamp(Math.round(255 - ((cy - MARGIN_TOP) / INNER_HEIGHT) * 255), 0, 255),
-    [INNER_HEIGHT]
-  );
-
   const draw = useCallback(() => {
     const c = canvasRef.current;
     if (!c) {
       return;
     }
-    c.width = width;
-    c.height = height;
+    c.width = CANVAS_WIDTH;
+    c.height = CANVAS_HEIGHT;
     const ctx = c.getContext('2d');
     if (!ctx) {
       return;
     }
 
     // background
-    ctx.clearRect(0, 0, width, height);
+    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     ctx.fillStyle = '#111';
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     // grid inside inner rect
     ctx.strokeStyle = '#2a2a2a';
@@ -156,19 +152,7 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
       ctx.lineWidth = 1.5;
       ctx.stroke();
     }
-  }, [
-    MARGIN_LEFT,
-    MARGIN_TOP,
-    INNER_HEIGHT,
-    INNER_WIDTH,
-    channel,
-    height,
-    histogram,
-    localPoints,
-    valueToCanvasX,
-    valueToCanvasY,
-    width,
-  ]);
+  }, [channel, histogram, localPoints]);
 
   useEffect(() => {
     draw();
@@ -196,7 +180,7 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
       }
       return -1;
     },
-    [canvasToValueX, canvasToValueY, localPoints]
+    [localPoints]
   );
 
   const handlePointerDown = useCallback(
@@ -224,7 +208,7 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
       setLocalPoints(next);
       setDragIndex(next.findIndex(([x, y]) => x === xVal && y === yVal));
     },
-    [canvasToValueX, canvasToValueY, getNearestPointIndex, localPoints]
+    [getNearestPointIndex, localPoints]
   );
 
   const handlePointerMove = useCallback(
@@ -258,7 +242,7 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
         return sortPoints(next);
       });
     },
-    [canvasToValueX, canvasToValueY, dragIndex]
+    [dragIndex]
   );
 
   const commit = useCallback(
@@ -296,10 +280,7 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
     [commit, getNearestPointIndex, localPoints]
   );
 
-  const canvasStyle = useMemo<React.CSSProperties>(
-    () => ({ width: '100%', height: height, touchAction: 'none', borderRadius: 4, background: '#111' }),
-    [height]
-  );
+  const canvasStyle = useMemo<React.CSSProperties>(() => CANVAS_STYLE, []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -308,8 +289,8 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
       </Text>
       <canvas
         ref={canvasRef}
-        width={width}
-        height={height}
+        width={CANVAS_WIDTH}
+        height={CANVAS_HEIGHT}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
