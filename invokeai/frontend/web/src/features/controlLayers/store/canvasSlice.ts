@@ -1261,25 +1261,33 @@ const slice = createSlice({
         newEntity.name = `${newEntity.name} (Copy)`;
       }
       switch (newEntity.type) {
-        case 'raster_layer':
+        case 'raster_layer': {
           newEntity.id = getPrefixedId('raster_layer');
-          state.rasterLayers.entities.push(newEntity);
+          const newEntityIndex = state.rasterLayers.entities.findIndex((e) => e.id === entityIdentifier.id) + 1;
+          state.rasterLayers.entities.splice(newEntityIndex, 0, newEntity);
           break;
-        case 'control_layer':
+        }
+        case 'control_layer': {
           newEntity.id = getPrefixedId('control_layer');
-          state.controlLayers.entities.push(newEntity);
+          const newEntityIndex = state.controlLayers.entities.findIndex((e) => e.id === entityIdentifier.id) + 1;
+          state.controlLayers.entities.splice(newEntityIndex, 0, newEntity);
           break;
-        case 'regional_guidance':
+        }
+        case 'regional_guidance': {
           newEntity.id = getPrefixedId('regional_guidance');
           for (const refImage of newEntity.referenceImages) {
             refImage.id = getPrefixedId('regional_guidance_ip_adapter');
           }
-          state.regionalGuidance.entities.push(newEntity);
+          const newEntityIndex = state.regionalGuidance.entities.findIndex((e) => e.id === entityIdentifier.id) + 1;
+          state.regionalGuidance.entities.splice(newEntityIndex, 0, newEntity);
           break;
-        case 'inpaint_mask':
+        }
+        case 'inpaint_mask': {
           newEntity.id = getPrefixedId('inpaint_mask');
-          state.inpaintMasks.entities.push(newEntity);
+          const newEntityIndex = state.inpaintMasks.entities.findIndex((e) => e.id === entityIdentifier.id) + 1;
+          state.inpaintMasks.entities.splice(newEntityIndex, 0, newEntity);
           break;
+        }
       }
 
       state.selectedEntityIdentifier = getEntityIdentifier(newEntity);
