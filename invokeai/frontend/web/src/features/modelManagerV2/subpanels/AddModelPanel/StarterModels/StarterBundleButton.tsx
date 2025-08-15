@@ -1,5 +1,13 @@
 import type { ButtonProps } from '@invoke-ai/ui-library';
-import { Button, ConfirmationAlertDialog, Flex, ListItem, Text, UnorderedList, useDisclosure } from '@invoke-ai/ui-library';
+import {
+  Button,
+  ConfirmationAlertDialog,
+  Flex,
+  ListItem,
+  Text,
+  UnorderedList,
+  useDisclosure,
+} from '@invoke-ai/ui-library';
 import { useStarterBundleInstall } from 'features/modelManagerV2/hooks/useStarterBundleInstall';
 import { useStarterBundleInstallStatus } from 'features/modelManagerV2/hooks/useStarterBundleInstallStatus';
 import { t } from 'i18next';
@@ -29,25 +37,25 @@ export const StarterBundleButton = ({ bundle, ...rest }: { bundle: S['StarterMod
         {bundle.name}
       </Button>
       <ConfirmationAlertDialog
-          isOpen={isOpen}
-          onClose={onClose}
-          title={t('modelManager.installBundle')}
-          acceptCallback={handleInstallBundle}
-          acceptButtonText={t('modelManager.install')}
-          useInert={false}
-        >
-          <Flex rowGap={4} flexDirection="column">
-            <Text fontWeight="bold">{t('modelManager.installBundleMsg1', { bundleName: bundle.name })}</Text>
-            <Text>{t('modelManager.installBundleMsg2', { count: install.length })}</Text>
-            <UnorderedList>
-              {install.map((model, index) => (
-                <ListItem key={index} wordBreak="break-all">
-                  <Text>{model.config.name}</Text>
-                </ListItem>
-              ))}
-            </UnorderedList>
-          </Flex>
-        </ConfirmationAlertDialog>
-      </>
+        isOpen={isOpen}
+        onClose={onClose}
+        title={t('modelManager.installBundle')}
+        acceptCallback={handleInstallBundle}
+        acceptButtonText={t('modelManager.install')}
+        useInert={false}
+      >
+        <Flex rowGap={4} flexDirection="column">
+          <Text fontWeight="bold">{t('modelManager.installBundleMsg1', { bundleName: bundle.name })}</Text>
+          <Text>{t('modelManager.installBundleMsg2', { count: install.length })}</Text>
+          <UnorderedList>
+            {install.map((model, index) => (
+              <ListItem key={index} wordBreak="break-all">
+                <Text>{model.config.name}</Text>
+              </ListItem>
+            ))}
+          </UnorderedList>
+        </Flex>
+      </ConfirmationAlertDialog>
+    </>
   );
 };
