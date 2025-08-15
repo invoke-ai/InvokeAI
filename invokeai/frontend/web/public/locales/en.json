@@ -1187,6 +1187,7 @@
     },
     "parameters": {
         "aspect": "Aspect",
+        "duration": "Duration",
         "lockAspectRatio": "Lock Aspect Ratio",
         "swapDimensions": "Swap Dimensions",
         "setToOptimalSize": "Optimize size for model",

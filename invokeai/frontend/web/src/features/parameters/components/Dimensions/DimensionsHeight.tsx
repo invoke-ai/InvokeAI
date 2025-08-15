@@ -3,9 +3,11 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { heightChanged, selectHeight } from 'features/controlLayers/store/paramsSlice';
 import { selectGridSize, selectOptimalDimension } from 'features/controlLayers/store/selectors';
+import { useIsApiModel } from 'features/parameters/hooks/useIsApiModel';
 import { selectHeightConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 
 export const DimensionsHeight = memo(() => {
   const { t } = useTranslation();
@@ -14,7 +16,8 @@ export const DimensionsHeight = memo(() => {
   const height = useAppSelector(selectHeight);
   const config = useAppSelector(selectHeightConfig);
   const gridSize = useAppSelector(selectGridSize);
-
+  const activeTab = useAppSelector(selectActiveTab);
+  const isApiModel = useIsApiModel();
   const onChange = useCallback(
     (v: number) => {
       dispatch(heightChanged({ height: v }));
@@ -28,7 +31,7 @@ export const DimensionsHeight = memo(() => {
   );
 
   return (
-    <FormControl>
+    <FormControl isDisabled={isApiModel || activeTab === 'video'}>
       <InformationalPopover feature="paramHeight">
         <FormLabel>{t('parameters.height')}</FormLabel>
       </InformationalPopover>
