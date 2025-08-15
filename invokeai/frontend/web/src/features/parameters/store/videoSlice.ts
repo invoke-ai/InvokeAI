@@ -11,8 +11,7 @@ import z from 'zod';
 
 const zVideoState = z.object({
   _version: z.literal(1),
-  videoFirstFrameImage: zImageWithDims.nullable(),
-  videoLastFrameImage: zImageWithDims.nullable(),
+  startingFrameImage: zImageWithDims.nullable(),
   generatedVideo: zVideoOutput.nullable(),
 });
 
@@ -20,8 +19,7 @@ export type VideoState = z.infer<typeof zVideoState>;
 
 const getInitialState = (): VideoState => ({
   _version: 1,
-  videoFirstFrameImage: null,
-  videoLastFrameImage: null,
+  startingFrameImage: null,
   generatedVideo: null,
 });
 
@@ -29,12 +27,8 @@ const slice = createSlice({
   name: 'video',
   initialState: getInitialState(),
   reducers: {
-    videoFirstFrameImageChanged: (state, action: PayloadAction<ImageWithDims | null>) => {
-      state.videoFirstFrameImage = action.payload;
-    },
-
-    videoLastFrameImageChanged: (state, action: PayloadAction<ImageWithDims | null>) => {
-      state.videoLastFrameImage = action.payload;
+    startingFrameImageChanged: (state, action: PayloadAction<ImageWithDims | null>) => {
+      state.startingFrameImage = action.payload;
     },
 
     generatedVideoChanged: (state, action: PayloadAction<VideoOutput | null>) => {
@@ -45,8 +39,7 @@ const slice = createSlice({
 });
 
 export const {
-  videoFirstFrameImageChanged,
-  videoLastFrameImageChanged,
+  startingFrameImageChanged,
   generatedVideoChanged,
 } = slice.actions;
 
@@ -68,6 +61,5 @@ export const videoSliceConfig: SliceConfig<typeof slice> = {
 export const selectVideoSlice = (state: RootState) => state.video;
 const createVideoSelector = <T>(selector: Selector<VideoState, T>) => createSelector(selectVideoSlice, selector);
 
-export const selectVideoFirstFrameImage = createVideoSelector((video) => video.videoFirstFrameImage);
-export const selectVideoLastFrameImage = createVideoSelector((video) => video.videoLastFrameImage);
+export const selectStartingFrameImage = createVideoSelector((video) => video.startingFrameImage);
 export const selectGeneratedVideo = createVideoSelector((video) => video.generatedVideo);

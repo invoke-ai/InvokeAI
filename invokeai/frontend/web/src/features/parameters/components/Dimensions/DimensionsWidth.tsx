@@ -7,6 +7,7 @@ import { useIsApiModel } from 'features/parameters/hooks/useIsApiModel';
 import { selectWidthConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 
 export const DimensionsWidth = memo(() => {
   const { t } = useTranslation();
@@ -16,6 +17,7 @@ export const DimensionsWidth = memo(() => {
   const config = useAppSelector(selectWidthConfig);
   const isApiModel = useIsApiModel();
   const gridSize = useAppSelector(selectGridSize);
+  const activeTab = useAppSelector(selectActiveTab);
 
   const onChange = useCallback(
     (v: number) => {
@@ -30,7 +32,7 @@ export const DimensionsWidth = memo(() => {
   );
 
   return (
-    <FormControl isDisabled={isApiModel}>
+    <FormControl isDisabled={isApiModel || activeTab === 'video'}>
       <InformationalPopover feature="paramWidth">
         <FormLabel>{t('parameters.width')}</FormLabel>
       </InformationalPopover>
