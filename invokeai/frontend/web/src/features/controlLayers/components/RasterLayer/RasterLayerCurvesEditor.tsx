@@ -1,10 +1,10 @@
-import { Flex, Text } from '@invoke-ai/ui-library';
+import { Flex, Text, Box } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEntityAdapterContext } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { rasterLayerAdjustmentsCurvesUpdated } from 'features/controlLayers/store/canvasSlice';
-import { selectEntity } from 'features/controlLayers/store/selectors';
-import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
+import { selectEntity, selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { createSelector } from '@reduxjs/toolkit';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -283,7 +283,7 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
   const canvasStyle = useMemo<React.CSSProperties>(() => CANVAS_STYLE, []);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <Flex flexDir="column" gap={4}>
       <Text fontSize="xs" color={channelColor[channel]}>
         {title}
       </Text>
@@ -297,7 +297,7 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
         onDoubleClick={handleDoubleClick}
         style={canvasStyle}
       />
-    </div>
+    </Flex>
   );
 });
 
@@ -306,9 +306,12 @@ export const RasterLayerCurvesEditor = memo(() => {
   const entityIdentifier = useEntityIdentifierContext<'raster_layer'>();
   const adapter = useEntityAdapterContext<'raster_layer'>('raster_layer');
   const { t } = useTranslation();
-  const layer = useAppSelector((s) => selectEntity(s.canvas.present, entityIdentifier)) as
-    | CanvasRasterLayerState
-    | undefined;
+  const selectLayer = useMemo(
+    () =>
+      createSelector(selectCanvasSlice, (canvas) => selectEntity(canvas, entityIdentifier)),
+    [entityIdentifier]
+  );
+  const layer = useAppSelector(selectLayer);
 
   const [histMaster, setHistMaster] = useState<number[] | null>(null);
   const [histR, setHistR] = useState<number[] | null>(null);
@@ -368,8 +371,7 @@ export const RasterLayerCurvesEditor = memo(() => {
 
   useEffect(() => {
     recalcHistogram();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layer?.objects, layer?.adjustments]);
+  }, [layer?.objects, layer?.adjustments, recalcHistogram]);
 
   const onChangePoints = useCallback(
     (channel: Channel, pts: Array<[number, number]>) => {
@@ -384,14 +386,9 @@ export const RasterLayerCurvesEditor = memo(() => {
   const onChangeG = useCallback((pts: Array<[number, number]>) => onChangePoints('g', pts), [onChangePoints]);
   const onChangeB = useCallback((pts: Array<[number, number]>) => onChangePoints('b', pts), [onChangePoints]);
 
-  const gridStyles: React.CSSProperties = useMemo(
-    () => ({ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }),
-    []
-  );
-
   return (
     <Flex direction="column" gap={2}>
-      <div style={gridStyles}>
+      <Box display="grid" gridTemplateColumns="repeat(2, minmax(0, 1fr))" gap={8}>
         <CurveGraph
           title={t('controlLayers.adjustments.master')}
           channel="master"
@@ -402,7 +399,7 @@ export const RasterLayerCurvesEditor = memo(() => {
         <CurveGraph title={t('common.red')} channel="r" points={pointsR} histogram={histR} onChange={onChangeR} />
         <CurveGraph title={t('common.green')} channel="g" points={pointsG} histogram={histG} onChange={onChangeG} />
         <CurveGraph title={t('common.blue')} channel="b" points={pointsB} histogram={histB} onChange={onChangeB} />
-      </div>
+      </Box>
     </Flex>
   );
 });
