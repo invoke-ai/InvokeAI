@@ -623,16 +623,13 @@ class ModelInstallService(ModelInstallServiceBase):
         if old_path == new_path:
             return old_path
 
+        if new_path.exists():
+            raise FileExistsError(f"Cannot move {old_path} to {new_path}: destination already exists")
+
         new_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # if path already exists then we jigger the name to make it unique
-        counter: int = 1
-        while new_path.exists():
-            path = new_path.with_stem(new_path.stem + f"_{counter:02d}")
-            if not path.exists():
-                new_path = path
-            counter += 1
         move(old_path, new_path)
+
         return new_path
 
     def _probe(self, model_path: Path, config: Optional[ModelRecordChanges] = None):

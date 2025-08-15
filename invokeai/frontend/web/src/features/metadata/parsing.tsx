@@ -9,14 +9,13 @@ import { bboxHeightChanged, bboxWidthChanged, canvasMetadataRecalled } from 'fea
 import { loraAllDeleted, loraRecalled } from 'features/controlLayers/store/lorasSlice';
 import {
   heightChanged,
-  negativePrompt2Changed,
   negativePromptChanged,
-  positivePrompt2Changed,
   positivePromptChanged,
   refinerModelChanged,
   selectBase,
   setCfgRescaleMultiplier,
   setCfgScale,
+  setClipSkip,
   setGuidance,
   setImg2imgStrength,
   setRefinerCFGScale,
@@ -30,7 +29,6 @@ import {
   setSeamlessYAxis,
   setSeed,
   setSteps,
-  shouldConcatPromptsChanged,
   vaeSelected,
   widthChanged,
 } from 'features/controlLayers/store/paramsSlice';
@@ -44,12 +42,12 @@ import { modelSelected } from 'features/parameters/store/actions';
 import type {
   ParameterCFGRescaleMultiplier,
   ParameterCFGScale,
+  ParameterCLIPSkip,
   ParameterGuidance,
   ParameterHeight,
   ParameterModel,
   ParameterNegativePrompt,
   ParameterPositivePrompt,
-  ParameterPositiveStylePromptSDXL,
   ParameterScheduler,
   ParameterSDXLRefinerModel,
   ParameterSDXLRefinerNegativeAestheticScore,
@@ -67,12 +65,11 @@ import {
   zLoRAWeight,
   zParameterCFGRescaleMultiplier,
   zParameterCFGScale,
+  zParameterCLIPSkip,
   zParameterGuidance,
   zParameterImageDimension,
   zParameterNegativePrompt,
-  zParameterNegativeStylePromptSDXL,
   zParameterPositivePrompt,
-  zParameterPositiveStylePromptSDXL,
   zParameterScheduler,
   zParameterSDXLRefinerNegativeAestheticScore,
   zParameterSDXLRefinerPositiveAestheticScore,
@@ -289,46 +286,6 @@ const NegativePrompt: SingleMetadataHandler<ParameterNegativePrompt> = {
 };
 //#endregion Negative Prompt
 
-//#region SDXL Positive Style Prompt
-const PositiveStylePrompt: SingleMetadataHandler<ParameterPositiveStylePromptSDXL> = {
-  [SingleMetadataKey]: true,
-  type: 'PositiveStylePrompt',
-  parse: (metadata, _store) => {
-    const raw = getProperty(metadata, 'positive_style_prompt');
-    const parsed = zParameterPositiveStylePromptSDXL.parse(raw);
-    return Promise.resolve(parsed);
-  },
-  recall: (value, store) => {
-    store.dispatch(positivePrompt2Changed(value));
-  },
-  i18nKey: 'sdxl.posStylePrompt',
-  LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<ParameterPositiveStylePromptSDXL>) => (
-    <MetadataPrimitiveValue value={value} />
-  ),
-};
-//#endregion SDXL Positive Style Prompt
-
-//#region SDXL Negative Style Prompt
-const NegativeStylePrompt: SingleMetadataHandler<ParameterPositiveStylePromptSDXL> = {
-  [SingleMetadataKey]: true,
-  type: 'NegativeStylePrompt',
-  parse: (metadata, _store) => {
-    const raw = getProperty(metadata, 'negative_style_prompt');
-    const parsed = zParameterNegativeStylePromptSDXL.parse(raw);
-    return Promise.resolve(parsed);
-  },
-  recall: (value, store) => {
-    store.dispatch(negativePrompt2Changed(value));
-  },
-  i18nKey: 'sdxl.negStylePrompt',
-  LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<ParameterPositiveStylePromptSDXL>) => (
-    <MetadataPrimitiveValue value={value} />
-  ),
-};
-//#endregion SDXL Negative Style Prompt
-
 //#region CFG Scale
 const CFGScale: SingleMetadataHandler<ParameterCFGScale> = {
   [SingleMetadataKey]: true,
@@ -366,6 +323,24 @@ const CFGRescaleMultiplier: SingleMetadataHandler<ParameterCFGRescaleMultiplier>
   ),
 };
 //#endregion CFG Rescale Multiplier
+
+//#region CLIP Skip
+const CLIPSkip: SingleMetadataHandler<ParameterCLIPSkip> = {
+  [SingleMetadataKey]: true,
+  type: 'CLIPSkip',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'clip_skip');
+    const parsed = zParameterCLIPSkip.parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setClipSkip(value));
+  },
+  i18nKey: 'metadata.clipSkip',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ParameterCLIPSkip>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion CLIP Skip
 
 //#region Guidance
 const Guidance: SingleMetadataHandler<ParameterGuidance> = {
@@ -927,10 +902,9 @@ export const MetadataHandlers = {
   GenerationMode,
   PositivePrompt,
   NegativePrompt,
-  PositiveStylePrompt,
-  NegativeStylePrompt,
   CFGScale,
   CFGRescaleMultiplier,
+  CLIPSkip,
   Guidance,
   Scheduler,
   Width,
@@ -1052,26 +1026,6 @@ const recallByHandlers = async (arg: {
     }
   }
 
-  // We may need to update the prompt concat flag based on the recalled prompts
-  const positivePrompt = recalled.get(MetadataHandlers.PositivePrompt);
-  const negativePrompt = recalled.get(MetadataHandlers.NegativePrompt);
-  const positiveStylePrompt = recalled.get(MetadataHandlers.PositiveStylePrompt);
-  const negativeStylePrompt = recalled.get(MetadataHandlers.NegativeStylePrompt);
-
-  // The values will be undefined if the handler was not recalled
-  if (
-    positivePrompt !== undefined ||
-    negativePrompt !== undefined ||
-    positiveStylePrompt !== undefined ||
-    negativeStylePrompt !== undefined
-  ) {
-    const concat =
-      (Boolean(positiveStylePrompt) && positiveStylePrompt === positivePrompt) ||
-      (Boolean(negativeStylePrompt) && negativeStylePrompt === negativePrompt);
-
-    store.dispatch(shouldConcatPromptsChanged(concat));
-  }
-
   if (!silent) {
     if (recalled.size > 0) {
       toast({
@@ -1094,12 +1048,7 @@ const recallByHandlers = async (arg: {
 const recallPrompts = async (metadata: unknown, store: AppStore) => {
   const recalled = await recallByHandlers({
     metadata,
-    handlers: [
-      MetadataHandlers.PositivePrompt,
-      MetadataHandlers.NegativePrompt,
-      MetadataHandlers.PositiveStylePrompt,
-      MetadataHandlers.NegativeStylePrompt,
-    ],
+    handlers: [MetadataHandlers.PositivePrompt, MetadataHandlers.NegativePrompt],
     store,
     silent: true,
   });

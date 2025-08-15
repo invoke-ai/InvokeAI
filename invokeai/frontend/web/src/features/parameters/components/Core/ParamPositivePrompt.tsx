@@ -4,7 +4,6 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { usePersistedTextAreaSize } from 'common/hooks/usePersistedTextareaSize';
 import {
   positivePromptChanged,
-  selectBase,
   selectModelSupportsNegativePrompt,
   selectPositivePrompt,
 } from 'features/controlLayers/store/paramsSlice';
@@ -21,7 +20,6 @@ import { PromptExpansionOverlay } from 'features/prompt/PromptExpansion/PromptEx
 import { promptExpansionApi } from 'features/prompt/PromptExpansion/state';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
-import { SDXLConcatButton } from 'features/sdxl/components/SDXLPrompts/SDXLConcatButton';
 import {
   selectStylePresetActivePresetId,
   selectStylePresetViewMode,
@@ -42,7 +40,6 @@ const persistOptions: Parameters<typeof usePersistedTextAreaSize>[2] = {
 export const ParamPositivePrompt = memo(() => {
   const dispatch = useAppDispatch();
   const prompt = useAppSelector(selectPositivePrompt);
-  const baseModel = useAppSelector(selectBase);
   const viewMode = useAppSelector(selectStylePresetViewMode);
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
   const modelSupportsNegativePrompt = useAppSelector(selectModelSupportsNegativePrompt);
@@ -118,7 +115,6 @@ export const ParamPositivePrompt = memo(() => {
           <PromptOverlayButtonWrapper>
             <Flex flexDir="column" gap={2} justifyContent="flex-start" alignItems="center">
               <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
-              {baseModel === 'sdxl' && <SDXLConcatButton />}
               <ShowDynamicPromptsPreviewButton />
               {modelSupportsNegativePrompt && <NegativePromptToggleButton />}
             </Flex>

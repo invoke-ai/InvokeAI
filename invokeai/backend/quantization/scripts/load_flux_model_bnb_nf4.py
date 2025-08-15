@@ -33,7 +33,7 @@ def main():
     )
 
     # inference_dtype = torch.bfloat16
-    with log_time("Intialize FLUX transformer on meta device"):
+    with log_time("Initialize FLUX transformer on meta device"):
         # TODO(ryand): Determine if this is a schnell model or a dev model and load the appropriate config.
         p = params["flux-schnell"]
 

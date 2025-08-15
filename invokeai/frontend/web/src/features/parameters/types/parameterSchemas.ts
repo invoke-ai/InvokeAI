@@ -33,16 +33,6 @@ export const [zParameterNegativePrompt, isParameterNegativePrompt] = buildParame
 export type ParameterNegativePrompt = z.infer<typeof zParameterNegativePrompt>;
 // #endregion
 
-// #region Positive style prompt (SDXL)
-export const [zParameterPositiveStylePromptSDXL, isParameterPositiveStylePromptSDXL] = buildParameter(z.string());
-export type ParameterPositiveStylePromptSDXL = z.infer<typeof zParameterPositiveStylePromptSDXL>;
-// #endregion
-
-// #region Positive style prompt (SDXL)
-export const [zParameterNegativeStylePromptSDXL, isParameterNegativeStylePromptSDXL] = buildParameter(z.string());
-export type ParameterNegativeStylePromptSDXL = z.infer<typeof zParameterNegativeStylePromptSDXL>;
-// #endregion
-
 // #region Steps
 export const [zParameterSteps, isParameterSteps] = buildParameter(z.number().int().min(1));
 export type ParameterSteps = z.infer<typeof zParameterSteps>;
@@ -202,4 +192,9 @@ export type ParameterCanvasCoherenceMode = z.infer<typeof zParameterCanvasCohere
 // #region LoRA weight
 export const [zLoRAWeight, isParameterLoRAWeight] = buildParameter(z.number());
 export type ParameterLoRAWeight = z.infer<typeof zLoRAWeight>;
+// #endregion
+
+// #region CLIP skip
+export const [zParameterCLIPSkip, isParameterCLIPSkip] = buildParameter(z.number().int().min(0));
+export type ParameterCLIPSkip = z.infer<typeof zParameterCLIPSkip>;
 // #endregion

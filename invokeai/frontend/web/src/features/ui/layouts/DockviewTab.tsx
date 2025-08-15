@@ -3,10 +3,12 @@ import { setFocusedRegion } from 'common/hooks/focus';
 import { useCallbackOnDragEnter } from 'common/hooks/useCallbackOnDragEnter';
 import type { IDockviewPanelHeaderProps } from 'dockview';
 import { memo, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
-import type { PanelParameters } from './auto-layout-context';
+import type { DockviewPanelParameters } from './auto-layout-context';
 
-export const DockviewTab = memo((props: IDockviewPanelHeaderProps<PanelParameters>) => {
+export const DockviewTab = memo((props: IDockviewPanelHeaderProps<DockviewPanelParameters>) => {
+  const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   const setActive = useCallback(() => {
     if (!props.api.isActive) {
@@ -23,7 +25,7 @@ export const DockviewTab = memo((props: IDockviewPanelHeaderProps<PanelParameter
   return (
     <Flex ref={ref} alignItems="center" h="full" onPointerDown={onPointerDown}>
       <Text userSelect="none" px={4}>
-        {props.api.title ?? props.api.id}
+        {t(props.params.i18nKey)}
       </Text>
     </Flex>
   );

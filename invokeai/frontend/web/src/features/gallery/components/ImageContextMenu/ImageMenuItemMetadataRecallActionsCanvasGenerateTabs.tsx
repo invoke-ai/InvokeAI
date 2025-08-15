@@ -2,6 +2,7 @@ import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { useRecallAll } from 'features/gallery/hooks/useRecallAll';
+import { useRecallCLIPSkip } from 'features/gallery/hooks/useRecallCLIPSkip';
 import { useRecallDimensions } from 'features/gallery/hooks/useRecallDimensions';
 import { useRecallPrompts } from 'features/gallery/hooks/useRecallPrompts';
 import { useRecallRemix } from 'features/gallery/hooks/useRecallRemix';
@@ -28,6 +29,7 @@ export const ImageMenuItemMetadataRecallActionsCanvasGenerateTabs = memo(() => {
   const recallPrompts = useRecallPrompts(imageDTO);
   const recallSeed = useRecallSeed(imageDTO);
   const recallDimensions = useRecallDimensions(imageDTO);
+  const recallCLIPSkip = useRecallCLIPSkip(imageDTO);
 
   return (
     <MenuItem {...subMenu.parentMenuItemProps} icon={<PiArrowBendUpLeftBold />}>
@@ -54,6 +56,9 @@ export const ImageMenuItemMetadataRecallActionsCanvasGenerateTabs = memo(() => {
           </MenuItem>
           <MenuItem icon={<PiRulerBold />} onClick={recallDimensions.recall} isDisabled={!recallDimensions.isEnabled}>
             {t('parameters.useSize')}
+          </MenuItem>
+          <MenuItem icon={<PiRulerBold />} onClick={recallCLIPSkip.recall} isDisabled={!recallCLIPSkip.isEnabled}>
+            {t('parameters.useClipSkip')}
           </MenuItem>
         </MenuList>
       </Menu>

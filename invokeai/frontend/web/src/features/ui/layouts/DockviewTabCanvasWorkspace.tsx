@@ -7,11 +7,13 @@ import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagin
 import { useCurrentQueueItemDestination } from 'features/queue/hooks/useCurrentQueueItemDestination';
 import ProgressBar from 'features/system/components/ProgressBar';
 import { memo, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useIsGenerationInProgress } from 'services/api/endpoints/queue';
 
-import type { PanelParameters } from './auto-layout-context';
+import type { DockviewPanelParameters } from './auto-layout-context';
 
-export const DockviewTabCanvasWorkspace = memo((props: IDockviewPanelHeaderProps<PanelParameters>) => {
+export const DockviewTabCanvasWorkspace = memo((props: IDockviewPanelHeaderProps<DockviewPanelParameters>) => {
+  const { t } = useTranslation();
   const isGenerationInProgress = useIsGenerationInProgress();
   const canvasSessionId = useAppSelector(selectCanvasSessionId);
   const currentQueueItemDestination = useCurrentQueueItemDestination();
@@ -32,7 +34,7 @@ export const DockviewTabCanvasWorkspace = memo((props: IDockviewPanelHeaderProps
   return (
     <Flex ref={ref} position="relative" alignItems="center" h="full" onPointerDown={onPointerDown}>
       <Text userSelect="none" px={4}>
-        {props.api.title ?? props.api.id}
+        {t(props.params.i18nKey)}
       </Text>
       {currentQueueItemDestination === canvasSessionId && isGenerationInProgress && (
         <ProgressBar position="absolute" bottom={0} left={0} right={0} h={1} borderRadius="none" />

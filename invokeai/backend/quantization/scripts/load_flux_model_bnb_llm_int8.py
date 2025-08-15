@@ -20,7 +20,7 @@ def main():
         "/data/invokeai/models/.download_cache/https__huggingface.co_black-forest-labs_flux.1-schnell_resolve_main_flux1-schnell.safetensors/flux1-schnell.safetensors"
     )
 
-    with log_time("Intialize FLUX transformer on meta device"):
+    with log_time("Initialize FLUX transformer on meta device"):
         # TODO(ryand): Determine if this is a schnell model or a dev model and load the appropriate config.
         p = params["flux-schnell"]
 

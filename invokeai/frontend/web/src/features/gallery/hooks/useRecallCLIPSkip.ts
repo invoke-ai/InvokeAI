@@ -1,4 +1,5 @@
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { selectHasModelCLIPSkip } from 'features/controlLayers/store/paramsSlice';
 import { MetadataHandlers, MetadataUtils } from 'features/metadata/parsing';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
@@ -6,35 +7,33 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 import type { ImageDTO } from 'services/api/types';
 
-import { useClearStylePresetWithToast } from './useClearStylePresetWithToast';
-
 const ALLOWED_TABS: TabName[] = ['canvas', 'generate', 'upscaling'];
 
-export const useRecallPrompts = (imageDTO: ImageDTO) => {
+export const useRecallCLIPSkip = (imageDTO: ImageDTO) => {
   const store = useAppStore();
+  const hasModelCLIPSkip = useAppSelector(selectHasModelCLIPSkip);
   const tab = useAppSelector(selectActiveTab);
-  const clearStylePreset = useClearStylePresetWithToast();
-  const [hasPrompts, setHasPrompts] = useState(false);
+  const [hasCLIPSkip, setHasCLIPSkip] = useState(false);
 
   const { metadata, isLoading } = useDebouncedMetadata(imageDTO.image_name);
 
   useEffect(() => {
     const parse = async () => {
       try {
-        const result = await MetadataUtils.hasMetadataByHandlers({
-          handlers: [MetadataHandlers.PositivePrompt, MetadataHandlers.NegativePrompt],
-          metadata,
-          store,
-          require: 'some',
-        });
-        setHasPrompts(result);
+        await MetadataHandlers.CLIPSkip.parse(metadata, store);
+        setHasCLIPSkip(true);
       } catch {
-        setHasPrompts(false);
+        setHasCLIPSkip(false);
       }
     };
 
+    if (!hasModelCLIPSkip) {
+      setHasCLIPSkip(false);
+      return;
+    }
+
     parse();
-  }, [metadata, store]);
+  }, [metadata, store, hasModelCLIPSkip]);
 
   const isEnabled = useMemo(() => {
     if (isLoading) {
@@ -45,12 +44,16 @@ export const useRecallPrompts = (imageDTO: ImageDTO) => {
       return false;
     }
 
-    if (!hasPrompts) {
+    if (!metadata) {
+      return false;
+    }
+
+    if (!hasCLIPSkip) {
       return false;
     }
 
     return true;
-  }, [hasPrompts, isLoading, tab]);
+  }, [hasCLIPSkip, isLoading, metadata, tab]);
 
   const recall = useCallback(() => {
     if (!metadata) {
@@ -59,9 +62,8 @@ export const useRecallPrompts = (imageDTO: ImageDTO) => {
     if (!isEnabled) {
       return;
     }
-    MetadataUtils.recallPrompts(metadata, store);
-    clearStylePreset();
-  }, [metadata, isEnabled, store, clearStylePreset]);
+    MetadataUtils.recallByHandler({ metadata, handler: MetadataHandlers.CLIPSkip, store });
+  }, [metadata, isEnabled, store]);
 
   return {
     recall,
