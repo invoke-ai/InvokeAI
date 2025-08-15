@@ -117,7 +117,7 @@ const slice = createSlice({
         const { id, overrides, isSelected, isBookmarked, mergedEntitiesToDelete = [], insertAfterEntity } = action.payload;
         const entityState = getRasterLayerState(id, overrides);
 
-        const index = insertAfterEntity ? state.rasterLayers.entities.findIndex((e) => e.id === insertAfterEntity) + 1 : 0;
+        const index = insertAfterEntity ? state.rasterLayers.entities.findIndex((e) => e.id === insertAfterEntity) + 1 : state.rasterLayers.entities.length;
         state.rasterLayers.entities.splice(index, 0, entityState);
 
         if (mergedEntitiesToDelete.length > 0) {
@@ -282,7 +282,7 @@ const slice = createSlice({
 
         const entityState = getControlLayerState(id, overrides);
 
-        const index = insertAfterEntity ? state.controlLayers.entities.findIndex((e) => e.id === insertAfterEntity) + 1 : 0;
+        const index = insertAfterEntity ? state.controlLayers.entities.findIndex((e) => e.id === insertAfterEntity) + 1 : state.controlLayers.entities.length;
         state.controlLayers.entities.splice(index, 0, entityState);
 
         if (mergedEntitiesToDelete.length > 0) {
@@ -583,7 +583,7 @@ const slice = createSlice({
 
         const entityState = getRegionalGuidanceState(id, overrides);
 
-        const index = insertAfterEntity ? state.regionalGuidance.entities.findIndex((e) => e.id === insertAfterEntity) + 1 : 0;
+        const index = insertAfterEntity ? state.regionalGuidance.entities.findIndex((e) => e.id === insertAfterEntity) + 1 : state.regionalGuidance.entities.length;
         state.regionalGuidance.entities.splice(index, 0, entityState);
 
         if (mergedEntitiesToDelete.length > 0) {
@@ -890,7 +890,7 @@ const slice = createSlice({
 
         const entityState = getInpaintMaskState(id, overrides);
 
-        const index = insertAfterEntity ? state.inpaintMasks.entities.findIndex((e) => e.id === insertAfterEntity) + 1 : 0;
+        const index = insertAfterEntity ? state.inpaintMasks.entities.findIndex((e) => e.id === insertAfterEntity) + 1 : state.inpaintMasks.entities.length;
         state.inpaintMasks.entities.splice(index, 0, entityState);
 
         if (mergedEntitiesToDelete.length > 0) {
