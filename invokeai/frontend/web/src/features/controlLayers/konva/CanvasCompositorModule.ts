@@ -372,7 +372,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
         position: { x: Math.floor(rect.x), y: Math.floor(rect.y) },
       },
       mergedEntitiesToDelete: deleteMergedEntities ? entityIdentifiers.map(mapId) : [],
-      insertAfterEntity: entityIdentifiers.map(mapId).at(-1),
+      addAfter: entityIdentifiers.map(mapId).at(-1),
     };
 
     switch (type) {
