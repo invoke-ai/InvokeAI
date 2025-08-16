@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import type { AppGetState } from 'app/store/store';
-import { useAppDispatch, useAppStore } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
@@ -16,7 +16,11 @@ import {
   rgRefImageAdded,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectBase, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
+import {
+  selectCanvasSlice,
+  selectEntity,
+  selectSelectedEntityIdentifier,
+} from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityIdentifier,
   CanvasRegionalGuidanceState,
@@ -136,37 +140,49 @@ export const getDefaultRegionalGuidanceRefImageConfig = (getState: AppGetState):
 
 export const useAddControlLayer = () => {
   const dispatch = useAppDispatch();
+  const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
+  const selectedControlLayer =
+    selectedEntityIdentifier?.type === 'control_layer' ? selectedEntityIdentifier.id : undefined;
   const func = useCallback(() => {
     const overrides = { controlAdapter: deepClone(initialControlNet) };
-    dispatch(controlLayerAdded({ isSelected: true, overrides }));
-  }, [dispatch]);
+    dispatch(controlLayerAdded({ isSelected: true, overrides, addAfter: selectedControlLayer }));
+  }, [dispatch, selectedControlLayer]);
 
   return func;
 };
 
 export const useAddRasterLayer = () => {
   const dispatch = useAppDispatch();
+  const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
+  const selectedRasterLayer =
+    selectedEntityIdentifier?.type === 'raster_layer' ? selectedEntityIdentifier.id : undefined;
   const func = useCallback(() => {
-    dispatch(rasterLayerAdded({ isSelected: true }));
-  }, [dispatch]);
+    dispatch(rasterLayerAdded({ isSelected: true, addAfter: selectedRasterLayer }));
+  }, [dispatch, selectedRasterLayer]);
 
   return func;
 };
 
 export const useAddInpaintMask = () => {
   const dispatch = useAppDispatch();
+  const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
+  const selectedInpaintMask =
+    selectedEntityIdentifier?.type === 'inpaint_mask' ? selectedEntityIdentifier.id : undefined;
   const func = useCallback(() => {
-    dispatch(inpaintMaskAdded({ isSelected: true }));
-  }, [dispatch]);
+    dispatch(inpaintMaskAdded({ isSelected: true, addAfter: selectedInpaintMask }));
+  }, [dispatch, selectedInpaintMask]);
 
   return func;
 };
 
 export const useAddRegionalGuidance = () => {
   const dispatch = useAppDispatch();
+  const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
+  const selectedRegionalGuidance =
+    selectedEntityIdentifier?.type === 'regional_guidance' ? selectedEntityIdentifier.id : undefined;
   const func = useCallback(() => {
-    dispatch(rgAdded({ isSelected: true }));
-  }, [dispatch]);
+    dispatch(rgAdded({ isSelected: true, addAfter: selectedRegionalGuidance }));
+  }, [dispatch, selectedRegionalGuidance]);
 
   return func;
 };
