@@ -3,6 +3,9 @@
  * https://konvajs.org/docs/filters/Custom_Filter.html
  */
 
+import { clamp } from 'es-toolkit/compat';
+import type Konva from 'konva';
+
 /**
  * Calculates the lightness (HSL) of a given pixel and sets the alpha channel to that value.
  * This is useful for edge maps and other masks, to make the black areas transparent.
@@ -21,9 +24,6 @@ export const LightnessToAlphaFilter = (imageData: ImageData): void => {
   }
 };
 
-// Utility clamp
-const clamp = (v: number, min: number, max: number) => (v < min ? min : v > max ? max : v);
-
 type SimpleAdjustParams = {
   brightness: number; // -1..1 (additive)
   contrast: number; // -1..1 (scale around 128)
@@ -38,8 +38,7 @@ type SimpleAdjustParams = {
  *
  * Parameters are read from the Konva node attr `adjustmentsSimple` set by the adapter.
  */
-type KonvaFilterThis = { getAttr?: (key: string) => unknown };
-export const AdjustmentsSimpleFilter = function (this: KonvaFilterThis, imageData: ImageData): void {
+export const AdjustmentsSimpleFilter = function (this: Konva.Node, imageData: ImageData): void {
   const params = (this?.getAttr?.('adjustmentsSimple') as SimpleAdjustParams | undefined) ?? null;
   if (!params) {
     return;
@@ -49,8 +48,8 @@ export const AdjustmentsSimpleFilter = function (this: KonvaFilterThis, imageDat
 
   const data = imageData.data;
   const len = data.length / 4;
-  const width = (imageData as ImageData & { width: number }).width ?? 0;
-  const height = (imageData as ImageData & { height: number }).height ?? 0;
+  const width = imageData.width;
+  const height = imageData.height;
 
   // Precompute factors
   const brightnessShift = brightness * 255; // additive shift
@@ -181,7 +180,7 @@ type CurvesAdjustParams = {
 };
 
 // Curves filter: apply master curve, then per-channel curves
-export const AdjustmentsCurvesFilter = function (this: KonvaFilterThis, imageData: ImageData): void {
+export const AdjustmentsCurvesFilter = function (this: Konva.Node, imageData: ImageData): void {
   const params = (this?.getAttr?.('adjustmentsCurves') as CurvesAdjustParams | undefined) ?? null;
   if (!params) {
     return;
