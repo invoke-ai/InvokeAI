@@ -111,21 +111,14 @@ const slice = createSlice({
           isSelected?: boolean;
           isBookmarked?: boolean;
           mergedEntitiesToDelete?: string[];
-          insertAfterEntity?: string;
+          addAfter?: string;
         }>
       ) => {
-        const {
-          id,
-          overrides,
-          isSelected,
-          isBookmarked,
-          mergedEntitiesToDelete = [],
-          insertAfterEntity,
-        } = action.payload;
+        const { id, overrides, isSelected, isBookmarked, mergedEntitiesToDelete = [], addAfter } = action.payload;
         const entityState = getRasterLayerState(id, overrides);
 
-        const index = insertAfterEntity
-          ? state.rasterLayers.entities.findIndex((e) => e.id === insertAfterEntity) + 1
+        const index = addAfter
+          ? state.rasterLayers.entities.findIndex((e) => e.id === addAfter) + 1
           : state.rasterLayers.entities.length;
         state.rasterLayers.entities.splice(index, 0, entityState);
 
@@ -150,7 +143,7 @@ const slice = createSlice({
         isSelected?: boolean;
         isBookmarked?: boolean;
         mergedEntitiesToDelete?: string[];
-        insertAfterEntity?: string;
+        addAfter?: string;
       }) => ({
         payload: { ...payload, id: getPrefixedId('raster_layer') },
       }),
@@ -284,22 +277,15 @@ const slice = createSlice({
           isSelected?: boolean;
           isBookmarked?: boolean;
           mergedEntitiesToDelete?: string[];
-          insertAfterEntity?: string;
+          addAfter?: string;
         }>
       ) => {
-        const {
-          id,
-          overrides,
-          isSelected,
-          isBookmarked,
-          mergedEntitiesToDelete = [],
-          insertAfterEntity,
-        } = action.payload;
+        const { id, overrides, isSelected, isBookmarked, mergedEntitiesToDelete = [], addAfter } = action.payload;
 
         const entityState = getControlLayerState(id, overrides);
 
-        const index = insertAfterEntity
-          ? state.controlLayers.entities.findIndex((e) => e.id === insertAfterEntity) + 1
+        const index = addAfter
+          ? state.controlLayers.entities.findIndex((e) => e.id === addAfter) + 1
           : state.controlLayers.entities.length;
         state.controlLayers.entities.splice(index, 0, entityState);
 
@@ -323,7 +309,7 @@ const slice = createSlice({
         isSelected?: boolean;
         isBookmarked?: boolean;
         mergedEntitiesToDelete?: string[];
-        insertAfterEntity?: string;
+        addAfter?: string;
       }) => ({
         payload: { ...payload, id: getPrefixedId('control_layer') },
       }),
@@ -594,22 +580,15 @@ const slice = createSlice({
           isSelected?: boolean;
           isBookmarked?: boolean;
           mergedEntitiesToDelete?: string[];
-          insertAfterEntity?: string;
+          addAfter?: string;
         }>
       ) => {
-        const {
-          id,
-          overrides,
-          isSelected,
-          isBookmarked,
-          mergedEntitiesToDelete = [],
-          insertAfterEntity,
-        } = action.payload;
+        const { id, overrides, isSelected, isBookmarked, mergedEntitiesToDelete = [], addAfter } = action.payload;
 
         const entityState = getRegionalGuidanceState(id, overrides);
 
-        const index = insertAfterEntity
-          ? state.regionalGuidance.entities.findIndex((e) => e.id === insertAfterEntity) + 1
+        const index = addAfter
+          ? state.regionalGuidance.entities.findIndex((e) => e.id === addAfter) + 1
           : state.regionalGuidance.entities.length;
         state.regionalGuidance.entities.splice(index, 0, entityState);
 
@@ -633,7 +612,7 @@ const slice = createSlice({
         isSelected?: boolean;
         isBookmarked?: boolean;
         mergedEntitiesToDelete?: string[];
-        insertAfterEntity?: string;
+        addAfter?: string;
       }) => ({
         payload: { ...payload, id: getPrefixedId('regional_guidance') },
       }),
@@ -910,22 +889,15 @@ const slice = createSlice({
           isSelected?: boolean;
           isBookmarked?: boolean;
           mergedEntitiesToDelete?: string[];
-          insertAfterEntity?: string;
+          addAfter?: string;
         }>
       ) => {
-        const {
-          id,
-          overrides,
-          isSelected,
-          isBookmarked,
-          mergedEntitiesToDelete = [],
-          insertAfterEntity,
-        } = action.payload;
+        const { id, overrides, isSelected, isBookmarked, mergedEntitiesToDelete = [], addAfter } = action.payload;
 
         const entityState = getInpaintMaskState(id, overrides);
 
-        const index = insertAfterEntity
-          ? state.inpaintMasks.entities.findIndex((e) => e.id === insertAfterEntity) + 1
+        const index = addAfter
+          ? state.inpaintMasks.entities.findIndex((e) => e.id === addAfter) + 1
           : state.inpaintMasks.entities.length;
         state.inpaintMasks.entities.splice(index, 0, entityState);
 
@@ -949,7 +921,7 @@ const slice = createSlice({
         isSelected?: boolean;
         isBookmarked?: boolean;
         mergedEntitiesToDelete?: string[];
-        insertAfterEntity?: string;
+        addAfter?: string;
       }) => ({
         payload: { ...payload, id: getPrefixedId('inpaint_mask') },
       }),
