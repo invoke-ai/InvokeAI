@@ -449,6 +449,35 @@ export class NavigationApi {
   };
 
   /**
+   * Expand the left panel in the currently active tab.
+   *
+   * This method will not wait for the panel to be registered.
+   *
+   * @returns True if the panel was expanded, false if it was not found or an error occurred
+   */
+  expandLeftPanel = (): boolean => {
+    const activeTab = this._app?.activeTab.get() ?? null;
+    if (!activeTab) {
+      log.warn('No active tab found to expand left panel');
+      return false;
+    }
+    const leftPanel = this.getPanel(activeTab, LEFT_PANEL_ID);
+    if (!leftPanel) {
+      log.warn(`Left panel not found in active tab "${activeTab}"`);
+      return false;
+    }
+
+    if (!(leftPanel instanceof GridviewPanel)) {
+      log.error(`Right panels must be instances of GridviewPanel`);
+      return false;
+    }
+
+    this._expandPanel(leftPanel, LEFT_PANEL_MIN_SIZE_PX);
+
+    return true;
+  };
+
+  /**
    * Toggle the left panel in the currently active tab.
    *
    * This method will not wait for the panel to be registered.
@@ -478,6 +507,35 @@ export class NavigationApi {
     } else {
       this._collapsePanel(leftPanel);
     }
+    return true;
+  };
+
+  /**
+   * Expand the right panel in the currently active tab.
+   *
+   * This method will not wait for the panel to be registered.
+   *
+   * @returns True if the panel was expanded, false if it was not found or an error occurred
+   */
+  expandRightPanel = (): boolean => {
+    const activeTab = this._app?.activeTab.get() ?? null;
+    if (!activeTab) {
+      log.warn('No active tab found to expand right panel');
+      return false;
+    }
+    const rightPanel = this.getPanel(activeTab, RIGHT_PANEL_ID);
+    if (!rightPanel) {
+      log.warn(`Right panel not found in active tab "${activeTab}"`);
+      return false;
+    }
+
+    if (!(rightPanel instanceof GridviewPanel)) {
+      log.error(`Right panels must be instances of GridviewPanel`);
+      return false;
+    }
+
+    this._expandPanel(rightPanel, RIGHT_PANEL_MIN_SIZE_PX);
+
     return true;
   };
 
