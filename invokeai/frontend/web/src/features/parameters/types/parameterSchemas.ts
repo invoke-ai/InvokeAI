@@ -193,3 +193,8 @@ export type ParameterCanvasCoherenceMode = z.infer<typeof zParameterCanvasCohere
 export const [zLoRAWeight, isParameterLoRAWeight] = buildParameter(z.number());
 export type ParameterLoRAWeight = z.infer<typeof zLoRAWeight>;
 // #endregion
+
+// #region CLIP skip
+export const [zParameterCLIPSkip, isParameterCLIPSkip] = buildParameter(z.number().int().min(0));
+export type ParameterCLIPSkip = z.infer<typeof zParameterCLIPSkip>;
+// #endregion
