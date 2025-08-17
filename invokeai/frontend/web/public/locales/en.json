@@ -38,6 +38,7 @@
         "deletedImagesCannotBeRestored": "Deleted images cannot be restored.",
         "hideBoards": "Hide Boards",
         "loading": "Loading...",
+        "locateInGalery": "Locate in Gallery",
         "menuItemAutoAdd": "Auto-add to this Board",
         "move": "Move",
         "movingImagesToBoard_one": "Moving {{count}} image to board:",
