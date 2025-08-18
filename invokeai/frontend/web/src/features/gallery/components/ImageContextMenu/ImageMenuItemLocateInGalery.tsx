@@ -7,7 +7,7 @@ import { useGalleryPanel } from 'features/ui/layouts/use-gallery-panel';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCrosshair } from 'react-icons/pi';
+import { PiCrosshairBold } from 'react-icons/pi';
 
 export const ImageMenuItemLocateInGalery = memo(() => {
   const { t } = useTranslation();
@@ -27,7 +27,7 @@ export const ImageMenuItemLocateInGalery = memo(() => {
   }, [dispatch, galleryPanel, imageDTO]);
 
   return (
-    <MenuItem icon={<PiCrosshair />} onClickCapture={onClick} isDisabled={!isGalleryImage}>
+    <MenuItem icon={<PiCrosshairBold />} onClickCapture={onClick} isDisabled={!isGalleryImage}>
       {t('boards.locateInGalery')}
     </MenuItem>
   );
