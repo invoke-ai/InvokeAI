@@ -147,7 +147,7 @@ class CenterPadCropInvocation(BaseInvocation):
     title="Paste Image",
     tags=["image", "paste"],
     category="image",
-    version="1.2.2",
+    version="1.3.0",
 )
 class ImagePasteInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Pastes an image into another image."""
@@ -161,6 +161,7 @@ class ImagePasteInvocation(BaseInvocation, WithMetadata, WithBoard):
     x: int = InputField(default=0, description="The left x coordinate at which to paste the image")
     y: int = InputField(default=0, description="The top y coordinate at which to paste the image")
     crop: bool = InputField(default=False, description="Crop to base image dimensions")
+    invert_mask: bool = InputField(default=False, description="Invert mask color")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         base_image = context.images.get_pil(self.base_image.image_name, mode="RGBA")
@@ -168,21 +169,18 @@ class ImagePasteInvocation(BaseInvocation, WithMetadata, WithBoard):
         mask = None
         if self.mask is not None:
             mask = context.images.get_pil(self.mask.image_name, mode="L")
-            mask = ImageOps.invert(mask)
-        # TODO: probably shouldn't invert mask here... should user be required to do it?
+            if self.invert_mask:
+                mask = ImageOps.invert(mask)
 
         min_x = min(0, self.x)
         min_y = min(0, self.y)
         max_x = max(base_image.width, image.width + self.x)
         max_y = max(base_image.height, image.height + self.y)
 
-        new_image = Image.new(mode="RGBA", size=(max_x - min_x, max_y - min_y), color=(0, 0, 0, 0))
-        new_image.paste(base_image, (abs(min_x), abs(min_y)))
-
         # Create a temporary image to paste the image with transparency
-        temp_image = Image.new("RGBA", new_image.size)
+        temp_image = base_image
         temp_image.paste(image, (max(0, self.x), max(0, self.y)), mask=mask)
-        new_image = Image.alpha_composite(new_image, temp_image)
+        new_image = Image.alpha_composite(base_image, temp_image)
 
         if self.crop:
             base_w, base_h = base_image.size
@@ -452,7 +450,7 @@ class ImageResizeInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Scale Image",
     tags=["image", "scale"],
     category="image",
-    version="1.2.2",
+    version="1.3.0",
 )
 class ImageScaleInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Scales an image by a factor"""
@@ -464,16 +462,25 @@ class ImageScaleInvocation(BaseInvocation, WithMetadata, WithBoard):
         description="The factor by which to scale the image",
     )
     resample_mode: PIL_RESAMPLING_MODES = InputField(default="bicubic", description="The resampling mode")
+    multiple_of: int = InputField(
+        default=8,
+        description="If > 1, the output image will be resized to the nearest multiple in both dimensions.",
+    )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name)
 
         resample_mode = PIL_RESAMPLING_MAP[self.resample_mode]
-        width = int(image.width * self.scale_factor)
-        height = int(image.height * self.scale_factor)
+        target_width = int(image.width * self.scale_factor)
+        target_height = int(image.height * self.scale_factor)
+
+        # We may need to resize the image to a multiple of 8. Use floor division to ensure we don't scale the image up in the final resize
+        if self.multiple_of > 1:
+            target_width = int(target_width // self.multiple_of * self.multiple_of)
+            target_height = int(target_height // self.multiple_of * self.multiple_of)
 
         resize_image = image.resize(
-            (width, height),
+            (target_width, target_height),
             resample=resample_mode,
         )
 
