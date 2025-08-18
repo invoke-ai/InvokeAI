@@ -3,7 +3,6 @@ from einops import rearrange
 from PIL import Image
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
-from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     Input,
@@ -18,6 +17,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux
 
 
 @invocation(
@@ -39,17 +39,11 @@ class FluxVaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
         input=Input.Connection,
     )
 
-    def _estimate_working_memory(self, latents: torch.Tensor, vae: AutoEncoder) -> int:
-        """Estimate the working memory required by the invocation in bytes."""
-        out_h = LATENT_SCALE_FACTOR * latents.shape[-2]
-        out_w = LATENT_SCALE_FACTOR * latents.shape[-1]
-        element_size = next(vae.parameters()).element_size()
-        scaling_constant = 2200  # Determined experimentally.
-        working_memory = out_h * out_w * element_size * scaling_constant
-        return int(working_memory)
-
     def _vae_decode(self, vae_info: LoadedModel, latents: torch.Tensor) -> Image.Image:
-        estimated_working_memory = self._estimate_working_memory(latents, vae_info.model)
+        assert isinstance(vae_info.model, AutoEncoder)
+        estimated_working_memory = estimate_vae_working_memory_flux(
+            operation="decode", image_tensor=latents, vae=vae_info.model
+        )
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             assert isinstance(vae, AutoEncoder)
             vae_dtype = next(iter(vae.parameters())).dtype

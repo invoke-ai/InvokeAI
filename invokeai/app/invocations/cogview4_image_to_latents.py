@@ -17,6 +17,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_cogview4
 
 # TODO(ryand): This is effectively a copy of SD3ImageToLatentsInvocation and a subset of ImageToLatentsInvocation. We
 # should refactor to avoid this duplication.
@@ -36,18 +37,12 @@ class CogView4ImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
     image: ImageField = InputField(description="The image to encode.")
     vae: VAEField = InputField(description=FieldDescriptions.vae, input=Input.Connection)
 
-    def _estimate_working_memory(self, image_tensor: torch.Tensor, vae: AutoencoderKL) -> int:
-        """Estimate the working memory required by the invocation in bytes."""
-        # Encode operations use approximately 50% of the memory required for decode operations
-        h = image_tensor.shape[-2]
-        w = image_tensor.shape[-1]
-        element_size = next(vae.parameters()).element_size()
-        scaling_constant = 1100  # 50% of decode scaling constant (2200)
-        working_memory = h * w * element_size * scaling_constant
-        return int(working_memory)
-
     @staticmethod
-    def vae_encode(vae_info: LoadedModel, image_tensor: torch.Tensor, estimated_working_memory: int) -> torch.Tensor:
+    def vae_encode(vae_info: LoadedModel, image_tensor: torch.Tensor) -> torch.Tensor:
+        assert isinstance(vae_info.model, AutoencoderKL)
+        estimated_working_memory = estimate_vae_working_memory_cogview4(
+            operation="encode", image_tensor=image_tensor, vae=vae_info.model
+        )
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             assert isinstance(vae, AutoencoderKL)
 
@@ -74,10 +69,7 @@ class CogView4ImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
         vae_info = context.models.load(self.vae.vae)
         assert isinstance(vae_info.model, AutoencoderKL)
 
-        estimated_working_memory = self._estimate_working_memory(image_tensor, vae_info.model)
-        latents = self.vae_encode(
-            vae_info=vae_info, image_tensor=image_tensor, estimated_working_memory=estimated_working_memory
-        )
+        latents = self.vae_encode(vae_info=vae_info, image_tensor=image_tensor)
 
         latents = latents.to("cpu")
         name = context.tensors.save(tensor=latents)
