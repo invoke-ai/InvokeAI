@@ -17,7 +17,7 @@ export const ImageMenuItemLocateInGalery = memo(() => {
   const galleryPanel = useGalleryPanel(activeTab);
 
   const isGalleryImage = useMemo(() => {
-    return !!imageDTO.board_id;
+    return !imageDTO.is_intermediate;
   }, [imageDTO]);
 
   const onClick = useCallback(() => {
