@@ -61,7 +61,7 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
     # Determine which prefix is used and remove it from all keys.
     # Check if any key starts with "base_model.model." prefix
     has_base_model_prefix = any(k.startswith("base_model.model.") for k in grouped_state_dict.keys())
-    
+
     if has_base_model_prefix:
         # Remove the "base_model.model." prefix from all keys.
         grouped_state_dict = {k.replace("base_model.model.", ""): v for k, v in grouped_state_dict.items()}
