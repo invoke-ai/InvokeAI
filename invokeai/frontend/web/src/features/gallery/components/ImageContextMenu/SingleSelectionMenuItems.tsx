@@ -56,7 +56,11 @@ const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) =
       <MenuDivider />
       <ImageMenuItemChangeBoard />
       <ImageMenuItemStarUnstar />
-      <ImageMenuItemLocateInGalery />
+      {(tab === 'canvas' || tab === 'generate' || tab === 'workflows' || tab === 'upscaling') &&
+        !imageDTO.is_intermediate && (
+          // Only render this button on tabs with a gallery.
+          <ImageMenuItemLocateInGalery />
+        )}
     </ImageDTOContextProvider>
   );
 };
