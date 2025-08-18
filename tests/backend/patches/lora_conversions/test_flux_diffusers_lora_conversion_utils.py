@@ -12,6 +12,9 @@ from tests.backend.patches.lora_conversions.lora_state_dicts.flux_dora_onetraine
 from tests.backend.patches.lora_conversions.lora_state_dicts.flux_lora_diffusers_format import (
     state_dict_keys as flux_diffusers_state_dict_keys,
 )
+from tests.backend.patches.lora_conversions.lora_state_dicts.flux_lora_diffusers_base_model_format import (
+    state_dict_keys as flux_diffusers_base_model_state_dict_keys,
+)
 from tests.backend.patches.lora_conversions.lora_state_dicts.flux_lora_diffusers_no_proj_mlp_format import (
     state_dict_keys as flux_diffusers_no_proj_mlp_state_dict_keys,
 )
@@ -21,7 +24,7 @@ from tests.backend.patches.lora_conversions.lora_state_dicts.flux_lora_kohya_for
 from tests.backend.patches.lora_conversions.lora_state_dicts.utils import keys_to_mock_state_dict
 
 
-@pytest.mark.parametrize("sd_keys", [flux_diffusers_state_dict_keys, flux_diffusers_no_proj_mlp_state_dict_keys])
+@pytest.mark.parametrize("sd_keys", [flux_diffusers_state_dict_keys, flux_diffusers_no_proj_mlp_state_dict_keys, flux_diffusers_base_model_state_dict_keys])
 def test_is_state_dict_likely_in_flux_diffusers_format_true(sd_keys: dict[str, list[int]]):
     """Test that is_state_dict_likely_in_flux_diffusers_format() can identify a state dict in the Diffusers FLUX LoRA format."""
     # Construct a state dict that is in the Diffusers FLUX LoRA format.
@@ -41,7 +44,7 @@ def test_is_state_dict_likely_in_flux_diffusers_format_false(sd_keys: dict[str, 
     assert not is_state_dict_likely_in_flux_diffusers_format(state_dict)
 
 
-@pytest.mark.parametrize("sd_keys", [flux_diffusers_state_dict_keys, flux_diffusers_no_proj_mlp_state_dict_keys])
+@pytest.mark.parametrize("sd_keys", [flux_diffusers_state_dict_keys, flux_diffusers_no_proj_mlp_state_dict_keys, flux_diffusers_base_model_state_dict_keys])
 def test_lora_model_from_flux_diffusers_state_dict(sd_keys: dict[str, list[int]]):
     """Test that lora_model_from_flux_diffusers_state_dict() can load a state dict in the Diffusers FLUX LoRA format."""
     # Construct a state dict that is in the Diffusers FLUX LoRA format.
@@ -75,3 +78,28 @@ def test_lora_model_from_flux_diffusers_state_dict_extra_keys_error():
     # Check that an error is raised.
     with pytest.raises(AssertionError):
         lora_model_from_flux_diffusers_state_dict(state_dict, alpha=8.0)
+
+
+def test_base_model_and_transformer_prefixes_produce_identical_results():
+    """Test that both base_model.model and transformer prefixes produce identical results after conversion."""
+    # Create state dicts with both prefix formats
+    transformer_state_dict = keys_to_mock_state_dict(flux_diffusers_state_dict_keys)
+    base_model_state_dict = keys_to_mock_state_dict(flux_diffusers_base_model_state_dict_keys)
+    
+    # Convert both to LoRA models
+    transformer_model = lora_model_from_flux_diffusers_state_dict(transformer_state_dict, alpha=8.0)
+    base_model_model = lora_model_from_flux_diffusers_state_dict(base_model_state_dict, alpha=8.0)
+    
+    # Both models should have the same number of layers
+    assert len(transformer_model.layers) == len(base_model_model.layers)
+    
+    # Both models should have the same layer keys (after prefix removal)
+    transformer_keys = set(transformer_model.layers.keys())
+    base_model_keys = set(base_model_model.layers.keys())
+    assert transformer_keys == base_model_keys
+    
+    # Both models should have the same layer types and structures
+    for key in transformer_keys:
+        transformer_layer = transformer_model.layers[key]
+        base_model_layer = base_model_model.layers[key]
+        assert type(transformer_layer) == type(base_model_layer)

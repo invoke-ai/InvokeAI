@@ -1,0 +1,6101 @@
+{
+    "base_model.model.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.proj_out.lora_B.weight": {
+        "shape": [
+            64,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.0.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.0.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.0.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.0.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.0.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.0.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.0.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.0.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.0.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.0.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.1.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.1.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.1.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.1.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.1.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.1.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.1.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.1.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.1.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.1.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.10.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.10.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.10.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.10.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.10.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.10.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.10.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.10.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.10.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.10.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.11.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.11.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.11.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.11.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.11.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.11.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.11.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.11.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.11.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.11.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.12.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.12.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.12.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.12.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.12.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.12.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.12.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.12.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.12.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.12.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.13.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.13.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.13.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.13.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.13.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.13.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.13.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.13.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.13.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.13.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.14.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.14.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.14.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.14.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.14.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.14.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.14.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.14.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.14.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.14.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.15.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.15.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.15.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.15.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.15.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.15.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.15.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.15.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.15.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.15.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.16.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.16.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.16.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.16.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.16.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.16.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.16.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.16.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.16.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.16.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.17.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.17.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.17.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.17.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.17.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.17.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.17.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.17.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.17.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.17.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.18.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.18.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.18.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.18.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.18.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.18.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.18.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.18.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.18.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.18.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.19.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.19.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.19.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.19.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.19.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.19.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.19.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.19.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.19.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.19.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.2.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.2.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.2.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.2.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.2.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.2.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.2.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.2.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.2.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.2.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.20.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.20.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.20.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.20.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.20.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.20.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.20.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.20.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.20.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.20.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.21.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.21.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.21.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.21.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.21.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.21.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.21.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.21.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.21.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.21.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.22.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.22.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.22.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.22.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.22.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.22.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.22.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.22.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.22.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.22.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.23.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.23.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.23.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.23.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.23.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.23.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.23.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.23.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.23.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.23.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.24.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.24.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.24.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.24.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.24.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.24.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.24.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.24.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.24.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.24.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.25.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.25.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.25.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.25.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.25.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.25.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.25.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.25.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.25.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.25.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.26.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.26.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.26.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.26.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.26.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.26.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.26.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.26.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.26.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.26.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.27.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.27.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.27.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.27.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.27.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.27.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.27.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.27.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.27.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.27.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.28.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.28.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.28.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.28.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.28.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.28.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.28.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.28.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.28.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.28.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.29.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.29.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.29.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.29.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.29.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.29.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.29.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.29.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.29.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.29.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.3.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.3.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.3.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.3.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.3.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.3.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.3.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.3.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.3.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.3.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.30.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.30.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.30.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.30.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.30.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.30.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.30.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.30.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.30.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.30.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.31.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.31.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.31.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.31.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.31.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.31.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.31.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.31.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.31.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.31.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.32.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.32.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.32.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.32.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.32.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.32.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.32.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.32.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.32.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.32.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.33.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.33.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.33.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.33.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.33.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.33.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.33.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.33.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.33.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.33.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.34.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.34.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.34.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.34.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.34.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.34.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.34.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.34.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.34.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.34.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.35.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.35.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.35.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.35.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.35.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.35.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.35.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.35.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.35.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.35.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.36.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.36.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.36.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.36.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.36.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.36.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.36.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.36.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.36.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.36.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.37.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.37.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.37.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.37.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.37.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.37.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.37.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.37.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.37.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.37.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.4.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.4.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.4.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.4.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.4.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.4.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.4.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.4.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.4.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.4.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.5.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.5.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.5.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.5.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.5.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.5.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.5.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.5.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.5.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.5.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.6.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.6.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.6.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.6.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.6.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.6.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.6.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.6.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.6.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.6.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.7.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.7.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.7.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.7.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.7.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.7.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.7.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.7.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.7.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.7.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.8.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.8.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.8.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.8.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.8.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.8.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.8.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.8.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.8.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.8.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.9.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.9.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.9.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.9.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.9.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.9.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.9.proj_mlp.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.9.proj_mlp.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.9.proj_out.lora_A.weight": {
+        "shape": [
+            4,
+            15360
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.single_transformer_blocks.9.proj_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.0.attn.add_k_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.0.attn.add_k_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.0.attn.add_q_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.0.attn.add_q_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.0.attn.add_v_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.0.attn.add_v_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.0.attn.to_add_out.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.0.attn.to_add_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.0.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.0.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.0.attn.to_out.0.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.0.attn.to_out.0.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.0.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.0.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.0.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.0.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.0.ff.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.0.ff.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.0.ff_context.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.0.ff_context.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.1.attn.add_k_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.1.attn.add_k_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.1.attn.add_q_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.1.attn.add_q_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.1.attn.add_v_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.1.attn.add_v_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.1.attn.to_add_out.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.1.attn.to_add_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.1.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.1.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.1.attn.to_out.0.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.1.attn.to_out.0.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.1.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.1.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.1.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.1.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.1.ff.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.1.ff.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.1.ff_context.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.1.ff_context.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.10.attn.add_k_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.10.attn.add_k_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.10.attn.add_q_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.10.attn.add_q_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.10.attn.add_v_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.10.attn.add_v_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.10.attn.to_add_out.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.10.attn.to_add_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.10.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.10.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.10.attn.to_out.0.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.10.attn.to_out.0.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.10.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.10.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.10.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.10.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.10.ff.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.10.ff.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.10.ff_context.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.10.ff_context.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.11.attn.add_k_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.11.attn.add_k_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.11.attn.add_q_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.11.attn.add_q_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.11.attn.add_v_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.11.attn.add_v_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.11.attn.to_add_out.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.11.attn.to_add_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.11.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.11.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.11.attn.to_out.0.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.11.attn.to_out.0.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.11.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.11.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.11.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.11.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.11.ff.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.11.ff.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.11.ff_context.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.11.ff_context.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.12.attn.add_k_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.12.attn.add_k_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.12.attn.add_q_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.12.attn.add_q_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.12.attn.add_v_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.12.attn.add_v_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.12.attn.to_add_out.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.12.attn.to_add_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.12.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.12.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.12.attn.to_out.0.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.12.attn.to_out.0.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.12.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.12.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.12.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.12.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.12.ff.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.12.ff.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.12.ff_context.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.12.ff_context.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.13.attn.add_k_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.13.attn.add_k_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.13.attn.add_q_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.13.attn.add_q_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.13.attn.add_v_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.13.attn.add_v_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.13.attn.to_add_out.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.13.attn.to_add_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.13.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.13.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.13.attn.to_out.0.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.13.attn.to_out.0.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.13.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.13.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.13.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.13.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.13.ff.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.13.ff.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.13.ff_context.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.13.ff_context.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.14.attn.add_k_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.14.attn.add_k_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.14.attn.add_q_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.14.attn.add_q_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.14.attn.add_v_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.14.attn.add_v_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.14.attn.to_add_out.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.14.attn.to_add_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.14.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.14.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.14.attn.to_out.0.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.14.attn.to_out.0.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.14.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.14.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.14.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.14.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.14.ff.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.14.ff.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.14.ff_context.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.14.ff_context.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.15.attn.add_k_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.15.attn.add_k_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.15.attn.add_q_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.15.attn.add_q_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.15.attn.add_v_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.15.attn.add_v_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.15.attn.to_add_out.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.15.attn.to_add_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.15.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.15.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.15.attn.to_out.0.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.15.attn.to_out.0.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.15.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.15.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.15.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.15.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.15.ff.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.15.ff.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.15.ff_context.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.15.ff_context.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.16.attn.add_k_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.16.attn.add_k_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.16.attn.add_q_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.16.attn.add_q_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.16.attn.add_v_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.16.attn.add_v_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.16.attn.to_add_out.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.16.attn.to_add_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.16.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.16.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.16.attn.to_out.0.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.16.attn.to_out.0.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.16.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.16.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.16.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.16.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.16.ff.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.16.ff.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.16.ff_context.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.16.ff_context.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.17.attn.add_k_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.17.attn.add_k_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.17.attn.add_q_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.17.attn.add_q_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.17.attn.add_v_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.17.attn.add_v_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.17.attn.to_add_out.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.17.attn.to_add_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.17.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.17.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.17.attn.to_out.0.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.17.attn.to_out.0.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.17.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.17.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.17.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.17.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.17.ff.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.17.ff.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.17.ff_context.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.17.ff_context.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.18.attn.add_k_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.18.attn.add_k_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.18.attn.add_q_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.18.attn.add_q_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.18.attn.add_v_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.18.attn.add_v_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.18.attn.to_add_out.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.18.attn.to_add_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.18.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.18.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.18.attn.to_out.0.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.18.attn.to_out.0.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.18.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.18.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.18.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.18.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.18.ff.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.18.ff.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.18.ff_context.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.18.ff_context.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.2.attn.add_k_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.2.attn.add_k_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.2.attn.add_q_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.2.attn.add_q_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.2.attn.add_v_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.2.attn.add_v_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.2.attn.to_add_out.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.2.attn.to_add_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.2.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.2.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.2.attn.to_out.0.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.2.attn.to_out.0.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.2.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.2.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.2.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.2.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.2.ff.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.2.ff.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.2.ff_context.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.2.ff_context.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.3.attn.add_k_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.3.attn.add_k_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.3.attn.add_q_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.3.attn.add_q_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.3.attn.add_v_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.3.attn.add_v_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.3.attn.to_add_out.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.3.attn.to_add_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.3.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.3.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.3.attn.to_out.0.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.3.attn.to_out.0.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.3.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.3.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.3.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.3.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.3.ff.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.3.ff.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.3.ff_context.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.3.ff_context.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.4.attn.add_k_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.4.attn.add_k_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.4.attn.add_q_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.4.attn.add_q_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.4.attn.add_v_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.4.attn.add_v_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.4.attn.to_add_out.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.4.attn.to_add_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.4.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.4.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.4.attn.to_out.0.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.4.attn.to_out.0.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.4.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.4.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.4.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.4.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.4.ff.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.4.ff.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.4.ff_context.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.4.ff_context.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.5.attn.add_k_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.5.attn.add_k_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.5.attn.add_q_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.5.attn.add_q_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.5.attn.add_v_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.5.attn.add_v_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.5.attn.to_add_out.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.5.attn.to_add_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.5.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.5.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.5.attn.to_out.0.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.5.attn.to_out.0.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.5.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.5.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.5.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.5.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.5.ff.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.5.ff.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.5.ff_context.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.5.ff_context.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.6.attn.add_k_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.6.attn.add_k_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.6.attn.add_q_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.6.attn.add_q_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.6.attn.add_v_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.6.attn.add_v_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.6.attn.to_add_out.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.6.attn.to_add_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.6.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.6.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.6.attn.to_out.0.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.6.attn.to_out.0.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.6.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.6.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.6.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.6.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.6.ff.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.6.ff.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.6.ff_context.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.6.ff_context.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.7.attn.add_k_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.7.attn.add_k_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.7.attn.add_q_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.7.attn.add_q_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.7.attn.add_v_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.7.attn.add_v_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.7.attn.to_add_out.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.7.attn.to_add_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.7.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.7.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.7.attn.to_out.0.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.7.attn.to_out.0.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.7.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.7.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.7.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.7.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.7.ff.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.7.ff.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.7.ff_context.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.7.ff_context.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.8.attn.add_k_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.8.attn.add_k_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.8.attn.add_q_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.8.attn.add_q_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.8.attn.add_v_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.8.attn.add_v_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.8.attn.to_add_out.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.8.attn.to_add_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.8.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.8.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.8.attn.to_out.0.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.8.attn.to_out.0.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.8.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.8.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.8.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.8.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.8.ff.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.8.ff.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.8.ff_context.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.8.ff_context.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.9.attn.add_k_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.9.attn.add_k_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.9.attn.add_q_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.9.attn.add_q_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.9.attn.add_v_proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.9.attn.add_v_proj.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.9.attn.to_add_out.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.9.attn.to_add_out.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.9.attn.to_k.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.9.attn.to_k.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.9.attn.to_out.0.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.9.attn.to_out.0.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.9.attn.to_q.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.9.attn.to_q.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.9.attn.to_v.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.9.attn.to_v.lora_B.weight": {
+        "shape": [
+            3072,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.9.ff.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.9.ff.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.9.ff_context.net.0.proj.lora_A.weight": {
+        "shape": [
+            4,
+            3072
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "base_model.model.transformer_blocks.9.ff_context.net.0.proj.lora_B.weight": {
+        "shape": [
+            12288,
+            4
+        ],
+        "dtype": "torch.bfloat16",
+        "fakeTensor": true
+    },
+    "metadata_key_for_stripped_models": {
+        "format": "pt"
+    }
+}
