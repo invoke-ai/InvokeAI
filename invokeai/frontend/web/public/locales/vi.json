@@ -252,7 +252,10 @@
         "clear": "Dọn Dẹp",
         "compactView": "Chế Độ Xem Gọn",
         "fullView": "Chế Độ Xem Đầy Đủ",
-        "options_withCount_other": "{{count}} thiết lập"
+        "options_withCount_other": "{{count}} thiết lập",
+        "removeNegativePrompt": "Xóa Lệnh Tiêu Cực",
+        "addNegativePrompt": "Thêm Lệnh Tiêu Cực",
+        "selectYourModel": "Chọn Model"
     },
     "prompt": {
         "addPromptTrigger": "Thêm Trigger Cho Lệnh",
@@ -492,6 +495,10 @@
                 "title": "Huỷ Segment Anything",
                 "desc": "Huỷ hoạt động Segment Anything hiện tại.",
                 "key": "esc"
+            },
+            "fitBboxToLayers": {
+                "title": "Xếp Vừa Hộp Giới Hạn Vào Layer",
+                "desc": "Tự động điểu chỉnh hộp giới hạn tạo sinh vừa vặn vào layer nhìn thấy được"
             }
         },
         "workflows": {
@@ -898,7 +905,8 @@
         "recallParameters": "Gợi Nhớ Tham Số",
         "scheduler": "Scheduler",
         "noMetaData": "Không tìm thấy metadata",
-        "imageDimensions": "Kích Thước Ảnh"
+        "imageDimensions": "Kích Thước Ảnh",
+        "clipSkip": "$t(parameters.clipSkip)"
     },
     "accordions": {
         "generation": {
@@ -1707,7 +1715,8 @@
         "upscaling": "Upscale",
         "tileSize": "Kích Thước Khối",
         "disabledNoRasterContent": "Đã Tắt (Không Có Nội Dung Dạng Raster)",
-        "modelDisabledForTrial": "Tạo sinh với {{modelName}} là không thể với tài khoản trial. Vào phần <LinkComponent>thiết lập tài khoản</LinkComponent> để nâng cấp."
+        "modelDisabledForTrial": "Tạo sinh với {{modelName}} là không thể với tài khoản trial. Vào phần <LinkComponent>thiết lập tài khoản</LinkComponent> để nâng cấp.",
+        "useClipSkip": "Dùng CLIP Skip"
     },
     "dynamicPrompts": {
         "seedBehaviour": {
@@ -2198,7 +2207,8 @@
             "rgReferenceImagesNotSupported": "Ảnh Mẫu Khu Vực không được hỗ trợ cho model cơ sở được chọn",
             "rgAutoNegativeNotSupported": "Tự Động Đảo Chiều không được hỗ trợ cho model cơ sở được chọn",
             "rgNoRegion": "không có khu vực được vẽ",
-            "fluxFillIncompatibleWithControlLoRA": "LoRA Điều Khiển Được không tương tích với FLUX Fill"
+            "fluxFillIncompatibleWithControlLoRA": "LoRA Điều Khiển Được không tương tích với FLUX Fill",
+            "bboxHidden": "Hộp giới hạn đang ẩn (shift+o để bật/tắt)"
         },
         "pasteTo": "Dán Vào",
         "pasteToAssets": "Tài Nguyên",
