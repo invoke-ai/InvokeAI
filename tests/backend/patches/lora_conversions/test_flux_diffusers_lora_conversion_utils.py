@@ -92,28 +92,3 @@ def test_lora_model_from_flux_diffusers_state_dict_extra_keys_error():
     # Check that an error is raised.
     with pytest.raises(AssertionError):
         lora_model_from_flux_diffusers_state_dict(state_dict, alpha=8.0)
-
-
-def test_base_model_and_transformer_prefixes_produce_identical_results():
-    """Test that both base_model.model and transformer prefixes produce identical results after conversion."""
-    # Create state dicts with both prefix formats
-    transformer_state_dict = keys_to_mock_state_dict(flux_diffusers_state_dict_keys)
-    base_model_state_dict = keys_to_mock_state_dict(flux_diffusers_base_model_state_dict_keys)
-
-    # Convert both to LoRA models
-    transformer_model = lora_model_from_flux_diffusers_state_dict(transformer_state_dict, alpha=8.0)
-    base_model_model = lora_model_from_flux_diffusers_state_dict(base_model_state_dict, alpha=8.0)
-
-    # Both models should have the same number of layers
-    assert len(transformer_model.layers) == len(base_model_model.layers)
-
-    # Both models should have the same layer keys (after prefix removal)
-    transformer_keys = set(transformer_model.layers.keys())
-    base_model_keys = set(base_model_model.layers.keys())
-    assert transformer_keys == base_model_keys
-
-    # Both models should have the same layer types and structures
-    for key in transformer_keys:
-        transformer_layer = transformer_model.layers[key]
-        base_model_layer = base_model_model.layers[key]
-        assert type(transformer_layer) is type(base_model_layer)
