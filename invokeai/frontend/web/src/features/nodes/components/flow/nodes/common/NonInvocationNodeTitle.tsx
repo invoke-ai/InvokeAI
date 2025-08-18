@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEditable } from 'common/hooks/useEditable';
 import { nodeLabelChanged } from 'features/nodes/store/nodesSlice';
 import { selectNodes } from 'features/nodes/store/selectors';
-import { NO_FIT_ON_DOUBLE_CLICK_CLASS } from 'features/nodes/types/constants';
+import { NO_DRAG_CLASS, NO_FIT_ON_DOUBLE_CLICK_CLASS } from 'features/nodes/types/constants';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -56,6 +56,7 @@ const NonInvocationNodeTitle = ({ nodeId, title }: Props) => {
       )}
       {editable.isEditing && (
         <Input
+          className={NO_DRAG_CLASS}
           ref={inputRef}
           {...editable.inputProps}
           variant="outline"

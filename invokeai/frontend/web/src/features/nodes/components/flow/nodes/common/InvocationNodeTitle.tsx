@@ -8,7 +8,7 @@ import { useNodeHasErrors } from 'features/nodes/hooks/useNodeIsInvalid';
 import { useNodeTemplateTitleSafe } from 'features/nodes/hooks/useNodeTemplateTitleSafe';
 import { useNodeUserTitleSafe } from 'features/nodes/hooks/useNodeUserTitleSafe';
 import { nodeLabelChanged } from 'features/nodes/store/nodesSlice';
-import { NO_FIT_ON_DOUBLE_CLICK_CLASS } from 'features/nodes/types/constants';
+import { NO_DRAG_CLASS, NO_FIT_ON_DOUBLE_CLICK_CLASS } from 'features/nodes/types/constants';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -74,6 +74,7 @@ const InvocationNodeTitle = ({ nodeId, title }: Props) => {
       )}
       {editable.isEditing && (
         <Input
+          className={NO_DRAG_CLASS}
           ref={inputRef}
           {...editable.inputProps}
           variant="outline"
