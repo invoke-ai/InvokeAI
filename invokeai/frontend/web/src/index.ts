@@ -31,7 +31,7 @@ import {
 export { default as InvokeAIUI } from './app/components/InvokeAIUI';
 export type { StudioInitAction } from './app/hooks/useStudioInitAction';
 export type { LoggingOverrides } from './app/logging/logger';
-export type { PartialAppConfig } from './app/types/invokeai';
+export type { NumericalParameterConfig, PartialAppConfig } from './app/types/invokeai';
 export { default as Loading } from './common/components/Loading/Loading';
 export { default as HotkeysModal } from './features/system/components/HotkeysModal/HotkeysModal';
 export { default as InvokeAiLogoComponent } from './features/system/components/InvokeAILogoComponent';
