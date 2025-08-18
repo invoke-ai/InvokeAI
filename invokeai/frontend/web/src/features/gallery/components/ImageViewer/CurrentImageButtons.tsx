@@ -17,6 +17,7 @@ import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { useGalleryPanel } from 'features/ui/layouts/use-gallery-panel';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   PiArrowsCounterClockwiseBold,
@@ -45,7 +46,9 @@ export const CurrentImageButtons = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
   const locateInGallery = useCallback(() => {
     navigationApi.expandRightPanel();
     galleryPanel.expand();
-    dispatch(boardIdSelected({ boardId: imageDTO.board_id ?? 'none', selectedImageName: imageDTO.image_name }));
+    flushSync(() => {
+      dispatch(boardIdSelected({ boardId: imageDTO.board_id ?? 'none', selectedImageName: imageDTO.image_name }));
+    });
   }, [dispatch, galleryPanel, imageDTO]);
 
   const isCanvasOrGenerateTab = tab === 'canvas' || tab === 'generate';
