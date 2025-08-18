@@ -138,6 +138,7 @@ const scrollIntoView = (
 ) => {
   if (range.endIndex === 0) {
     // No range is rendered; no need to scroll to anything.
+    log.trace('Not scrolling into view: Range endIdex is 0');
     return;
   }
 
@@ -145,6 +146,7 @@ const scrollIntoView = (
 
   if (targetIndex === -1) {
     // The image isn't in the currently rendered list.
+    log.trace('Not scrolling into view: targetIndex is -1');
     return;
   }
 
@@ -154,12 +156,28 @@ const scrollIntoView = (
 
   if (!targetItem) {
     if (targetIndex > range.endIndex) {
+      log.trace(
+        {
+          index: targetIndex,
+          behavior: 'auto',
+          align: 'start',
+        },
+        'Scrolling into view: not in DOM'
+      );
       virtuosoGridHandle.scrollToIndex({
         index: targetIndex,
         behavior: 'auto',
         align: 'start',
       });
     } else if (targetIndex < range.startIndex) {
+      log.trace(
+        {
+          index: targetIndex,
+          behavior: 'auto',
+          align: 'end',
+        },
+        'Scrolling into view: not in DOM'
+      );
       virtuosoGridHandle.scrollToIndex({
         index: targetIndex,
         behavior: 'auto',
@@ -180,12 +198,28 @@ const scrollIntoView = (
   const rootRect = rootEl.getBoundingClientRect();
 
   if (itemRect.top < rootRect.top) {
+    log.trace(
+      {
+        index: targetIndex,
+        behavior: 'auto',
+        align: 'start',
+      },
+      'Scrolling into view: in overscan'
+    );
     virtuosoGridHandle.scrollToIndex({
       index: targetIndex,
       behavior: 'auto',
       align: 'start',
     });
   } else if (itemRect.bottom > rootRect.bottom) {
+    log.trace(
+      {
+        index: targetIndex,
+        behavior: 'auto',
+        align: 'end',
+      },
+      'Scrolling into view: in overscan'
+    );
     virtuosoGridHandle.scrollToIndex({
       index: targetIndex,
       behavior: 'auto',
@@ -193,6 +227,7 @@ const scrollIntoView = (
     });
   } else {
     // Image is already in view
+    log.debug('Not scrolling into view: Image is already in view');
   }
 
   return;
