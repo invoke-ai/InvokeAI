@@ -9,6 +9,7 @@ import {
   selectGalleryImageMinimumWidth,
   selectImageToCompare,
   selectLastSelectedImage,
+  selectSelection,
   selectSelectionCount,
 } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
@@ -427,9 +428,10 @@ const useKeepSelectedImageInView = (
   rootRef: React.RefObject<HTMLDivElement>,
   rangeRef: MutableRefObject<ListRange>
 ) => {
-  const targetImageName = useAppSelector(selectLastSelectedImage);
+  const selection = useAppSelector(selectSelection);
 
   useEffect(() => {
+    const targetImageName = selection.at(-1);
     const virtuosoGridHandle = virtuosoRef.current;
     const rootEl = rootRef.current;
     const range = rangeRef.current;
@@ -437,8 +439,11 @@ const useKeepSelectedImageInView = (
     if (!virtuosoGridHandle || !rootEl || !targetImageName || !imageNames || imageNames.length === 0) {
       return;
     }
-    scrollIntoView(targetImageName, imageNames, rootEl, virtuosoGridHandle, range);
-  }, [targetImageName, imageNames, rangeRef, rootRef, virtuosoRef]);
+
+    setTimeout(() => {
+      scrollIntoView(targetImageName, imageNames, rootEl, virtuosoGridHandle, range);
+    }, 0);
+  }, [imageNames, rangeRef, rootRef, virtuosoRef, selection]);
 };
 
 /**
