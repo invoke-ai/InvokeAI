@@ -9,6 +9,9 @@ from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_L
 from tests.backend.patches.lora_conversions.lora_state_dicts.flux_dora_onetrainer_format import (
     state_dict_keys as flux_onetrainer_state_dict_keys,
 )
+from tests.backend.patches.lora_conversions.lora_state_dicts.flux_lora_diffusers_base_model_format import (
+    state_dict_keys as flux_diffusers_base_model_state_dict_keys,
+)
 from tests.backend.patches.lora_conversions.lora_state_dicts.flux_lora_diffusers_format import (
     state_dict_keys as flux_diffusers_state_dict_keys,
 )
@@ -21,7 +24,14 @@ from tests.backend.patches.lora_conversions.lora_state_dicts.flux_lora_kohya_for
 from tests.backend.patches.lora_conversions.lora_state_dicts.utils import keys_to_mock_state_dict
 
 
-@pytest.mark.parametrize("sd_keys", [flux_diffusers_state_dict_keys, flux_diffusers_no_proj_mlp_state_dict_keys])
+@pytest.mark.parametrize(
+    "sd_keys",
+    [
+        flux_diffusers_state_dict_keys,
+        flux_diffusers_no_proj_mlp_state_dict_keys,
+        flux_diffusers_base_model_state_dict_keys,
+    ],
+)
 def test_is_state_dict_likely_in_flux_diffusers_format_true(sd_keys: dict[str, list[int]]):
     """Test that is_state_dict_likely_in_flux_diffusers_format() can identify a state dict in the Diffusers FLUX LoRA format."""
     # Construct a state dict that is in the Diffusers FLUX LoRA format.
@@ -41,7 +51,14 @@ def test_is_state_dict_likely_in_flux_diffusers_format_false(sd_keys: dict[str, 
     assert not is_state_dict_likely_in_flux_diffusers_format(state_dict)
 
 
-@pytest.mark.parametrize("sd_keys", [flux_diffusers_state_dict_keys, flux_diffusers_no_proj_mlp_state_dict_keys])
+@pytest.mark.parametrize(
+    "sd_keys",
+    [
+        flux_diffusers_state_dict_keys,
+        flux_diffusers_no_proj_mlp_state_dict_keys,
+        flux_diffusers_base_model_state_dict_keys,
+    ],
+)
 def test_lora_model_from_flux_diffusers_state_dict(sd_keys: dict[str, list[int]]):
     """Test that lora_model_from_flux_diffusers_state_dict() can load a state dict in the Diffusers FLUX LoRA format."""
     # Construct a state dict that is in the Diffusers FLUX LoRA format.
