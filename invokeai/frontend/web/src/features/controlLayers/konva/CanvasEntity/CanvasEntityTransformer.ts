@@ -482,13 +482,24 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     // "contain" means that the entity should be scaled to fit within the bbox, but it should not exceed the bbox.
     const scale = Math.min(scaleX, scaleY);
 
-    // Center the shape within the bounding box
-    const offsetX = (rect.width - width * scale) / 2;
-    const offsetY = (rect.height - height * scale) / 2;
+    // Calculate the scaled dimensions
+    const scaledWidth = width * scale;
+    const scaledHeight = height * scale;
+
+    // Calculate centered position
+    const centerX = rect.x + (rect.width - scaledWidth) / 2;
+    const centerY = rect.y + (rect.height - scaledHeight) / 2;
+
+    // Round to grid and clamp to valid bounds
+    const roundedX = gridSize > 1 ? roundToMultiple(centerX, gridSize) : centerX;
+    const roundedY = gridSize > 1 ? roundToMultiple(centerY, gridSize) : centerY;
+
+    const x = clamp(roundedX, rect.x, rect.x + rect.width - scaledWidth);
+    const y = clamp(roundedY, rect.y, rect.y + rect.height - scaledHeight);
 
     this.konva.proxyRect.setAttrs({
-      x: clamp(roundToMultiple(rect.x + offsetX, gridSize), rect.x, rect.x + rect.width),
-      y: clamp(roundToMultiple(rect.y + offsetY, gridSize), rect.y, rect.y + rect.height),
+      x,
+      y,
       scaleX: scale,
       scaleY: scale,
       rotation: 0,
@@ -513,16 +524,32 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     const scaleX = rect.width / width;
     const scaleY = rect.height / height;
 
-    // "cover" is the same as "contain", but we choose the larger scale to cover the shape
+    // "cover" means the entity should cover the entire bbox, potentially overflowing
     const scale = Math.max(scaleX, scaleY);
 
-    // Center the shape within the bounding box
-    const offsetX = (rect.width - width * scale) / 2;
-    const offsetY = (rect.height - height * scale) / 2;
+    // Calculate the scaled dimensions
+    const scaledWidth = width * scale;
+    const scaledHeight = height * scale;
+
+    // Calculate position - center only if entity exceeds bbox
+    let x = rect.x;
+    let y = rect.y;
+
+    // If scaled width exceeds bbox width, center horizontally
+    if (scaledWidth > rect.width) {
+      const centerX = rect.x + (rect.width - scaledWidth) / 2;
+      x = gridSize > 1 ? roundToMultiple(centerX, gridSize) : centerX;
+    }
+
+    // If scaled height exceeds bbox height, center vertically
+    if (scaledHeight > rect.height) {
+      const centerY = rect.y + (rect.height - scaledHeight) / 2;
+      y = gridSize > 1 ? roundToMultiple(centerY, gridSize) : centerY;
+    }
 
     this.konva.proxyRect.setAttrs({
-      x: roundToMultiple(rect.x + offsetX, gridSize),
-      y: roundToMultiple(rect.y + offsetY, gridSize),
+      x,
+      y,
       scaleX: scale,
       scaleY: scale,
       rotation: 0,

@@ -98,7 +98,7 @@ const InvokeAIUI = ({
   loggingOverrides,
   onClickGoToModelManager,
   whatsNew,
-  storagePersistDebounce = 2000,
+  storagePersistDebounce = 300,
 }: Props) => {
   const [store, setStore] = useState<ReturnType<typeof createStore> | undefined>(undefined);
   const [didRehydrate, setDidRehydrate] = useState(false);
