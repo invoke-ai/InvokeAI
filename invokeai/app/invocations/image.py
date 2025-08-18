@@ -161,7 +161,7 @@ class ImagePasteInvocation(BaseInvocation, WithMetadata, WithBoard):
     x: int = InputField(default=0, description="The left x coordinate at which to paste the image")
     y: int = InputField(default=0, description="The top y coordinate at which to paste the image")
     crop: bool = InputField(default=False, description="Crop to base image dimensions")
-    invert_mask: bool = InputField(default=False, description="Invert mask color")
+    invert_mask: bool = InputField(default=True, description="Invert mask color")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         base_image = context.images.get_pil(self.base_image.image_name, mode="RGBA")
@@ -463,7 +463,7 @@ class ImageScaleInvocation(BaseInvocation, WithMetadata, WithBoard):
     )
     resample_mode: PIL_RESAMPLING_MODES = InputField(default="bicubic", description="The resampling mode")
     multiple_of: int = InputField(
-        default=8,
+        default=1,
         description="If > 1, the output image will be resized to the nearest multiple in both dimensions.",
     )
 
