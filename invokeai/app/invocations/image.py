@@ -177,10 +177,13 @@ class ImagePasteInvocation(BaseInvocation, WithMetadata, WithBoard):
         max_x = max(base_image.width, image.width + self.x)
         max_y = max(base_image.height, image.height + self.y)
 
+        new_image = Image.new(mode="RGBA", size=(max_x - min_x, max_y - min_y), color=(0, 0, 0, 0))
+        new_image.paste(base_image, (abs(min_x), abs(min_y)))
+
         # Create a temporary image to paste the image with transparency
-        temp_image = base_image
+        temp_image = new_image
         temp_image.paste(image, (max(0, self.x), max(0, self.y)), mask=mask)
-        new_image = Image.alpha_composite(base_image, temp_image)
+        new_image = Image.alpha_composite(new_image, temp_image)
 
         if self.crop:
             base_w, base_h = base_image.size
