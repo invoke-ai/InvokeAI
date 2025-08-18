@@ -9,11 +9,11 @@ from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_L
 from tests.backend.patches.lora_conversions.lora_state_dicts.flux_dora_onetrainer_format import (
     state_dict_keys as flux_onetrainer_state_dict_keys,
 )
-from tests.backend.patches.lora_conversions.lora_state_dicts.flux_lora_diffusers_format import (
-    state_dict_keys as flux_diffusers_state_dict_keys,
-)
 from tests.backend.patches.lora_conversions.lora_state_dicts.flux_lora_diffusers_base_model_format import (
     state_dict_keys as flux_diffusers_base_model_state_dict_keys,
+)
+from tests.backend.patches.lora_conversions.lora_state_dicts.flux_lora_diffusers_format import (
+    state_dict_keys as flux_diffusers_state_dict_keys,
 )
 from tests.backend.patches.lora_conversions.lora_state_dicts.flux_lora_diffusers_no_proj_mlp_format import (
     state_dict_keys as flux_diffusers_no_proj_mlp_state_dict_keys,
@@ -116,4 +116,4 @@ def test_base_model_and_transformer_prefixes_produce_identical_results():
     for key in transformer_keys:
         transformer_layer = transformer_model.layers[key]
         base_model_layer = base_model_model.layers[key]
-        assert type(transformer_layer) == type(base_model_layer)
+        assert type(transformer_layer) is type(base_model_layer)
