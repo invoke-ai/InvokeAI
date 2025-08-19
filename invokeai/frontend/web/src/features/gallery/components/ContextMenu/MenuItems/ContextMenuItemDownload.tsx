@@ -1,5 +1,5 @@
 import { IconMenuItem } from 'common/components/IconMenuItem';
-import { useDownloadImage } from 'common/hooks/useDownloadImage';
+import { useDownloadItem } from 'common/hooks/useDownloadImage';
 import { useItemDTOContext } from 'features/gallery/contexts/ItemDTOContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,15 +9,15 @@ import { isImageDTO } from 'services/api/types';
 export const ContextMenuItemDownload = memo(() => {
   const { t } = useTranslation();
   const itemDTO = useItemDTOContext();
-  const { downloadImage } = useDownloadImage();
+  const { downloadItem } = useDownloadItem(itemDTO);
 
   const onClick = useCallback(() => {
     if (isImageDTO(itemDTO)) {
-      downloadImage(itemDTO.image_url, itemDTO.image_name);
+      downloadItem(itemDTO.image_url, itemDTO.image_name);
     } else {
-      // downloadVideo(itemDTO.video_url, itemDTO.video_id);
+      downloadItem(itemDTO.video_url, itemDTO.video_id);
     }
-  }, [downloadImage, itemDTO]);
+  }, [downloadItem, itemDTO]);
 
   return (
     <IconMenuItem
