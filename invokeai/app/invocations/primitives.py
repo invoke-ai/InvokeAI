@@ -307,6 +307,7 @@ class RunwayVideoOutput(BaseInvocationOutput):
             runway_task_id=runway_task_id,
         )
 
+
 @invocation_output("video_output")
 class VideoOutput(BaseInvocationOutput):
     """Base class for nodes that output a video"""
@@ -324,8 +325,6 @@ class VideoOutput(BaseInvocationOutput):
             height=height,
             duration_seconds=duration_seconds,
         )
-
-
 
 
 # endregion
