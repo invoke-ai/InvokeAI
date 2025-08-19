@@ -14,27 +14,17 @@ export const VideoPlayerPanel = memo(() => {
   const ref = useRef<HTMLDivElement>(null);
   const generatedVideo = useAppSelector(selectGeneratedVideo);
   const lastSelectedVideoId = useAppSelector(selectLastSelectedImage);
-  const { data: videoDTO } = useGetVideoDTOQuery(generatedVideo?.video_id ?? skipToken);
+  const { data: videoDTO } = useGetVideoDTOQuery(lastSelectedVideoId ?? skipToken);
 
   useFocusRegion('video', ref);
 
-  const videoUrl = useMemo(() => {
-    // if (generatedVideo) {
-    //   return generatedVideo.video_url;
-    // }
-    if (!videoDTO) {
-      return null;
-    }
-    return videoDTO.video_url;
-  }, [videoDTO]);
-
   return (
     <Flex ref={ref} w="full" h="full" flexDirection="column" gap={4}>
-      {videoUrl && (
+      {videoDTO?.video_url && (
         <>
           <Box flex={0.75} position="relative">
             <ReactPlayer
-              src={videoUrl}
+              src={videoDTO.video_url }
               width="75%"
               height="75%"
               controls={true}
@@ -49,7 +39,7 @@ export const VideoPlayerPanel = memo(() => {
           </Box>
         </>
       )}
-      {!videoUrl && <Text>No video generated</Text>}
+      {!videoDTO?.video_url  && <Text>No video generated</Text>}
     </Flex>
   );
 });
