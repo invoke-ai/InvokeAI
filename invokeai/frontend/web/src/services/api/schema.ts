@@ -22222,21 +22222,6 @@ export type components = {
              * @description The id of the video
              */
             video_id: string;
-            /**
-             * Width
-             * @description The width of the video in pixels
-             */
-            width: number;
-            /**
-             * Height
-             * @description The height of the video in pixels
-             */
-            height: number;
-            /**
-             * Duration Seconds
-             * @description The duration of the video in seconds
-             */
-            duration_seconds: number;
         };
         /**
          * VideoIdsResult
@@ -22266,6 +22251,21 @@ export type components = {
         VideoOutput: {
             /** @description The output video */
             video: components["schemas"]["VideoField"];
+            /**
+             * Width
+             * @description The width of the video in pixels
+             */
+            width: number;
+            /**
+             * Height
+             * @description The height of the video in pixels
+             */
+            height: number;
+            /**
+             * Duration Seconds
+             * @description The duration of the video in seconds
+             */
+            duration_seconds: number;
             /**
              * type
              * @default video_output
