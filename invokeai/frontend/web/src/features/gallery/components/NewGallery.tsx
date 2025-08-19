@@ -35,6 +35,7 @@ import { GalleryImage, GalleryImagePlaceholder } from './ImageGrid/GalleryImage'
 import { GallerySelectionCountTag } from './ImageGrid/GallerySelectionCountTag';
 import { useGalleryImageNames } from './use-gallery-image-names';
 import { useGalleryVideoIds } from './use-gallery-video-ids';
+import { GalleryVideo } from './ImageGrid/GalleryVideo';
 
 const log = logger('gallery');
 
@@ -91,7 +92,7 @@ const VideoAtPosition = memo(({ itemId }: { index: number; itemId: string }) => 
     return <GalleryImagePlaceholder data-item-id={itemId} />;
   }
 
-  return <GalleryVideo imageDTO={imageDTO} />;
+  return <GalleryVideo videoDTO={item} />;
 });
 VideoAtPosition.displayName = 'VideoAtPosition';
 

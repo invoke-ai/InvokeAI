@@ -3,16 +3,17 @@ import { useAppStore } from 'app/store/storeHooks';
 import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { refImageAdded } from 'features/controlLayers/store/refImagesSlice';
 import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
-import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
+import { useItemDTOContext, useItemDTOContextImageOnly } from 'features/gallery/contexts/ItemDTOContext';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiImageBold } from 'react-icons/pi';
+import type { ImageDTO } from 'services/api/types';
 
-export const ImageMenuItemUseAsRefImage = memo(() => {
+export const ContextMenuItemUseAsRefImage = memo(() => {
   const { t } = useTranslation();
   const store = useAppStore();
-  const imageDTO = useImageDTOContext();
+  const imageDTO = useItemDTOContextImageOnly();
 
   const onClickNewGlobalReferenceImageFromImage = useCallback(() => {
     const { dispatch, getState } = store;
@@ -33,4 +34,4 @@ export const ImageMenuItemUseAsRefImage = memo(() => {
   );
 });
 
-ImageMenuItemUseAsRefImage.displayName = 'ImageMenuItemUseAsRefImage';
+  ContextMenuItemUseAsRefImage.displayName = 'ContextMenuItemUseAsRefImage';
