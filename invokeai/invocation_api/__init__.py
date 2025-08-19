@@ -66,9 +66,9 @@ from invokeai.app.invocations.primitives import (
     IntegerOutput,
     LatentsCollectionOutput,
     LatentsOutput,
+    RunwayVideoOutput,
     StringCollectionOutput,
     StringOutput,
-    RunwayVideoOutput,
     VideoOutput,
 )
 from invokeai.app.invocations.scheduler import SchedulerOutput
