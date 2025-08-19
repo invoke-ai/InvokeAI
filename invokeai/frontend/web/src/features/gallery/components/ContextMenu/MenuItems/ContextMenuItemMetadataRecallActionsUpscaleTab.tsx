@@ -1,20 +1,22 @@
 import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
-import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
+import { useItemDTOContext } from 'features/gallery/contexts/ItemDTOContext';
 import { useRecallPrompts } from 'features/gallery/hooks/useRecallPrompts';
 import { useRecallSeed } from 'features/gallery/hooks/useRecallSeed';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowBendUpLeftBold, PiPlantBold, PiQuotesBold } from 'react-icons/pi';
+import type { ImageDTO } from 'services/api/types';
 
-export const ImageMenuItemMetadataRecallActionsUpscaleTab = memo(() => {
+export const ContextMenuItemMetadataRecallActionsUpscaleTab = memo(() => {
   const { t } = useTranslation();
   const subMenu = useSubMenu();
 
-  const imageDTO = useImageDTOContext();
+  const itemDTO = useItemDTOContext();
 
-  const recallPrompts = useRecallPrompts(imageDTO);
-  const recallSeed = useRecallSeed(imageDTO);
+  // TODO: Implement video recall metadata actions
+  const recallPrompts = useRecallPrompts(itemDTO as ImageDTO);
+  const recallSeed = useRecallSeed(itemDTO as ImageDTO);
 
   return (
     <MenuItem {...subMenu.parentMenuItemProps} icon={<PiArrowBendUpLeftBold />}>
@@ -35,4 +37,4 @@ export const ImageMenuItemMetadataRecallActionsUpscaleTab = memo(() => {
   );
 });
 
-ImageMenuItemMetadataRecallActionsUpscaleTab.displayName = 'ImageMenuItemMetadataRecallActionsUpscaleTab';
+ContextMenuItemMetadataRecallActionsUpscaleTab.displayName = 'ContextMenuItemMetadataRecallActionsUpscaleTab';

@@ -1,6 +1,6 @@
 import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
-import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
+import { useItemDTOContext } from 'features/gallery/contexts/ItemDTOContext';
 import { useRecallAll } from 'features/gallery/hooks/useRecallAll';
 import { useRecallCLIPSkip } from 'features/gallery/hooks/useRecallCLIPSkip';
 import { useRecallDimensions } from 'features/gallery/hooks/useRecallDimensions';
@@ -17,19 +17,21 @@ import {
   PiQuotesBold,
   PiRulerBold,
 } from 'react-icons/pi';
+import type { ImageDTO } from 'services/api/types';
 
-export const ImageMenuItemMetadataRecallActionsCanvasGenerateTabs = memo(() => {
+export const ContextMenuItemMetadataRecallActionsCanvasGenerateTabs = memo(() => {
   const { t } = useTranslation();
   const subMenu = useSubMenu();
 
-  const imageDTO = useImageDTOContext();
+  const itemDTO = useItemDTOContext();
 
-  const recallAll = useRecallAll(imageDTO);
-  const recallRemix = useRecallRemix(imageDTO);
-  const recallPrompts = useRecallPrompts(imageDTO);
-  const recallSeed = useRecallSeed(imageDTO);
-  const recallDimensions = useRecallDimensions(imageDTO);
-  const recallCLIPSkip = useRecallCLIPSkip(imageDTO);
+  // TODO: Implement video recall metadata actions
+  const recallAll = useRecallAll(itemDTO as ImageDTO);
+  const recallRemix = useRecallRemix(itemDTO as ImageDTO);
+  const recallPrompts = useRecallPrompts(itemDTO as ImageDTO);
+  const recallSeed = useRecallSeed(itemDTO as ImageDTO);
+  const recallDimensions = useRecallDimensions(itemDTO as ImageDTO);
+  const recallCLIPSkip = useRecallCLIPSkip(itemDTO as ImageDTO);
 
   return (
     <MenuItem {...subMenu.parentMenuItemProps} icon={<PiArrowBendUpLeftBold />}>
@@ -66,5 +68,5 @@ export const ImageMenuItemMetadataRecallActionsCanvasGenerateTabs = memo(() => {
   );
 });
 
-ImageMenuItemMetadataRecallActionsCanvasGenerateTabs.displayName =
-  'ImageMenuItemMetadataRecallActionsCanvasGenerateTabs';
+ContextMenuItemMetadataRecallActionsCanvasGenerateTabs.displayName =
+  'ContextMenuItemMetadataRecallActionsCanvasGenerateTabs';
