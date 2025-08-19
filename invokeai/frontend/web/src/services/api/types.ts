@@ -69,6 +69,9 @@ const _zImageDTO = z.object({
 });
 export type ImageDTO = z.infer<typeof _zImageDTO>;
 assert<Equals<ImageDTO, S['ImageDTO']>>();
+export const isImageDTO = (dto: ImageDTO | VideoDTO): dto is ImageDTO => {
+  return 'image_name' in dto;
+};
 
 export type BoardDTO = S['BoardDTO'];
 export type OffsetPaginatedResults_ImageDTO_ = S['OffsetPaginatedResults_ImageDTO_'];
@@ -91,6 +94,9 @@ const _zVideoDTO = z.object({
 });
 export type VideoDTO = z.infer<typeof _zVideoDTO>;
 assert<Equals<VideoDTO, S['VideoDTO']>>();
+export const isVideoDTO = (dto: ImageDTO | VideoDTO): dto is VideoDTO => {
+  return 'video_id' in dto;
+};
 export type OffsetPaginatedResults_VideoDTO_ = S['OffsetPaginatedResults_VideoDTO_'];
 
 // Models

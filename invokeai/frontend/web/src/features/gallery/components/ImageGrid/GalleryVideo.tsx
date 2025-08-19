@@ -25,6 +25,8 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PiImageBold } from 'react-icons/pi';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { VideoDTO } from 'services/api/types';
+import { GalleryItemHoverIcons } from './GalleryItemHoverIcons';
+import { useVideoContextMenu } from '../ContextMenu/VideoContextMenu';
 
 const galleryImageContainerSX = {
   containerType: 'inline-size',
@@ -220,7 +222,7 @@ export const GalleryVideo = memo(({ videoDTO  }: Props) => {
     navigationApi.focusPanelInActiveTab(VIEWER_PANEL_ID);
   }, [store]);
 
-  // useImageContextMenu(videoDTO, ref);
+  useVideoContextMenu(videoDTO, ref);
 
   return (
     <>
@@ -247,7 +249,7 @@ export const GalleryVideo = memo(({ videoDTO  }: Props) => {
           maxH="full"
           borderRadius="base"
         />
-        {/* <GalleryImageHoverIcons imageDTO={videoDTO} isHovered={isHovered} /> */}
+        <GalleryItemHoverIcons itemDTO={videoDTO} isHovered={isHovered} />
       </Flex>
       {dragPreviewState?.type === 'multiple-video' ? createMultipleVideoDragPreview(dragPreviewState) : null}
       {dragPreviewState?.type === 'single-video' ? createSingleVideoDragPreview(dragPreviewState) : null}
@@ -255,7 +257,7 @@ export const GalleryVideo = memo(({ videoDTO  }: Props) => {
   );
 });
 
-GalleryVideo.displayName = 'GalleryImage';
+GalleryVideo.displayName = 'GalleryVideo';
 
 export const GalleryImagePlaceholder = memo((props: FlexProps) => (
   <Flex w="full" h="full" bg="base.850" borderRadius="base" alignItems="center" justifyContent="center" {...props}>

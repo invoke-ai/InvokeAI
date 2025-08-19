@@ -1,18 +1,23 @@
 import { IconMenuItem } from 'common/components/IconMenuItem';
 import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
-import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
+import { useItemDTOContext } from 'features/gallery/contexts/ItemDTOContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCopyBold } from 'react-icons/pi';
+import { isImageDTO } from 'services/api/types';
 
-export const ImageMenuItemCopy = memo(() => {
+export const ContextMenuItemCopy = memo(() => {
   const { t } = useTranslation();
-  const imageDTO = useImageDTOContext();
+  const itemDTO = useItemDTOContext();
   const copyImageToClipboard = useCopyImageToClipboard();
 
   const onClick = useCallback(() => {
-    copyImageToClipboard(imageDTO.image_url);
-  }, [copyImageToClipboard, imageDTO.image_url]);
+    if (isImageDTO(itemDTO)) {
+      copyImageToClipboard(itemDTO.image_url);
+    } else {
+      // copyVideoToClipboard(itemDTO.video_url);
+    }
+  }, [copyImageToClipboard, itemDTO]);
 
   return (
     <IconMenuItem
@@ -24,4 +29,4 @@ export const ImageMenuItemCopy = memo(() => {
   );
 });
 
-ImageMenuItemCopy.displayName = 'ImageMenuItemCopy';
+ContextMenuItemCopy.displayName = 'ContextMenuItemCopy';

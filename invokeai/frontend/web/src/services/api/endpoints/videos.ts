@@ -7,7 +7,8 @@ import type {
 import stableHash from 'stable-hash';
 import type { Param0 } from 'tsafe';
 
-import { api, buildV1Url } from '..';
+import { api, buildV1Url, LIST_TAG } from '..';
+import { getTagsToInvalidateForBoardAffectingMutation, getTagsToInvalidateForVideoMutation } from '../util/tagInvalidation';
 
 /**
  * Builds an endpoint URL for the videos router
@@ -76,6 +77,79 @@ export const videosApi = api.injectEndpoints({
         }
       },
     }),
+    /**
+     * Star a list of videos.
+     */
+    starVideos: build.mutation<
+      paths['/api/v1/videos/star']['post']['responses']['200']['content']['application/json'],
+      paths['/api/v1/videos/star']['post']['requestBody']['content']['application/json']
+    >({
+      query: (body) => ({
+        url: buildVideosUrl('star'),
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (result) => {
+        if (!result) {
+          return [];
+        }
+        return [
+          ...getTagsToInvalidateForVideoMutation(result.starred_videos),
+          ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
+          'VideoCollectionCounts',
+          { type: 'VideoCollection', id: 'starred' },
+          { type: 'VideoCollection', id: 'unstarred' },
+        ];
+      },
+    }),
+    /**
+     * Unstar a list of videos.
+     */
+    unstarVideos: build.mutation<
+      paths['/api/v1/videos/unstar']['post']['responses']['200']['content']['application/json'],
+      paths['/api/v1/videos/unstar']['post']['requestBody']['content']['application/json']
+    >({
+      query: (body) => ({
+        url: buildVideosUrl('unstar'),
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (result) => {
+        if (!result) {
+          return [];
+        }
+        return [
+          ...getTagsToInvalidateForVideoMutation(result.unstarred_videos),
+          ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
+          'VideoCollectionCounts',
+          { type: 'VideoCollection', id: 'starred' },
+          { type: 'VideoCollection', id: 'unstarred' },
+        ];
+      },
+    }),
+    deleteVideos: build.mutation<
+      paths['/api/v1/videos/delete']['post']['responses']['200']['content']['application/json'],
+      paths['/api/v1/videos/delete']['post']['requestBody']['content']['application/json']
+    >({
+      query: (body) => ({
+        url: buildVideosUrl('delete'),
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (result) => {
+        if (!result) {
+          return [];
+        }
+        // We ignore the deleted images when getting tags to invalidate. If we did not, we will invalidate the queries
+        // that fetch image DTOs, metadata, and workflows. But we have just deleted those images! Invalidating the tags
+        // will force those queries to re-fetch, and the requests will of course 404.
+        return [
+          ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
+          'VideoCollectionCounts',
+          { type: 'VideoCollection', id: LIST_TAG },
+        ];
+      },
+    }),
   }),
 });
 
@@ -83,6 +157,9 @@ export const {
   useGetVideoDTOQuery,
   useGetVideoIdsQuery,
   useGetVideoDTOsByNamesMutation,
+  useStarVideosMutation,
+  useUnstarVideosMutation,
+  useDeleteVideosMutation,
 } = videosApi;
 
 

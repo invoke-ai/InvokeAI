@@ -1,19 +1,24 @@
 import { useAppDispatch } from 'app/store/storeHooks';
 import { IconMenuItem } from 'common/components/IconMenuItem';
-import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
+import { useItemDTOContext } from 'features/gallery/contexts/ItemDTOContext';
 import { imageOpenedInNewTab } from 'features/gallery/store/actions';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowSquareOutBold } from 'react-icons/pi';
+import { isImageDTO } from 'services/api/types';
 
-export const ImageMenuItemOpenInNewTab = memo(() => {
+export const ContextMenuItemOpenInNewTab = memo(() => {
   const { t } = useTranslation();
-  const imageDTO = useImageDTOContext();
+  const itemDTO = useItemDTOContext();
   const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
-    window.open(imageDTO.image_url, '_blank');
+    if (isImageDTO(itemDTO)) {
+    window.open(itemDTO.image_url, '_blank');
     dispatch(imageOpenedInNewTab());
-  }, [imageDTO.image_url, dispatch]);
+    } else {
+      // TODO: Implement video open in new tab
+    }
+  }, [itemDTO, dispatch]);
 
   return (
     <IconMenuItem
@@ -25,4 +30,4 @@ export const ImageMenuItemOpenInNewTab = memo(() => {
   );
 });
 
-ImageMenuItemOpenInNewTab.displayName = 'ImageMenuItemOpenInNewTab';
+ContextMenuItemOpenInNewTab.displayName = 'ContextMenuItemOpenInNewTab';
