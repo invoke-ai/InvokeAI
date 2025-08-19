@@ -1,13 +1,12 @@
 import { logger } from 'app/logging/logger';
-import type { RootState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
-import { selectStartingFrameImage } from 'features/parameters/store/videoSlice';
 import { zImageField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {  selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
+import { selectStartingFrameImage } from 'features/parameters/store/videoSlice';
 import { t } from 'i18next';
 import { assert } from 'tsafe';
 
