@@ -2,13 +2,19 @@ from typing import Optional
 
 from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 
-from invokeai.app.services.videos_common import VideoDTO, VideoRecordChanges, DeleteVideosResult, StarredVideosResult, UnstarredVideosResult, VideoIdsResult
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.videos_common import (
+    DeleteVideosResult,
+    StarredVideosResult,
+    UnstarredVideosResult,
+    VideoDTO,
+    VideoIdsResult,
+    VideoRecordChanges,
+)
 
 videos_router = APIRouter(prefix="/v1/videos", tags=["videos"])
-
 
 
 @videos_router.patch(
@@ -42,10 +48,8 @@ async def get_video_dto(
 async def delete_videos_from_list(
     video_ids: list[str] = Body(description="The list of ids of videos to delete", embed=True),
 ) -> DeleteVideosResult:
-
     raise HTTPException(status_code=501, detail="Not implemented")
 
-   
 
 @videos_router.post("/star", operation_id="star_videos_in_list", response_model=StarredVideosResult)
 async def star_videos_in_list(
@@ -61,11 +65,8 @@ async def unstar_videos_in_list(
     raise HTTPException(status_code=501, detail="Not implemented")
 
 
-@videos_router.delete(
-    "/uncategorized", operation_id="delete_uncategorized_videos", response_model=DeleteVideosResult
-)
-async def delete_uncategorized_videos(   
-) -> DeleteVideosResult:
+@videos_router.delete("/uncategorized", operation_id="delete_uncategorized_videos", response_model=DeleteVideosResult)
+async def delete_uncategorized_videos() -> DeleteVideosResult:
     """Deletes all videos that are uncategorized"""
 
     raise HTTPException(status_code=501, detail="Not implemented")
