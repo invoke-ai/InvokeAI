@@ -16,8 +16,6 @@ import {
   isChatGPT4oAspectRatioID,
   isFluxKontextAspectRatioID,
   isImagenAspectRatioID,
-  isRunwayAspectRatioID,
-  RUNWAY_ASPECT_RATIOS,
   zParamsState,
 } from 'features/controlLayers/store/types';
 import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';

@@ -5,9 +5,9 @@ import { heightChanged, selectHeight } from 'features/controlLayers/store/params
 import { selectGridSize, selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { useIsApiModel } from 'features/parameters/hooks/useIsApiModel';
 import { selectHeightConfig } from 'features/system/store/configSlice';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 
 export const DimensionsHeight = memo(() => {
   const { t } = useTranslation();

@@ -25,7 +25,7 @@ import { type FieldIdentifier, isImageFieldCollectionInputInstance } from 'featu
 import { startingFrameImageChanged } from 'features/parameters/store/videoSlice';
 import { expandPrompt } from 'features/prompt/PromptExpansion/expand';
 import { promptExpansionApi } from 'features/prompt/PromptExpansion/state';
-import type { ImageDTO } from 'services/api/types';
+import type { ImageDTO, VideoDTO } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
 const log = logger('dnd');
@@ -71,6 +71,36 @@ type DndSource<SourceData extends DndData> = {
   typeGuard: ReturnType<typeof buildTypeGuard<SourceData>>;
   getData: ReturnType<typeof buildGetData<SourceData>>;
 };
+
+//#region Single Video
+const _singleVideo = buildTypeAndKey('single-video');
+export type SingleVideoDndSourceData = DndData<
+  typeof _singleVideo.type,
+  typeof _singleVideo.key,
+  { videoDTO: VideoDTO }
+>;
+export const singleVideoDndSource: DndSource<SingleVideoDndSourceData> = {
+  ..._singleVideo,
+  typeGuard: buildTypeGuard(_singleVideo.key),
+  getData: buildGetData(_singleVideo.key, _singleVideo.type),
+};
+//#endregion
+
+//#region Multiple Image
+const _multipleVideo = buildTypeAndKey('multiple-video');
+export type MultipleVideoDndSourceData = DndData<
+  typeof _multipleVideo.type,
+  typeof _multipleVideo.key,
+  { ids: string[]; board_id: BoardId }
+>;
+export const multipleVideoDndSource: DndSource<MultipleVideoDndSourceData> = {
+  ..._multipleVideo,
+  typeGuard: buildTypeGuard(_multipleVideo.key),
+  getData: buildGetData(_multipleVideo.key, _multipleVideo.type),
+};
+//#endregion
+
+
 //#region Single Image
 const _singleImage = buildTypeAndKey('single-image');
 export type SingleImageDndSourceData = DndData<

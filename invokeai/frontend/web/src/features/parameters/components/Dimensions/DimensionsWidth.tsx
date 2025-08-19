@@ -5,9 +5,9 @@ import { selectWidth, widthChanged } from 'features/controlLayers/store/paramsSl
 import { selectGridSize, selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { useIsApiModel } from 'features/parameters/hooks/useIsApiModel';
 import { selectWidthConfig } from 'features/system/store/configSlice';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 
 export const DimensionsWidth = memo(() => {
   const { t } = useTranslation();
