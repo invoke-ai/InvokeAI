@@ -34,6 +34,7 @@ import { resolveBatchValue } from 'features/nodes/util/node/resolveBatchValue';
 import { useIsModelDisabled } from 'features/parameters/hooks/useIsModelDisabled';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
+import { selectVideoSlice, type VideoState } from 'features/parameters/store/videoSlice';
 import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
 import { getGridSize } from 'features/parameters/util/optimalDimension';
 import { promptExpansionApi, type PromptExpansionRequestState } from 'features/prompt/PromptExpansion/state';
@@ -91,7 +92,8 @@ const debouncedUpdateReasons = debounce(
     store: AppStore,
     isInPublishFlow: boolean,
     isChatGPT4oHighModelDisabled: (model: ParameterModel) => boolean,
-    promptExpansionRequest: PromptExpansionRequestState
+    promptExpansionRequest: PromptExpansionRequestState,
+    video: VideoState,
   ) => {
     if (tab === 'generate') {
       const model = selectMainModelConfig(store.getState());
@@ -121,6 +123,7 @@ const debouncedUpdateReasons = debounce(
         canvasIsSelectingObject,
         isChatGPT4oHighModelDisabled,
         promptExpansionRequest,
+  
       });
       $reasonsWhyCannotEnqueue.set(reasons);
     } else if (tab === 'workflows') {
@@ -140,6 +143,15 @@ const debouncedUpdateReasons = debounce(
         config,
         params,
         promptExpansionRequest,
+      });
+      $reasonsWhyCannotEnqueue.set(reasons);
+    } else if (tab === 'video') {
+      const reasons = getReasonsWhyCannotEnqueueVideoTab({
+        isConnected,
+        video,
+        params,
+        promptExpansionRequest,
+        dynamicPrompts,
       });
       $reasonsWhyCannotEnqueue.set(reasons);
     } else {
@@ -172,7 +184,7 @@ export const useReadinessWatcher = () => {
   const isInPublishFlow = useStore($isInPublishFlow);
   const { isChatGPT4oHighModelDisabled } = useIsModelDisabled();
   const promptExpansionRequest = useStore(promptExpansionApi.$state);
-
+  const video = useAppSelector(selectVideoSlice);
   useEffect(() => {
     debouncedUpdateReasons(
       tab,
@@ -194,7 +206,8 @@ export const useReadinessWatcher = () => {
       store,
       isInPublishFlow,
       isChatGPT4oHighModelDisabled,
-      promptExpansionRequest
+      promptExpansionRequest,
+      video,
     );
   }, [
     store,
@@ -217,10 +230,43 @@ export const useReadinessWatcher = () => {
     isInPublishFlow,
     isChatGPT4oHighModelDisabled,
     promptExpansionRequest,
+    video,
   ]);
 };
 
 const disconnectedReason = (t: typeof i18n.t) => ({ content: t('parameters.invoke.systemDisconnected') });
+
+const getReasonsWhyCannotEnqueueVideoTab = (arg: {
+  isConnected: boolean;
+  video: VideoState;
+  params: ParamsState;
+  dynamicPrompts: DynamicPromptsState;
+  promptExpansionRequest: PromptExpansionRequestState;
+}) => {
+  const { isConnected, video, params, dynamicPrompts, promptExpansionRequest } = arg;
+  const { positivePrompt } = params;
+  const reasons: Reason[] = [];
+
+  if (!isConnected) {
+    reasons.push(disconnectedReason(i18n.t));
+  }
+
+  if (dynamicPrompts.prompts.length === 0 && getShouldProcessPrompt(positivePrompt)) {
+    reasons.push({ content: i18n.t('parameters.invoke.noPrompts') });
+  }
+
+  if (promptExpansionRequest.isPending) {
+    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionPending') });
+  } else if (promptExpansionRequest.isSuccess) {
+    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionResultPending') });
+  }
+
+  if (!video.startingFrameImage?.image_name) {
+    reasons.push({ content: i18n.t('parameters.invoke.noStartingFrameImage') });
+  }
+
+  return reasons;
+};
 
 const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   isConnected: boolean;
