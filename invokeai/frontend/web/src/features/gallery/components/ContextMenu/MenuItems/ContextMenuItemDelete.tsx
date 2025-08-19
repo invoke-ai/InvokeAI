@@ -4,11 +4,13 @@ import { useItemDTOContext } from 'features/gallery/contexts/ItemDTOContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold } from 'react-icons/pi';
+import { useDeleteVideosMutation } from 'services/api/endpoints/videos';
 import { isImageDTO } from 'services/api/types';
 
 export const ContextMenuItemDelete = memo(() => {
   const { t } = useTranslation();
   const deleteImageModal = useDeleteImageModalApi();
+  const [deleteVideos] = useDeleteVideosMutation();
   const itemDTO = useItemDTOContext();
 
   const onClick = useCallback(async () => {
@@ -16,12 +18,13 @@ export const ContextMenuItemDelete = memo(() => {
       if (isImageDTO(itemDTO)) {
         await deleteImageModal.delete([itemDTO.image_name]);
       } else {
-        // await deleteVideoModal.delete([itemDTO.video_id]);
+        // TODO: Add confirm on delete and video usage functionality
+        await deleteVideos({ video_ids: [itemDTO.video_id] });
       }
     } catch {
       // noop;
     }
-  }, [deleteImageModal, itemDTO]);
+  }, [deleteImageModal, deleteVideos, itemDTO]);
 
   return (
     <IconMenuItem

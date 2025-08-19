@@ -1083,6 +1083,46 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/board_videos/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Videos To Board
+         * @description Adds a list of videos to a board
+         */
+        post: operations["add_videos_to_board"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/board_videos/batch/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove Videos From Board
+         * @description Removes a list of videos from their board, if they had one
+         */
+        post: operations["remove_videos_from_board"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/model_relationships/i/{model_key}": {
         parameters: {
             query?: never;
@@ -2087,6 +2127,19 @@ export type components = {
              */
             type: "add";
         };
+        /** AddVideosToBoardResult */
+        AddVideosToBoardResult: {
+            /**
+             * Affected Boards
+             * @description The ids of boards affected by the delete operation
+             */
+            affected_boards: string[];
+            /**
+             * Added Videos
+             * @description The video ids that were added to the board
+             */
+            added_videos: string[];
+        };
         /**
          * Alpha Mask to Tensor
          * @description Convert a mask image to a tensor. Opaque regions are 1 and transparent regions are 0.
@@ -2772,6 +2825,19 @@ export type components = {
              */
             image_names: string[];
         };
+        /** Body_add_videos_to_board */
+        Body_add_videos_to_board: {
+            /**
+             * Board Id
+             * @description The id of the board to add to
+             */
+            board_id: string;
+            /**
+             * Video Ids
+             * @description The ids of the videos to add
+             */
+            video_ids: string[];
+        };
         /** Body_cancel_by_batch_ids */
         Body_cancel_by_batch_ids: {
             /**
@@ -2956,6 +3022,14 @@ export type components = {
              * @description The names of the images to remove
              */
             image_names: string[];
+        };
+        /** Body_remove_videos_from_board */
+        Body_remove_videos_from_board: {
+            /**
+             * Video Ids
+             * @description The ids of the videos to remove
+             */
+            video_ids: string[];
         };
         /** Body_set_workflow_thumbnail */
         Body_set_workflow_thumbnail: {
@@ -18385,6 +18459,19 @@ export type components = {
              */
             removed_images: string[];
         };
+        /** RemoveVideosFromBoardResult */
+        RemoveVideosFromBoardResult: {
+            /**
+             * Affected Boards
+             * @description The ids of boards affected by the delete operation
+             */
+            affected_boards: string[];
+            /**
+             * Removed Videos
+             * @description The video ids that were removed from their board
+             */
+            removed_videos: string[];
+        };
         /**
          * Resize Latents
          * @description Resizes latents to explicit width/height (in pixels). Provided dimensions are floor-divided by 8.
@@ -25135,6 +25222,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RemoveImagesFromBoardResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_videos_to_board: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_add_videos_to_board"];
+            };
+        };
+        responses: {
+            /** @description Videos were added to board successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddVideosToBoardResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_videos_from_board: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_remove_videos_from_board"];
+            };
+        };
+        responses: {
+            /** @description Videos were removed from board successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoveVideosFromBoardResult"];
                 };
             };
             /** @description Validation Error */
