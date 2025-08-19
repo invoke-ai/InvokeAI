@@ -24,6 +24,8 @@ export const buildRunwayVideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn 
 
   const params = selectParamsSlice(state);
   const prompts = selectPresetModifiedPrompts(state);
+  assert(prompts.positive.length > 0, 'Runway video requires positive prompt to have at least one character');
+
   const startingFrameImage = selectStartingFrameImage(state);
 
   assert(startingFrameImage, 'Video starting frame is required for runway video generation');
