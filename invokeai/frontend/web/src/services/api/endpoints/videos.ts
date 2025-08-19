@@ -7,7 +7,7 @@ import type {
 import stableHash from 'stable-hash';
 import type { Param0 } from 'tsafe';
 
-import { api, buildV1Url, LIST_TAG } from '..';
+import { api, buildV1Url } from '..';
 
 /**
  * Builds an endpoint URL for the videos router
