@@ -12,8 +12,8 @@ import { createMultipleImageDragPreview, setMultipleImageDragPreview } from 'fea
 import type { DndDragPreviewSingleImageState } from 'features/dnd/DndDragPreviewSingleImage';
 import { createSingleImageDragPreview, setSingleImageDragPreview } from 'features/dnd/DndDragPreviewSingleImage';
 import { firefoxDndFix } from 'features/dnd/util';
-import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
-import { GalleryImageHoverIcons } from 'features/gallery/components/ImageGrid/GalleryImageHoverIcons';
+import { useImageContextMenu } from 'features/gallery/components/ContextMenu/ImageContextMenu';
+import { GalleryItemHoverIcons } from 'features/gallery/components/ImageGrid/GalleryItemHoverIcons';
 import {
   selectGetImageNamesQueryArgs,
   selectSelectedBoardId,
@@ -262,7 +262,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
           maxH="full"
           borderRadius="base"
         />
-        <GalleryImageHoverIcons imageDTO={imageDTO} isHovered={isHovered} />
+        <GalleryItemHoverIcons itemDTO={imageDTO} isHovered={isHovered} />
       </Flex>
       {dragPreviewState?.type === 'multiple-image' ? createMultipleImageDragPreview(dragPreviewState) : null}
       {dragPreviewState?.type === 'single-image' ? createSingleImageDragPreview(dragPreviewState) : null}

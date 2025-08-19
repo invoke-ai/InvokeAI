@@ -3,13 +3,13 @@ import { Menu, MenuButton, MenuList, Portal, useGlobalMenuClose } from '@invoke-
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import MultipleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/MultipleSelectionMenuItems';
-import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
+import MultipleSelectionVideoMenuItems from 'features/gallery/components/ContextMenu/MultipleSelectionVideoMenuItems';
+import SingleSelectionVideoMenuItems from 'features/gallery/components/ContextMenu/SingleSelectionVideoMenuItems';
 import { selectSelectionCount } from 'features/gallery/store/gallerySelectors';
 import { map } from 'nanostores';
 import type { RefObject } from 'react';
 import { memo, useCallback, useEffect, useRef } from 'react';
-import type { ImageDTO } from 'services/api/types';
+import type { VideoDTO } from 'services/api/types';
 
 /**
  * The delay in milliseconds before the context menu opens on long press.
@@ -23,13 +23,13 @@ const LONGPRESS_MOVE_THRESHOLD_PX = 10;
 /**
  * The singleton state of the context menu.
  */
-const $imageContextMenuState = map<{
+const $videoContextMenuState = map<{
   isOpen: boolean;
-  imageDTO: ImageDTO | null;
+  videoDTO: VideoDTO | null;
   position: { x: number; y: number };
 }>({
   isOpen: false,
-  imageDTO: null,
+  videoDTO: null,
   position: { x: -1, y: -1 },
 });
 
@@ -37,21 +37,21 @@ const $imageContextMenuState = map<{
  * Convenience function to close the context menu.
  */
 const onClose = () => {
-  $imageContextMenuState.setKey('isOpen', false);
+  $videoContextMenuState.setKey('isOpen', false);
 };
 
 /**
  * Map of elements to image DTOs. This is used to determine which image DTO to show the context menu for, depending on
  * the target of the context menu or long press event.
  */
-const elToImageMap = new Map<HTMLElement, ImageDTO>();
+const elToVideoMap = new Map<HTMLElement, VideoDTO>();
 
 /**
  * Given a target node, find the first registered parent element that contains the target node and return the imageDTO
  * associated with it.
  */
-const getImageDTOFromMap = (target: Node): ImageDTO | undefined => {
-  const entry = Array.from(elToImageMap.entries()).find((entry) => entry[0].contains(target));
+const getVideoDTOFromMap = (target: Node): VideoDTO | undefined => {
+  const entry = Array.from(elToVideoMap.entries()).find((entry) => entry[0].contains(target));
   return entry?.[1];
 };
 
@@ -60,7 +60,7 @@ const getImageDTOFromMap = (target: Node): ImageDTO | undefined => {
  * @param imageDTO The image DTO to register the context menu for.
  * @param targetRef The ref of the target element that should trigger the context menu.
  */
-export const useImageContextMenu = (imageDTO: ImageDTO, ref: RefObject<HTMLElement> | (HTMLElement | null)) => {
+export const useVideoContextMenu = (videoDTO: VideoDTO, ref: RefObject<HTMLElement> | (HTMLElement | null)) => {
   useEffect(() => {
     if (ref === null) {
       return;
@@ -69,19 +69,19 @@ export const useImageContextMenu = (imageDTO: ImageDTO, ref: RefObject<HTMLEleme
     if (!el) {
       return;
     }
-    elToImageMap.set(el, imageDTO);
+    elToVideoMap.set(el, videoDTO);
     return () => {
-      elToImageMap.delete(el);
+      elToVideoMap.delete(el);
     };
-  }, [imageDTO, ref]);
+  }, [videoDTO, ref]);
 };
 
 /**
  * Singleton component that renders the context menu for images.
  */
-export const ImageContextMenu = memo(() => {
-  useAssertSingleton('ImageContextMenu');
-  const state = useStore($imageContextMenuState);
+export const VideoContextMenu = memo(() => {
+  useAssertSingleton('VideoContextMenu');
+  const state = useStore($videoContextMenuState);
   useGlobalMenuClose(onClose);
 
   return (
@@ -101,12 +101,12 @@ export const ImageContextMenu = memo(() => {
         />
         <MenuContent />
       </Menu>
-      <ImageContextMenuEventLogical />
+      <VideoContextMenuEventLogical />
     </Portal>
   );
 });
 
-ImageContextMenu.displayName = 'ImageContextMenu';
+VideoContextMenu.displayName = 'VideoContextMenu';
 
 const _hover: ChakraProps['_hover'] = { bg: 'transparent' };
 
@@ -114,7 +114,7 @@ const _hover: ChakraProps['_hover'] = { bg: 'transparent' };
  * A logical component that listens for context menu events and opens the context menu. It's separate from
  * ImageContextMenu component to avoid re-rendering the whole context menu on every context menu event.
  */
-const ImageContextMenuEventLogical = memo(() => {
+const VideoContextMenuEventLogical = memo(() => {
   const lastPositionRef = useRef<{ x: number; y: number }>({ x: -1, y: -1 });
   const longPressTimeoutRef = useRef(0);
   const animationTimeoutRef = useRef(0);
@@ -126,9 +126,9 @@ const ImageContextMenuEventLogical = memo(() => {
       return;
     }
 
-    const imageDTO = getImageDTOFromMap(e.target as Node);
+    const videoDTO = getVideoDTOFromMap(e.target as Node);
 
-    if (!imageDTO) {
+    if (!videoDTO) {
       // Can't find the image DTO, close the context menu
       onClose();
       return;
@@ -140,23 +140,23 @@ const ImageContextMenuEventLogical = memo(() => {
 
     if (lastPositionRef.current.x !== e.pageX || lastPositionRef.current.y !== e.pageY) {
       // if the mouse moved, we need to close, wait for animation and reopen the menu at the new position
-      if ($imageContextMenuState.get().isOpen) {
+      if ($videoContextMenuState.get().isOpen) {
         onClose();
       }
       animationTimeoutRef.current = window.setTimeout(() => {
         // Open the menu after the animation with the new state
-        $imageContextMenuState.set({
+        $videoContextMenuState.set({
           isOpen: true,
           position: { x: e.pageX, y: e.pageY },
-          imageDTO,
+          videoDTO,
         });
       }, 100);
     } else {
       // else we can just open the menu at the current position w/ new state
-      $imageContextMenuState.set({
+      $videoContextMenuState.set({
         isOpen: true,
         position: { x: e.pageX, y: e.pageY },
-        imageDTO,
+        videoDTO,
       });
     }
 
@@ -249,29 +249,29 @@ const ImageContextMenuEventLogical = memo(() => {
   return null;
 });
 
-ImageContextMenuEventLogical.displayName = 'ImageContextMenuEventLogical';
+VideoContextMenuEventLogical.displayName = 'VideoContextMenuEventLogical';
 
 // The content of the context menu, which changes based on the selection count. Split out and memoized to avoid
 // re-rendering the whole context menu too often.
 const MenuContent = memo(() => {
   const selectionCount = useAppSelector(selectSelectionCount);
-  const state = useStore($imageContextMenuState);
+  const state = useStore($videoContextMenuState);
 
-  if (!state.imageDTO) {
+  if (!state.videoDTO) {
     return null;
   }
 
   if (selectionCount > 1) {
     return (
       <MenuList visibility="visible">
-        <MultipleSelectionMenuItems />
+        <MultipleSelectionVideoMenuItems />
       </MenuList>
     );
   }
 
   return (
     <MenuList visibility="visible">
-      <SingleSelectionMenuItems imageDTO={state.imageDTO} />
+      <SingleSelectionVideoMenuItems videoDTO={state.videoDTO} />
     </MenuList>
   );
 });

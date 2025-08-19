@@ -1,21 +1,22 @@
 import { MenuItem } from '@invoke-ai/ui-library';
-import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
+import { useItemDTOContext, useItemDTOContextImageOnly } from 'features/gallery/contexts/ItemDTOContext';
 import {  startingFrameImageChanged } from 'features/parameters/store/videoSlice';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiVideoBold } from 'react-icons/pi';
 import { useDispatch } from 'react-redux';
+import { isImageDTO } from 'services/api/types';
 
-export const ImageMenuItemSendToVideo = memo(() => {
+export const ContextMenuItemSendToVideo = memo(() => {
   const { t } = useTranslation();
-  const imageDTO = useImageDTOContext();
+  const imageDTO = useItemDTOContextImageOnly();
   const dispatch = useDispatch();
 
   const onClick = useCallback(() => {
     dispatch(startingFrameImageChanged(imageDTO));
     navigationApi.switchToTab('video');
-  }, [imageDTO]);
+  }, [imageDTO, dispatch]);
 
   return (
     <MenuItem
@@ -28,4 +29,4 @@ export const ImageMenuItemSendToVideo = memo(() => {
   );
 });
 
-ImageMenuItemSendToVideo.displayName = 'ImageMenuItemSendToVideo'; 
+ContextMenuItemSendToVideo.displayName = 'ContextMenuItemSendToVideo'; 
