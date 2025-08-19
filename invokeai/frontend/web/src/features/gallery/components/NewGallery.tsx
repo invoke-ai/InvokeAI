@@ -28,6 +28,7 @@ import type {
 } from 'react-virtuoso';
 import { VirtuosoGrid } from 'react-virtuoso';
 import { imagesApi, useImageDTO, useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
+import { videosApi } from 'services/api/endpoints/videos';
 import { useDebounce } from 'use-debounce';
 
 import { GalleryImage, GalleryImagePlaceholder } from './ImageGrid/GalleryImage';
@@ -62,12 +63,37 @@ const ImageAtPosition = memo(({ imageName }: { index: number; imageName: string 
   imagesApi.endpoints.getImageDTO.useQuerySubscription(imageName, { skip: isUninitialized });
 
   if (!imageDTO) {
-    return <GalleryImagePlaceholder data-image-name={imageName} />;
+    return <GalleryImagePlaceholder data-item-id={imageName} />;
   }
 
   return <GalleryImage imageDTO={imageDTO} />;
 });
 ImageAtPosition.displayName = 'ImageAtPosition';
+
+const VideoAtPosition = memo(({ itemId }: { index: number; itemId: string }) => {
+  /*
+   * We rely on the useRangeBasedImageFetching to fetch all image DTOs, caching them with RTK Query.
+   *
+   * In this component, we just want to consume that cache. Unforutnately, RTK Query does not provide a way to
+   * subscribe to a query without triggering a new fetch.
+   *
+   * There is a hack, though:
+   * - https://github.com/reduxjs/redux-toolkit/discussions/4213
+   *
+   * This essentially means "subscribe to the query once it has some data".
+   */
+
+  // Use `currentData` instead of `data` to prevent a flash of previous image rendered at this index
+  const { currentData: item, isUninitialized } = videosApi.endpoints.getVideoDTO.useQueryState(itemId);
+  videosApi.endpoints.getVideoDTO.useQuerySubscription(itemId, { skip: isUninitialized });
+
+  if (!item) {
+    return <GalleryImagePlaceholder data-item-id={itemId} />;
+  }
+
+  return <GalleryVideo imageDTO={imageDTO} />;
+});
+VideoAtPosition.displayName = 'VideoAtPosition';
 
 const computeItemKey: GridComputeItemKey<string, GridContext> = (index, imageName, { queryArgs }) => {
   return `${JSON.stringify(queryArgs)}-${imageName ?? index}`;
@@ -133,8 +159,8 @@ const getImagesPerRow = (rootEl: HTMLDivElement): number => {
  * Scroll the item at the given index into view if it is not currently visible.
  */
 const scrollIntoView = (
-  targetImageName: string,
-  imageNames: string[],
+  targetItemId: string,
+  itemIds: string[],
   rootEl: HTMLDivElement,
   virtuosoGridHandle: VirtuosoGridHandle,
   range: ListRange
@@ -145,7 +171,7 @@ const scrollIntoView = (
     return;
   }
 
-  const targetIndex = imageNames.findIndex((name) => name === targetImageName);
+  const targetIndex = itemIds.findIndex((name) => name === targetItemId);
 
   if (targetIndex === -1) {
     // The image isn't in the currently rendered list.
@@ -154,7 +180,7 @@ const scrollIntoView = (
   }
 
   const targetItem = rootEl.querySelector(
-    `.virtuoso-grid-item:has([data-image-name="${targetImageName}"])`
+    `.virtuoso-grid-item:has([data-item-id="${targetItemId}"])`
   ) as HTMLElement;
 
   if (!targetItem) {
@@ -188,7 +214,7 @@ const scrollIntoView = (
       });
     } else {
       log.debug(
-        `Unable to find image ${targetImageName} at index ${targetIndex} but it is in the rendered range ${range.startIndex}-${range.endIndex}`
+        `Unable to find image ${targetItemId} at index ${targetIndex} but it is in the rendered range ${range.startIndex}-${range.endIndex}`
       );
     }
     return;

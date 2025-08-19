@@ -1,7 +1,7 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
 import QueueControls from 'features/queue/components/QueueControls';
+import { ParametersPanelVideo } from 'features/ui/components/ParametersPanels/ParametersPanelVideo';
 import { memo } from 'react';
-import { ParametersPanelVideo } from '../components/ParametersPanels/ParametersPanelVideo';
 
 export const VideoTabLeftPanel = memo(() => {
   return (
