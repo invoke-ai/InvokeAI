@@ -9,6 +9,7 @@ import stableHash from 'stable-hash';
 import type { Param0 } from 'tsafe';
 
 import { api, buildV1Url, LIST_TAG } from '..';
+import { skipToken } from '@reduxjs/toolkit/query';
 
 /**
  * Builds an endpoint URL for the videos router
@@ -223,4 +224,9 @@ export const getVideoDTOSafe = async (
   } catch {
     return null;
   }
+};
+
+export const useVideoDTO = (id: string | null | undefined) => {
+  const { currentData: videoDTO } = useGetVideoDTOQuery(id ?? skipToken);
+  return videoDTO ?? null;
 };

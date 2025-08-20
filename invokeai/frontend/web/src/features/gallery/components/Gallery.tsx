@@ -122,7 +122,7 @@ export const GalleryPanel = memo(() => {
       </Collapse>
       <Divider pt={2} />
       <Flex w="full" h="full" pt={2}>
-        {galleryView === 'images' ? <NewGallery /> : galleryView === 'videos' ? <VideoGallery /> : <NewGallery />}
+        <NewGallery />
       </Flex>
     </Flex>
   );
