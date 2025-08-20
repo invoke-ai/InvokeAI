@@ -12,10 +12,16 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import { useAddImagesToBoardMutation, useRemoveImagesFromBoardMutation } from 'services/api/endpoints/images';
+import { useAddVideosToBoardMutation, useRemoveVideosFromBoardMutation } from 'services/api/endpoints/videos';
 
 const selectImagesToChange = createSelector(
   selectChangeBoardModalSlice,
   (changeBoardModal) => changeBoardModal.image_names
+);
+
+const selectVideosToChange = createSelector(
+  selectChangeBoardModalSlice,
+  (changeBoardModal) => changeBoardModal.video_ids
 );
 
 const selectIsModalOpen = createSelector(
@@ -30,8 +36,11 @@ const ChangeBoardModal = () => {
   const { data: boards, isFetching } = useListAllBoardsQuery({ include_archived: true });
   const isModalOpen = useAppSelector(selectIsModalOpen);
   const imagesToChange = useAppSelector(selectImagesToChange);
+  const videosToChange = useAppSelector(selectVideosToChange);
   const [addImagesToBoard] = useAddImagesToBoardMutation();
   const [removeImagesFromBoard] = useRemoveImagesFromBoardMutation();
+  const [addVideosToBoard] = useAddVideosToBoardMutation();
+  const [removeVideosFromBoard] = useRemoveVideosFromBoardMutation();
   const { t } = useTranslation();
 
   const options = useMemo<ComboboxOption[]>(() => {
@@ -51,21 +60,33 @@ const ChangeBoardModal = () => {
   }, [dispatch]);
 
   const handleChangeBoard = useCallback(() => {
-    if (!imagesToChange.length || !selectedBoard) {
+    if (!selectedBoard || (imagesToChange.length === 0 && videosToChange.length === 0)) {
       return;
     }
 
-    if (selectedBoard === 'none') {
-      removeImagesFromBoard({ image_names: imagesToChange });
-    } else {
-      addImagesToBoard({
-        image_names: imagesToChange,
-        board_id: selectedBoard,
-      });
+    if (imagesToChange.length) {
+      if (selectedBoard === 'none') {
+        removeImagesFromBoard({ image_names: imagesToChange });
+      } else {
+        addImagesToBoard({
+          image_names: imagesToChange,
+          board_id: selectedBoard,
+        });
+      }
+    }
+    if (videosToChange.length) {
+      if (selectedBoard === 'none') {
+        removeVideosFromBoard({ video_ids: videosToChange });
+      } else {
+        addVideosToBoard({
+          video_ids: videosToChange,
+          board_id: selectedBoard,
+        });
+      }
     }
     setSelectedBoard(null);
     dispatch(changeBoardReset());
-  }, [addImagesToBoard, dispatch, imagesToChange, removeImagesFromBoard, selectedBoard]);
+  }, [addImagesToBoard, dispatch, imagesToChange, videosToChange, removeImagesFromBoard, selectedBoard]);
 
   const onChange = useCallback<ComboboxOnChange>((v) => {
     if (!v) {
@@ -86,8 +107,11 @@ const ChangeBoardModal = () => {
     >
       <Flex flexDir="column" gap={4}>
         <Text>
-          {t('boards.movingImagesToBoard', {
+          {imagesToChange.length > 0 && t('boards.movingImagesToBoard', {
             count: imagesToChange.length,
+          })}
+          {videosToChange.length > 0 && t('boards.movingVideosToBoard', {
+            count: videosToChange.length,
           })}
           :
         </Text>
