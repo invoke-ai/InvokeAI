@@ -7,13 +7,7 @@ import { useGallerySearchTerm } from 'features/gallery/components/ImageGrid/useG
 import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
 import { galleryViewChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
-import {
-  GALLERY_PANEL_DEFAULT_HEIGHT_PX,
-  GALLERY_PANEL_ID,
-  GALLERY_PANEL_MIN_EXPANDED_HEIGHT_PX,
-  GALLERY_PANEL_MIN_HEIGHT_PX,
-} from 'features/ui/layouts/shared';
-import { useCollapsibleGridviewPanel } from 'features/ui/layouts/use-collapsible-gridview-panel';
+import { useGalleryPanel } from 'features/ui/layouts/use-gallery-panel';
 import type { CSSProperties } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -34,16 +28,8 @@ export const GalleryPanel = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { tab } = useAutoLayoutContext();
-  const collapsibleApi = useCollapsibleGridviewPanel(
-    tab,
-    GALLERY_PANEL_ID,
-    'vertical',
-    GALLERY_PANEL_DEFAULT_HEIGHT_PX,
-    GALLERY_PANEL_MIN_HEIGHT_PX,
-    GALLERY_PANEL_MIN_EXPANDED_HEIGHT_PX
-  );
-  const isCollapsed = useStore(collapsibleApi.$isCollapsed);
-
+  const galleryPanel = useGalleryPanel(tab);
+  const isCollapsed = useStore(galleryPanel.$isCollapsed);
   const galleryView = useAppSelector(selectGalleryView);
   const initialSearchTerm = useAppSelector(selectSearchTerm);
   const searchDisclosure = useDisclosure(!!initialSearchTerm);
@@ -58,11 +44,11 @@ export const GalleryPanel = memo(() => {
 
   const handleClickSearch = useCallback(() => {
     onResetSearchTerm();
-    if (!searchDisclosure.isOpen && collapsibleApi.$isCollapsed.get()) {
-      collapsibleApi.expand();
+    if (!searchDisclosure.isOpen && galleryPanel.$isCollapsed.get()) {
+      galleryPanel.expand();
     }
     searchDisclosure.toggle();
-  }, [collapsibleApi, onResetSearchTerm, searchDisclosure]);
+  }, [galleryPanel, onResetSearchTerm, searchDisclosure]);
 
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
   const boardName = useBoardName(selectedBoardId);
@@ -73,7 +59,7 @@ export const GalleryPanel = memo(() => {
         <Button
           size="sm"
           variant="ghost"
-          onClick={collapsibleApi.toggle}
+          onClick={galleryPanel.toggle}
           leftIcon={isCollapsed ? <PiCaretDownBold /> : <PiCaretUpBold />}
           noOfLines={1}
         >

@@ -19,16 +19,25 @@ def is_state_dict_likely_in_flux_diffusers_format(state_dict: Dict[str, torch.Te
     # First, check that all keys end in "lora_A.weight" or "lora_B.weight" (i.e. are in PEFT format).
     all_keys_in_peft_format = all(k.endswith(("lora_A.weight", "lora_B.weight")) for k in state_dict.keys())
 
-    # Next, check that this is likely a FLUX model by spot-checking a few keys.
-    expected_keys = [
+    # Check if keys use transformer prefix
+    transformer_prefix_keys = [
         "transformer.single_transformer_blocks.0.attn.to_q.lora_A.weight",
         "transformer.single_transformer_blocks.0.attn.to_q.lora_B.weight",
         "transformer.transformer_blocks.0.attn.add_q_proj.lora_A.weight",
         "transformer.transformer_blocks.0.attn.add_q_proj.lora_B.weight",
     ]
-    all_expected_keys_present = all(k in state_dict for k in expected_keys)
+    transformer_keys_present = all(k in state_dict for k in transformer_prefix_keys)
 
-    return all_keys_in_peft_format and all_expected_keys_present
+    # Check if keys use base_model.model prefix
+    base_model_prefix_keys = [
+        "base_model.model.single_transformer_blocks.0.attn.to_q.lora_A.weight",
+        "base_model.model.single_transformer_blocks.0.attn.to_q.lora_B.weight",
+        "base_model.model.transformer_blocks.0.attn.add_q_proj.lora_A.weight",
+        "base_model.model.transformer_blocks.0.attn.add_q_proj.lora_B.weight",
+    ]
+    base_model_keys_present = all(k in state_dict for k in base_model_prefix_keys)
+
+    return all_keys_in_peft_format and (transformer_keys_present or base_model_keys_present)
 
 
 def lora_model_from_flux_diffusers_state_dict(
@@ -50,8 +59,16 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
     https://github.com/huggingface/diffusers/blob/55ac421f7bb12fd00ccbef727be4dc2f3f920abb/scripts/convert_flux_to_diffusers.py
     """
 
-    # Remove the "transformer." prefix from all keys.
-    grouped_state_dict = {k.replace("transformer.", ""): v for k, v in grouped_state_dict.items()}
+    # Determine which prefix is used and remove it from all keys.
+    # Check if any key starts with "base_model.model." prefix
+    has_base_model_prefix = any(k.startswith("base_model.model.") for k in grouped_state_dict.keys())
+
+    if has_base_model_prefix:
+        # Remove the "base_model.model." prefix from all keys.
+        grouped_state_dict = {k.replace("base_model.model.", ""): v for k, v in grouped_state_dict.items()}
+    else:
+        # Remove the "transformer." prefix from all keys.
+        grouped_state_dict = {k.replace("transformer.", ""): v for k, v in grouped_state_dict.items()}
 
     # Constants for FLUX.1
     num_double_layers = 19

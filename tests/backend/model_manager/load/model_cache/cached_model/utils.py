@@ -1,3 +1,5 @@
+import os
+
 import pytest
 import torch
 
@@ -20,11 +22,17 @@ class DummyModule(torch.nn.Module):
         return x
 
 
+is_github_ci = os.getenv("GITHUB_ACTIONS") == "true"
+
 parameterize_mps_and_cuda = pytest.mark.parametrize(
     ("device"),
     [
         pytest.param(
-            "mps", marks=pytest.mark.skipif(not torch.backends.mps.is_available(), reason="MPS is not available.")
+            "mps",
+            marks=pytest.mark.skipif(
+                is_github_ci or not torch.backends.mps.is_available(),
+                reason="MPS is very flaky in CI" if is_github_ci else "MPS is not available.",
+            ),
         ),
         pytest.param("cuda", marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is not available.")),
     ],
