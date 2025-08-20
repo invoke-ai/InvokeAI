@@ -145,11 +145,6 @@ export const [zParameterSeamlessY, isParameterSeamlessY] = buildParameter(z.bool
 export type ParameterSeamlessY = z.infer<typeof zParameterSeamlessY>;
 // #endregion
 
-// #region Duration
-export const [zParameterDuration, isParameterDuration] = buildParameter(z.union([z.literal(5), z.literal(10)]));
-export type ParameterDuration = z.infer<typeof zParameterDuration>;
-// #endregion
-
 // #region Precision
 export const [zParameterPrecision, isParameterPrecision] = buildParameter(z.enum(['fp16', 'fp32']));
 export type ParameterPrecision = z.infer<typeof zParameterPrecision>;

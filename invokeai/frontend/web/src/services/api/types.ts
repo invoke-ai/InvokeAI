@@ -130,6 +130,7 @@ export type ApiModelConfig = S['ApiModelConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig | ApiModelConfig;
 export type FLUXKontextModelConfig = MainModelConfig;
 export type ChatGPT4oModelConfig = ApiModelConfig;
+export type Veo3ModelConfig = ApiModelConfig;
 export type AnyModelConfig =
   | ControlLoRAModelConfig
   | LoRAModelConfig
@@ -293,6 +294,10 @@ export const isFluxReduxModelConfig = (config: AnyModelConfig): config is FLUXRe
 
 export const isChatGPT4oModelConfig = (config: AnyModelConfig): config is ChatGPT4oModelConfig => {
   return config.type === 'main' && config.base === 'chatgpt-4o';
+};
+
+export const isVeo3ModelConfig = (config: AnyModelConfig): config is Veo3ModelConfig => {
+  return config.type === 'main' && config.base === 'veo3';
 };
 
 export const isImagen3ModelConfig = (config: AnyModelConfig): config is ApiModelConfig => {

@@ -261,6 +261,10 @@ const zChatGPT4oModelFieldType = zFieldTypeBase.extend({
   name: z.literal('ChatGPT4oModelField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zVeo3ModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('Veo3ModelField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zFluxKontextModelFieldType = zFieldTypeBase.extend({
   name: z.literal('FluxKontextModelField'),
   originalType: zStatelessFieldType.optional(),
@@ -319,6 +323,7 @@ const zStatefulFieldType = z.union([
   zImagen4ModelFieldType,
   zChatGPT4oModelFieldType,
   zFluxKontextModelFieldType,
+  zVeo3ModelFieldType,
   zColorFieldType,
   zSchedulerFieldType,
   zFloatGeneratorFieldType,
@@ -361,6 +366,7 @@ const modelFieldTypeNames = [
   zImagen4ModelFieldType.shape.name.value,
   zChatGPT4oModelFieldType.shape.name.value,
   zFluxKontextModelFieldType.shape.name.value,
+  zVeo3ModelFieldType.shape.name.value,
   // Stateless model fields
   'UNetField',
   'VAEField',
@@ -1274,6 +1280,24 @@ export const isChatGPT4oModelFieldInputTemplate =
   buildTemplateTypeGuard<ChatGPT4oModelFieldInputTemplate>('ChatGPT4oModelField');
 // #endregion
 
+// #region Veo3ModelField
+export const zVeo3ModelFieldValue = zModelIdentifierField.optional();
+const zVeo3ModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zVeo3ModelFieldValue,
+});
+const zVeo3ModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zVeo3ModelFieldType,
+  originalType: zFieldType.optional(),
+  default: zVeo3ModelFieldValue,
+});
+export type Veo3ModelFieldValue = z.infer<typeof zVeo3ModelFieldValue>;
+export type Veo3ModelFieldInputInstance = z.infer<typeof zVeo3ModelFieldInputInstance>;
+export type Veo3ModelFieldInputTemplate = z.infer<typeof zVeo3ModelFieldInputTemplate>;
+export const isVeo3ModelFieldInputInstance = buildInstanceTypeGuard(zVeo3ModelFieldInputInstance);
+export const isVeo3ModelFieldInputTemplate =
+  buildTemplateTypeGuard<Veo3ModelFieldInputTemplate>('Veo3ModelField');
+// #endregion
+
 // #region SchedulerField
 export const zSchedulerFieldValue = zSchedulerField.optional();
 const zSchedulerFieldInputInstance = zFieldInputInstanceBase.extend({
@@ -2003,6 +2027,7 @@ const zStatefulFieldInputTemplate = z.union([
   zImagen4ModelFieldInputTemplate,
   zChatGPT4oModelFieldInputTemplate,
   zFluxKontextModelFieldInputTemplate,
+  zVeo3ModelFieldInputTemplate,
   zColorFieldInputTemplate,
   zSchedulerFieldInputTemplate,
   zStatelessFieldInputTemplate,
