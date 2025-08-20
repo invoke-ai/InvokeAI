@@ -1303,6 +1303,7 @@
         "gaussianBlur": "Gaussian Blur",
         "boxBlur": "Box Blur",
         "staged": "Staged",
+        "resolution": "Resolution",
         "modelDisabledForTrial": "Generating with {{modelName}} is not available on trial accounts. Visit your <LinkComponent>account settings</LinkComponent> to upgrade."
     },
     "dynamicPrompts": {

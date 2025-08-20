@@ -469,6 +469,15 @@ export const VEO3_ASPECT_RATIOS: Record<Veo3AspectRatio, Dimensions> = {
   '16:9': { width: 1280, height: 720 },
 };
 
+export const zVeo3Resolution = z.enum(['720p', '1080p']);
+export type Veo3Resolution = z.infer<typeof zVeo3Resolution>;
+export const isVeo3Resolution = (v: unknown): v is Veo3Resolution =>
+  zVeo3Resolution.safeParse(v).success;
+export const VEO3_RESOLUTIONS: Record<Veo3Resolution, Dimensions> = {
+  '720p': { width: 1280, height: 720 },
+  '1080p': { width: 1920, height: 1080 },
+};
+
 const zAspectRatioConfig = z.object({
   id: zAspectRatioID,
   value: z.number().gt(0),
@@ -562,7 +571,6 @@ export const zParamsState = z.object({
   clipGEmbedModel: zParameterCLIPGEmbedModel.nullable(),
   controlLora: zParameterControlLoRAModel.nullable(),
   dimensions: zDimensionsState,
-  videoDuration: zVeo3DurationID,
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
@@ -613,7 +621,6 @@ export const getInitialParamsState = (): ParamsState => ({
     rect: { x: 0, y: 0, width: 512, height: 512 },
     aspectRatio: deepClone(DEFAULT_ASPECT_RATIO_CONFIG),
   },
-  videoDuration: '8',
 });
 
 const zInpaintMasks = z.object({

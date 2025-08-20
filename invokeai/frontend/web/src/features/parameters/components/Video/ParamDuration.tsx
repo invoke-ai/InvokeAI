@@ -1,6 +1,6 @@
 import { FormControl, FormLabel, Select } from "@invoke-ai/ui-library";
 import { useAppDispatch, useAppSelector } from "app/store/storeHooks";
-import {  selectVideoDuration, setVideoDuration } from "features/controlLayers/store/paramsSlice";
+import {  selectVideoDuration, videoDurationChanged } from "features/parameters/store/videoSlice";
 import { isVeo3DurationID, VEO3_DURATIONS, zVeo3DurationID } from "features/controlLayers/store/types";
 import type { ChangeEventHandler} from "react";
 import { useCallback, useMemo } from "react";
@@ -28,7 +28,7 @@ export const ParamDuration = () => {
         return;
       }
 
-      dispatch(setVideoDuration(duration));
+      dispatch(videoDurationChanged(duration));
     },
     [dispatch]
   );
