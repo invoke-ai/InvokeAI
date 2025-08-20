@@ -2,7 +2,7 @@ import { MenuDivider, MenuItem } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { imagesToChangeSelected, isModalOpenChanged } from 'features/changeBoardModal/store/slice';
+import {  isModalOpenChanged, videosToChangeSelected } from 'features/changeBoardModal/store/slice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFoldersBold, PiStarBold, PiStarFill, PiTrashSimpleBold } from 'react-icons/pi';
@@ -24,7 +24,7 @@ const MultipleSelectionMenuItems = () => {
   const [deleteVideos] = useDeleteVideosMutation();
 
   const handleChangeBoard = useCallback(() => {
-    dispatch(imagesToChangeSelected(selection));
+    dispatch(videosToChangeSelected(selection));
     dispatch(isModalOpenChanged(true));
   }, [dispatch, selection]);
 
