@@ -1,10 +1,12 @@
-import { CompositeNumberInput, CompositeSlider } from '@invoke-ai/ui-library';
+import { Button, CompositeNumberInput, CompositeSlider } from '@invoke-ai/ui-library';
 import type { FieldComponentProps } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/types';
 import { useIntegerField } from 'features/nodes/components/flow/nodes/Invocation/fields/IntegerField/useIntegerField';
 import { NO_DRAG_CLASS } from 'features/nodes/types/constants';
 import type { IntegerFieldInputInstance, IntegerFieldInputTemplate } from 'features/nodes/types/field';
 import type { NodeFieldIntegerSettings } from 'features/nodes/types/workflow';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { PiShuffleBold } from 'react-icons/pi';
 
 export const IntegerFieldInputAndSlider = memo(
   (
@@ -15,18 +17,25 @@ export const IntegerFieldInputAndSlider = memo(
     >
   ) => {
     const { nodeId, field, fieldTemplate, settings } = props;
-    const { defaultValue, onChange, min, max, step, fineStep } = useIntegerField(
-      nodeId,
-      field.name,
-      fieldTemplate,
-      settings
-    );
+    const {
+      defaultValue,
+      onValueChange,
+      min,
+      max,
+      step,
+      fineStep,
+      constrainValue,
+      showShuffle,
+      handleClickRandomizeValue,
+    } = useIntegerField(nodeId, field.name, fieldTemplate, settings);
+
+    const { t } = useTranslation();
 
     return (
       <>
         <CompositeSlider
           defaultValue={defaultValue}
-          onChange={onChange}
+          onChange={onValueChange}
           value={field.value}
           min={min}
           max={max}
@@ -39,7 +48,7 @@ export const IntegerFieldInputAndSlider = memo(
         />
         <CompositeNumberInput
           defaultValue={defaultValue}
-          onChange={onChange}
+          onChange={onValueChange}
           value={field.value}
           min={min}
           max={max}
@@ -47,7 +56,19 @@ export const IntegerFieldInputAndSlider = memo(
           fineStep={fineStep}
           className={NO_DRAG_CLASS}
           flex="1 1 0"
+          constrainValue={constrainValue}
         />
+        {showShuffle && (
+          <Button
+            size="sm"
+            isDisabled={false}
+            onClick={handleClickRandomizeValue}
+            leftIcon={<PiShuffleBold />}
+            flexShrink={0}
+          >
+            {t('workflows.builder.shuffle')}
+          </Button>
+        )}
       </>
     );
   }
