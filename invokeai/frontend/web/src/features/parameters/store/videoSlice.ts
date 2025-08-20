@@ -6,7 +6,9 @@ import { isPlainObject } from 'es-toolkit';
 import type { ImageWithDims } from 'features/controlLayers/store/types';
 import { zImageWithDims } from 'features/controlLayers/store/types';
 import type { VideoField } from 'features/nodes/types/common';
-import { zVideoField } from 'features/nodes/types/common';
+import { zModelIdentifierField, zVideoField } from 'features/nodes/types/common';
+import { ModelIdentifier } from 'features/nodes/types/v2/common';
+import { Veo3ModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import z from 'zod';
 
@@ -14,6 +16,7 @@ const zVideoState = z.object({
   _version: z.literal(1),
   startingFrameImage: zImageWithDims.nullable(),
   generatedVideo: zVideoField.nullable(),
+  videoModel: zModelIdentifierField.nullable(),
 });
 
 export type VideoState = z.infer<typeof zVideoState>;
@@ -22,6 +25,7 @@ const getInitialState = (): VideoState => ({
   _version: 1,
   startingFrameImage: null,
   generatedVideo: null,
+  videoModel: null,
 });
 
 const slice = createSlice({
@@ -36,10 +40,15 @@ const slice = createSlice({
       const { videoField } = action.payload;
       state.generatedVideo = videoField;
     },
+
+    videoModelChanged: (state, action: PayloadAction<Veo3ModelConfig | null>) => {
+      const parsedModel = zModelIdentifierField.parse(action.payload);
+      state.videoModel = parsedModel;
+    },
   },
 });
 
-export const { startingFrameImageChanged, generatedVideoChanged } = slice.actions;
+export const { startingFrameImageChanged, generatedVideoChanged, videoModelChanged } = slice.actions;
 
 export const videoSliceConfig: SliceConfig<typeof slice> = {
   slice,
@@ -61,3 +70,4 @@ const createVideoSelector = <T>(selector: Selector<VideoState, T>) => createSele
 
 export const selectStartingFrameImage = createVideoSelector((video) => video.startingFrameImage);
 export const selectGeneratedVideo = createVideoSelector((video) => video.generatedVideo);
+export const selectVideoModel = createVideoSelector((video) => video.videoModel);

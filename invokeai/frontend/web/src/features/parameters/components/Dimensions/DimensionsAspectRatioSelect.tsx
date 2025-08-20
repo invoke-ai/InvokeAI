@@ -17,13 +17,13 @@ import {
   zFluxKontextAspectRatioID,
   zGemini2_5AspectRatioID,
   zImagen3AspectRatioID,
-  zRunwayAspectRatioID,
+  zVeo3AspectRatioID,
 } from 'features/controlLayers/store/types';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { ChangeEventHandler } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 
 export const DimensionsAspectRatioSelect = memo(() => {
   const { t } = useTranslation();
@@ -50,7 +50,7 @@ export const DimensionsAspectRatioSelect = memo(() => {
       return zGemini2_5AspectRatioID.options;
     }
     if (activeTab === 'video') {
-      return zRunwayAspectRatioID.options;
+      return zVeo3AspectRatioID.options;
     }
     // All other models
     return zAspectRatioID.options;
