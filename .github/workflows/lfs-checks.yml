@@ -19,6 +19,9 @@ jobs:
   lfs-check:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      # Required to label and comment on the PRs
+      pull-requests: write
     steps:
       - name: checkout
         uses: actions/checkout@v4
