@@ -66,6 +66,7 @@ class UIType(str, Enum, metaclass=MetaEnum):
     ChatGPT4oModel = "ChatGPT4oModelField"
     FluxKontextModel = "FluxKontextModelField"
     Veo3Model = "Veo3ModelField"
+    RunwayModel = "RunwayModelField"
     # endregion
 
     # region Misc Field Types
