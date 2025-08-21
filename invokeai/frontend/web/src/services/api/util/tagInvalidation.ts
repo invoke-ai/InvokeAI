@@ -4,7 +4,7 @@ import { getListImagesUrl } from 'services/api/util';
 import type { ApiTagDescription } from '..';
 
 export const getTagsToInvalidateForBoardAffectingMutation = (affected_boards: string[]): ApiTagDescription[] => {
-  const tags: ApiTagDescription[] = ['ImageNameList'];
+  const tags: ApiTagDescription[] = ['ImageNameList', 'VideoIdList'];
 
   for (const board_id of affected_boards) {
     tags.push({
@@ -21,10 +21,6 @@ export const getTagsToInvalidateForBoardAffectingMutation = (affected_boards: st
         board_id,
         categories: ASSETS_CATEGORIES,
       }),
-    });
-
-    tags.push({
-      type: 'VideoIdList',
     });
 
     tags.push({

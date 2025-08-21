@@ -135,7 +135,7 @@ export const useGlobalHotkeys = () => {
       if (!selection.length) {
         return;
       }
-      deleteImageModalApi.delete(selection);
+      deleteImageModalApi.delete(selection.map((s) => s.id));
     },
     dependencies: [getState, deleteImageModalApi],
   });
