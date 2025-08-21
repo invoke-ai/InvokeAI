@@ -67,6 +67,7 @@ class UIType(str, Enum, metaclass=MetaEnum):
     Gemini2_5Model = "Gemini2_5ModelField"
     FluxKontextModel = "FluxKontextModelField"
     Veo3Model = "Veo3ModelField"
+    RunwayModel = "RunwayModelField"
     # endregion
 
     # region Misc Field Types
