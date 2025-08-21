@@ -14,10 +14,8 @@ export type GetImageNamesResult =
   paths['/api/v1/images/names']['get']['responses']['200']['content']['application/json'];
 export type GetImageNamesArgs = NonNullable<paths['/api/v1/images/names']['get']['parameters']['query']>;
 
-export type GetVideoIdsResult =
-  paths['/api/v1/videos/ids']['get']['responses']['200']['content']['application/json'];
+export type GetVideoIdsResult = paths['/api/v1/videos/ids']['get']['responses']['200']['content']['application/json'];
 export type GetVideoIdsArgs = NonNullable<paths['/api/v1/videos/ids']['get']['parameters']['query']>;
-
 
 export type ListBoardsArgs = NonNullable<paths['/api/v1/boards/']['get']['parameters']['query']>;
 

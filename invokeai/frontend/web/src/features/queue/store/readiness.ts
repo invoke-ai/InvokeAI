@@ -93,7 +93,7 @@ const debouncedUpdateReasons = debounce(
     isInPublishFlow: boolean,
     isChatGPT4oHighModelDisabled: (model: ParameterModel) => boolean,
     promptExpansionRequest: PromptExpansionRequestState,
-    video: VideoState,
+    video: VideoState
   ) => {
     if (tab === 'generate') {
       const model = selectMainModelConfig(store.getState());
@@ -123,7 +123,6 @@ const debouncedUpdateReasons = debounce(
         canvasIsSelectingObject,
         isChatGPT4oHighModelDisabled,
         promptExpansionRequest,
-  
       });
       $reasonsWhyCannotEnqueue.set(reasons);
     } else if (tab === 'workflows') {
@@ -207,7 +206,7 @@ export const useReadinessWatcher = () => {
       isInPublishFlow,
       isChatGPT4oHighModelDisabled,
       promptExpansionRequest,
-      video,
+      video
     );
   }, [
     store,

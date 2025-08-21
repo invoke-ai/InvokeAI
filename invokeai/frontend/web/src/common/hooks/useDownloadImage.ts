@@ -5,9 +5,8 @@ import { imageDownloaded } from 'features/gallery/store/actions';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ImageDTO, VideoDTO } from 'services/api/types';
 
-export const useDownloadItem = (itemDTO: ImageDTO | VideoDTO) => {
+export const useDownloadItem = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const authToken = useStore($authToken);

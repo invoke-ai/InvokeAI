@@ -238,8 +238,6 @@ export class NavigationApi {
       this._app.storage.set(key, api.toJSON());
     }
 
-    console.log('api.panels', api.panels);
-
     for (const panel of api.panels) {
       this._registerPanel(tab, panel.id, panel);
     }
@@ -447,7 +445,6 @@ export class NavigationApi {
    */
   getPanel = (tab: TabName, panelId: string): PanelType | undefined => {
     const key = this._getPanelKey(tab, panelId);
-    console.log('key', key);
     return this.panels.get(key);
   };
 
@@ -489,7 +486,6 @@ export class NavigationApi {
    */
   toggleLeftPanel = (): boolean => {
     const activeTab = this._app?.activeTab.get() ?? null;
-    console.log('activeTab', activeTab);
     if (!activeTab) {
       log.warn('No active tab found to toggle left panel');
       return false;

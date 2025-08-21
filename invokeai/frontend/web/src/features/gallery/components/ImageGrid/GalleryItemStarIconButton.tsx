@@ -5,7 +5,7 @@ import { memo, useCallback } from 'react';
 import { PiStarBold, PiStarFill } from 'react-icons/pi';
 import { useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
 import { useStarVideosMutation, useUnstarVideosMutation } from 'services/api/endpoints/videos';
-import { isImageDTO, type ImageDTO, type VideoDTO } from 'services/api/types';
+import { type ImageDTO, isImageDTO, type VideoDTO } from 'services/api/types';
 
 type Props = {
   itemDTO: ImageDTO | VideoDTO;
