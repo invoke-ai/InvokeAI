@@ -1,5 +1,5 @@
 import { useOverlayScrollbars } from 'overlayscrollbars-react';
-import { type RefObject, useState, useEffect } from 'react';
+import { type RefObject, useEffect, useState } from 'react';
 
 /**
  * Handles the initialization of the overlay scrollbars for the gallery, returning the ref to the scroller element.
