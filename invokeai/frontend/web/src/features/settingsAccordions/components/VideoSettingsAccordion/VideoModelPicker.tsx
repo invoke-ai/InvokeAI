@@ -5,16 +5,16 @@ import { ModelPicker } from 'features/parameters/components/ModelPicker';
 import { selectVideoModel, videoModelChanged } from 'features/parameters/store/videoSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useVeo3Models } from 'services/api/hooks/modelsByType';
-import type { Veo3ModelConfig } from 'services/api/types';
+import { useVideoModels } from 'services/api/hooks/modelsByType';
+import type { RunwayModelConfig, Veo3ModelConfig } from 'services/api/types';
 
 export const VideoModelPicker = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const [modelConfigs] = useVeo3Models();
+  const [modelConfigs] = useVideoModels();
   const selectedModelConfig = useAppSelector(selectVideoModel);
   const onChange = useCallback(
-    (modelConfig: Veo3ModelConfig) => {
+    (modelConfig: Veo3ModelConfig | RunwayModelConfig) => {
       dispatch(videoModelChanged(modelConfig));
     },
     [dispatch]
@@ -28,7 +28,7 @@ export const VideoModelPicker = memo(() => {
       <ModelPicker
         pickerId="main-model"
         modelConfigs={modelConfigs}
-        selectedModelConfig={selectedModelConfig as Veo3ModelConfig | undefined}
+        selectedModelConfig={selectedModelConfig as Veo3ModelConfig | RunwayModelConfig | undefined}
         onChange={onChange}
         grouped
       />

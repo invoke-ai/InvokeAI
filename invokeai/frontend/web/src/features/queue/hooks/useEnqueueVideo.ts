@@ -5,6 +5,7 @@ import type { AppStore } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
 import { extractMessageFromAssertionError } from 'common/util/extractMessageFromAssertionError';
 import { withResultAsync } from 'common/util/result';
+import { buildRunwayVideoGraph } from 'features/nodes/util/graph/generation/buildRunwayVideoGraph';
 import { buildVeo3VideoGraph } from 'features/nodes/util/graph/generation/buildVeo3VideoGraph';
 import { selectCanvasDestination } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg } from 'features/nodes/util/graph/types';
@@ -13,7 +14,7 @@ import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import { serializeError } from 'serialize-error';
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
-import { AssertionError } from 'tsafe';
+import { assert, AssertionError } from 'tsafe';
 
 const log = logger('generation');
 export const enqueueRequestedCanvas = createAction('app/enqueueRequestedCanvas');
@@ -28,9 +29,19 @@ const enqueueVideo = async (store: AppStore, prepend: boolean) => {
   const destination = selectCanvasDestination(state);
 
   const buildGraphResult = await withResultAsync(async () => {
+    const model = state.video.videoModel;
+    assert(model, 'No model found in state');
+    const base = model.base;
     const graphBuilderArg: GraphBuilderArg = { generationMode: 'txt2img', state, manager: null };
 
-    return await buildVeo3VideoGraph(graphBuilderArg);
+    switch (base) {
+      case 'veo3':
+        return await buildVeo3VideoGraph(graphBuilderArg);
+      case 'runway':
+        return await buildRunwayVideoGraph(graphBuilderArg);
+      default:
+        assert(false, `No graph builders for base ${base}`);
+    }
   });
 
   if (buildGraphResult.isErr()) {

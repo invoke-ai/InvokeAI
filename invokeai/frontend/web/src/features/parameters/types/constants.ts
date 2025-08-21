@@ -18,6 +18,7 @@ export const MODEL_TYPE_MAP: Record<BaseModelType, string> = {
   'chatgpt-4o': 'ChatGPT 4o',
   'flux-kontext': 'Flux Kontext',
   veo3: 'Veo3',
+  runway: 'Runway',
 };
 
 /**
@@ -37,6 +38,7 @@ export const MODEL_TYPE_SHORT_MAP: Record<BaseModelType, string> = {
   'chatgpt-4o': 'ChatGPT 4o',
   'flux-kontext': 'Flux Kontext',
   veo3: 'Veo3',
+  runway: 'Runway',
 };
 
 /**
@@ -133,3 +135,5 @@ export const SCHEDULER_OPTIONS: ComboboxOption[] = [
  * List of base models that make API requests
  */
 export const API_BASE_MODELS = ['imagen3', 'imagen4', 'chatgpt-4o', 'flux-kontext'];
+
+export const VIDEO_BASE_MODELS = ['veo3', 'runway'];

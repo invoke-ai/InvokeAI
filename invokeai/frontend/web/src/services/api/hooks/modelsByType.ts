@@ -29,6 +29,7 @@ import {
   isNonRefinerMainModelConfig,
   isNonSDXLMainModelConfig,
   isRefinerMainModelModelConfig,
+  isRunwayModelConfig,
   isSD3MainModelModelConfig,
   isSDXLMainModelModelConfig,
   isSigLipModelConfig,
@@ -104,6 +105,8 @@ export const useImagen4Models = buildModelsHook(isImagen4ModelConfig);
 export const useChatGPT4oModels = buildModelsHook(isChatGPT4oModelConfig);
 export const useFluxKontextModels = buildModelsHook(isFluxKontextApiModelConfig);
 export const useVeo3Models = buildModelsHook(isVeo3ModelConfig);
+export const useRunwayModels = buildModelsHook(isRunwayModelConfig);
+export const useVideoModels = buildModelsHook((config) => isVeo3ModelConfig(config) || isRunwayModelConfig(config));
 
 const buildModelsSelector =
   <T extends AnyModelConfig>(typeGuard: (config: AnyModelConfig) => config is T): Selector<RootState, T[]> =>

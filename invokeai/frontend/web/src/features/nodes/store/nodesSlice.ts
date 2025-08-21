@@ -51,6 +51,7 @@ import type {
   LoRAModelFieldValue,
   MainModelFieldValue,
   ModelIdentifierFieldValue,
+  RunwayModelFieldValue,
   SchedulerFieldValue,
   SDXLRefinerModelFieldValue,
   SigLipModelFieldValue,
@@ -94,6 +95,7 @@ import {
   zLoRAModelFieldValue,
   zMainModelFieldValue,
   zModelIdentifierFieldValue,
+  zRunwayModelFieldValue,
   zSchedulerFieldValue,
   zSDXLRefinerModelFieldValue,
   zSigLipModelFieldValue,
@@ -557,6 +559,9 @@ const slice = createSlice({
     fieldVeo3ModelValueChanged: (state, action: FieldValueAction<Veo3ModelFieldValue>) => {
       fieldValueReducer(state, action, zVeo3ModelFieldValue);
     },
+    fieldRunwayModelValueChanged: (state, action: FieldValueAction<RunwayModelFieldValue>) => {
+      fieldValueReducer(state, action, zRunwayModelFieldValue);
+    },
     fieldFluxKontextModelValueChanged: (state, action: FieldValueAction<FluxKontextModelFieldValue>) => {
       fieldValueReducer(state, action, zFluxKontextModelFieldValue);
     },
@@ -736,6 +741,7 @@ export const {
   fieldStringGeneratorValueChanged,
   fieldImageGeneratorValueChanged,
   fieldVeo3ModelValueChanged,
+  fieldRunwayModelValueChanged,
   fieldDescriptionChanged,
   nodeEditorReset,
   nodeIsIntermediateChanged,
