@@ -85,6 +85,8 @@ import {
   isMainModelFieldInputTemplate,
   isModelIdentifierFieldInputInstance,
   isModelIdentifierFieldInputTemplate,
+  isRunwayModelFieldInputInstance,
+  isRunwayModelFieldInputTemplate,
   isSchedulerFieldInputInstance,
   isSchedulerFieldInputTemplate,
   isSD3MainModelFieldInputInstance,
@@ -136,6 +138,7 @@ import LLaVAModelFieldInputComponent from './inputs/LLaVAModelFieldInputComponen
 import LoRAModelFieldInputComponent from './inputs/LoRAModelFieldInputComponent';
 import MainModelFieldInputComponent from './inputs/MainModelFieldInputComponent';
 import RefinerModelFieldInputComponent from './inputs/RefinerModelFieldInputComponent';
+import RunwayModelFieldInputComponent from './inputs/RunwayModelFieldInputComponent';
 import SchedulerFieldInputComponent from './inputs/SchedulerFieldInputComponent';
 import SD3MainModelFieldInputComponent from './inputs/SD3MainModelFieldInputComponent';
 import SDXLMainModelFieldInputComponent from './inputs/SDXLMainModelFieldInputComponent';
@@ -442,6 +445,13 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
       return null;
     }
     return <Veo3ModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isRunwayModelFieldInputTemplate(template)) {
+    if (!isRunwayModelFieldInputInstance(field)) {
+      return null;
+    }
+    return <RunwayModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
   }
 
   if (isColorFieldInputTemplate(template)) {
