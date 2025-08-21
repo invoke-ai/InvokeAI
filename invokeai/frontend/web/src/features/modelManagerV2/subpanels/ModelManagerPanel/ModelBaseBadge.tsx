@@ -21,6 +21,7 @@ export const BASE_COLOR_MAP: Record<BaseModelType, string> = {
   'chatgpt-4o': 'pink',
   'flux-kontext': 'pink',
   'gemini-2.5': 'pink',
+  veo3: 'white',
 };
 
 const ModelBaseBadge = ({ base }: Props) => {

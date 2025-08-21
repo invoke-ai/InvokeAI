@@ -391,7 +391,7 @@ const applyClipSkip = (state: { clipSkip: number }, model: ParameterModel | null
 
   const maxClip = getModelMaxClipSkip(model);
 
-  state.clipSkip = clamp(clipSkip, 0, maxClip);
+  state.clipSkip = clamp(clipSkip, 0, maxClip ?? 0);
 };
 
 const hasModelClipSkip = (model: ParameterModel | null) => {
@@ -399,7 +399,7 @@ const hasModelClipSkip = (model: ParameterModel | null) => {
     return false;
   }
 
-  return getModelMaxClipSkip(model) > 0;
+  return getModelMaxClipSkip(model) ?? 0 > 0;
 };
 
 const getModelMaxClipSkip = (model: ParameterModel) => {
@@ -408,7 +408,7 @@ const getModelMaxClipSkip = (model: ParameterModel) => {
     return 0;
   }
 
-  return CLIP_SKIP_MAP[model.base].maxClip;
+  return CLIP_SKIP_MAP[model.base]?.maxClip;
 };
 
 const resetState = (state: ParamsState): ParamsState => {
