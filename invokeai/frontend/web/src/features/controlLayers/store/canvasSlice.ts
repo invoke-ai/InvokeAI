@@ -32,7 +32,8 @@ import {
 } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { simplifyFlatNumbersArray } from 'features/controlLayers/util/simplify';
 import { isMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
-import { API_BASE_MODELS } from 'features/parameters/types/constants';
+import { videoModelChanged } from 'features/parameters/store/videoSlice';
+import { API_BASE_MODELS, VIDEO_BASE_MODELS } from 'features/parameters/types/constants';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
 import type { UndoableOptions } from 'redux-undo';
@@ -1581,6 +1582,18 @@ const slice = createSlice({
     builder.addCase(canvasReset, (state) => {
       return resetState(state);
     });
+    builder.addCase(videoModelChanged, (state, action) => {
+      if (action.payload) {
+        const { base } = action.payload;
+        if (VIDEO_BASE_MODELS.includes(base)) {
+          state.bbox.aspectRatio.isLocked = true;
+          state.bbox.aspectRatio.value = 1;
+          state.bbox.aspectRatio.id = '16:9';
+          state.bbox.rect.width = 1280;
+          state.bbox.rect.height = 720;
+        }
+      }
+    });
     builder.addCase(modelChanged, (state, action) => {
       const { model } = action.payload;
       /**
@@ -1611,6 +1624,7 @@ const slice = createSlice({
           state.bbox.rect.width = 1024;
           state.bbox.rect.height = 1024;
         }
+
         syncScaledSize(state);
       }
     });
