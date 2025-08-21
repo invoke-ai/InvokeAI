@@ -5,10 +5,7 @@ import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { getFocusedRegion } from 'common/hooks/focus';
 import { useRangeBasedVideoFetching } from 'features/gallery/hooks/useRangeBasedVideoFetching';
 import type { selectGetVideoIdsQueryArgs } from 'features/gallery/store/gallerySelectors';
-import {
-  selectGalleryImageMinimumWidth,
-  selectLastSelectedImage,
-} from 'features/gallery/store/gallerySelectors';
+import { selectGalleryImageMinimumWidth, selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import type { MutableRefObject } from 'react';
@@ -25,13 +22,13 @@ import { VirtuosoGrid } from 'react-virtuoso';
 import { videosApi } from 'services/api/endpoints/videos';
 import { useDebounce } from 'use-debounce';
 
+import { getItemsPerRow } from '../../../../../../../getItemsPerRow';
+import { getItemIndex } from './getItemIndex';
 import { GalleryImagePlaceholder } from './ImageGrid/GalleryImage';
 import { GallerySelectionCountTag } from './ImageGrid/GallerySelectionCountTag';
 import { GalleryVideo, GalleryVideoPlaceholder } from './ImageGrid/GalleryVideo';
-import { useGalleryVideoIds } from './use-gallery-video-ids';
-import { getItemsPerRow } from '../../../../../../../getItemsPerRow';
 import { scrollIntoView } from './scrollIntoView';
-import { getItemIndex } from './getItemIndex';
+import { useGalleryVideoIds } from './use-gallery-video-ids';
 import { useScrollableGallery } from './useScrollableGallery';
 
 export const log = logger('gallery');

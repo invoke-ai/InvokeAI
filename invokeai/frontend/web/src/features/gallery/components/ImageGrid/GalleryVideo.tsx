@@ -13,7 +13,11 @@ import type { DndDragPreviewSingleVideoState } from 'features/dnd/DndDragPreview
 import { createSingleVideoDragPreview, setSingleVideoDragPreview } from 'features/dnd/DndDragPreviewSingleVideo';
 import { firefoxDndFix } from 'features/dnd/util';
 import { useVideoContextMenu } from 'features/gallery/components/ContextMenu/VideoContextMenu';
-import { selectGetImageNamesQueryArgs, selectSelectedBoardId, selectSelection } from 'features/gallery/store/gallerySelectors';
+import {
+  selectGetImageNamesQueryArgs,
+  selectSelectedBoardId,
+  selectSelection,
+} from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectGallerySlice, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
@@ -23,8 +27,8 @@ import { PiVideoBold } from 'react-icons/pi';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { VideoDTO } from 'services/api/types';
 
-import { GalleryItemHoverIcons } from './GalleryItemHoverIcons';
 import { galleryItemContainerSX } from './galleryItemContainerSX';
+import { GalleryItemHoverIcons } from './GalleryItemHoverIcons';
 
 interface Props {
   videoDTO: VideoDTO;
