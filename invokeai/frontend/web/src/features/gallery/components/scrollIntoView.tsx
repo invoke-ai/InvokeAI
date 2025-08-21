@@ -1,4 +1,5 @@
-import type { VirtuosoGridHandle, ListRange } from 'react-virtuoso';
+import type { ListRange, VirtuosoGridHandle } from 'react-virtuoso';
+
 import { log } from './VideoGallery';
 
 /**
