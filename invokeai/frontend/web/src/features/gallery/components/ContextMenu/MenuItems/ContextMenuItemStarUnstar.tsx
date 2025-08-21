@@ -24,7 +24,7 @@ export const ContextMenuItemStarUnstar = memo(() => {
     } else if (isVideoDTO(itemDTO)) {
       starVideos({ video_ids: [itemDTO.video_id] });
     }
-  }, [starImages, itemDTO]);
+  }, [starImages, itemDTO, starVideos]);
 
   const unstarImage = useCallback(() => {
     if (isImageDTO(itemDTO)) {
@@ -32,7 +32,7 @@ export const ContextMenuItemStarUnstar = memo(() => {
     } else if (isVideoDTO(itemDTO)) {
       unstarVideos({ video_ids: [itemDTO.video_id] });
     }
-  }, [unstarImages, itemDTO]);
+  }, [unstarImages, itemDTO, unstarVideos]);
 
   if (itemDTO.starred) {
     return (

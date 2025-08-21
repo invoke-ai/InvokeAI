@@ -322,7 +322,7 @@ const useStarImageHotkey = () => {
     } else {
       starImages({ image_names: [imageDTO.image_name] });
     }
-  }, [imageDTO, isGalleryFocused, starImages, unstarImages]);
+  }, [imageDTO, isGalleryFocused, starImages, unstarImages, starVideos, unstarVideos, galleryView, videoDTO]);
 
   useRegisteredHotkeys({
     id: 'starImage',

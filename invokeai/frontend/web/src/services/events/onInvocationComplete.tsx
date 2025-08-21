@@ -11,10 +11,8 @@ import {
 } from 'features/gallery/store/gallerySelectors';
 import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
-import type { VideoField } from 'features/nodes/types/common';
 import { isImageField, isImageFieldCollection, isVideoField } from 'features/nodes/types/common';
 import { zNodeStatus } from 'features/nodes/types/invocation';
-import { generatedVideoChanged } from 'features/parameters/store/videoSlice';
 import type { LRUCache } from 'lru-cache';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';

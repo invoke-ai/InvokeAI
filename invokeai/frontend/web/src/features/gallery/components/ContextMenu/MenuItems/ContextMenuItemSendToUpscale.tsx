@@ -1,14 +1,13 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
-import { useItemDTOContext, useItemDTOContextImageOnly } from 'features/gallery/contexts/ItemDTOContext';
+import { useItemDTOContextImageOnly } from 'features/gallery/contexts/ItemDTOContext';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { toast } from 'features/toast/toast';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiShareFatBold } from 'react-icons/pi';
-import { isImageDTO } from 'services/api/types';
 
 export const ContextMenuItemSendToUpscale = memo(() => {
   const { t } = useTranslation();

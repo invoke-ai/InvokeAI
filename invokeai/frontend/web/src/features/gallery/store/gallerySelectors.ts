@@ -52,12 +52,7 @@ export const selectGetImageNamesQueryArgs = createMemoizedSelector(
 );
 
 export const selectGetVideoIdsQueryArgs = createMemoizedSelector(
-  [
-    selectSelectedBoardId,
-    selectGallerySearchTerm,
-    selectGalleryOrderDir,
-    selectGalleryStarredFirst,
-  ],
+  [selectSelectedBoardId, selectGallerySearchTerm, selectGalleryOrderDir, selectGalleryStarredFirst],
   (board_id, search_term, order_dir, starred_first): GetVideoIdsArgs => ({
     board_id,
     search_term,

@@ -1,11 +1,12 @@
-import { FormControl, FormLabel, Select } from "@invoke-ai/ui-library";
-import { useAppDispatch, useAppSelector } from "app/store/storeHooks";
-import { aspectRatioIdChanged, heightChanged, widthChanged } from "features/controlLayers/store/paramsSlice";
-import { isVeo3Resolution, VEO3_RESOLUTIONS, zVeo3Resolution } from "features/controlLayers/store/types";
-import { selectVideoResolution, videoResolutionChanged } from "features/parameters/store/videoSlice";
-import { ChangeEventHandler, useCallback, useEffect, useMemo } from "react";
-import { useTranslation } from "react-i18next";
-import { PiCaretDownBold } from "react-icons/pi";
+import { FormControl, FormLabel, Select } from '@invoke-ai/ui-library';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { aspectRatioIdChanged, heightChanged, widthChanged } from 'features/controlLayers/store/paramsSlice';
+import { isVeo3Resolution, VEO3_RESOLUTIONS, zVeo3Resolution } from 'features/controlLayers/store/types';
+import { selectVideoResolution, videoResolutionChanged } from 'features/parameters/store/videoSlice';
+import type { ChangeEventHandler } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { PiCaretDownBold } from 'react-icons/pi';
 
 export const ParamResolution = () => {
   const videoResolution = useAppSelector(selectVideoResolution);
@@ -35,16 +36,25 @@ export const ParamResolution = () => {
     [dispatch]
   );
 
-  const value = useMemo(() => options.find((o) => o === videoResolution), [videoResolution]);
+  const value = useMemo(() => options.find((o) => o === videoResolution), [videoResolution, options]);
 
-  return <FormControl>
-    <FormLabel>{t('parameters.resolution')}</FormLabel>
-    <Select size="sm" value={value} onChange={onChange} cursor="pointer" iconSize="0.75rem" icon={<PiCaretDownBold />}>
-      {options.map((resolution) => (
-        <option key={resolution} value={resolution}>
-          {resolution}
-        </option>
-      ))}
-    </Select>
-  </FormControl>;
+  return (
+    <FormControl>
+      <FormLabel>{t('parameters.resolution')}</FormLabel>
+      <Select
+        size="sm"
+        value={value}
+        onChange={onChange}
+        cursor="pointer"
+        iconSize="0.75rem"
+        icon={<PiCaretDownBold />}
+      >
+        {options.map((resolution) => (
+          <option key={resolution} value={resolution}>
+            {resolution}
+          </option>
+        ))}
+      </Select>
+    </FormControl>
+  );
 };
