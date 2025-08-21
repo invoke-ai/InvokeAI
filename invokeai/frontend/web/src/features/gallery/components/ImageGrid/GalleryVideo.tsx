@@ -1,15 +1,15 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import type { FlexProps, SystemStyleObject } from '@invoke-ai/ui-library';
+import type { FlexProps } from '@invoke-ai/ui-library';
 import { Flex, Icon, Image } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { uniq } from 'es-toolkit';
-import { multipleVideoDndSource, singleVideoDndSource } from 'features/dnd/dnd';
-import type { DndDragPreviewMultipleVideoState} from 'features/dnd/DndDragPreviewMultipleVideo';
+import { multipleImageDndSource, multipleVideoDndSource, singleVideoDndSource } from 'features/dnd/dnd';
+import type { DndDragPreviewMultipleVideoState } from 'features/dnd/DndDragPreviewMultipleVideo';
 import { createMultipleVideoDragPreview, setMultipleVideoDragPreview } from 'features/dnd/DndDragPreviewMultipleVideo';
-import type { DndDragPreviewSingleVideoState} from 'features/dnd/DndDragPreviewSingleVideo';
+import type { DndDragPreviewSingleVideoState } from 'features/dnd/DndDragPreviewSingleVideo';
 import { createSingleVideoDragPreview, setSingleVideoDragPreview } from 'features/dnd/DndDragPreviewSingleVideo';
 import { firefoxDndFix } from 'features/dnd/util';
 import {
@@ -22,62 +22,12 @@ import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import type { MouseEvent, MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PiImageBold } from 'react-icons/pi';
+import { PiImageBold, PiVideoBold } from 'react-icons/pi';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { VideoDTO } from 'services/api/types';
 import { GalleryItemHoverIcons } from './GalleryItemHoverIcons';
 import { useVideoContextMenu } from '../ContextMenu/VideoContextMenu';
-
-const galleryImageContainerSX = {
-  containerType: 'inline-size',
-  w: 'full',
-  h: 'full',
-  '.gallery-image-size-badge': {
-    '@container (max-width: 80px)': {
-      '&': { display: 'none' },
-    },
-  },
-  '&[data-is-dragging=true]': {
-    opacity: 0.3,
-  },
-  userSelect: 'none',
-  webkitUserSelect: 'none',
-  position: 'relative',
-  justifyContent: 'center',
-  alignItems: 'center',
-  aspectRatio: '1/1',
-  '::before': {
-    content: '""',
-    display: 'inline-block',
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    pointerEvents: 'none',
-    borderRadius: 'base',
-  },
-  '&[data-selected=true]::before': {
-    boxShadow:
-      'inset 0px 0px 0px 3px var(--invoke-colors-invokeBlue-500), inset 0px 0px 0px 4px var(--invoke-colors-invokeBlue-800)',
-  },
-  '&[data-selected-for-compare=true]::before': {
-    boxShadow:
-      'inset 0px 0px 0px 3px var(--invoke-colors-invokeGreen-300), inset 0px 0px 0px 4px var(--invoke-colors-invokeGreen-800)',
-  },
-  '&:hover::before': {
-    boxShadow:
-      'inset 0px 0px 0px 1px var(--invoke-colors-invokeBlue-300), inset 0px 0px 0px 2px var(--invoke-colors-invokeBlue-800)',
-  },
-  '&:hover[data-selected=true]::before': {
-    boxShadow:
-      'inset 0px 0px 0px 3px var(--invoke-colors-invokeBlue-400), inset 0px 0px 0px 4px var(--invoke-colors-invokeBlue-800)',
-  },
-  '&:hover[data-selected-for-compare=true]::before': {
-    boxShadow:
-      'inset 0px 0px 0px 3px var(--invoke-colors-invokeGreen-200), inset 0px 0px 0px 4px var(--invoke-colors-invokeGreen-800)',
-  },
-} satisfies SystemStyleObject;
+import { galleryItemContainerSX } from './galleryItemContainerSX';
 
 interface Props {
   videoDTO: VideoDTO;
@@ -131,7 +81,7 @@ const buildOnClick =
     }
   };
 
-export const GalleryVideo = memo(({ videoDTO  }: Props) => {
+export const GalleryVideo = memo(({ videoDTO }: Props) => {
   const store = useAppStore();
   const [isDragging, setIsDragging] = useState(false);
   const [dragPreviewState, setDragPreviewState] = useState<
@@ -157,8 +107,16 @@ export const GalleryVideo = memo(({ videoDTO  }: Props) => {
           const selection = selectSelection(store.getState());
           const boardId = selectSelectedBoardId(store.getState());
 
-          // Otherwise, initiate a single-image drag
-          return singleVideoDndSource.getData({  videoDTO }, videoDTO.video_id);
+          // When we have multiple images selected, and the dragged image is part of the selection, initiate a
+          // multi-image drag.
+          if (selection.length > 1 && selection.includes(videoDTO.video_id)) {
+            return multipleVideoDndSource.getData({
+              ids: selection,
+              board_id: boardId,
+            });
+          } // Otherwise, initiate a single-image drag
+
+          return singleVideoDndSource.getData({ videoDTO }, videoDTO.video_id);
         },
         // This is a "local" drag start event, meaning that it is only called when this specific image is dragged.
         onDragStart: ({ source }) => {
@@ -190,10 +148,7 @@ export const GalleryVideo = memo(({ videoDTO  }: Props) => {
         onDragStart: ({ source }) => {
           // When we start dragging multiple images, set the dragging state to true if the dragged image is part of the
           // selection. This is called for all drag events.
-          if (
-            multipleVideoDndSource.typeGuard(source.data) &&
-            source.data.payload.ids.includes(videoDTO.video_id)
-          ) {
+          if (multipleVideoDndSource.typeGuard(source.data) && source.data.payload.ids.includes(videoDTO.video_id)) {
             setIsDragging(true);
           }
         },
@@ -228,7 +183,7 @@ export const GalleryVideo = memo(({ videoDTO  }: Props) => {
     <>
       <Flex
         ref={ref}
-        sx={galleryImageContainerSX}
+        sx={galleryItemContainerSX}
         data-is-dragging={isDragging}
         data-item-id={videoDTO.video_id}
         role="button"
@@ -243,7 +198,7 @@ export const GalleryVideo = memo(({ videoDTO  }: Props) => {
           pointerEvents="none"
           src={videoDTO.thumbnail_url}
           w={videoDTO.width}
-          fallback={<GalleryImagePlaceholder />}
+          fallback={<GalleryVideoPlaceholder />}
           objectFit="contain"
           maxW="full"
           maxH="full"
@@ -259,10 +214,10 @@ export const GalleryVideo = memo(({ videoDTO  }: Props) => {
 
 GalleryVideo.displayName = 'GalleryVideo';
 
-export const GalleryImagePlaceholder = memo((props: FlexProps) => (
+export const GalleryVideoPlaceholder = memo((props: FlexProps) => (
   <Flex w="full" h="full" bg="base.850" borderRadius="base" alignItems="center" justifyContent="center" {...props}>
-    <Icon as={PiImageBold} boxSize={16} color="base.800" />
+    <Icon as={PiVideoBold} boxSize={16} color="base.800" />
   </Flex>
 ));
 
-GalleryImagePlaceholder.displayName = 'GalleryImagePlaceholder';
+GalleryVideoPlaceholder.displayName = 'GalleryVideoPlaceholder';
