@@ -20,6 +20,24 @@ type Props = {
 };
 
 export const NodeFieldElementFloatSettings = memo(({ id, settings, nodeId, fieldName, fieldTemplate }: Props) => {
+  return (
+    <>
+      <SettingShuffle id={id} settings={settings} nodeId={nodeId} fieldName={fieldName} fieldTemplate={fieldTemplate} />
+      <SettingComponent
+        id={id}
+        settings={settings}
+        nodeId={nodeId}
+        fieldName={fieldName}
+        fieldTemplate={fieldTemplate}
+      />
+      <SettingMin id={id} settings={settings} nodeId={nodeId} fieldName={fieldName} fieldTemplate={fieldTemplate} />
+      <SettingMax id={id} settings={settings} nodeId={nodeId} fieldName={fieldName} fieldTemplate={fieldTemplate} />
+    </>
+  );
+});
+NodeFieldElementFloatSettings.displayName = 'NodeFieldElementFloatSettings';
+
+const SettingShuffle = memo(({ id, settings }: Props) => {
   const { showShuffle } = settings;
 
   const { t } = useTranslation();
@@ -34,24 +52,13 @@ export const NodeFieldElementFloatSettings = memo(({ id, settings, nodeId, field
   }, [dispatch, id, settings, showShuffle]);
 
   return (
-    <>
-      <FormControl>
-        <FormLabel flex={1}>{t('workflows.builder.showShuffle')}</FormLabel>
-        <Switch size="sm" isChecked={showShuffle} onChange={toggleShowShuffle} />
-      </FormControl>
-      <SettingComponent
-        id={id}
-        settings={settings}
-        nodeId={nodeId}
-        fieldName={fieldName}
-        fieldTemplate={fieldTemplate}
-      />
-      <SettingMin id={id} settings={settings} nodeId={nodeId} fieldName={fieldName} fieldTemplate={fieldTemplate} />
-      <SettingMax id={id} settings={settings} nodeId={nodeId} fieldName={fieldName} fieldTemplate={fieldTemplate} />
-    </>
+    <FormControl>
+      <FormLabel flex={1}>{t('workflows.builder.showShuffle')}</FormLabel>
+      <Switch size="sm" isChecked={showShuffle} onChange={toggleShowShuffle} />
+    </FormControl>
   );
 });
-NodeFieldElementFloatSettings.displayName = 'NodeFieldElementFloatSettings';
+SettingShuffle.displayName = 'SettingShuffle';
 
 const SettingComponent = memo(({ id, settings }: Props) => {
   const { t } = useTranslation();

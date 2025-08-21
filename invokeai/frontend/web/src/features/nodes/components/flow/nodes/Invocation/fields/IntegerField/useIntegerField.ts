@@ -70,27 +70,27 @@ export const useIntegerField = (
     [max, min, overrideMax, overrideMin, overrideStep, step]
   );
 
-  const onValueChange = useCallback(
+  const onChange = useCallback(
     (value: number) => {
       dispatch(fieldIntegerValueChanged({ nodeId, fieldName, value }));
     },
     [dispatch, fieldName, nodeId]
   );
 
-  const handleClickRandomizeValue = useCallback(() => {
+  const randomizeValue = useCallback(() => {
     const value = Math.round(randomInt(min, max) / step) * step;
     dispatch(fieldIntegerValueChanged({ nodeId, fieldName, value }));
   }, [dispatch, fieldName, nodeId, min, max, step]);
 
   return {
     defaultValue: fieldTemplate.default,
-    onValueChange,
+    onChange,
     min,
     max,
     step,
     fineStep,
     constrainValue,
     showShuffle,
-    handleClickRandomizeValue,
+    randomizeValue,
   };
 };
