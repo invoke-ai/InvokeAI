@@ -8,7 +8,7 @@ import { ImageComparisonDroppable } from 'features/gallery/components/ImageViewe
 import { ImageComparisonHover } from 'features/gallery/components/ImageViewer/ImageComparisonHover';
 import { ImageComparisonSideBySide } from 'features/gallery/components/ImageViewer/ImageComparisonSideBySide';
 import { ImageComparisonSlider } from 'features/gallery/components/ImageViewer/ImageComparisonSlider';
-import { selectComparisonMode, selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
+import { selectComparisonMode, selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import { memo, useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useImageDTO } from 'services/api/endpoints/images';
 import type { Equals } from 'tsafe';
@@ -39,10 +39,9 @@ const ImageComparisonContent = memo(({ firstImage, secondImage, rect }: Comparis
 ImageComparisonContent.displayName = 'ImageComparisonContent';
 
 export const ImageComparison = memo(() => {
-  const lastSelectedImageName = useAppSelector(selectLastSelectedImage);
-  const lastSelectedImageDTO = useImageDTO(lastSelectedImageName);
-  const comparisonImageName = useAppSelector(selectImageToCompare);
-  const comparisonImageDTO = useImageDTO(comparisonImageName);
+  const lastSelectedItem = useAppSelector(selectLastSelectedItem);
+  const lastSelectedImageDTO = useImageDTO(lastSelectedItem?.id);
+  const comparisonImageDTO = useImageDTO(useAppSelector(selectImageToCompare));
 
   const [rect, setRect] = useState<DOMRect | null>(null);
   const ref = useRef<HTMLDivElement | null>(null);

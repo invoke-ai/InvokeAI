@@ -7,7 +7,7 @@ import type { selectGetImageNamesQueryArgs } from 'features/gallery/store/galler
 import {
   selectGalleryImageMinimumWidth,
   selectImageToCompare,
-  selectLastSelectedImage,
+  selectLastSelectedItem,
   selectSelection,
   selectSelectionCount,
 } from 'features/gallery/store/gallerySelectors';
@@ -147,10 +147,10 @@ const useKeyboardNavigation = (
       const imageName = event.altKey
         ? // When the user holds alt, we are changing the image to compare - if no image to compare is currently selected,
           // we start from the last selected image
-          (selectImageToCompare(state) ?? selectLastSelectedImage(state))
-        : selectLastSelectedImage(state);
+          (selectImageToCompare(state) ?? selectLastSelectedItem(state)?.id)
+        : selectLastSelectedItem(state)?.id;
 
-      const currentIndex = getItemIndex(imageName, imageNames);
+      const currentIndex = getItemIndex(imageName ?? null, imageNames);
 
       let newIndex = currentIndex;
 
@@ -195,7 +195,7 @@ const useKeyboardNavigation = (
           if (event.altKey) {
             dispatch(imageToCompareChanged(newImageName));
           } else {
-            dispatch(selectionChanged([newImageName]));
+            dispatch(selectionChanged([{ type: 'image', id: newImageName }]));
           }
         }
       }
@@ -282,7 +282,7 @@ const useKeepSelectedImageInView = (
   const selection = useAppSelector(selectSelection);
 
   useEffect(() => {
-    const targetImageName = selection.at(-1);
+    const targetImageName = selection.at(-1)?.id;
     const virtuosoGridHandle = virtuosoRef.current;
     const rootEl = rootRef.current;
     const range = rangeRef.current;
@@ -298,10 +298,10 @@ const useKeepSelectedImageInView = (
 };
 
 const useStarImageHotkey = () => {
-  const lastSelectedImage = useAppSelector(selectLastSelectedImage);
+  const lastSelectedItem = useAppSelector(selectLastSelectedItem);
   const selectionCount = useAppSelector(selectSelectionCount);
   const isGalleryFocused = useIsRegionFocused('gallery');
-  const imageDTO = useImageDTO(lastSelectedImage);
+  const imageDTO = useImageDTO(lastSelectedItem?.id);
   const [starImages] = useStarImagesMutation();
   const [unstarImages] = useUnstarImagesMutation();
 

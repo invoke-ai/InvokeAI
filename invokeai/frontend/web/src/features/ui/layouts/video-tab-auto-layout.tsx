@@ -2,6 +2,7 @@ import type { DockviewApi, GridviewApi, IDockviewReactProps, IGridviewReactProps
 import { DockviewReact, GridviewReact, LayoutPriority, Orientation } from 'dockview';
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
 import { GalleryPanel } from 'features/gallery/components/Gallery';
+import { ImageViewerPanel } from 'features/gallery/components/ImageViewer/ImageViewerPanel';
 import { FloatingLeftPanelButtons } from 'features/ui/components/FloatingLeftPanelButtons';
 import { FloatingRightPanelButtons } from 'features/ui/components/FloatingRightPanelButtons';
 import type {
@@ -42,7 +43,6 @@ import {
   SETTINGS_PANEL_ID,
   VIEWER_PANEL_ID,
 } from './shared';
-import { VideoPlayerPanel } from './VideoPlayerPanel';
 import { VideoTabLeftPanel } from './VideoTabLeftPanel';
 
 const tabComponents = {
@@ -53,7 +53,7 @@ const tabComponents = {
 
 const mainPanelComponents: AutoLayoutDockviewComponents = {
   [LAUNCHPAD_PANEL_ID]: withPanelContainer(GenerateLaunchpadPanel),
-  [VIEWER_PANEL_ID]: withPanelContainer(VideoPlayerPanel),
+  [VIEWER_PANEL_ID]: withPanelContainer(ImageViewerPanel),
 };
 
 const initializeMainPanelLayout = (tab: TabName, api: DockviewApi) => {

@@ -4,7 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasAlertsInvocationProgress } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsInvocationProgress';
 import { DndImage } from 'features/dnd/DndImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
-import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
+import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
 import { selectShouldShowImageDetails, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -85,7 +85,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
             left={0}
             pointerEvents="none"
           >
-            <NextPrevImageButtons />
+            <NextPrevItemButtons />
           </Box>
         )}
       </AnimatePresence>

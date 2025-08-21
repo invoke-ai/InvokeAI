@@ -46,7 +46,7 @@ const buildOnClick =
     if (imageNames.length === 0) {
       // For basic click without modifiers, we can still set selection
       if (!shiftKey && !ctrlKey && !metaKey && !altKey) {
-        dispatch(selectionChanged([imageName]));
+        dispatch(selectionChanged([{ type: 'image', id: imageName }]));
       }
       return;
     }
@@ -61,7 +61,7 @@ const buildOnClick =
       }
     } else if (shiftKey) {
       const rangeEndImageName = imageName;
-      const lastSelectedImage = selection.at(-1);
+      const lastSelectedImage = selection.at(-1)?.id;
       const lastClickedIndex = imageNames.findIndex((name) => name === lastSelectedImage);
       const currentClickedIndex = imageNames.findIndex((name) => name === rangeEndImageName);
       if (lastClickedIndex > -1 && currentClickedIndex > -1) {
@@ -72,16 +72,16 @@ const buildOnClick =
         if (currentClickedIndex < lastClickedIndex) {
           imagesToSelect.reverse();
         }
-        dispatch(selectionChanged(uniq(selection.concat(imagesToSelect))));
+        dispatch(selectionChanged(uniq(selection.concat(imagesToSelect.map((name) => ({ type: 'image', id: name }))))));
       }
     } else if (ctrlKey || metaKey) {
-      if (selection.some((n) => n === imageName) && selection.length > 1) {
-        dispatch(selectionChanged(uniq(selection.filter((n) => n !== imageName))));
+      if (selection.some((n) => n.id === imageName) && selection.length > 1) {
+        dispatch(selectionChanged(uniq(selection.filter((n) => n.id !== imageName))));
       } else {
-        dispatch(selectionChanged(uniq(selection.concat(imageName))));
+        dispatch(selectionChanged(uniq(selection.concat({ type: 'image', id: imageName }))));
       }
     } else {
-      dispatch(selectionChanged([imageName]));
+      dispatch(selectionChanged([{ type: 'image', id: imageName }]));
     }
   };
 
@@ -98,7 +98,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
   );
   const isSelectedForCompare = useAppSelector(selectIsSelectedForCompare);
   const selectIsSelected = useMemo(
-    () => createSelector(selectGallerySlice, (gallery) => gallery.selection.includes(imageDTO.image_name)),
+    () => createSelector(selectGallerySlice, (gallery) => gallery.selection.some((s) => s.id === imageDTO.image_name)),
     [imageDTO.image_name]
   );
   const isSelected = useAppSelector(selectIsSelected);
@@ -118,9 +118,9 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
 
           // When we have multiple images selected, and the dragged image is part of the selection, initiate a
           // multi-image drag.
-          if (selection.length > 1 && selection.includes(imageDTO.image_name)) {
+          if (selection.length > 1 && selection.some((s) => s.id === imageDTO.image_name)) {
             return multipleImageDndSource.getData({
-              image_names: selection,
+              image_names: selection.map((s) => s.id),
               board_id: boardId,
             });
           }

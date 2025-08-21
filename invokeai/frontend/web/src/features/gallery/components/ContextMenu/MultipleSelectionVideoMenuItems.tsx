@@ -19,21 +19,21 @@ const MultipleSelectionMenuItems = () => {
   const [deleteVideos] = useDeleteVideosMutation();
 
   const handleChangeBoard = useCallback(() => {
-    dispatch(videosToChangeSelected(selection));
+    dispatch(videosToChangeSelected(selection.map((s) => s.id)));
     dispatch(isModalOpenChanged(true));
   }, [dispatch, selection]);
 
   const handleDeleteSelection = useCallback(() => {
     // TODO: Add confirm on delete and video usage functionality
-    deleteVideos({ video_ids: selection });
+    deleteVideos({ video_ids: selection.map((s) => s.id) });
   }, [deleteVideos, selection]);
 
   const handleStarSelection = useCallback(() => {
-    starVideos({ video_ids: selection });
+    starVideos({ video_ids: selection.map((s) => s.id) });
   }, [starVideos, selection]);
 
   const handleUnstarSelection = useCallback(() => {
-    unstarVideos({ video_ids: selection });
+    unstarVideos({ video_ids: selection.map((s) => s.id) });
   }, [unstarVideos, selection]);
 
   return (

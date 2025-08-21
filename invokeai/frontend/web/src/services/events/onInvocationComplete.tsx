@@ -9,7 +9,7 @@ import {
   selectListBoardsQueryArgs,
   selectSelectedBoardId,
 } from 'features/gallery/store/gallerySelectors';
-import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
+import { boardIdSelected, galleryViewChanged, itemSelected } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { isImageField, isImageFieldCollection, isVideoField } from 'features/nodes/types/common';
 import { zNodeStatus } from 'features/nodes/types/invocation';
@@ -181,7 +181,7 @@ export const buildOnInvocationComplete = (
         dispatch(galleryViewChanged('images'));
       }
       // Select the image immediately since we've optimistically updated the cache
-      dispatch(imageSelected(lastImageDTO.image_name));
+      dispatch(itemSelected({ type: 'image', id: lastImageDTO.image_name }));
     }
   };
 
@@ -288,7 +288,7 @@ export const buildOnInvocationComplete = (
           ...getVideoIdsArg,
           ...videoSpecificArgs,
         };
-        dispatch(imagesApi.util.invalidateTags([{ type: 'ImageNameList', id: stableHash(expectedQueryArgs) }]));
+        dispatch(videosApi.util.invalidateTags([{ type: 'VideoList', id: stableHash(expectedQueryArgs) }]));
       }
     }
 
@@ -301,7 +301,7 @@ export const buildOnInvocationComplete = (
       return;
     }
 
-    // Finally, we may need to autoswitch to the new image. We'll only do it for the last image in the list.
+    // Finally, we may need to autoswitch to the new video. We'll only do it for the last video in the list.
     const lastVideoDTO = videoDTOs.at(-1);
 
     if (!lastVideoDTO) {
@@ -314,8 +314,8 @@ export const buildOnInvocationComplete = (
     // With optimistic updates, we can immediately switch to the new image
     const selectedBoardId = selectSelectedBoardId(getState());
 
-    // If the image is from a different board, switch to that board & select the image - otherwise just select the
-    // image. This implicitly changes the view to 'images' if it was not already.
+    // If the video is from a different board, switch to that board & select the video - otherwise just select the
+    // video. This implicitly changes the view to 'videos' if it was not already.
     if (board_id !== selectedBoardId) {
       dispatch(
         boardIdSelected({
@@ -324,13 +324,13 @@ export const buildOnInvocationComplete = (
         })
       );
     } else {
-      // Ensure we are on the 'images' gallery view - that's where this image will be displayed
+      // Ensure we are on the 'videos' gallery view - that's where this video will be displayed
       const galleryView = selectGalleryView(getState());
       if (galleryView !== 'videos') {
         dispatch(galleryViewChanged('videos'));
       }
-      // Select the image immediately since we've optimistically updated the cache
-      dispatch(imageSelected(lastVideoDTO.video_id));
+      // Select the video immediately since we've optimistically updated the cache
+      dispatch(itemSelected({ type: 'video', id: lastVideoDTO.video_id }));
     }
   };
   const getResultImageDTOs = async (data: S['InvocationCompleteEvent']): Promise<ImageDTO[]> => {

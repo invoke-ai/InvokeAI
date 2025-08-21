@@ -19,7 +19,7 @@ export const IMAGE_CATEGORIES: ImageCategory[] = ['general'];
 export const ASSETS_CATEGORIES: ImageCategory[] = ['control', 'mask', 'user', 'other'];
 
 export const zGalleryState = z.object({
-  selection: z.array(z.string()),
+  selection: z.array(z.object({ type: z.enum(['image', 'video']), id: z.string() })),
   shouldAutoSwitch: z.boolean(),
   autoAssignBoardOnClick: z.boolean(),
   autoAddBoardId: zBoardId,
