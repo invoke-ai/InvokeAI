@@ -24,14 +24,16 @@ export const VideoPlayer = memo(() => {
         <Box flex={0.75} position="relative">
           <ChakraReactPlayer
             src={videoDTO.video_url}
-            width="75%"
-            height="75%"
             controls={true}
             position="absolute"
             top="50%"
             left="50%"
             transform="translate(-50%, -50%)"
-            maxWidth="900px"
+            maxWidth="90%"
+            style={{
+              width: videoDTO.width,
+              height: videoDTO.height,
+            }}
           />
         </Box>
       )}
