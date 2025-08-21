@@ -5,7 +5,7 @@ import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { getFocusedRegion } from 'common/hooks/focus';
 import { useRangeBasedVideoFetching } from 'features/gallery/hooks/useRangeBasedVideoFetching';
 import type { selectGetVideoIdsQueryArgs } from 'features/gallery/store/gallerySelectors';
-import { selectGalleryImageMinimumWidth, selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
+import { selectGalleryImageMinimumWidth, selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import { selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import type { MutableRefObject } from 'react';
@@ -115,7 +115,7 @@ const useKeyboardNavigation = (
       event.preventDefault();
 
       const state = getState();
-      const itemId = selectLastSelectedImage(state);
+      const itemId = selectLastSelectedItem(state)?.id;
 
       const currentIndex = getItemIndex(itemId, itemIds);
 
@@ -153,7 +153,7 @@ const useKeyboardNavigation = (
       if (newIndex !== currentIndex && newIndex >= 0 && newIndex < itemIds.length) {
         const nextItemId = itemIds[newIndex];
         if (nextItemId) {
-          dispatch(selectionChanged([nextItemId]));
+          dispatch(selectionChanged([{ type: 'video', id: nextItemId }]));
         }
       }
     },
@@ -236,7 +236,7 @@ const useKeepSelectedVideoInView = (
   rootRef: React.RefObject<HTMLDivElement>,
   rangeRef: MutableRefObject<ListRange>
 ) => {
-  const targetVideoId = useAppSelector(selectLastSelectedImage);
+  const targetVideoId = useAppSelector(selectLastSelectedItem)?.id;
 
   useEffect(() => {
     const virtuosoGridHandle = virtuosoRef.current;
