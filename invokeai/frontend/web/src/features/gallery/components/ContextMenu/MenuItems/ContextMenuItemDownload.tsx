@@ -9,7 +9,7 @@ import { isImageDTO } from 'services/api/types';
 export const ContextMenuItemDownload = memo(() => {
   const { t } = useTranslation();
   const itemDTO = useItemDTOContext();
-  const { downloadItem } = useDownloadItem(itemDTO);
+  const { downloadItem } = useDownloadItem();
 
   const onClick = useCallback(() => {
     if (isImageDTO(itemDTO)) {
