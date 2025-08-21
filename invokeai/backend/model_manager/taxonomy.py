@@ -32,6 +32,7 @@ class BaseModelType(str, Enum):
     ChatGPT4o = "chatgpt-4o"
     FluxKontext = "flux-kontext"
     Veo3 = "veo3"
+    Runway = "runway"
 
 
 class ModelType(str, Enum):
