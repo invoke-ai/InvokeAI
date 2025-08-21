@@ -13,7 +13,7 @@ export const FloatFieldSlider = memo(
     props: FieldComponentProps<FloatFieldInputInstance, FloatFieldInputTemplate, { settings?: NodeFieldFloatSettings }>
   ) => {
     const { nodeId, field, fieldTemplate, settings } = props;
-    const { defaultValue, onChange, min, max, step, fineStep, showShuffle, handleClickRandomizeValue } = useFloatField(
+    const { defaultValue, onChange, min, max, step, fineStep, showShuffle, randomizeValue } = useFloatField(
       nodeId,
       field.name,
       fieldTemplate,
@@ -38,13 +38,7 @@ export const FloatFieldSlider = memo(
           flex="1 1 0"
         />
         {showShuffle && (
-          <Button
-            size="sm"
-            isDisabled={false}
-            onClick={handleClickRandomizeValue}
-            leftIcon={<PiShuffleBold />}
-            flexShrink={0}
-          >
+          <Button size="sm" isDisabled={false} onClick={randomizeValue} leftIcon={<PiShuffleBold />} flexShrink={0}>
             {t('workflows.builder.shuffle')}
           </Button>
         )}

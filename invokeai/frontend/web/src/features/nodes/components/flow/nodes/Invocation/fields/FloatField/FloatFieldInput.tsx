@@ -13,7 +13,7 @@ export const FloatFieldInput = memo(
     props: FieldComponentProps<FloatFieldInputInstance, FloatFieldInputTemplate, { settings?: NodeFieldFloatSettings }>
   ) => {
     const { nodeId, field, fieldTemplate, settings } = props;
-    const { defaultValue, onChange, min, max, step, fineStep, constrainValue, showShuffle, handleClickRandomizeValue } =
+    const { defaultValue, onChange, min, max, step, fineStep, constrainValue, showShuffle, randomizeValue } =
       useFloatField(nodeId, field.name, fieldTemplate, settings);
 
     const { t } = useTranslation();
@@ -33,13 +33,7 @@ export const FloatFieldInput = memo(
           constrainValue={constrainValue}
         />
         {showShuffle && (
-          <Button
-            size="sm"
-            isDisabled={false}
-            onClick={handleClickRandomizeValue}
-            leftIcon={<PiShuffleBold />}
-            flexShrink={0}
-          >
+          <Button size="sm" isDisabled={false} onClick={randomizeValue} leftIcon={<PiShuffleBold />} flexShrink={0}>
             {t('workflows.builder.shuffle')}
           </Button>
         )}

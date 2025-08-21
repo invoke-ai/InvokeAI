@@ -17,8 +17,12 @@ export const IntegerFieldSlider = memo(
     >
   ) => {
     const { nodeId, field, fieldTemplate, settings } = props;
-    const { defaultValue, onValueChange, min, max, step, fineStep, showShuffle, handleClickRandomizeValue } =
-      useIntegerField(nodeId, field.name, fieldTemplate, settings);
+    const { defaultValue, onChange, min, max, step, fineStep, showShuffle, randomizeValue } = useIntegerField(
+      nodeId,
+      field.name,
+      fieldTemplate,
+      settings
+    );
 
     const { t } = useTranslation();
 
@@ -26,7 +30,7 @@ export const IntegerFieldSlider = memo(
       <>
         <CompositeSlider
           defaultValue={defaultValue}
-          onChange={onValueChange}
+          onChange={onChange}
           value={field.value}
           min={min}
           max={max}
@@ -38,13 +42,7 @@ export const IntegerFieldSlider = memo(
           flex="1 1 0"
         />
         {showShuffle && (
-          <Button
-            size="sm"
-            isDisabled={false}
-            onClick={handleClickRandomizeValue}
-            leftIcon={<PiShuffleBold />}
-            flexShrink={0}
-          >
+          <Button size="sm" isDisabled={false} onClick={randomizeValue} leftIcon={<PiShuffleBold />} flexShrink={0}>
             {t('workflows.builder.shuffle')}
           </Button>
         )}

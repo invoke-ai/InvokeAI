@@ -78,7 +78,7 @@ export const useFloatField = (
     [dispatch, fieldName, nodeId]
   );
 
-  const handleClickRandomizeValue = useCallback(() => {
+  const randomizeValue = useCallback(() => {
     const value = Number((Math.round(randomFloat(min, max) / step) * step).toFixed(10));
     dispatch(fieldFloatValueChanged({ nodeId, fieldName, value }));
   }, [dispatch, fieldName, nodeId, min, max, step]);
@@ -92,6 +92,6 @@ export const useFloatField = (
     fineStep,
     constrainValue,
     showShuffle,
-    handleClickRandomizeValue,
+    randomizeValue,
   };
 };
