@@ -6,7 +6,7 @@ import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsOutBold } from 'react-icons/pi';
-import { isImageDTO, type ImageDTO, type VideoDTO } from 'services/api/types';
+import { type ImageDTO, isImageDTO, type VideoDTO } from 'services/api/types';
 
 type Props = {
   itemDTO: ImageDTO | VideoDTO;

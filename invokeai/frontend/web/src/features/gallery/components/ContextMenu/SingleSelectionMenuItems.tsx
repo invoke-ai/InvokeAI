@@ -35,7 +35,7 @@ const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) =
   return (
     <ItemDTOContextProvider value={imageDTO}>
       <IconMenuItemGroup>
-          <ContextMenuItemOpenInNewTab />
+        <ContextMenuItemOpenInNewTab />
         <ContextMenuItemCopy />
         <ContextMenuItemDownload />
         <ContextMenuItemOpenInViewer />

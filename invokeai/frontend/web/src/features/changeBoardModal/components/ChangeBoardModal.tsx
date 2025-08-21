@@ -91,7 +91,16 @@ const ChangeBoardModal = () => {
       }
     }
     dispatch(changeBoardReset());
-  }, [addImagesToBoard, dispatch, imagesToChange, videosToChange, removeImagesFromBoard, selectedBoard]);
+  }, [
+    addImagesToBoard,
+    dispatch,
+    imagesToChange,
+    videosToChange,
+    removeImagesFromBoard,
+    selectedBoard,
+    addVideosToBoard,
+    removeVideosFromBoard,
+  ]);
 
   const onChange = useCallback<ComboboxOnChange>((v) => {
     if (!v) {
@@ -112,12 +121,14 @@ const ChangeBoardModal = () => {
     >
       <Flex flexDir="column" gap={4}>
         <Text>
-          {imagesToChange.length > 0 && t('boards.movingImagesToBoard', {
-            count: imagesToChange.length,
-          })}
-          {videosToChange.length > 0 && t('boards.movingVideosToBoard', {
-            count: videosToChange.length,
-          })}
+          {imagesToChange.length > 0 &&
+            t('boards.movingImagesToBoard', {
+              count: imagesToChange.length,
+            })}
+          {videosToChange.length > 0 &&
+            t('boards.movingVideosToBoard', {
+              count: videosToChange.length,
+            })}
           :
         </Text>
         <FormControl isDisabled={isFetching}>

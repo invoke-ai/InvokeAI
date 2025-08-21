@@ -13,19 +13,20 @@ export const ContextMenuItemSelectForCompare = memo(() => {
   const dispatch = useAppDispatch();
   const itemDTO = useItemDTOContext();
   const selectMaySelectForCompare = useMemo(
-    () => createSelector(selectGallerySlice, (gallery) => {
-      if (isImageDTO(itemDTO)) {
-        return gallery.imageToCompare !== itemDTO.image_name;
-      }
-      return false;
-    }),
+    () =>
+      createSelector(selectGallerySlice, (gallery) => {
+        if (isImageDTO(itemDTO)) {
+          return gallery.imageToCompare !== itemDTO.image_name;
+        }
+        return false;
+      }),
     [itemDTO]
   );
   const maySelectForCompare = useAppSelector(selectMaySelectForCompare);
 
   const onClick = useCallback(() => {
     if (isImageDTO(itemDTO)) {
-    dispatch(imageToCompareChanged(itemDTO.image_name));
+      dispatch(imageToCompareChanged(itemDTO.image_name));
     } else {
       // TODO: Implement video select for compare
     }
