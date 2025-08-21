@@ -15,9 +15,8 @@ import {
 } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { useOverlayScrollbars } from 'overlayscrollbars-react';
-import type { MutableRefObject, RefObject } from 'react';
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { MutableRefObject } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import type {
   GridComponents,
   GridComputeItemKey,
@@ -36,6 +35,10 @@ import { GallerySelectionCountTag } from './ImageGrid/GallerySelectionCountTag';
 import { useGalleryImageNames } from './use-gallery-image-names';
 import { useGalleryVideoIds } from './use-gallery-video-ids';
 import { GalleryVideo } from './ImageGrid/GalleryVideo';
+import { getItemsPerRow } from '../../../../../../../getItemsPerRow';
+import { scrollIntoView } from './scrollIntoView';
+import { useScrollableGallery } from './useScrollableGallery';
+import { getItemIndex } from './getItemIndex';
 
 const log = logger('gallery');
 
@@ -101,182 +104,6 @@ const computeItemKey: GridComputeItemKey<string, GridContext> = (index, imageNam
 };
 
 /**
- * Calculate how many images fit in a row based on the current grid layout.
- *
- * TODO(psyche): We only need to do this when the gallery width changes, or when the galleryImageMinimumWidth value
- * changes. Cache this calculation.
- */
-const getImagesPerRow = (rootEl: HTMLDivElement): number => {
-  // Start from root and find virtuoso grid elements
-  const gridElement = rootEl.querySelector('.virtuoso-grid-list');
-
-  if (!gridElement) {
-    return 0;
-  }
-
-  const firstGridItem = gridElement.querySelector('.virtuoso-grid-item');
-
-  if (!firstGridItem) {
-    return 0;
-  }
-
-  const itemRect = firstGridItem.getBoundingClientRect();
-  const containerRect = gridElement.getBoundingClientRect();
-
-  // Get the computed gap from CSS
-  const gridStyle = window.getComputedStyle(gridElement);
-  const gapValue = gridStyle.gap;
-  const gap = parseFloat(gapValue);
-
-  if (isNaN(gap) || !itemRect.width || !itemRect.height || !containerRect.width || !containerRect.height) {
-    return 0;
-  }
-
-  /**
-   * You might be tempted to just do some simple math like:
-   * const imagesPerRow = Math.floor(containerRect.width / itemRect.width);
-   *
-   * But floating point precision can cause issues with this approach, causing it to be off by 1 in some cases.
-   *
-   * Instead, we use a more robust approach that iteratively calculates how many images fit in the row.
-   */
-  let imagesPerRow = 0;
-  let spaceUsed = 0;
-
-  // Floating point precision can cause imagesPerRow to be 1 too small. Adding 1px to the container size fixes
-  // this, without the possibility of accidentally adding an extra column.
-  while (spaceUsed + itemRect.width <= containerRect.width + 1) {
-    imagesPerRow++; // Increment the number of images
-    spaceUsed += itemRect.width; // Add image size to the used space
-    if (spaceUsed + gap <= containerRect.width) {
-      spaceUsed += gap; // Add gap size to the used space after each image except after the last image
-    }
-  }
-
-  return Math.max(1, imagesPerRow);
-};
-
-/**
- * Scroll the item at the given index into view if it is not currently visible.
- */
-const scrollIntoView = (
-  targetItemId: string,
-  itemIds: string[],
-  rootEl: HTMLDivElement,
-  virtuosoGridHandle: VirtuosoGridHandle,
-  range: ListRange
-) => {
-  if (range.endIndex === 0) {
-    // No range is rendered; no need to scroll to anything.
-    log.trace('Not scrolling into view: Range endIdex is 0');
-    return;
-  }
-
-  const targetIndex = itemIds.findIndex((name) => name === targetItemId);
-
-  if (targetIndex === -1) {
-    // The image isn't in the currently rendered list.
-    log.trace('Not scrolling into view: targetIndex is -1');
-    return;
-  }
-
-  const targetItem = rootEl.querySelector(
-    `.virtuoso-grid-item:has([data-item-id="${targetItemId}"])`
-  ) as HTMLElement;
-
-  if (!targetItem) {
-    if (targetIndex > range.endIndex) {
-      log.trace(
-        {
-          index: targetIndex,
-          behavior: 'auto',
-          align: 'start',
-        },
-        'Scrolling into view: not in DOM'
-      );
-      virtuosoGridHandle.scrollToIndex({
-        index: targetIndex,
-        behavior: 'auto',
-        align: 'start',
-      });
-    } else if (targetIndex < range.startIndex) {
-      log.trace(
-        {
-          index: targetIndex,
-          behavior: 'auto',
-          align: 'end',
-        },
-        'Scrolling into view: not in DOM'
-      );
-      virtuosoGridHandle.scrollToIndex({
-        index: targetIndex,
-        behavior: 'auto',
-        align: 'end',
-      });
-    } else {
-      log.debug(
-        `Unable to find image ${targetItemId} at index ${targetIndex} but it is in the rendered range ${range.startIndex}-${range.endIndex}`
-      );
-    }
-    return;
-  }
-
-  // We found the image in the DOM, but it might be in the overscan range - rendered but not in the visible viewport.
-  // Check if it is in the viewport and scroll if necessary.
-
-  const itemRect = targetItem.getBoundingClientRect();
-  const rootRect = rootEl.getBoundingClientRect();
-
-  if (itemRect.top < rootRect.top) {
-    log.trace(
-      {
-        index: targetIndex,
-        behavior: 'auto',
-        align: 'start',
-      },
-      'Scrolling into view: in overscan'
-    );
-    virtuosoGridHandle.scrollToIndex({
-      index: targetIndex,
-      behavior: 'auto',
-      align: 'start',
-    });
-  } else if (itemRect.bottom > rootRect.bottom) {
-    log.trace(
-      {
-        index: targetIndex,
-        behavior: 'auto',
-        align: 'end',
-      },
-      'Scrolling into view: in overscan'
-    );
-    virtuosoGridHandle.scrollToIndex({
-      index: targetIndex,
-      behavior: 'auto',
-      align: 'end',
-    });
-  } else {
-    // Image is already in view
-    log.debug('Not scrolling into view: Image is already in view');
-  }
-
-  return;
-};
-
-/**
- * Get the index of the image in the list of image names.
- * If the image name is not found, return 0.
- * If no image name is provided, return 0.
- */
-const getImageIndex = (imageName: string | undefined | null, imageNames: string[]) => {
-  if (!imageName || imageNames.length === 0) {
-    return 0;
-  }
-  const index = imageNames.findIndex((n) => n === imageName);
-  return index >= 0 ? index : 0;
-};
-
-/**
  * Handles keyboard navigation for the gallery.
  */
 const useKeyboardNavigation = (
@@ -312,7 +139,7 @@ const useKeyboardNavigation = (
         return;
       }
 
-      const imagesPerRow = getImagesPerRow(rootEl);
+      const imagesPerRow = getItemsPerRow(rootEl);
 
       if (imagesPerRow === 0) {
         // This can happen if the grid is not yet rendered or has no items
@@ -328,7 +155,7 @@ const useKeyboardNavigation = (
           (selectImageToCompare(state) ?? selectLastSelectedImage(state))
         : selectLastSelectedImage(state);
 
-      const currentIndex = getImageIndex(imageName, imageNames);
+      const currentIndex = getItemIndex(imageName, imageNames);
 
       let newIndex = currentIndex;
 
@@ -475,51 +302,6 @@ const useKeepSelectedImageInView = (
   }, [imageNames, rangeRef, rootRef, virtuosoRef, selection]);
 };
 
-/**
- * Handles the initialization of the overlay scrollbars for the gallery, returning the ref to the scroller element.
- */
-const useScrollableGallery = (rootRef: RefObject<HTMLDivElement>) => {
-  const [scroller, scrollerRef] = useState<HTMLElement | null>(null);
-  const [initialize, osInstance] = useOverlayScrollbars({
-    defer: true,
-    events: {
-      initialized(osInstance) {
-        // force overflow styles
-        const { viewport } = osInstance.elements();
-        viewport.style.overflowX = `var(--os-viewport-overflow-x)`;
-        viewport.style.overflowY = `var(--os-viewport-overflow-y)`;
-      },
-    },
-    options: {
-      scrollbars: {
-        visibility: 'auto',
-        autoHide: 'scroll',
-        autoHideDelay: 1300,
-        theme: 'os-theme-dark',
-      },
-    },
-  });
-
-  useEffect(() => {
-    const { current: root } = rootRef;
-
-    if (scroller && root) {
-      initialize({
-        target: root,
-        elements: {
-          viewport: scroller,
-        },
-      });
-    }
-
-    return () => {
-      osInstance()?.destroy();
-    };
-  }, [scroller, initialize, osInstance, rootRef]);
-
-  return scrollerRef;
-};
-
 const useStarImageHotkey = () => {
   const lastSelectedImage = useAppSelector(selectLastSelectedImage);
   const selectionCount = useAppSelector(selectSelectionCount);
@@ -551,7 +333,7 @@ const useStarImageHotkey = () => {
   });
 };
 
-export const NewGallery = memo(() => {
+export const ImageGallery = memo(() => {
   const virtuosoRef = useRef<VirtuosoGridHandle>(null);
   const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
   const rootRef = useRef<HTMLDivElement>(null);
@@ -559,7 +341,6 @@ export const NewGallery = memo(() => {
 
   // Get the ordered list of image names - this is our primary data source for virtualization
   const { queryArgs, imageNames, isLoading } = useGalleryImageNames();
-  const { queryArgs: videoQueryArgs, videoIds, isLoading: isLoadingVideos } = useGalleryVideoIds();
 
   // Use range-based fetching for bulk loading image DTOs into cache based on the visible range
   const { onRangeChanged } = useRangeBasedImageFetching({
@@ -584,7 +365,7 @@ export const NewGallery = memo(() => {
     [onRangeChanged]
   );
 
-  const context = useMemo<GridContext>(() => ({ imageNames, queryArgs, videoIds, videoQueryArgs }), [imageNames, queryArgs, videoIds, videoQueryArgs]);
+  const context = useMemo<GridContext>(() => ({ imageNames, queryArgs }), [imageNames, queryArgs]);
 
   if (isLoading) {
     return (
@@ -609,7 +390,7 @@ export const NewGallery = memo(() => {
       <VirtuosoGrid<string, GridContext>
         ref={virtuosoRef}
         context={context}
-        data={galleryView === 'images' ? imageNames : videoIds}
+        data={imageNames}
         increaseViewportBy={4096}
         itemContent={itemContent}
         computeItemKey={computeItemKey}
@@ -624,7 +405,7 @@ export const NewGallery = memo(() => {
   );
 });
 
-NewGallery.displayName = 'NewGallery';
+ImageGallery.displayName = 'NewGallery';
 
 const scrollSeekConfiguration: ScrollSeekConfiguration = {
   enter: (velocity) => {
