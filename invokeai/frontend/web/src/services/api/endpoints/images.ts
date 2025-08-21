@@ -15,13 +15,16 @@ import type {
   UploadImageArg,
 } from 'services/api/types';
 import { getListImagesUrl } from 'services/api/util';
+import {
+  getTagsToInvalidateForBoardAffectingMutation,
+  getTagsToInvalidateForImageMutation,
+} from 'services/api/util/tagInvalidation';
 import stableHash from 'stable-hash';
 import type { Param0 } from 'tsafe';
 import type { JsonObject } from 'type-fest';
 
 import { api, buildV1Url, LIST_TAG } from '..';
 import { buildBoardsUrl } from './boards';
-import { getTagsToInvalidateForBoardAffectingMutation, getTagsToInvalidateForImageMutation } from '../util/tagInvalidation';
 
 /**
  * Builds an endpoint URL for the images router
@@ -590,5 +593,3 @@ export const useImageDTO = (imageName: string | null | undefined) => {
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName ?? skipToken);
   return imageDTO ?? null;
 };
-
-

@@ -18,7 +18,6 @@ const overlayScrollbarsStyles: CSSProperties = {
 export const ParametersPanelVideo = memo(() => {
   const isStylePresetsMenuOpen = useStore($isStylePresetsMenuOpen);
 
-
   return (
     <Flex w="full" h="full" flexDir="column" gap={2}>
       <StylePresetMenuTrigger />

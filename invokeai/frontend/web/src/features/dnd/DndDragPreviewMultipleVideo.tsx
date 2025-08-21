@@ -8,7 +8,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type { Param0 } from 'tsafe';
 
-const DndDragPreviewMultipleVideo = memo(({ ids}: { ids: string[] }) => {
+const DndDragPreviewMultipleVideo = memo(({ ids }: { ids: string[] }) => {
   const { t } = useTranslation();
   return (
     <Flex
@@ -51,7 +51,7 @@ export const setMultipleVideoDragPreview = ({
   const { nativeSetDragImage, source, location } = onGenerateDragPreviewArgs;
   setCustomNativeDragPreview({
     render({ container }) {
-      setDragPreviewState({ type: 'multiple-video', container, ids: multipleVideoDndData.payload.ids});
+      setDragPreviewState({ type: 'multiple-video', container, ids: multipleVideoDndData.payload.ids });
       return () => setDragPreviewState(null);
     },
     nativeSetDragImage,

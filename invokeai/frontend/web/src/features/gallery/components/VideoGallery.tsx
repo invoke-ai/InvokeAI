@@ -7,15 +7,12 @@ import { useRangeBasedVideoFetching } from 'features/gallery/hooks/useRangeBased
 import type { selectGetVideoIdsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import {
   selectGalleryImageMinimumWidth,
-  selectGalleryView,
-  selectImageToCompare,
   selectLastSelectedImage,
 } from 'features/gallery/store/gallerySelectors';
 import { selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { useOverlayScrollbars } from 'overlayscrollbars-react';
-import type { MutableRefObject, RefObject } from 'react';
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { MutableRefObject } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import type {
   GridComponents,
   GridComputeItemKey,

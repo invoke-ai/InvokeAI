@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import ReactPlayer from 'react-player';
 import { useGetVideoDTOQuery } from 'services/api/endpoints/videos';
 
-const ChakraReactPlayer = chakra(ReactPlayer)
+const ChakraReactPlayer = chakra(ReactPlayer);
 
 export const VideoPlayerPanel = memo(() => {
   const { t } = useTranslation();
@@ -21,23 +21,21 @@ export const VideoPlayerPanel = memo(() => {
   return (
     <Flex ref={ref} w="full" h="full" flexDirection="column" gap={4}>
       {videoDTO?.video_url && (
-        <>
-          <Box flex={0.75} position="relative">
-            <ChakraReactPlayer
-              src={videoDTO.video_url}
-              width="75%"
-              height="75%"
-              controls={true}
-              position='absolute'
-              top='50%'
-              left='50%'
-              transform='translate(-50%, -50%)'
-              maxWidth='900px'
-            />
-          </Box>
-        </>
+        <Box flex={0.75} position="relative">
+          <ChakraReactPlayer
+            src={videoDTO.video_url}
+            width="75%"
+            height="75%"
+            controls={true}
+            position="absolute"
+            top="50%"
+            left="50%"
+            transform="translate(-50%, -50%)"
+            maxWidth="900px"
+          />
+        </Box>
       )}
-      {!videoDTO?.video_url && <Text>No video generated</Text>}
+      {!videoDTO?.video_url && <Text>{t('gallery.noVideoSelected')}</Text>}
     </Flex>
   );
 });
