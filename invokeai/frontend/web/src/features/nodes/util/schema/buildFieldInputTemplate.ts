@@ -34,6 +34,7 @@ import type {
   LoRAModelFieldInputTemplate,
   MainModelFieldInputTemplate,
   ModelIdentifierFieldInputTemplate,
+  RunwayModelFieldInputTemplate,
   SchedulerFieldInputTemplate,
   SD3MainModelFieldInputTemplate,
   SDXLMainModelFieldInputTemplate,
@@ -642,6 +643,19 @@ const buildVeo3ModelFieldInputTemplate: FieldInputTemplateBuilder<Veo3ModelField
   return template;
 };
 
+const buildRunwayModelFieldInputTemplate: FieldInputTemplateBuilder<RunwayModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: RunwayModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+  return template;
+};
+
 const buildChatGPT4oModelFieldInputTemplate: FieldInputTemplateBuilder<ChatGPT4oModelFieldInputTemplate> = ({
   schemaObject,
   baseField,
@@ -866,6 +880,7 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   ChatGPT4oModelField: buildChatGPT4oModelFieldInputTemplate,
   FluxKontextModelField: buildFluxKontextModelFieldInputTemplate,
   Veo3ModelField: buildVeo3ModelFieldInputTemplate,
+  RunwayModelField: buildRunwayModelFieldInputTemplate,
   FloatGeneratorField: buildFloatGeneratorFieldInputTemplate,
   IntegerGeneratorField: buildIntegerGeneratorFieldInputTemplate,
   StringGeneratorField: buildStringGeneratorFieldInputTemplate,

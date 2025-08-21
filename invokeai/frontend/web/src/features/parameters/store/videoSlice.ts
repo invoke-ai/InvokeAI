@@ -3,11 +3,16 @@ import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import { isPlainObject } from 'es-toolkit';
-import type { ImageWithDims, Veo3Duration, Veo3Resolution } from 'features/controlLayers/store/types';
-import { zImageWithDims, zVeo3DurationID, zVeo3Resolution } from 'features/controlLayers/store/types';
+import type { ImageWithDims, RunwayDuration, Veo3Duration, Veo3Resolution } from 'features/controlLayers/store/types';
+import {
+  zImageWithDims,
+  zRunwayDurationID,
+  zVeo3DurationID,
+  zVeo3Resolution,
+} from 'features/controlLayers/store/types';
 import type { VideoField } from 'features/nodes/types/common';
 import { zModelIdentifierField, zVideoField } from 'features/nodes/types/common';
-import type { Veo3ModelConfig } from 'services/api/types';
+import type { RunwayModelConfig, Veo3ModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import z from 'zod';
 
@@ -17,7 +22,7 @@ const zVideoState = z.object({
   generatedVideo: zVideoField.nullable(),
   videoModel: zModelIdentifierField.nullable(),
   videoResolution: zVeo3Resolution.nullable(),
-  videoDuration: zVeo3DurationID.nullable(),
+  videoDuration: zVeo3DurationID.or(zRunwayDurationID).nullable(),
 });
 
 export type VideoState = z.infer<typeof zVideoState>;
@@ -44,7 +49,7 @@ const slice = createSlice({
       state.generatedVideo = videoField;
     },
 
-    videoModelChanged: (state, action: PayloadAction<Veo3ModelConfig | null>) => {
+    videoModelChanged: (state, action: PayloadAction<Veo3ModelConfig | RunwayModelConfig | null>) => {
       const parsedModel = zModelIdentifierField.parse(action.payload);
       state.videoModel = parsedModel;
     },
@@ -53,7 +58,7 @@ const slice = createSlice({
       state.videoResolution = action.payload;
     },
 
-    videoDurationChanged: (state, action: PayloadAction<Veo3Duration | null>) => {
+    videoDurationChanged: (state, action: PayloadAction<Veo3Duration | RunwayDuration | null>) => {
       state.videoDuration = action.payload;
     },
   },
@@ -90,3 +95,6 @@ export const selectGeneratedVideo = createVideoSelector((video) => video.generat
 export const selectVideoModel = createVideoSelector((video) => video.videoModel);
 export const selectVideoResolution = createVideoSelector((video) => video.videoResolution);
 export const selectVideoDuration = createVideoSelector((video) => video.videoDuration);
+
+export const selectIsVeo3 = createVideoSelector((video) => video.videoModel?.base === 'veo3');
+export const selectIsRunway = createVideoSelector((video) => video.videoModel?.base === 'runway');
