@@ -3,6 +3,7 @@ import { setCustomNativeDragPreview } from '@atlaskit/pragmatic-drag-and-drop/el
 import { chakra, Flex, Text } from '@invoke-ai/ui-library';
 import type { SingleVideoDndSourceData } from 'features/dnd/dnd';
 import { DND_IMAGE_DRAG_PREVIEW_SIZE, preserveOffsetOnSourceFallbackCentered } from 'features/dnd/util';
+import { GalleryVideoPlaceholder } from 'features/gallery/components/ImageGrid/GalleryVideo';
 import { memo } from 'react';
 import { createPortal } from 'react-dom';
 import type { VideoDTO } from 'services/api/types';
@@ -12,14 +13,19 @@ const ChakraImg = chakra('img');
 
 const DndDragPreviewSingleVideo = memo(({ videoDTO }: { videoDTO: VideoDTO }) => {
   return (
-    <Flex w={DND_IMAGE_DRAG_PREVIEW_SIZE} h={DND_IMAGE_DRAG_PREVIEW_SIZE} bg="cyan">
-      <Text color="base.900">I AM A VIDEO</Text>
+    <Flex position="relative" w={DND_IMAGE_DRAG_PREVIEW_SIZE} h={DND_IMAGE_DRAG_PREVIEW_SIZE}>
+      <GalleryVideoPlaceholder />
       <ChakraImg
+        position="absolute"
         margin="auto"
         maxW="full"
         maxH="full"
         objectFit="contain"
         borderRadius="base"
+        borderWidth={2}
+        borderColor="invokeBlue.300"
+        borderStyle="solid"
+        cursor="grabbing"
         src={videoDTO.thumbnail_url}
       />
     </Flex>
