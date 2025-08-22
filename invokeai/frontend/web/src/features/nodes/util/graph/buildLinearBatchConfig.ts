@@ -4,22 +4,22 @@ import { range } from 'es-toolkit/compat';
 import type { SeedBehaviour } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { API_BASE_MODELS } from 'features/parameters/types/constants';
+import { API_BASE_MODELS, VIDEO_BASE_MODELS } from 'features/parameters/types/constants';
 import type { components } from 'services/api/schema';
-import type { Batch, EnqueueBatchArg, Invocation } from 'services/api/types';
+import type { AnyModelConfig, BaseModelType, Batch, EnqueueBatchArg, Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
 
 const getExtendedPrompts = (arg: {
   seedBehaviour: SeedBehaviour;
   iterations: number;
   prompts: string[];
-  model: ModelIdentifierField;
+  base: BaseModelType;
 }): string[] => {
-  const { seedBehaviour, iterations, prompts, model } = arg;
+  const { seedBehaviour, iterations, prompts, base } = arg;
   // Normally, the seed behaviour implicity determines the batch size. But when we use models without seeds (like
   // ChatGPT 4o) in conjunction with the per-prompt seed behaviour, we lose out on that implicit batch size. To rectify
   // this, we need to create a batch of the right size by repeating the prompts.
-  if (seedBehaviour === 'PER_PROMPT' || API_BASE_MODELS.includes(model.base)) {
+  if (seedBehaviour === 'PER_PROMPT' || API_BASE_MODELS.includes(base) || VIDEO_BASE_MODELS.includes(base)) {
     return range(iterations).flatMap(() => prompts);
   }
   return prompts;
@@ -29,16 +29,15 @@ export const prepareLinearUIBatch = (arg: {
   state: RootState;
   g: Graph;
   prepend: boolean;
+  base: BaseModelType;
   positivePromptNode: Invocation<'string'>;
   seedNode?: Invocation<'integer'>;
   origin: string;
   destination: string;
 }): EnqueueBatchArg => {
-  const { state, g, prepend, positivePromptNode, seedNode, origin, destination } = arg;
-  const { iterations, model, shouldRandomizeSeed, seed } = state.params;
+  const { state, g, base, prepend, positivePromptNode, seedNode, origin, destination } = arg;
+  const { iterations, shouldRandomizeSeed, seed } = state.params;
   const { prompts, seedBehaviour } = state.dynamicPrompts;
-
-  assert(model, 'No model found in state when preparing batch');
 
   const data: Batch['data'] = [];
   const firstBatchDatumList: components['schemas']['BatchDatum'][] = [];
@@ -63,6 +62,7 @@ export const prepareLinearUIBatch = (arg: {
       start: shouldRandomizeSeed ? undefined : seed,
     });
 
+    console.log(seeds);
     secondBatchDatumList.push({
       node_path: seedNode.id,
       field_name: 'value',
@@ -71,7 +71,7 @@ export const prepareLinearUIBatch = (arg: {
     data.push(secondBatchDatumList);
   }
 
-  const extendedPrompts = getExtendedPrompts({ seedBehaviour, iterations, prompts, model });
+  const extendedPrompts = getExtendedPrompts({ seedBehaviour, iterations, prompts, base });
 
   // zipped batch of prompts
   firstBatchDatumList.push({

@@ -38,11 +38,15 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
 
   const destination = selectCanvasDestination(state);
 
-  const buildGraphResult = await withResultAsync(async () => {
-    const model = state.params.model;
-    assert(model, 'No model found in state');
-    const base = model.base;
+  const model = state.params.model;
+  if (!model) {
+    log.error('No model found in state');
+    return;
+  }
 
+  const base = model.base;
+
+  const buildGraphResult = await withResultAsync(async () => {
     const generationMode = await canvasManager.compositor.getGenerationMode();
     const graphBuilderArg: GraphBuilderArg = { generationMode, state, manager: canvasManager };
 
@@ -98,6 +102,7 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
     prepareLinearUIBatch({
       state,
       g,
+      base,
       prepend,
       seedNode: seed,
       positivePromptNode: positivePrompt,
