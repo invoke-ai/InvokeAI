@@ -261,7 +261,11 @@ const getReasonsWhyCannotEnqueueVideoTab = (arg: {
     reasons.push({ content: i18n.t('parameters.invoke.promptExpansionResultPending') });
   }
 
-  if (!video.startingFrameImage?.image_name) {
+  if (!video.videoModel) {
+    reasons.push({ content: i18n.t('parameters.invoke.noModelSelected') });
+  }
+
+  if (video.videoModel?.base === 'runway' && !video.startingFrameImage?.image_name) {
     reasons.push({ content: i18n.t('parameters.invoke.noStartingFrameImage') });
   }
 
