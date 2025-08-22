@@ -33,13 +33,6 @@ export const VideoLaunchpadPanel = memo(() => {
 			</Grid>
 			<LaunchpadGenerateFromTextButton />
 			<LaunchpadStartingFrameButton />
-			<LaunchpadAddStyleReference />
-			<Alert status="info" borderRadius="base" flexDir="column" gap={2} overflow="unset">
-				<Text fontSize="md" fontWeight="semibold">
-					{t('ui.launchpad.video.startingFrameCalloutTitle')}
-				</Text>
-				<Text>{t('ui.launchpad.video.startingFrameCalloutDesc')}</Text>
-			</Alert>
 		</LaunchpadContainer>
 	);
 });
