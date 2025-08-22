@@ -1,4 +1,5 @@
 import { createAction } from '@reduxjs/toolkit';
+import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
@@ -8,6 +9,8 @@ import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endp
 
 export const enqueueRequestedUpscaling = createAction('app/enqueueRequestedUpscaling');
 
+const log = logger('generation');
+
 const enqueueUpscaling = async (store: AppStore, prepend: boolean) => {
   const { dispatch, getState } = store;
 
@@ -15,11 +18,19 @@ const enqueueUpscaling = async (store: AppStore, prepend: boolean) => {
 
   const state = getState();
 
+  const model = state.params.model;
+  if (!model) {
+    log.error('No model found in state');
+    return;
+  }
+  const base = model.base;
+
   const { g, seed, positivePrompt } = await buildMultidiffusionUpscaleGraph(state);
 
   const batchConfig = prepareLinearUIBatch({
     state,
     g,
+    base,
     prepend,
     seedNode: seed,
     positivePromptNode: positivePrompt,
