@@ -491,6 +491,13 @@ class MainConfigBase(ABC, BaseModel):
     )
     variant: AnyVariant = ModelVariantType.Normal
 
+class VideoConfigBase(ABC, BaseModel):
+    type: Literal[ModelType.Video] = ModelType.Video
+    trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
+    default_settings: Optional[MainModelDefaultSettings] = Field(
+        description="Default settings for this model", default=None
+    )
+    variant: AnyVariant = ModelVariantType.Normal
 
 class MainCheckpointConfig(CheckpointConfigBase, MainConfigBase, LegacyProbeMixin, ModelConfigBase):
     """Model config for main checkpoint models."""
@@ -648,6 +655,20 @@ class ApiModelConfig(MainConfigBase, ModelConfigBase):
     def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
         raise NotImplementedError("API models are not parsed from disk.")
 
+class VideoApiModelConfig(VideoConfigBase, ModelConfigBase):
+    """Model config for API-based video models."""
+
+    format: Literal[ModelFormat.Api] = ModelFormat.Api 
+
+    @classmethod
+    def matches(cls, mod: ModelOnDisk) -> bool:
+        # API models are not stored on disk, so we can't match them.
+        return False
+
+    @classmethod
+    def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
+        raise NotImplementedError("API models are not parsed from disk.")
+
 
 def get_model_discriminator_value(v: Any) -> str:
     """
@@ -718,6 +739,7 @@ AnyModelConfig = Annotated[
         Annotated[FluxReduxConfig, FluxReduxConfig.get_tag()],
         Annotated[LlavaOnevisionConfig, LlavaOnevisionConfig.get_tag()],
         Annotated[ApiModelConfig, ApiModelConfig.get_tag()],
+        Annotated[VideoApiModelConfig, VideoApiModelConfig.get_tag()],
     ],
     Discriminator(get_model_discriminator_value),
 ]
