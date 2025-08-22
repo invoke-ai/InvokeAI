@@ -1,6 +1,6 @@
 import type { PartialDeep } from 'type-fest';
 
-type NumberConstraints = { min: number; max: number; step: number };
+type NumberConstraints = { min: number; max: number; step?: number };
 
 /**
  * Constrain a number to a range and round to the nearest multiple of a given value.

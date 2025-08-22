@@ -37,6 +37,13 @@ export const useFloatField = (
     return fieldTemplate.multipleOf;
   }, [fieldTemplate.multipleOf, overrideStep]);
 
+  const baseStep = useMemo(() => {
+    if (isNil(fieldTemplate.multipleOf)) {
+      return undefined;
+    }
+    return fieldTemplate.multipleOf;
+  }, [fieldTemplate.multipleOf]);
+
   const min = useMemo(() => {
     let min = -NUMPY_RAND_MAX;
 
@@ -67,8 +74,8 @@ export const useFloatField = (
 
   const constrainValue = useCallback(
     (v: number) =>
-      constrainNumber(v, { min, max, step: step }, { min: overrideMin, max: overrideMax, step: overrideStep }),
-    [max, min, overrideMax, overrideMin, overrideStep, step]
+      constrainNumber(v, { min, max, step: baseStep }, { min: overrideMin, max: overrideMax, step: overrideStep }),
+    [max, min, overrideMax, overrideMin, overrideStep, baseStep]
   );
 
   const onChange = useCallback(
