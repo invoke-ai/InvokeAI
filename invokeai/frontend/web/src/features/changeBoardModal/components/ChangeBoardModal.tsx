@@ -36,10 +36,12 @@ const ChangeBoardModal = () => {
 
   const options = useMemo<ComboboxOption[]>(() => {
     return [{ label: t('boards.uncategorized'), value: 'none' }].concat(
-      (boards ?? []).map((board) => ({
-        label: board.board_name,
-        value: board.board_id,
-      }))
+      (boards ?? [])
+        .map((board) => ({
+          label: board.board_name,
+          value: board.board_id,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label))
     );
   }, [boards, t]);
 
@@ -63,7 +65,6 @@ const ChangeBoardModal = () => {
         board_id: selectedBoard,
       });
     }
-    setSelectedBoard(null);
     dispatch(changeBoardReset());
   }, [addImagesToBoard, dispatch, imagesToChange, removeImagesFromBoard, selectedBoard]);
 
@@ -89,7 +90,6 @@ const ChangeBoardModal = () => {
           {t('boards.movingImagesToBoard', {
             count: imagesToChange.length,
           })}
-          :
         </Text>
         <FormControl isDisabled={isFetching}>
           <Combobox
