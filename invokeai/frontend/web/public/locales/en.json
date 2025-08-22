@@ -1950,6 +1950,7 @@
             "zoomToNode": "Zoom to Node",
             "nodeFieldTooltip": "To add a node field, click the small plus sign button on the field in the Workflow Editor, or drag the field by its name into the form.",
             "addToForm": "Add to Form",
+            "removeFromForm": "Remove from Form",
             "label": "Label",
             "showDescription": "Show Description",
             "showShuffle": "Show Shuffle",

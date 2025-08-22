@@ -1,6 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, Spacer } from '@invoke-ai/ui-library';
-import { InputFieldAddToFormRoot } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldAddToFormRoot';
 import { InputFieldDescriptionPopover } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldDescriptionPopover';
 import { InputFieldHandle } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldHandle';
 import { InputFieldResetToDefaultValueIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldResetToDefaultValueIconButton';
@@ -12,6 +11,7 @@ import { NO_DRAG_CLASS } from 'features/nodes/types/constants';
 import type { FieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useRef } from 'react';
 
+import { InputFieldAddRemoveFormRoot } from './InputFieldAddRemoveFormRoot';
 import { InputFieldRenderer } from './InputFieldRenderer';
 import { InputFieldTitle } from './InputFieldTitle';
 import { InputFieldWrapper } from './InputFieldWrapper';
@@ -113,7 +113,7 @@ const DirectField = memo(({ nodeId, fieldName, isInvalid, isConnected, fieldTemp
           <Flex className="direct-field-action-buttons">
             <InputFieldDescriptionPopover nodeId={nodeId} fieldName={fieldName} />
             <InputFieldResetToDefaultValueIconButton nodeId={nodeId} fieldName={fieldName} />
-            <InputFieldAddToFormRoot nodeId={nodeId} fieldName={fieldName} />
+            <InputFieldAddRemoveFormRoot nodeId={nodeId} fieldName={fieldName} />
           </Flex>
         </Flex>
         <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />

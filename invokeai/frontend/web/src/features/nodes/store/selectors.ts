@@ -103,7 +103,10 @@ export const selectWorkflowFormNodeFieldFieldIdentifiersDeduped = createSelector
 );
 
 export const buildSelectElement = (id: string) => createNodesSelector((workflow) => workflow.form?.elements[id]);
-export const buildSelectWorkflowFormNodeExists = (nodeId: string, fieldName: string) =>
-  createSelector(selectWorkflowFormNodeFieldFieldIdentifiersDeduped, (identifiers) =>
-    identifiers.some((identifier) => identifier.nodeId === nodeId && identifier.fieldName === fieldName)
+export const buildSelectWorkflowFormNodeElement = (nodeId: string, fieldName: string) =>
+  createSelector(selectNodeFieldElements, (elements) =>
+    elements.find(
+      (element) =>
+        element.data.fieldIdentifier.nodeId === nodeId && element.data.fieldIdentifier.fieldName === fieldName
+    )
   );
