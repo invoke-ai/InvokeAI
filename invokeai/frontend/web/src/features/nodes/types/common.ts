@@ -101,8 +101,6 @@ export const zMainModelBase = z.enum([
   'imagen4',
   'chatgpt-4o',
   'flux-kontext',
-  'veo3',
-  'runway',
 ]);
 type MainModelBase = z.infer<typeof zMainModelBase>;
 export const isMainModelBase = (base: unknown): base is MainModelBase => zMainModelBase.safeParse(base).success;
@@ -123,6 +121,7 @@ export const zModelType = z.enum([
   'clip_embed',
   'siglip',
   'flux_redux',
+  'video',
 ]);
 const zSubModelType = z.enum([
   'unet',

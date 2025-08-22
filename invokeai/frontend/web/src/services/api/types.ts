@@ -125,11 +125,12 @@ type CLIPVisionDiffusersConfig = S['CLIPVisionDiffusersConfig'];
 export type SigLipModelConfig = S['SigLIPConfig'];
 export type FLUXReduxModelConfig = S['FluxReduxConfig'];
 export type ApiModelConfig = S['ApiModelConfig'];
+export type VideoApiModelConfig = S['VideoApiModelConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig | ApiModelConfig;
 export type FLUXKontextModelConfig = MainModelConfig;
 export type ChatGPT4oModelConfig = ApiModelConfig;
-export type Veo3ModelConfig = ApiModelConfig;
-export type RunwayModelConfig = ApiModelConfig;
+export type Veo3ModelConfig = VideoApiModelConfig;
+export type RunwayModelConfig = VideoApiModelConfig;
 export type AnyModelConfig =
   | ControlLoRAModelConfig
   | LoRAModelConfig
@@ -143,6 +144,7 @@ export type AnyModelConfig =
   | SpandrelImageToImageModelConfig
   | TextualInversionModelConfig
   | MainModelConfig
+  | VideoApiModelConfig
   | CLIPVisionDiffusersConfig
   | SigLipModelConfig
   | FLUXReduxModelConfig
@@ -295,12 +297,16 @@ export const isChatGPT4oModelConfig = (config: AnyModelConfig): config is ChatGP
   return config.type === 'main' && config.base === 'chatgpt-4o';
 };
 
+export const isVideoModelConfig = (config: AnyModelConfig): config is VideoApiModelConfig => {
+  return config.type === 'video';
+};
+
 export const isVeo3ModelConfig = (config: AnyModelConfig): config is Veo3ModelConfig => {
-  return config.type === 'main' && config.base === 'veo3';
+  return config.base === 'veo3' && config.type === 'video';
 };
 
 export const isRunwayModelConfig = (config: AnyModelConfig): config is RunwayModelConfig => {
-  return config.type === 'main' && config.base === 'runway';
+  return config.base === 'runway' && config.type === 'video';
 };
 
 export const isImagen3ModelConfig = (config: AnyModelConfig): config is ApiModelConfig => {
