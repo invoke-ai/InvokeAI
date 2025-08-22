@@ -1241,6 +1241,7 @@
             "batchNodeCollectionSizeMismatchNoGroupId": "Batch group collection size mismatch",
             "batchNodeCollectionSizeMismatch": "Collection size mismatch on Batch {{batchGroupId}}",
             "noModelSelected": "No model selected",
+            "noStartingFrameImage": "No starting frame image",
             "noT5EncoderModelSelected": "No T5 Encoder model selected for FLUX generation",
             "noFLUXVAEModelSelected": "No VAE model selected for FLUX generation",
             "noCLIPEmbedModelSelected": "No CLIP Embed model selected for FLUX generation",
