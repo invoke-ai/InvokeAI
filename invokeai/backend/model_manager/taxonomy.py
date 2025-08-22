@@ -53,6 +53,7 @@ class ModelType(str, Enum):
     SigLIP = "siglip"
     FluxRedux = "flux_redux"
     LlavaOnevision = "llava_onevision"
+    Video = "video"
 
 
 class SubModelType(str, Enum):
