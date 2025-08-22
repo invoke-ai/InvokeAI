@@ -1,7 +1,6 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import type { FlexProps } from '@invoke-ai/ui-library';
-import { Flex, Icon, Image } from '@invoke-ai/ui-library';
+import { Flex, Image } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
@@ -23,12 +22,12 @@ import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import type { MouseEvent, MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PiVideoBold } from 'react-icons/pi';
 import { videosApi } from 'services/api/endpoints/videos';
 import type { VideoDTO } from 'services/api/types';
 
 import { galleryItemContainerSX } from './galleryItemContainerSX';
 import { GalleryItemHoverIcons } from './GalleryItemHoverIcons';
+import { GalleryVideoPlaceholder } from './GalleryVideoPlaceholder';
 
 interface Props {
   videoDTO: VideoDTO;
@@ -217,11 +216,3 @@ export const GalleryVideo = memo(({ videoDTO }: Props) => {
 });
 
 GalleryVideo.displayName = 'GalleryVideo';
-
-export const GalleryVideoPlaceholder = memo((props: FlexProps) => (
-  <Flex w="full" h="full" bg="base.850" borderRadius="base" alignItems="center" justifyContent="center" {...props}>
-    <Icon as={PiVideoBold} boxSize={16} color="base.800" />
-  </Flex>
-));
-
-GalleryVideoPlaceholder.displayName = 'GalleryVideoPlaceholder';
