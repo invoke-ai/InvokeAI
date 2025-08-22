@@ -98,6 +98,7 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
     prepareLinearUIBatch({
       state,
       g,
+      base,
       prepend,
       seedNode: seed,
       positivePromptNode: positivePrompt,
