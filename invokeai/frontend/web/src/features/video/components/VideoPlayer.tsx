@@ -8,8 +8,6 @@ import { useTranslation } from 'react-i18next';
 import ReactPlayer from 'react-player';
 import { useGetVideoDTOQuery } from 'services/api/endpoints/videos';
 
-const ChakraReactPlayer = chakra(ReactPlayer);
-
 export const VideoPlayer = memo(() => {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
@@ -19,23 +17,9 @@ export const VideoPlayer = memo(() => {
   useFocusRegion('video', ref);
 
   return (
-    <Flex ref={ref} w="full" h="full" flexDirection="column" gap={4}>
+    <Flex ref={ref} w="full" h="full" flexDirection="column" gap={4} alignItems="center" justifyContent="center">
       {videoDTO?.video_url && (
-        <Box flex={0.75} position="relative">
-          <ChakraReactPlayer
-            src={videoDTO.video_url}
-            controls={true}
-            position="absolute"
-            top="50%"
-            left="50%"
-            transform="translate(-50%, -50%)"
-            maxWidth="90%"
-            style={{
-              width: videoDTO.width,
-              height: videoDTO.height,
-            }}
-          />
-        </Box>
+        <ReactPlayer src={videoDTO.video_url} controls={true} width={videoDTO.width} height={videoDTO.height} />
       )}
       {!videoDTO?.video_url && <Text>{t('gallery.noVideoSelected')}</Text>}
     </Flex>
