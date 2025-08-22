@@ -3,6 +3,8 @@ import { FieldParseError } from 'features/nodes/types/error';
 import type {
   BoardFieldInputTemplate,
   BooleanFieldInputTemplate,
+  BriaControlNetModelFieldInputTemplate,
+  BriaMainModelFieldInputTemplate,
   ChatGPT4oModelFieldInputTemplate,
   CLIPEmbedModelFieldInputTemplate,
   CLIPGEmbedModelFieldInputTemplate,
@@ -334,6 +336,34 @@ const buildFluxMainModelFieldInputTemplate: FieldInputTemplateBuilder<FluxMainMo
   fieldType,
 }) => {
   const template: FluxMainModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildBriaMainModelFieldInputTemplate: FieldInputTemplateBuilder<BriaMainModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: BriaMainModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildBriaControlNetModelFieldInputTemplate: FieldInputTemplateBuilder<BriaControlNetModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: BriaControlNetModelFieldInputTemplate = {
     ...baseField,
     type: fieldType,
     default: schemaObject.default ?? undefined,
@@ -834,6 +864,8 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   SD3MainModelField: buildSD3MainModelFieldInputTemplate,
   CogView4MainModelField: buildCogView4MainModelFieldInputTemplate,
   FluxMainModelField: buildFluxMainModelFieldInputTemplate,
+  BriaMainModelField: buildBriaMainModelFieldInputTemplate,
+  BriaControlNetModelField: buildBriaControlNetModelFieldInputTemplate,
   SDXLRefinerModelField: buildRefinerModelFieldInputTemplate,
   StringField: buildStringFieldInputTemplate,
   T2IAdapterModelField: buildT2IAdapterModelFieldInputTemplate,
