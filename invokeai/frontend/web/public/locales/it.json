@@ -130,7 +130,8 @@
         "compactView": "Vista compatta",
         "fullView": "Vista completa",
         "removeNegativePrompt": "Rimuovi prompt negativo",
-        "addNegativePrompt": "Aggiungi prompt negativo"
+        "addNegativePrompt": "Aggiungi prompt negativo",
+        "selectYourModel": "Seleziona il modello"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -717,7 +718,10 @@
             "bundleDescription": "Ogni pacchetto include modelli essenziali per ogni famiglia di modelli e modelli base selezionati per iniziare.",
             "browseAll": "Oppure scopri tutti i modelli disponibili:"
         },
-        "launchpadTab": "Rampa di lancio"
+        "launchpadTab": "Rampa di lancio",
+        "installBundle": "Installa pacchetto",
+        "installBundleMsg1": "Vuoi davvero installare il pacchetto {{bundleName}}?",
+        "installBundleMsg2": "Questo pacchetto installerà i seguenti {{count}} modelli:"
     },
     "parameters": {
         "images": "Immagini",
@@ -834,7 +838,8 @@
         "coherenceMinDenoise": "Min rid. rumore",
         "recallMetadata": "Richiama i metadati",
         "disabledNoRasterContent": "Disabilitato (nessun contenuto Raster)",
-        "modelDisabledForTrial": "La generazione con {{modelName}} non è disponibile per gli account di prova. Visita le <LinkComponent>impostazioni account</LinkComponent> per effettuare l'upgrade."
+        "modelDisabledForTrial": "La generazione con {{modelName}} non è disponibile per gli account di prova. Visita le <LinkComponent>impostazioni account</LinkComponent> per effettuare l'upgrade.",
+        "useClipSkip": "Usa CLIP Skip"
     },
     "settings": {
         "models": "Modelli",
@@ -1233,7 +1238,8 @@
         "updateBoardError": "Errore durante l'aggiornamento della bacheca",
         "uncategorizedImages": "Immagini non categorizzate",
         "deleteAllUncategorizedImages": "Elimina tutte le immagini non categorizzate",
-        "deletedImagesCannotBeRestored": "Le immagini eliminate non possono essere ripristinate."
+        "deletedImagesCannotBeRestored": "Le immagini eliminate non possono essere ripristinate.",
+        "locateInGalery": "Trova nella Galleria"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
@@ -1980,7 +1986,9 @@
             "publishInProgress": "Pubblicazione in corso",
             "selectingOutputNode": "Selezione del nodo di uscita",
             "selectingOutputNodeDesc": "Fare clic su un nodo per selezionarlo come nodo di uscita del flusso di lavoro.",
-            "errorWorkflowHasUnpublishableNodes": "Il flusso di lavoro ha nodi di estrazione lotto, generatore o metadati"
+            "errorWorkflowHasUnpublishableNodes": "Il flusso di lavoro ha nodi di estrazione lotto, generatore o metadati",
+            "showShuffle": "Mostra Mescola",
+            "shuffle": "Mescola"
         },
         "loadMore": "Carica altro",
         "searchPlaceholder": "Cerca per nome, descrizione o etichetta",
@@ -2461,7 +2469,8 @@
             "ipAdapterIncompatibleBaseModel": "modello base dell'immagine di riferimento incompatibile",
             "ipAdapterNoImageSelected": "nessuna immagine di riferimento selezionata",
             "rgAutoNegativeNotSupported": "Auto-Negativo non supportato per il modello base selezionato",
-            "fluxFillIncompatibleWithControlLoRA": "Il controllo LoRA non è compatibile con FLUX Fill"
+            "fluxFillIncompatibleWithControlLoRA": "Il controllo LoRA non è compatibile con FLUX Fill",
+            "bboxHidden": "Il riquadro di delimitazione è nascosto (Shift+o per attivarlo)"
         },
         "pasteTo": "Incolla su",
         "pasteToBboxDesc": "Nuovo livello (nel riquadro di delimitazione)",
@@ -2691,8 +2700,8 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "Lo stato dello studio viene salvato sul server, consentendoti di continuare a lavorare su qualsiasi dispositivo.",
-            "Supporto per più immagini di riferimento per FLUX Kontext (solo modello locale)."
+            "Vari QoL: attiva/disattiva la visibilità del Riquadro di delimitazione, evidenzia i nodi con errori, evita di aggiungere più volte i campi dei nodi al modulo Generatore, i metadati CLIP Skip ora richiamabili",
+            "Utilizzo ridotto di VRAM per immagini di riferimento Kontext multiple e codifica VAE"
         ]
     },
     "system": {
