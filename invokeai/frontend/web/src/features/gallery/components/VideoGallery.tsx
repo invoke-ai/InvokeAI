@@ -24,7 +24,6 @@ import { useDebounce } from 'use-debounce';
 
 import { getItemsPerRow } from '../../../../../../../getItemsPerRow';
 import { getItemIndex } from './getItemIndex';
-import { GalleryImagePlaceholder } from './ImageGrid/GalleryImage';
 import { GallerySelectionCountTag } from './ImageGrid/GallerySelectionCountTag';
 import { GalleryVideo } from './ImageGrid/GalleryVideo';
 import { GalleryVideoPlaceholder } from './ImageGrid/GalleryVideoPlaceholder';
@@ -59,7 +58,7 @@ const VideoAtPosition = memo(({ videoId }: { index: number; videoId: string }) =
   videosApi.endpoints.getVideoDTO.useQuerySubscription(videoId, { skip: isUninitialized });
 
   if (!videoDTO) {
-    return <GalleryImagePlaceholder data-video-id={videoId} />;
+    return <GalleryVideoPlaceholder data-video-id={videoId} />;
   }
 
   return <GalleryVideo videoDTO={videoDTO} />;
