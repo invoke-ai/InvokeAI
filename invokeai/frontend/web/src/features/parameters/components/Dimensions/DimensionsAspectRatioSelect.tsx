@@ -14,11 +14,8 @@ import {
   zAspectRatioID,
   zChatGPT4oAspectRatioID,
   zFluxKontextAspectRatioID,
-  zImagen3AspectRatioID,
-  zRunwayAspectRatioID,
-  zVeo3AspectRatioID,
+  zImagen3AspectRatioID,    
 } from 'features/controlLayers/store/types';
-import { selectIsRunway, selectIsVeo3 } from 'features/parameters/store/videoSlice';
 import type { ChangeEventHandler } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -32,8 +29,7 @@ export const DimensionsAspectRatioSelect = memo(() => {
   const isChatGPT4o = useAppSelector(selectIsChatGPT4o);
   const isImagen4 = useAppSelector(selectIsImagen4);
   const isFluxKontext = useAppSelector(selectIsFluxKontext);
-  const isVeo3 = useAppSelector(selectIsVeo3);
-  const isRunway = useAppSelector(selectIsRunway);
+
   const options = useMemo(() => {
     // Imagen3 and ChatGPT4o have different aspect ratio options, and do not support freeform sizes
     if (isImagen3 || isImagen4) {
@@ -45,15 +41,9 @@ export const DimensionsAspectRatioSelect = memo(() => {
     if (isFluxKontext) {
       return zFluxKontextAspectRatioID.options;
     }
-    if (isVeo3) {
-      return zVeo3AspectRatioID.options;
-    }
-    if (isRunway) {
-      return zRunwayAspectRatioID.options;
-    }
     // All other models
     return zAspectRatioID.options;
-  }, [isImagen3, isChatGPT4o, isImagen4, isFluxKontext, isVeo3, isRunway]);
+  }, [isImagen3, isChatGPT4o, isImagen4, isFluxKontext]);
 
   const onChange = useCallback<ChangeEventHandler<HTMLSelectElement>>(
     (e) => {
