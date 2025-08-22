@@ -1,4 +1,5 @@
-import { FormControl, FormLabel, Select } from '@invoke-ai/ui-library';
+import type { ComboboxOnChange } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   isRunwayDurationID,
@@ -7,10 +8,8 @@ import {
   VEO3_DURATIONS,
 } from 'features/controlLayers/store/types';
 import { selectVideoDuration, selectVideoModel, videoDurationChanged } from 'features/parameters/store/videoSlice';
-import type { ChangeEventHandler } from 'react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCaretDownBold } from 'react-icons/pi';
 
 export const ParamDuration = () => {
   const videoDuration = useAppSelector(selectVideoDuration);
@@ -34,9 +33,9 @@ export const ParamDuration = () => {
     }
   }, [model]);
 
-  const onChange = useCallback<ChangeEventHandler<HTMLSelectElement>>(
-    (e) => {
-      const duration = e.target.value;
+  const onChange = useCallback<ComboboxOnChange>(
+    (v) => {
+      const duration = v?.value;
       if (!isVeo3DurationID(duration) && !isRunwayDurationID(duration)) {
         return;
       }
@@ -46,25 +45,12 @@ export const ParamDuration = () => {
     [dispatch]
   );
 
-  const value = useMemo(() => options.find((o) => o.value === videoDuration)?.value, [videoDuration, options]);
+  const value = useMemo(() => options.find((o) => o.value === videoDuration), [videoDuration, options]);
 
   return (
     <FormControl>
       <FormLabel>{t('parameters.duration')}</FormLabel>
-      <Select
-        size="sm"
-        value={value}
-        onChange={onChange}
-        cursor="pointer"
-        iconSize="0.75rem"
-        icon={<PiCaretDownBold />}
-      >
-        {options.map((duration) => (
-          <option key={duration.value} value={duration.value}>
-            {duration.label}
-          </option>
-        ))}
-      </Select>
+      <Combobox value={value} options={options} onChange={onChange} />
     </FormControl>
   );
 };
