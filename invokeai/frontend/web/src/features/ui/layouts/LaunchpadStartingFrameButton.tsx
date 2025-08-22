@@ -1,27 +1,39 @@
 import { Flex, Heading, Icon, Text } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppStore } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
+import { videoFrameFromImageDndTarget } from 'features/dnd/dnd';
+import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { LaunchpadButton } from 'features/ui/layouts/LaunchpadButton';
 import { startingFrameImageChanged } from 'features/parameters/store/videoSlice';
-import { memo, useCallback } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiUploadBold } from 'react-icons/pi';
+import { PiUploadBold, PiVideoBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
-export const LaunchpadStartingFrameButton = memo(() => {
+const dndTargetData = videoFrameFromImageDndTarget.getData({ frame: 'start' });
+
+export const LaunchpadStartingFrameButton = memo((props: { extraAction?: () => void }) => {
 	const { t } = useTranslation();
-	const dispatch = useAppDispatch();
+	const { dispatch, getState } = useAppStore();
 
-	const onUpload = useCallback((imageDTO: ImageDTO) => {
-		dispatch(startingFrameImageChanged(imageDTOToImageWithDims(imageDTO)));
-	}, [dispatch]);
+	const uploadOptions = useMemo(
+		() =>
+			({
+				onUpload: (imageDTO: ImageDTO) => {
+					dispatch(startingFrameImageChanged(imageDTOToImageWithDims(imageDTO)));
+					props.extraAction?.();
+				},
+				allowMultiple: false,
+			}) as const,
+		[dispatch, props]
+	);
 
-	const uploadApi = useImageUploadButton({ allowMultiple: false, onUpload });
+	const uploadApi = useImageUploadButton(uploadOptions);
 
 	return (
 		<LaunchpadButton {...uploadApi.getUploadButtonProps()} position="relative" gap={8}>
-			<Icon as={PiUploadBold} boxSize={8} color="base.500" />
+			<Icon as={PiVideoBold} boxSize={8} color="base.500" />
 			<Flex flexDir="column" alignItems="flex-start" gap={2}>
 				<Heading size="sm">{t('ui.launchpad.addStartingFrame.title')}</Heading>
 				<Text>{t('ui.launchpad.addStartingFrame.description')}</Text>
@@ -30,6 +42,7 @@ export const LaunchpadStartingFrameButton = memo(() => {
 				<PiUploadBold />
 				<input {...uploadApi.getUploadInputProps()} />
 			</Flex>
+			<DndDropTarget dndTarget={videoFrameFromImageDndTarget} dndTargetData={dndTargetData} label="Drop" />
 		</LaunchpadButton>
 	);
 });

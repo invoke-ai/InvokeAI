@@ -2,7 +2,6 @@ import { Alert, Button, Flex, Grid, Text } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { LaunchpadAddStyleReference } from './LaunchpadAddStyleReference';
 import { LaunchpadContainer } from './LaunchpadContainer';
 import { LaunchpadGenerateFromTextButton } from './LaunchpadGenerateFromTextButton';
 import { LaunchpadStartingFrameButton } from './LaunchpadStartingFrameButton';
