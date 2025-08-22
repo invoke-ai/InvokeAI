@@ -6,7 +6,6 @@ from einops import rearrange
 from PIL import Image
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
-from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     Input,
@@ -20,6 +19,7 @@ from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_cogview4
 
 # TODO(ryand): This is effectively a copy of SD3LatentsToImageInvocation and a subset of LatentsToImageInvocation. We
 # should refactor to avoid this duplication.
@@ -39,22 +39,15 @@ class CogView4LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     latents: LatentsField = InputField(description=FieldDescriptions.latents, input=Input.Connection)
     vae: VAEField = InputField(description=FieldDescriptions.vae, input=Input.Connection)
 
-    def _estimate_working_memory(self, latents: torch.Tensor, vae: AutoencoderKL) -> int:
-        """Estimate the working memory required by the invocation in bytes."""
-        out_h = LATENT_SCALE_FACTOR * latents.shape[-2]
-        out_w = LATENT_SCALE_FACTOR * latents.shape[-1]
-        element_size = next(vae.parameters()).element_size()
-        scaling_constant = 2200  # Determined experimentally.
-        working_memory = out_h * out_w * element_size * scaling_constant
-        return int(working_memory)
-
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.tensors.load(self.latents.latents_name)
 
         vae_info = context.models.load(self.vae.vae)
         assert isinstance(vae_info.model, (AutoencoderKL))
-        estimated_working_memory = self._estimate_working_memory(latents, vae_info.model)
+        estimated_working_memory = estimate_vae_working_memory_cogview4(
+            operation="decode", image_tensor=latents, vae=vae_info.model
+        )
         with (
             SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes),
             vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae),

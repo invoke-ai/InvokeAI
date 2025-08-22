@@ -38,6 +38,7 @@
         "deletedImagesCannotBeRestored": "Deleted images cannot be restored.",
         "hideBoards": "Hide Boards",
         "loading": "Loading...",
+        "locateInGalery": "Locate in Gallery",
         "menuItemAutoAdd": "Auto-add to this Board",
         "move": "Move",
         "movingImagesToBoard_one": "Moving {{count}} image to board:",
@@ -876,6 +877,9 @@
         "install": "Install",
         "installAll": "Install All",
         "installRepo": "Install Repo",
+        "installBundle": "Install Bundle",
+        "installBundleMsg1": "Are you sure you want to install the {{bundleName}} bundle?",
+        "installBundleMsg2": "This bundle will install the following {{count}} models:",
         "ipAdapters": "IP Adapters",
         "learnMoreAboutSupportedModels": "Learn more about the models we support",
         "load": "Load",
@@ -1949,6 +1953,8 @@
             "addToForm": "Add to Form",
             "label": "Label",
             "showDescription": "Show Description",
+            "showShuffle": "Show Shuffle",
+            "shuffle": "Shuffle",
             "component": "Component",
             "numberInput": "Number Input",
             "singleLine": "Single Line",
@@ -2683,8 +2689,8 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "Studio state is saved to the server, allowing you to continue your work on any device.",
-            "Support for multiple reference images for FLUX Kontext (local model only)."
+            "Misc QoL: Toggle Bbox visibility, highlight nodes with errors, prevent adding node fields to Builder form multiple times, CLIP Skip metadata recallable",
+            "Reduced VRAM usage for multiple Kontext Ref images and VAE encoding"
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",

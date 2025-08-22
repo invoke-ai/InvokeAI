@@ -6,6 +6,7 @@ import { ImageMenuItemCopy } from 'features/gallery/components/ImageContextMenu/
 import { ImageMenuItemDelete } from 'features/gallery/components/ImageContextMenu/ImageMenuItemDelete';
 import { ImageMenuItemDownload } from 'features/gallery/components/ImageContextMenu/ImageMenuItemDownload';
 import { ImageMenuItemLoadWorkflow } from 'features/gallery/components/ImageContextMenu/ImageMenuItemLoadWorkflow';
+import { ImageMenuItemLocateInGalery } from 'features/gallery/components/ImageContextMenu/ImageMenuItemLocateInGalery';
 import { ImageMenuItemMetadataRecallActionsCanvasGenerateTabs } from 'features/gallery/components/ImageContextMenu/ImageMenuItemMetadataRecallActionsCanvasGenerateTabs';
 import { ImageMenuItemNewCanvasFromImageSubMenu } from 'features/gallery/components/ImageContextMenu/ImageMenuItemNewCanvasFromImageSubMenu';
 import { ImageMenuItemNewLayerFromImageSubMenu } from 'features/gallery/components/ImageContextMenu/ImageMenuItemNewLayerFromImageSubMenu';
@@ -55,6 +56,11 @@ const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) =
       <MenuDivider />
       <ImageMenuItemChangeBoard />
       <ImageMenuItemStarUnstar />
+      {(tab === 'canvas' || tab === 'generate' || tab === 'workflows' || tab === 'upscaling') &&
+        !imageDTO.is_intermediate && (
+          // Only render this button on tabs with a gallery.
+          <ImageMenuItemLocateInGalery />
+        )}
     </ImageDTOContextProvider>
   );
 };

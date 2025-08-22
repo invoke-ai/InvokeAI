@@ -33,30 +33,45 @@ Hardware requirements vary significantly depending on model and image output siz
 
 More detail on system requirements can be found [here](./requirements.md).
 
-## Step 2: Download
+## Step 2: Download and Set Up the Launcher
 
-Download the most recent launcher for your operating system:
+The Launcher manages your Invoke install. Follow these instructions to download and set up the Launcher.
 
-- [Download for Windows](https://download.invoke.ai/Invoke%20Community%20Edition.exe)
-- [Download for macOS](https://download.invoke.ai/Invoke%20Community%20Edition.dmg)
-- [Download for Linux](https://download.invoke.ai/Invoke%20Community%20Edition.AppImage)
+!!! info "Instructions for each OS"
 
-## Step 3: Install or Update
+    === "Windows"
 
-Run the launcher you just downloaded, click **Install** and follow the instructions to get set up.
+        - [Download for Windows](https://github.com/invoke-ai/launcher/releases/latest/download/Invoke.Community.Edition.Setup.latest.exe)
+        - Run the `EXE` to install the Launcher and start it.
+        - A desktop shortcut will be created; use this to run the Launcher in the future.
+        - You can delete the `EXE` file you downloaded.
+
+    === "macOS"
+
+        - [Download for macOS](https://github.com/invoke-ai/launcher/releases/latest/download/Invoke.Community.Edition-latest-arm64.dmg)
+        - Open the `DMG` and drag the app into `Applications`.
+        - Run the Launcher using its entry in `Applications`.
+        - You can delete the `DMG` file you downloaded.
+
+    === "Linux"
+
+        - [Download for Linux](https://github.com/invoke-ai/launcher/releases/latest/download/Invoke.Community.Edition-latest.AppImage)
+        - You may need to edit the `AppImage` file properties and make it executable.
+        - Optionally move the file to a location that does not require admin privileges and add a desktop shortcut for it.
+        - Run the Launcher by double-clicking the `AppImage` or the shortcut you made.
+
+## Step 3: Install Invoke
+
+Run the Launcher you just set up if you haven't already. Click **Install** and follow the instructions to install (or update) Invoke.
 
 If you have an existing Invoke installation, you can select it and let the launcher manage the install. You'll be able to update or launch the installation.
 
-!!! warning "Problem running the launcher on macOS"
+!!! tip "Updating"
 
-    macOS may not allow you to run the launcher. We are working to resolve this by signing the launcher executable. Until that is done, you can manually flag the launcher as safe:
+    The Launcher will check for updates for itself _and_ Invoke.
 
-    - Open the **Invoke Community Edition.dmg** file.
-    - Drag the launcher to **Applications**.
-    - Open a terminal.
-    - Run `xattr -d 'com.apple.quarantine' /Applications/Invoke\ Community\ Edition.app`.
-
-    You should now be able to run the launcher.
+    - When the Launcher detects an update is available for itself, you'll get a small popup window. Click through this and the Launcher will update itself.
+    - When the Launcher detects an update for Invoke, you'll see a small green alert in the Launcher. Click that and follow the instructions to update Invoke.
 
 ## Step 4: Launch
 

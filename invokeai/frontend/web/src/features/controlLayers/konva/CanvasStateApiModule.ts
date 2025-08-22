@@ -231,7 +231,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   /**
    * Sets the drawing color, pushing state to redux.
    */
-  setColor = (color: RgbaColor) => {
+  setColor = (color: Partial<RgbaColor>) => {
     return this.store.dispatch(settingsColorChanged(color));
   };
 

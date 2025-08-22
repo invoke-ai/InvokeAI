@@ -1,5 +1,5 @@
 import { Button, Divider, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
 import { useDeleteImage } from 'features/gallery/hooks/useDeleteImage';
@@ -10,14 +10,19 @@ import { useRecallDimensions } from 'features/gallery/hooks/useRecallDimensions'
 import { useRecallPrompts } from 'features/gallery/hooks/useRecallPrompts';
 import { useRecallRemix } from 'features/gallery/hooks/useRecallRemix';
 import { useRecallSeed } from 'features/gallery/hooks/useRecallSeed';
+import { boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { PostProcessingPopover } from 'features/parameters/components/PostProcessing/PostProcessingPopover';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
+import { useGalleryPanel } from 'features/ui/layouts/use-gallery-panel';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import { memo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   PiArrowsCounterClockwiseBold,
   PiAsteriskBold,
+  PiCrosshairBold,
   PiDotsThreeOutlineFill,
   PiFlowArrowBold,
   PiPencilBold,
@@ -30,8 +35,25 @@ import type { ImageDTO } from 'services/api/types';
 export const CurrentImageButtons = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
   const { t } = useTranslation();
   const tab = useAppSelector(selectActiveTab);
+  const dispatch = useAppDispatch();
+  const activeTab = useAppSelector(selectActiveTab);
+  const galleryPanel = useGalleryPanel(activeTab);
+
+  const isGalleryImage = useMemo(() => {
+    return !imageDTO.is_intermediate;
+  }, [imageDTO]);
+
+  const locateInGallery = useCallback(() => {
+    navigationApi.expandRightPanel();
+    galleryPanel.expand();
+    flushSync(() => {
+      dispatch(boardIdSelected({ boardId: imageDTO.board_id ?? 'none', selectedImageName: imageDTO.image_name }));
+    });
+  }, [dispatch, galleryPanel, imageDTO]);
+
   const isCanvasOrGenerateTab = tab === 'canvas' || tab === 'generate';
   const isCanvasOrGenerateOrUpscalingTab = tab === 'canvas' || tab === 'generate' || tab === 'upscaling';
+  const doesTabHaveGallery = tab === 'canvas' || tab === 'generate' || tab === 'workflows' || tab === 'upscaling';
 
   const isUpscalingEnabled = useFeatureStatus('upscaling');
 
@@ -75,6 +97,17 @@ export const CurrentImageButtons = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
 
       <Divider orientation="vertical" h={8} mx={2} />
 
+      {doesTabHaveGallery && isGalleryImage && (
+        <IconButton
+          icon={<PiCrosshairBold />}
+          aria-label={t('boards.locateInGalery')}
+          tooltip={t('boards.locateInGalery')}
+          onClick={locateInGallery}
+          variant="link"
+          size="sm"
+          alignSelf="stretch"
+        />
+      )}
       <IconButton
         icon={<PiFlowArrowBold />}
         tooltip={`${t('nodes.loadWorkflow')} (W)`}

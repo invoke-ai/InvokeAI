@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { PiInfoBold, PiXBold } from 'react-icons/pi';
 import type { GetStarterModelsResponse } from 'services/api/endpoints/models';
 
-import { StarterBundleButton } from './StarterBundle';
+import { StarterBundleButton } from './StarterBundleButton';
 import { StarterBundleTooltipContent } from './StarterBundleTooltipContent';
 import { StarterModelsResultItem } from './StarterModelsResultItem';
 

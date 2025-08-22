@@ -27,6 +27,7 @@ from invokeai.backend.model_manager import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.backend.stable_diffusion.vae_tiling import patch_vae_tiling_params
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_sd15_sdxl
 
 
 @invocation(
@@ -52,47 +53,23 @@ class ImageToLatentsInvocation(BaseInvocation):
     tile_size: int = InputField(default=0, multiple_of=8, description=FieldDescriptions.vae_tile_size)
     fp32: bool = InputField(default=False, description=FieldDescriptions.fp32)
 
-    def _estimate_working_memory(
-        self, image_tensor: torch.Tensor, use_tiling: bool, vae: AutoencoderKL | AutoencoderTiny
-    ) -> int:
-        """Estimate the working memory required by the invocation in bytes."""
-        # Encode operations use approximately 50% of the memory required for decode operations
-        element_size = 4 if self.fp32 else 2
-        scaling_constant = 1100  # 50% of decode scaling constant (2200)
-
-        if use_tiling:
-            tile_size = self.tile_size
-            if tile_size == 0:
-                tile_size = vae.tile_sample_min_size
-                assert isinstance(tile_size, int)
-            h = tile_size
-            w = tile_size
-            working_memory = h * w * element_size * scaling_constant
-
-            # We add 25% to the working memory estimate when tiling is enabled to account for factors like tile overlap
-            # and number of tiles. We could make this more precise in the future, but this should be good enough for
-            # most use cases.
-            working_memory = working_memory * 1.25
-        else:
-            h = image_tensor.shape[-2]
-            w = image_tensor.shape[-1]
-            working_memory = h * w * element_size * scaling_constant
-
-        if self.fp32:
-            # If we are running in FP32, then we should account for the likely increase in model size (~250MB).
-            working_memory += 250 * 2**20
-
-        return int(working_memory)
-
-    @staticmethod
+    @classmethod
     def vae_encode(
+        cls,
         vae_info: LoadedModel,
         upcast: bool,
         tiled: bool,
         image_tensor: torch.Tensor,
         tile_size: int = 0,
-        estimated_working_memory: int = 0,
     ) -> torch.Tensor:
+        assert isinstance(vae_info.model, (AutoencoderKL, AutoencoderTiny))
+        estimated_working_memory = estimate_vae_working_memory_sd15_sdxl(
+            operation="encode",
+            image_tensor=image_tensor,
+            vae=vae_info.model,
+            tile_size=tile_size if tiled else None,
+            fp32=upcast,
+        )
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             assert isinstance(vae, (AutoencoderKL, AutoencoderTiny))
             orig_dtype = vae.dtype
@@ -156,17 +133,13 @@ class ImageToLatentsInvocation(BaseInvocation):
         if image_tensor.dim() == 3:
             image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
 
-        use_tiling = self.tiled or context.config.get().force_tiled_decode
-        estimated_working_memory = self._estimate_working_memory(image_tensor, use_tiling, vae_info.model)
-
         context.util.signal_progress("Running VAE encoder")
         latents = self.vae_encode(
             vae_info=vae_info,
             upcast=self.fp32,
-            tiled=self.tiled,
+            tiled=self.tiled or context.config.get().force_tiled_decode,
             image_tensor=image_tensor,
             tile_size=self.tile_size,
-            estimated_working_memory=estimated_working_memory,
         )
 
         latents = latents.to("cpu")

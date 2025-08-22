@@ -1,0 +1,30 @@
+# Checks that large files and LFS-tracked files are properly checked in with pointer format.
+# Uses https://github.com/ppremk/lfs-warning to detect LFS issues.
+
+name: 'lfs checks'
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    types:
+      - 'ready_for_review'
+      - 'opened'
+      - 'synchronize'
+  merge_group:
+  workflow_dispatch:
+
+jobs:
+  lfs-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      # Required to label and comment on the PRs
+      pull-requests: write
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: check lfs files
+        uses: ppremk/lfs-warning@v3.3
