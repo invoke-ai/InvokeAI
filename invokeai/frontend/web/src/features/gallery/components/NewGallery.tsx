@@ -69,31 +69,6 @@ const ImageAtPosition = memo(({ imageName }: { index: number; imageName: string 
 });
 ImageAtPosition.displayName = 'ImageAtPosition';
 
-const VideoAtPosition = memo(({ itemId }: { index: number; itemId: string }) => {
-  /*
-   * We rely on the useRangeBasedImageFetching to fetch all image DTOs, caching them with RTK Query.
-   *
-   * In this component, we just want to consume that cache. Unforutnately, RTK Query does not provide a way to
-   * subscribe to a query without triggering a new fetch.
-   *
-   * There is a hack, though:
-   * - https://github.com/reduxjs/redux-toolkit/discussions/4213
-   *
-   * This essentially means "subscribe to the query once it has some data".
-   */
-
-  // Use `currentData` instead of `data` to prevent a flash of previous image rendered at this index
-  const { currentData: item, isUninitialized } = videosApi.endpoints.getVideoDTO.useQueryState(itemId);
-  videosApi.endpoints.getVideoDTO.useQuerySubscription(itemId, { skip: isUninitialized });
-
-  if (!item) {
-    return <GalleryImagePlaceholder data-item-id={itemId} />;
-  }
-
-  return <GalleryVideo videoDTO={item} />;
-});
-VideoAtPosition.displayName = 'VideoAtPosition';
-
 const computeItemKey: GridComputeItemKey<string, GridContext> = (index, imageName, { queryArgs }) => {
   return `${JSON.stringify(queryArgs)}-${imageName ?? index}`;
 };
