@@ -219,49 +219,58 @@ const rootPanelComponents: RootLayoutGridviewComponents = {
 	[RIGHT_PANEL_ID]: RightPanel,
 };
 
-export const VideoTabAutoLayout = memo(() => {
-	const onReady = useCallback<IGridviewReactProps['onReady']>(({ api }) => {
-		api.addPanel<GridviewPanelParameters>({
+const initializeRootPanelLayout = (tab: TabName, api: GridviewApi) => {
+	navigationApi.registerContainer(tab, 'root', api, () => {
+		const main = api.addPanel<GridviewPanelParameters>({
+			id: MAIN_PANEL_ID,
+			component: MAIN_PANEL_ID,
+			priority: LayoutPriority.High,
+		});
+
+		const left = api.addPanel<GridviewPanelParameters>({
 			id: LEFT_PANEL_ID,
 			component: LEFT_PANEL_ID,
 			minimumWidth: LEFT_PANEL_MIN_SIZE_PX,
-			params: {
-				priority: LayoutPriority.Low,
-			},
-		});
-		api.addPanel<GridviewPanelParameters>({
-			id: MAIN_PANEL_ID,
-			component: MAIN_PANEL_ID,
-			params: {
-				priority: LayoutPriority.High,
-			},
 			position: {
-				direction: 'right',
-				referencePanel: LEFT_PANEL_ID,
+				direction: 'left',
+				referencePanel: main.id,
 			},
 		});
-		api.addPanel<GridviewPanelParameters>({
+
+		const right = api.addPanel<GridviewPanelParameters>({
 			id: RIGHT_PANEL_ID,
 			component: RIGHT_PANEL_ID,
 			minimumWidth: RIGHT_PANEL_MIN_SIZE_PX,
-			params: {
-				priority: LayoutPriority.Low,
-			},
 			position: {
 				direction: 'right',
-				referencePanel: MAIN_PANEL_ID,
+				referencePanel: main.id,
 			},
 		});
-		api.setActivePanel(MAIN_PANEL_ID);
+
+		left.api.setSize({ width: LEFT_PANEL_MIN_SIZE_PX });
+		right.api.setSize({ width: RIGHT_PANEL_MIN_SIZE_PX });
+	});
+};
+
+export const VideoTabAutoLayout = memo(() => {
+	const onReady = useCallback<IGridviewReactProps['onReady']>(({ api }) => {
+		initializeRootPanelLayout('video', api);
 	}, []);
 
+	useEffect(
+		() => () => {
+			navigationApi.unregisterTab('video');
+		},
+		[]
+	);
+
 	return (
-		<AutoLayoutProvider id="video" components={rootPanelComponents}>
+		<AutoLayoutProvider tab="video">
 			<GridviewReact
 				className="dockview-theme-invoke"
-				orientation={Orientation.HORIZONTAL}
-				proportionalLayout={true}
+				components={rootPanelComponents}
 				onReady={onReady}
+				orientation={Orientation.VERTICAL}
 			/>
 		</AutoLayoutProvider>
 	);

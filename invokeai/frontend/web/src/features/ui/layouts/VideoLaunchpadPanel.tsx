@@ -2,11 +2,11 @@ import { Alert, Button, Flex, Grid, Text } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { InitialStateMainModelPicker } from './InitialStateMainModelPicker';
 import { LaunchpadAddStyleReference } from './LaunchpadAddStyleReference';
 import { LaunchpadContainer } from './LaunchpadContainer';
 import { LaunchpadGenerateFromTextButton } from './LaunchpadGenerateFromTextButton';
 import { LaunchpadStartingFrameButton } from './LaunchpadStartingFrameButton';
+import { VideoModelPicker } from 'features/settingsAccordions/components/VideoSettingsAccordion/VideoModelPicker';
 
 export const VideoLaunchpadPanel = memo(() => {
 	const { t } = useTranslation();
@@ -14,7 +14,7 @@ export const VideoLaunchpadPanel = memo(() => {
 	return (
 		<LaunchpadContainer heading={t('ui.launchpad.videoTitle')}>
 			<Grid gridTemplateColumns="1fr 1fr" gap={8}>
-				<InitialStateMainModelPicker />
+				<VideoModelPicker labelKey="common.selectYourModel" />
 				<Flex flexDir="column" gap={2} justifyContent="center">
 					<Text>
 						{t('ui.launchpad.modelGuideText')}{' '}
