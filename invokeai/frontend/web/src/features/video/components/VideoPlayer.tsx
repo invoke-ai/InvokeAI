@@ -1,4 +1,4 @@
-import { Box, chakra, Flex, Text } from '@invoke-ai/ui-library';
+import { Flex, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useFocusRegion } from 'common/hooks/focus';
