@@ -1,4 +1,4 @@
-import { type FlexProps, Flex, Icon } from '@invoke-ai/ui-library';
+import { Flex, type FlexProps, Icon } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import { PiVideoBold } from 'react-icons/pi';
 

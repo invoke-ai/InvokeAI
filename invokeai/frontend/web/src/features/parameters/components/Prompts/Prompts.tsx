@@ -11,7 +11,7 @@ export const Prompts = memo(() => {
   const modelSupportsNegativePrompt = useAppSelector(selectModelSupportsNegativePrompt);
   const hasNegativePrompt = useAppSelector(selectHasNegativePrompt);
   const activeTab = useAppSelector(selectActiveTab);
-  
+
   return (
     <Flex flexDir="column" gap={2}>
       <ParamPositivePrompt />
