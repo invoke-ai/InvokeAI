@@ -15,7 +15,7 @@ export type Serializable = z.infer<typeof zSerializable>;
 export const zUIState = z.object({
   _version: z.literal(4),
   activeTab: zTabName,
-  shouldShowImageDetails: z.boolean(),
+  shouldShowItemDetails: z.boolean(),
   shouldShowProgressInViewer: z.boolean(),
   accordions: z.record(z.string(), z.boolean()),
   expanders: z.record(z.string(), z.boolean()),
@@ -28,7 +28,7 @@ export type UIState = z.infer<typeof zUIState>;
 export const getInitialUIState = (): UIState => ({
   _version: 4 as const,
   activeTab: 'generate' as const,
-  shouldShowImageDetails: false,
+  shouldShowItemDetails: false,
   shouldShowProgressInViewer: true,
   accordions: {},
   expanders: {},
