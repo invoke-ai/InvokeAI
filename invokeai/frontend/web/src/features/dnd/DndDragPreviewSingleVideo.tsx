@@ -1,6 +1,6 @@
 import type { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { setCustomNativeDragPreview } from '@atlaskit/pragmatic-drag-and-drop/element/set-custom-native-drag-preview';
-import { chakra, Flex, Text } from '@invoke-ai/ui-library';
+import { chakra, Flex } from '@invoke-ai/ui-library';
 import type { SingleVideoDndSourceData } from 'features/dnd/dnd';
 import { DND_IMAGE_DRAG_PREVIEW_SIZE, preserveOffsetOnSourceFallbackCentered } from 'features/dnd/util';
 import { GalleryVideoPlaceholder } from 'features/gallery/components/ImageGrid/GalleryVideoPlaceholder';
