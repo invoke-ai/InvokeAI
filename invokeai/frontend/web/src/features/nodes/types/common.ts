@@ -125,6 +125,7 @@ export const zModelType = z.enum([
   'clip_embed',
   'siglip',
   'flux_redux',
+  'video',
 ]);
 const zSubModelType = z.enum([
   'unet',
