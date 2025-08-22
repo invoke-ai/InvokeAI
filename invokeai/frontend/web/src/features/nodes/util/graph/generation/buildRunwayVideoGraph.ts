@@ -8,6 +8,7 @@ import type { GraphBuilderArg, GraphBuilderReturn } from 'features/nodes/util/gr
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { selectStartingFrameImage, selectVideoSlice } from 'features/parameters/store/videoSlice';
 import { t } from 'i18next';
+import type { VideoApiModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 const log = logger('system');
@@ -33,7 +34,9 @@ export const buildRunwayVideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn 
   const firstFrameImageField = zImageField.parse(startingFrameImage);
 
   const { seed, shouldRandomizeSeed } = params;
-  const { videoDuration } = videoParams;
+  const { videoModel, videoDuration, videoAspectRatio, videoResolution } = videoParams;
+
+  assert(videoModel, 'Runway video requires a model');
 
   const finalSeed = shouldRandomizeSeed ? undefined : seed;
 
@@ -51,7 +54,7 @@ export const buildRunwayVideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn 
     // @ts-expect-error: This node is not available in the OSS application
     type: 'runway_generate_video',
     duration: parseInt(videoDuration || '0', 10),
-    aspect_ratio: params.dimensions.aspectRatio.id,
+    aspect_ratio: videoAspectRatio,
     seed: finalSeed,
     first_frame_image: firstFrameImageField,
   });
@@ -61,12 +64,13 @@ export const buildRunwayVideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn 
 
   // Set up metadata
   g.upsertMetadata({
+    model: Graph.getModelMetadataField(videoModel as VideoApiModelConfig),
     positive_prompt: prompts.positive,
     negative_prompt: prompts.negative || '',
-    video_duration: videoDuration,
-    video_aspect_ratio: params.dimensions.aspectRatio.id,
+    duration: videoDuration,
+    aspect_ratio: videoAspectRatio,
+    resolution: videoResolution,
     seed: finalSeed,
-    generation_type: 'image-to-video',
     first_frame_image: startingFrameImage,
   });
 
