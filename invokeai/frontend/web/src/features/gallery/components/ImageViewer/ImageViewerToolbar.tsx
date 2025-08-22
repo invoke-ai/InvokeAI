@@ -8,7 +8,7 @@ import { useImageDTO } from 'services/api/endpoints/images';
 import { CurrentImageButtons } from './CurrentImageButtons';
 import { ToggleProgressButton } from './ToggleProgressButton';
 
-export const ViewerToolbar = memo(() => {
+export const ImageViewerToolbar = memo(() => {
   const lastSelectedItem = useAppSelector(selectLastSelectedItem);
   const imageDTO = useImageDTO(lastSelectedItem?.id);
 
@@ -23,4 +23,4 @@ export const ViewerToolbar = memo(() => {
   );
 });
 
-ViewerToolbar.displayName = 'ViewerToolbar';
+ImageViewerToolbar.displayName = 'ImageViewerToolbar';

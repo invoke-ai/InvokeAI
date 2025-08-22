@@ -1,27 +1,18 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import { CanvasAlertsInvocationProgress } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsInvocationProgress';
-import { DndImage } from 'features/dnd/DndImage';
-import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
+import VideoMetadataViewer from 'features/gallery/components/ImageMetadataViewer/VideoMetadataViewer';
 import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
-import { selectShouldShowItemDetails, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
+import { selectShouldShowItemDetails } from 'features/ui/store/uiSelectors';
+import { VideoPlayer } from 'features/video/components/VideoPlayer';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useCallback, useRef, useState } from 'react';
-import type { ImageDTO } from 'services/api/types';
+import type { VideoDTO } from 'services/api/types';
 
-import { useImageViewerContext } from './context';
 import { NoContentForViewer } from './NoContentForViewer';
-import { ProgressImage } from './ProgressImage2';
-import { ProgressIndicator } from './ProgressIndicator2';
 
-export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | null }) => {
+export const CurrentVideoPreview = memo(({ videoDTO }: { videoDTO: VideoDTO | null }) => {
   const shouldShowItemDetails = useAppSelector(selectShouldShowItemDetails);
-  const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
-  const { onLoadImage, $progressEvent, $progressImage } = useImageViewerContext();
-  const progressEvent = useStore($progressEvent);
-  const progressImage = useStore($progressImage);
 
   // Show and hide the next/prev buttons on mouse move
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] = useState<boolean>(false);
@@ -36,8 +27,6 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     }, 500);
   }, []);
 
-  const withProgress = shouldShowProgressInViewer && progressImage !== null;
-
   return (
     <Flex
       onMouseOver={onMouseOver}
@@ -48,30 +37,19 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       justifyContent="center"
       position="relative"
     >
-      {imageDTO && (
+      {videoDTO && videoDTO.video_url && (
         <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center">
-          <DndImage imageDTO={imageDTO} onLoad={onLoadImage} borderRadius="base" />
+          <VideoPlayer />
         </Flex>
       )}
-      {!imageDTO && <NoContentForViewer />}
-      {withProgress && (
-        <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center" bg="base.900">
-          <ProgressImage progressImage={progressImage} />
-          {progressEvent && (
-            <ProgressIndicator progressEvent={progressEvent} position="absolute" top={6} right={6} size={8} />
-          )}
-        </Flex>
-      )}
-      <Flex flexDir="column" gap={2} position="absolute" top={0} insetInlineStart={0} alignItems="flex-start">
-        <CanvasAlertsInvocationProgress />
-      </Flex>
-      {shouldShowItemDetails && imageDTO && !withProgress && (
+      {!videoDTO && <NoContentForViewer />}
+      {shouldShowItemDetails && videoDTO && (
         <Box position="absolute" opacity={0.8} top={0} width="full" height="full" borderRadius="base">
-          <ImageMetadataViewer image={imageDTO} />
+          <VideoMetadataViewer video={videoDTO} />
         </Box>
       )}
       <AnimatePresence>
-        {shouldShowNextPrevButtons && imageDTO && (
+        {shouldShowNextPrevButtons && videoDTO && (
           <Box
             as={motion.div}
             key="nextPrevButtons"
@@ -92,7 +70,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     </Flex>
   );
 });
-CurrentImagePreview.displayName = 'CurrentImagePreview';
+CurrentVideoPreview.displayName = 'CurrentVideoPreview';
 
 const initial: AnimationProps['initial'] = {
   opacity: 0,

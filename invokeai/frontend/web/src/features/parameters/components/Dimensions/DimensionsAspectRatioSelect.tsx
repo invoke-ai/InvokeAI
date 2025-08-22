@@ -14,7 +14,7 @@ import {
   zAspectRatioID,
   zChatGPT4oAspectRatioID,
   zFluxKontextAspectRatioID,
-  zImagen3AspectRatioID,    
+  zImagen3AspectRatioID,
 } from 'features/controlLayers/store/types';
 import type { ChangeEventHandler } from 'react';
 import { memo, useCallback, useMemo } from 'react';
