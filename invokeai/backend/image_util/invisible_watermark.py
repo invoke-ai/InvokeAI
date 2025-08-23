@@ -6,13 +6,10 @@ configuration variable, that allows the watermarking to be supressed.
 
 import cv2
 import numpy as np
-from imwatermark import WatermarkEncoder
 from PIL import Image
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config.config_default import get_config
-
-config = get_config()
+from invokeai.backend.image_util.imwatermark.vendor import WatermarkEncoder
 
 
 class InvisibleWatermark:
