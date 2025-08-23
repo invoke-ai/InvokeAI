@@ -17,6 +17,8 @@ export const MODEL_TYPE_MAP: Record<BaseModelType, string> = {
   imagen4: 'Imagen4',
   'chatgpt-4o': 'ChatGPT 4o',
   'flux-kontext': 'Flux Kontext',
+  veo3: 'Veo3',
+  runway: 'Runway',
 };
 
 /**
@@ -35,12 +37,14 @@ export const MODEL_TYPE_SHORT_MAP: Record<BaseModelType, string> = {
   imagen4: 'Imagen4',
   'chatgpt-4o': 'ChatGPT 4o',
   'flux-kontext': 'Flux Kontext',
+  veo3: 'Veo3',
+  runway: 'Runway',
 };
 
 /**
  * Mapping of base model to CLIP skip parameter constraints
  */
-export const CLIP_SKIP_MAP: Record<BaseModelType, { maxClip: number; markers: number[] }> = {
+export const CLIP_SKIP_MAP: { [key in BaseModelType]?: { maxClip: number; markers: number[] } } = {
   any: {
     maxClip: 0,
     markers: [],
@@ -131,3 +135,5 @@ export const SCHEDULER_OPTIONS: ComboboxOption[] = [
  * List of base models that make API requests
  */
 export const API_BASE_MODELS = ['imagen3', 'imagen4', 'chatgpt-4o', 'flux-kontext'];
+
+export const VIDEO_BASE_MODELS = ['veo3', 'runway'];

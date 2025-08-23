@@ -1,6 +1,6 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import type { FlexProps, SystemStyleObject } from '@invoke-ai/ui-library';
+import type { FlexProps } from '@invoke-ai/ui-library';
 import { Flex, Icon, Image } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import type { AppDispatch, AppGetState } from 'app/store/store';
@@ -12,8 +12,8 @@ import { createMultipleImageDragPreview, setMultipleImageDragPreview } from 'fea
 import type { DndDragPreviewSingleImageState } from 'features/dnd/DndDragPreviewSingleImage';
 import { createSingleImageDragPreview, setSingleImageDragPreview } from 'features/dnd/DndDragPreviewSingleImage';
 import { firefoxDndFix } from 'features/dnd/util';
-import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
-import { GalleryImageHoverIcons } from 'features/gallery/components/ImageGrid/GalleryImageHoverIcons';
+import { useImageContextMenu } from 'features/gallery/components/ContextMenu/ImageContextMenu';
+import { GalleryItemHoverIcons } from 'features/gallery/components/ImageGrid/GalleryItemHoverIcons';
 import {
   selectGetImageNamesQueryArgs,
   selectSelectedBoardId,
@@ -28,56 +28,7 @@ import { PiImageBold } from 'react-icons/pi';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
-const galleryImageContainerSX = {
-  containerType: 'inline-size',
-  w: 'full',
-  h: 'full',
-  '.gallery-image-size-badge': {
-    '@container (max-width: 80px)': {
-      '&': { display: 'none' },
-    },
-  },
-  '&[data-is-dragging=true]': {
-    opacity: 0.3,
-  },
-  userSelect: 'none',
-  webkitUserSelect: 'none',
-  position: 'relative',
-  justifyContent: 'center',
-  alignItems: 'center',
-  aspectRatio: '1/1',
-  '::before': {
-    content: '""',
-    display: 'inline-block',
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    pointerEvents: 'none',
-    borderRadius: 'base',
-  },
-  '&[data-selected=true]::before': {
-    boxShadow:
-      'inset 0px 0px 0px 3px var(--invoke-colors-invokeBlue-500), inset 0px 0px 0px 4px var(--invoke-colors-invokeBlue-800)',
-  },
-  '&[data-selected-for-compare=true]::before': {
-    boxShadow:
-      'inset 0px 0px 0px 3px var(--invoke-colors-invokeGreen-300), inset 0px 0px 0px 4px var(--invoke-colors-invokeGreen-800)',
-  },
-  '&:hover::before': {
-    boxShadow:
-      'inset 0px 0px 0px 1px var(--invoke-colors-invokeBlue-300), inset 0px 0px 0px 2px var(--invoke-colors-invokeBlue-800)',
-  },
-  '&:hover[data-selected=true]::before': {
-    boxShadow:
-      'inset 0px 0px 0px 3px var(--invoke-colors-invokeBlue-400), inset 0px 0px 0px 4px var(--invoke-colors-invokeBlue-800)',
-  },
-  '&:hover[data-selected-for-compare=true]::before': {
-    boxShadow:
-      'inset 0px 0px 0px 3px var(--invoke-colors-invokeGreen-200), inset 0px 0px 0px 4px var(--invoke-colors-invokeGreen-800)',
-  },
-} satisfies SystemStyleObject;
+import { galleryItemContainerSX } from './galleryItemContainerSX';
 
 interface Props {
   imageDTO: ImageDTO;
@@ -95,7 +46,7 @@ const buildOnClick =
     if (imageNames.length === 0) {
       // For basic click without modifiers, we can still set selection
       if (!shiftKey && !ctrlKey && !metaKey && !altKey) {
-        dispatch(selectionChanged([imageName]));
+        dispatch(selectionChanged([{ type: 'image', id: imageName }]));
       }
       return;
     }
@@ -110,7 +61,7 @@ const buildOnClick =
       }
     } else if (shiftKey) {
       const rangeEndImageName = imageName;
-      const lastSelectedImage = selection.at(-1);
+      const lastSelectedImage = selection.at(-1)?.id;
       const lastClickedIndex = imageNames.findIndex((name) => name === lastSelectedImage);
       const currentClickedIndex = imageNames.findIndex((name) => name === rangeEndImageName);
       if (lastClickedIndex > -1 && currentClickedIndex > -1) {
@@ -118,16 +69,16 @@ const buildOnClick =
         const start = Math.min(lastClickedIndex, currentClickedIndex);
         const end = Math.max(lastClickedIndex, currentClickedIndex);
         const imagesToSelect = imageNames.slice(start, end + 1);
-        dispatch(selectionChanged(uniq(selection.concat(imagesToSelect))));
+        dispatch(selectionChanged(uniq(selection.concat(imagesToSelect.map((name) => ({ type: 'image', id: name }))))));
       }
     } else if (ctrlKey || metaKey) {
-      if (selection.some((n) => n === imageName) && selection.length > 1) {
-        dispatch(selectionChanged(uniq(selection.filter((n) => n !== imageName))));
+      if (selection.some((n) => n.id === imageName) && selection.length > 1) {
+        dispatch(selectionChanged(uniq(selection.filter((n) => n.id !== imageName))));
       } else {
-        dispatch(selectionChanged(uniq(selection.concat(imageName))));
+        dispatch(selectionChanged(uniq(selection.concat({ type: 'image', id: imageName }))));
       }
     } else {
-      dispatch(selectionChanged([imageName]));
+      dispatch(selectionChanged([{ type: 'image', id: imageName }]));
     }
   };
 
@@ -144,7 +95,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
   );
   const isSelectedForCompare = useAppSelector(selectIsSelectedForCompare);
   const selectIsSelected = useMemo(
-    () => createSelector(selectGallerySlice, (gallery) => gallery.selection.includes(imageDTO.image_name)),
+    () => createSelector(selectGallerySlice, (gallery) => gallery.selection.some((s) => s.id === imageDTO.image_name)),
     [imageDTO.image_name]
   );
   const isSelected = useAppSelector(selectIsSelected);
@@ -161,11 +112,12 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
         getInitialData: () => {
           const selection = selectSelection(store.getState());
           const boardId = selectSelectedBoardId(store.getState());
+
           // When we have multiple images selected, and the dragged image is part of the selection, initiate a
           // multi-image drag.
-          if (selection.length > 1 && selection.includes(imageDTO.image_name)) {
+          if (selection.length > 1 && selection.some((s) => s.id === imageDTO.image_name)) {
             return multipleImageDndSource.getData({
-              image_names: selection,
+              image_names: selection.map((s) => s.id),
               board_id: boardId,
             });
           }
@@ -241,9 +193,9 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
     <>
       <Flex
         ref={ref}
-        sx={galleryImageContainerSX}
+        sx={galleryItemContainerSX}
         data-is-dragging={isDragging}
-        data-image-name={imageDTO.image_name}
+        data-item-id={imageDTO.image_name}
         role="button"
         onMouseOver={onMouseOver}
         onMouseOut={onMouseOut}
@@ -262,7 +214,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
           maxH="full"
           borderRadius="base"
         />
-        <GalleryImageHoverIcons imageDTO={imageDTO} isHovered={isHovered} />
+        <GalleryItemHoverIcons itemDTO={imageDTO} isHovered={isHovered} />
       </Flex>
       {dragPreviewState?.type === 'multiple-image' ? createMultipleImageDragPreview(dragPreviewState) : null}
       {dragPreviewState?.type === 'single-image' ? createSingleImageDragPreview(dragPreviewState) : null}

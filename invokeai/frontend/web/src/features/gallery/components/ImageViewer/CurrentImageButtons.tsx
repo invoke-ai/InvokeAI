@@ -1,7 +1,7 @@
 import { Button, Divider, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
-import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
+import SingleSelectionMenuItems from 'features/gallery/components/ContextMenu/SingleSelectionMenuItems';
 import { useDeleteImage } from 'features/gallery/hooks/useDeleteImage';
 import { useEditImage } from 'features/gallery/hooks/useEditImage';
 import { useLoadWorkflow } from 'features/gallery/hooks/useLoadWorkflow';
@@ -11,6 +11,7 @@ import { useRecallPrompts } from 'features/gallery/hooks/useRecallPrompts';
 import { useRecallRemix } from 'features/gallery/hooks/useRecallRemix';
 import { useRecallSeed } from 'features/gallery/hooks/useRecallSeed';
 import { boardIdSelected } from 'features/gallery/store/gallerySlice';
+import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { PostProcessingPopover } from 'features/parameters/components/PostProcessing/PostProcessingPopover';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -47,7 +48,15 @@ export const CurrentImageButtons = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
     navigationApi.expandRightPanel();
     galleryPanel.expand();
     flushSync(() => {
-      dispatch(boardIdSelected({ boardId: imageDTO.board_id ?? 'none', selectedImageName: imageDTO.image_name }));
+      dispatch(
+        boardIdSelected({
+          boardId: imageDTO.board_id ?? 'none',
+          select: {
+            selection: [{ type: 'image', id: imageDTO.image_name }],
+            galleryView: IMAGE_CATEGORIES.includes(imageDTO.image_category) ? 'images' : 'assets',
+          },
+        })
+      );
     });
   }, [dispatch, galleryPanel, imageDTO]);
 

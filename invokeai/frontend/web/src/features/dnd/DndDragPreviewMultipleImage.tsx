@@ -21,7 +21,7 @@ const DndDragPreviewMultipleImage = memo(({ image_names }: { image_names: string
       borderRadius="base"
     >
       <Heading>{image_names.length}</Heading>
-      <Heading size="sm">{t('parameters.images')}</Heading>
+      <Heading size="sm">{t('parameters.images_withCount', { count: image_names.length })}</Heading>
     </Flex>
   );
 });

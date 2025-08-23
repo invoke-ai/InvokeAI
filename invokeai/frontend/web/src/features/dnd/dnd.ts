@@ -9,9 +9,11 @@ import { selectComparisonImages } from 'features/gallery/components/ImageViewer/
 import type { BoardId } from 'features/gallery/store/types';
 import {
   addImagesToBoard,
+  addVideosToBoard,
   createNewCanvasEntityFromImage,
   newCanvasFromImage,
   removeImagesFromBoard,
+  removeVideosFromBoard,
   replaceCanvasEntityObjectsWithImage,
   setComparisonImage,
   setGlobalReferenceImage,
@@ -22,9 +24,10 @@ import {
 import { fieldImageCollectionValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectFieldInputInstanceSafe, selectNodesSlice } from 'features/nodes/store/selectors';
 import { type FieldIdentifier, isImageFieldCollectionInputInstance } from 'features/nodes/types/field';
+import { startingFrameImageChanged } from 'features/parameters/store/videoSlice';
 import { expandPrompt } from 'features/prompt/PromptExpansion/expand';
 import { promptExpansionApi } from 'features/prompt/PromptExpansion/state';
-import type { ImageDTO } from 'services/api/types';
+import type { ImageDTO, VideoDTO } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
 const log = logger('dnd');
@@ -70,6 +73,35 @@ type DndSource<SourceData extends DndData> = {
   typeGuard: ReturnType<typeof buildTypeGuard<SourceData>>;
   getData: ReturnType<typeof buildGetData<SourceData>>;
 };
+
+//#region Single Video
+const _singleVideo = buildTypeAndKey('single-video');
+export type SingleVideoDndSourceData = DndData<
+  typeof _singleVideo.type,
+  typeof _singleVideo.key,
+  { videoDTO: VideoDTO }
+>;
+export const singleVideoDndSource: DndSource<SingleVideoDndSourceData> = {
+  ..._singleVideo,
+  typeGuard: buildTypeGuard(_singleVideo.key),
+  getData: buildGetData(_singleVideo.key, _singleVideo.type),
+};
+//#endregion
+
+//#region Multiple Image
+const _multipleVideo = buildTypeAndKey('multiple-video');
+export type MultipleVideoDndSourceData = DndData<
+  typeof _multipleVideo.type,
+  typeof _multipleVideo.key,
+  { video_ids: string[]; board_id: BoardId }
+>;
+export const multipleVideoDndSource: DndSource<MultipleVideoDndSourceData> = {
+  ..._multipleVideo,
+  typeGuard: buildTypeGuard(_multipleVideo.key),
+  getData: buildGetData(_multipleVideo.key, _multipleVideo.type),
+};
+//#endregion
+
 //#region Single Image
 const _singleImage = buildTypeAndKey('single-image');
 export type SingleImageDndSourceData = DndData<
@@ -443,12 +475,22 @@ export type AddImageToBoardDndTargetData = DndData<
 >;
 export const addImageToBoardDndTarget: DndTarget<
   AddImageToBoardDndTargetData,
-  SingleImageDndSourceData | MultipleImageDndSourceData
+  SingleImageDndSourceData | MultipleImageDndSourceData | SingleVideoDndSourceData | MultipleVideoDndSourceData
 > = {
   ..._addToBoard,
   typeGuard: buildTypeGuard(_addToBoard.key),
   getData: buildGetData(_addToBoard.key, _addToBoard.type),
   isValid: ({ sourceData, targetData }) => {
+    if (singleVideoDndSource.typeGuard(sourceData)) {
+      const currentBoard = sourceData.payload.videoDTO.board_id ?? 'none';
+      const destinationBoard = targetData.payload.boardId;
+      return currentBoard !== destinationBoard;
+    }
+    if (multipleVideoDndSource.typeGuard(sourceData)) {
+      const currentBoard = sourceData.payload.board_id;
+      const destinationBoard = targetData.payload.boardId;
+      return currentBoard !== destinationBoard;
+    }
     if (singleImageDndSource.typeGuard(sourceData)) {
       const currentBoard = sourceData.payload.imageDTO.board_id ?? 'none';
       const destinationBoard = targetData.payload.boardId;
@@ -462,6 +504,18 @@ export const addImageToBoardDndTarget: DndTarget<
     return false;
   },
   handler: ({ sourceData, targetData, dispatch }) => {
+    if (singleVideoDndSource.typeGuard(sourceData)) {
+      const { videoDTO } = sourceData.payload;
+      const { boardId } = targetData.payload;
+      addVideosToBoard({ video_ids: [videoDTO.video_id], boardId, dispatch });
+    }
+
+    if (multipleVideoDndSource.typeGuard(sourceData)) {
+      const { video_ids } = sourceData.payload;
+      const { boardId } = targetData.payload;
+      addVideosToBoard({ video_ids, boardId, dispatch });
+    }
+
     if (singleImageDndSource.typeGuard(sourceData)) {
       const { imageDTO } = sourceData.payload;
       const { boardId } = targetData.payload;
@@ -487,7 +541,7 @@ export type RemoveImageFromBoardDndTargetData = DndData<
 >;
 export const removeImageFromBoardDndTarget: DndTarget<
   RemoveImageFromBoardDndTargetData,
-  SingleImageDndSourceData | MultipleImageDndSourceData
+  SingleImageDndSourceData | MultipleImageDndSourceData | SingleVideoDndSourceData | MultipleVideoDndSourceData
 > = {
   ..._removeFromBoard,
   typeGuard: buildTypeGuard(_removeFromBoard.key),
@@ -503,6 +557,16 @@ export const removeImageFromBoardDndTarget: DndTarget<
       return currentBoard !== 'none';
     }
 
+    if (singleVideoDndSource.typeGuard(sourceData)) {
+      const currentBoard = sourceData.payload.videoDTO.board_id ?? 'none';
+      return currentBoard !== 'none';
+    }
+
+    if (multipleVideoDndSource.typeGuard(sourceData)) {
+      const currentBoard = sourceData.payload.board_id;
+      return currentBoard !== 'none';
+    }
+
     return false;
   },
   handler: ({ sourceData, dispatch }) => {
@@ -514,6 +578,16 @@ export const removeImageFromBoardDndTarget: DndTarget<
     if (multipleImageDndSource.typeGuard(sourceData)) {
       const { image_names } = sourceData.payload;
       removeImagesFromBoard({ image_names, dispatch });
+    }
+
+    if (singleVideoDndSource.typeGuard(sourceData)) {
+      const { videoDTO } = sourceData.payload;
+      removeVideosFromBoard({ video_ids: [videoDTO.video_id], dispatch });
+    }
+
+    if (multipleVideoDndSource.typeGuard(sourceData)) {
+      const { video_ids } = sourceData.payload;
+      removeVideosFromBoard({ video_ids, dispatch });
     }
   },
 };
@@ -548,6 +622,30 @@ export const promptGenerationFromImageDndTarget: DndTarget<
 };
 //#endregion
 
+//#region Video Frame From Image
+const _videoFrameFromImage = buildTypeAndKey('video-frame-from-image');
+type VideoFrameFromImageDndTargetData = DndData<
+  typeof _videoFrameFromImage.type,
+  typeof _videoFrameFromImage.key,
+  { frame: 'start' | 'end' }
+>;
+export const videoFrameFromImageDndTarget: DndTarget<VideoFrameFromImageDndTargetData, SingleImageDndSourceData> = {
+  ..._videoFrameFromImage,
+  typeGuard: buildTypeGuard(_videoFrameFromImage.key),
+  getData: buildGetData(_videoFrameFromImage.key, _videoFrameFromImage.type),
+  isValid: ({ sourceData }) => {
+    if (singleImageDndSource.typeGuard(sourceData)) {
+      return true;
+    }
+    return false;
+  },
+  handler: ({ sourceData, dispatch }) => {
+    const { imageDTO } = sourceData.payload;
+    dispatch(startingFrameImageChanged(imageDTOToImageWithDims(imageDTO)));
+  },
+};
+//#endregion
+
 export const dndTargets = [
   setGlobalReferenceImageDndTarget,
   addGlobalReferenceImageDndTarget,
@@ -562,6 +660,7 @@ export const dndTargets = [
   addImageToBoardDndTarget,
   removeImageFromBoardDndTarget,
   promptGenerationFromImageDndTarget,
+  videoFrameFromImageDndTarget,
 ] as const;
 
 export type AnyDndTarget = (typeof dndTargets)[number];

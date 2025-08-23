@@ -1,7 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
+import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { selectShouldShowImageDetails, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import { setShouldShowImageDetails } from 'features/ui/store/uiSlice';
@@ -20,7 +20,7 @@ export const ToggleMetadataViewerButton = memo(() => {
   const isDisabledOverride = hasProgressImage && shouldShowProgressInViewer;
 
   const shouldShowImageDetails = useAppSelector(selectShouldShowImageDetails);
-  const imageDTO = useAppSelector(selectLastSelectedImage);
+  const imageDTO = useAppSelector(selectLastSelectedItem);
   const { t } = useTranslation();
 
   const toggleMetadataViewer = useCallback(() => {

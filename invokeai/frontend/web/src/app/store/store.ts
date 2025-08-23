@@ -33,6 +33,7 @@ import { nodesSliceConfig } from 'features/nodes/store/nodesSlice';
 import { workflowLibrarySliceConfig } from 'features/nodes/store/workflowLibrarySlice';
 import { workflowSettingsSliceConfig } from 'features/nodes/store/workflowSettingsSlice';
 import { upscaleSliceConfig } from 'features/parameters/store/upscaleSlice';
+import { videoSliceConfig } from 'features/parameters/store/videoSlice';
 import { queueSliceConfig } from 'features/queue/store/queueSlice';
 import { stylePresetSliceConfig } from 'features/stylePresets/store/stylePresetSlice';
 import { configSliceConfig } from 'features/system/store/configSlice';
@@ -78,6 +79,7 @@ const SLICE_CONFIGS = {
   [systemSliceConfig.slice.reducerPath]: systemSliceConfig,
   [uiSliceConfig.slice.reducerPath]: uiSliceConfig,
   [upscaleSliceConfig.slice.reducerPath]: upscaleSliceConfig,
+  [videoSliceConfig.slice.reducerPath]: videoSliceConfig,
   [workflowLibrarySliceConfig.slice.reducerPath]: workflowLibrarySliceConfig,
   [workflowSettingsSliceConfig.slice.reducerPath]: workflowSettingsSliceConfig,
 };
@@ -111,6 +113,7 @@ const ALL_REDUCERS = {
   [systemSliceConfig.slice.reducerPath]: systemSliceConfig.slice.reducer,
   [uiSliceConfig.slice.reducerPath]: uiSliceConfig.slice.reducer,
   [upscaleSliceConfig.slice.reducerPath]: upscaleSliceConfig.slice.reducer,
+  [videoSliceConfig.slice.reducerPath]: videoSliceConfig.slice.reducer,
   [workflowLibrarySliceConfig.slice.reducerPath]: workflowLibrarySliceConfig.slice.reducer,
   [workflowSettingsSliceConfig.slice.reducerPath]: workflowSettingsSliceConfig.slice.reducer,
 };

@@ -6,7 +6,8 @@ import { DeleteImageModal } from 'features/deleteImageModal/components/DeleteIma
 import { FullscreenDropzone } from 'features/dnd/FullscreenDropzone';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
-import { ImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
+import { ImageContextMenu } from 'features/gallery/components/ContextMenu/ImageContextMenu';
+import { VideoContextMenu } from 'features/gallery/components/ContextMenu/VideoContextMenu';
 import { ShareWorkflowModal } from 'features/nodes/components/sidePanel/workflow/WorkflowLibrary/ShareWorkflowModal';
 import { WorkflowLibraryModal } from 'features/nodes/components/sidePanel/workflow/WorkflowLibrary/WorkflowLibraryModal';
 import { CancelAllExceptCurrentQueueItemConfirmationAlertDialog } from 'features/queue/components/CancelAllExceptCurrentQueueItemConfirmationAlertDialog';
@@ -47,6 +48,7 @@ export const GlobalModalIsolator = memo(() => {
       <DeleteBoardModal />
       <GlobalImageHotkeys />
       <ImageContextMenu />
+      <VideoContextMenu />
       <FullscreenDropzone />
       <VideosModal />
       <SaveWorkflowAsDialog />

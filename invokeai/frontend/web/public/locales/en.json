@@ -43,6 +43,8 @@
         "move": "Move",
         "movingImagesToBoard_one": "Moving {{count}} image to board:",
         "movingImagesToBoard_other": "Moving {{count}} images to board:",
+        "movingVideosToBoard_one": "Moving {{count}} video to board:",
+        "movingVideosToBoard_other": "Moving {{count}} videos to board:",
         "myBoard": "My Board",
         "noBoards": "No {{boardType}} Boards",
         "noMatching": "No matching Boards",
@@ -380,6 +382,7 @@
         "sortDirection": "Sort Direction",
         "showStarredImagesFirst": "Show Starred Images First",
         "noImageSelected": "No Image Selected",
+        "noVideoSelected": "No Video Selected",
         "noImagesInGallery": "No Images to Display",
         "starImage": "Star Image",
         "unstarImage": "Unstar Image",
@@ -411,7 +414,9 @@
         "openViewer": "Open Viewer",
         "closeViewer": "Close Viewer",
         "move": "Move",
-        "useForPromptGeneration": "Use for Prompt Generation"
+        "useForPromptGeneration": "Use for Prompt Generation",
+        "videos": "Videos",
+        "videosTab": "Videos you've created and saved within Invoke."
     },
     "hotkeys": {
         "hotkeys": "Hotkeys",
@@ -1185,6 +1190,7 @@
     },
     "parameters": {
         "aspect": "Aspect",
+        "duration": "Duration",
         "lockAspectRatio": "Lock Aspect Ratio",
         "swapDimensions": "Swap Dimensions",
         "setToOptimalSize": "Optimize size for model",
@@ -1209,6 +1215,10 @@
         "height": "Height",
         "imageFit": "Fit Initial Image To Output Size",
         "images": "Images",
+        "images_withCount_one": "Image",
+        "images_withCount_other": "Images",
+        "videos_withCount_one": "Video",
+        "videos_withCount_other": "Videos",
         "infillMethod": "Infill Method",
         "infillColorValue": "Fill Color",
         "info": "Info",
@@ -1235,6 +1245,7 @@
             "batchNodeCollectionSizeMismatchNoGroupId": "Batch group collection size mismatch",
             "batchNodeCollectionSizeMismatch": "Collection size mismatch on Batch {{batchGroupId}}",
             "noModelSelected": "No model selected",
+            "noStartingFrameImage": "No starting frame image",
             "noT5EncoderModelSelected": "No T5 Encoder model selected for FLUX generation",
             "noFLUXVAEModelSelected": "No VAE model selected for FLUX generation",
             "noCLIPEmbedModelSelected": "No CLIP Embed model selected for FLUX generation",
@@ -1247,7 +1258,6 @@
             "modelIncompatibleScaledBboxWidth": "Scaled bbox width is {{width}} but {{model}} requires multiple of {{multiple}}",
             "modelIncompatibleScaledBboxHeight": "Scaled bbox height is {{height}} but {{model}} requires multiple of {{multiple}}",
             "fluxModelMultipleControlLoRAs": "Can only use 1 Control LoRA at a time",
-            "fluxKontextMultipleReferenceImages": "Can only use 1 Reference Image at a time with FLUX Kontext via BFL API",
             "canvasIsFiltering": "Canvas is busy (filtering)",
             "canvasIsTransforming": "Canvas is busy (transforming)",
             "canvasIsRasterizing": "Canvas is busy (rasterizing)",
@@ -1278,6 +1288,7 @@
         "imageActions": "Image Actions",
         "sendToCanvas": "Send To Canvas",
         "sendToUpscale": "Send To Upscale",
+        "sendToVideo": "Send To Video",
         "showOptionsPanel": "Show Side Panel (O or T)",
         "shuffle": "Shuffle Seed",
         "steps": "Steps",
@@ -1289,6 +1300,7 @@
         "postProcessing": "Post-Processing (Shift + U)",
         "processImage": "Process Image",
         "upscaling": "Upscaling",
+        "video": "Video",
         "useAll": "Use All",
         "useSize": "Use Size",
         "useCpuNoise": "Use CPU Noise",
@@ -1300,6 +1312,7 @@
         "gaussianBlur": "Gaussian Blur",
         "boxBlur": "Box Blur",
         "staged": "Staged",
+        "resolution": "Resolution",
         "modelDisabledForTrial": "Generating with {{modelName}} is not available on trial accounts. Visit your <LinkComponent>account settings</LinkComponent> to upgrade."
     },
     "dynamicPrompts": {
@@ -2560,19 +2573,30 @@
             "queue": "Queue",
             "upscaling": "Upscaling",
             "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)",
+            "video": "Video",
             "gallery": "Gallery"
         },
         "panels": {
             "launchpad": "Launchpad",
             "workflowEditor": "Workflow Editor",
             "imageViewer": "Image Viewer",
-            "canvas": "Canvas"
+            "canvas": "Canvas",
+            "video": "Video"
         },
         "launchpad": {
             "workflowsTitle": "Go deep with Workflows.",
             "upscalingTitle": "Upscale and add detail.",
             "canvasTitle": "Edit and refine on Canvas.",
             "generateTitle": "Generate images from text prompts.",
+            "videoTitle": "Generate videos from text prompts.",
+            "video": {
+                "startingFrameCalloutTitle": "Add a Starting Frame",
+                "startingFrameCalloutDesc": "Add an image to control the first frame of your video."
+            },
+            "addStartingFrame": {
+                "title": "Add a Starting Frame",
+                "description": "Add an image to control the first frame of your video."
+            }
             "modelGuideText": "Want to learn what prompts work best for each model?",
             "modelGuideLink": "Check out our Model Guide.",
             "createNewWorkflowFromScratch": "Create a new Workflow from scratch",
@@ -2646,6 +2670,10 @@
                 }
             }
         }
+    },
+    "video": {
+        "noVideoSelected": "No video selected",
+        "selectFromGallery": "Select a video from the gallery to play"
     },
     "system": {
         "enableLogging": "Enable Logging",

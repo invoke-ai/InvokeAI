@@ -7,7 +7,7 @@ import { singleImageDndSource } from 'features/dnd/dnd';
 import type { DndDragPreviewSingleImageState } from 'features/dnd/DndDragPreviewSingleImage';
 import { createSingleImageDragPreview, setSingleImageDragPreview } from 'features/dnd/DndDragPreviewSingleImage';
 import { firefoxDndFix } from 'features/dnd/util';
-import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
+import { useImageContextMenu } from 'features/gallery/components/ContextMenu/ImageContextMenu';
 import { forwardRef, memo, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
 

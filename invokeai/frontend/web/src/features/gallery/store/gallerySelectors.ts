@@ -2,10 +2,10 @@ import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
-import type { GetImageNamesArgs, ListBoardsArgs } from 'services/api/types';
+import type { GetImageNamesArgs, GetVideoIdsArgs, ListBoardsArgs } from 'services/api/types';
 
-export const selectFirstSelectedImage = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(0));
-export const selectLastSelectedImage = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(-1));
+export const selectFirstSelectedItem = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(0));
+export const selectLastSelectedItem = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(-1));
 
 export const selectListBoardsQueryArgs = createMemoizedSelector(
   selectGallerySlice,
@@ -20,9 +20,15 @@ export const selectAutoAddBoardId = createSelector(selectGallerySlice, (gallery)
 export const selectAutoSwitch = createSelector(selectGallerySlice, (gallery) => gallery.shouldAutoSwitch);
 export const selectSelectedBoardId = createSelector(selectGallerySlice, (gallery) => gallery.selectedBoardId);
 export const selectGalleryView = createSelector(selectGallerySlice, (gallery) => gallery.galleryView);
-const selectGalleryQueryCategories = createSelector(selectGalleryView, (galleryView) =>
-  galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES
-);
+const selectGalleryQueryCategories = createSelector(selectGalleryView, (galleryView) => {
+  if (galleryView === 'images') {
+    return IMAGE_CATEGORIES;
+  }
+  if (galleryView === 'videos') {
+    return [];
+  }
+  return ASSETS_CATEGORIES;
+});
 const selectGallerySearchTerm = createSelector(selectGallerySlice, (gallery) => gallery.searchTerm);
 const selectGalleryOrderDir = createSelector(selectGallerySlice, (gallery) => gallery.orderDir);
 const selectGalleryStarredFirst = createSelector(selectGallerySlice, (gallery) => gallery.starredFirst);
@@ -44,6 +50,18 @@ export const selectGetImageNamesQueryArgs = createMemoizedSelector(
     is_intermediate: false,
   })
 );
+
+export const selectGetVideoIdsQueryArgs = createMemoizedSelector(
+  [selectSelectedBoardId, selectGallerySearchTerm, selectGalleryOrderDir, selectGalleryStarredFirst],
+  (board_id, search_term, order_dir, starred_first): GetVideoIdsArgs => ({
+    board_id,
+    search_term,
+    order_dir,
+    starred_first,
+    is_intermediate: false,
+  })
+);
+
 export const selectAutoAssignBoardOnClick = createSelector(
   selectGallerySlice,
   (gallery) => gallery.autoAssignBoardOnClick

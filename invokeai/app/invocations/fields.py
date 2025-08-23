@@ -65,11 +65,14 @@ class UIType(str, Enum, metaclass=MetaEnum):
     Imagen4Model = "Imagen4ModelField"
     ChatGPT4oModel = "ChatGPT4oModelField"
     FluxKontextModel = "FluxKontextModelField"
+    Veo3Model = "Veo3ModelField"
+    RunwayModel = "RunwayModelField"
     # endregion
 
     # region Misc Field Types
     Scheduler = "SchedulerField"
     Any = "AnyField"
+    Video = "VideoField"
     # endregion
 
     # region Internal Field Types
@@ -222,6 +225,12 @@ class ImageField(BaseModel):
     """An image primitive field"""
 
     image_name: str = Field(description="The name of the image")
+
+
+class VideoField(BaseModel):
+    """A video primitive field"""
+
+    video_id: str = Field(description="The id of the video")
 
 
 class BoardField(BaseModel):

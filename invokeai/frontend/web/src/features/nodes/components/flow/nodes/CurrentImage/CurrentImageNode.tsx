@@ -4,8 +4,8 @@ import type { NodeProps } from '@xyflow/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { DndImage } from 'features/dnd/DndImage';
-import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
-import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
+import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
+import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import NonInvocationNodeWrapper from 'features/nodes/components/flow/nodes/common/NonInvocationNodeWrapper';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import type { AnimationProps } from 'framer-motion';
@@ -17,9 +17,9 @@ import { useImageDTO } from 'services/api/endpoints/images';
 import { $lastProgressEvent } from 'services/events/stores';
 
 const CurrentImageNode = (props: NodeProps) => {
-  const image_name = useAppSelector(selectLastSelectedImage);
+  const lastSelectedItem = useAppSelector(selectLastSelectedItem);
   const lastProgressEvent = useStore($lastProgressEvent);
-  const imageDTO = useImageDTO(image_name);
+  const imageDTO = useImageDTO(lastSelectedItem?.id);
 
   if (lastProgressEvent?.image) {
     return (
@@ -76,7 +76,7 @@ const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => {
           {props.children}
           {isHovering && (
             <motion.div key="nextPrevButtons" initial={initial} animate={animate} exit={exit} style={styles}>
-              <NextPrevImageButtons inset={2} />
+              <NextPrevItemButtons inset={2} />
             </motion.div>
           )}
         </Flex>

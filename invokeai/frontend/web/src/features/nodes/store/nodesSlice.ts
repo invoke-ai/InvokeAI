@@ -51,6 +51,7 @@ import type {
   LoRAModelFieldValue,
   MainModelFieldValue,
   ModelIdentifierFieldValue,
+  RunwayModelFieldValue,
   SchedulerFieldValue,
   SDXLRefinerModelFieldValue,
   SigLipModelFieldValue,
@@ -62,6 +63,7 @@ import type {
   T2IAdapterModelFieldValue,
   T5EncoderModelFieldValue,
   VAEModelFieldValue,
+  Veo3ModelFieldValue,
 } from 'features/nodes/types/field';
 import {
   zBoardFieldValue,
@@ -93,6 +95,7 @@ import {
   zLoRAModelFieldValue,
   zMainModelFieldValue,
   zModelIdentifierFieldValue,
+  zRunwayModelFieldValue,
   zSchedulerFieldValue,
   zSDXLRefinerModelFieldValue,
   zSigLipModelFieldValue,
@@ -104,6 +107,7 @@ import {
   zT2IAdapterModelFieldValue,
   zT5EncoderModelFieldValue,
   zVAEModelFieldValue,
+  zVeo3ModelFieldValue,
 } from 'features/nodes/types/field';
 import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
 import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
@@ -552,6 +556,12 @@ const slice = createSlice({
     fieldChatGPT4oModelValueChanged: (state, action: FieldValueAction<ChatGPT4oModelFieldValue>) => {
       fieldValueReducer(state, action, zChatGPT4oModelFieldValue);
     },
+    fieldVeo3ModelValueChanged: (state, action: FieldValueAction<Veo3ModelFieldValue>) => {
+      fieldValueReducer(state, action, zVeo3ModelFieldValue);
+    },
+    fieldRunwayModelValueChanged: (state, action: FieldValueAction<RunwayModelFieldValue>) => {
+      fieldValueReducer(state, action, zRunwayModelFieldValue);
+    },
     fieldFluxKontextModelValueChanged: (state, action: FieldValueAction<FluxKontextModelFieldValue>) => {
       fieldValueReducer(state, action, zFluxKontextModelFieldValue);
     },
@@ -730,6 +740,8 @@ export const {
   fieldIntegerGeneratorValueChanged,
   fieldStringGeneratorValueChanged,
   fieldImageGeneratorValueChanged,
+  fieldVeo3ModelValueChanged,
+  fieldRunwayModelValueChanged,
   fieldDescriptionChanged,
   nodeEditorReset,
   nodeIsIntermediateChanged,

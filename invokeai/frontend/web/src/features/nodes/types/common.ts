@@ -1,3 +1,6 @@
+import type { S } from 'services/api/types';
+import type { Equals } from 'tsafe';
+import { assert } from 'tsafe';
 import { z } from 'zod';
 
 // #region Field data schemas
@@ -10,6 +13,13 @@ const zImageFieldCollection = z.array(zImageField);
 type ImageFieldCollection = z.infer<typeof zImageFieldCollection>;
 export const isImageFieldCollection = (field: unknown): field is ImageFieldCollection =>
   zImageFieldCollection.safeParse(field).success;
+
+export const zVideoField = z.object({
+  video_id: z.string().trim().min(1),
+});
+export type VideoField = z.infer<typeof zVideoField>;
+export const isVideoField = (field: unknown): field is VideoField => zVideoField.safeParse(field).success;
+assert<Equals<VideoField, S['VideoField']>>();
 
 export const zBoardField = z.object({
   board_id: z.string().trim().min(1),
@@ -76,6 +86,8 @@ const zBaseModel = z.enum([
   'imagen4',
   'chatgpt-4o',
   'flux-kontext',
+  'veo3',
+  'runway',
 ]);
 export type BaseModelType = z.infer<typeof zBaseModel>;
 export const zMainModelBase = z.enum([
@@ -109,6 +121,7 @@ export const zModelType = z.enum([
   'clip_embed',
   'siglip',
   'flux_redux',
+  'video',
 ]);
 const zSubModelType = z.enum([
   'unet',
@@ -187,4 +200,12 @@ export const zImageOutput = z.object({
   type: z.literal('image_output'),
 });
 export type ImageOutput = z.infer<typeof zImageOutput>;
+// #endregion
+
+// #region ImageOutput
+export const zVideoOutput = z.object({
+  video_id: z.string().trim().min(1),
+  type: z.literal('video_output'),
+});
+export type VideoOutput = z.infer<typeof zVideoOutput>;
 // #endregion

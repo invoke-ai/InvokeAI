@@ -3,7 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { setComparisonImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { CurrentImagePreview } from 'features/gallery/components/ImageViewer/CurrentImagePreview';
-import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
+import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useImageDTO } from 'services/api/endpoints/images';
@@ -15,8 +15,8 @@ const dndTargetData = setComparisonImageDndTarget.getData();
 export const ImageViewer = memo(() => {
   const { t } = useTranslation();
 
-  const lastSelectedImageName = useAppSelector(selectLastSelectedImage);
-  const lastSelectedImageDTO = useImageDTO(lastSelectedImageName);
+  const lastSelectedItem = useAppSelector(selectLastSelectedItem);
+  const lastSelectedImageDTO = useImageDTO(lastSelectedItem?.type === 'image' ? lastSelectedItem.id : null);
   return (
     <Flex flexDir="column" w="full" h="full" overflow="hidden" gap={2} position="relative">
       <ViewerToolbar />

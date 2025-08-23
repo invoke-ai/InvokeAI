@@ -461,6 +461,40 @@ export const FLUX_KONTEXT_ASPECT_RATIOS: Record<FluxKontextAspectRatio, Dimensio
   '1:1': { width: 1024, height: 1024 },
 };
 
+export const zVeo3AspectRatioID = z.enum(['16:9']);
+type Veo3AspectRatio = z.infer<typeof zVeo3AspectRatioID>;
+export const isVeo3AspectRatioID = (v: unknown): v is Veo3AspectRatio => zVeo3AspectRatioID.safeParse(v).success;
+export const VEO3_ASPECT_RATIOS: Record<Veo3AspectRatio, Dimensions> = {
+  '16:9': { width: 1280, height: 720 },
+};
+
+export const zRunwayAspectRatioID = z.enum(['16:9', '4:3', '1:1', '3:4', '9:16', '21:9']);
+type RunwayAspectRatio = z.infer<typeof zRunwayAspectRatioID>;
+export const isRunwayAspectRatioID = (v: unknown): v is RunwayAspectRatio => zRunwayAspectRatioID.safeParse(v).success;
+export const RUNWAY_ASPECT_RATIOS: Record<RunwayAspectRatio, Dimensions> = {
+  '16:9': { width: 1280, height: 720 },
+  '4:3': { width: 1104, height: 832 },
+  '1:1': { width: 960, height: 960 },
+  '3:4': { width: 832, height: 1104 },
+  '9:16': { width: 720, height: 1280 },
+  '21:9': { width: 1584, height: 672 },
+};
+
+export const zVeo3Resolution = z.enum(['720p', '1080p']);
+export type Veo3Resolution = z.infer<typeof zVeo3Resolution>;
+export const isVeo3Resolution = (v: unknown): v is Veo3Resolution => zVeo3Resolution.safeParse(v).success;
+export const VEO3_RESOLUTIONS: Record<Veo3Resolution, Dimensions> = {
+  '720p': { width: 1280, height: 720 },
+  '1080p': { width: 1920, height: 1080 },
+};
+
+export const zRunwayResolution = z.enum(['720p']);
+export type RunwayResolution = z.infer<typeof zRunwayResolution>;
+export const isRunwayResolution = (v: unknown): v is RunwayResolution => zRunwayResolution.safeParse(v).success;
+export const RUNWAY_RESOLUTIONS: Record<RunwayResolution, Dimensions> = {
+  '720p': { width: 1280, height: 720 },
+};
+
 const zAspectRatioConfig = z.object({
   id: zAspectRatioID,
   value: z.number().gt(0),
@@ -472,6 +506,21 @@ export const DEFAULT_ASPECT_RATIO_CONFIG: AspectRatioConfig = {
   id: '1:1',
   value: 1,
   isLocked: false,
+};
+
+export const zVeo3DurationID = z.enum(['8']);
+export type Veo3Duration = z.infer<typeof zVeo3DurationID>;
+export const isVeo3DurationID = (v: unknown): v is Veo3Duration => zVeo3DurationID.safeParse(v).success;
+export const VEO3_DURATIONS: Record<Veo3Duration, string> = {
+  '8': '8 seconds',
+};
+
+export const zRunwayDurationID = z.enum(['5', '10']);
+export type RunwayDuration = z.infer<typeof zRunwayDurationID>;
+export const isRunwayDurationID = (v: unknown): v is RunwayDuration => zRunwayDurationID.safeParse(v).success;
+export const RUNWAY_DURATIONS: Record<RunwayDuration, string> = {
+  '5': '5 seconds',
+  '10': '10 seconds',
 };
 
 const zBboxState = z.object({

@@ -15,11 +15,14 @@ import type {
   UploadImageArg,
 } from 'services/api/types';
 import { getListImagesUrl } from 'services/api/util';
+import {
+  getTagsToInvalidateForBoardAffectingMutation,
+  getTagsToInvalidateForImageMutation,
+} from 'services/api/util/tagInvalidation';
 import stableHash from 'stable-hash';
 import type { Param0 } from 'tsafe';
 import type { JsonObject } from 'type-fest';
 
-import type { ApiTagDescription } from '..';
 import { api, buildV1Url, LIST_TAG } from '..';
 import { buildBoardsUrl } from './boards';
 
@@ -589,59 +592,4 @@ export const imageDTOToFile = async (imageDTO: ImageDTO): Promise<File> => {
 export const useImageDTO = (imageName: string | null | undefined) => {
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName ?? skipToken);
   return imageDTO ?? null;
-};
-
-const getTagsToInvalidateForImageMutation = (image_names: string[]): ApiTagDescription[] => {
-  const tags: ApiTagDescription[] = [];
-
-  for (const image_name of image_names) {
-    tags.push({
-      type: 'Image',
-      id: image_name,
-    });
-    tags.push({
-      type: 'ImageMetadata',
-      id: image_name,
-    });
-    tags.push({
-      type: 'ImageWorkflow',
-      id: image_name,
-    });
-  }
-
-  return tags;
-};
-
-const getTagsToInvalidateForBoardAffectingMutation = (affected_boards: string[]): ApiTagDescription[] => {
-  const tags: ApiTagDescription[] = ['ImageNameList'];
-
-  for (const board_id of affected_boards) {
-    tags.push({
-      type: 'ImageList',
-      id: getListImagesUrl({
-        board_id,
-        categories: IMAGE_CATEGORIES,
-      }),
-    });
-
-    tags.push({
-      type: 'ImageList',
-      id: getListImagesUrl({
-        board_id,
-        categories: ASSETS_CATEGORIES,
-      }),
-    });
-
-    tags.push({
-      type: 'Board',
-      id: board_id,
-    });
-
-    tags.push({
-      type: 'BoardImagesTotal',
-      id: board_id,
-    });
-  }
-
-  return tags;
 };
