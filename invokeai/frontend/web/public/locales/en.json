@@ -1948,6 +1948,8 @@
             "addToForm": "Add to Form",
             "label": "Label",
             "showDescription": "Show Description",
+            "showShuffle": "Show Shuffle",
+            "shuffle": "Shuffle",
             "component": "Component",
             "numberInput": "Number Input",
             "singleLine": "Single Line",

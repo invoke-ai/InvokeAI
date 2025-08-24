@@ -23,6 +23,7 @@ type Props = {
 export const NodeFieldElementIntegerSettings = memo(({ id, settings, nodeId, fieldName, fieldTemplate }: Props) => {
   return (
     <>
+      <SettingShuffle id={id} settings={settings} nodeId={nodeId} fieldName={fieldName} fieldTemplate={fieldTemplate} />
       <SettingComponent
         id={id}
         settings={settings}
@@ -36,6 +37,29 @@ export const NodeFieldElementIntegerSettings = memo(({ id, settings, nodeId, fie
   );
 });
 NodeFieldElementIntegerSettings.displayName = 'NodeFieldElementIntegerSettings';
+
+const SettingShuffle = memo(({ id, settings }: Props) => {
+  const { showShuffle } = settings;
+
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+
+  const toggleShowShuffle = useCallback(() => {
+    const newSettings: NodeFieldIntegerSettings = {
+      ...settings,
+      showShuffle: !showShuffle,
+    };
+    dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newSettings } }));
+  }, [dispatch, id, settings, showShuffle]);
+
+  return (
+    <FormControl>
+      <FormLabel flex={1}>{t('workflows.builder.showShuffle')}</FormLabel>
+      <Switch size="sm" isChecked={showShuffle} onChange={toggleShowShuffle} />
+    </FormControl>
+  );
+});
+SettingShuffle.displayName = 'SettingShuffle';
 
 const SettingComponent = memo(({ id, settings }: Props) => {
   const { t } = useTranslation();

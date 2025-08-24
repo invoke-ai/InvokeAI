@@ -74,6 +74,7 @@ export const NODE_FIELD_CLASS_NAME = `form-builder-${NODE_FIELD_TYPE}`;
 const FLOAT_FIELD_SETTINGS_TYPE = 'float-field-config';
 const zNodeFieldFloatSettings = z.object({
   type: z.literal(FLOAT_FIELD_SETTINGS_TYPE).default(FLOAT_FIELD_SETTINGS_TYPE),
+  showShuffle: z.boolean().default(false),
   component: zNumberComponent.default('number-input'),
   min: z.number().optional(),
   max: z.number().optional(),
@@ -84,6 +85,7 @@ export type NodeFieldFloatSettings = z.infer<typeof zNodeFieldFloatSettings>;
 const INTEGER_FIELD_CONFIG_TYPE = 'integer-field-config';
 const zNodeFieldIntegerSettings = z.object({
   type: z.literal(INTEGER_FIELD_CONFIG_TYPE).default(INTEGER_FIELD_CONFIG_TYPE),
+  showShuffle: z.boolean().default(false),
   component: zNumberComponent.default('number-input'),
   min: z.number().optional(),
   max: z.number().optional(),

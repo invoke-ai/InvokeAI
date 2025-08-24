@@ -406,8 +406,8 @@ export class CanvasColorPickerToolModule extends CanvasModuleBase {
   };
 
   onStagePointerUp = (_e: KonvaEventObject<PointerEvent>) => {
-    const color = this.$colorUnderCursor.get();
-    this.manager.stateApi.setColor({ ...color, a: color.a / 255 });
+    const { a: _, ...color } = this.$colorUnderCursor.get();
+    this.manager.stateApi.setColor(color);
   };
 
   onStagePointerMove = (_e: KonvaEventObject<PointerEvent>) => {

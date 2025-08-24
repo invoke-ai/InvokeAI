@@ -1,10 +1,12 @@
-import { CompositeSlider } from '@invoke-ai/ui-library';
+import { Button, CompositeSlider } from '@invoke-ai/ui-library';
 import type { FieldComponentProps } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/types';
 import { useIntegerField } from 'features/nodes/components/flow/nodes/Invocation/fields/IntegerField/useIntegerField';
 import { NO_DRAG_CLASS } from 'features/nodes/types/constants';
 import type { IntegerFieldInputInstance, IntegerFieldInputTemplate } from 'features/nodes/types/field';
 import type { NodeFieldIntegerSettings } from 'features/nodes/types/workflow';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { PiShuffleBold } from 'react-icons/pi';
 
 export const IntegerFieldSlider = memo(
   (
@@ -15,27 +17,36 @@ export const IntegerFieldSlider = memo(
     >
   ) => {
     const { nodeId, field, fieldTemplate, settings } = props;
-    const { defaultValue, onChange, min, max, step, fineStep } = useIntegerField(
+    const { defaultValue, onChange, min, max, step, fineStep, showShuffle, randomizeValue } = useIntegerField(
       nodeId,
       field.name,
       fieldTemplate,
       settings
     );
 
+    const { t } = useTranslation();
+
     return (
-      <CompositeSlider
-        defaultValue={defaultValue}
-        onChange={onChange}
-        value={field.value}
-        min={min}
-        max={max}
-        step={step}
-        fineStep={fineStep}
-        className={NO_DRAG_CLASS}
-        marks
-        withThumbTooltip
-        flex="1 1 0"
-      />
+      <>
+        <CompositeSlider
+          defaultValue={defaultValue}
+          onChange={onChange}
+          value={field.value}
+          min={min}
+          max={max}
+          step={step}
+          fineStep={fineStep}
+          className={NO_DRAG_CLASS}
+          marks
+          withThumbTooltip
+          flex="1 1 0"
+        />
+        {showShuffle && (
+          <Button size="sm" isDisabled={false} onClick={randomizeValue} leftIcon={<PiShuffleBold />} flexShrink={0}>
+            {t('workflows.builder.shuffle')}
+          </Button>
+        )}
+      </>
     );
   }
 );

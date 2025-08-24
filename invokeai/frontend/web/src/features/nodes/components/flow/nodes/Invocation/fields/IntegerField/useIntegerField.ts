@@ -1,5 +1,6 @@
 import { NUMPY_RAND_MAX } from 'app/constants';
 import { useAppDispatch } from 'app/store/storeHooks';
+import randomInt from 'common/util/randomInt';
 import { roundDownToMultiple, roundUpToMultiple } from 'common/util/roundDownToMultiple';
 import { isNil } from 'es-toolkit/compat';
 import { fieldIntegerValueChanged } from 'features/nodes/store/nodesSlice';
@@ -11,9 +12,9 @@ export const useIntegerField = (
   nodeId: string,
   fieldName: string,
   fieldTemplate: IntegerFieldInputTemplate,
-  overrides: { min?: number; max?: number; step?: number } = {}
+  overrides: { showShuffle?: boolean; min?: number; max?: number; step?: number } = {}
 ) => {
-  const { min: overrideMin, max: overrideMax, step: overrideStep } = overrides;
+  const { showShuffle, min: overrideMin, max: overrideMax, step: overrideStep } = overrides;
   const dispatch = useAppDispatch();
 
   const step = useMemo(() => {
@@ -65,8 +66,7 @@ export const useIntegerField = (
   }, [fieldTemplate.exclusiveMaximum, fieldTemplate.maximum, overrideMax, step]);
 
   const constrainValue = useCallback(
-    (v: number) =>
-      constrainNumber(v, { min, max, step: step }, { min: overrideMin, max: overrideMax, step: overrideStep }),
+    (v: number) => constrainNumber(v, { min, max, step }, { min: overrideMin, max: overrideMax, step: overrideStep }),
     [max, min, overrideMax, overrideMin, overrideStep, step]
   );
 
@@ -77,6 +77,11 @@ export const useIntegerField = (
     [dispatch, fieldName, nodeId]
   );
 
+  const randomizeValue = useCallback(() => {
+    const value = Math.round(randomInt(min, max) / step) * step;
+    dispatch(fieldIntegerValueChanged({ nodeId, fieldName, value }));
+  }, [dispatch, fieldName, nodeId, min, max, step]);
+
   return {
     defaultValue: fieldTemplate.default,
     onChange,
@@ -85,5 +90,7 @@ export const useIntegerField = (
     step,
     fineStep,
     constrainValue,
+    showShuffle,
+    randomizeValue,
   };
 };

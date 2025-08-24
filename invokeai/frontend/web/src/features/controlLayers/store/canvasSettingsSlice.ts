@@ -134,8 +134,8 @@ const slice = createSlice({
     settingsEraserWidthChanged: (state, action: PayloadAction<CanvasSettingsState['eraserWidth']>) => {
       state.eraserWidth = Math.round(action.payload);
     },
-    settingsColorChanged: (state, action: PayloadAction<CanvasSettingsState['color']>) => {
-      state.color = action.payload;
+    settingsColorChanged: (state, action: PayloadAction<Partial<CanvasSettingsState['color']>>) => {
+      state.color = { ...state.color, ...action.payload };
     },
     settingsInvertScrollForToolWidthChanged: (
       state,

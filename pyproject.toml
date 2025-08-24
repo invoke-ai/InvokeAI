@@ -38,7 +38,6 @@ dependencies = [
   "compel==2.1.1",
   "diffusers[torch]==0.33.0",
   "gguf",
-  "invisible-watermark==0.2.0",           # needed to install SDXL base and refiner using their repo_ids
   "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
   "numpy<2.0.0",
   "onnx==1.16.1",
@@ -74,6 +73,7 @@ dependencies = [
   "python-multipart",
   "requests",
   "semver~=3.0.1",
+  "PyWavelets",
 ]
 
 [project.optional-dependencies]
@@ -234,6 +234,7 @@ exclude = [
   "invokeai/backend/image_util/mlsd/",           # External code
   "invokeai/backend/image_util/normal_bae/",     # External code
   "invokeai/backend/image_util/pidi/",           # External code
+  "invokeai/backend/image_util/imwatermark/",    # External code
 ]
 
 [tool.ruff.lint]

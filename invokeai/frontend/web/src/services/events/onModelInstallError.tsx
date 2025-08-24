@@ -173,7 +173,7 @@ const HFUnauthorizedToastDescription = () => {
   if (data === 'unknown') {
     return (
       <Text fontSize="md">
-        {t('modelManager.hfTokenUnableToErrorMessage')}{' '}
+        {t('modelManager.hfTokenUnableToVerifyErrorMessage')}{' '}
         <Button onClick={onClick} variant="link" color="base.50" flexGrow={0}>
           {t('modelManager.modelManager')}.
         </Button>
@@ -181,6 +181,13 @@ const HFUnauthorizedToastDescription = () => {
     );
   }
 
-  // data === 'valid' - should never happen!
-  assert(false, 'Unexpected valid HF token with unauthorized error');
+  // data === 'valid' - user may have a token but not authorized for model?
+  return (
+    <Text fontSize="md">
+      {t('modelManager.hfTokenForbiddenErrorMessage')}{' '}
+      <Button onClick={onClick} variant="link" color="base.50" flexGrow={0}>
+        {t('modelManager.modelManager')}.
+      </Button>
+    </Text>
+  );
 };
