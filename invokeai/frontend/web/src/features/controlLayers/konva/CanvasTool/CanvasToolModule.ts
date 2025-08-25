@@ -164,7 +164,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     const selectedEntityAdapter = this.manager.stateApi.getSelectedEntityAdapter();
 
     if (this.manager.stage.getIsDragging()) {
-      this.tools.view.syncCursorStyle();
+      stage.setCursor('grabbing');
     } else if (tool === 'view') {
       this.tools.view.syncCursorStyle();
     } else if (segmentingAdapter) {
