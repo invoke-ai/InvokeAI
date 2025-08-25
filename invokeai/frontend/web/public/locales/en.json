@@ -622,6 +622,10 @@
                 "title": "Fit Bbox To Masks",
                 "desc": "Automatically adjust the generation bounding box to fit visible inpaint masks"
             },
+            "toggleBbox": {
+                "title": "Toggle Bbox Visibility",
+                "desc": "Hide or show the generation bounding box"
+            },
             "applySegmentAnything": {
                 "title": "Apply Segment Anything",
                 "desc": "Apply the current Segment Anything mask.",
