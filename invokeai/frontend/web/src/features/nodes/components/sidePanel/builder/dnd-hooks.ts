@@ -34,7 +34,7 @@ import {
 import { selectFormRootElementId, selectNodesSlice, selectWorkflowForm } from 'features/nodes/store/selectors';
 import type { FieldInputTemplate, StatefulFieldValue } from 'features/nodes/types/field';
 import type { ElementId, FormElement } from 'features/nodes/types/workflow';
-import { buildNodeFieldElement, isContainerElement } from 'features/nodes/types/workflow';
+import { buildNodeFieldElement, isContainerElement, isNodeFieldElement } from 'features/nodes/types/workflow';
 import type { RefObject } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
@@ -119,6 +119,29 @@ const useElementExists = () => {
     [store]
   );
   return _elementExists;
+};
+
+/**
+ * Checks if a node field element exists in the form.
+ *
+ * @param form The form to check
+ * @param nodeId The id of the node
+ * @param fieldName The name of field
+ *
+ * @returns True if the element exists, false otherwise
+ */
+export const useNodeFieldElementExists = () => {
+  const store = useAppStore();
+  const nodeFieldElementExists = useCallback(
+    (nodeId: string, fieldName: string): boolean => {
+      const form = selectWorkflowForm(store.getState());
+      return Object.values(form.elements)
+        .filter(isNodeFieldElement)
+        .some((el) => el.data.fieldIdentifier.nodeId === nodeId && el.data.fieldIdentifier.fieldName === fieldName);
+    },
+    [store]
+  );
+  return nodeFieldElementExists;
 };
 
 /**
@@ -368,6 +391,7 @@ export const useFormElementDnd = (
   const [activeDropRegion, setActiveDropRegion] = useState<CenterOrEdge | null>(null);
   const getElement = useGetElement();
   const getAllowedDropRegions = useGetAllowedDropRegions();
+  const nodeFieldElementExists = useNodeFieldElementExists();
 
   useEffect(() => {
     if (isRootElement) {
@@ -401,7 +425,7 @@ export const useFormElementDnd = (
         // TODO(psyche): This causes a kinda jittery behaviour - need a better heuristic to determine stickiness
         getIsSticky: () => false,
         canDrop: ({ source }) => {
-          if (isNodeFieldDndData(source.data)) {
+          if (isNodeFieldDndData(source.data) && !nodeFieldElementExists(source.data.nodeId, source.data.fieldName)) {
             return true;
           }
           if (isFormElementDndData(source.data)) {
@@ -449,7 +473,15 @@ export const useFormElementDnd = (
         },
       })
     );
-  }, [dragHandleRef, draggableRef, elementId, getAllowedDropRegions, getElement, isRootElement]);
+  }, [
+    dragHandleRef,
+    draggableRef,
+    elementId,
+    getAllowedDropRegions,
+    getElement,
+    nodeFieldElementExists,
+    isRootElement,
+  ]);
 
   return [activeDropRegion, isDragging] as const;
 };
