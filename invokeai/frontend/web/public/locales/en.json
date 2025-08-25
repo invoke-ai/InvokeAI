@@ -61,6 +61,8 @@
         "imagesWithCount_other": "{{count}} images",
         "assetsWithCount_one": "{{count}} asset",
         "assetsWithCount_other": "{{count}} assets",
+        "videosWithCount_one": "{{count}} video",
+        "videosWithCount_other": "{{count}} videos",
         "updateBoardError": "Error updating board"
     },
     "accordions": {
