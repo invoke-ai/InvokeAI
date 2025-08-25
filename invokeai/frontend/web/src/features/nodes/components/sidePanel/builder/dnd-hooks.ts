@@ -130,7 +130,7 @@ const useElementExists = () => {
  *
  * @returns True if the element exists, false otherwise
  */
-export const useNodeFieldElementExists = () => {
+const useNodeFieldElementExists = () => {
   const store = useAppStore();
   const nodeFieldElementExists = useCallback(
     (nodeId: string, fieldName: string): boolean => {
