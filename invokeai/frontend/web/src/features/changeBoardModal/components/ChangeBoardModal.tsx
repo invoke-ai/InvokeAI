@@ -8,6 +8,7 @@ import {
   isModalOpenChanged,
   selectChangeBoardModalSlice,
 } from 'features/changeBoardModal/store/slice';
+import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
@@ -26,7 +27,8 @@ const selectIsModalOpen = createSelector(
 const ChangeBoardModal = () => {
   useAssertSingleton('ChangeBoardModal');
   const dispatch = useAppDispatch();
-  const [selectedBoard, setSelectedBoard] = useState<string | null>();
+  const currentBoardId = useAppSelector(selectSelectedBoardId);
+  const [selectedBoardId, setSelectedBoardId] = useState<string | null>();
   const { data: boards, isFetching } = useListAllBoardsQuery({ include_archived: true });
   const isModalOpen = useAppSelector(selectIsModalOpen);
   const imagesToChange = useAppSelector(selectImagesToChange);
@@ -35,17 +37,19 @@ const ChangeBoardModal = () => {
   const { t } = useTranslation();
 
   const options = useMemo<ComboboxOption[]>(() => {
-    return [{ label: t('boards.uncategorized'), value: 'none' }].concat(
-      (boards ?? [])
-        .map((board) => ({
-          label: board.board_name,
-          value: board.board_id,
-        }))
-        .sort((a, b) => a.label.localeCompare(b.label))
-    );
-  }, [boards, t]);
+    return [{ label: t('boards.uncategorized'), value: 'none' }]
+      .concat(
+        (boards ?? [])
+          .map((board) => ({
+            label: board.board_name,
+            value: board.board_id,
+          }))
+          .sort((a, b) => a.label.localeCompare(b.label))
+      )
+      .filter((board) => board.value !== currentBoardId);
+  }, [boards, currentBoardId, t]);
 
-  const value = useMemo(() => options.find((o) => o.value === selectedBoard), [options, selectedBoard]);
+  const value = useMemo(() => options.find((o) => o.value === selectedBoardId), [options, selectedBoardId]);
 
   const handleClose = useCallback(() => {
     dispatch(changeBoardReset());
@@ -53,26 +57,26 @@ const ChangeBoardModal = () => {
   }, [dispatch]);
 
   const handleChangeBoard = useCallback(() => {
-    if (!imagesToChange.length || !selectedBoard) {
+    if (!imagesToChange.length || !selectedBoardId) {
       return;
     }
 
-    if (selectedBoard === 'none') {
+    if (selectedBoardId === 'none') {
       removeImagesFromBoard({ image_names: imagesToChange });
     } else {
       addImagesToBoard({
         image_names: imagesToChange,
-        board_id: selectedBoard,
+        board_id: selectedBoardId,
       });
     }
     dispatch(changeBoardReset());
-  }, [addImagesToBoard, dispatch, imagesToChange, removeImagesFromBoard, selectedBoard]);
+  }, [addImagesToBoard, dispatch, imagesToChange, removeImagesFromBoard, selectedBoardId]);
 
   const onChange = useCallback<ComboboxOnChange>((v) => {
     if (!v) {
       return;
     }
-    setSelectedBoard(v.value);
+    setSelectedBoardId(v.value);
   }, []);
 
   return (
