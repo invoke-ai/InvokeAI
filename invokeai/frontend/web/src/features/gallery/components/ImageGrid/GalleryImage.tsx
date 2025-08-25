@@ -121,7 +121,7 @@ const buildOnClick =
         if (currentClickedIndex < lastClickedIndex) {
           imagesToSelect.reverse();
         }
-        dispatch(selectionChanged(imagesToSelect));
+        dispatch(selectionChanged(uniq(selection.concat(imagesToSelect))));
       }
     } else if (ctrlKey || metaKey) {
       if (selection.some((n) => n === imageName) && selection.length > 1) {
