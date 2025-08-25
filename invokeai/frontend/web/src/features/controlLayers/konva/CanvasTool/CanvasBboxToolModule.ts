@@ -344,9 +344,9 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
     let width = roundToMultipleMin(this.konva.proxyRect.width() * this.konva.proxyRect.scaleX(), gridSize);
     let height = roundToMultipleMin(this.konva.proxyRect.height() * this.konva.proxyRect.scaleY(), gridSize);
 
-    // If shift is held and we are resizing from a corner, retain aspect ratio - needs special handling. We skip this
-    // if alt/opt is held - this requires math too big for my brain.
-    if (shift && CORNER_ANCHORS.includes(anchor) && !alt) {
+    // If ratio is locked OR shift is held and we are resizing from a corner, retain aspect ratio - needs special
+    // handling. We skip this if alt/opt is held - this requires math too big for my brain.
+    if ((this.manager.stateApi.getBbox().aspectRatio.isLocked || (shift && CORNER_ANCHORS.includes(anchor))) && !alt) {
       // Fit the bbox to the last aspect ratio
       let fittedWidth = Math.sqrt(width * height * this.$aspectRatioBuffer.get());
       let fittedHeight = fittedWidth / this.$aspectRatioBuffer.get();
