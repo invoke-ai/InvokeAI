@@ -15,7 +15,11 @@ import {
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetBoardImagesTotalQuery } from 'services/api/endpoints/boards';
+import {
+  useGetBoardAssetsTotalQuery,
+  useGetBoardImagesTotalQuery,
+  useGetBoardVideosTotalQuery,
+} from 'services/api/endpoints/boards';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 interface Props {
@@ -31,6 +35,16 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
   const { imagesTotal } = useGetBoardImagesTotalQuery('none', {
     selectFromResult: ({ data }) => {
       return { imagesTotal: data?.total ?? 0 };
+    },
+  });
+  const { assetsTotal } = useGetBoardAssetsTotalQuery('none', {
+    selectFromResult: ({ data }) => {
+      return { assetsTotal: data?.total ?? 0 };
+    },
+  });
+  const { videoTotal } = useGetBoardVideosTotalQuery('none', {
+    selectFromResult: ({ data }) => {
+      return { videoTotal: data?.total ?? 0 };
     },
   });
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
@@ -56,7 +70,17 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
     <Box position="relative" w="full" h={12}>
       <NoBoardBoardContextMenu>
         {(ref) => (
-          <Tooltip label={<BoardTooltip board={null} />} openDelay={1000} placement="left" closeOnScroll>
+          <Tooltip
+            label={
+              <BoardTooltip
+                board={null}
+                boardCounts={{ image_count: imagesTotal, asset_count: assetsTotal, video_count: videoTotal }}
+              />
+            }
+            openDelay={1000}
+            placement="right"
+            closeOnScroll
+          >
             <Flex
               ref={ref}
               onClick={handleSelectBoard}
@@ -92,7 +116,9 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
                 {boardName}
               </Text>
               {autoAddBoardId === 'none' && <AutoAddBadge />}
-              <Text variant="subtext">{imagesTotal}</Text>
+              <Text variant="subtext">
+                {imagesTotal} | {assetsTotal} | {videoTotal}
+              </Text>
             </Flex>
           </Tooltip>
         )}

@@ -18,7 +18,7 @@ import { api, buildV1Url, LIST_TAG } from '..';
  * buildVideosUrl('some-path')
  * // '/api/v1/videos/some-path'
  */
-const buildVideosUrl = (path: string = '', query?: Parameters<typeof buildV1Url>[1]) =>
+export const buildVideosUrl = (path: string = '', query?: Parameters<typeof buildV1Url>[1]) =>
   buildV1Url(`videos/${path}`, query);
 
 const buildBoardVideosUrl = (path: string = '') => buildV1Url(`board_videos/${path}`);
