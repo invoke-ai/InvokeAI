@@ -98,6 +98,9 @@ importers:
       lru-cache:
         specifier: ^11.1.0
         version: 11.1.0
+      media-chrome:
+        specifier: ^4.13.0
+        version: 4.13.0(react@18.3.1)
       mtwist:
         specifier: ^1.0.2
         version: 1.0.2
@@ -3255,6 +3258,9 @@ packages:
 
   media-chrome@4.11.1:
     resolution: {integrity: sha512-+2niDc4qOwlpFAjwxg1OaizK/zKV6y7QqGm4nBFEVlSaG0ZBgOmfc4IXAPiirZqAlZGaFFUaMqCl1SpGU0/naA==}
+
+  media-chrome@4.13.0:
+    resolution: {integrity: sha512-DfX/Hwxjae/tEHjr1tVnV/6XDFHriMXI1ev8Ji4Z/YwXnqMhNfRtvNsMjefnQK5pkMS/9hC+jmdS+VDWZfsSIw==}
 
   media-tracks@0.3.3:
     resolution: {integrity: sha512-9P2FuUHnZZ3iji+2RQk7Zkh5AmZTnOG5fODACnjhCVveX1McY3jmCRHofIEI+yTBqplz7LXy48c7fQ3Uigp88w==}
@@ -7917,6 +7923,12 @@ snapshots:
   media-chrome@4.11.1(react@18.3.1):
     dependencies:
       '@vercel/edge': 1.2.2
+      ce-la-react: 0.3.1(react@18.3.1)
+    transitivePeerDependencies:
+      - react
+
+  media-chrome@4.13.0(react@18.3.1):
+    dependencies:
       ce-la-react: 0.3.1(react@18.3.1)
     transitivePeerDependencies:
       - react
