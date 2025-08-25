@@ -2782,6 +2782,11 @@ export type components = {
              */
             image_count: number;
             /**
+             * Asset Count
+             * @description The number of assets in the board.
+             */
+            asset_count: number;
+            /**
              * Video Count
              * @description The number of videos in the board.
              */
