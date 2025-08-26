@@ -6,7 +6,11 @@ import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
-import { selectStartingFrameImage, selectVideoSlice } from 'features/parameters/store/videoSlice';
+import {
+  selectStartingFrameImage,
+  selectVideoModelConfig,
+  selectVideoSlice,
+} from 'features/parameters/store/videoSlice';
 import { t } from 'i18next';
 import type { VideoApiModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -23,6 +27,10 @@ export const buildRunwayVideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn 
     throw new UnsupportedGenerationModeError(t('toast.runwayIncompatibleGenerationMode'));
   }
 
+  const model = selectVideoModelConfig(state);
+  assert(model, 'No model selected');
+  assert(model.base === 'runway', 'Selected model is not a Runway model');
+
   const params = selectParamsSlice(state);
   const videoParams = selectVideoSlice(state);
   const prompts = selectPresetModifiedPrompts(state);
@@ -34,9 +42,7 @@ export const buildRunwayVideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn 
   const firstFrameImageField = zImageField.parse(startingFrameImage);
 
   const { seed, shouldRandomizeSeed } = params;
-  const { videoModel, videoDuration, videoAspectRatio, videoResolution } = videoParams;
-
-  assert(videoModel, 'Runway video requires a model');
+  const { videoDuration, videoAspectRatio, videoResolution } = videoParams;
 
   const finalSeed = shouldRandomizeSeed ? undefined : seed;
 
@@ -64,9 +70,8 @@ export const buildRunwayVideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn 
 
   // Set up metadata
   g.upsertMetadata({
-    model: Graph.getModelMetadataField(videoModel as VideoApiModelConfig),
+    model: Graph.getModelMetadataField(model),
     positive_prompt: prompts.positive,
-    negative_prompt: prompts.negative || '',
     duration: videoDuration,
     aspect_ratio: videoAspectRatio,
     resolution: videoResolution,
