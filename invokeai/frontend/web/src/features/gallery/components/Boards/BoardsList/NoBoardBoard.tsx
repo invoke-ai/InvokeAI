@@ -13,6 +13,7 @@ import {
   selectBoardSearchText,
 } from 'features/gallery/store/gallerySelectors';
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -32,6 +33,7 @@ const _hover: SystemStyleObject = {
 
 const NoBoardBoard = memo(({ isSelected }: Props) => {
   const dispatch = useAppDispatch();
+  const isVideoEnabled = useFeatureStatus('video');
   const { imagesTotal } = useGetBoardImagesTotalQuery('none', {
     selectFromResult: ({ data }) => {
       return { imagesTotal: data?.total ?? 0 };
@@ -43,6 +45,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
     },
   });
   const { videoTotal } = useGetBoardVideosTotalQuery('none', {
+    skip: !isVideoEnabled,
     selectFromResult: ({ data }) => {
       return { videoTotal: data?.total ?? 0 };
     },
@@ -117,7 +120,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
               </Text>
               {autoAddBoardId === 'none' && <AutoAddBadge />}
               <Text variant="subtext">
-                {imagesTotal} | {assetsTotal} | {videoTotal}
+                {imagesTotal} | {assetsTotal} {isVideoEnabled && `| ${videoTotal}`}
               </Text>
             </Flex>
           </Tooltip>
