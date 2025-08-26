@@ -10,13 +10,19 @@ import type {
   ChatGPT4oModelConfig,
   FLUXKontextModelConfig,
   FLUXReduxModelConfig,
+  Gemini2_5ModelConfig,
   IPAdapterModelConfig,
 } from 'services/api/types';
 
 type Props = {
   modelKey: string | null;
   onChangeModel: (
-    modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | ChatGPT4oModelConfig | FLUXKontextModelConfig
+    modelConfig:
+      | IPAdapterModelConfig
+      | FLUXReduxModelConfig
+      | ChatGPT4oModelConfig
+      | FLUXKontextModelConfig
+      | Gemini2_5ModelConfig
   ) => void;
 };
 
@@ -28,7 +34,13 @@ export const RefImageModel = memo(({ modelKey, onChangeModel }: Props) => {
 
   const _onChangeModel = useCallback(
     (
-      modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | ChatGPT4oModelConfig | FLUXKontextModelConfig | null
+      modelConfig:
+        | IPAdapterModelConfig
+        | FLUXReduxModelConfig
+        | ChatGPT4oModelConfig
+        | FLUXKontextModelConfig
+        | Gemini2_5ModelConfig
+        | null
     ) => {
       if (!modelConfig) {
         return;
@@ -39,7 +51,14 @@ export const RefImageModel = memo(({ modelKey, onChangeModel }: Props) => {
   );
 
   const getIsDisabled = useCallback(
-    (model: IPAdapterModelConfig | FLUXReduxModelConfig | ChatGPT4oModelConfig | FLUXKontextModelConfig): boolean => {
+    (
+      model:
+        | IPAdapterModelConfig
+        | FLUXReduxModelConfig
+        | ChatGPT4oModelConfig
+        | FLUXKontextModelConfig
+        | Gemini2_5ModelConfig
+    ): boolean => {
       return !areBasesCompatibleForRefImage(mainModelConfig, model);
     },
     [mainModelConfig]

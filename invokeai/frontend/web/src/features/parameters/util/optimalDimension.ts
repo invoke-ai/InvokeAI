@@ -21,6 +21,7 @@ export const getOptimalDimension = (base?: BaseModelType | null): number => {
     case 'imagen4':
     case 'chatgpt-4o':
     case 'flux-kontext':
+    case 'gemini-2.5':
     default:
       return 1024;
   }
