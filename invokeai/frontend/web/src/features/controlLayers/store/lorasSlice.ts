@@ -13,11 +13,6 @@ const zLoRAsState = z.object({
 });
 type LoRAsState = z.infer<typeof zLoRAsState>;
 
-const defaultLoRAConfig: Pick<LoRA, 'weight' | 'isEnabled'> = {
-  weight: 0.75,
-  isEnabled: true,
-};
-
 const getInitialState = (): LoRAsState => ({
   loras: [],
 });
@@ -32,6 +27,10 @@ const slice = createSlice({
       reducer: (state, action: PayloadAction<{ model: LoRAModelConfig; id: string }>) => {
         const { model, id } = action.payload;
         const parsedModel = zModelIdentifierField.parse(model);
+        const defaultLoRAConfig: Pick<LoRA, 'weight' | 'isEnabled'> = {
+          weight: model.default_settings?.weight ?? 0.75,
+          isEnabled: true,
+        };
         state.loras.push({ ...defaultLoRAConfig, model: parsedModel, id });
       },
       prepare: (payload: { model: LoRAModelConfig }) => ({ payload: { ...payload, id: uuidv4() } }),
@@ -87,3 +86,7 @@ export const lorasSliceConfig: SliceConfig<typeof slice> = {
 
 export const selectLoRAsSlice = (state: RootState) => state.loras;
 export const selectAddedLoRAs = createSelector(selectLoRAsSlice, (loras) => loras.loras);
+export const buildSelectLoRA = (id: string) =>
+  createSelector([selectLoRAsSlice], (loras) => {
+    return selectLoRA(loras, id);
+  });
