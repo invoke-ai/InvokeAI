@@ -80,6 +80,7 @@ export const zAppConfig = z.object({
   allowClientSideUpload: z.boolean(),
   allowPublishWorkflows: z.boolean(),
   allowPromptExpansion: z.boolean(),
+  allowVideo: z.boolean(),
   disabledTabs: z.array(zTabName),
   disabledFeatures: z.array(zAppFeature),
   disabledSDFeatures: z.array(zSDFeature),
@@ -140,8 +141,9 @@ export const getDefaultAppConfig = (): AppConfig => ({
   allowClientSideUpload: false,
   allowPublishWorkflows: false,
   allowPromptExpansion: false,
+  allowVideo: false, // used to determine if video is enabled vs upsell
   shouldShowCredits: false,
-  disabledTabs: ['video'],
+  disabledTabs: ['video'], // used to determine if video functionality is visible
   disabledFeatures: ['lightbox', 'faceRestore', 'batches'] satisfies AppFeature[],
   disabledSDFeatures: ['variation', 'symmetry', 'hires', 'perlinNoise', 'noiseThreshold'] satisfies SDFeature[],
   sd: {
