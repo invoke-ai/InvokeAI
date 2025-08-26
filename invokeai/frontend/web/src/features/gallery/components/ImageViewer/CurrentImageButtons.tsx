@@ -5,7 +5,7 @@ import SingleSelectionMenuItems from 'features/gallery/components/ContextMenu/Si
 import { useDeleteImage } from 'features/gallery/hooks/useDeleteImage';
 import { useEditImage } from 'features/gallery/hooks/useEditImage';
 import { useLoadWorkflow } from 'features/gallery/hooks/useLoadWorkflow';
-import { useRecallAll } from 'features/gallery/hooks/useRecallAll';
+import { useRecallAll } from 'features/gallery/hooks/useRecallAllImageMetadata';
 import { useRecallDimensions } from 'features/gallery/hooks/useRecallDimensions';
 import { useRecallPrompts } from 'features/gallery/hooks/useRecallPrompts';
 import { useRecallRemix } from 'features/gallery/hooks/useRecallRemix';

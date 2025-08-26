@@ -2,14 +2,14 @@ import { ExternalLink, Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@in
 import { IAINoContentFallback, IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import ImageMetadataGraphTabContent from 'features/gallery/components/ImageMetadataViewer/ImageMetadataGraphTabContent';
-import { MetadataHandlers } from 'features/metadata/parsing';
+import { ImageMetadataHandlers } from 'features/metadata/parsing';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 import type { ImageDTO } from 'services/api/types';
 
 import DataViewer from './DataViewer';
-import ImageMetadataActions, { UnrecallableMetadataDatum } from './ImageMetadataActions';
+import { ImageMetadataActions, UnrecallableMetadataDatum } from './ImageMetadataActions';
 import ImageMetadataWorkflowTabContent from './ImageMetadataWorkflowTabContent';
 
 type ImageMetadataViewerProps = {
@@ -39,7 +39,7 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
       overflow="hidden"
     >
       <ExternalLink href={image.image_url} label={image.image_name} />
-      <UnrecallableMetadataDatum metadata={metadata} handler={MetadataHandlers.CreatedBy} />
+      <UnrecallableMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.CreatedBy} />
 
       <Tabs variant="line" isLazy={true} display="flex" flexDir="column" w="full" h="full">
         <TabList>

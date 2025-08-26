@@ -2,7 +2,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useIsRegionFocused } from 'common/hooks/focus';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useLoadWorkflow } from 'features/gallery/hooks/useLoadWorkflow';
-import { useRecallAll } from 'features/gallery/hooks/useRecallAll';
+import { useRecallAll } from 'features/gallery/hooks/useRecallAllImageMetadata';
 import { useRecallDimensions } from 'features/gallery/hooks/useRecallDimensions';
 import { useRecallPrompts } from 'features/gallery/hooks/useRecallPrompts';
 import { useRecallRemix } from 'features/gallery/hooks/useRecallRemix';

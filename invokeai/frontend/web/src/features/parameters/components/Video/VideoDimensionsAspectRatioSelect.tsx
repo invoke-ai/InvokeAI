@@ -2,12 +2,7 @@ import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import {
-  isAspectRatioID,
-  zAspectRatioID,
-  zRunwayAspectRatioID,
-  zVeo3AspectRatioID,
-} from 'features/controlLayers/store/types';
+import { isVideoAspectRatio, zRunwayAspectRatioID, zVeo3AspectRatioID } from 'features/controlLayers/store/types';
 import {
   selectIsRunway,
   selectIsVeo3,
@@ -31,12 +26,12 @@ export const VideoDimensionsAspectRatioSelect = memo(() => {
       return zRunwayAspectRatioID.options.map((o) => ({ label: o, value: o }));
     }
     // All other models
-    return zAspectRatioID.options.map((o) => ({ label: o, value: o }));
+    return [];
   }, [isVeo3, isRunway]);
 
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {
-      if (!isAspectRatioID(v?.value)) {
+      if (!isVideoAspectRatio(v?.value)) {
         return;
       }
       dispatch(videoAspectRatioChanged(v.value));
