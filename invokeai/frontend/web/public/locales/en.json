@@ -792,6 +792,9 @@
             }
         }
     },
+    "lora": {
+        "weight": "Weight"
+    },
     "metadata": {
         "allPrompts": "All Prompts",
         "cfgScale": "CFG scale",

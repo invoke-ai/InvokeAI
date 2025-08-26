@@ -9,16 +9,16 @@ import {
   Switch,
   Text,
 } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import {
+  buildSelectLoRA,
   loraDeleted,
   loraIsEnabledChanged,
   loraWeightChanged,
-  selectLoRAsSlice,
 } from 'features/controlLayers/store/lorasSlice';
 import type { LoRA } from 'features/controlLayers/store/types';
+import { selectLoRAWeightConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
@@ -26,10 +26,7 @@ import { useGetModelConfigQuery } from 'services/api/endpoints/models';
 const marks = [-1, 0, 1, 2];
 
 export const LoRACard = memo((props: { id: string }) => {
-  const selectLoRA = useMemo(
-    () => createSelector(selectLoRAsSlice, ({ loras }) => loras.find(({ id }) => id === props.id)),
-    [props.id]
-  );
+  const selectLoRA = useMemo(() => buildSelectLoRA(props.id), [props.id]);
   const lora = useAppSelector(selectLoRA);
 
   if (!lora) {
@@ -42,6 +39,7 @@ LoRACard.displayName = 'LoRACard';
 
 const LoRAContent = memo(({ lora }: { lora: LoRA }) => {
   const dispatch = useAppDispatch();
+  const config = useAppSelector(selectLoRAWeightConfig);
   const { data: loraConfig } = useGetModelConfigQuery(lora.model.key);
 
   const handleChange = useCallback(
@@ -83,22 +81,22 @@ const LoRAContent = memo(({ lora }: { lora: LoRA }) => {
           <CompositeSlider
             value={lora.weight}
             onChange={handleChange}
-            min={-1}
-            max={2}
-            step={0.01}
+            min={config.sliderMin}
+            max={config.sliderMax}
+            step={config.coarseStep}
             marks={marks}
-            defaultValue={0.75}
+            defaultValue={config.initial}
             isDisabled={!lora.isEnabled}
           />
           <CompositeNumberInput
             value={lora.weight}
             onChange={handleChange}
-            min={-10}
-            max={10}
-            step={0.01}
+            min={config.numberInputMin}
+            max={config.numberInputMax}
+            step={config.coarseStep}
             w={20}
             flexShrink={0}
-            defaultValue={0.75}
+            defaultValue={config.initial}
             isDisabled={!lora.isEnabled}
           />
         </CardBody>
