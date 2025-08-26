@@ -1,6 +1,4 @@
 import { Icon, IconButton } from '@invoke-ai/ui-library';
-import { logger } from 'app/logging/logger';
-import { toast } from 'features/toast/toast';
 import { useVideoViewerContext } from 'features/video/context/VideoViewerContext';
 import { useCaptureVideoFrame } from 'features/video/hooks/useCaptureVideoFrame';
 import {
@@ -13,10 +11,6 @@ import {
 import type { CSSProperties } from 'react';
 import { useCallback, useState } from 'react';
 import { PiArrowsOutBold, PiCameraBold, PiPauseFill, PiPlayFill, PiSpinnerBold } from 'react-icons/pi';
-import { serializeError } from 'serialize-error';
-import { uploadImage } from 'services/api/endpoints/images';
-
-const log = logger('video');
 
 const NoHoverBackground = {
   '--media-control-hover-background': 'transparent',
@@ -25,35 +19,15 @@ const NoHoverBackground = {
 } as CSSProperties;
 
 export const VideoPlayerControls = () => {
-  const { captureFrame } = useCaptureVideoFrame();
+  const captureVideoFrame = useCaptureVideoFrame();
   const [capturing, setCapturing] = useState(false);
-  const { $videoRef } = useVideoViewerContext();
+  const { videoRef } = useVideoViewerContext();
 
   const onClickSaveFrame = useCallback(async () => {
     setCapturing(true);
-    let file: File;
-    try {
-      const videoRef = $videoRef.get();
-      if (!videoRef) {
-        return;
-      }
-
-      file = captureFrame(videoRef);
-      await uploadImage({ file, image_category: 'user', is_intermediate: false, silent: true });
-      toast({
-        status: 'success',
-        title: 'Frame saved to assets tab',
-      });
-    } catch (error) {
-      log.error({ error: serializeError(error as Error) }, 'Failed to capture frame');
-      toast({
-        status: 'error',
-        title: 'Failed to capture frame',
-      });
-    } finally {
-      setCapturing(false);
-    }
-  }, [captureFrame, $videoRef]);
+    await captureVideoFrame(videoRef.current);
+    setCapturing(false);
+  }, [captureVideoFrame, videoRef]);
 
   return (
     <MediaControlBar>
