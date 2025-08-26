@@ -90,6 +90,10 @@ class MainModelDefaultSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class LoraModelDefaultSettings(BaseModel):
+    weight: float | None = Field(default=None, ge=-1, le=2, description="Default weight for this model")
+    model_config = ConfigDict(extra="forbid")
+
 class ControlAdapterDefaultSettings(BaseModel):
     # This could be narrowed to controlnet processor nodes, but they change. Leaving this a string is safer.
     preprocessor: str | None
@@ -287,6 +291,9 @@ class LoRAConfigBase(ABC, BaseModel):
 
     type: Literal[ModelType.LoRA] = ModelType.LoRA
     trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
+    default_settings: Optional[LoraModelDefaultSettings] = Field(
+        description="Default settings for this model", default=None
+    )
 
     @classmethod
     def flux_lora_format(cls, mod: ModelOnDisk):
@@ -748,7 +755,7 @@ AnyModelConfig = Annotated[
 ]
 
 AnyModelConfigValidator = TypeAdapter(AnyModelConfig)
-AnyDefaultSettings: TypeAlias = Union[MainModelDefaultSettings, ControlAdapterDefaultSettings]
+AnyDefaultSettings: TypeAlias = Union[MainModelDefaultSettings, LoraModelDefaultSettings, ControlAdapterDefaultSettings]
 
 
 class ModelConfigFactory:

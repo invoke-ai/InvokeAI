@@ -23,6 +23,7 @@ from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     ControlAdapterDefaultSettings,
     InvalidModelConfigException,
+    LoraModelDefaultSettings,
     MainModelDefaultSettings,
     ModelConfigFactory,
     SubmodelDefinition,
@@ -217,6 +218,8 @@ class ModelProbe(object):
         if not fields["default_settings"]:
             if fields["type"] in {ModelType.ControlNet, ModelType.T2IAdapter, ModelType.ControlLoRa}:
                 fields["default_settings"] = get_default_settings_control_adapters(fields["name"])
+            if fields["type"] in {ModelType.LoRA}:
+                fields["default_settings"] = get_default_settings_lora()
             elif fields["type"] is ModelType.Main:
                 fields["default_settings"] = get_default_settings_main(fields["base"])
 
@@ -542,6 +545,8 @@ def get_default_settings_control_adapters(model_name: str) -> Optional[ControlAd
             return ControlAdapterDefaultSettings(preprocessor=v)
     return None
 
+def get_default_settings_lora() -> LoraModelDefaultSettings:
+    return LoraModelDefaultSettings()
 
 def get_default_settings_main(model_base: BaseModelType) -> Optional[MainModelDefaultSettings]:
     if model_base is BaseModelType.StableDiffusion1 or model_base is BaseModelType.StableDiffusion2:
