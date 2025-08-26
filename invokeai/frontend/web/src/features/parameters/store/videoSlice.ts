@@ -25,7 +25,7 @@ import {
   zVeo3DurationID,
   zVeo3Resolution,
 } from 'features/controlLayers/store/types';
-import type { VideoField } from 'features/nodes/types/common';
+import type { ModelIdentifierField, VideoField } from 'features/nodes/types/common';
 import { zModelIdentifierField, zVideoField } from 'features/nodes/types/common';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import { isVideoModelConfig, type RunwayModelConfig, type Veo3ModelConfig } from 'services/api/types';
@@ -69,11 +69,12 @@ const slice = createSlice({
       state.generatedVideo = videoField;
     },
 
-    videoModelChanged: (state, action: PayloadAction<Veo3ModelConfig | RunwayModelConfig | null>) => {
-      const parsedModel = zModelIdentifierField.parse(action.payload);
-      state.videoModel = parsedModel;
+    videoModelChanged: (state, action: PayloadAction<{ videoModel: ModelIdentifierField | null }>) => {
+      const { videoModel } = action.payload;
 
-      if (parsedModel?.base === 'veo3') {
+      state.videoModel = videoModel;
+
+      if (videoModel?.base === 'veo3') {
         if (!state.videoResolution || !isVeo3Resolution(state.videoResolution)) {
           state.videoResolution = '720p';
         }
@@ -83,7 +84,7 @@ const slice = createSlice({
         if (!state.videoAspectRatio || !isVeo3AspectRatioID(state.videoAspectRatio)) {
           state.videoAspectRatio = '16:9';
         }
-      } else if (parsedModel?.base === 'runway') {
+      } else if (videoModel?.base === 'runway') {
         if (!state.videoResolution || !isRunwayResolution(state.videoResolution)) {
           state.videoResolution = '720p';
         }
