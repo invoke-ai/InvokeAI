@@ -13,7 +13,7 @@ export const VideoDimensionsPreview = memo(() => {
   const currentVideoDimensions = useCurrentVideoDimensions();
 
   const previewBoxSize = useMemo(() => {
-    if (!dims || aspectRatio === 'Free') {
+    if (!dims) {
       return { width: 0, height: 0 };
     }
 

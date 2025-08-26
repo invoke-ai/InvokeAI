@@ -9,10 +9,11 @@ import type {
   UnrecallableMetadataHandler,
 } from 'features/metadata/parsing';
 import {
-  MetadataHandlers,
+  ImageMetadataHandlers,
   useCollectionMetadataDatum,
   useSingleMetadataDatum,
   useUnrecallableMetadataDatum,
+  VideoMetadataHandlers,
 } from 'features/metadata/parsing';
 import { memo, useCallback } from 'react';
 import { PiArrowBendUpLeftBold } from 'react-icons/pi';
@@ -21,7 +22,7 @@ type Props = {
   metadata?: unknown;
 };
 
-const ImageMetadataActions = (props: Props) => {
+export const ImageMetadataActions = memo((props: Props) => {
   const { metadata } = props;
 
   if (!metadata || Object.keys(metadata).length === 0) {
@@ -30,38 +31,60 @@ const ImageMetadataActions = (props: Props) => {
 
   return (
     <Flex flexDir="column" ps={8}>
-      <UnrecallableMetadataDatum metadata={metadata} handler={MetadataHandlers.GenerationMode} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.PositivePrompt} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.NegativePrompt} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.MainModel} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.VAEModel} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.Width} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.Height} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.Seed} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.Steps} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.Scheduler} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.CLIPSkip} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.CFGScale} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.CFGRescaleMultiplier} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.Guidance} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.DenoisingStrength} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.SeamlessX} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.SeamlessY} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerModel} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerCFGScale} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerPositiveAestheticScore} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerNegativeAestheticScore} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerScheduler} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerDenoisingStart} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.RefinerSteps} />
-      <SingleMetadataDatum metadata={metadata} handler={MetadataHandlers.CanvasLayers} />
-      <CollectionMetadataDatum metadata={metadata} handler={MetadataHandlers.RefImages} />
-      <CollectionMetadataDatum metadata={metadata} handler={MetadataHandlers.LoRAs} />
+      <UnrecallableMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.GenerationMode} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.PositivePrompt} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.NegativePrompt} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.MainModel} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.VAEModel} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.Width} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.Height} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.Seed} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.Steps} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.Scheduler} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.CLIPSkip} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.CFGScale} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.CFGRescaleMultiplier} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.Guidance} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.DenoisingStrength} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.SeamlessX} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.SeamlessY} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerModel} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerCFGScale} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerPositiveAestheticScore} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerNegativeAestheticScore} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerScheduler} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerDenoisingStart} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerSteps} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.CanvasLayers} />
+      <CollectionMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefImages} />
+      <CollectionMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.LoRAs} />
     </Flex>
   );
-};
+});
 
-export default memo(ImageMetadataActions);
+ImageMetadataActions.displayName = 'ImageMetadataActions';
+
+export const VideoMetadataActions = memo((props: Props) => {
+  const { metadata } = props;
+
+  if (!metadata || Object.keys(metadata).length === 0) {
+    return null;
+  }
+
+  return (
+    <Flex flexDir="column" ps={8}>
+      <UnrecallableMetadataDatum metadata={metadata} handler={VideoMetadataHandlers.GenerationMode} />
+      <SingleMetadataDatum metadata={metadata} handler={VideoMetadataHandlers.PositivePrompt} />
+      <SingleMetadataDatum metadata={metadata} handler={VideoMetadataHandlers.Seed} />
+      <SingleMetadataDatum metadata={metadata} handler={VideoMetadataHandlers.VideoAspectRatio} />
+      <SingleMetadataDatum metadata={metadata} handler={VideoMetadataHandlers.VideoDuration} />
+      <SingleMetadataDatum metadata={metadata} handler={VideoMetadataHandlers.VideoResolution} />
+      <SingleMetadataDatum metadata={metadata} handler={VideoMetadataHandlers.VideoModel} />
+    </Flex>
+  );
+});
+
+VideoMetadataActions.displayName = 'VideoMetadataActions';
 
 export const UnrecallableMetadataDatum = typedMemo(
   <T,>({ metadata, handler }: { metadata: unknown; handler: UnrecallableMetadataHandler<T> }) => {
