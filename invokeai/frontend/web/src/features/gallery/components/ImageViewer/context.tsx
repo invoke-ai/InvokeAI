@@ -83,7 +83,15 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
         // switch to the final image automatically. In this case, we clear the progress image immediately.
         //
         // We also clear the progress image if the queue item is canceled or failed, as there is no final image to show.
-        if (data.status === 'canceled' || data.status === 'failed' || !autoSwitch) {
+        if (
+          data.status === 'canceled' ||
+          data.status === 'failed' ||
+          !autoSwitch ||
+          // When the origin is 'canvas' and destination is 'canvas' (without a ':<session id>' suffix), that means the
+          // image is going to be added to the staging area. In this case, we need to clear the progress image else it
+          // will be stuck on the viewer.
+          (data.origin === 'canvas' && data.destination !== 'canvas')
+        ) {
           $progressEvent.set(null);
           $progressImage.set(null);
         }
