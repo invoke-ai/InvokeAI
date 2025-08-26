@@ -30,7 +30,6 @@ const ALL_ANCHORS: string[] = [
   'bottom-center',
   'bottom-right',
 ];
-const CORNER_ANCHORS: string[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
 const NO_ANCHORS: string[] = [];
 
 /**
@@ -344,9 +343,23 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
     let width = roundToMultipleMin(this.konva.proxyRect.width() * this.konva.proxyRect.scaleX(), gridSize);
     let height = roundToMultipleMin(this.konva.proxyRect.height() * this.konva.proxyRect.scaleY(), gridSize);
 
-    // If ratio is locked OR shift is held and we are resizing from a corner, retain aspect ratio - needs special
-    // handling. We skip this if alt/opt is held - this requires math too big for my brain.
-    if ((this.manager.stateApi.getBbox().aspectRatio.isLocked || (shift && CORNER_ANCHORS.includes(anchor))) && !alt) {
+    // When resizing the bbox using the transformer, we may need to do some extra math to maintain the current aspect
+    // ratio. Need to check a few things to determine if we should be maintaining the aspect ratio or not.
+    let shouldMaintainAspectRatio = false;
+
+    if (alt) {
+      // If alt is held, we are doing center-anchored transforming. In this case, maintaining aspect ratio is rather
+      // complicated.
+      shouldMaintainAspectRatio = false;
+    } else if (this.manager.stateApi.getBbox().aspectRatio.isLocked) {
+      // When the aspect ratio is locked, holding shift means we SHOULD NOT maintain the aspect ratio
+      shouldMaintainAspectRatio = !shift;
+    } else {
+      // When the aspect ratio is not locked, holding shift means we SHOULD maintain aspect ratio
+      shouldMaintainAspectRatio = shift;
+    }
+
+    if (shouldMaintainAspectRatio) {
       // Fit the bbox to the last aspect ratio
       let fittedWidth = Math.sqrt(width * height * this.$aspectRatioBuffer.get());
       let fittedHeight = fittedWidth / this.$aspectRatioBuffer.get();
