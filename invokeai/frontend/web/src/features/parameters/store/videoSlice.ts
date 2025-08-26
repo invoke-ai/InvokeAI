@@ -27,7 +27,8 @@ import {
 } from 'features/controlLayers/store/types';
 import type { VideoField } from 'features/nodes/types/common';
 import { zModelIdentifierField, zVideoField } from 'features/nodes/types/common';
-import type { RunwayModelConfig, Veo3ModelConfig } from 'services/api/types';
+import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
+import { isVideoModelConfig, type RunwayModelConfig, type Veo3ModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import z from 'zod';
 
@@ -134,7 +135,7 @@ export const videoSliceConfig: SliceConfig<typeof slice> = {
 };
 
 export const selectVideoSlice = (state: RootState) => state.video;
-const createVideoSelector = <T>(selector: Selector<VideoState, T>) => createSelector(selectVideoSlice, selector);
+const createVideoSelector = <T,>(selector: Selector<VideoState, T>) => createSelector(selectVideoSlice, selector);
 
 export const selectStartingFrameImage = createVideoSelector((video) => video.startingFrameImage);
 export const selectGeneratedVideo = createVideoSelector((video) => video.generatedVideo);
@@ -145,3 +146,23 @@ export const selectVideoDuration = createVideoSelector((video) => video.videoDur
 export const selectVideoAspectRatio = createVideoSelector((video) => video.videoAspectRatio);
 export const selectIsVeo3 = createVideoSelector((video) => video.videoModel?.base === 'veo3');
 export const selectIsRunway = createVideoSelector((video) => video.videoModel?.base === 'runway');
+export const selectVideoModelConfig = createSelector(
+  selectModelConfigsQuery,
+  selectVideoSlice,
+  (modelConfigs, { videoModel }) => {
+    if (!modelConfigs.data) {
+      return null;
+    }
+    if (!videoModel) {
+      return null;
+    }
+    const modelConfig = modelConfigsAdapterSelectors.selectById(modelConfigs.data, videoModel.key);
+    if (!modelConfig) {
+      return null;
+    }
+    if (!isVideoModelConfig(modelConfig)) {
+      return null;
+    }
+    return modelConfig;
+  }
+);
