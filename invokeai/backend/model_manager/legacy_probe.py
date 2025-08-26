@@ -545,8 +545,10 @@ def get_default_settings_control_adapters(model_name: str) -> Optional[ControlAd
             return ControlAdapterDefaultSettings(preprocessor=v)
     return None
 
+
 def get_default_settings_lora() -> LoraModelDefaultSettings:
     return LoraModelDefaultSettings()
+
 
 def get_default_settings_main(model_base: BaseModelType) -> Optional[MainModelDefaultSettings]:
     if model_base is BaseModelType.StableDiffusion1 or model_base is BaseModelType.StableDiffusion2:
