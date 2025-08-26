@@ -21,6 +21,7 @@ import {
   isFluxMainModelModelConfig,
   isFluxReduxModelConfig,
   isFluxVAEModelConfig,
+  isGemini2_5ModelConfig,
   isImagen3ModelConfig,
   isImagen4ModelConfig,
   isIPAdapterModelConfig,
@@ -92,7 +93,8 @@ export const useGlobalReferenceImageModels = buildModelsHook(
     isFluxReduxModelConfig(config) ||
     isChatGPT4oModelConfig(config) ||
     isFluxKontextApiModelConfig(config) ||
-    isFluxKontextModelConfig(config)
+    isFluxKontextModelConfig(config) ||
+    isGemini2_5ModelConfig(config)
 );
 export const useRegionalReferenceImageModels = buildModelsHook(
   (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config)

@@ -264,6 +264,13 @@ const zChatGPT4oReferenceImageConfig = z.object({
 });
 export type ChatGPT4oReferenceImageConfig = z.infer<typeof zChatGPT4oReferenceImageConfig>;
 
+const zGemini2_5ReferenceImageConfig = z.object({
+  type: z.literal('gemini_2_5_reference_image'),
+  image: zImageWithDims.nullable(),
+  model: zModelIdentifierField.nullable(),
+});
+export type Gemini2_5ReferenceImageConfig = z.infer<typeof zGemini2_5ReferenceImageConfig>;
+
 const zFluxKontextReferenceImageConfig = z.object({
   type: z.literal('flux_kontext_reference_image'),
   image: zImageWithDims.nullable(),
@@ -286,6 +293,7 @@ export const zRefImageState = z.object({
     zFLUXReduxConfig,
     zChatGPT4oReferenceImageConfig,
     zFluxKontextReferenceImageConfig,
+    zGemini2_5ReferenceImageConfig,
   ]),
 });
 export type RefImageState = z.infer<typeof zRefImageState>;
@@ -298,9 +306,14 @@ export const isFLUXReduxConfig = (config: RefImageState['config']): config is FL
 export const isChatGPT4oReferenceImageConfig = (
   config: RefImageState['config']
 ): config is ChatGPT4oReferenceImageConfig => config.type === 'chatgpt_4o_reference_image';
+
 export const isFluxKontextReferenceImageConfig = (
   config: RefImageState['config']
 ): config is FluxKontextReferenceImageConfig => config.type === 'flux_kontext_reference_image';
+
+export const isGemini2_5ReferenceImageConfig = (
+  config: RefImageState['config']
+): config is Gemini2_5ReferenceImageConfig => config.type === 'gemini_2_5_reference_image';
 
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
 export type FillStyle = z.infer<typeof zFillStyle>;
@@ -445,6 +458,14 @@ export const CHATGPT_ASPECT_RATIOS: Record<ChatGPT4oAspectRatio, Dimensions> = {
   '3:2': { width: 1536, height: 1024 },
   '1:1': { width: 1024, height: 1024 },
   '2:3': { width: 1024, height: 1536 },
+} as const;
+
+export const zGemini2_5AspectRatioID = z.enum(['1:1']);
+type Gemini2_5AspectRatio = z.infer<typeof zGemini2_5AspectRatioID>;
+export const isGemini2_5AspectRatioID = (v: unknown): v is Gemini2_5AspectRatio =>
+  zGemini2_5AspectRatioID.safeParse(v).success;
+export const GEMINI_2_5_ASPECT_RATIOS: Record<Gemini2_5AspectRatio, Dimensions> = {
+  '1:1': { width: 1024, height: 1024 },
 } as const;
 
 export const zFluxKontextAspectRatioID = z.enum(['21:9', '16:9', '4:3', '1:1', '3:4', '9:16', '9:21']);
@@ -655,7 +676,12 @@ export const getInitialRefImagesState = (): RefImagesState => ({
 
 export const zCanvasReferenceImageState_OLD = zCanvasEntityBase.extend({
   type: z.literal('reference_image'),
-  ipAdapter: z.discriminatedUnion('type', [zIPAdapterConfig, zFLUXReduxConfig, zChatGPT4oReferenceImageConfig]),
+  ipAdapter: z.discriminatedUnion('type', [
+    zIPAdapterConfig,
+    zFLUXReduxConfig,
+    zChatGPT4oReferenceImageConfig,
+    zGemini2_5ReferenceImageConfig,
+  ]),
 });
 
 export const zCanvasMetadata = z.object({

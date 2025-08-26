@@ -11,10 +11,12 @@ import {
   CHATGPT_ASPECT_RATIOS,
   DEFAULT_ASPECT_RATIO_CONFIG,
   FLUX_KONTEXT_ASPECT_RATIOS,
+  GEMINI_2_5_ASPECT_RATIOS,
   getInitialParamsState,
   IMAGEN_ASPECT_RATIOS,
   isChatGPT4oAspectRatioID,
   isFluxKontextAspectRatioID,
+  isGemini2_5AspectRatioID,
   isImagenAspectRatioID,
   zParamsState,
 } from 'features/controlLayers/store/types';
@@ -290,6 +292,12 @@ const slice = createSlice({
         state.dimensions.rect.height = height;
         state.dimensions.aspectRatio.value = state.dimensions.rect.width / state.dimensions.rect.height;
         state.dimensions.aspectRatio.isLocked = true;
+      } else if (state.model?.base === 'gemini-2.5' && isGemini2_5AspectRatioID(id)) {
+        const { width, height } = GEMINI_2_5_ASPECT_RATIOS[id];
+        state.dimensions.rect.width = width;
+        state.dimensions.rect.height = height;
+        state.dimensions.aspectRatio.value = state.dimensions.rect.width / state.dimensions.rect.height;
+        state.dimensions.aspectRatio.isLocked = true;
       } else if (state.model?.base === 'flux-kontext' && isFluxKontextAspectRatioID(id)) {
         const { width, height } = FLUX_KONTEXT_ASPECT_RATIOS[id];
         state.dimensions.rect.width = width;
@@ -488,6 +496,7 @@ export const selectIsFluxKontext = createParamsSelector((params) => {
   return false;
 });
 export const selectIsChatGPT4o = createParamsSelector((params) => params.model?.base === 'chatgpt-4o');
+export const selectIsGemini2_5 = createParamsSelector((params) => params.model?.base === 'gemini-2.5');
 
 export const selectModel = createParamsSelector((params) => params.model);
 export const selectModelKey = createParamsSelector((params) => params.model?.key);

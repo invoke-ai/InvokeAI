@@ -28,6 +28,7 @@ import type {
   ControlLoRAConfig,
   ControlNetConfig,
   FluxKontextReferenceImageConfig,
+  Gemini2_5ReferenceImageConfig,
   IPAdapterConfig,
   T2IAdapterConfig,
 } from 'features/controlLayers/store/types';
@@ -35,6 +36,7 @@ import {
   initialChatGPT4oReferenceImage,
   initialControlNet,
   initialFluxKontextReferenceImage,
+  initialGemini2_5ReferenceImage,
   initialIPAdapter,
   initialT2IAdapter,
 } from 'features/controlLayers/store/util';
@@ -76,7 +78,11 @@ export const selectDefaultControlAdapter = createSelector(
 
 export const getDefaultRefImageConfig = (
   getState: AppGetState
-): IPAdapterConfig | ChatGPT4oReferenceImageConfig | FluxKontextReferenceImageConfig => {
+):
+  | IPAdapterConfig
+  | ChatGPT4oReferenceImageConfig
+  | FluxKontextReferenceImageConfig
+  | Gemini2_5ReferenceImageConfig => {
   const state = getState();
 
   const mainModelConfig = selectMainModelConfig(state);
@@ -93,6 +99,12 @@ export const getDefaultRefImageConfig = (
 
   if (base === 'flux-kontext' || (base === 'flux' && mainModelConfig?.name?.toLowerCase().includes('kontext'))) {
     const config = deepClone(initialFluxKontextReferenceImage);
+    config.model = zModelIdentifierField.parse(mainModelConfig);
+    return config;
+  }
+
+  if (base === 'gemini-2.5') {
+    const config = deepClone(initialGemini2_5ReferenceImage);
     config.model = zModelIdentifierField.parse(mainModelConfig);
     return config;
   }

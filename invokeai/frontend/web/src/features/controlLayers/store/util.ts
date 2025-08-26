@@ -13,6 +13,7 @@ import type {
   Dimensions,
   FluxKontextReferenceImageConfig,
   FLUXReduxConfig,
+  Gemini2_5ReferenceImageConfig,
   ImageWithDims,
   IPAdapterConfig,
   RefImageState,
@@ -102,6 +103,11 @@ export const initialFLUXRedux: FLUXReduxConfig = {
 };
 export const initialChatGPT4oReferenceImage: ChatGPT4oReferenceImageConfig = {
   type: 'chatgpt_4o_reference_image',
+  image: null,
+  model: null,
+};
+export const initialGemini2_5ReferenceImage: Gemini2_5ReferenceImageConfig = {
+  type: 'gemini_2_5_reference_image',
   image: null,
   model: null,
 };

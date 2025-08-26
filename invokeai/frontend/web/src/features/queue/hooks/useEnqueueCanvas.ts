@@ -12,6 +12,7 @@ import { buildChatGPT4oGraph } from 'features/nodes/util/graph/generation/buildC
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
 import { buildFluxKontextGraph } from 'features/nodes/util/graph/generation/buildFluxKontextGraph';
+import { buildGemini2_5Graph } from 'features/nodes/util/graph/generation/buildGemini2_5Graph';
 import { buildImagen3Graph } from 'features/nodes/util/graph/generation/buildImagen3Graph';
 import { buildImagen4Graph } from 'features/nodes/util/graph/generation/buildImagen4Graph';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
@@ -66,6 +67,8 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
         return await buildChatGPT4oGraph(graphBuilderArg);
       case 'flux-kontext':
         return buildFluxKontextGraph(graphBuilderArg);
+      case 'gemini-2.5':
+        return buildGemini2_5Graph(graphBuilderArg);
       default:
         assert(false, `No graph builders for base ${base}`);
     }

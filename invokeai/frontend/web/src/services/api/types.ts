@@ -99,6 +99,7 @@ export type ApiModelConfig = S['ApiModelConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig | ApiModelConfig;
 export type FLUXKontextModelConfig = MainModelConfig;
 export type ChatGPT4oModelConfig = ApiModelConfig;
+export type Gemini2_5ModelConfig = ApiModelConfig;
 export type AnyModelConfig =
   | ControlLoRAModelConfig
   | LoRAModelConfig
@@ -278,6 +279,10 @@ export const isFluxKontextApiModelConfig = (config: AnyModelConfig): config is A
 
 export const isFluxKontextModelConfig = (config: AnyModelConfig): config is FLUXKontextModelConfig => {
   return config.type === 'main' && config.base === 'flux' && config.name.toLowerCase().includes('kontext');
+};
+
+export const isGemini2_5ModelConfig = (config: AnyModelConfig): config is ApiModelConfig => {
+  return config.type === 'main' && config.base === 'gemini-2.5';
 };
 
 export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {

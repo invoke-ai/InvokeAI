@@ -20,6 +20,7 @@ export const BASE_COLOR_MAP: Record<BaseModelType, string> = {
   imagen4: 'pink',
   'chatgpt-4o': 'pink',
   'flux-kontext': 'pink',
+  'gemini-2.5': 'pink',
 };
 
 const ModelBaseBadge = ({ base }: Props) => {
