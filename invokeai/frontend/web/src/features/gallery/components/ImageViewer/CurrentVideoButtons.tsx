@@ -1,11 +1,8 @@
 import { Button, Divider, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
-import { logger } from 'app/logging/logger';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import SingleSelectionVideoMenuItems from 'features/gallery/components/ContextMenu/SingleSelectionVideoMenuItems';
 import { boardIdSelected } from 'features/gallery/store/gallerySlice';
-import { toast } from 'features/toast/toast';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { useGalleryPanel } from 'features/ui/layouts/use-gallery-panel';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -15,12 +12,8 @@ import { memo, useCallback, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { PiCameraBold, PiCrosshairBold, PiDotsThreeOutlineFill, PiSpinnerBold } from 'react-icons/pi';
-import { serializeError } from 'serialize-error';
-import { uploadImage } from 'services/api/endpoints/images';
 import { useDeleteVideosMutation } from 'services/api/endpoints/videos';
 import type { VideoDTO } from 'services/api/types';
-
-const log = logger('video');
 
 export const CurrentVideoButtons = memo(({ videoDTO }: { videoDTO: VideoDTO }) => {
   const { t } = useTranslation();
@@ -30,10 +23,8 @@ export const CurrentVideoButtons = memo(({ videoDTO }: { videoDTO: VideoDTO }) =
   const galleryPanel = useGalleryPanel(activeTab);
   const [deleteVideos] = useDeleteVideosMutation();
 
-  // Video frame capture functionality
-  const { $videoRef } = useVideoViewerContext();
-  const videoRef = useStore($videoRef);
-  const { captureFrame } = useCaptureVideoFrame();
+  const captureVideoFrame = useCaptureVideoFrame();
+  const { videoRef } = useVideoViewerContext();
   const [capturing, setCapturing] = useState(false);
 
   const locateInGallery = useCallback(() => {
@@ -58,34 +49,9 @@ export const CurrentVideoButtons = memo(({ videoDTO }: { videoDTO: VideoDTO }) =
 
   const onClickSaveFrame = useCallback(async () => {
     setCapturing(true);
-    let file: File;
-    try {
-      if (!videoRef) {
-        toast({
-          status: 'error',
-          title: 'Video not ready',
-          description: 'Please wait for the video to load before capturing a frame.',
-        });
-        return;
-      }
-
-      file = captureFrame(videoRef);
-      await uploadImage({ file, image_category: 'user', is_intermediate: false, silent: true });
-      toast({
-        status: 'success',
-        title: 'Frame saved to assets tab',
-      });
-    } catch (error) {
-      log.error({ error: serializeError(error as Error) }, 'Failed to capture frame');
-      toast({
-        status: 'error',
-        title: 'Failed to capture frame',
-        description: 'There was an error capturing the current video frame.',
-      });
-    } finally {
-      setCapturing(false);
-    }
-  }, [captureFrame, videoRef]);
+    await captureVideoFrame(videoRef.current);
+    setCapturing(false);
+  }, [captureVideoFrame, videoRef]);
 
   const doesTabHaveGallery = tab === 'canvas' || tab === 'generate' || tab === 'workflows' || tab === 'upscaling';
 
