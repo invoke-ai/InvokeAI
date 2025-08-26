@@ -1,5 +1,5 @@
 import { Button, Flex, Heading, SimpleGrid } from '@invoke-ai/ui-library';
-import { useLoRAModelDefaultSettings } from 'features/modelManagerV2/hooks/useLoraModelDefaultSettings';
+import { useLoRAModelDefaultSettings } from 'features/modelManagerV2/hooks/useLoRAModelDefaultSettings';
 import { DefaultWeight } from 'features/modelManagerV2/subpanels/ModelPanel/LoRAModelDefaultSettings/DefaultWeight';
 import type { FormField } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/MainModelDefaultSettings';
 import { toast } from 'features/toast/toast';
