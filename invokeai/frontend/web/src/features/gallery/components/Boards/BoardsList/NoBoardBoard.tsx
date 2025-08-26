@@ -120,7 +120,8 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
               </Text>
               {autoAddBoardId === 'none' && <AutoAddBadge />}
               <Text variant="subtext">
-                {imagesTotal} | {assetsTotal} {isVideoEnabled && `| ${videoTotal}`}
+                {imagesTotal} | {isVideoEnabled && `${videoTotal} | `}
+                {assetsTotal}
               </Text>
             </Flex>
           </Tooltip>
