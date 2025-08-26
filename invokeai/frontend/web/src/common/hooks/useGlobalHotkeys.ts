@@ -1,5 +1,6 @@
 import { useAppStore } from 'app/store/storeHooks';
 import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
+import { useDeleteVideoModalApi } from 'features/deleteVideoModal/store/state';
 import { selectSelection } from 'features/gallery/store/gallerySelectors';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { useDeleteCurrentQueueItem } from 'features/queue/hooks/useDeleteCurrentQueueItem';
@@ -123,6 +124,8 @@ export const useGlobalHotkeys = () => {
   });
 
   const deleteImageModalApi = useDeleteImageModalApi();
+  const deleteVideoModalApi = useDeleteVideoModalApi();
+
   useRegisteredHotkeys({
     id: 'deleteSelection',
     category: 'gallery',
@@ -135,7 +138,13 @@ export const useGlobalHotkeys = () => {
       if (!selection.length) {
         return;
       }
-      deleteImageModalApi.delete(selection.map((s) => s.id));
+      if (selection.every(({ type }) => type === 'image')) {
+        deleteImageModalApi.delete(selection.map((s) => s.id));
+      } else if (selection.every(({ type }) => type === 'video')) {
+        deleteVideoModalApi.delete(selection.map((s) => s.id));
+      } else {
+        // no-op, we expect selections to always be only images or only video
+      }
     },
     dependencies: [getState, deleteImageModalApi],
   });
