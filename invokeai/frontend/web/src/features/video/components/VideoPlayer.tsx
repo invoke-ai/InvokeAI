@@ -1,4 +1,6 @@
 import { Flex } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
+import { $authToken } from 'app/store/nanostores/authToken';
 import { useVideoContextMenu } from 'features/gallery/components/ContextMenu/VideoContextMenu';
 import { useVideoViewerContext } from 'features/video/context/VideoViewerContext';
 import { MediaController } from 'media-chrome/react';
@@ -16,15 +18,11 @@ export const VideoPlayer = memo(({ videoDTO }: VideoPlayerProps) => {
   const ref = useRef<HTMLDivElement>(null);
   useVideoContextMenu(videoDTO, ref);
   const { videoRef } = useVideoViewerContext();
+  const authToken = useStore($authToken);
 
   return (
     <Flex ref={ref} w="full" h="full" flexDirection="column" gap={4} alignItems="center" justifyContent="center">
-      <MediaController
-        style={{
-          width: '100%',
-          aspectRatio: '16/9',
-        }}
-      >
+      <MediaController>
         <ReactPlayer
           slot="media"
           ref={videoRef}
@@ -33,7 +31,7 @@ export const VideoPlayer = memo(({ videoDTO }: VideoPlayerProps) => {
           width={videoDTO.width}
           height={videoDTO.height}
           pip={false}
-          // crossOrigin={$authToken.get() ? 'use-credentials' : 'anonymous'}
+          crossOrigin={authToken ? 'use-credentials' : 'anonymous'}
         />
 
         <VideoPlayerControls />
