@@ -82,14 +82,7 @@ export const GalleryPanel = memo(() => {
           >
             {t('parameters.images')}
           </Button>
-          <Button
-            tooltip={t('gallery.assetsTab')}
-            onClick={handleClickAssets}
-            data-testid="assets-tab"
-            colorScheme={galleryView === 'assets' ? 'invokeBlue' : undefined}
-          >
-            {t('gallery.assets')}
-          </Button>
+
           {isVideoEnabled && (
             <Button
               tooltip={t('gallery.videosTab')}
@@ -100,6 +93,14 @@ export const GalleryPanel = memo(() => {
               {t('gallery.videos')}
             </Button>
           )}
+          <Button
+            tooltip={t('gallery.assetsTab')}
+            onClick={handleClickAssets}
+            data-testid="assets-tab"
+            colorScheme={galleryView === 'assets' ? 'invokeBlue' : undefined}
+          >
+            {t('gallery.assets')}
+          </Button>
         </ButtonGroup>
         <Flex flexGrow={1} flexBasis={0} justifyContent="flex-end">
           <GalleryUploadButton />

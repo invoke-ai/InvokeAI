@@ -1,4 +1,4 @@
-import { Flex, Spacer } from '@invoke-ai/ui-library';
+import { Divider, Flex, Spacer } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -48,13 +48,15 @@ export const VerticalNavBar = memo(() => {
         {withGenerateTab && <TabButton tab="generate" icon={<PiTextAaBold />} label={t('ui.tabs.generate')} />}
         {withCanvasTab && <TabButton tab="canvas" icon={<PiBoundingBoxBold />} label={t('ui.tabs.canvas')} />}
         {withUpscalingTab && <TabButton tab="upscaling" icon={<PiFrameCornersBold />} label={t('ui.tabs.upscaling')} />}
-        {withWorkflowsTab && <TabButton tab="workflows" icon={<PiFlowArrowBold />} label={t('ui.tabs.workflows')} />}
-        {withModelsTab && <TabButton tab="models" icon={<PiCubeBold />} label={t('ui.tabs.models')} />}
-        {withQueueTab && <TabButton tab="queue" icon={<PiQueueBold />} label={t('ui.tabs.queue')} />}
         {withVideoTab && <TabButton tab="video" icon={<PiVideoBold />} label={t('ui.tabs.video')} />}
+        {withWorkflowsTab && <TabButton tab="workflows" icon={<PiFlowArrowBold />} label={t('ui.tabs.workflows')} />}
       </Flex>
       <Spacer />
       <StatusIndicator />
+      {withModelsTab && <TabButton tab="models" icon={<PiCubeBold />} label={t('ui.tabs.models')} />}
+      {withQueueTab && <TabButton tab="queue" icon={<PiQueueBold />} label={t('ui.tabs.queue')} />}
+      <Divider borderColor="base.200" />
+
       <Notifications />
       <VideosModalButton />
       {customNavComponent ? customNavComponent : <SettingsMenu />}
