@@ -1,6 +1,8 @@
 import { Box, Flex, forwardRef, Grid, GridItem, Spinner, Text } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
+import { $accountTypeText } from 'app/store/nanostores/accountTypeText';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { getFocusedRegion } from 'common/hooks/focus';
 import { useRangeBasedVideoFetching } from 'features/gallery/hooks/useRangeBasedVideoFetching';
@@ -8,6 +10,7 @@ import type { selectGetVideoIdsQueryArgs } from 'features/gallery/store/galleryS
 import { selectGalleryImageMinimumWidth, selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import { selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
+import { selectAllowVideo } from 'features/system/store/configSlice';
 import type { MutableRefObject } from 'react';
 import React, { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import type {
@@ -286,6 +289,19 @@ export const VideoGallery = memo(() => {
   );
 
   const context = useMemo<GridContext>(() => ({ videoIds, queryArgs }), [videoIds, queryArgs]);
+
+  const isVideoEnabled = useAppSelector(selectAllowVideo);
+  const accountTypeText = useStore($accountTypeText);
+
+  if (!isVideoEnabled) {
+    return (
+      <Flex w="full" h="full" alignItems="center" justifyContent="center" flexDirection="column" gap={4}>
+        <Text fontSize="sm" color="base.300">
+          Video generation is not enabled for {accountTypeText} accounts
+        </Text>
+      </Flex>
+    );
+  }
 
   if (isLoading) {
     return (

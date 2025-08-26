@@ -1280,7 +1280,8 @@
             "noNodesInGraph": "No nodes in graph",
             "systemDisconnected": "System disconnected",
             "promptExpansionPending": "Prompt expansion in progress",
-            "promptExpansionResultPending": "Please accept or discard your prompt expansion result"
+            "promptExpansionResultPending": "Please accept or discard your prompt expansion result",
+            "videoIsDisabled": "Video generation is not enabled for {{accountType}} accounts."
         },
         "maskBlur": "Mask Blur",
         "negativePromptPlaceholder": "Negative Prompt",
@@ -2593,7 +2594,7 @@
         "panels": {
             "launchpad": "Launchpad",
             "workflowEditor": "Workflow Editor",
-            "imageViewer": "Image Viewer",
+            "imageViewer": "Viewer",
             "canvas": "Canvas",
             "video": "Video"
         },
@@ -2602,6 +2603,15 @@
             "upscalingTitle": "Upscale and add detail.",
             "canvasTitle": "Edit and refine on Canvas.",
             "generateTitle": "Generate images from text prompts.",
+            "videoTitle": "Generate videos from text prompts.",
+            "video": {
+                "startingFrameCalloutTitle": "Add a Starting Frame",
+                "startingFrameCalloutDesc": "Add an image to control the first frame of your video."
+            },
+            "addStartingFrame": {
+                "title": "Add a Starting Frame",
+                "description": "Add an image to control the first frame of your video."
+            },
             "modelGuideText": "Want to learn what prompts work best for each model?",
             "modelGuideLink": "Check out our Model Guide.",
             "createNewWorkflowFromScratch": "Create a new Workflow from scratch",
