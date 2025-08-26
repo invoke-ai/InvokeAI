@@ -4,12 +4,10 @@ import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import { isPlainObject } from 'es-toolkit';
 import type {
-  AspectRatioID,
   ImageWithDims,
-  RunwayDuration,
-  RunwayResolution,
-  Veo3Duration,
-  Veo3Resolution,
+  VideoAspectRatio,
+  VideoDuration,
+  VideoResolution,
 } from 'features/controlLayers/store/types';
 import {
   isRunwayAspectRatioID,
@@ -18,17 +16,15 @@ import {
   isVeo3AspectRatioID,
   isVeo3DurationID,
   isVeo3Resolution,
-  zAspectRatioID,
   zImageWithDims,
-  zRunwayDurationID,
-  zRunwayResolution,
-  zVeo3DurationID,
-  zVeo3Resolution,
+  zVideoAspectRatio,
+  zVideoDuration,
+  zVideoResolution,
 } from 'features/controlLayers/store/types';
 import type { ModelIdentifierField, VideoField } from 'features/nodes/types/common';
 import { zModelIdentifierField, zVideoField } from 'features/nodes/types/common';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
-import { isVideoModelConfig, type RunwayModelConfig, type Veo3ModelConfig } from 'services/api/types';
+import { isVideoModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import z from 'zod';
 
@@ -37,9 +33,9 @@ const zVideoState = z.object({
   startingFrameImage: zImageWithDims.nullable(),
   generatedVideo: zVideoField.nullable(),
   videoModel: zModelIdentifierField.nullable(),
-  videoResolution: zVeo3Resolution.or(zRunwayResolution),
-  videoDuration: zVeo3DurationID.or(zRunwayDurationID),
-  videoAspectRatio: zAspectRatioID,
+  videoResolution: zVideoResolution,
+  videoDuration: zVideoDuration,
+  videoAspectRatio: zVideoAspectRatio,
 });
 
 export type VideoState = z.infer<typeof zVideoState>;
@@ -97,15 +93,15 @@ const slice = createSlice({
       }
     },
 
-    videoResolutionChanged: (state, action: PayloadAction<Veo3Resolution | RunwayResolution>) => {
+    videoResolutionChanged: (state, action: PayloadAction<VideoResolution>) => {
       state.videoResolution = action.payload;
     },
 
-    videoDurationChanged: (state, action: PayloadAction<Veo3Duration | RunwayDuration>) => {
+    videoDurationChanged: (state, action: PayloadAction<VideoDuration>) => {
       state.videoDuration = action.payload;
     },
 
-    videoAspectRatioChanged: (state, action: PayloadAction<AspectRatioID>) => {
+    videoAspectRatioChanged: (state, action: PayloadAction<VideoAspectRatio>) => {
       state.videoAspectRatio = action.payload;
     },
   },
@@ -136,7 +132,7 @@ export const videoSliceConfig: SliceConfig<typeof slice> = {
 };
 
 export const selectVideoSlice = (state: RootState) => state.video;
-const createVideoSelector = <T,>(selector: Selector<VideoState, T>) => createSelector(selectVideoSlice, selector);
+const createVideoSelector = <T>(selector: Selector<VideoState, T>) => createSelector(selectVideoSlice, selector);
 
 export const selectStartingFrameImage = createVideoSelector((video) => video.startingFrameImage);
 export const selectGeneratedVideo = createVideoSelector((video) => video.generatedVideo);

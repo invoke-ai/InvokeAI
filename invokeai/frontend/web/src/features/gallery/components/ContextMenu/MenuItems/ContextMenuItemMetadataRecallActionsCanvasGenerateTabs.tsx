@@ -1,7 +1,7 @@
 import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { useItemDTOContext } from 'features/gallery/contexts/ItemDTOContext';
-import { useRecallAll } from 'features/gallery/hooks/useRecallAll';
+import { useRecallAll } from 'features/gallery/hooks/useRecallAllImageMetadata';
 import { useRecallCLIPSkip } from 'features/gallery/hooks/useRecallCLIPSkip';
 import { useRecallDimensions } from 'features/gallery/hooks/useRecallDimensions';
 import { useRecallPrompts } from 'features/gallery/hooks/useRecallPrompts';
