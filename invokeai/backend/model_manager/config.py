@@ -94,6 +94,7 @@ class LoraModelDefaultSettings(BaseModel):
     weight: float | None = Field(default=None, ge=-1, le=2, description="Default weight for this model")
     model_config = ConfigDict(extra="forbid")
 
+
 class ControlAdapterDefaultSettings(BaseModel):
     # This could be narrowed to controlnet processor nodes, but they change. Leaving this a string is safer.
     preprocessor: str | None
