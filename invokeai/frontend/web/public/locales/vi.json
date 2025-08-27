@@ -55,7 +55,8 @@
         "assetsWithCount_other": "{{count}} tài nguyên",
         "uncategorizedImages": "Ảnh Chưa Sắp Xếp",
         "deleteAllUncategorizedImages": "Xoá Tất Cả Ảnh Chưa Sắp Xếp",
-        "deletedImagesCannotBeRestored": "Ảnh đã xoá không thể phục hồi lại."
+        "deletedImagesCannotBeRestored": "Ảnh đã xoá không thể phục hồi lại.",
+        "locateInGalery": "Vị Trí Ở Thư Viện Ảnh"
     },
     "gallery": {
         "swapImages": "Đổi Hình Ảnh",
@@ -499,6 +500,10 @@
             "fitBboxToLayers": {
                 "title": "Xếp Vừa Hộp Giới Hạn Vào Layer",
                 "desc": "Tự động điểu chỉnh hộp giới hạn tạo sinh vừa vặn vào layer nhìn thấy được"
+            },
+            "toggleBbox": {
+                "title": "Bật/Tắt Hiển Thị Hộp Giới Hạn",
+                "desc": "Ẩn hoặc hiện hộp giới hạn tạo sinh"
             }
         },
         "workflows": {
@@ -872,7 +877,10 @@
             "stableDiffusion15": "Stable Diffusion 1.5",
             "sdxl": "SDXL",
             "fluxDev": "FLUX.1 dev"
-        }
+        },
+        "installBundle": "Tải Xuống Gói",
+        "installBundleMsg1": "Bạn có chắc chắn muốn tải xuống gói {{bundleName}}?",
+        "installBundleMsg2": "Gói này sẽ tải xuống {{count}} model sau đây:"
     },
     "metadata": {
         "guidance": "Hướng Dẫn",
@@ -2632,7 +2640,10 @@
             "publishingValidationRunInProgress": "Quá trình kiểm tra tính hợp lệ đang diễn ra.",
             "selectingOutputNodeDesc": "Bấm vào node để biến nó thành node đầu ra của workflow.",
             "selectingOutputNode": "Chọn node đầu ra",
-            "errorWorkflowHasUnpublishableNodes": "Workflow có lô node, node sản sinh, hoặc node tách metadata"
+            "errorWorkflowHasUnpublishableNodes": "Workflow có lô node, node sản sinh, hoặc node tách metadata",
+            "removeFromForm": "Xóa Khỏi Vùng Nhập",
+            "showShuffle": "Hiện Xáo Trộn",
+            "shuffle": "Xáo Trộn"
         },
         "yourWorkflows": "Workflow Của Bạn",
         "browseWorkflows": "Khám Phá Workflow",
@@ -2689,8 +2700,8 @@
         "watchRecentReleaseVideos": "Xem Video Phát Hành Mới Nhất",
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
         "items": [
-            "Trạng thái Studio được lưu vào server, giúp bạn tiếp tục công việc ở mọi thiết bị.",
-            "Hỗ trợ nhiều ảnh mẫu cho FLUX KONTEXT (chỉ cho model trên máy)."
+            "Misc QoL: Bật/Tắt hiển thị hộp giới hạn, đánh dấu node bị lỗi, chặn lỗi thêm node vào vùng nhập nhiều lần, khả năng đọc lại metadata của CLIP Skip",
+            "Giảm lượng tiêu thụ VRAM cho các ảnh mẫu Kontext và mã hóa VAE"
         ]
     },
     "upsell": {
