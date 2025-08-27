@@ -21,7 +21,7 @@ import {
   zParamsState,
 } from 'features/controlLayers/store/types';
 import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
-import { ModelIdentifierField } from 'features/nodes/types/common';
+import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import type {
   ParameterCanvasCoherenceMode,
@@ -43,7 +43,7 @@ import type {
 } from 'features/parameters/types/parameterSchemas';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
-import { AnyModelConfig, isNonRefinerMainModelConfig, MainModelConfig } from 'services/api/types';
+import { isNonRefinerMainModelConfig } from 'services/api/types';
 
 const slice = createSlice({
   name: 'params',
