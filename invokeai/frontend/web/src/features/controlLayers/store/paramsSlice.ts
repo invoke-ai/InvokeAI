@@ -26,8 +26,10 @@ import {
   CLIP_SKIP_MAP,
   SUPPORTS_ASPECT_RATIO_BASE_MODELS,
   SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS,
+  SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS,
   SUPPORTS_PIXEL_DIMENSIONS_BASE_MODELS,
   SUPPORTS_REF_IMAGES_BASE_MODELS,
+  SUPPORTS_SEED_BASE_MODELS,
 } from 'features/parameters/types/constants';
 import type {
   ParameterCanvasCoherenceMode,
@@ -550,6 +552,10 @@ export const selectModelSupportsNegativePrompt = createSelector(
   selectModel,
   (model) => !!model && SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS.includes(model.base)
 );
+export const selectModelSupportsSeed = createSelector(
+  selectModel,
+  (model) => !!model && SUPPORTS_SEED_BASE_MODELS.includes(model.base)
+);
 export const selectModelSupportsRefImages = createSelector(
   selectModel,
   (model) => !!model && SUPPORTS_REF_IMAGES_BASE_MODELS.includes(model.base)
@@ -565,6 +571,10 @@ export const selectModelSupportsPixelDimensions = createSelector(
 export const selectIsApiBaseModel = createSelector(
   selectModel,
   (model) => !!model && API_BASE_MODELS.includes(model.base)
+);
+export const selectModelSupportsOptimizedDenoising = createSelector(
+  selectModel,
+  (model) => !!model && SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS.includes(model.base)
 );
 export const selectScheduler = createParamsSelector((params) => params.scheduler);
 export const selectSeamlessXAxis = createParamsSelector((params) => params.seamlessXAxis);

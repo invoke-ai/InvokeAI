@@ -4,7 +4,6 @@ import { bboxSyncedToOptimalDimension, rgRefImageModelChanged } from 'features/c
 import { buildSelectIsStaging, selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraIsEnabledChanged } from 'features/controlLayers/store/lorasSlice';
 import {
-  doesModelSupportRefImages,
   modelChanged,
   syncedToOptimalDimension,
   vaeSelected,
@@ -17,6 +16,7 @@ import {
 } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { modelSelected } from 'features/parameters/store/actions';
+import { SUPPORTS_REF_IMAGES_BASE_MODELS } from 'features/parameters/types/constants';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
@@ -67,7 +67,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           modelsUpdatedDisabledOrCleared += 1;
         }
 
-        if (doesModelSupportRefImages(newModel)) {
+        if (SUPPORTS_REF_IMAGES_BASE_MODELS.includes(newModel.base)) {
           // Handle incompatible reference image models - switch to first compatible model, with some smart logic
           // to choose the best available model based on the new main model.
           const allRefImageModels = selectGlobalRefImageModels(state).filter(({ base }) => base === newBase);

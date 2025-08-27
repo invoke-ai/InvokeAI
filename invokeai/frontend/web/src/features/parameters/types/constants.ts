@@ -138,6 +138,10 @@ export const SCHEDULER_OPTIONS: ComboboxOption[] = [
  */
 export const API_BASE_MODELS: BaseModelType[] = ['imagen3', 'imagen4', 'chatgpt-4o', 'flux-kontext', 'gemini-2.5'];
 
+export const SUPPORTS_SEED_BASE_MODELS: BaseModelType[] = ['sd-1', 'sd-2', 'sd-3', 'sdxl', 'flux', 'cogview4'];
+
+export const SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS: BaseModelType[] = ['flux', 'sd-3'];
+
 export const SUPPORTS_REF_IMAGES_BASE_MODELS: BaseModelType[] = [
   'sd-1',
   'sdxl',

@@ -7,9 +7,14 @@ import {
   selectIsApiBaseModel,
   selectIsFLUX,
   selectIsSD3,
+  selectModelSupportsAspectRatio,
+  selectModelSupportsOptimizedDenoising,
+  selectModelSupportsPixelDimensions,
+  selectModelSupportsSeed,
   selectParamsSlice,
+  selectShouldRandomizeSeed,
 } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasSlice, selectScaleMethod } from 'features/controlLayers/store/selectors';
+import { selectBbox, selectCanvasSlice, selectScaleMethod } from 'features/controlLayers/store/selectors';
 import { ParamOptimizedDenoisingToggle } from 'features/parameters/components/Advanced/ParamOptimizedDenoisingToggle';
 import BboxScaledHeight from 'features/parameters/components/Bbox/BboxScaledHeight';
 import BboxScaledWidth from 'features/parameters/components/Bbox/BboxScaledWidth';
@@ -21,30 +26,46 @@ import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selectBadges = createMemoizedSelector([selectCanvasSlice, selectParamsSlice], (canvas, params) => {
-  const { shouldRandomizeSeed } = params;
-  const badges: string[] = [];
+const selectBadges = createMemoizedSelector(
+  [
+    selectBbox,
+    selectShouldRandomizeSeed,
+    selectModelSupportsSeed,
+    selectModelSupportsAspectRatio,
+    selectModelSupportsPixelDimensions,
+  ],
+  (bbox, shouldRandomizeSeed, modelSupportsSeed, modelSupportsAspectRatio, modelSupportsPixelDimensions) => {
+    const badges: string[] = [];
 
-  const { aspectRatio } = canvas.bbox;
-  const { width, height } = canvas.bbox.rect;
+    const { aspectRatio, rect } = bbox;
+    const { width, height } = rect;
 
-  badges.push(`${width}×${height}`);
-  badges.push(aspectRatio.id);
+    if (modelSupportsPixelDimensions) {
+      badges.push(`${width}×${height}`);
+    }
 
-  if (aspectRatio.isLocked) {
-    badges.push('locked');
+    if (modelSupportsAspectRatio) {
+      badges.push(aspectRatio.id);
+
+      // If a model does not support pixel dimensions, the ratio is essentially always locked.
+      if (modelSupportsPixelDimensions && aspectRatio.isLocked) {
+        badges.push('locked');
+      }
+    }
+
+    if (modelSupportsSeed) {
+      if (!shouldRandomizeSeed) {
+        badges.push('Manual Seed');
+      }
+    }
+
+    if (badges.length === 0) {
+      return EMPTY_ARRAY;
+    }
+
+    return badges;
   }
-
-  if (!shouldRandomizeSeed) {
-    badges.push('Manual Seed');
-  }
-
-  if (badges.length === 0) {
-    return EMPTY_ARRAY;
-  }
-
-  return badges;
-});
+);
 
 const scalingLabelProps: FormLabelProps = {
   minW: '4.5rem',
@@ -62,9 +83,16 @@ export const CanvasTabImageSettingsAccordion = memo(() => {
     id: 'image-settings-advanced',
     defaultIsOpen: false,
   });
-  const isFLUX = useAppSelector(selectIsFLUX);
-  const isSD3 = useAppSelector(selectIsSD3);
-  const isApiModel = useAppSelector(selectIsApiBaseModel);
+  const modelSupportsOptimizedDenoising = useAppSelector(selectModelSupportsOptimizedDenoising);
+  const modelSupportsSeed = useAppSelector(selectModelSupportsSeed);
+  const modelSupportsAspectRatio = useAppSelector(selectModelSupportsAspectRatio);
+  const modelSupportsPixelDimensions = useAppSelector(selectModelSupportsPixelDimensions);
+
+  if (!modelSupportsAspectRatio && !modelSupportsSeed) {
+    return null;
+  }
+
+  const withAdvancedSettingsExpander = modelSupportsPixelDimensions;
 
   return (
     <StandaloneAccordion
@@ -76,18 +104,18 @@ export const CanvasTabImageSettingsAccordion = memo(() => {
       <Flex
         px={4}
         pt={4}
-        pb={isApiModel ? 4 : 0}
+        pb={withAdvancedSettingsExpander ? 0 : 4}
         w="full"
         h="full"
         flexDir="column"
         data-testid="image-settings-accordion"
       >
         <BboxSettings />
-        {!isApiModel && <ParamSeed py={3} />}
-        {!isApiModel && (
+        {modelSupportsSeed && <ParamSeed pt={3} pb={withAdvancedSettingsExpander ? 0 : 3} />}
+        {withAdvancedSettingsExpander && (
           <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
             <Flex gap={4} pb={4} flexDir="column">
-              {(isFLUX || isSD3) && <ParamOptimizedDenoisingToggle />}
+              {modelSupportsOptimizedDenoising && <ParamOptimizedDenoisingToggle />}
               <BboxScaleMethod />
               {scaleMethod !== 'none' && (
                 <FormControlGroup formLabelProps={scalingLabelProps}>
