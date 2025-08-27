@@ -9,7 +9,6 @@ import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { debounce, groupBy, upperFirst } from 'es-toolkit/compat';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import {
-  doesModelSupportRefImages,
   selectMainModelConfig,
   selectParamsSlice,
 } from 'features/controlLayers/store/paramsSlice';
@@ -38,6 +37,7 @@ import { resolveBatchValue } from 'features/nodes/util/node/resolveBatchValue';
 import { useIsModelDisabled } from 'features/parameters/hooks/useIsModelDisabled';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
+import { SUPPORTS_REF_IMAGES_BASE_MODELS } from 'features/parameters/types/constants';
 import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
 import { getGridSize } from 'features/parameters/util/optimalDimension';
 import { promptExpansionApi, type PromptExpansionRequestState } from 'features/prompt/PromptExpansion/state';
@@ -281,7 +281,7 @@ const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     reasons.push({ content: i18n.t('parameters.invoke.promptExpansionResultPending') });
   }
 
-  if (model && doesModelSupportRefImages(model)) {
+  if (model && SUPPORTS_REF_IMAGES_BASE_MODELS.includes(model.base)) {
     const enabledRefImages = refImages.entities.filter(({ isEnabled }) => isEnabled);
 
     enabledRefImages.forEach((entity, i) => {
@@ -632,7 +632,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
   });
 
-  if (model && doesModelSupportRefImages(model)) {
+  if (model && SUPPORTS_REF_IMAGES_BASE_MODELS.includes(model.base)) {
     const enabledRefImages = refImages.entities.filter(({ isEnabled }) => isEnabled);
 
     enabledRefImages.forEach((entity, i) => {
