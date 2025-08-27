@@ -21,8 +21,14 @@ import {
   zParamsState,
 } from 'features/controlLayers/store/types';
 import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
-import type { ModelIdentifierField } from 'features/nodes/types/common';
-import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
+import {
+  API_BASE_MODELS,
+  CLIP_SKIP_MAP,
+  SUPPORTS_ASPECT_RATIO_BASE_MODELS,
+  SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS,
+  SUPPORTS_PIXEL_DIMENSIONS_BASE_MODELS,
+  SUPPORTS_REF_IMAGES_BASE_MODELS,
+} from 'features/parameters/types/constants';
 import type {
   ParameterCanvasCoherenceMode,
   ParameterCFGRescaleMultiplier,
@@ -108,6 +114,14 @@ const slice = createSlice({
       // If the model base changes (e.g. SD1.5 -> SDXL), we need to change a few things
       if (model === null || previousModel?.base === model.base) {
         return;
+      }
+
+      if (API_BASE_MODELS.includes(model.base)) {
+        state.dimensions.aspectRatio.isLocked = true;
+        state.dimensions.aspectRatio.value = 1;
+        state.dimensions.aspectRatio.id = '1:1';
+        state.dimensions.rect.width = 1024;
+        state.dimensions.rect.height = 1024;
       }
 
       applyClipSkip(state, model, state.clipSkip);
@@ -532,17 +546,25 @@ export const selectPositivePrompt = createParamsSelector((params) => params.posi
 export const selectNegativePrompt = createParamsSelector((params) => params.negativePrompt);
 export const selectNegativePromptWithFallback = createParamsSelector((params) => params.negativePrompt ?? '');
 export const selectHasNegativePrompt = createParamsSelector((params) => params.negativePrompt !== null);
-const doesModelSupportNegativePrompt = (model: ModelIdentifierField) =>
-  ['sd-1', 'sdxl', 'cogview4', 'sd-3', 'imagen3', 'imagen4'].includes(model.base);
 export const selectModelSupportsNegativePrompt = createSelector(
   selectModel,
-  (model) => !!model && doesModelSupportNegativePrompt(model)
+  (model) => !!model && SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS.includes(model.base)
 );
-export const doesModelSupportRefImages = (model: ModelIdentifierField) =>
-  ['sd-1', 'sdxl', 'flux', 'flux-kontext', 'chatgpt-4o', 'gemini-2.5'].includes(model.base);
 export const selectModelSupportsRefImages = createSelector(
   selectModel,
-  (model) => !!model && doesModelSupportRefImages(model)
+  (model) => !!model && SUPPORTS_REF_IMAGES_BASE_MODELS.includes(model.base)
+);
+export const selectModelSupportsAspectRatio = createSelector(
+  selectModel,
+  (model) => !!model && SUPPORTS_ASPECT_RATIO_BASE_MODELS.includes(model.base)
+);
+export const selectModelSupportsPixelDimensions = createSelector(
+  selectModel,
+  (model) => !!model && SUPPORTS_PIXEL_DIMENSIONS_BASE_MODELS.includes(model.base)
+);
+export const selectIsApiBaseModel = createSelector(
+  selectModel,
+  (model) => !!model && API_BASE_MODELS.includes(model.base)
 );
 export const selectScheduler = createParamsSelector((params) => params.scheduler);
 export const selectSeamlessXAxis = createParamsSelector((params) => params.seamlessXAxis);

@@ -2,9 +2,8 @@ import { Box, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import { selectIsCogView4, selectIsSDXL } from 'features/controlLayers/store/paramsSlice';
+import { selectIsApiBaseModel, selectIsCogView4, selectIsSDXL } from 'features/controlLayers/store/paramsSlice';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
-import { useIsApiModel } from 'features/parameters/hooks/useIsApiModel';
 import { AdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
 import { CompositingSettingsAccordion } from 'features/settingsAccordions/components/CompositingSettingsAccordion/CompositingSettingsAccordion';
 import { GenerationSettingsAccordion } from 'features/settingsAccordions/components/GenerationSettingsAccordion/GenerationSettingsAccordion';
@@ -27,7 +26,7 @@ export const ParametersPanelCanvas = memo(() => {
   const isCogview4 = useAppSelector(selectIsCogView4);
   const isStylePresetsMenuOpen = useStore($isStylePresetsMenuOpen);
 
-  const isApiModel = useIsApiModel();
+  const isApiModel = useAppSelector(selectIsApiBaseModel);
 
   return (
     <Flex w="full" h="full" flexDir="column" gap={2}>

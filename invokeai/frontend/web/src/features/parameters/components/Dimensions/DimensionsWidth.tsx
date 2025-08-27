@@ -1,9 +1,8 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { selectWidth, widthChanged } from 'features/controlLayers/store/paramsSlice';
+import { selectIsApiBaseModel, selectWidth, widthChanged } from 'features/controlLayers/store/paramsSlice';
 import { selectGridSize, selectOptimalDimension } from 'features/controlLayers/store/selectors';
-import { useIsApiModel } from 'features/parameters/hooks/useIsApiModel';
 import { selectWidthConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,7 +13,7 @@ export const DimensionsWidth = memo(() => {
   const width = useAppSelector(selectWidth);
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const config = useAppSelector(selectWidthConfig);
-  const isApiModel = useIsApiModel();
+  const isApiModel = useAppSelector(selectIsApiBaseModel);
   const gridSize = useAppSelector(selectGridSize);
 
   const onChange = useCallback(
