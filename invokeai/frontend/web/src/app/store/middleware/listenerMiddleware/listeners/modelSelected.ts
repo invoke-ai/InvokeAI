@@ -2,8 +2,13 @@ import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/store';
 import { bboxSyncedToOptimalDimension, rgRefImageModelChanged } from 'features/controlLayers/store/canvasSlice';
 import { buildSelectIsStaging, selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
-import { modelChanged, syncedToOptimalDimension, vaeSelected } from 'features/controlLayers/store/paramsSlice';
+import { loraIsEnabledChanged } from 'features/controlLayers/store/lorasSlice';
+import {
+  doesModelSupportRefImages,
+  modelChanged,
+  syncedToOptimalDimension,
+  vaeSelected,
+} from 'features/controlLayers/store/paramsSlice';
 import { refImageModelChanged, selectReferenceImageEntities } from 'features/controlLayers/store/refImagesSlice';
 import {
   selectAllEntitiesOfType,
@@ -22,6 +27,7 @@ import {
   isFluxKontextApiModelConfig,
   isFluxKontextModelConfig,
   isFluxReduxModelConfig,
+  isGemini2_5ModelConfig,
 } from 'services/api/types';
 
 const log = logger('models');
@@ -44,13 +50,13 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
 
       if (didBaseModelChange) {
         // we may need to reset some incompatible submodels
-        let modelsCleared = 0;
+        let modelsUpdatedDisabledOrCleared = 0;
 
         // handle incompatible loras
         state.loras.loras.forEach((lora) => {
           if (lora.model.base !== newBase) {
-            dispatch(loraDeleted({ id: lora.id }));
-            modelsCleared += 1;
+            dispatch(loraIsEnabledChanged({ id: lora.id, isEnabled: false }));
+            modelsUpdatedDisabledOrCleared += 1;
           }
         });
 
@@ -58,52 +64,57 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         const { vae } = state.params;
         if (vae && vae.base !== newBase) {
           dispatch(vaeSelected(null));
-          modelsCleared += 1;
+          modelsUpdatedDisabledOrCleared += 1;
         }
 
-        // Handle incompatible reference image models - switch to first compatible model, with some smart logic
-        // to choose the best available model based on the new main model.
-        const allRefImageModels = selectGlobalRefImageModels(state).filter(({ base }) => base === newBase);
+        if (doesModelSupportRefImages(newModel)) {
+          // Handle incompatible reference image models - switch to first compatible model, with some smart logic
+          // to choose the best available model based on the new main model.
+          const allRefImageModels = selectGlobalRefImageModels(state).filter(({ base }) => base === newBase);
 
-        let newGlobalRefImageModel = null;
+          let newGlobalRefImageModel = null;
 
-        // Certain models require the ref image model to be the same as the main model - others just need a matching
-        // base. Helper to grab the first exact match or the first available model if no exact match is found.
-        const exactMatchOrFirst = <T extends AnyModelConfig>(candidates: T[]): T | null =>
-          candidates.find(({ key }) => key === newModel.key) ?? candidates[0] ?? null;
+          // Certain models require the ref image model to be the same as the main model - others just need a matching
+          // base. Helper to grab the first exact match or the first available model if no exact match is found.
+          const exactMatchOrFirst = <T extends AnyModelConfig>(candidates: T[]): T | null =>
+            candidates.find(({ key }) => key === newModel.key) ?? candidates[0] ?? null;
 
-        // The only way we can differentiate between FLUX and FLUX Kontext is to check for "kontext" in the name
-        if (newModel.base === 'flux' && newModel.name.toLowerCase().includes('kontext')) {
-          const fluxKontextDevModels = allRefImageModels.filter(isFluxKontextModelConfig);
-          newGlobalRefImageModel = exactMatchOrFirst(fluxKontextDevModels);
-        } else if (newModel.base === 'chatgpt-4o') {
-          const chatGPT4oModels = allRefImageModels.filter(isChatGPT4oModelConfig);
-          newGlobalRefImageModel = exactMatchOrFirst(chatGPT4oModels);
-        } else if (newModel.base === 'flux-kontext') {
-          const fluxKontextApiModels = allRefImageModels.filter(isFluxKontextApiModelConfig);
-          newGlobalRefImageModel = exactMatchOrFirst(fluxKontextApiModels);
-        } else if (newModel.base === 'flux') {
-          const fluxReduxModels = allRefImageModels.filter(isFluxReduxModelConfig);
-          newGlobalRefImageModel = fluxReduxModels[0] ?? null;
-        } else {
-          newGlobalRefImageModel = allRefImageModels[0] ?? null;
-        }
+          // The only way we can differentiate between FLUX and FLUX Kontext is to check for "kontext" in the name
+          if (newModel.base === 'flux' && newModel.name.toLowerCase().includes('kontext')) {
+            const fluxKontextDevModels = allRefImageModels.filter(isFluxKontextModelConfig);
+            newGlobalRefImageModel = exactMatchOrFirst(fluxKontextDevModels);
+          } else if (newModel.base === 'chatgpt-4o') {
+            const chatGPT4oModels = allRefImageModels.filter(isChatGPT4oModelConfig);
+            newGlobalRefImageModel = exactMatchOrFirst(chatGPT4oModels);
+          } else if (newModel.base === 'gemini-2.5') {
+            const gemini2_5Models = allRefImageModels.filter(isGemini2_5ModelConfig);
+            newGlobalRefImageModel = exactMatchOrFirst(gemini2_5Models);
+          } else if (newModel.base === 'flux-kontext') {
+            const fluxKontextApiModels = allRefImageModels.filter(isFluxKontextApiModelConfig);
+            newGlobalRefImageModel = exactMatchOrFirst(fluxKontextApiModels);
+          } else if (newModel.base === 'flux') {
+            const fluxReduxModels = allRefImageModels.filter(isFluxReduxModelConfig);
+            newGlobalRefImageModel = fluxReduxModels[0] ?? null;
+          } else {
+            newGlobalRefImageModel = allRefImageModels[0] ?? null;
+          }
 
-        // All ref image entities are updated to use the same new model
-        const refImageEntities = selectReferenceImageEntities(state);
-        for (const entity of refImageEntities) {
-          const shouldUpdateModel =
-            (entity.config.model && entity.config.model.base !== newBase) ||
-            (!entity.config.model && newGlobalRefImageModel);
+          // All ref image entities are updated to use the same new model
+          const refImageEntities = selectReferenceImageEntities(state);
+          for (const entity of refImageEntities) {
+            const shouldUpdateModel =
+              (entity.config.model && entity.config.model.base !== newBase) ||
+              (!entity.config.model && newGlobalRefImageModel);
 
-          if (shouldUpdateModel) {
-            dispatch(
-              refImageModelChanged({
-                id: entity.id,
-                modelConfig: newGlobalRefImageModel,
-              })
-            );
-            modelsCleared += 1;
+            if (shouldUpdateModel) {
+              dispatch(
+                refImageModelChanged({
+                  id: entity.id,
+                  modelConfig: newGlobalRefImageModel,
+                })
+              );
+              modelsUpdatedDisabledOrCleared += 1;
+            }
           }
         }
 
@@ -128,17 +139,17 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
                   modelConfig: newRegionalRefImageModel,
                 })
               );
-              modelsCleared += 1;
+              modelsUpdatedDisabledOrCleared += 1;
             }
           }
         }
 
-        if (modelsCleared > 0) {
+        if (modelsUpdatedDisabledOrCleared > 0) {
           toast({
             id: 'BASE_MODEL_CHANGED',
             title: t('toast.baseModelChanged'),
             description: t('toast.baseModelChangedCleared', {
-              count: modelsCleared,
+              count: modelsUpdatedDisabledOrCleared,
             }),
             status: 'warning',
           });
