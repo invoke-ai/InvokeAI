@@ -512,6 +512,8 @@ const zBboxState = z.object({
 });
 
 const zDimensionsState = z.object({
+  // TODO(psyche): There is no concept of x/y coords for the dimensions state here... It's just width and height.
+  // Remove the extraneous data.
   rect: z.object({
     x: z.number().int(),
     y: z.number().int(),
