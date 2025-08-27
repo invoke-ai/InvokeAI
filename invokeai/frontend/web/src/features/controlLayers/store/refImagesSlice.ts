@@ -26,6 +26,7 @@ import {
   initialChatGPT4oReferenceImage,
   initialFluxKontextReferenceImage,
   initialFLUXRedux,
+  initialGemini2_5ReferenceImage,
   initialIPAdapter,
 } from './util';
 
@@ -130,6 +131,16 @@ const slice = createSlice({
         // Switching to chatgpt-4o ref image
         entity.config = {
           ...initialChatGPT4oReferenceImage,
+          image: entity.config.image,
+          model: entity.config.model,
+        };
+        return;
+      }
+
+      if (entity.config.model.base === 'gemini-2.5') {
+        // Switching to Gemini 2.5 Flash Preview (nano banana) ref image
+        entity.config = {
+          ...initialGemini2_5ReferenceImage,
           image: entity.config.image,
           model: entity.config.model,
         };
