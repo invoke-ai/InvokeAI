@@ -137,7 +137,8 @@ export const selectGlobalRefImageModels = buildModelsSelector(
     isFluxReduxModelConfig(config) ||
     isChatGPT4oModelConfig(config) ||
     isFluxKontextApiModelConfig(config) ||
-    isFluxKontextModelConfig(config)
+    isFluxKontextModelConfig(config) ||
+    isGemini2_5ModelConfig(config)
 );
 export const selectRegionalRefImageModels = buildModelsSelector(
   (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config)
