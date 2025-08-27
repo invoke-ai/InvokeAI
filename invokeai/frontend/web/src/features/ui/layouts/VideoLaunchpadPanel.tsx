@@ -17,12 +17,7 @@ export const VideoLaunchpadPanel = memo(() => {
   const videoUpsellComponent = useStore($videoUpsellComponent);
 
   if (!isVideoEnabled) {
-    return (
-      <LaunchpadContainer heading="">
-          {videoUpsellComponent}
-       
-      </LaunchpadContainer>
-    );
+    return <LaunchpadContainer heading="">{videoUpsellComponent}</LaunchpadContainer>;
   }
 
   return (
