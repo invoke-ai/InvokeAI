@@ -1,5 +1,6 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
 import { Flex, FormControlGroup } from '@invoke-ai/ui-library';
+import { useIsApiModel } from 'features/parameters/hooks/useIsApiModel';
 import { memo } from 'react';
 
 import { DimensionsAspectRatioSelect } from './DimensionsAspectRatioSelect';
@@ -11,6 +12,8 @@ import { DimensionsSwapButton } from './DimensionsSwapButton';
 import { DimensionsWidth } from './DimensionsWidth';
 
 export const Dimensions = memo(() => {
+  const isApiModel = useIsApiModel();
+
   return (
     <Flex gap={4} alignItems="center">
       <Flex gap={4} flexDirection="column" width="full">
@@ -21,8 +24,12 @@ export const Dimensions = memo(() => {
             <DimensionsLockAspectRatioButton />
             <DimensionsSetOptimalSizeButton />
           </Flex>
-          <DimensionsWidth />
-          <DimensionsHeight />
+          {!isApiModel && (
+            <>
+              <DimensionsWidth />
+              <DimensionsHeight />
+            </>
+          )}
         </FormControlGroup>
       </Flex>
       <Flex w="108px" h="108px" flexShrink={0} flexGrow={0} alignItems="center" justifyContent="center">
