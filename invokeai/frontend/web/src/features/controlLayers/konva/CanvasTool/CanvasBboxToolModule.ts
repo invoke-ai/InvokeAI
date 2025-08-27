@@ -400,7 +400,7 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
 
     // Update the aspect ratio buffer whenever the shift key is not held - this allows for a nice UX where you can start
     // a transform, get the right aspect ratio, then hold shift to lock it in.
-    if (!shift) {
+    if (!shouldMaintainAspectRatio) {
       this.$aspectRatioBuffer.set(bboxRect.width / bboxRect.height);
     }
   };
