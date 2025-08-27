@@ -215,6 +215,9 @@ const slice = createSlice({
   initialState: getInitialState(),
   reducers: {
     nodesChanged: (state, action: PayloadAction<NodeChange<AnyNode>[]>) => {
+      // TODO(psyche): The below TS issue was recently fixed upstream. Need to upgrade @xyflow/react and then we
+      // should be able to remove this cast.
+      //
       // In v12.7.0, @xyflow/react added a `domAttributes` property to the node data. One DOM attribute is
       // defaultValue, which may have a value of type `readonly string[]`. This conflicts with the immer-
       // provided Draft type, used internally by RTK. We don't use `domAttributes`, so we can safely cast
