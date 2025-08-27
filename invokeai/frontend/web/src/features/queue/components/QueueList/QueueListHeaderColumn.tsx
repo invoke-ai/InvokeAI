@@ -6,8 +6,7 @@ import {
   selectQueueSortBy,
   selectQueueSortOrder,
   sortByChanged,
-  sortOrderChanged,
-  zSortBy,
+  sortOrderChanged
 } from 'features/queue/store/queueSlice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,7 +14,7 @@ import { PiSortAscendingBold, PiSortDescendingBold } from 'react-icons/pi';
 import { useSelector } from 'react-redux';
 
 type QueueListHeaderColumnProps = {
-  field?: string;
+  field?: SortBy;
   displayName: string;  
   alignItems?: CSS.Property.AlignItems;
   ps?: CSS.Property.PaddingInlineStart | number;
@@ -23,13 +22,6 @@ type QueueListHeaderColumnProps = {
 };
 
 const QueueListHeaderColumn = ({ field, displayName, alignItems, ps, w }: QueueListHeaderColumnProps) => {
-  const sortByField = useMemo(() => {
-    if(!field) {
-      return null;
-    }
-    const result = zSortBy.safeParse(field);
-    return result.success ? result.data : null;
-  }, [field]);
   const [isMouseHoveringColumn, setIsMouseHoveringColumn] = useState(false);
 
   const handleMouseEnterColumn = useCallback(() => {
@@ -48,8 +40,8 @@ const QueueListHeaderColumn = ({ field, displayName, alignItems, ps, w }: QueueL
       onMouseLeave={handleMouseLeaveColumn}
     >
       <Text variant="subtext">{displayName}</Text>
-      {!!sortByField && (
-        <SortColumnIcon field={sortByField} displayName={displayName} isMouseHoveringColumn={isMouseHoveringColumn} />
+      {!!field && (
+        <SortColumnIcon field={field} displayName={displayName} isMouseHoveringColumn={isMouseHoveringColumn} />
       )}
     </Flex>
   );
