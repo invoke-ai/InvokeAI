@@ -6,12 +6,12 @@ import {
   selectAspectRatioID,
   selectAspectRatioIsLocked,
   selectHeight,
+  selectIsApiBaseModel,
   selectShouldRandomizeSeed,
   selectWidth,
 } from 'features/controlLayers/store/paramsSlice';
 import { Dimensions } from 'features/parameters/components/Dimensions/Dimensions';
 import { ParamSeed } from 'features/parameters/components/Seed/ParamSeed';
-import { useIsApiModel } from 'features/parameters/hooks/useIsApiModel';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -47,7 +47,7 @@ export const GenerateTabImageSettingsAccordion = memo(() => {
     id: 'image-settings-generate-tab',
     defaultIsOpen: true,
   });
-  const isApiModel = useIsApiModel();
+  const isApiModel = useAppSelector(selectIsApiBaseModel);
 
   return (
     <StandaloneAccordion

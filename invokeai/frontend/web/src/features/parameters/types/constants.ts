@@ -136,4 +136,44 @@ export const SCHEDULER_OPTIONS: ComboboxOption[] = [
 /**
  * List of base models that make API requests
  */
-export const API_BASE_MODELS = ['imagen3', 'imagen4', 'chatgpt-4o', 'flux-kontext', 'gemini-2.5'];
+export const API_BASE_MODELS: BaseModelType[] = ['imagen3', 'imagen4', 'chatgpt-4o', 'flux-kontext', 'gemini-2.5'];
+
+export const SUPPORTS_REF_IMAGES_BASE_MODELS: BaseModelType[] = [
+  'sd-1',
+  'sdxl',
+  'flux',
+  'flux-kontext',
+  'chatgpt-4o',
+  'gemini-2.5',
+];
+
+export const SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS: BaseModelType[] = [
+  'sd-1',
+  'sdxl',
+  'cogview4',
+  'sd-3',
+  'imagen3',
+  'imagen4',
+];
+
+export const SUPPORTS_PIXEL_DIMENSIONS_BASE_MODELS: BaseModelType[] = [
+  'sd-1',
+  'sd-2',
+  'sd-3',
+  'sdxl',
+  'flux',
+  'cogview4',
+];
+
+export const SUPPORTS_ASPECT_RATIO_BASE_MODELS: BaseModelType[] = [
+  'sd-1',
+  'sd-2',
+  'sd-3',
+  'sdxl',
+  'flux',
+  'cogview4',
+  'imagen3',
+  'imagen4',
+  'flux-kontext',
+  'chatgpt-4o',
+];
