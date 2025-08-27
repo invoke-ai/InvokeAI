@@ -4,7 +4,7 @@ import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import z from 'zod';
 
-export const zSortBy = z.enum(['item_id', 'status', 'completed_at']);
+const zSortBy = z.enum(['item_id', 'status', 'completed_at']);
 export type SortBy = z.infer<typeof zSortBy>;
 
 const zQueueState = z.object({
