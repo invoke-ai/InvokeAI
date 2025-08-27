@@ -6,7 +6,6 @@ import {
   selectAspectRatioID,
   selectAspectRatioIsLocked,
   selectHeight,
-  selectIsApiBaseModel,
   selectModelSupportsAspectRatio,
   selectModelSupportsPixelDimensions,
   selectModelSupportsSeed,
