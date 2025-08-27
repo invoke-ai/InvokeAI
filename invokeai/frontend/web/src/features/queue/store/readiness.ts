@@ -8,7 +8,11 @@ import type { AppConfig } from 'app/types/invokeai';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { debounce, groupBy, upperFirst } from 'es-toolkit/compat';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import {
+  doesModelSupportRefImages,
+  selectMainModelConfig,
+  selectParamsSlice,
+} from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasState, ParamsState, RefImagesState } from 'features/controlLayers/store/types';
@@ -277,19 +281,21 @@ const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     reasons.push({ content: i18n.t('parameters.invoke.promptExpansionResultPending') });
   }
 
-  const enabledRefImages = refImages.entities.filter(({ isEnabled }) => isEnabled);
+  if (model && doesModelSupportRefImages(model)) {
+    const enabledRefImages = refImages.entities.filter(({ isEnabled }) => isEnabled);
 
-  enabledRefImages.forEach((entity, i) => {
-    const layerNumber = i + 1;
-    const refImageLiteral = i18n.t(LAYER_TYPE_TO_TKEY['reference_image']);
-    const prefix = `${refImageLiteral} #${layerNumber}`;
-    const problems = getGlobalReferenceImageWarnings(entity, model);
+    enabledRefImages.forEach((entity, i) => {
+      const layerNumber = i + 1;
+      const refImageLiteral = i18n.t(LAYER_TYPE_TO_TKEY['reference_image']);
+      const prefix = `${refImageLiteral} #${layerNumber}`;
+      const problems = getGlobalReferenceImageWarnings(entity, model);
 
-    if (problems.length) {
-      const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
-      reasons.push({ prefix, content });
-    }
-  });
+      if (problems.length) {
+        const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
+        reasons.push({ prefix, content });
+      }
+    });
+  }
 
   return reasons;
 };
@@ -626,19 +632,21 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
   });
 
-  const enabledRefImages = refImages.entities.filter(({ isEnabled }) => isEnabled);
+  if (model && doesModelSupportRefImages(model)) {
+    const enabledRefImages = refImages.entities.filter(({ isEnabled }) => isEnabled);
 
-  enabledRefImages.forEach((entity, i) => {
-    const layerNumber = i + 1;
-    const refImageLiteral = i18n.t(LAYER_TYPE_TO_TKEY['reference_image']);
-    const prefix = `${refImageLiteral} #${layerNumber}`;
-    const problems = getGlobalReferenceImageWarnings(entity, model);
+    enabledRefImages.forEach((entity, i) => {
+      const layerNumber = i + 1;
+      const refImageLiteral = i18n.t(LAYER_TYPE_TO_TKEY['reference_image']);
+      const prefix = `${refImageLiteral} #${layerNumber}`;
+      const problems = getGlobalReferenceImageWarnings(entity, model);
 
-    if (problems.length) {
-      const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
-      reasons.push({ prefix, content });
-    }
-  });
+      if (problems.length) {
+        const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
+        reasons.push({ prefix, content });
+      }
+    });
+  }
 
   canvas.regionalGuidance.entities
     .filter((entity) => entity.isEnabled)
