@@ -10,11 +10,19 @@ import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase'
 import type { CanvasSegmentAnythingModule } from 'features/controlLayers/konva/CanvasSegmentAnythingModule';
 import type { CanvasStagingAreaModule } from 'features/controlLayers/konva/CanvasStagingAreaModule';
 import { getKonvaNodeDebugAttrs, loadImage } from 'features/controlLayers/konva/util';
-import type { CanvasImageState } from 'features/controlLayers/store/types';
+import type { CanvasImageState, Dimensions } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
+
+type CanvasObjectImageConfig = {
+  usePhysicalDimensions: boolean;
+};
+
+const DEFAULT_CONFIG: CanvasObjectImageConfig = {
+  usePhysicalDimensions: false,
+};
 
 export class CanvasObjectImage extends CanvasModuleBase {
   readonly type = 'object_image';
@@ -30,6 +38,9 @@ export class CanvasObjectImage extends CanvasModuleBase {
   readonly log: Logger;
 
   state: CanvasImageState;
+
+  config: CanvasObjectImageConfig;
+
   konva: {
     group: Konva.Group;
     placeholder: { group: Konva.Group; rect: Konva.Rect; text: Konva.Text };
@@ -47,7 +58,8 @@ export class CanvasObjectImage extends CanvasModuleBase {
       | CanvasEntityBufferObjectRenderer
       | CanvasStagingAreaModule
       | CanvasSegmentAnythingModule
-      | CanvasEntityFilterer
+      | CanvasEntityFilterer,
+    config = DEFAULT_CONFIG
   ) {
     super();
     this.id = state.id;
@@ -55,6 +67,7 @@ export class CanvasObjectImage extends CanvasModuleBase {
     this.manager = parent.manager;
     this.path = this.manager.buildPath(this);
     this.log = this.manager.buildLogger(this);
+    this.config = config;
 
     this.log.debug({ state }, 'Creating module');
 
@@ -157,9 +170,22 @@ export class CanvasObjectImage extends CanvasModuleBase {
     this.konva.placeholder.group.visible(true);
   };
 
+  getDimensions = (): Dimensions => {
+    if (this.config.usePhysicalDimensions && this.imageElement) {
+      return {
+        width: this.imageElement.width,
+        height: this.imageElement.height,
+      };
+    }
+    return {
+      width: this.state.image.width,
+      height: this.state.image.height,
+    };
+  };
+
   updateImageElement = () => {
     if (this.imageElement) {
-      const { width, height } = this.state.image;
+      const { width, height } = this.getDimensions();
 
       if (this.konva.image) {
         this.log.trace('Updating Konva image attrs');
@@ -196,7 +222,6 @@ export class CanvasObjectImage extends CanvasModuleBase {
       this.log.trace({ state }, 'Updating image');
 
       const { image } = state;
-      const { width, height } = image;
 
       if (force || (!objectEquals(this.state, state) && !this.isLoading)) {
         const release = await this.mutex.acquire();
@@ -212,7 +237,7 @@ export class CanvasObjectImage extends CanvasModuleBase {
         }
       }
 
-      this.konva.image?.setAttrs({ width, height });
+      this.konva.image?.setAttrs(this.getDimensions());
       this.state = state;
       return true;
     }

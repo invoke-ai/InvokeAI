@@ -12,7 +12,11 @@ import {
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectBboxRect, selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
-import { imageNameToImageObject } from 'features/controlLayers/store/util';
+import {
+  imageDTOToImageObject,
+  imageDTOToImageWithDims,
+  imageNameToImageObject,
+} from 'features/controlLayers/store/util';
 import type { PropsWithChildren } from 'react';
 import { createContext, memo, useContext, useEffect, useMemo, useState } from 'react';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
@@ -71,8 +75,8 @@ export const StagingAreaContextProvider = memo(({ children, sessionId }: PropsWi
       },
       onAccept: (item, imageDTO) => {
         const bboxRect = selectBboxRect(store.getState());
-        const { x, y, width, height } = bboxRect;
-        const imageObject = imageNameToImageObject(imageDTO.image_name, { width, height });
+        const { x, y } = bboxRect;
+        const imageObject = imageDTOToImageObject(imageDTO);
         const selectedEntityIdentifier = selectSelectedEntityIdentifier(store.getState());
         const overrides: Partial<CanvasRasterLayerState> = {
           position: { x, y },

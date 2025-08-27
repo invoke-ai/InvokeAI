@@ -230,7 +230,11 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
       if (imageSrc) {
         const image = this._getImageFromSrc(imageSrc, width, height);
         if (!this.image) {
-          this.image = new CanvasObjectImage({ id: 'staging-area-image', type: 'image', image }, this);
+          this.image = new CanvasObjectImage({ id: 'staging-area-image', type: 'image', image }, this, {
+            // Some models do not make guarantees about their output dimensions. This flag allows the staged images to
+            // render at their real dimensions, instead of the bbox size.
+            usePhysicalDimensions: true,
+          });
           await this.image.update(this.image.state, true);
           this.konva.group.add(this.image.konva.group);
         } else if (this.image.isLoading || this.image.isError) {
