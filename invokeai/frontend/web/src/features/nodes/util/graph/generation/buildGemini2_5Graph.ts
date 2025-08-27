@@ -21,7 +21,9 @@ export const buildGemini2_5Graph = (arg: GraphBuilderArg): GraphBuilderReturn =>
   const { generationMode, state, manager } = arg;
 
   if (generationMode !== 'txt2img') {
-    throw new UnsupportedGenerationModeError(t('toast.chatGPT4oIncompatibleGenerationMode'));
+    throw new UnsupportedGenerationModeError(
+      t('toast.imagenIncompatibleGenerationMode', { model: 'Gemini 2.5 Flash Preview' })
+    );
   }
 
   log.debug({ generationMode, manager: manager?.id }, 'Building Gemini 2.5 graph');
