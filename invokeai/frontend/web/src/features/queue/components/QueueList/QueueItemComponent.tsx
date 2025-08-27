@@ -83,11 +83,14 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
       data-testid="queue-item"
     >
       <Flex minH={9} alignItems="center" gap={4} p={1.5} cursor="pointer" onClick={handleToggle}>
-        <Flex w={COLUMN_WIDTHS.number} justifyContent="flex-end" alignItems="center" flexShrink={0}>
+        <Flex w={COLUMN_WIDTHS.number} alignItems="center" flexShrink={0}>
           <Text variant="subtext">{index + 1}</Text>
         </Flex>
         <Flex w={COLUMN_WIDTHS.statusBadge} alignItems="center" flexShrink={0}>
           <QueueStatusBadge status={item.status} />
+        </Flex>
+        <Flex w={COLUMN_WIDTHS.completedAt} alignItems="center" flexShrink={0}>
+          {item.completed_at || '-'}
         </Flex>
         <Flex w={COLUMN_WIDTHS.origin} flexShrink={0}>
           <Text overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" alignItems="center">
@@ -111,22 +114,6 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
           <Text overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" alignItems="center">
             {item.batch_id}
           </Text>
-        </Flex>
-        <Flex alignItems="center" overflow="hidden" flexGrow={1}>
-          {item.field_values && (
-            <Flex gap={2} w="full" whiteSpace="nowrap" textOverflow="ellipsis" overflow="hidden">
-              {item.field_values
-                .filter((v) => v.node_path !== 'metadata_accumulator')
-                .map(({ node_path, field_name, value }) => (
-                  <Text as="span" key={`${item.item_id}.${node_path}.${field_name}.${value}`}>
-                    <Text as="span" fontWeight="semibold">
-                      {node_path}.{field_name}
-                    </Text>
-                    : {JSON.stringify(value)}
-                  </Text>
-                ))}
-            </Flex>
-          )}
         </Flex>
         <Flex alignItems="center" w={COLUMN_WIDTHS.validationRun} flexShrink={0}>
           {isValidationRun && <Badge>{t('workflows.builder.publishingValidationRun')}</Badge>}
