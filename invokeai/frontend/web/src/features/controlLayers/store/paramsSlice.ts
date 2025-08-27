@@ -21,6 +21,7 @@ import {
   zParamsState,
 } from 'features/controlLayers/store/types';
 import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
+import { ModelIdentifierField } from 'features/nodes/types/common';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import type {
   ParameterCanvasCoherenceMode,
@@ -42,7 +43,7 @@ import type {
 } from 'features/parameters/types/parameterSchemas';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
-import { isNonRefinerMainModelConfig } from 'services/api/types';
+import { AnyModelConfig, isNonRefinerMainModelConfig, MainModelConfig } from 'services/api/types';
 
 const slice = createSlice({
   name: 'params',
@@ -476,7 +477,7 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
 };
 
 export const selectParamsSlice = (state: RootState) => state.params;
-const createParamsSelector = <T>(selector: Selector<ParamsState, T>) => createSelector(selectParamsSlice, selector);
+const createParamsSelector = <T,>(selector: Selector<ParamsState, T>) => createSelector(selectParamsSlice, selector);
 
 export const selectBase = createParamsSelector((params) => params.model?.base);
 export const selectIsSDXL = createParamsSelector((params) => params.model?.base === 'sdxl');
@@ -531,9 +532,17 @@ export const selectPositivePrompt = createParamsSelector((params) => params.posi
 export const selectNegativePrompt = createParamsSelector((params) => params.negativePrompt);
 export const selectNegativePromptWithFallback = createParamsSelector((params) => params.negativePrompt ?? '');
 export const selectHasNegativePrompt = createParamsSelector((params) => params.negativePrompt !== null);
+const doesModelSupportNegativePrompt = (model: ModelIdentifierField) =>
+  ['sd-1', 'sdxl', 'cogview4', 'sd-3', 'imagen3', 'imagen4'].includes(model.base);
 export const selectModelSupportsNegativePrompt = createSelector(
-  [selectIsFLUX, selectIsChatGPT4o, selectIsFluxKontext],
-  (isFLUX, isChatGPT4o, isFluxKontext) => !isFLUX && !isChatGPT4o && !isFluxKontext
+  selectModel,
+  (model) => !!model && doesModelSupportNegativePrompt(model)
+);
+export const doesModelSupportRefImages = (model: ModelIdentifierField) =>
+  ['sd-1', 'sdxl', 'flux', 'flux-kontext', 'chatgpt-4o', 'gemini-2.5'].includes(model.base);
+export const selectModelSupportsRefImages = createSelector(
+  selectModel,
+  (model) => !!model && doesModelSupportRefImages(model)
 );
 export const selectScheduler = createParamsSelector((params) => params.scheduler);
 export const selectSeamlessXAxis = createParamsSelector((params) => params.seamlessXAxis);
