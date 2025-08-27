@@ -417,6 +417,10 @@
             "fitBboxToLayers": {
                 "title": "Adatta il riquadro di delimitazione ai livelli",
                 "desc": "Regola automaticamente il riquadro di delimitazione della generazione per adattarlo ai livelli visibili"
+            },
+            "toggleBbox": {
+                "title": "Attiva/disattiva la visibilità del riquadro di delimitazione",
+                "desc": "Nascondi o mostra il riquadro di delimitazione della generazione"
             }
         },
         "workflows": {
@@ -1988,7 +1992,8 @@
             "selectingOutputNodeDesc": "Fare clic su un nodo per selezionarlo come nodo di uscita del flusso di lavoro.",
             "errorWorkflowHasUnpublishableNodes": "Il flusso di lavoro ha nodi di estrazione lotto, generatore o metadati",
             "showShuffle": "Mostra Mescola",
-            "shuffle": "Mescola"
+            "shuffle": "Mescola",
+            "removeFromForm": "Rimuovi dal modulo"
         },
         "loadMore": "Carica altro",
         "searchPlaceholder": "Cerca per nome, descrizione o etichetta",
