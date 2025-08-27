@@ -12,8 +12,8 @@ import { BboxPreview } from 'features/parameters/components/Bbox/BboxPreview';
 import { BboxSetOptimalSizeButton } from 'features/parameters/components/Bbox/BboxSetOptimalSizeButton';
 import { BboxSwapDimensionsButton } from 'features/parameters/components/Bbox/BboxSwapDimensionsButton';
 import { BboxWidth } from 'features/parameters/components/Bbox/BboxWidth';
+import { PixelDimensionsUnsupportedAlert } from 'features/parameters/components/PixelDimensionsUnsupportedAlert';
 import { memo } from 'react';
-import { PixelDimensionsUnsupportedAlert } from '../PixelDimensionsUnsupportedAlert';
 
 export const BboxSettings = memo(() => {
   const supportsAspectRatio = useAppSelector(selectModelSupportsAspectRatio);

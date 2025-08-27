@@ -10,7 +10,6 @@ import type {
   ChatGPT4oReferenceImageConfig,
   ControlLoRAConfig,
   ControlNetConfig,
-  Dimensions,
   FluxKontextReferenceImageConfig,
   FLUXReduxConfig,
   Gemini2_5ReferenceImageConfig,
@@ -34,22 +33,6 @@ export const imageDTOToImageObject = (imageDTO: ImageDTO, overrides?: Partial<Ca
       image_name,
       width,
       height,
-    },
-    ...overrides,
-  };
-};
-
-export const imageNameToImageObject = (
-  imageName: string,
-  dimensions: Dimensions,
-  overrides?: Partial<CanvasImageState>
-): CanvasImageState => {
-  return {
-    id: getPrefixedId('image'),
-    type: 'image',
-    image: {
-      image_name: imageName,
-      ...dimensions,
     },
     ...overrides,
   };

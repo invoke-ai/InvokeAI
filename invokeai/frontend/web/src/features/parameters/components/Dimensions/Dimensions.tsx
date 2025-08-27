@@ -1,10 +1,11 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
-import { Alert, Flex, FormControlGroup, Text } from '@invoke-ai/ui-library';
+import { Flex, FormControlGroup } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
   selectModelSupportsAspectRatio,
   selectModelSupportsPixelDimensions,
 } from 'features/controlLayers/store/paramsSlice';
+import { PixelDimensionsUnsupportedAlert } from 'features/parameters/components/PixelDimensionsUnsupportedAlert';
 import { memo } from 'react';
 
 import { DimensionsAspectRatioSelect } from './DimensionsAspectRatioSelect';
@@ -14,7 +15,6 @@ import { DimensionsPreview } from './DimensionsPreview';
 import { DimensionsSetOptimalSizeButton } from './DimensionsSetOptimalSizeButton';
 import { DimensionsSwapButton } from './DimensionsSwapButton';
 import { DimensionsWidth } from './DimensionsWidth';
-import { PixelDimensionsUnsupportedAlert } from '../PixelDimensionsUnsupportedAlert';
 
 export const Dimensions = memo(() => {
   const supportsAspectRatio = useAppSelector(selectModelSupportsAspectRatio);

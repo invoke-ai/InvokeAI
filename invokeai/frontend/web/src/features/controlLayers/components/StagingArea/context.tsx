@@ -12,11 +12,7 @@ import {
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectBboxRect, selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
-import {
-  imageDTOToImageObject,
-  imageDTOToImageWithDims,
-  imageNameToImageObject,
-} from 'features/controlLayers/store/util';
+import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import type { PropsWithChildren } from 'react';
 import { createContext, memo, useContext, useEffect, useMemo, useState } from 'react';
 import { getImageDTOSafe } from 'services/api/endpoints/images';

@@ -6,10 +6,7 @@ import { isGemini2_5ReferenceImageConfig } from 'features/controlLayers/store/ty
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import type { ImageField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import {
-  getOriginalAndScaledSizesForTextToImage,
-  selectCanvasOutputFields,
-} from 'features/nodes/util/graph/graphBuilderUtils';
+import { selectCanvasOutputFields } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { t } from 'i18next';

@@ -3,11 +3,7 @@ import type { AppStartListening } from 'app/store/store';
 import { bboxSyncedToOptimalDimension, rgRefImageModelChanged } from 'features/controlLayers/store/canvasSlice';
 import { buildSelectIsStaging, selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraIsEnabledChanged } from 'features/controlLayers/store/lorasSlice';
-import {
-  modelChanged,
-  syncedToOptimalDimension,
-  vaeSelected,
-} from 'features/controlLayers/store/paramsSlice';
+import { modelChanged, syncedToOptimalDimension, vaeSelected } from 'features/controlLayers/store/paramsSlice';
 import { refImageModelChanged, selectReferenceImageEntities } from 'features/controlLayers/store/refImagesSlice';
 import {
   selectAllEntitiesOfType,

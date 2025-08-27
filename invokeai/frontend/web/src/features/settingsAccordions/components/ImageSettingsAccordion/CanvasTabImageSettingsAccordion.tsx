@@ -4,17 +4,13 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
-  selectIsApiBaseModel,
-  selectIsFLUX,
-  selectIsSD3,
   selectModelSupportsAspectRatio,
   selectModelSupportsOptimizedDenoising,
   selectModelSupportsPixelDimensions,
   selectModelSupportsSeed,
-  selectParamsSlice,
   selectShouldRandomizeSeed,
 } from 'features/controlLayers/store/paramsSlice';
-import { selectBbox, selectCanvasSlice, selectScaleMethod } from 'features/controlLayers/store/selectors';
+import { selectBbox, selectScaleMethod } from 'features/controlLayers/store/selectors';
 import { ParamOptimizedDenoisingToggle } from 'features/parameters/components/Advanced/ParamOptimizedDenoisingToggle';
 import BboxScaledHeight from 'features/parameters/components/Bbox/BboxScaledHeight';
 import BboxScaledWidth from 'features/parameters/components/Bbox/BboxScaledWidth';
