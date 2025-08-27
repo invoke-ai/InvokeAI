@@ -2,7 +2,7 @@ import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { isGemini2_5AspectRatioID, isGemini2_5ReferenceImageConfig } from 'features/controlLayers/store/types';
+import { isGemini2_5ReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import type { ImageField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
@@ -51,9 +51,6 @@ export const buildGemini2_5Graph = (arg: GraphBuilderArg): GraphBuilderReturn =>
     }
   }
 
-  const { originalSize, aspectRatio } = getOriginalAndScaledSizesForTextToImage(state);
-  assert(isGemini2_5AspectRatioID(aspectRatio.id), 'Gemini 2.5 does not support this aspect ratio');
-
   const g = new Graph(getPrefixedId('gemini_2_5_txt2img_graph'));
   const positivePrompt = g.addNode({
     id: getPrefixedId('positive_prompt'),
@@ -76,8 +73,6 @@ export const buildGemini2_5Graph = (arg: GraphBuilderArg): GraphBuilderReturn =>
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
   g.upsertMetadata({
     model: Graph.getModelMetadataField(model),
-    width: originalSize.width,
-    height: originalSize.height,
   });
   return {
     g,
