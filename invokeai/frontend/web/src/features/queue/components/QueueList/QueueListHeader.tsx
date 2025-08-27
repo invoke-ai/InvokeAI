@@ -1,14 +1,16 @@
-import { Flex, Text } from '@invoke-ai/ui-library';
+import { Flex } from '@invoke-ai/ui-library';
 import { selectShouldShowCredits } from 'features/system/store/configSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
 
 import { COLUMN_WIDTHS } from './constants';
+import QueueListHeaderColumn from './QueueListHeaderColumn';
 
 const QueueListHeader = () => {
   const { t } = useTranslation();
   const shouldShowCredits = useSelector(selectShouldShowCredits);
+
   return (
     <Flex
       alignItems="center"
@@ -20,32 +22,41 @@ const QueueListHeader = () => {
       fontSize="sm"
       letterSpacing={1}
     >
-      <Flex w={COLUMN_WIDTHS.number} justifyContent="flex-end" alignItems="center">
-        <Text variant="subtext">#</Text>
-      </Flex>
-      <Flex ps={0.5} w={COLUMN_WIDTHS.statusBadge} alignItems="center">
-        <Text variant="subtext">{t('queue.status')}</Text>
-      </Flex>
-      <Flex ps={0.5} w={COLUMN_WIDTHS.origin} alignItems="center">
-        <Text variant="subtext">{t('queue.origin')}</Text>
-      </Flex>
-      <Flex ps={0.5} w={COLUMN_WIDTHS.destination} alignItems="center">
-        <Text variant="subtext">{t('queue.destination')}</Text>
-      </Flex>
-      <Flex ps={0.5} w={COLUMN_WIDTHS.time} alignItems="center">
-        <Text variant="subtext">{t('queue.time')}</Text>
-      </Flex>
+      <QueueListHeaderColumn field="item_id" displayName="#" w={COLUMN_WIDTHS.number} alignItems="center" />
+      <QueueListHeaderColumn
+        field="status"
+        displayName={t('queue.status')}
+        ps={0.5}
+        w={COLUMN_WIDTHS.statusBadge}
+        alignItems="center"
+      />
+      <QueueListHeaderColumn
+        field="completed_at"
+        displayName={t('queue.completedAt')}
+        ps={0.5} w={COLUMN_WIDTHS.completedAt} alignItems="center"
+      />
+      <QueueListHeaderColumn
+        displayName={t('queue.origin')}
+        ps={0.5} w={COLUMN_WIDTHS.origin} alignItems="center"
+      />
+      <QueueListHeaderColumn
+        displayName={t('queue.destination')}
+        ps={0.5} w={COLUMN_WIDTHS.destination} alignItems="center"
+      />
+      <QueueListHeaderColumn
+        displayName={t('queue.time')}
+        ps={0.5} w={COLUMN_WIDTHS.time} alignItems="center"
+      />
       {shouldShowCredits && (
-        <Flex ps={0.5} w={COLUMN_WIDTHS.credits} alignItems="center">
-          <Text variant="subtext">{t('queue.credits')}</Text>
-        </Flex>
+        <QueueListHeaderColumn
+          displayName={t('queue.credits')}
+          ps={0.5} w={COLUMN_WIDTHS.credits} alignItems="center"
+        />
       )}
-      <Flex ps={0.5} w={COLUMN_WIDTHS.batchId} alignItems="center">
-        <Text variant="subtext">{t('queue.batch')}</Text>
-      </Flex>
-      <Flex ps={0.5} w={COLUMN_WIDTHS.fieldValues} alignItems="center">
-        <Text variant="subtext">{t('queue.batchFieldValues')}</Text>
-      </Flex>
+      <QueueListHeaderColumn
+        displayName={t('queue.batch')}
+        ps={0.5} w={COLUMN_WIDTHS.batchId} alignItems="center"
+      />
     </Flex>
   );
 };
