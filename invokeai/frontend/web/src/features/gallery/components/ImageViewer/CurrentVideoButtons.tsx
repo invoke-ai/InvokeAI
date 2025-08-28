@@ -1,7 +1,6 @@
 import { Button, Divider, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useDeleteVideo } from 'features/deleteImageModal/hooks/use-delete-video';
-import { DeleteVideoButton } from 'features/deleteVideoModal/components/DeleteVideoButton';
+import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import SingleSelectionVideoMenuItems from 'features/gallery/components/ContextMenu/SingleSelectionVideoMenuItems';
 import { boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -13,6 +12,7 @@ import { memo, useCallback, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { PiCameraBold, PiCrosshairBold, PiDotsThreeOutlineFill, PiSpinnerBold } from 'react-icons/pi';
+import { useDeleteVideosMutation } from 'services/api/endpoints/videos';
 import type { VideoDTO } from 'services/api/types';
 
 export const CurrentVideoButtons = memo(({ videoDTO }: { videoDTO: VideoDTO }) => {
@@ -21,7 +21,7 @@ export const CurrentVideoButtons = memo(({ videoDTO }: { videoDTO: VideoDTO }) =
   const dispatch = useAppDispatch();
   const activeTab = useAppSelector(selectActiveTab);
   const galleryPanel = useGalleryPanel(activeTab);
-  const deleteVideo = useDeleteVideo(videoDTO);
+  const [deleteVideos] = useDeleteVideosMutation();
 
   const captureVideoFrame = useCaptureVideoFrame();
   const { videoRef } = useVideoViewerContext();
@@ -42,6 +42,10 @@ export const CurrentVideoButtons = memo(({ videoDTO }: { videoDTO: VideoDTO }) =
       );
     });
   }, [dispatch, galleryPanel, videoDTO]);
+
+  const handleDelete = useCallback(() => {
+    deleteVideos({ video_ids: [videoDTO.video_id] });
+  }, [deleteVideos, videoDTO]);
 
   const onClickSaveFrame = useCallback(async () => {
     setCapturing(true);
@@ -94,21 +98,20 @@ export const CurrentVideoButtons = memo(({ videoDTO }: { videoDTO: VideoDTO }) =
       <Divider orientation="vertical" h={8} mx={2} />
 
       {doesTabHaveGallery && (
-        <>
-          <IconButton
-            icon={<PiCrosshairBold />}
-            aria-label={t('boards.locateInGalery')}
-            tooltip={t('boards.locateInGalery')}
-            onClick={locateInGallery}
-            variant="link"
-            size="sm"
-            alignSelf="stretch"
-          />
-          <Divider orientation="vertical" h={8} mx={2} />
-        </>
+        <IconButton
+          icon={<PiCrosshairBold />}
+          aria-label={t('boards.locateInGalery')}
+          tooltip={t('boards.locateInGalery')}
+          onClick={locateInGallery}
+          variant="link"
+          size="sm"
+          alignSelf="stretch"
+        />
       )}
 
-      <DeleteVideoButton onClick={deleteVideo.delete} isDisabled={!deleteVideo.isEnabled} />
+      <Divider orientation="vertical" h={8} mx={2} />
+
+      <DeleteImageButton onClick={handleDelete} />
     </>
   );
 });

@@ -3,7 +3,6 @@ import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardMo
 import { CanvasPasteModal } from 'features/controlLayers/components/CanvasPasteModal';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { DeleteImageModal } from 'features/deleteImageModal/components/DeleteImageModal';
-import { DeleteVideoModal } from 'features/deleteVideoModal/components/DeleteVideoModal';
 import { FullscreenDropzone } from 'features/dnd/FullscreenDropzone';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
@@ -33,7 +32,6 @@ export const GlobalModalIsolator = memo(() => {
   return (
     <>
       <DeleteImageModal />
-      <DeleteVideoModal />
       <ChangeBoardModal />
       <DynamicPromptsModal />
       <StylePresetModal />
