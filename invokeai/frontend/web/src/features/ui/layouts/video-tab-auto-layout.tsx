@@ -21,6 +21,7 @@ import { memo, useCallback, useEffect } from 'react';
 import { DockviewTab } from './DockviewTab';
 import { DockviewTabLaunchpad } from './DockviewTabLaunchpad';
 import { DockviewTabProgress } from './DockviewTabProgress';
+import { GenerateLaunchpadPanel } from './GenerateLaunchpadPanel';
 import { navigationApi } from './navigation-api';
 import { PanelHotkeysLogical } from './PanelHotkeysLogical';
 import {
@@ -42,7 +43,6 @@ import {
   SETTINGS_PANEL_ID,
   VIEWER_PANEL_ID,
 } from './shared';
-import { VideoLaunchpadPanel } from './VideoLaunchpadPanel';
 import { VideoTabLeftPanel } from './VideoTabLeftPanel';
 
 const tabComponents = {
@@ -52,7 +52,7 @@ const tabComponents = {
 };
 
 const mainPanelComponents: AutoLayoutDockviewComponents = {
-  [LAUNCHPAD_PANEL_ID]: withPanelContainer(VideoLaunchpadPanel),
+  [LAUNCHPAD_PANEL_ID]: withPanelContainer(GenerateLaunchpadPanel),
   [VIEWER_PANEL_ID]: withPanelContainer(ImageViewerPanel),
 };
 

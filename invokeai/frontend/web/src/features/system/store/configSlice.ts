@@ -71,8 +71,6 @@ export const selectIsModelsTabDisabled = createConfigSelector((config) => config
 export const selectIsClientSideUploadEnabled = createConfigSelector((config) => config.allowClientSideUpload);
 export const selectAllowPublishWorkflows = createConfigSelector((config) => config.allowPublishWorkflows);
 export const selectAllowPromptExpansion = createConfigSelector((config) => config.allowPromptExpansion);
-export const selectAllowVideo = createConfigSelector((config) => config.allowVideo);
-
 export const selectIsLocal = createSelector(selectConfigSlice, (config) => config.isLocal);
 export const selectShouldShowCredits = createConfigSelector((config) => config.shouldShowCredits);
 const selectDisabledTabs = createConfigSelector((config) => config.disabledTabs);
