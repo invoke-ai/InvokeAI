@@ -1,5 +1,7 @@
 import { Flex, StandaloneAccordion } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { aspectRatioIdChanged, aspectRatioLockToggled,heightChanged, widthChanged } from 'features/controlLayers/store/paramsSlice';
+import { RUNWAY_ASPECT_RATIOS } from 'features/controlLayers/store/types';
 import { Dimensions } from 'features/parameters/components/Dimensions/Dimensions';
 import { ParamSeed } from 'features/parameters/components/Seed/ParamSeed';
 import { ParamDuration } from 'features/parameters/components/Video/ParamDuration';
@@ -8,7 +10,6 @@ import { memo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { StartingFrameImage } from './StartingFrameImage';
-import { VideoModelPicker } from './VideoModelPicker';
 
 
 export const VideoSettingsAccordion = memo(() => {
@@ -18,6 +19,15 @@ export const VideoSettingsAccordion = memo(() => {
         defaultIsOpen: true,
     });
     const dispatch = useAppDispatch();
+
+    useEffect(() => { // hack to get the default aspect ratio for runway models outside paramsSlice
+        const { width, height } = RUNWAY_ASPECT_RATIOS['16:9'];
+        dispatch(widthChanged({ width, updateAspectRatio: true, clamp: true }));
+        dispatch(heightChanged({ height, updateAspectRatio: true, clamp: true }));
+        dispatch(aspectRatioIdChanged({ id: '16:9' }));
+        dispatch(aspectRatioLockToggled());
+    }, [dispatch]);
+
 
     return (
         <StandaloneAccordion
@@ -31,7 +41,6 @@ export const VideoSettingsAccordion = memo(() => {
                 <Flex gap={4}>
                     <StartingFrameImage />
                     <Flex gap={4} flexDirection="column" width="full">
-                        <VideoModelPicker />
                         <ParamDuration />
                     </Flex>
                 </Flex>

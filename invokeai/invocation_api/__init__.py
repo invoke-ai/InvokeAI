@@ -66,6 +66,7 @@ from invokeai.app.invocations.primitives import (
     IntegerOutput,
     LatentsCollectionOutput,
     LatentsOutput,
+    RunwayVideoOutput,
     StringCollectionOutput,
     StringOutput,
     VideoOutput,
@@ -157,6 +158,7 @@ __all__ = [
     "LatentsOutput",
     "StringCollectionOutput",
     "StringOutput",
+    "RunwayVideoOutput",
     "VideoOutput",
     # invokeai.app.services.image_records.image_records_common
     "ImageCategory",

@@ -10,7 +10,6 @@ import {
 import type { AnyModelConfig } from 'services/api/types';
 import {
   isChatGPT4oModelConfig,
-  isVeo3ModelConfig,
   isCLIPEmbedModelConfig,
   isCLIPVisionModelConfig,
   isCogView4MainModelModelConfig,
@@ -105,7 +104,6 @@ export const useImagen3Models = buildModelsHook(isImagen3ModelConfig);
 export const useImagen4Models = buildModelsHook(isImagen4ModelConfig);
 export const useChatGPT4oModels = buildModelsHook(isChatGPT4oModelConfig);
 export const useFluxKontextModels = buildModelsHook(isFluxKontextApiModelConfig);
-export const useVeo3Models = buildModelsHook(isVeo3ModelConfig);
 
 const buildModelsSelector =
   <T extends AnyModelConfig>(typeGuard: (config: AnyModelConfig) => config is T): Selector<RootState, T[]> =>

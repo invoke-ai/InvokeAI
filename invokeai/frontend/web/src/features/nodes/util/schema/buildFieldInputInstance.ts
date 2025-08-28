@@ -37,7 +37,6 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   Imagen4ModelField: undefined,
   ChatGPT4oModelField: undefined,
   FluxKontextModelField: undefined,
-  Veo3ModelField: undefined,
   FloatGeneratorField: undefined,
   IntegerGeneratorField: undefined,
   StringGeneratorField: undefined,
