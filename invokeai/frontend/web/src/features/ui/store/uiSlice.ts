@@ -14,8 +14,8 @@ const slice = createSlice({
     setActiveTab: (state, action: PayloadAction<UIState['activeTab']>) => {
       state.activeTab = action.payload;
     },
-    setShouldShowItemDetails: (state, action: PayloadAction<UIState['shouldShowItemDetails']>) => {
-      state.shouldShowItemDetails = action.payload;
+    setShouldShowImageDetails: (state, action: PayloadAction<UIState['shouldShowImageDetails']>) => {
+      state.shouldShowImageDetails = action.payload;
     },
     setShouldShowProgressInViewer: (state, action: PayloadAction<UIState['shouldShowProgressInViewer']>) => {
       state.shouldShowProgressInViewer = action.payload;
@@ -75,7 +75,7 @@ const slice = createSlice({
 
 export const {
   setActiveTab,
-  setShouldShowItemDetails,
+  setShouldShowImageDetails,
   setShouldShowProgressInViewer,
   accordionStateChanged,
   expanderStateChanged,
@@ -111,6 +111,6 @@ export const uiSliceConfig: SliceConfig<typeof slice> = {
       }
       return zUIState.parse(state);
     },
-    persistDenylist: ['shouldShowItemDetails'],
+    persistDenylist: ['shouldShowImageDetails'],
   },
 };

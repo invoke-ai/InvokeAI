@@ -8,7 +8,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useImageDTO } from 'services/api/endpoints/images';
 
-import { ImageViewerToolbar } from './ImageViewerToolbar';
+import { ViewerToolbar } from './ViewerToolbar';
 
 const dndTargetData = setComparisonImageDndTarget.getData();
 
@@ -19,7 +19,7 @@ export const ImageViewer = memo(() => {
   const lastSelectedImageDTO = useImageDTO(lastSelectedItem?.type === 'image' ? lastSelectedItem.id : null);
   return (
     <Flex flexDir="column" w="full" h="full" overflow="hidden" gap={2} position="relative">
-      <ImageViewerToolbar />
+      <ViewerToolbar />
       <Divider />
       <Flex w="full" h="full" position="relative">
         <CurrentImagePreview imageDTO={lastSelectedImageDTO} />

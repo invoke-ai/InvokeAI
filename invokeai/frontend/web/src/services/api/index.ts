@@ -55,7 +55,6 @@ const tagTypes = [
   'Schema',
   'QueueCountsByDestination',
   'Video',
-  'VideoMetadata',
   'VideoList',
   'VideoIdList',
   'VideoCollectionCounts',

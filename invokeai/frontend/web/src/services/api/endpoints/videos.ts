@@ -1,4 +1,3 @@
-import { skipToken } from '@reduxjs/toolkit/query';
 import { getStore } from 'app/store/nanostores/store';
 import type { paths } from 'services/api/schema';
 import type { GetVideoIdsArgs, GetVideoIdsResult, VideoDTO } from 'services/api/types';
@@ -8,7 +7,6 @@ import {
 } from 'services/api/util/tagInvalidation';
 import stableHash from 'stable-hash';
 import type { Param0 } from 'tsafe';
-import type { JsonObject } from 'type-fest';
 
 import { api, buildV1Url, LIST_TAG } from '..';
 
@@ -32,11 +30,6 @@ export const videosApi = api.injectEndpoints({
     getVideoDTO: build.query<VideoDTO, string>({
       query: (video_id) => ({ url: buildVideosUrl(`i/${video_id}`) }),
       providesTags: (result, error, video_id) => [{ type: 'Video', id: video_id }],
-    }),
-
-    getVideoMetadata: build.query<JsonObject | undefined, string>({
-      query: (video_id) => ({ url: buildVideosUrl(`i/${video_id}/metadata`) }),
-      providesTags: (result, error, video_id) => [{ type: 'VideoMetadata', id: video_id }],
     }),
 
     /**
@@ -208,7 +201,6 @@ export const {
   useDeleteVideosMutation,
   useAddVideosToBoardMutation,
   useRemoveVideosFromBoardMutation,
-  useGetVideoMetadataQuery,
 } = videosApi;
 
 /**
@@ -231,9 +223,4 @@ export const getVideoDTOSafe = async (
   } catch {
     return null;
   }
-};
-
-export const useVideoDTO = (video_id: string | null | undefined) => {
-  const { currentData: videoDTO } = useGetVideoDTOQuery(video_id ?? skipToken);
-  return videoDTO ?? null;
 };
