@@ -18,9 +18,9 @@ from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
 from invokeai.app.api.routers import (
     app_info,
     board_images,
-    board_videos,
     boards,
     client_state,
+    board_videos,
     download_queue,
     images,
     model_manager,
