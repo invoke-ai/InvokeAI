@@ -28,7 +28,7 @@ export const buildVeo3VideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn =>
 
   const model = selectVideoModelConfig(state);
   assert(model, 'No model selected');
-  assert(model.base === 'runway', 'Selected model is not a Veo3 model');
+  assert(model.base === 'veo3', 'Selected model is not a Veo3 model');
 
   const params = selectParamsSlice(state);
   const videoParams = selectVideoSlice(state);
