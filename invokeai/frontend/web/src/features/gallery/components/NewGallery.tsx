@@ -1,11 +1,13 @@
 import { Box, Flex, forwardRef, Grid, GridItem, Spinner, Text } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
+import { logger } from 'app/logging/logger';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { getFocusedRegion, useIsRegionFocused } from 'common/hooks/focus';
 import { useRangeBasedImageFetching } from 'features/gallery/hooks/useRangeBasedImageFetching';
 import type { selectGetImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import {
   selectGalleryImageMinimumWidth,
+  selectGalleryView,
   selectImageToCompare,
   selectLastSelectedImage,
   selectSelection,
@@ -28,14 +30,17 @@ import { imagesApi, useImageDTO, useStarImagesMutation, useUnstarImagesMutation 
 import { videosApi } from 'services/api/endpoints/videos';
 import { useDebounce } from 'use-debounce';
 
-import { getItemsPerRow } from '../../../../../../../getItemsPerRow';
-import { getItemIndex } from './getItemIndex';
 import { GalleryImage, GalleryImagePlaceholder } from './ImageGrid/GalleryImage';
 import { GallerySelectionCountTag } from './ImageGrid/GallerySelectionCountTag';
-import { GalleryVideo } from './ImageGrid/GalleryVideo';
-import { scrollIntoView } from './scrollIntoView';
 import { useGalleryImageNames } from './use-gallery-image-names';
+import { useGalleryVideoIds } from './use-gallery-video-ids';
+import { GalleryVideo } from './ImageGrid/GalleryVideo';
+import { getItemsPerRow } from '../../../../../../../getItemsPerRow';
+import { scrollIntoView } from './scrollIntoView';
 import { useScrollableGallery } from './useScrollableGallery';
+import { getItemIndex } from './getItemIndex';
+
+const log = logger('gallery');
 
 type ListImageNamesQueryArgs = ReturnType<typeof selectGetImageNamesQueryArgs>;
 
@@ -317,7 +322,7 @@ const useStarImageHotkey = () => {
     } else {
       starImages({ image_names: [imageDTO.image_name] });
     }
-  }, [imageDTO, isGalleryFocused, starImages, unstarImages]);
+  }, [imageDTO, isGalleryFocused, starImages, unstarImages, starVideos, unstarVideos, galleryView, videoDTO]);
 
   useRegisteredHotkeys({
     id: 'starImage',
@@ -332,6 +337,7 @@ export const ImageGallery = memo(() => {
   const virtuosoRef = useRef<VirtuosoGridHandle>(null);
   const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
   const rootRef = useRef<HTMLDivElement>(null);
+  const galleryView = useAppSelector(selectGalleryView);
 
   // Get the ordered list of image names - this is our primary data source for virtualization
   const { queryArgs, imageNames, isLoading } = useGalleryImageNames();
