@@ -21,15 +21,25 @@ export const VideoPlayer = memo(({ videoDTO }: VideoPlayerProps) => {
   const authToken = useStore($authToken);
 
   return (
-    <Flex ref={ref} w="full" h="full" flexDirection="column" gap={4} alignItems="center" justifyContent="center">
-      <MediaController>
+    <Flex
+      ref={ref}
+      w="full"
+      maxH="100vh"
+      overflow="hidden"
+      flexDirection="column"
+      gap={4}
+      alignItems="center"
+      justifyContent="center"
+      aspectRatio={videoDTO.width / videoDTO.height}
+    >
+      <MediaController style={{ maxHeight: '100%' }}>
         <ReactPlayer
           slot="media"
           ref={videoRef}
           src={videoDTO.video_url}
           controls={false}
           width={videoDTO.width}
-          height={videoDTO.height}
+          height="auto"
           pip={false}
           crossOrigin={authToken ? 'use-credentials' : 'anonymous'}
         />
