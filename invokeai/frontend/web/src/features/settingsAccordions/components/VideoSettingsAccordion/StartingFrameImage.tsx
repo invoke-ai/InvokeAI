@@ -2,8 +2,6 @@ import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { UploadImageIconButton } from 'common/hooks/useImageUploadButton';
 import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
-import { videoFrameFromImageDndTarget } from 'features/dnd/dnd';
-import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
 import { DndImageIcon } from 'features/dnd/DndImageIcon';
 import { selectStartingFrameImage, startingFrameImageChanged } from 'features/parameters/store/videoSlice';
@@ -13,12 +11,11 @@ import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 import { useImageDTO } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
-const dndTargetData = videoFrameFromImageDndTarget.getData({ frame: 'start' });
-
 export const StartingFrameImage = () => {
   const dispatch = useAppDispatch();
   const startingFrameImage = useAppSelector(selectStartingFrameImage);
   const imageDTO = useImageDTO(startingFrameImage?.image_name);
+ 
 
   const onReset = useCallback(() => {
     dispatch(startingFrameImageChanged(null));
@@ -62,7 +59,7 @@ export const StartingFrameImage = () => {
             >{`${imageDTO.width}x${imageDTO.height}`}</Text>
           </>
         )}
-        <DndDropTarget label="Drop" dndTarget={videoFrameFromImageDndTarget} dndTargetData={dndTargetData} />
+        
       </Flex>
     </Flex>
   );
