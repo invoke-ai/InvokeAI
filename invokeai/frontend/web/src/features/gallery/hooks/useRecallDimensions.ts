@@ -26,7 +26,7 @@ export const useRecallDimensions = (imageDTO: ImageDTO) => {
     if (!isEnabled) {
       return;
     }
-    MetadataUtils.recallImageDimensions(imageDTO, store);
+    MetadataUtils.recallDimensions(imageDTO, store);
   }, [isEnabled, imageDTO, store]);
 
   return {

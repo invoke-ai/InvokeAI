@@ -1,6 +1,6 @@
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { ImageMetadataHandlers, MetadataUtils } from 'features/metadata/parsing';
+import { MetadataHandlers, MetadataUtils } from 'features/metadata/parsing';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { useCallback, useMemo } from 'react';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
@@ -34,7 +34,7 @@ export const useRecallAll = (imageDTO: ImageDTO) => {
   const handlersToSkip = useMemo(() => {
     if (tab === 'canvas' && isStaging) {
       // When we are staging and on canvas, the bbox is locked - we cannot recall width and height
-      return [ImageMetadataHandlers.Width, ImageMetadataHandlers.Height];
+      return [MetadataHandlers.Width, MetadataHandlers.Height];
     }
     return undefined;
   }, [isStaging, tab]);
@@ -46,7 +46,7 @@ export const useRecallAll = (imageDTO: ImageDTO) => {
     if (!isEnabled) {
       return;
     }
-    MetadataUtils.recallAllImageMetadata(metadata, store, handlersToSkip);
+    MetadataUtils.recallAll(metadata, store, handlersToSkip);
     clearStylePreset();
   }, [metadata, isEnabled, store, handlersToSkip, clearStylePreset]);
 

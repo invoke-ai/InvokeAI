@@ -501,10 +501,6 @@ export const RUNWAY_ASPECT_RATIOS: Record<RunwayAspectRatio, Dimensions> = {
   '21:9': { width: 1584, height: 672 },
 };
 
-export const zVideoAspectRatio = z.union([zVeo3AspectRatioID, zRunwayAspectRatioID]);
-export type VideoAspectRatio = z.infer<typeof zVideoAspectRatio>;
-export const isVideoAspectRatio = (v: unknown): v is VideoAspectRatio => zVideoAspectRatio.safeParse(v).success;
-
 export const zVeo3Resolution = z.enum(['720p', '1080p']);
 export type Veo3Resolution = z.infer<typeof zVeo3Resolution>;
 export const isVeo3Resolution = (v: unknown): v is Veo3Resolution => zVeo3Resolution.safeParse(v).success;
@@ -516,9 +512,6 @@ export const RESOLUTION_MAP: Record<Veo3Resolution | RunwayResolution, Dimension
 export const zRunwayResolution = z.enum(['720p']);
 export type RunwayResolution = z.infer<typeof zRunwayResolution>;
 export const isRunwayResolution = (v: unknown): v is RunwayResolution => zRunwayResolution.safeParse(v).success;
-
-export const zVideoResolution = z.union([zVeo3Resolution, zRunwayResolution]);
-export type VideoResolution = z.infer<typeof zVideoResolution>;
 
 const zAspectRatioConfig = z.object({
   id: zAspectRatioID,
@@ -547,9 +540,6 @@ export const RUNWAY_DURATIONS: Record<RunwayDuration, string> = {
   '5': '5 seconds',
   '10': '10 seconds',
 };
-
-export const zVideoDuration = z.union([zVeo3DurationID, zRunwayDurationID]);
-export type VideoDuration = z.infer<typeof zVideoDuration>;
 
 const zBboxState = z.object({
   rect: z.object({

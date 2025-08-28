@@ -1,5 +1,5 @@
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
-import { ImageMetadataHandlers, MetadataUtils } from 'features/metadata/parsing';
+import { MetadataHandlers, MetadataUtils } from 'features/metadata/parsing';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -18,7 +18,7 @@ export const useRecallSeed = (imageDTO: ImageDTO) => {
   useEffect(() => {
     const parse = async () => {
       try {
-        await ImageMetadataHandlers.Seed.parse(metadata, store);
+        await MetadataHandlers.Seed.parse(metadata, store);
         setHasSeed(true);
       } catch {
         setHasSeed(false);
@@ -55,7 +55,7 @@ export const useRecallSeed = (imageDTO: ImageDTO) => {
     if (!isEnabled) {
       return;
     }
-    MetadataUtils.recallByHandler({ metadata, handler: ImageMetadataHandlers.Seed, store });
+    MetadataUtils.recallByHandler({ metadata, handler: MetadataHandlers.Seed, store });
   }, [metadata, isEnabled, store]);
 
   return {

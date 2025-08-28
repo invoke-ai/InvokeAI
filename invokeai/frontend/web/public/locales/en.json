@@ -810,11 +810,7 @@
         "vae": "VAE",
         "width": "Width",
         "workflow": "Workflow",
-        "canvasV2Metadata": "Canvas Layers",
-        "videoModel": "Model",
-        "videoDuration": "Duration",
-        "videoAspectRatio": "Aspect Ratio",
-        "videoResolution": "Resolution"
+        "canvasV2Metadata": "Canvas Layers"
     },
     "modelManager": {
         "active": "active",
