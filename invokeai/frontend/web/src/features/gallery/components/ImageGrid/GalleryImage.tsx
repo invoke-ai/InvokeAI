@@ -246,7 +246,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
         ref={ref}
         sx={galleryImageContainerSX}
         data-is-dragging={isDragging}
-        data-item-id={imageDTO.image_name}
+        data-image-name={imageDTO.image_name}
         role="button"
         onMouseOver={onMouseOver}
         onMouseOut={onMouseOut}

@@ -1,6 +1,6 @@
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectGetVideoIdsQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { selectGetImageNamesQueryArgs, selectGetVideoIdsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { useGetVideoIdsQuery } from 'services/api/endpoints/videos';
 import { useDebounce } from 'use-debounce';
 

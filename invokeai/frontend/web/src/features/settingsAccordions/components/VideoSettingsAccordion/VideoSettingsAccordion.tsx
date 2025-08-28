@@ -1,14 +1,14 @@
 import { Flex, StandaloneAccordion } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { aspectRatioIdChanged, aspectRatioLockToggled,heightChanged, widthChanged } from 'features/controlLayers/store/paramsSlice';
-import { RUNWAY_ASPECT_RATIOS } from 'features/controlLayers/store/types';
-import { Dimensions } from 'features/parameters/components/Dimensions/Dimensions';
-import { ParamSeed } from 'features/parameters/components/Seed/ParamSeed';
-import { ParamDuration } from 'features/parameters/components/Video/ParamDuration';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { memo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ParamDuration } from 'features/parameters/components/Video/ParamDuration';
+import { ParamSeed } from 'features/parameters/components/Seed/ParamSeed';
+import { Dimensions } from 'features/parameters/components/Dimensions/Dimensions';
+import { RUNWAY_ASPECT_RATIOS } from 'features/controlLayers/store/types';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { widthChanged, heightChanged, aspectRatioIdChanged, aspectRatioLockToggled } from 'features/controlLayers/store/paramsSlice';
 import { StartingFrameImage } from './StartingFrameImage';
 
 
@@ -31,7 +31,7 @@ export const VideoSettingsAccordion = memo(() => {
 
     return (
         <StandaloneAccordion
-            label="Video"
+            label={"Video"}
             badges={[]}
             isOpen={isOpenAccordion}
             onToggle={onToggleAccordion}
