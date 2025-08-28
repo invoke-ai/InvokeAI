@@ -4,8 +4,7 @@ import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
 import { extractMessageFromAssertionError } from 'common/util/extractMessageFromAssertionError';
-import { withResult, withResultAsync } from 'common/util/result';
-import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
+import { withResultAsync } from 'common/util/result';
 import { buildRunwayVideoGraph } from 'features/nodes/util/graph/generation/buildRunwayVideoGraph';
 import { buildVeo3VideoGraph } from 'features/nodes/util/graph/generation/buildVeo3VideoGraph';
 import { selectCanvasDestination } from 'features/nodes/util/graph/graphBuilderUtils';
@@ -18,23 +17,21 @@ import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endp
 import { assert, AssertionError } from 'tsafe';
 
 const log = logger('generation');
-export const enqueueRequestedVideos = createAction('app/enqueueRequestedVideos');
+export const enqueueRequestedCanvas = createAction('app/enqueueRequestedCanvas');
 
 const enqueueVideo = async (store: AppStore, prepend: boolean) => {
   const { dispatch, getState } = store;
 
-  dispatch(enqueueRequestedVideos());
+  dispatch(enqueueRequestedCanvas());
 
   const state = getState();
 
-  const model = state.video.videoModel;
-  if (!model) {
-    log.error('No model found in state');
-    return;
-  }
-  const base = model.base;
+  const destination = selectCanvasDestination(state);
 
   const buildGraphResult = await withResultAsync(async () => {
+    const model = state.video.videoModel;
+    assert(model, 'No model found in state');
+    const base = model.base;
     const graphBuilderArg: GraphBuilderArg = { generationMode: 'txt2img', state, manager: null };
 
     switch (base) {
@@ -68,37 +65,36 @@ const enqueueVideo = async (store: AppStore, prepend: boolean) => {
     return;
   }
 
-  const { g, positivePrompt, seed } = buildGraphResult.value;
+  const { g } = buildGraphResult.value;
 
-  const prepareBatchResult = withResult(() =>
-    prepareLinearUIBatch({
-      state,
-      g,
-      base,
-      prepend,
-      seedNode: seed,
-      positivePromptNode: positivePrompt,
-      origin: 'videos',
-      destination: 'gallery',
-    })
-  );
-
-  if (prepareBatchResult.isErr()) {
-    log.error({ error: serializeError(prepareBatchResult.error) }, 'Failed to prepare batch');
-    return;
-  }
-
-  const batchConfig = prepareBatchResult.value;
-
-  // const batchConfig = {
-  //   prepend,
-  //   batch: {
-  //     graph: g.getGraph(),
-  //     runs: 1,
-  //     origin,
+  // const prepareBatchResult = withResult(() =>
+  //   prepareLinearUIBatch({
+  //     state,
+  //     g,
+  //     prepend,
+  //     seedNode: seed,
+  //     positivePromptNode: positivePrompt,
+  //     origin: 'canvas',
   //     destination,
-  //   },
-  // };
+  //   })
+  // );
+
+  // if (prepareBatchResult.isErr()) {
+  //   log.error({ error: serializeError(prepareBatchResult.error) }, 'Failed to prepare batch');
+  //   return;
+  // }
+
+  // const batchConfig = prepareBatchResult.value;
+
+  const batchConfig = {
+    prepend,
+    batch: {
+      graph: g.getGraph(),
+      runs: 1,
+      origin,
+      destination,
+    },
+  };
 
   const req = dispatch(
     queueApi.endpoints.enqueueBatch.initiate(batchConfig, {
