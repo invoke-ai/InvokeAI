@@ -214,7 +214,13 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     const isVisible = this.parent.konva.layer.visible();
     const isCached = this.konva.objectGroup.isCached();
 
-    if (isVisible && (force || !isCached)) {
+    // We should also never cache if the entity has no dimensions. Konva will log an error to console like this:
+    // Konva error: Can not cache the node. Width or height of the node equals 0. Caching is skipped.
+    //
+    // It won't raise - just logs the error.
+    const hasContent = this.konva.objectGroup.width() > 0 && this.konva.objectGroup.height() > 0;
+
+    if (hasContent && isVisible && (force || !isCached)) {
       this.log.trace('Caching object group');
       this.konva.objectGroup.clearCache();
       this.konva.objectGroup.cache({ pixelRatio: 1, imageSmoothingEnabled: false });
