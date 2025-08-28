@@ -2781,11 +2781,6 @@ export type components = {
              * @description The number of images in the board.
              */
             image_count: number;
-            /**
-             * Video Count
-             * @description The number of videos in the board.
-             */
-            video_count: number;
         };
         /**
          * BoardField
