@@ -233,7 +233,12 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
           this.image = new CanvasObjectImage({ id: 'staging-area-image', type: 'image', image }, this, {
             // Some models do not make guarantees about their output dimensions. This flag allows the staged images to
             // render at their real dimensions, instead of the bbox size.
-            usePhysicalDimensions: true,
+            //
+            // When the image source is an image name, it is a final output image. In that case, we should use its
+            // physical dimensions. Otherwise, if it is a dataURL, that means it is a progress image. These come in at
+            // a smaller resolution and need to be stretched to fill the bbox, so we do not use the physical
+            // dimensions in that case.
+            usePhysicalDimensions: imageSrc.type === 'imageName',
           });
           await this.image.update(this.image.state, true);
           this.konva.group.add(this.image.konva.group);
