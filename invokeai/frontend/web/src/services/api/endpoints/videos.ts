@@ -8,7 +8,7 @@ import stableHash from 'stable-hash';
 import type { Param0 } from 'tsafe';
 
 import { api, buildV1Url, LIST_TAG } from '..';
-import { getTagsToInvalidateForBoardAffectingMutation, getTagsToInvalidateForImageMutation, getTagsToInvalidateForVideoMutation } from '../util/tagInvalidation';
+import { getTagsToInvalidateForBoardAffectingMutation, getTagsToInvalidateForVideoMutation } from '../util/tagInvalidation';
 
 /**
  * Builds an endpoint URL for the videos router
@@ -18,8 +18,6 @@ import { getTagsToInvalidateForBoardAffectingMutation, getTagsToInvalidateForIma
  */
 const buildVideosUrl  = (path: string = '', query?: Parameters<typeof buildV1Url>[1]) =>
   buildV1Url(`videos/${path}`, query);
-
-const buildBoardVideosUrl = (path: string = '') => buildV1Url(`board_videos/${path}`);  
 
 export const videosApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -152,44 +150,6 @@ export const videosApi = api.injectEndpoints({
         ];
       },
     }),
-    addVideosToBoard: build.mutation<
-      paths['/api/v1/board_videos/batch']['post']['responses']['201']['content']['application/json'],
-      paths['/api/v1/board_videos/batch']['post']['requestBody']['content']['application/json']
-    >({
-      query: (body) => ({
-        url: buildBoardVideosUrl('batch'),
-        method: 'POST',
-        body,
-      }),
-      invalidatesTags: (result) => {
-        if (!result) {
-          return [];
-        }
-        return [
-          ...getTagsToInvalidateForVideoMutation(result.added_videos),
-          ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
-        ];
-      },
-    }),
-    removeVideosFromBoard: build.mutation<
-      paths['/api/v1/board_videos/batch/delete']['post']['responses']['201']['content']['application/json'],
-      paths['/api/v1/board_videos/batch/delete']['post']['requestBody']['content']['application/json']
-    >({
-      query: (body) => ({
-        url: buildBoardVideosUrl('batch/delete'),
-        method: 'POST',
-        body,
-      }),
-      invalidatesTags: (result) => {
-        if (!result) {
-          return [];
-        }
-        return [
-          ...getTagsToInvalidateForVideoMutation(result.removed_videos),
-          ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
-        ];
-      },
-    }),
   }),
 });
 
@@ -200,8 +160,6 @@ export const {
   useStarVideosMutation,
   useUnstarVideosMutation,
   useDeleteVideosMutation,
-  useAddVideosToBoardMutation,
-  useRemoveVideosFromBoardMutation,
 } = videosApi;
 
 
