@@ -3,8 +3,8 @@ import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { selectShouldShowItemDetails, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
-import { setShouldShowItemDetails } from 'features/ui/store/uiSlice';
+import { selectShouldShowImageDetails, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
+import { setShouldShowImageDetails } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiInfoBold } from 'react-icons/pi';
@@ -19,19 +19,19 @@ export const ToggleMetadataViewerButton = memo(() => {
 
   const isDisabledOverride = hasProgressImage && shouldShowProgressInViewer;
 
-  const shouldShowItemDetails = useAppSelector(selectShouldShowItemDetails);
+  const shouldShowImageDetails = useAppSelector(selectShouldShowImageDetails);
   const imageDTO = useAppSelector(selectLastSelectedItem);
   const { t } = useTranslation();
 
   const toggleMetadataViewer = useCallback(() => {
-    dispatch(setShouldShowItemDetails(!shouldShowItemDetails));
-  }, [dispatch, shouldShowItemDetails]);
+    dispatch(setShouldShowImageDetails(!shouldShowImageDetails));
+  }, [dispatch, shouldShowImageDetails]);
 
   useRegisteredHotkeys({
     id: 'toggleMetadata',
     category: 'viewer',
     callback: toggleMetadataViewer,
-    dependencies: [imageDTO, shouldShowItemDetails],
+    dependencies: [imageDTO, shouldShowImageDetails],
   });
 
   return (
@@ -42,7 +42,7 @@ export const ToggleMetadataViewerButton = memo(() => {
       onClick={toggleMetadataViewer}
       variant="link"
       alignSelf="stretch"
-      colorScheme={shouldShowItemDetails ? 'invokeBlue' : 'base'}
+      colorScheme={shouldShowImageDetails ? 'invokeBlue' : 'base'}
       data-testid="toggle-show-metadata-button"
       isDisabled={isDisabledOverride}
     />

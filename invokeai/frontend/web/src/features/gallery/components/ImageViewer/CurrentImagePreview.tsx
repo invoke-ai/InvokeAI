@@ -5,7 +5,7 @@ import { CanvasAlertsInvocationProgress } from 'features/controlLayers/component
 import { DndImage } from 'features/dnd/DndImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
-import { selectShouldShowItemDetails, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
+import { selectShouldShowImageDetails, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useCallback, useRef, useState } from 'react';
@@ -17,7 +17,7 @@ import { ProgressImage } from './ProgressImage2';
 import { ProgressIndicator } from './ProgressIndicator2';
 
 export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | null }) => {
-  const shouldShowItemDetails = useAppSelector(selectShouldShowItemDetails);
+  const shouldShowImageDetails = useAppSelector(selectShouldShowImageDetails);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
   const { onLoadImage, $progressEvent, $progressImage } = useImageViewerContext();
   const progressEvent = useStore($progressEvent);
@@ -65,7 +65,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       <Flex flexDir="column" gap={2} position="absolute" top={0} insetInlineStart={0} alignItems="flex-start">
         <CanvasAlertsInvocationProgress />
       </Flex>
-      {shouldShowItemDetails && imageDTO && !withProgress && (
+      {shouldShowImageDetails && imageDTO && !withProgress && (
         <Box position="absolute" opacity={0.8} top={0} width="full" height="full" borderRadius="base">
           <ImageMetadataViewer image={imageDTO} />
         </Box>

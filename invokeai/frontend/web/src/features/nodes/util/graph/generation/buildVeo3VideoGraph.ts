@@ -8,7 +8,6 @@ import type { GraphBuilderArg, GraphBuilderReturn } from 'features/nodes/util/gr
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { selectStartingFrameImage, selectVideoSlice } from 'features/parameters/store/videoSlice';
 import { t } from 'i18next';
-import type { VideoApiModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 const log = logger('system');
@@ -29,10 +28,8 @@ export const buildVeo3VideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn =>
   assert(prompts.positive.length > 0, 'Veo3 video requires positive prompt to have at least one character');
 
   const { seed, shouldRandomizeSeed } = params;
-  const { videoModel, videoResolution, videoDuration, videoAspectRatio } = videoParams;
+  const { videoModel, videoResolution, videoDuration } = videoParams;
   const finalSeed = shouldRandomizeSeed ? undefined : seed;
-
-  assert(videoModel, 'Veo3 video requires a model');
 
   const g = new Graph(getPrefixedId('veo3_video_graph'));
 
@@ -66,14 +63,14 @@ export const buildVeo3VideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn =>
 
   // Set up metadata
   g.upsertMetadata({
-    model: Graph.getModelMetadataField(videoModel as VideoApiModelConfig),
     positive_prompt: prompts.positive,
     negative_prompt: prompts.negative || '',
-    duration: videoDuration,
-    aspect_ratio: videoAspectRatio,
-    resolution: videoResolution,
+    video_duration: videoDuration,
+    video_aspect_ratio: params.dimensions.aspectRatio.id,
     seed: finalSeed,
-    first_frame_image: startingFrameImage,
+    generation_type: 'image-to-video',
+    starting_image: startingFrameImage,
+    video_model: videoParams.videoModel,
   });
 
   g.setMetadataReceivingNode(veo3VideoNode);
