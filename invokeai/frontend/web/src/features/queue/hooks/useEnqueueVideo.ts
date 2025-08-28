@@ -4,7 +4,8 @@ import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
 import { extractMessageFromAssertionError } from 'common/util/extractMessageFromAssertionError';
-import { withResultAsync } from 'common/util/result';
+import { withResult, withResultAsync } from 'common/util/result';
+import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildRunwayVideoGraph } from 'features/nodes/util/graph/generation/buildRunwayVideoGraph';
 import { selectCanvasDestination } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg } from 'features/nodes/util/graph/types';
@@ -18,7 +19,7 @@ import { AssertionError } from 'tsafe';
 const log = logger('generation');
 export const enqueueRequestedCanvas = createAction('app/enqueueRequestedCanvas');
 
-const enqueueVideo = async (store: AppStore, prepend: boolean) => {
+const enqueueVideo = async (store: AppStore,  prepend: boolean) => {
   const { dispatch, getState } = store;
 
   dispatch(enqueueRequestedCanvas());
@@ -28,6 +29,7 @@ const enqueueVideo = async (store: AppStore, prepend: boolean) => {
   const destination = selectCanvasDestination(state);
 
   const buildGraphResult = await withResultAsync(async () => {
+    
     const graphBuilderArg: GraphBuilderArg = { generationMode: 'txt2img', state, manager: null };
 
     return await buildRunwayVideoGraph(graphBuilderArg);
@@ -56,44 +58,30 @@ const enqueueVideo = async (store: AppStore, prepend: boolean) => {
 
   const { g, seed, positivePrompt } = buildGraphResult.value;
 
-  // const prepareBatchResult = withResult(() =>
-  //   prepareLinearUIBatch({
-  //     state,
-  //     g,
-  //     prepend,
-  //     seedNode: seed,
-  //     positivePromptNode: positivePrompt,
-  //     origin: 'canvas',
-  //     destination,
-  //   })
-  // );
-
-  // if (prepareBatchResult.isErr()) {
-  //   log.error({ error: serializeError(prepareBatchResult.error) }, 'Failed to prepare batch');
-  //   return;
-  // }
-
-  // const batchConfig = prepareBatchResult.value;
-
-
-  const batchConfig = {
-    prepend,
-    batch: {
-      graph: g.getGraph(),
-      runs: 1,
-      origin,
+  const prepareBatchResult = withResult(() =>
+    prepareLinearUIBatch({
+      state,
+      g,
+      prepend,
+      seedNode: seed,
+      positivePromptNode: positivePrompt,
+      origin: 'canvas',
       destination,
-    },
-  };
+    })
+  );
+
+  if (prepareBatchResult.isErr()) {
+    log.error({ error: serializeError(prepareBatchResult.error) }, 'Failed to prepare batch');
+    return;
+  }
+
+  const batchConfig = prepareBatchResult.value;
 
   const req = dispatch(
-    queueApi.endpoints.enqueueBatch.initiate(
-      batchConfig,
-      {
-        ...enqueueMutationFixedCacheKeyOptions,
-        track: false,
-      }
-    )
+    queueApi.endpoints.enqueueBatch.initiate(batchConfig, {
+      ...enqueueMutationFixedCacheKeyOptions,
+      track: false,
+    })
   );
 
   const enqueueResult = await req.unwrap();
@@ -105,9 +93,10 @@ export const useEnqueueVideo = () => {
   const store = useAppStore();
   const enqueue = useCallback(
     (prepend: boolean) => {
+      
       return enqueueVideo(store, prepend);
     },
-    [store]
+    [ store]
   );
   return enqueue;
 };
