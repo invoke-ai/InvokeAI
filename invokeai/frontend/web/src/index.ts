@@ -1,5 +1,3 @@
-import { enqueueRequestedVideos } from 'features/queue/hooks/useEnqueueVideo';
-
 import { adHocPostProcessingRequested } from './app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
 import { socketConnected } from './app/store/middleware/listenerMiddleware/listeners/socketConnected';
 import {
@@ -65,7 +63,6 @@ export const reduxActions = {
   enqueueRequestedCanvas,
   enqueueRequestedWorkflows,
   enqueueRequestedUpscaling,
-  enqueueRequestedVideos,
   adHocPostProcessingRequested,
   boardIdSelected,
   rasterLayerAdded,
