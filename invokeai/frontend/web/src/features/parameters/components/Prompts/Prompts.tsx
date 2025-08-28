@@ -8,18 +8,20 @@ import {
 } from 'features/controlLayers/store/paramsSlice';
 import { ParamNegativePrompt } from 'features/parameters/components/Core/ParamNegativePrompt';
 import { ParamPositivePrompt } from 'features/parameters/components/Core/ParamPositivePrompt';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 
 export const Prompts = memo(() => {
   const modelSupportsNegativePrompt = useAppSelector(selectModelSupportsNegativePrompt);
   const modelSupportsRefImages = useAppSelector(selectModelSupportsRefImages);
   const hasNegativePrompt = useAppSelector(selectHasNegativePrompt);
+  const activeTab = useAppSelector(selectActiveTab);
 
   return (
     <Flex flexDir="column" gap={2}>
       <ParamPositivePrompt />
       {modelSupportsNegativePrompt && hasNegativePrompt && <ParamNegativePrompt />}
-      {modelSupportsRefImages && <RefImageList />}
+      {activeTab !== 'video' && modelSupportsRefImages && <RefImageList />}
     </Flex>
   );
 });
