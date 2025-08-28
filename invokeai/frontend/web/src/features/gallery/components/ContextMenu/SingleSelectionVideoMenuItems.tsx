@@ -21,8 +21,10 @@ const SingleSelectionVideoMenuItems = ({ videoDTO }: SingleSelectionVideoMenuIte
     <ItemDTOContextProvider value={videoDTO}>
       <IconMenuItemGroup>
         <ContextMenuItemOpenInNewTab />
+        <ContextMenuItemCopy />
         <ContextMenuItemDownload />
         <ContextMenuItemOpenInViewer />
+        <ContextMenuItemSelectForCompare />
         <ContextMenuItemDeleteVideo />
       </IconMenuItemGroup>
       <MenuDivider />
