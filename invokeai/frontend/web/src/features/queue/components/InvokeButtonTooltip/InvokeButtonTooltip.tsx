@@ -47,34 +47,9 @@ const TooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
     return <UpscaleTabTooltipContent prepend={prepend} />;
   }
 
-  if (activeTab === 'video') {
-    return <VideoTabTooltipContent prepend={prepend} />;
-  }
-
   return null;
 });
 TooltipContent.displayName = 'TooltipContent';
-
-const VideoTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
-  const isReady = useStore($isReadyToEnqueue);
-  const reasons = useStore($reasonsWhyCannotEnqueue);
-
-  return (
-    <Flex flexDir="column" gap={1}>
-      <IsReadyText isReady={isReady} prepend={prepend} />
-      <QueueCountPredictionCanvasOrUpscaleTab />
-      {reasons.length > 0 && (
-        <>
-          <StyledDivider />
-          <ReasonsList reasons={reasons} />
-        </>
-      )}
-      <StyledDivider />
-      <AddingToText />
-    </Flex>
-  )
-});
-VideoTabTooltipContent.displayName = 'VideoTabTooltipContent';
 
 const CanvasTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
   const isReady = useStore($isReadyToEnqueue);
