@@ -5,10 +5,9 @@ from invokeai.app.services.videos_common import AddVideosToBoardResult, RemoveVi
 
 board_videos_router = APIRouter(prefix="/v1/board_videos", tags=["boards"])
 
-
 @board_videos_router.post(
     "/batch",
-    operation_id="add_videos_to_board",
+        operation_id="add_videos_to_board",
     responses={
         201: {"description": "Videos were added to board successfully"},
     },
@@ -30,7 +29,7 @@ async def add_videos_to_board(
         201: {"description": "Videos were removed from board successfully"},
     },
     status_code=201,
-    response_model=RemoveVideosFromBoardResult,
+        response_model=RemoveVideosFromBoardResult,
 )
 async def remove_videos_from_board(
     video_ids: list[str] = Body(description="The ids of the videos to remove", embed=True),

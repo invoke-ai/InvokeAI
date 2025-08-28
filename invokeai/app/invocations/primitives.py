@@ -292,7 +292,6 @@ class ImageCollectionInvocation(BaseInvocation):
 
 # region Video
 
-
 @invocation_output("video_output")
 class VideoOutput(BaseInvocationOutput):
     """Base class for nodes that output a video"""

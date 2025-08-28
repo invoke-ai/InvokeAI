@@ -491,7 +491,6 @@ class MainConfigBase(ABC, BaseModel):
     )
     variant: AnyVariant = ModelVariantType.Normal
 
-
 class VideoConfigBase(ABC, BaseModel):
     type: Literal[ModelType.Video] = ModelType.Video
     trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
@@ -499,7 +498,6 @@ class VideoConfigBase(ABC, BaseModel):
         description="Default settings for this model", default=None
     )
     variant: AnyVariant = ModelVariantType.Normal
-
 
 class MainCheckpointConfig(CheckpointConfigBase, MainConfigBase, LegacyProbeMixin, ModelConfigBase):
     """Model config for main checkpoint models."""
@@ -657,11 +655,10 @@ class ApiModelConfig(MainConfigBase, ModelConfigBase):
     def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
         raise NotImplementedError("API models are not parsed from disk.")
 
-
 class VideoApiModelConfig(VideoConfigBase, ModelConfigBase):
     """Model config for API-based video models."""
 
-    format: Literal[ModelFormat.Api] = ModelFormat.Api
+    format: Literal[ModelFormat.Api] = ModelFormat.Api 
 
     @classmethod
     def matches(cls, mod: ModelOnDisk) -> bool:
