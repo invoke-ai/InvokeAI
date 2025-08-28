@@ -1,7 +1,6 @@
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
-import { $accountTypeText } from 'app/store/nanostores/accountTypeText';
 import { $false } from 'app/store/nanostores/util';
 import type { AppDispatch, AppStore } from 'app/store/store';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
@@ -40,7 +39,7 @@ import { selectVideoSlice, type VideoState } from 'features/parameters/store/vid
 import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
 import { getGridSize } from 'features/parameters/util/optimalDimension';
 import { promptExpansionApi, type PromptExpansionRequestState } from 'features/prompt/PromptExpansion/state';
-import { selectAllowVideo, selectConfigSlice } from 'features/system/store/configSlice';
+import { selectConfigSlice } from 'features/system/store/configSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
 import i18n from 'i18next';
@@ -94,7 +93,6 @@ const debouncedUpdateReasons = debounce(
     store: AppStore,
     isInPublishFlow: boolean,
     isChatGPT4oHighModelDisabled: (model: ParameterModel) => boolean,
-    isVideoEnabled: boolean,
     promptExpansionRequest: PromptExpansionRequestState,
     video: VideoState
   ) => {
@@ -154,7 +152,6 @@ const debouncedUpdateReasons = debounce(
         params,
         promptExpansionRequest,
         dynamicPrompts,
-        isVideoEnabled,
       });
       $reasonsWhyCannotEnqueue.set(reasons);
     } else {
@@ -186,7 +183,6 @@ export const useReadinessWatcher = () => {
   const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $false);
   const isInPublishFlow = useStore($isInPublishFlow);
   const { isChatGPT4oHighModelDisabled } = useIsModelDisabled();
-  const isVideoEnabled = useAppSelector(selectAllowVideo);
   const promptExpansionRequest = useStore(promptExpansionApi.$state);
   const video = useAppSelector(selectVideoSlice);
   useEffect(() => {
@@ -210,7 +206,6 @@ export const useReadinessWatcher = () => {
       store,
       isInPublishFlow,
       isChatGPT4oHighModelDisabled,
-      isVideoEnabled,
       promptExpansionRequest,
       video
     );
@@ -234,7 +229,6 @@ export const useReadinessWatcher = () => {
     workflowSettings,
     isInPublishFlow,
     isChatGPT4oHighModelDisabled,
-    isVideoEnabled,
     promptExpansionRequest,
     video,
   ]);
@@ -248,16 +242,10 @@ const getReasonsWhyCannotEnqueueVideoTab = (arg: {
   params: ParamsState;
   dynamicPrompts: DynamicPromptsState;
   promptExpansionRequest: PromptExpansionRequestState;
-  isVideoEnabled: boolean;
 }) => {
-  const { isConnected, video, params, dynamicPrompts, promptExpansionRequest, isVideoEnabled } = arg;
+  const { isConnected, video, params, dynamicPrompts, promptExpansionRequest } = arg;
   const { positivePrompt } = params;
   const reasons: Reason[] = [];
-  const accountTypeText = $accountTypeText.get();
-
-  if (!isVideoEnabled) {
-    reasons.push({ content: i18n.t('parameters.invoke.videoIsDisabled', { accountType: accountTypeText }) });
-  }
 
   if (!isConnected) {
     reasons.push(disconnectedReason(i18n.t));
