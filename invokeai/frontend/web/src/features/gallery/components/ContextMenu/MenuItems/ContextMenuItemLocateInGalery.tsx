@@ -2,7 +2,6 @@ import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useItemDTOContext } from 'features/gallery/contexts/ItemDTOContext';
 import { boardIdSelected } from 'features/gallery/store/gallerySlice';
-import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { useGalleryPanel } from 'features/ui/layouts/use-gallery-panel';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -24,32 +23,14 @@ export const ContextMenuItemLocateInGalery = memo(() => {
   }, [itemDTO]);
 
   const onClick = useCallback(() => {
-    navigationApi.expandRightPanel();
-    galleryPanel.expand();
     if (isImageDTO(itemDTO)) {
+      navigationApi.expandRightPanel();
+      galleryPanel.expand();
       flushSync(() => {
-        dispatch(
-          boardIdSelected({
-            boardId: itemDTO.board_id ?? 'none',
-            select: {
-              selection: [{ type: 'image', id: itemDTO.image_name }],
-              galleryView: IMAGE_CATEGORIES.includes(itemDTO.image_category) ? 'images' : 'assets',
-            },
-          })
-        );
+        dispatch(boardIdSelected({ boardId: itemDTO.board_id ?? 'none', selectedImageName: itemDTO.image_name }));
       });
     } else {
-      flushSync(() => {
-        dispatch(
-          boardIdSelected({
-            boardId: itemDTO.board_id ?? 'none',
-            select: {
-              selection: [{ type: 'video', id: itemDTO.video_id }],
-              galleryView: 'videos',
-            },
-          })
-        );
-      });
+      // TODO: Implement video locate in gallery
     }
   }, [dispatch, galleryPanel, itemDTO]);
 

@@ -86,21 +86,12 @@ const slice = createSlice({
     autoAssignBoardOnClickChanged: (state, action: PayloadAction<boolean>) => {
       state.autoAssignBoardOnClick = action.payload;
     },
-    boardIdSelected: (
-      state,
-      action: PayloadAction<{
-        boardId: BoardId;
-        select?: {
-          selection: GalleryState['selection'];
-          galleryView: GalleryState['galleryView'];
-        };
-      }>
-    ) => {
-      const { boardId, select } = action.payload;
+    boardIdSelected: (state, action: PayloadAction<{ boardId: BoardId; selectedImageName?: string }>) => {
+      const { boardId, selectedImageName } = action.payload;
       state.selectedBoardId = boardId;
-      if (select) {
-        state.selection = select.selection;
-        state.galleryView = select.galleryView;
+      state.galleryView = 'images';
+      if (selectedImageName) {
+        state.selection = [{ type: 'image', id: selectedImageName }];
       }
     },
     autoAddBoardIdChanged: (state, action: PayloadAction<BoardId>) => {
