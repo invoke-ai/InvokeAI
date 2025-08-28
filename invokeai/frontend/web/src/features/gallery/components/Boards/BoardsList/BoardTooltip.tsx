@@ -1,21 +1,26 @@
 import { Flex, Image, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useTranslation } from 'react-i18next';
+import { useGetBoardAssetsTotalQuery, useGetBoardImagesTotalQuery } from 'services/api/endpoints/boards';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { BoardDTO } from 'services/api/types';
 
 type Props = {
   board: BoardDTO | null;
-  boardCounts: {
-    image_count: number;
-    asset_count: number;
-    video_count: number;
-  };
 };
 
-export const BoardTooltip = ({ board, boardCounts }: Props) => {
+export const BoardTooltip = ({ board }: Props) => {
   const { t } = useTranslation();
-
+  const { imagesTotal } = useGetBoardImagesTotalQuery(board?.board_id || 'none', {
+    selectFromResult: ({ data }) => {
+      return { imagesTotal: data?.total ?? 0 };
+    },
+  });
+  const { assetsTotal } = useGetBoardAssetsTotalQuery(board?.board_id || 'none', {
+    selectFromResult: ({ data }) => {
+      return { assetsTotal: data?.total ?? 0 };
+    },
+  });
   const { currentData: coverImage } = useGetImageDTOQuery(board?.cover_image_name ?? skipToken);
 
   return (
@@ -34,10 +39,8 @@ export const BoardTooltip = ({ board, boardCounts }: Props) => {
       <Flex flexDir="column" alignItems="center">
         {board && <Text fontWeight="semibold">{board.board_name}</Text>}
         <Text noOfLines={1}>
-          {t('boards.imagesWithCount', { count: boardCounts.image_count })},{' '}
-          {t('boards.assetsWithCount', { count: boardCounts.asset_count })}
+          {t('boards.imagesWithCount', { count: imagesTotal })}, {t('boards.assetsWithCount', { count: assetsTotal })}
         </Text>
-        <Text noOfLines={1}>{t('boards.videosWithCount', { count: boardCounts.video_count })}</Text>
         {board?.archived && <Text>({t('boards.archived')})</Text>}
       </Flex>
     </Flex>

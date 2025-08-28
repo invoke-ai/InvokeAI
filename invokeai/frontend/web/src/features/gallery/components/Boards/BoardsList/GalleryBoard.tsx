@@ -50,26 +50,11 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
     [board.board_id]
   );
 
-  const boardCounts = useMemo(
-    () => ({
-      image_count: board.image_count,
-      asset_count: board.asset_count,
-      video_count: board.video_count,
-    }),
-    [board]
-  );
-
   return (
     <Box position="relative" w="full" h={12}>
       <BoardContextMenu board={board}>
         {(ref) => (
-          <Tooltip
-            label={<BoardTooltip board={board} boardCounts={boardCounts} />}
-            openDelay={1000}
-            placement="right"
-            closeOnScroll
-            p={2}
-          >
+          <Tooltip label={<BoardTooltip board={board} />} openDelay={1000} placement="left" closeOnScroll p={2}>
             <Flex
               ref={ref}
               onClick={onClick}
@@ -86,16 +71,12 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
               h="full"
             >
               <CoverImage board={board} />
-              <Flex flex={1}>
+              <Flex w="full">
                 <BoardEditableTitle board={board} isSelected={isSelected} />
               </Flex>
               {autoAddBoardId === board.board_id && <AutoAddBadge />}
               {board.archived && <Icon as={PiArchiveBold} fill="base.300" />}
-              <Flex justifyContent="flex-end">
-                <Text variant="subtext">
-                  {board.image_count} | {board.asset_count} | {board.video_count}
-                </Text>
-              </Flex>
+              <Text variant="subtext">{board.image_count}</Text>
             </Flex>
           </Tooltip>
         )}
