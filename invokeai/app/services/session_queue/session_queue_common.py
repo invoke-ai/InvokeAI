@@ -174,7 +174,16 @@ class Batch(BaseModel):
 
 DEFAULT_QUEUE_ID = "default"
 
+QUEUE_ORDER_BY = Literal["item_id", "status", "created_at"]
 QUEUE_ITEM_STATUS = Literal["pending", "in_progress", "completed", "failed", "canceled"]
+
+
+class ItemIdsResult(BaseModel):
+    """Response containing ordered item ids with metadata for optimistic updates."""
+
+    item_ids: list[int] = Field(description="Ordered list of item ids")
+    total_count: int = Field(description="Total number of queue items matching the query")
+
 
 NodeFieldValueValidator = TypeAdapter(list[NodeFieldValue])
 
