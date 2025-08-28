@@ -17,7 +17,7 @@ import { useBoardName } from 'services/api/hooks/useBoardName';
 import { GallerySettingsPopover } from './GallerySettingsPopover/GallerySettingsPopover';
 import { GalleryUploadButton } from './GalleryUploadButton';
 import { GallerySearch } from './ImageGrid/GallerySearch';
-import { ImageGallery } from './NewGallery';
+import { NewGallery } from './NewGallery';
 import { VideoGallery } from './VideoGallery';
 
 const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0, width: '100%' };
@@ -122,7 +122,7 @@ export const GalleryPanel = memo(() => {
       </Collapse>
       <Divider pt={2} />
       <Flex w="full" h="full" pt={2}>
-        {galleryView === 'videos' ? <VideoGallery /> : <ImageGallery />}
+        {galleryView === 'images' ? <NewGallery /> : galleryView === 'videos' ? <VideoGallery /> : <NewGallery />}
       </Flex>
     </Flex>
   );
