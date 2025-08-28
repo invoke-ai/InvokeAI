@@ -15,7 +15,7 @@ import type { CanvasImageState, Dimensions } from 'features/controlLayers/store/
 import { t } from 'i18next';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
-import { JsonObject } from 'roarr/dist/types';
+import type { JsonObject } from 'roarr/dist/types';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
 
 type CanvasObjectImageConfig = {
