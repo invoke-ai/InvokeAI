@@ -58,9 +58,6 @@ class ImageCategory(str, Enum, metaclass=MetaEnum):
     """OTHER: The image is some other type of image with a specialized purpose. To be used by external nodes."""
 
 
-IMAGE_CATEGORIES: list[ImageCategory] = [ImageCategory.GENERAL];
-ASSETS_CATEGORIES: list[ImageCategory] = [ImageCategory.CONTROL, ImageCategory.MASK, ImageCategory.USER, ImageCategory.OTHER];
-
 class InvalidImageCategoryException(ValueError):
     """Raised when a provided value is not a valid ImageCategory.
 
