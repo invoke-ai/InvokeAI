@@ -18,7 +18,6 @@ export const MODEL_TYPE_MAP: Record<BaseModelType, string> = {
   'chatgpt-4o': 'ChatGPT 4o',
   'flux-kontext': 'Flux Kontext',
   'gemini-2.5': 'Gemini 2.5',
-  veo3: 'Veo3',
 };
 
 /**
@@ -38,13 +37,12 @@ export const MODEL_TYPE_SHORT_MAP: Record<BaseModelType, string> = {
   'chatgpt-4o': 'ChatGPT 4o',
   'flux-kontext': 'Flux Kontext',
   'gemini-2.5': 'Gemini 2.5',
-  veo3: 'Veo3',
 };
 
 /**
  * Mapping of base model to CLIP skip parameter constraints
  */
-export const CLIP_SKIP_MAP: { [key in BaseModelType]?: { maxClip: number; markers: number[] } } = {
+export const CLIP_SKIP_MAP: Record<BaseModelType, { maxClip: number; markers: number[] }> = {
   any: {
     maxClip: 0,
     markers: [],
