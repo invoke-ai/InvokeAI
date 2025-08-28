@@ -1,7 +1,6 @@
-import { logger } from 'app/logging/logger';
 import type { ListRange, VirtuosoGridHandle } from 'react-virtuoso';
 
-const log = logger('gallery');
+import { log } from './VideoGallery';
 
 /**
  * Scroll the item at the given index into view if it is not currently visible.
