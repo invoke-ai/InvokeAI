@@ -38,7 +38,7 @@ const VideoMetadataViewer = ({ video }: VideoMetadataViewerProps) => {
         <TabList>
           <Tab>{t('metadata.recallParameters')}</Tab>
           <Tab>{t('metadata.metadata')}</Tab>
-          <Tab>{t('metadata.imageDetails')}</Tab>
+          <Tab>{t('metadata.videoDetails')}</Tab>
         </TabList>
 
         <TabPanels>
@@ -53,24 +53,16 @@ const VideoMetadataViewer = ({ video }: VideoMetadataViewerProps) => {
           </TabPanel>
           <TabPanel>
             {metadata ? (
-              <DataViewer
-                fileName={`${video.video_id.replace('.png', '')}_metadata`}
-                data={metadata}
-                label={t('metadata.metadata')}
-              />
+              <DataViewer fileName={`${video.video_id}_metadata`} data={metadata} label={t('metadata.metadata')} />
             ) : (
               <IAINoContentFallback label={t('metadata.noMetaData')} />
             )}
           </TabPanel>
           <TabPanel>
             {video ? (
-              <DataViewer
-                fileName={`${video.video_id.replace('.png', '')}_details`}
-                data={video}
-                label={t('metadata.imageDetails')}
-              />
+              <DataViewer fileName={`${video.video_id}_details`} data={video} label={t('metadata.videoDetails')} />
             ) : (
-              <IAINoContentFallback label={t('metadata.noImageDetails')} />
+              <IAINoContentFallback label={t('metadata.noVideoDetails')} />
             )}
           </TabPanel>
           {/* <TabPanel>
