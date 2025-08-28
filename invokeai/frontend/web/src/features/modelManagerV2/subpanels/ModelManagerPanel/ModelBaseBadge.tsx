@@ -22,7 +22,7 @@ export const BASE_COLOR_MAP: Record<BaseModelType, string> = {
   'flux-kontext': 'pink',
   'gemini-2.5': 'pink',
   veo3: 'white',
-  runway: 'white',
+  runway: 'white'
 };
 
 const ModelBaseBadge = ({ base }: Props) => {
