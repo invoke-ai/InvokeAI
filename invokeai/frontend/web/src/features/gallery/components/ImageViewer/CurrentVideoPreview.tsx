@@ -3,7 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import VideoMetadataViewer from 'features/gallery/components/ImageMetadataViewer/VideoMetadataViewer';
 import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
 import { selectShouldShowItemDetails } from 'features/ui/store/uiSelectors';
-import { VideoViewer } from 'features/video/components/VideoViewer';
+import { VideoPlayer } from 'features/video/components/VideoPlayer';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useCallback, useRef, useState } from 'react';
@@ -39,7 +39,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: { videoDTO: VideoDTO | nu
     >
       {videoDTO && videoDTO.video_url && (
         <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center">
-          <VideoViewer />
+          <VideoPlayer />
         </Flex>
       )}
       {!videoDTO && <NoContentForViewer />}

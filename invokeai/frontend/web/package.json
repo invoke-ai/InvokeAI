@@ -69,7 +69,6 @@
     "linkify-react": "^4.3.1",
     "linkifyjs": "^4.3.1",
     "lru-cache": "^11.1.0",
-    "media-chrome": "^4.13.0",
     "mtwist": "^1.0.2",
     "nanoid": "^5.1.5",
     "nanostores": "^1.0.1",
