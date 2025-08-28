@@ -183,7 +183,7 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('gallery', 'starImage', ['.']);
 
     return data;
-  }, [isMacOS, isModelManagerEnabled, t]);
+  }, [isMacOS, isVideoEnabled, isModelManagerEnabled, t]);
 
   return hotkeysData;
 };

@@ -23,11 +23,11 @@ import {
 } from 'features/controlLayers/store/types';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { zModelIdentifierField } from 'features/nodes/types/common';
+import { REQUIRES_STARTING_FRAME_BASE_MODELS } from 'features/parameters/types/constants';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import { isVideoModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import z from 'zod';
-import { REQUIRES_STARTING_FRAME_BASE_MODELS } from '../types/constants';
 
 const zVideoState = z.object({
   _version: z.literal(1),
@@ -125,7 +125,7 @@ export const videoSliceConfig: SliceConfig<typeof slice> = {
 };
 
 export const selectVideoSlice = (state: RootState) => state.video;
-const createVideoSelector = <T,>(selector: Selector<VideoState, T>) => createSelector(selectVideoSlice, selector);
+const createVideoSelector = <T>(selector: Selector<VideoState, T>) => createSelector(selectVideoSlice, selector);
 
 export const selectStartingFrameImage = createVideoSelector((video) => video.startingFrameImage);
 export const selectVideoModel = createVideoSelector((video) => video.videoModel);
