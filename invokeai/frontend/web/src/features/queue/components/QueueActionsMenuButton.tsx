@@ -1,4 +1,5 @@
 import { IconButton, Menu, MenuButton, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
 import { SessionMenuItems } from 'common/components/SessionMenuItems';
 import { useCancelAllExceptCurrentQueueItemDialog } from 'features/queue/components/CancelAllExceptCurrentQueueItemConfirmationAlertDialog';
 import { QueueCountBadge } from 'features/queue/components/QueueCountBadge';
@@ -7,6 +8,7 @@ import { usePauseProcessor } from 'features/queue/hooks/usePauseProcessor';
 import { useResumeProcessor } from 'features/queue/hooks/useResumeProcessor';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiListBold, PiPauseFill, PiPlayFill, PiQueueBold, PiTrashBold, PiXBold, PiXCircle } from 'react-icons/pi';
@@ -27,6 +29,7 @@ export const QueueActionsMenuButton = memo(() => {
   const openQueue = useCallback(() => {
     navigationApi.switchToTab('queue');
   }, []);
+  const tab = useAppSelector(selectActiveTab);
 
   const cancelCurrentQueueItemWithToast = useCallback(() => {
     cancelCurrentQueueItem.trigger({ withToast: true });
@@ -37,9 +40,11 @@ export const QueueActionsMenuButton = memo(() => {
       <Menu placement="bottom-end" isLazy lazyBehavior="unmount">
         <MenuButton ref={ref} as={IconButton} size="lg" aria-label="Queue Actions Menu" icon={<PiListBold />} />
         <MenuList>
-          <MenuGroup title={t('common.new')}>
-            <SessionMenuItems />
-          </MenuGroup>
+          {(tab === 'canvas' || tab === 'generate') && (
+            <MenuGroup title={t('common.new')}>
+              <SessionMenuItems />
+            </MenuGroup>
+          )}
           <MenuGroup title={t('queue.queue')}>
             <MenuItem
               isDestructive
