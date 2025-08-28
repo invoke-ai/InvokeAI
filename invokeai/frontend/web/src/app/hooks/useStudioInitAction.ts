@@ -42,7 +42,6 @@ type StudioDestinationAction = _StudioInitAction<
       | 'canvas'
       | 'workflows'
       | 'upscaling'
-      | 'video'
       | 'viewAllWorkflows'
       | 'viewAllWorkflowsRecommended'
       | 'viewAllStylePresets';
@@ -177,10 +176,6 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
         case 'upscaling':
           // Go to the upscaling tab
           navigationApi.switchToTab('upscaling');
-          break;
-        case 'video':
-          // Go to the video tab
-          await navigationApi.focusPanel('video', LAUNCHPAD_PANEL_ID);
           break;
         case 'viewAllWorkflows':
           // Go to the workflows tab and open the workflow library modal
