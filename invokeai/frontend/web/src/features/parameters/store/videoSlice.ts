@@ -93,7 +93,6 @@ const createVideoSelector = <T>(selector: Selector<VideoState, T>) => createSele
 export const selectStartingFrameImage = createVideoSelector((video) => video.startingFrameImage);
 export const selectGeneratedVideo = createVideoSelector((video) => video.generatedVideo);
 export const selectVideoModel = createVideoSelector((video) => video.videoModel);
-export const selectVideoModelKey = createVideoSelector((video) => video.videoModel?.key);
 export const selectVideoResolution = createVideoSelector((video) => video.videoResolution);
 export const selectVideoDuration = createVideoSelector((video) => video.videoDuration);
 
