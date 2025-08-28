@@ -4,7 +4,6 @@ import { InformationalPopover } from 'common/components/InformationalPopover/Inf
 import { heightChanged, selectHeight, selectIsApiBaseModel } from 'features/controlLayers/store/paramsSlice';
 import { selectGridSize, selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { selectHeightConfig } from 'features/system/store/configSlice';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
