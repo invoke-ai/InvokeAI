@@ -497,7 +497,7 @@
             }
         },
         "video": {
-            "title": "Video"
+          "title": "Video"
         },
         "canvas": {
             "title": "Canvas",
