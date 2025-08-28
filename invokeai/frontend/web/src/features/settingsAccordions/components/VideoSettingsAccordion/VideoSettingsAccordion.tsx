@@ -6,6 +6,7 @@ import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { CreditEstimate } from './CreditEstimate';
 import { StartingFrameImage } from './StartingFrameImage';
 import { VideoModelPicker } from './VideoModelPicker';
 
@@ -30,6 +31,7 @@ export const VideoSettingsAccordion = memo(() => {
             <Flex gap={4} flexDirection="column" width="full">
               <VideoModelPicker />
               <ParamDuration />
+              <CreditEstimate />
             </Flex>
           </Flex>
           <VideoDimensions />
