@@ -7,7 +7,7 @@ import { useVideoDTO } from 'services/api/endpoints/videos';
 
 import { VideoPlayer } from './VideoPlayer';
 
-export const VideoView = () => {
+export const VideoViewer = () => {
   const ref = useRef<HTMLDivElement>(null);
   const lastSelectedItem = useAppSelector(selectLastSelectedItem);
   const videoDTO = useVideoDTO(lastSelectedItem?.id);
