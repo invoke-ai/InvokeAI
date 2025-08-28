@@ -2690,7 +2690,7 @@
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
             "Canvas: Color Picker does not sample alpha, bbox respects aspect ratio lock when resizing shuffle button for number fields in Workflow Builder, hide pixel dimension sliders when using a model that doesn't support them",
-            "Workflows: Add a Shuffle button to number input fields",
+            "Workflows: Add a Shuffle button to number input fields"
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
