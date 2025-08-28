@@ -45,7 +45,7 @@ const getInitialState = (): VideoState => {
     _version: 1,
     startingFrameImage: null,
     videoModel: null,
-    videoResolution: '720p',
+    videoResolution: '1080p',
     videoDuration: '8',
     videoAspectRatio: '16:9',
   };
@@ -66,7 +66,7 @@ const slice = createSlice({
 
       if (videoModel?.base === 'veo3') {
         if (!state.videoResolution || !isVeo3Resolution(state.videoResolution)) {
-          state.videoResolution = '720p';
+          state.videoResolution = '1080p';
         }
         if (!state.videoDuration || !isVeo3DurationID(state.videoDuration)) {
           state.videoDuration = '8';
