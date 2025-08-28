@@ -22,8 +22,8 @@ export const ContextMenuItemDownload = memo(() => {
   return (
     <IconMenuItem
       icon={<PiDownloadSimpleBold />}
-      aria-label={t('gallery.download')}
-      tooltip={t('gallery.download')}
+      aria-label={t('parameters.downloadImage')}
+      tooltip={t('parameters.downloadImage')}
       onClick={onClick}
     />
   );
