@@ -10,7 +10,6 @@ import type { VideoDTO } from 'services/api/types';
 import { ItemDTOContextProvider } from 'features/gallery/contexts/ItemDTOContext';
 import { ContextMenuItemStarUnstar } from './MenuItems/ContextMenuItemStarUnstar';
 import { MenuDivider } from '@invoke-ai/ui-library';
-import { ContextMenuItemChangeBoard } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemChangeBoard';
 
 type SingleSelectionVideoMenuItemsProps = {
   videoDTO: VideoDTO;
@@ -30,7 +29,6 @@ const SingleSelectionVideoMenuItems = ({ videoDTO }: SingleSelectionVideoMenuIte
       </IconMenuItemGroup>
       <MenuDivider />
       <ContextMenuItemStarUnstar />
-      <ContextMenuItemChangeBoard />
     </ItemDTOContextProvider>
   );
 };
