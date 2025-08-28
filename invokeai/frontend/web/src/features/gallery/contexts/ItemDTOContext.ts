@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import { type ImageDTO, isImageDTO, type VideoDTO } from 'services/api/types';
+import { type ImageDTO, isImageDTO, isVideoDTO, type VideoDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 
 const ItemDTOContext = createContext<ImageDTO | VideoDTO | null>(null);
@@ -17,4 +17,11 @@ export const useItemDTOContextImageOnly = (): ImageDTO => {
   assert(itemDTO !== null, 'useItemDTOContext must be used within ItemDTOContextProvider');
   assert(isImageDTO(itemDTO), 'ItemDTO is not an image');
   return itemDTO as ImageDTO;
+};
+
+export const useItemDTOContextVideoOnly = (): VideoDTO => {
+  const itemDTO = useContext(ItemDTOContext);
+  assert(itemDTO !== null, 'useItemDTOContext must be used within ItemDTOContextProvider');
+  assert(isVideoDTO(itemDTO), 'ItemDTO is not a video');
+  return itemDTO as VideoDTO;
 };

@@ -493,7 +493,7 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
 };
 
 export const selectParamsSlice = (state: RootState) => state.params;
-const createParamsSelector = <T>(selector: Selector<ParamsState, T>) => createSelector(selectParamsSlice, selector);
+const createParamsSelector = <T,>(selector: Selector<ParamsState, T>) => createSelector(selectParamsSlice, selector);
 
 export const selectBase = createParamsSelector((params) => params.model?.base);
 export const selectIsSDXL = createParamsSelector((params) => params.model?.base === 'sdxl');
