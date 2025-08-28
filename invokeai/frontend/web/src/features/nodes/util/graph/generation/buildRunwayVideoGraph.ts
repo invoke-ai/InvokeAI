@@ -12,6 +12,7 @@ import {
   selectVideoSlice,
 } from 'features/parameters/store/videoSlice';
 import { t } from 'i18next';
+import type { VideoApiModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 const log = logger('system');

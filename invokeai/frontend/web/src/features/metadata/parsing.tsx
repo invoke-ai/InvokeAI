@@ -33,32 +33,12 @@ import {
   widthChanged,
 } from 'features/controlLayers/store/paramsSlice';
 import { refImagesRecalled } from 'features/controlLayers/store/refImagesSlice';
-import type {
-  CanvasMetadata,
-  LoRA,
-  RefImageState,
-  VideoAspectRatio as ParameterVideoAspectRatio,
-  VideoDuration as ParameterVideoDuration,
-  VideoResolution as ParameterVideoResolution,
-} from 'features/controlLayers/store/types';
-import {
-  zCanvasMetadata,
-  zCanvasReferenceImageState_OLD,
-  zRefImageState,
-  zVideoAspectRatio,
-  zVideoDuration,
-  zVideoResolution,
-} from 'features/controlLayers/store/types';
+import type { CanvasMetadata, LoRA, RefImageState } from 'features/controlLayers/store/types';
+import { zCanvasMetadata, zCanvasReferenceImageState_OLD, zRefImageState } from 'features/controlLayers/store/types';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { zModelIdentifier } from 'features/nodes/types/v2/common';
 import { modelSelected } from 'features/parameters/store/actions';
-import {
-  videoAspectRatioChanged,
-  videoDurationChanged,
-  videoModelChanged,
-  videoResolutionChanged,
-} from 'features/parameters/store/videoSlice';
 import type {
   ParameterCFGRescaleMultiplier,
   ParameterCFGScale,
@@ -714,87 +694,6 @@ const VAEModel: SingleMetadataHandler<ParameterVAEModel> = {
 };
 //#endregion VAEModel
 
-//#region VideoModel
-const VideoModel: SingleMetadataHandler<ModelIdentifierField> = {
-  [SingleMetadataKey]: true,
-  type: 'VideoModel',
-  parse: async (metadata, store) => {
-    const raw = getProperty(metadata, 'model');
-    const parsed = await parseModelIdentifier(raw, store, 'video');
-    assert(parsed.type === 'video');
-    return Promise.resolve(parsed);
-  },
-  recall: (value, store) => {
-    store.dispatch(videoModelChanged({ videoModel: value }));
-  },
-  i18nKey: 'metadata.videoModel',
-  LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
-    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
-  ),
-};
-//#endregion VideoModel
-
-//#region VideoDuration
-const VideoDuration: SingleMetadataHandler<ParameterVideoDuration> = {
-  [SingleMetadataKey]: true,
-  type: 'VideoDuration',
-  parse: (metadata) => {
-    const raw = getProperty(metadata, 'duration');
-    const parsed = zVideoDuration.parse(raw);
-    return Promise.resolve(parsed);
-  },
-  recall: (value, store) => {
-    store.dispatch(videoDurationChanged(value));
-  },
-  i18nKey: 'metadata.videoDuration',
-  LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<ParameterVideoDuration>) => (
-    <MetadataPrimitiveValue value={value} />
-  ),
-};
-//#endregion VideoDuration
-
-//#region VideoResolution
-const VideoResolution: SingleMetadataHandler<ParameterVideoResolution> = {
-  [SingleMetadataKey]: true,
-  type: 'VideoResolution',
-  parse: (metadata) => {
-    const raw = getProperty(metadata, 'resolution');
-    const parsed = zVideoResolution.parse(raw);
-    return Promise.resolve(parsed);
-  },
-  recall: (value, store) => {
-    store.dispatch(videoResolutionChanged(value));
-  },
-  i18nKey: 'metadata.videoResolution',
-  LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<ParameterVideoResolution>) => (
-    <MetadataPrimitiveValue value={value} />
-  ),
-};
-//#endregion VideoResolution
-
-//#region VideoAspectRatio
-const VideoAspectRatio: SingleMetadataHandler<ParameterVideoAspectRatio> = {
-  [SingleMetadataKey]: true,
-  type: 'VideoAspectRatio',
-  parse: (metadata) => {
-    const raw = getProperty(metadata, 'aspect_ratio');
-    const parsed = zVideoAspectRatio.parse(raw);
-    return Promise.resolve(parsed);
-  },
-  recall: (value, store) => {
-    store.dispatch(videoAspectRatioChanged(value));
-  },
-  i18nKey: 'metadata.videoAspectRatio',
-  LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<ParameterVideoAspectRatio>) => (
-    <MetadataPrimitiveValue value={value} />
-  ),
-};
-//#endregion VideoAspectRatio
-
 //#region LoRAs
 const LoRAs: CollectionMetadataHandler<LoRA[]> = {
   [CollectionMetadataKey]: true,
@@ -998,7 +897,7 @@ const RefImages: CollectionMetadataHandler<RefImageState[]> = {
 };
 //#endregion RefImages
 
-export const ImageMetadataHandlers = {
+export const MetadataHandlers = {
   CreatedBy,
   GenerationMode,
   PositivePrompt,
@@ -1038,17 +937,6 @@ export const ImageMetadataHandlers = {
   // t2iAdapterToControlAdapterLayer: parseT2IAdapterToControlAdapterLayer,
   // ipAdapterToIPAdapterLayer: parseIPAdapterToIPAdapterLayer,
 } as const;
-
-export const VideoMetadataHandlers = {
-  CreatedBy,
-  GenerationMode,
-  PositivePrompt,
-  VideoModel,
-  Seed,
-  VideoAspectRatio,
-  VideoDuration,
-  VideoResolution,
-};
 
 const successToast = (parameter: string) => {
   toast({
@@ -1119,9 +1007,9 @@ const recallByHandlers = async (arg: {
   // model is recalled first, so it doesn't accidentally override the width and height. This is the only known case
   // where the order of recall matters.
   const sortedHandlers = filteredHandlers.sort((a, b) => {
-    if (a === ImageMetadataHandlers.MainModel) {
+    if (a === MetadataHandlers.MainModel) {
       return -1; // MainModel should be recalled first
-    } else if (b === ImageMetadataHandlers.MainModel) {
+    } else if (b === MetadataHandlers.MainModel) {
       return 1; // MainModel should be recalled first
     } else {
       return 0; // Keep the original order for other handlers
@@ -1157,10 +1045,10 @@ const recallByHandlers = async (arg: {
   return recalled;
 };
 
-const recallImagePrompts = async (metadata: unknown, store: AppStore) => {
+const recallPrompts = async (metadata: unknown, store: AppStore) => {
   const recalled = await recallByHandlers({
     metadata,
-    handlers: [ImageMetadataHandlers.PositivePrompt, ImageMetadataHandlers.NegativePrompt],
+    handlers: [MetadataHandlers.PositivePrompt, MetadataHandlers.NegativePrompt],
     store,
     silent: true,
   });
@@ -1191,10 +1079,10 @@ const hasMetadataByHandlers = async (arg: {
   return true;
 };
 
-const recallImageDimensions = async (metadata: unknown, store: AppStore) => {
+const recallDimensions = async (metadata: unknown, store: AppStore) => {
   const recalled = await recallByHandlers({
     metadata,
-    handlers: [ImageMetadataHandlers.Width, ImageMetadataHandlers.Height],
+    handlers: [MetadataHandlers.Width, MetadataHandlers.Height],
     store,
     silent: true,
   });
@@ -1203,12 +1091,12 @@ const recallImageDimensions = async (metadata: unknown, store: AppStore) => {
   }
 };
 
-const recallAllImageMetadata = async (
+const recallAll = async (
   metadata: unknown,
   store: AppStore,
   skip?: (SingleMetadataHandler<any> | CollectionMetadataHandler<any[]>)[]
 ) => {
-  const handlers = Object.values(ImageMetadataHandlers).filter(
+  const handlers = Object.values(MetadataHandlers).filter(
     (handler) => isSingleMetadataHandler(handler) || isCollectionMetadataHandler(handler)
   );
   await recallByHandlers({
@@ -1223,9 +1111,9 @@ export const MetadataUtils = {
   hasMetadataByHandlers,
   recallByHandler,
   recallByHandlers,
-  recallAllImageMetadata,
-  recallImagePrompts,
-  recallImageDimensions,
+  recallAll,
+  recallPrompts,
+  recallDimensions,
 } as const;
 
 export function useSingleMetadataDatum<T>(metadata: unknown, handler: SingleMetadataHandler<T>) {

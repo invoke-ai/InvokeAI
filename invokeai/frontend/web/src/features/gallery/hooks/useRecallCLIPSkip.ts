@@ -1,6 +1,6 @@
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { selectHasModelCLIPSkip } from 'features/controlLayers/store/paramsSlice';
-import { ImageMetadataHandlers, MetadataUtils } from 'features/metadata/parsing';
+import { MetadataHandlers, MetadataUtils } from 'features/metadata/parsing';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -20,7 +20,7 @@ export const useRecallCLIPSkip = (imageDTO: ImageDTO) => {
   useEffect(() => {
     const parse = async () => {
       try {
-        await ImageMetadataHandlers.CLIPSkip.parse(metadata, store);
+        await MetadataHandlers.CLIPSkip.parse(metadata, store);
         setHasCLIPSkip(true);
       } catch {
         setHasCLIPSkip(false);
@@ -62,7 +62,7 @@ export const useRecallCLIPSkip = (imageDTO: ImageDTO) => {
     if (!isEnabled) {
       return;
     }
-    MetadataUtils.recallByHandler({ metadata, handler: ImageMetadataHandlers.CLIPSkip, store });
+    MetadataUtils.recallByHandler({ metadata, handler: MetadataHandlers.CLIPSkip, store });
   }, [metadata, isEnabled, store]);
 
   return {

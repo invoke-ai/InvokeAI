@@ -1,5 +1,5 @@
 import { useAppStore } from 'app/store/storeHooks';
-import { ImageMetadataHandlers, MetadataUtils } from 'features/metadata/parsing';
+import { MetadataHandlers, MetadataUtils } from 'features/metadata/parsing';
 import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
@@ -13,7 +13,7 @@ export const useCreateStylePresetFromMetadata = (imageDTO?: ImageDTO | null) => 
 
   useEffect(() => {
     MetadataUtils.hasMetadataByHandlers({
-      handlers: [ImageMetadataHandlers.PositivePrompt, ImageMetadataHandlers.NegativePrompt],
+      handlers: [MetadataHandlers.PositivePrompt, MetadataHandlers.NegativePrompt],
       metadata,
       store,
       require: 'some',
@@ -51,12 +51,12 @@ export const useCreateStylePresetFromMetadata = (imageDTO?: ImageDTO | null) => 
     let negativePrompt: string;
 
     try {
-      positivePrompt = await ImageMetadataHandlers.PositivePrompt.parse(metadata, store);
+      positivePrompt = await MetadataHandlers.PositivePrompt.parse(metadata, store);
     } catch {
       positivePrompt = '';
     }
     try {
-      negativePrompt = (await ImageMetadataHandlers.NegativePrompt.parse(metadata, store)) ?? '';
+      negativePrompt = (await MetadataHandlers.NegativePrompt.parse(metadata, store)) ?? '';
     } catch {
       negativePrompt = '';
     }

@@ -118,7 +118,7 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
       const metadata = getImageMetadataResult.value;
       store.dispatch(canvasReset());
       // This shows a toast
-      await MetadataUtils.recallAllImageMetadata(metadata, store);
+      await MetadataUtils.recallAll(metadata, store);
     },
     [store, t]
   );

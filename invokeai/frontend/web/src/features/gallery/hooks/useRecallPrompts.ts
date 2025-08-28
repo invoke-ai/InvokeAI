@@ -1,5 +1,5 @@
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
-import { ImageMetadataHandlers, MetadataUtils } from 'features/metadata/parsing';
+import { MetadataHandlers, MetadataUtils } from 'features/metadata/parsing';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -22,7 +22,7 @@ export const useRecallPrompts = (imageDTO: ImageDTO) => {
     const parse = async () => {
       try {
         const result = await MetadataUtils.hasMetadataByHandlers({
-          handlers: [ImageMetadataHandlers.PositivePrompt, ImageMetadataHandlers.NegativePrompt],
+          handlers: [MetadataHandlers.PositivePrompt, MetadataHandlers.NegativePrompt],
           metadata,
           store,
           require: 'some',
@@ -59,7 +59,7 @@ export const useRecallPrompts = (imageDTO: ImageDTO) => {
     if (!isEnabled) {
       return;
     }
-    MetadataUtils.recallImagePrompts(metadata, store);
+    MetadataUtils.recallPrompts(metadata, store);
     clearStylePreset();
   }, [metadata, isEnabled, store, clearStylePreset]);
 
