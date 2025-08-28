@@ -6,11 +6,7 @@ import { videoFrameFromImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
 import { DndImageIcon } from 'features/dnd/DndImageIcon';
-import {
-  selectStartingFrameImage,
-  selectVideoModelRequiresStartingFrame,
-  startingFrameImageChanged,
-} from 'features/parameters/store/videoSlice';
+import { selectStartingFrameImage, startingFrameImageChanged } from 'features/parameters/store/videoSlice';
 import { t } from 'i18next';
 import { useCallback } from 'react';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
@@ -21,7 +17,6 @@ const dndTargetData = videoFrameFromImageDndTarget.getData({ frame: 'start' });
 
 export const StartingFrameImage = () => {
   const dispatch = useAppDispatch();
-  const requiresStartingFrame = useAppSelector(selectVideoModelRequiresStartingFrame);
   const startingFrameImage = useAppSelector(selectStartingFrameImage);
   const imageDTO = useImageDTO(startingFrameImage?.image_name);
 
@@ -39,15 +34,7 @@ export const StartingFrameImage = () => {
   return (
     <Flex justifyContent="flex-start" flexDir="column" gap={2}>
       <Flex position="relative" w={36} h={36} alignItems="center" justifyContent="center">
-        {!imageDTO && (
-          <UploadImageIconButton
-            w="full"
-            h="full"
-            isError={requiresStartingFrame && !imageDTO}
-            onUpload={onUpload}
-            fontSize={36}
-          />
-        )}
+        {!imageDTO && <UploadImageIconButton w="full" h="full" isError={!imageDTO} onUpload={onUpload} fontSize={36} />}
         {imageDTO && (
           <>
             <DndImage imageDTO={imageDTO} borderRadius="base" borderWidth={1} borderStyle="solid" />

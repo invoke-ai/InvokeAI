@@ -187,5 +187,3 @@ export const SUPPORTS_ASPECT_RATIO_BASE_MODELS: BaseModelType[] = [
 ];
 
 export const VIDEO_BASE_MODELS = ['veo3', 'runway'];
-
-export const REQUIRES_STARTING_FRAME_BASE_MODELS = ['runway'];
