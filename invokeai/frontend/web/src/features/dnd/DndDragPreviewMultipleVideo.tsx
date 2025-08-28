@@ -8,7 +8,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type { Param0 } from 'tsafe';
 
-const DndDragPreviewMultipleVideo = memo(({ video_ids }: { video_ids: string[] }) => {
+const DndDragPreviewMultipleVideo = memo(({ ids }: { ids: string[] }) => {
   const { t } = useTranslation();
   return (
     <Flex
@@ -20,8 +20,8 @@ const DndDragPreviewMultipleVideo = memo(({ video_ids }: { video_ids: string[] }
       bg="base.900"
       borderRadius="base"
     >
-      <Heading>{video_ids.length}</Heading>
-      <Heading size="sm">{t('parameters.videos_withCount', { count: video_ids.length })}</Heading>
+      <Heading>{ids.length}</Heading>
+      <Heading size="sm">{t('parameters.videos')}</Heading>
     </Flex>
   );
 });
@@ -31,11 +31,11 @@ DndDragPreviewMultipleVideo.displayName = 'DndDragPreviewMultipleVideo';
 export type DndDragPreviewMultipleVideoState = {
   type: 'multiple-video';
   container: HTMLElement;
-  video_ids: string[];
+  ids: string[];
 };
 
 export const createMultipleVideoDragPreview = (arg: DndDragPreviewMultipleVideoState) =>
-  createPortal(<DndDragPreviewMultipleVideo video_ids={arg.video_ids} />, arg.container);
+  createPortal(<DndDragPreviewMultipleVideo ids={arg.ids} />, arg.container);
 
 type SetMultipleDragPreviewArg = {
   multipleVideoDndData: MultipleVideoDndSourceData;
@@ -51,7 +51,7 @@ export const setMultipleVideoDragPreview = ({
   const { nativeSetDragImage, source, location } = onGenerateDragPreviewArgs;
   setCustomNativeDragPreview({
     render({ container }) {
-      setDragPreviewState({ type: 'multiple-video', container, video_ids: multipleVideoDndData.payload.video_ids });
+      setDragPreviewState({ type: 'multiple-video', container, ids: multipleVideoDndData.payload.ids });
       return () => setDragPreviewState(null);
     },
     nativeSetDragImage,

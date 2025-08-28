@@ -9,11 +9,9 @@ import { selectComparisonImages } from 'features/gallery/components/ImageViewer/
 import type { BoardId } from 'features/gallery/store/types';
 import {
   addImagesToBoard,
-  addVideosToBoard,
   createNewCanvasEntityFromImage,
   newCanvasFromImage,
   removeImagesFromBoard,
-  removeVideosFromBoard,
   replaceCanvasEntityObjectsWithImage,
   setComparisonImage,
   setGlobalReferenceImage,
@@ -93,7 +91,7 @@ const _multipleVideo = buildTypeAndKey('multiple-video');
 export type MultipleVideoDndSourceData = DndData<
   typeof _multipleVideo.type,
   typeof _multipleVideo.key,
-  { video_ids: string[]; board_id: BoardId }
+  { ids: string[]; board_id: BoardId }
 >;
 export const multipleVideoDndSource: DndSource<MultipleVideoDndSourceData> = {
   ..._multipleVideo,
@@ -475,22 +473,12 @@ export type AddImageToBoardDndTargetData = DndData<
 >;
 export const addImageToBoardDndTarget: DndTarget<
   AddImageToBoardDndTargetData,
-  SingleImageDndSourceData | MultipleImageDndSourceData | SingleVideoDndSourceData | MultipleVideoDndSourceData
+  SingleImageDndSourceData | MultipleImageDndSourceData
 > = {
   ..._addToBoard,
   typeGuard: buildTypeGuard(_addToBoard.key),
   getData: buildGetData(_addToBoard.key, _addToBoard.type),
   isValid: ({ sourceData, targetData }) => {
-    if (singleVideoDndSource.typeGuard(sourceData)) {
-      const currentBoard = sourceData.payload.videoDTO.board_id ?? 'none';
-      const destinationBoard = targetData.payload.boardId;
-      return currentBoard !== destinationBoard;
-    }
-    if (multipleVideoDndSource.typeGuard(sourceData)) {
-      const currentBoard = sourceData.payload.board_id;
-      const destinationBoard = targetData.payload.boardId;
-      return currentBoard !== destinationBoard;
-    }
     if (singleImageDndSource.typeGuard(sourceData)) {
       const currentBoard = sourceData.payload.imageDTO.board_id ?? 'none';
       const destinationBoard = targetData.payload.boardId;
@@ -504,18 +492,6 @@ export const addImageToBoardDndTarget: DndTarget<
     return false;
   },
   handler: ({ sourceData, targetData, dispatch }) => {
-    if (singleVideoDndSource.typeGuard(sourceData)) {
-      const { videoDTO } = sourceData.payload;
-      const { boardId } = targetData.payload;
-      addVideosToBoard({ video_ids: [videoDTO.video_id], boardId, dispatch });
-    }
-
-    if (multipleVideoDndSource.typeGuard(sourceData)) {
-      const { video_ids } = sourceData.payload;
-      const { boardId } = targetData.payload;
-      addVideosToBoard({ video_ids, boardId, dispatch });
-    }
-
     if (singleImageDndSource.typeGuard(sourceData)) {
       const { imageDTO } = sourceData.payload;
       const { boardId } = targetData.payload;
@@ -541,7 +517,7 @@ export type RemoveImageFromBoardDndTargetData = DndData<
 >;
 export const removeImageFromBoardDndTarget: DndTarget<
   RemoveImageFromBoardDndTargetData,
-  SingleImageDndSourceData | MultipleImageDndSourceData | SingleVideoDndSourceData | MultipleVideoDndSourceData
+  SingleImageDndSourceData | MultipleImageDndSourceData
 > = {
   ..._removeFromBoard,
   typeGuard: buildTypeGuard(_removeFromBoard.key),
@@ -557,16 +533,6 @@ export const removeImageFromBoardDndTarget: DndTarget<
       return currentBoard !== 'none';
     }
 
-    if (singleVideoDndSource.typeGuard(sourceData)) {
-      const currentBoard = sourceData.payload.videoDTO.board_id ?? 'none';
-      return currentBoard !== 'none';
-    }
-
-    if (multipleVideoDndSource.typeGuard(sourceData)) {
-      const currentBoard = sourceData.payload.board_id;
-      return currentBoard !== 'none';
-    }
-
     return false;
   },
   handler: ({ sourceData, dispatch }) => {
@@ -578,16 +544,6 @@ export const removeImageFromBoardDndTarget: DndTarget<
     if (multipleImageDndSource.typeGuard(sourceData)) {
       const { image_names } = sourceData.payload;
       removeImagesFromBoard({ image_names, dispatch });
-    }
-
-    if (singleVideoDndSource.typeGuard(sourceData)) {
-      const { videoDTO } = sourceData.payload;
-      removeVideosFromBoard({ video_ids: [videoDTO.video_id], dispatch });
-    }
-
-    if (multipleVideoDndSource.typeGuard(sourceData)) {
-      const { video_ids } = sourceData.payload;
-      removeVideosFromBoard({ video_ids, dispatch });
     }
   },
 };
