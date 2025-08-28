@@ -5,7 +5,6 @@ import type { SliceConfig } from 'app/store/types';
 import { isPlainObject } from 'es-toolkit';
 import type { ImageWithDims } from 'features/controlLayers/store/types';
 import { zImageWithDims } from 'features/controlLayers/store/types';
-import { VideoOutput, zVideoOutput } from 'features/nodes/types/common';
 import { assert } from 'tsafe';
 import z from 'zod';
 
@@ -13,7 +12,10 @@ const zVideoState = z.object({
   _version: z.literal(1),
   videoFirstFrameImage: zImageWithDims.nullable(),
   videoLastFrameImage: zImageWithDims.nullable(),
-  generatedVideo: zVideoOutput.nullable(),
+  generatedVideo: z.object({
+    url: z.string(),
+    taskId: z.number(),
+  }).nullable(),
 });
 
 export type VideoState = z.infer<typeof zVideoState>;
@@ -37,7 +39,7 @@ const slice = createSlice({
       state.videoLastFrameImage = action.payload;
     },
 
-    generatedVideoChanged: (state, action: PayloadAction<VideoOutput | null>) => {
+    generatedVideoChanged: (state, action: PayloadAction<{ url: string, taskId: number } | null>) => {
       state.generatedVideo = action.payload;
     },
 
