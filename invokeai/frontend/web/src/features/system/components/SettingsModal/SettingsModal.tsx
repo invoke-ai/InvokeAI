@@ -33,6 +33,7 @@ import {
   selectSystemShouldEnableHighlightFocusedRegions,
   selectSystemShouldEnableInformationalPopovers,
   selectSystemShouldEnableModelDescriptions,
+  selectSystemShouldProtectStarredImages,
   selectSystemShouldShowInvocationProgressDetail,
   selectSystemShouldUseNSFWChecker,
   selectSystemShouldUseWatermarker,
@@ -40,6 +41,7 @@ import {
   setShouldEnableInformationalPopovers,
   setShouldEnableModelDescriptions,
   setShouldHighlightFocusedRegions,
+  setShouldProtectStarredImages,
   setShouldShowInvocationProgressDetail,
   shouldAntialiasProgressImageChanged,
   shouldConfirmOnNewSessionToggled,
@@ -102,6 +104,7 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
 
   const shouldUseCpuNoise = useAppSelector(selectShouldUseCPUNoise);
   const shouldConfirmOnDelete = useAppSelector(selectSystemShouldConfirmOnDelete);
+  const shouldProtectStarredImages = useAppSelector(selectSystemShouldProtectStarredImages);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
   const shouldAntialiasProgressImage = useAppSelector(selectSystemShouldAntialiasProgressImage);
   const shouldUseNSFWChecker = useAppSelector(selectSystemShouldUseNSFWChecker);
@@ -133,6 +136,14 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
     },
     [dispatch]
   );
+
+  const handleChangeProtectStarredImages = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setShouldProtectStarredImages(e.target.checked));
+    },
+    [dispatch]
+  );
+
   const handleChangeShouldUseNSFWChecker = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(shouldUseNSFWCheckerChanged(e.target.checked));
@@ -209,6 +220,11 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
                       <FormLabel>{t('settings.confirmOnDelete')}</FormLabel>
                       <Switch isChecked={shouldConfirmOnDelete} onChange={handleChangeShouldConfirmOnDelete} />
                     </FormControl>
+                    <FormControl>
+                      <FormLabel>{t('settings.protectStarredImages')}</FormLabel>
+                      <Switch isChecked={shouldProtectStarredImages} onChange={handleChangeProtectStarredImages} />
+                    </FormControl>
+                    <Text variant="subtext">{t('settings.protectStarredImagesDesc1')}</Text>
                     <FormControl>
                       <FormLabel>{t('settings.confirmOnNewSession')}</FormLabel>
                       <Switch isChecked={shouldConfirmOnNewSession} onChange={onToggleConfirmOnNewSession} />
