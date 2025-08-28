@@ -44,7 +44,7 @@ dependencies = [
   "onnxruntime==1.19.2",
   "opencv-contrib-python",
   "safetensors",
-  "sentencepiece",
+  "sentencepiece==0.2.0",                 # 0.2.1 coredumps windows when loading t5 tokenizer
   "spandrel",
   "torch~=2.7.0",                         # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
   "torchsde",                             # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
