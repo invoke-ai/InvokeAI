@@ -1,7 +1,7 @@
 import type { ImageCategory } from 'services/api/types';
 import z from 'zod';
 
-const zGalleryView = z.enum(['images', 'assets', 'videos']);
+const zGalleryView = z.enum(['images', 'assets']);
 export type GalleryView = z.infer<typeof zGalleryView>;
 const zBoardId = z.string();
 // TS hack to get autocomplete for "none" but accept any string

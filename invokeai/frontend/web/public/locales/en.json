@@ -411,9 +411,7 @@
         "openViewer": "Open Viewer",
         "closeViewer": "Close Viewer",
         "move": "Move",
-        "useForPromptGeneration": "Use for Prompt Generation",
-        "videos": "Videos",
-        "videosTab": "Videos you've created and saved within Invoke."
+        "useForPromptGeneration": "Use for Prompt Generation"
     },
     "hotkeys": {
         "hotkeys": "Hotkeys",
