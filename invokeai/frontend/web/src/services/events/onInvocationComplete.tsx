@@ -10,14 +10,13 @@ import {
 } from 'features/gallery/store/gallerySelectors';
 import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
-import type { VideoField } from 'features/nodes/types/common';
-import { isImageField, isImageFieldCollection, isVideoField } from 'features/nodes/types/common';
+import { isImageField, isImageFieldCollection } from 'features/nodes/types/common';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { generatedVideoChanged } from 'features/parameters/store/videoSlice';
 import type { LRUCache } from 'lru-cache';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
-import type { ImageDTO, S } from 'services/api/types';
+import type { ImageDTO, S, VideoOutput } from 'services/api/types';
 import { getCategories } from 'services/api/util';
 import { insertImageIntoNamesResult } from 'services/api/util/optimisticUpdates';
 import { $lastProgressEvent } from 'services/events/stores';
@@ -206,17 +205,13 @@ export const buildOnInvocationComplete = (
     return imageDTOs;
   };
 
-  const getResultVideoFields = (data: S['InvocationCompleteEvent']): VideoField[] => {
-    const { result } = data;
-    const videoFields: VideoField[] = [];
-
-    for (const [_name, value] of objectEntries(result)) {
-      if (isVideoField(value)) {
-        videoFields.push(value);
-      }
+  const getResultVideoDTOs = async (data: S['InvocationCompleteEvent']): Promise<VideoOutput | null> => {
+    // @ts-expect-error: This is a workaround to get the video name from the result
+    if (data.invocation.type === 'runway_generate_video') {
+      // @ts-expect-error: This is a workaround to get the video name from the result
+      return {videoId: data.result.video_id};
     }
-
-    return videoFields;
+    return null;
   };
 
   return async (data: S['InvocationCompleteEvent']) => {
@@ -240,9 +235,9 @@ export const buildOnInvocationComplete = (
 
     await addImagesToGallery(data);
 
-    const videoField = getResultVideoFields(data)[0];
-    if (videoField) {
-      dispatch(generatedVideoChanged({ videoField }));
+    const videoResult = await getResultVideoDTOs(data);
+    if (videoResult) {
+      dispatch(generatedVideoChanged({ video_id: videoResult.video.video_id, type: 'video_output' }));
     }
 
     $lastProgressEvent.set(null);

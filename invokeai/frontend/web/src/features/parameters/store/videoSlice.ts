@@ -5,15 +5,14 @@ import type { SliceConfig } from 'app/store/types';
 import { isPlainObject } from 'es-toolkit';
 import type { ImageWithDims } from 'features/controlLayers/store/types';
 import { zImageWithDims } from 'features/controlLayers/store/types';
-import type { VideoField } from 'features/nodes/types/common';
-import { zVideoField } from 'features/nodes/types/common';
+import { VideoOutput, zVideoOutput } from 'features/nodes/types/common';
 import { assert } from 'tsafe';
 import z from 'zod';
 
 const zVideoState = z.object({
   _version: z.literal(1),
   startingFrameImage: zImageWithDims.nullable(),
-  generatedVideo: zVideoField.nullable(),
+  generatedVideo: zVideoOutput.nullable(),
 });
 
 export type VideoState = z.infer<typeof zVideoState>;
@@ -32,14 +31,17 @@ const slice = createSlice({
       state.startingFrameImage = action.payload;
     },
 
-    generatedVideoChanged: (state, action: PayloadAction<{ videoField: VideoField | null }>) => {
-      const { videoField } = action.payload;
-      state.generatedVideo = videoField;
+    generatedVideoChanged: (state, action: PayloadAction<VideoOutput | null>) => {
+      state.generatedVideo = action.payload;
     },
+
   },
 });
 
-export const { startingFrameImageChanged, generatedVideoChanged } = slice.actions;
+export const {
+  startingFrameImageChanged,
+  generatedVideoChanged,
+} = slice.actions;
 
 export const videoSliceConfig: SliceConfig<typeof slice> = {
   slice,
