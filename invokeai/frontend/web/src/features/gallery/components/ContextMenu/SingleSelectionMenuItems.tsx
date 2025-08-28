@@ -3,6 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { IconMenuItemGroup } from 'common/components/IconMenuItem';
 import { ContextMenuItemChangeBoard } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemChangeBoard';
 import { ContextMenuItemCopy } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemCopy';
+import { ContextMenuItemDelete } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemDelete';
 import { ContextMenuItemDownload } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemDownload';
 import { ContextMenuItemLoadWorkflow } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemLoadWorkflow';
 import { ContextMenuItemLocateInGalery } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemLocateInGalery';
@@ -22,7 +23,6 @@ import { ItemDTOContextProvider } from 'features/gallery/contexts/ItemDTOContext
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { ImageDTO } from 'services/api/types';
 
-import { ContextMenuItemDeleteImage } from './MenuItems/ContextMenuItemDeleteImage';
 import { ContextMenuItemMetadataRecallActionsUpscaleTab } from './MenuItems/ContextMenuItemMetadataRecallActionsUpscaleTab';
 
 type SingleSelectionMenuItemsProps = {
@@ -40,7 +40,7 @@ const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) =
         <ContextMenuItemDownload />
         <ContextMenuItemOpenInViewer />
         <ContextMenuItemSelectForCompare />
-        <ContextMenuItemDeleteImage />
+        <ContextMenuItemDelete />
       </IconMenuItemGroup>
       <MenuDivider />
       <ContextMenuItemLoadWorkflow />

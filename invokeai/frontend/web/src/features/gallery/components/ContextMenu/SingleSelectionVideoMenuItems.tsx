@@ -2,6 +2,7 @@ import { MenuDivider } from '@invoke-ai/ui-library';
 import { IconMenuItemGroup } from 'common/components/IconMenuItem';
 import { ContextMenuItemChangeBoard } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemChangeBoard';
 import { ContextMenuItemCopy } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemCopy';
+import { ContextMenuItemDelete } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemDelete';
 import { ContextMenuItemDownload } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemDownload';
 import { ContextMenuItemOpenInNewTab } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemOpenInNewTab';
 import { ContextMenuItemOpenInViewer } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemOpenInViewer';
@@ -9,7 +10,6 @@ import { ContextMenuItemSelectForCompare } from 'features/gallery/components/Con
 import { ItemDTOContextProvider } from 'features/gallery/contexts/ItemDTOContext';
 import type { VideoDTO } from 'services/api/types';
 
-import { ContextMenuItemDeleteVideo } from './MenuItems/ContextMenuItemDeleteVideo';
 import { ContextMenuItemStarUnstar } from './MenuItems/ContextMenuItemStarUnstar';
 
 type SingleSelectionVideoMenuItemsProps = {
@@ -25,7 +25,7 @@ const SingleSelectionVideoMenuItems = ({ videoDTO }: SingleSelectionVideoMenuIte
         <ContextMenuItemDownload />
         <ContextMenuItemOpenInViewer />
         <ContextMenuItemSelectForCompare />
-        <ContextMenuItemDeleteVideo />
+        <ContextMenuItemDelete />
       </IconMenuItemGroup>
       <MenuDivider />
       <ContextMenuItemStarUnstar />
