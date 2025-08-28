@@ -293,39 +293,24 @@ class ImageCollectionInvocation(BaseInvocation):
 # region Video
 
 
-@invocation_output("runway_video_output")
-class RunwayVideoOutput(BaseInvocationOutput):
-    """Base class for nodes that output a runway result"""
-
-    video_url: str = OutputField(description="The output video url")
-    runway_task_id: str = OutputField(description="The runway task id")
-    
-
-    @classmethod
-    def build(cls, video_url: str, runway_task_id: str) -> "RunwayVideoOutput":
-        return cls(
-            video_url=video_url,
-            runway_task_id=runway_task_id,
-        )
-
 @invocation_output("video_output")
 class VideoOutput(BaseInvocationOutput):
-    """Base class for nodes that output a video"""
+    """Base class for nodes that output a single video"""
 
-    video_id: str = OutputField(description="The output video id")
+    video: VideoField = OutputField(description="The output video")
     width: int = OutputField(description="The width of the video in pixels")
     height: int = OutputField(description="The height of the video in pixels")
     duration_seconds: float = OutputField(description="The duration of the video in seconds")
-    
 
     @classmethod
-    def build(cls, video_id: str, width: int, height: int, duration_seconds: float) -> "VideoOutput":
+    def build(cls, video_name: str, width: int, height: int, duration_seconds: float) -> "VideoOutput":
         return cls(
-            video_id=video_id,
+            video=VideoField(video_name=video_name),
             width=width,
             height=height,
             duration_seconds=duration_seconds,
         )
+
 
 
 
