@@ -41,7 +41,7 @@ const QueueListHeaderColumn = ({ field, displayName, alignItems, ps, w }: QueueL
     >
       <Text variant="subtext">{displayName}</Text>
       {!!field && (
-        <SortColumnIcon field={field} displayName={displayName} isMouseHoveringColumn={isMouseHoveringColumn} />
+        <ColumnSortIcon field={field} displayName={displayName} isMouseHoveringColumn={isMouseHoveringColumn} />
       )}
     </Flex>
   );
@@ -49,13 +49,13 @@ const QueueListHeaderColumn = ({ field, displayName, alignItems, ps, w }: QueueL
 
 export default memo(QueueListHeaderColumn);
 
-type SortColumnIconProps = {
+type ColumnSortIconProps = {
   field: SortBy;
   displayName: string;
   isMouseHoveringColumn: boolean;
 };
 
-const SortColumnIcon = memo(({ field, displayName, isMouseHoveringColumn }: SortColumnIconProps) => {
+const ColumnSortIcon = memo(({ field, displayName, isMouseHoveringColumn }: ColumnSortIconProps) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
@@ -63,44 +63,38 @@ const SortColumnIcon = memo(({ field, displayName, isMouseHoveringColumn }: Sort
   const sortOrder = useSelector(selectQueueSortOrder);
   const isSortByColumn = useMemo(() => sortBy === field, [sortBy, field]);
   const isShown = useMemo(() => isSortByColumn || isMouseHoveringColumn, [isSortByColumn, isMouseHoveringColumn]);
+  const tooltip = useMemo(() => {
+    if (isSortByColumn) {
+      return sortOrder === 'asc' ? t('queue.sortOrderDescending') : t('queue.sortOrderAscending');
+    }
+    return t('queue.sortBy', { column: displayName });
+  }, [isSortByColumn, sortOrder, t, displayName]);
+  const icon = useMemo(() => (sortOrder === 'asc' ? <PiSortAscendingBold /> : <PiSortDescendingBold />), [sortOrder]);
 
-  const handleClickSortByColumn = useCallback(() => {
-    dispatch(sortByChanged(field));
-  }, [dispatch, field]);
-  const handleClickSortOrderAscending = useCallback(() => {
-    dispatch(sortOrderChanged('asc'));
-  }, [dispatch]);
-  const handleClickSortOrderDescending = useCallback(() => {
-    dispatch(sortOrderChanged('desc'));
-  }, [dispatch]);
+  const handleClickSortColumn = useCallback(() => {
+    if(isSortByColumn) {
+      if(sortOrder === 'asc') {
+        dispatch(sortOrderChanged('desc'));
+      } else {
+        dispatch(sortOrderChanged('asc'));
+      }
+    } else {
+      dispatch(sortByChanged(field));
+    }
+  }, [isSortByColumn, sortOrder, dispatch, field]);
 
   return (
     isShown && (
-      <>
-        {sortOrder === 'asc' && (
-          <IconButton
-            size="sm"
-            variant="link"
-            alignSelf="stretch"
-            onClick={isSortByColumn ? handleClickSortOrderDescending : handleClickSortByColumn}
-            tooltip={isSortByColumn ? t('queue.sortOrderDescending') : t('queue.sortBy', { column: displayName })}
-            aria-label={t('queue.sortColumn')}
-            icon={<PiSortAscendingBold />}
-          />
-        )}
-        {sortOrder === 'desc' && (
-          <IconButton
-            size="sm"
-            variant="link"
-            alignSelf="stretch"
-            onClick={isSortByColumn ? handleClickSortOrderAscending : handleClickSortByColumn}
-            tooltip={isSortByColumn ? t('queue.sortOrderAscending') : t('queue.sortBy', { column: displayName })}
-            aria-label={t('queue.sortColumn')}
-            icon={<PiSortDescendingBold />}
-          />
-        )}
-      </>
+      <IconButton
+        size="sm"
+        variant="link"
+        alignSelf="stretch"
+        onClick={handleClickSortColumn}
+        tooltip={tooltip}
+        aria-label={t('queue.sortColumn')}
+        icon={icon}
+      />
     )
   );
 });
-SortColumnIcon.displayName = 'SortColumnIcon';
+ColumnSortIcon.displayName = 'ColumnSortIcon';
