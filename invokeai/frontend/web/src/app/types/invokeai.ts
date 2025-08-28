@@ -141,7 +141,7 @@ export const getDefaultAppConfig = (): AppConfig => ({
   allowPublishWorkflows: false,
   allowPromptExpansion: false,
   shouldShowCredits: false,
-  disabledTabs: ['video'],
+  disabledTabs: [],
   disabledFeatures: ['lightbox', 'faceRestore', 'batches'] satisfies AppFeature[],
   disabledSDFeatures: ['variation', 'symmetry', 'hires', 'perlinNoise', 'noiseThreshold'] satisfies SDFeature[],
   sd: {

@@ -22,12 +22,6 @@ const slice = createSlice({
   initialState: getInitialState(),
   reducers: {
     configChanged: (state, action: PayloadAction<PartialAppConfig>) => {
-      // Handle disabledTabs specially - if provided, it should completely replace the default array
-      if (action.payload.disabledTabs !== undefined) {
-        state.disabledTabs = action.payload.disabledTabs;
-      }
-
-      // Merge the rest of the config normally
       merge(state, action.payload);
       state.didLoad = true;
     },

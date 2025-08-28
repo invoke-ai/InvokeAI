@@ -6,7 +6,6 @@ import { useDisclosure } from 'common/hooks/useBoolean';
 import { useGallerySearchTerm } from 'features/gallery/components/ImageGrid/useGallerySearchTerm';
 import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
 import { galleryViewChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
 import { useGalleryPanel } from 'features/ui/layouts/use-gallery-panel';
 import type { CSSProperties } from 'react';
@@ -58,7 +57,6 @@ export const GalleryPanel = memo(() => {
 
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
   const boardName = useBoardName(selectedBoardId);
-  const isVideoEnabled = useFeatureStatus('video');
 
   return (
     <Flex flexDirection="column" alignItems="center" justifyContent="space-between" h="full" w="full" minH={0}>
@@ -90,16 +88,14 @@ export const GalleryPanel = memo(() => {
           >
             {t('gallery.assets')}
           </Button>
-          {isVideoEnabled && (
-            <Button
-              tooltip={t('gallery.videosTab')}
-              onClick={handleClickVideos}
-              data-testid="videos-tab"
-              colorScheme={galleryView === 'videos' ? 'invokeBlue' : undefined}
-            >
-              {t('gallery.videos')}
-            </Button>
-          )}
+          <Button
+            tooltip={t('gallery.videosTab')}
+            onClick={handleClickVideos}
+            data-testid="videos-tab"
+            colorScheme={galleryView === 'videos' ? 'invokeBlue' : undefined}
+          >
+            {t('gallery.videos')}
+          </Button>
         </ButtonGroup>
         <Flex flexGrow={1} flexBasis={0} justifyContent="flex-end">
           <GalleryUploadButton />
