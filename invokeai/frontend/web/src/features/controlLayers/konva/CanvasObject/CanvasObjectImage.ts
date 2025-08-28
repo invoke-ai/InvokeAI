@@ -162,7 +162,7 @@ export class CanvasObjectImage extends CanvasModuleBase {
   };
 
   onFailedToLoadImage = (message: string) => {
-    this.log({ image: this.state.image }, message);
+    this.log.error({ image: this.state.image }, message);
     this.konva.image?.visible(false);
     this.isLoading = false;
     this.isError = true;
