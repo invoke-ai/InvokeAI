@@ -16,7 +16,7 @@ import type { ImageDTO } from 'services/api/types';
 export const GlobalImageHotkeys = memo(() => {
   useAssertSingleton('GlobalImageHotkeys');
   const lastSelectedItem = useAppSelector(selectLastSelectedItem);
-  const imageDTO = useImageDTO(lastSelectedItem?.type === 'image' ? lastSelectedItem.id : null);
+  const imageDTO = useImageDTO(lastSelectedItem?.id ?? null);
 
   if (!imageDTO) {
     return null;
