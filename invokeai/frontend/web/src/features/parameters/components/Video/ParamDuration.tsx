@@ -1,10 +1,8 @@
 import { FormControl, FormLabel, Select } from "@invoke-ai/ui-library";
 import { useAppDispatch, useAppSelector } from "app/store/storeHooks";
 import { selectVideoDuration, setVideoDuration } from "features/controlLayers/store/paramsSlice";
-import type { ParameterDuration } from "features/parameters/types/parameterSchemas";
-import { isParameterDuration } from "features/parameters/types/parameterSchemas";
-import type { ChangeEventHandler} from "react";
-import { useCallback, useMemo } from "react";
+import { isParameterDuration, ParameterDuration } from "features/parameters/types/parameterSchemas";
+import { ChangeEventHandler, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { PiCaretDownBold } from "react-icons/pi";
 

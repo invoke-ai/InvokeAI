@@ -1,7 +1,7 @@
 import { useAppStore } from 'app/store/storeHooks';
 import { useCallback, useEffect, useState } from 'react';
 import type { ListRange } from 'react-virtuoso';
-import { useGetVideoDTOsByNamesMutation,videosApi } from 'services/api/endpoints/videos';
+import { videosApi, useGetVideoDTOsByNamesMutation } from 'services/api/endpoints/videos';
 import { useThrottledCallback } from 'use-debounce';
 
 interface UseRangeBasedVideoFetchingArgs {

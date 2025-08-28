@@ -4,9 +4,9 @@ import { InformationalPopover } from 'common/components/InformationalPopover/Inf
 import { selectIsApiBaseModel, selectWidth, widthChanged } from 'features/controlLayers/store/paramsSlice';
 import { selectGridSize, selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { selectWidthConfig } from 'features/system/store/configSlice';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 
 export const DimensionsWidth = memo(() => {
   const { t } = useTranslation();

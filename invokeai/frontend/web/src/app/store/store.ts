@@ -33,7 +33,6 @@ import { nodesSliceConfig } from 'features/nodes/store/nodesSlice';
 import { workflowLibrarySliceConfig } from 'features/nodes/store/workflowLibrarySlice';
 import { workflowSettingsSliceConfig } from 'features/nodes/store/workflowSettingsSlice';
 import { upscaleSliceConfig } from 'features/parameters/store/upscaleSlice';
-import { videoSliceConfig } from 'features/parameters/store/videoSlice';
 import { queueSliceConfig } from 'features/queue/store/queueSlice';
 import { stylePresetSliceConfig } from 'features/stylePresets/store/stylePresetSlice';
 import { configSliceConfig } from 'features/system/store/configSlice';
@@ -55,6 +54,7 @@ import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { addArchivedOrDeletedBoardListener } from './middleware/listenerMiddleware/listeners/addArchivedOrDeletedBoardListener';
 import { addImageUploadedFulfilledListener } from './middleware/listenerMiddleware/listeners/imageUploaded';
+import { videoSliceConfig } from 'features/parameters/store/videoSlice';
 
 export const listenerMiddleware = createListenerMiddleware();
 

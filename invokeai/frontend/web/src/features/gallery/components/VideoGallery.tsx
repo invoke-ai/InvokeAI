@@ -2,16 +2,17 @@ import { Box, Flex, forwardRef, Grid, GridItem, Spinner, Text } from '@invoke-ai
 import { createSelector } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
-import { getFocusedRegion } from 'common/hooks/focus';
-import { useRangeBasedVideoFetching } from 'features/gallery/hooks/useRangeBasedVideoFetching';
-import type { selectGetVideoIdsQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { getFocusedRegion, useIsRegionFocused } from 'common/hooks/focus';
+import { useRangeBasedImageFetching } from 'features/gallery/hooks/useRangeBasedImageFetching';
+import type { selectGetImageNamesQueryArgs, selectGetVideoIdsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import {
   selectGalleryImageMinimumWidth,
   selectGalleryView,
   selectImageToCompare,
   selectLastSelectedImage,
+  selectSelectionCount,
 } from 'features/gallery/store/gallerySelectors';
-import { selectionChanged } from 'features/gallery/store/gallerySlice';
+import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useOverlayScrollbars } from 'overlayscrollbars-react';
 import type { MutableRefObject, RefObject } from 'react';
@@ -25,13 +26,15 @@ import type {
   VirtuosoGridHandle,
 } from 'react-virtuoso';
 import { VirtuosoGrid } from 'react-virtuoso';
-import { videosApi } from 'services/api/endpoints/videos';
 import { useDebounce } from 'use-debounce';
 
-import { GalleryImagePlaceholder } from './ImageGrid/GalleryImage';
 import { GallerySelectionCountTag } from './ImageGrid/GallerySelectionCountTag';
-import { GalleryVideo } from './ImageGrid/GalleryVideo';
+import { useGalleryImageNames } from './use-gallery-image-names';
 import { useGalleryVideoIds } from './use-gallery-video-ids';
+import { videosApi } from 'services/api/endpoints/videos';
+import { GalleryImagePlaceholder } from './ImageGrid/GalleryImage';
+import { useRangeBasedVideoFetching } from '../hooks/useRangeBasedVideoFetching';
+import { GalleryVideo } from './ImageGrid/GalleryVideo';
 
 const log = logger('gallery');
 

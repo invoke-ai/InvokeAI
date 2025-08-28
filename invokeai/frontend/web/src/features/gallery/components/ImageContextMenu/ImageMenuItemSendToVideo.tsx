@@ -21,7 +21,7 @@ export const ImageMenuItemSendToVideo = memo(() => {
     <MenuItem
       icon={<PiVideoBold />}
       onClickCapture={onClick}
-      aria-label="Send to Video"
+      aria-label={"Send to Video"}
     >
       Send to Video
     </MenuItem>
