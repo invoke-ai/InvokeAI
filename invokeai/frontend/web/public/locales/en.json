@@ -466,6 +466,10 @@
                 "title": "Select the Queue Tab",
                 "desc": "Selects the Queue tab."
             },
+            "selectVideoTab": {
+                "title": "Select the Video Tab",
+                "desc": "Selects the Video tab."
+            },
             "focusPrompt": {
                 "title": "Focus Prompt",
                 "desc": "Move cursor focus to the positive prompt."
@@ -491,6 +495,9 @@
                 "desc": "Selects the Generate tab.",
                 "key": "1"
             }
+        },
+        "video": {
+          "title": "Video"
         },
         "canvas": {
             "title": "Canvas",
