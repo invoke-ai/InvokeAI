@@ -112,7 +112,7 @@ export const GalleryVideo = memo(({ videoDTO }: Props) => {
           // multi-image drag.
           if (selection.length > 1 && selection.some((s) => s.id === videoDTO.video_id)) {
             return multipleVideoDndSource.getData({
-              video_ids: selection.map((s) => s.id),
+              ids: selection.map((s) => s.id),
               board_id: boardId,
             });
           } // Otherwise, initiate a single-image drag
@@ -149,10 +149,7 @@ export const GalleryVideo = memo(({ videoDTO }: Props) => {
         onDragStart: ({ source }) => {
           // When we start dragging multiple images, set the dragging state to true if the dragged image is part of the
           // selection. This is called for all drag events.
-          if (
-            multipleVideoDndSource.typeGuard(source.data) &&
-            source.data.payload.video_ids.includes(videoDTO.video_id)
-          ) {
+          if (multipleVideoDndSource.typeGuard(source.data) && source.data.payload.ids.includes(videoDTO.video_id)) {
             setIsDragging(true);
           }
         },
