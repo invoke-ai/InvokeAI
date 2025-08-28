@@ -3,8 +3,6 @@ from typing import Optional, cast
 
 from invokeai.app.services.board_image_records.board_image_records_base import BoardImageRecordStorageBase
 from invokeai.app.services.image_records.image_records_common import (
-    ASSETS_CATEGORIES,
-    IMAGE_CATEGORIES,
     ImageCategory,
     ImageRecord,
     deserialize_image_record,
@@ -153,38 +151,15 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
 
     def get_image_count_for_board(self, board_id: str) -> int:
         with self._db.transaction() as cursor:
-            # Convert the enum values to unique list of strings
-            category_strings = [c.value for c in set(IMAGE_CATEGORIES)]
-            # Create the correct length of placeholders
-            placeholders = ",".join("?" * len(category_strings))
             cursor.execute(
-                f"""--sql
+                """--sql
                     SELECT COUNT(*)
                     FROM board_images
                     INNER JOIN images ON board_images.image_name = images.image_name
-                    WHERE images.is_intermediate = FALSE AND images.image_category IN ( {placeholders} )
+                    WHERE images.is_intermediate = FALSE
                     AND board_images.board_id = ?;
                     """,
-                (board_id),
-            )
-            count = cast(int, cursor.fetchone()[0])
-        return count
-
-    def get_asset_count_for_board(self, board_id: str) -> int:
-        with self._db.transaction() as cursor:
-            # Convert the enum values to unique list of strings
-            category_strings = [c.value for c in set(ASSETS_CATEGORIES)]
-            # Create the correct length of placeholders
-            placeholders = ",".join("?" * len(category_strings))
-            cursor.execute(
-                f"""--sql
-                    SELECT COUNT(*)
-                    FROM board_images
-                    INNER JOIN images ON board_images.image_name = images.image_name
-                    WHERE images.is_intermediate = FALSE AND images.image_category IN ( {placeholders} )
-                    AND board_images.board_id = ?;
-                    """,
-                (board_id),
+                (board_id,),
             )
             count = cast(int, cursor.fetchone()[0])
         return count
