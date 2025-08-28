@@ -1244,6 +1244,7 @@
         "infillMethod": "Infill Method",
         "infillColorValue": "Fill Color",
         "info": "Info",
+        "startingFrameImage": "Start Frame",
         "invoke": {
             "addingImagesTo": "Adding images to",
             "modelDisabledForTrial": "Generating with {{modelName}} is not available on trial accounts. Visit your account settings to upgrade.",
