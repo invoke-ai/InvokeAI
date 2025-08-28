@@ -755,7 +755,6 @@
             "noFLUXVAEModelSelected": "FLUX生成にVAEモデルが選択されていません",
             "noT5EncoderModelSelected": "FLUX生成にT5エンコーダモデルが選択されていません",
             "modelDisabledForTrial": "{{modelName}} を使用した生成はトライアルアカウントではご利用いただけません.アカウント設定にアクセスしてアップグレードしてください。",
-            "fluxKontextMultipleReferenceImages": "Flux Kontext では一度に 1 つの参照画像しか使用できません",
             "promptExpansionPending": "プロンプト拡張が進行中",
             "promptExpansionResultPending": "プロンプト拡張結果を受け入れるか破棄してください"
         },

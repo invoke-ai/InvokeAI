@@ -1657,7 +1657,6 @@
             "modelIncompatibleScaledBboxHeight": "Chiều dài hộp giới hạn theo tỉ lệ là {{height}} nhưng {{model}} yêu cầu bội số của {{multiple}}",
             "modelIncompatibleScaledBboxWidth": "Chiều rộng hộp giới hạn theo tỉ lệ là {{width}} nhưng {{model}} yêu cầu bội số của {{multiple}}",
             "modelDisabledForTrial": "Tạo sinh với {{modelName}} là không thể với tài khoản trial. Vào phần thiết lập tài khoản để nâng cấp.",
-            "fluxKontextMultipleReferenceImages": "Chỉ có thể dùng 1 Ảnh Mẫu cùng lúc với LUX Kontext thông qua BFL API",
             "promptExpansionPending": "Trong quá trình mở rộng lệnh",
             "promptExpansionResultPending": "Hãy chấp thuận hoặc huỷ bỏ kết quả mở rộng lệnh của bạn"
         },
