@@ -896,8 +896,8 @@
         "parameterSet": "Parametro richiamato",
         "parameterNotSet": "Parametro non richiamato",
         "problemCopyingImage": "Impossibile copiare l'immagine",
-        "baseModelChangedCleared_one": "Cancellato o disabilitato {{count}} sottomodello incompatibile",
-        "baseModelChangedCleared_many": "Cancellati o disabilitati {{count}} sottomodelli incompatibili",
+        "baseModelChangedCleared_one": "Aggiornato, cancellato o disabilitato {{count}} sottomodello incompatibile",
+        "baseModelChangedCleared_many": "Aggiornati, cancellati o disabilitati {{count}} sottomodelli incompatibili",
         "baseModelChangedCleared_other": "Cancellati o disabilitati {{count}} sottomodelli incompatibili",
         "loadedWithWarnings": "Flusso di lavoro caricato con avvisi",
         "imageUploaded": "Immagine caricata",
@@ -2705,8 +2705,8 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "Vari QoL: attiva/disattiva la visibilità del Riquadro di delimitazione, evidenzia i nodi con errori, evita di aggiungere più volte i campi dei nodi al modulo Generatore, i metadati CLIP Skip ora richiamabili",
-            "Utilizzo ridotto di VRAM per immagini di riferimento Kontext multiple e codifica VAE"
+            "Tela: Color Picker non campiona l'alfa, il riquadro di delimitazione rispetta il blocco delle proporzioni quando si ridimensiona il pulsante Mescola per i campi numerici nel generatore di flusso di lavoro, nasconde i cursori delle dimensioni dei pixel quando si utilizza un modello che non li supporta",
+            "Flussi di lavoro: aggiunto un pulsante Mescola ai campi di input numerici"
         ]
     },
     "system": {
