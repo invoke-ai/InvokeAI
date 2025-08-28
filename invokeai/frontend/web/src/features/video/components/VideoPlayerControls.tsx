@@ -13,7 +13,6 @@ import { useCallback, useState } from 'react';
 import { PiArrowsOutBold, PiCameraBold, PiPauseFill, PiPlayFill, PiSpinnerBold } from 'react-icons/pi';
 
 const NoHoverBackground = {
-//   '--media-control-hover-background': 'rgb(21, 22, 29)',
   '--media-text-color': 'base.200',
   '--media-font-size': '12px',
 } as CSSProperties;
@@ -49,7 +48,7 @@ export const VideoPlayerControls = () => {
 
       <IconButton
         tooltip={capturing ? 'Capturing...' : 'Save Current Frame as Asset'}
-        icon={<Icon as={capturing ? PiSpinnerBold : PiCameraBold} boxSize={6} h={10}color="base.200" />}
+        icon={<Icon as={capturing ? PiSpinnerBold : PiCameraBold} boxSize={6} color="base.200" />}
         size="lg"
         variant="unstyled"
         onClick={onClickSaveFrame}
