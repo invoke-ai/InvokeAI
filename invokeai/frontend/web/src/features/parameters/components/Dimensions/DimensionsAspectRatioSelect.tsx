@@ -37,7 +37,6 @@ export const DimensionsAspectRatioSelect = memo(() => {
   const isGemini2_5 = useAppSelector(selectIsGemini2_5);
   const isVeo3 = useAppSelector(selectIsVeo3);
   const isRunway = useAppSelector(selectIsRunway);
-
   const options = useMemo(() => {
     // Imagen3 and ChatGPT4o have different aspect ratio options, and do not support freeform sizes
     if (isImagen3 || isImagen4) {
