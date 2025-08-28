@@ -88,7 +88,6 @@ const zBaseModel = z.enum([
   'flux-kontext',
   'gemini-2.5',
   'veo3',
-  'runway',
 ]);
 export type BaseModelType = z.infer<typeof zBaseModel>;
 export const zMainModelBase = z.enum([
@@ -104,7 +103,6 @@ export const zMainModelBase = z.enum([
   'flux-kontext',
   'gemini-2.5',
   'veo3',
-  'runway',
 ]);
 type MainModelBase = z.infer<typeof zMainModelBase>;
 export const isMainModelBase = (base: unknown): base is MainModelBase => zMainModelBase.safeParse(base).success;

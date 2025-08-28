@@ -17,10 +17,9 @@ import {
   zFluxKontextAspectRatioID,
   zGemini2_5AspectRatioID,
   zImagen3AspectRatioID,
-  zRunwayAspectRatioID,
   zVeo3AspectRatioID,
 } from 'features/controlLayers/store/types';
-import { selectIsRunway, selectIsVeo3 } from 'features/parameters/store/videoSlice';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { ChangeEventHandler } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -35,8 +34,7 @@ export const DimensionsAspectRatioSelect = memo(() => {
   const isImagen4 = useAppSelector(selectIsImagen4);
   const isFluxKontext = useAppSelector(selectIsFluxKontext);
   const isGemini2_5 = useAppSelector(selectIsGemini2_5);
-  const isVeo3 = useAppSelector(selectIsVeo3);
-  const isRunway = useAppSelector(selectIsRunway);
+  const activeTab = useAppSelector(selectActiveTab);
   const options = useMemo(() => {
     // Imagen3 and ChatGPT4o have different aspect ratio options, and do not support freeform sizes
     if (isImagen3 || isImagen4) {
@@ -51,15 +49,12 @@ export const DimensionsAspectRatioSelect = memo(() => {
     if (isGemini2_5) {
       return zGemini2_5AspectRatioID.options;
     }
-    if (isVeo3) {
+    if (activeTab === 'video') {
       return zVeo3AspectRatioID.options;
-    }
-    if (isRunway) {
-      return zRunwayAspectRatioID.options;
     }
     // All other models
     return zAspectRatioID.options;
-  }, [isImagen3, isChatGPT4o, isImagen4, isFluxKontext, isGemini2_5, isRunway, isVeo3]);
+  }, [isImagen3, isChatGPT4o, isImagen4, isFluxKontext, activeTab, isGemini2_5]);
 
   const onChange = useCallback<ChangeEventHandler<HTMLSelectElement>>(
     (e) => {

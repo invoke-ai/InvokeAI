@@ -1,15 +1,10 @@
 import { FormControl, FormLabel, Select } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { heightChanged, widthChanged } from 'features/controlLayers/store/paramsSlice';
-import {
-  isVeo3Resolution,
-  VEO3_RESOLUTIONS,
-  zRunwayResolution,
-  zVeo3Resolution,
-} from 'features/controlLayers/store/types';
-import { selectVideoModel, selectVideoResolution, videoResolutionChanged } from 'features/parameters/store/videoSlice';
+import { aspectRatioIdChanged, heightChanged, widthChanged } from 'features/controlLayers/store/paramsSlice';
+import { isVeo3Resolution, VEO3_RESOLUTIONS, zVeo3Resolution } from 'features/controlLayers/store/types';
+import { selectVideoResolution, videoResolutionChanged } from 'features/parameters/store/videoSlice';
 import type { ChangeEventHandler } from 'react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
 
@@ -17,17 +12,17 @@ export const ParamResolution = () => {
   const videoResolution = useAppSelector(selectVideoResolution);
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const model = useAppSelector(selectVideoModel);
 
-  const options = useMemo(() => {
-    if (model?.base === 'veo3') {
-      return zVeo3Resolution.options;
-    } else if (model?.base === 'runway') {
-      return zRunwayResolution.options;
-    } else {
-      return [];
+  const options = useMemo(() => zVeo3Resolution.options, []);
+
+  useEffect(() => {
+    if (!videoResolution) {
+      return;
     }
-  }, [model]);
+    dispatch(aspectRatioIdChanged({ id: '16:9' }));
+    dispatch(widthChanged({ width: VEO3_RESOLUTIONS[videoResolution].width, updateAspectRatio: true, clamp: true }));
+    dispatch(heightChanged({ height: VEO3_RESOLUTIONS[videoResolution].height, updateAspectRatio: true, clamp: true }));
+  }, [dispatch, videoResolution]);
 
   const onChange = useCallback<ChangeEventHandler<HTMLSelectElement>>(
     (e) => {
@@ -37,8 +32,6 @@ export const ParamResolution = () => {
       }
 
       dispatch(videoResolutionChanged(resolution));
-      dispatch(widthChanged({ width: VEO3_RESOLUTIONS[resolution].width, updateAspectRatio: true, clamp: true }));
-      dispatch(heightChanged({ height: VEO3_RESOLUTIONS[resolution].height, updateAspectRatio: true, clamp: true }));
     },
     [dispatch]
   );

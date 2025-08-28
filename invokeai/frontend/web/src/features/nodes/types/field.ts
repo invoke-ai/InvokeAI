@@ -265,10 +265,6 @@ const zVeo3ModelFieldType = zFieldTypeBase.extend({
   name: z.literal('Veo3ModelField'),
   originalType: zStatelessFieldType.optional(),
 });
-const zRunwayModelFieldType = zFieldTypeBase.extend({
-  name: z.literal('RunwayModelField'),
-  originalType: zStatelessFieldType.optional(),
-});
 const zFluxKontextModelFieldType = zFieldTypeBase.extend({
   name: z.literal('FluxKontextModelField'),
   originalType: zStatelessFieldType.optional(),
@@ -328,7 +324,6 @@ const zStatefulFieldType = z.union([
   zChatGPT4oModelFieldType,
   zFluxKontextModelFieldType,
   zVeo3ModelFieldType,
-  zRunwayModelFieldType,
   zColorFieldType,
   zSchedulerFieldType,
   zFloatGeneratorFieldType,
@@ -372,7 +367,6 @@ const modelFieldTypeNames = [
   zChatGPT4oModelFieldType.shape.name.value,
   zFluxKontextModelFieldType.shape.name.value,
   zVeo3ModelFieldType.shape.name.value,
-  zRunwayModelFieldType.shape.name.value,
   // Stateless model fields
   'UNetField',
   'VAEField',
@@ -1303,24 +1297,6 @@ export const isVeo3ModelFieldInputInstance = buildInstanceTypeGuard(zVeo3ModelFi
 export const isVeo3ModelFieldInputTemplate = buildTemplateTypeGuard<Veo3ModelFieldInputTemplate>('Veo3ModelField');
 // #endregion
 
-// #region RunwayModelField
-export const zRunwayModelFieldValue = zModelIdentifierField.optional();
-const zRunwayModelFieldInputInstance = zFieldInputInstanceBase.extend({
-  value: zRunwayModelFieldValue,
-});
-const zRunwayModelFieldInputTemplate = zFieldInputTemplateBase.extend({
-  type: zRunwayModelFieldType,
-  originalType: zFieldType.optional(),
-  default: zRunwayModelFieldValue,
-});
-export type RunwayModelFieldValue = z.infer<typeof zRunwayModelFieldValue>;
-export type RunwayModelFieldInputInstance = z.infer<typeof zRunwayModelFieldInputInstance>;
-export type RunwayModelFieldInputTemplate = z.infer<typeof zRunwayModelFieldInputTemplate>;
-export const isRunwayModelFieldInputInstance = buildInstanceTypeGuard(zRunwayModelFieldInputInstance);
-export const isRunwayModelFieldInputTemplate =
-  buildTemplateTypeGuard<RunwayModelFieldInputTemplate>('RunwayModelField');
-// #endregion
-
 // #region SchedulerField
 export const zSchedulerFieldValue = zSchedulerField.optional();
 const zSchedulerFieldInputInstance = zFieldInputInstanceBase.extend({
@@ -2051,7 +2027,6 @@ const zStatefulFieldInputTemplate = z.union([
   zChatGPT4oModelFieldInputTemplate,
   zFluxKontextModelFieldInputTemplate,
   zVeo3ModelFieldInputTemplate,
-  zRunwayModelFieldInputTemplate,
   zColorFieldInputTemplate,
   zSchedulerFieldInputTemplate,
   zStatelessFieldInputTemplate,
