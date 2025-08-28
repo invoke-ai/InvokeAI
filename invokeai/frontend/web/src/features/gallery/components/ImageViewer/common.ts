@@ -65,7 +65,7 @@ export const getSecondImageDims = (
   return { width, height };
 };
 export const selectComparisonImages = createMemoizedSelector(selectGallerySlice, (gallerySlice) => {
-  const firstImage = gallerySlice.selection.slice(-1)[0]?.id ?? null;
+  const firstImage = gallerySlice.selection.slice(-1)[0] ?? null;
   const secondImage = gallerySlice.imageToCompare;
   return { firstImage, secondImage };
 });

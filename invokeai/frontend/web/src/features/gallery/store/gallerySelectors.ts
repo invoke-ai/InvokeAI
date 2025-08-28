@@ -4,8 +4,8 @@ import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import type { GetImageNamesArgs, GetVideoIdsArgs, ListBoardsArgs } from 'services/api/types';
 
-export const selectFirstSelectedItem = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(0));
-export const selectLastSelectedItem = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(-1));
+export const selectFirstSelectedImage = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(0));
+export const selectLastSelectedImage = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(-1));
 
 export const selectListBoardsQueryArgs = createMemoizedSelector(
   selectGallerySlice,

@@ -3,6 +3,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import { isPlainObject } from 'es-toolkit';
+import { uniq } from 'es-toolkit/compat';
 import type { BoardRecordOrderBy } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -40,23 +41,17 @@ const slice = createSlice({
   name: 'gallery',
   initialState: getInitialState(),
   reducers: {
-    itemSelected: (state, action: PayloadAction<{ type: 'image' | 'video'; id: string } | null>) => {
-      const selectedItem = action.payload;
+    imageSelected: (state, action: PayloadAction<string | null>) => {
+      const selectedImageName = action.payload;
 
-      if (!selectedItem) {
+      if (!selectedImageName) {
         state.selection = [];
       } else {
-        state.selection = [selectedItem];
+        state.selection = [selectedImageName];
       }
     },
-    selectionChanged: (state, action: PayloadAction<{ type: 'image' | 'video'; id: string }[]>) => {
-      const uniqueById = new Map<string, { type: 'image' | 'video'; id: string }>();
-      for (const item of action.payload) {
-        if (!uniqueById.has(item.id)) {
-          uniqueById.set(item.id, item);
-        }
-      }
-      state.selection = Array.from(uniqueById.values());
+    selectionChanged: (state, action: PayloadAction<string[]>) => {
+      state.selection = uniq(action.payload);
     },
     imageToCompareChanged: (state, action: PayloadAction<string | null>) => {
       state.imageToCompare = action.payload;
@@ -91,7 +86,7 @@ const slice = createSlice({
       state.selectedBoardId = boardId;
       state.galleryView = 'images';
       if (selectedImageName) {
-        state.selection = [{ type: 'image', id: selectedImageName }];
+        state.selection = [selectedImageName];
       }
     },
     autoAddBoardIdChanged: (state, action: PayloadAction<BoardId>) => {
@@ -113,8 +108,8 @@ const slice = createSlice({
     comparedImagesSwapped: (state) => {
       if (state.imageToCompare) {
         const oldSelection = state.selection;
-        state.selection = [{ type: 'image', id: state.imageToCompare }];
-        state.imageToCompare = oldSelection[0]?.id ?? null;
+        state.selection = [state.imageToCompare];
+        state.imageToCompare = oldSelection[0] ?? null;
       }
     },
     comparisonFitChanged: (state, action: PayloadAction<'contain' | 'fill'>) => {
@@ -142,7 +137,7 @@ const slice = createSlice({
 });
 
 export const {
-  itemSelected,
+  imageSelected,
   shouldAutoSwitchChanged,
   autoAssignBoardOnClickChanged,
   setGalleryImageMinimumWidth,
