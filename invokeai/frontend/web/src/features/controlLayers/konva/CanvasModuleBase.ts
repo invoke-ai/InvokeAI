@@ -115,7 +115,7 @@ export abstract class CanvasModuleBase {
    * ```
    */
   destroy: () => void = () => {
-    this.log('Destroying module');
+    this.log.debug('Destroying module');
   };
 
   /**
