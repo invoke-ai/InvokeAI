@@ -2689,8 +2689,8 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "Misc QoL: Toggle Bbox visibility, highlight nodes with errors, prevent adding node fields to Builder form multiple times, CLIP Skip metadata recallable",
-            "Reduced VRAM usage for multiple Kontext Ref images and VAE encoding"
+            "Canvas: Color Picker does not sample alpha, bbox respects aspect ratio lock when resizing shuffle button for number fields in Workflow Builder, hide pixel dimension sliders when using a model that doesn't support them",
+            "Workflows: Add a Shuffle button to number input fields",
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
