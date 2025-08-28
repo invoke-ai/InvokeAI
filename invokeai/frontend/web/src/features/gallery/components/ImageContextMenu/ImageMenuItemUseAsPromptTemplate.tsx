@@ -1,15 +1,13 @@
 import { MenuItem } from '@invoke-ai/ui-library';
-import {  useItemDTOContextImageOnly } from 'features/gallery/contexts/ItemDTOContext';
+import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { useCreateStylePresetFromMetadata } from 'features/gallery/hooks/useCreateStylePresetFromMetadata';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPaintBrushBold } from 'react-icons/pi';
-import type { ImageDTO } from 'services/api/types';
 
-export const ContextMenuItemUseAsPromptTemplate = memo(() => {
+export const ImageMenuItemUseAsPromptTemplate = memo(() => {
   const { t } = useTranslation();
-  const imageDTO = useItemDTOContextImageOnly();
-
+  const imageDTO = useImageDTOContext();
   const stylePreset = useCreateStylePresetFromMetadata(imageDTO);
 
   return (
@@ -19,4 +17,4 @@ export const ContextMenuItemUseAsPromptTemplate = memo(() => {
   );
 });
 
-ContextMenuItemUseAsPromptTemplate.displayName = 'ContextMenuItemUseAsPromptTemplate';
+ImageMenuItemUseAsPromptTemplate.displayName = 'ImageMenuItemUseAsPromptTemplate';

@@ -1,23 +1,18 @@
 import { IconMenuItem } from 'common/components/IconMenuItem';
 import { useDownloadImage } from 'common/hooks/useDownloadImage';
-import { useItemDTOContext } from 'features/gallery/contexts/ItemDTOContext';
+import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDownloadSimpleBold } from 'react-icons/pi';
-import { isImageDTO } from 'services/api/types';
 
-export const ContextMenuItemDownload = memo(() => {
+export const ImageMenuItemDownload = memo(() => {
   const { t } = useTranslation();
-  const itemDTO = useItemDTOContext();
+  const imageDTO = useImageDTOContext();
   const { downloadImage } = useDownloadImage();
 
   const onClick = useCallback(() => {
-    if (isImageDTO(itemDTO)) {
-      downloadImage(itemDTO.image_url, itemDTO.image_name);
-    } else {
-      // downloadVideo(itemDTO.video_url, itemDTO.video_id);
-    }
-  }, [downloadImage, itemDTO]);
+    downloadImage(imageDTO.image_url, imageDTO.image_name);
+  }, [downloadImage, imageDTO.image_name, imageDTO.image_url]);
 
   return (
     <IconMenuItem
@@ -29,4 +24,4 @@ export const ContextMenuItemDownload = memo(() => {
   );
 });
 
-ContextMenuItemDownload.displayName = 'ContextMenuItemDownload';
+ImageMenuItemDownload.displayName = 'ImageMenuItemDownload';

@@ -19,9 +19,9 @@ import stableHash from 'stable-hash';
 import type { Param0 } from 'tsafe';
 import type { JsonObject } from 'type-fest';
 
+import type { ApiTagDescription } from '..';
 import { api, buildV1Url, LIST_TAG } from '..';
 import { buildBoardsUrl } from './boards';
-import { getTagsToInvalidateForBoardAffectingMutation, getTagsToInvalidateForImageMutation } from '../util/tagInvalidation';
 
 /**
  * Builds an endpoint URL for the images router
@@ -591,4 +591,57 @@ export const useImageDTO = (imageName: string | null | undefined) => {
   return imageDTO ?? null;
 };
 
+const getTagsToInvalidateForImageMutation = (image_names: string[]): ApiTagDescription[] => {
+  const tags: ApiTagDescription[] = [];
 
+  for (const image_name of image_names) {
+    tags.push({
+      type: 'Image',
+      id: image_name,
+    });
+    tags.push({
+      type: 'ImageMetadata',
+      id: image_name,
+    });
+    tags.push({
+      type: 'ImageWorkflow',
+      id: image_name,
+    });
+  }
+
+  return tags;
+};
+
+const getTagsToInvalidateForBoardAffectingMutation = (affected_boards: string[]): ApiTagDescription[] => {
+  const tags: ApiTagDescription[] = ['ImageNameList'];
+
+  for (const board_id of affected_boards) {
+    tags.push({
+      type: 'ImageList',
+      id: getListImagesUrl({
+        board_id,
+        categories: IMAGE_CATEGORIES,
+      }),
+    });
+
+    tags.push({
+      type: 'ImageList',
+      id: getListImagesUrl({
+        board_id,
+        categories: ASSETS_CATEGORIES,
+      }),
+    });
+
+    tags.push({
+      type: 'Board',
+      id: board_id,
+    });
+
+    tags.push({
+      type: 'BoardImagesTotal',
+      id: board_id,
+    });
+  }
+
+  return tags;
+};

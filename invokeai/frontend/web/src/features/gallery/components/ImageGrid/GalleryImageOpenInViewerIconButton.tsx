@@ -1,36 +1,37 @@
 import { useAppDispatch } from 'app/store/storeHooks';
-import { IconMenuItem } from 'common/components/IconMenuItem';
-import { useItemDTOContext } from 'features/gallery/contexts/ItemDTOContext';
+import { DndImageIcon } from 'features/dnd/DndImageIcon';
 import { imageSelected, imageToCompareChanged } from 'features/gallery/store/gallerySlice';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsOutBold } from 'react-icons/pi';
-import { isImageDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
 
-export const ContextMenuItemOpenInViewer = memo(() => {
+type Props = {
+  imageDTO: ImageDTO;
+};
+
+export const GalleryImageOpenInViewerIconButton = memo(({ imageDTO }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const itemDTO = useItemDTOContext();
+
   const onClick = useCallback(() => {
-    if (isImageDTO(itemDTO)) {
     dispatch(imageToCompareChanged(null));
-    dispatch(imageSelected(itemDTO.image_name));
+    dispatch(imageSelected(imageDTO.image_name));
     navigationApi.focusPanelInActiveTab(VIEWER_PANEL_ID);
-    } else {
-      // TODO: Implement video open in viewer
-    }
-  }, [dispatch, itemDTO]);
+  }, [dispatch, imageDTO]);
 
   return (
-    <IconMenuItem
+    <DndImageIcon
+      onClick={onClick}
       icon={<PiArrowsOutBold />}
-      onClickCapture={onClick}
-      aria-label={t('common.openInViewer')}
-      tooltip={t('common.openInViewer')}
+      tooltip={t('gallery.openInViewer')}
+      position="absolute"
+      insetBlockStart={2}
+      insetInlineStart={2}
     />
   );
 });
 
-ContextMenuItemOpenInViewer.displayName = 'ContextMenuItemOpenInViewer';
+GalleryImageOpenInViewerIconButton.displayName = 'GalleryImageOpenInViewerIconButton';

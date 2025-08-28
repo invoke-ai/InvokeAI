@@ -5,33 +5,26 @@ import type { MouseEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleFill } from 'react-icons/pi';
-import { useDeleteVideosMutation } from 'services/api/endpoints/videos';
-import { isImageDTO, type ImageDTO, type VideoDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
 
 type Props = {
-  itemDTO: ImageDTO | VideoDTO;
+  imageDTO: ImageDTO;
 };
 
-export const GalleryItemDeleteIconButton = memo(({ itemDTO }: Props) => {
+export const GalleryImageDeleteIconButton = memo(({ imageDTO }: Props) => {
   const shift = useShiftModifier();
   const { t } = useTranslation();
   const deleteImageModal = useDeleteImageModalApi();
-  const [deleteVideos] = useDeleteVideosMutation();
 
   const onClick = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
-      if (!itemDTO) {
+      if (!imageDTO) {
         return;
       }
-      if (isImageDTO(itemDTO)) {
-        deleteImageModal.delete([itemDTO.image_name]);
-      } else {
-        // TODO: Add confirm on delete and video usage functionality
-        deleteVideos({ video_ids: [itemDTO.video_id] });
-      }
+      deleteImageModal.delete([imageDTO.image_name]);
     },
-    [deleteImageModal, deleteVideos, itemDTO]
+    [deleteImageModal, imageDTO]
   );
 
   if (!shift) {
@@ -50,4 +43,4 @@ export const GalleryItemDeleteIconButton = memo(({ itemDTO }: Props) => {
   );
 });
 
-GalleryItemDeleteIconButton.displayName = 'GalleryItemDeleteIconButton';
+GalleryImageDeleteIconButton.displayName = 'GalleryImageDeleteIconButton';

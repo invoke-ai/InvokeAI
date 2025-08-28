@@ -20,12 +20,11 @@ export const ParamDuration = () => {
 
   const onChange = useCallback<ChangeEventHandler<HTMLSelectElement>>(
     (e) => {
-      const duration = parseInt(e.target.value);
-      if (!isParameterDuration(duration)) {
+      if (!isParameterDuration(e.target.value)) {
         return;
       }
 
-      dispatch(setVideoDuration(duration));
+      dispatch(setVideoDuration(e.target.value));
     },
     [dispatch]
   );

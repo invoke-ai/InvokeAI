@@ -1,7 +1,7 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
-import { useItemDTOContextImageOnly } from 'features/gallery/contexts/ItemDTOContext';
+import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { expandPrompt } from 'features/prompt/PromptExpansion/expand';
 import { promptExpansionApi } from 'features/prompt/PromptExpansion/state';
 import { selectAllowPromptExpansion } from 'features/system/store/configSlice';
@@ -10,10 +10,10 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTextTBold } from 'react-icons/pi';
 
-export const ContextMenuItemUseForPromptGeneration = memo(() => {
+export const ImageMenuItemUseForPromptGeneration = memo(() => {
   const { t } = useTranslation();
   const { dispatch, getState } = useAppStore();
-  const imageDTO = useItemDTOContextImageOnly();
+  const imageDTO = useImageDTOContext();
   const { isPending } = useStore(promptExpansionApi.$state);
   const isPromptExpansionEnabled = useAppSelector(selectAllowPromptExpansion);
 
@@ -43,4 +43,4 @@ export const ContextMenuItemUseForPromptGeneration = memo(() => {
   );
 });
 
-ContextMenuItemUseForPromptGeneration.displayName = 'ContextMenuItemUseForPromptGeneration';
+ImageMenuItemUseForPromptGeneration.displayName = 'ImageMenuItemUseForPromptGeneration';

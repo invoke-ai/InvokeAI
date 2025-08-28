@@ -1,12 +1,12 @@
 import { Text } from '@invoke-ai/ui-library';
 import { memo } from 'react';
-import type { ImageDTO, VideoDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
 
 type Props = {
-  itemDTO: ImageDTO | VideoDTO;
+  imageDTO: ImageDTO;
 };
 
-export const GalleryItemSizeBadge = memo(({ itemDTO }: Props) => {
+export const GalleryImageSizeBadge = memo(({ imageDTO }: Props) => {
   return (
     <Text
       className="gallery-image-size-badge"
@@ -22,8 +22,8 @@ export const GalleryItemSizeBadge = memo(({ itemDTO }: Props) => {
       lineHeight={1.25}
       borderTopEndRadius="base"
       pointerEvents="none"
-    >{`${itemDTO.width}x${itemDTO.height}`}</Text>
+    >{`${imageDTO.width}x${imageDTO.height}`}</Text>
   );
 });
 
-GalleryItemSizeBadge.displayName = 'GalleryItemSizeBadge';
+GalleryImageSizeBadge.displayName = 'GalleryImageSizeBadge';
