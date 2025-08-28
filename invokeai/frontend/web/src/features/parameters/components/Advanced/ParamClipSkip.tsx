@@ -24,16 +24,16 @@ const ParamClipSkip = () => {
 
   const max = useMemo(() => {
     if (!model) {
-      return CLIP_SKIP_MAP['sd-1']?.maxClip;
+      return CLIP_SKIP_MAP['sd-1'].maxClip;
     }
-    return CLIP_SKIP_MAP[model.base]?.maxClip;
+    return CLIP_SKIP_MAP[model.base].maxClip;
   }, [model]);
 
   const sliderMarks = useMemo(() => {
     if (!model) {
-      return CLIP_SKIP_MAP['sd-1']?.markers;
+      return CLIP_SKIP_MAP['sd-1'].markers;
     }
-    return CLIP_SKIP_MAP[model.base]?.markers;
+    return CLIP_SKIP_MAP[model.base].markers;
   }, [model]);
 
   if (model?.base === 'sdxl') {
@@ -49,7 +49,7 @@ const ParamClipSkip = () => {
         value={clipSkip}
         defaultValue={config.initial}
         min={config.sliderMin}
-        max={max ?? 0}
+        max={max}
         step={config.coarseStep}
         fineStep={config.fineStep}
         onChange={handleClipSkipChange}
@@ -59,7 +59,7 @@ const ParamClipSkip = () => {
         value={clipSkip}
         defaultValue={config.initial}
         min={config.numberInputMin}
-        max={max ?? 0}
+        max={max}
         step={config.coarseStep}
         fineStep={config.fineStep}
         onChange={handleClipSkipChange}
