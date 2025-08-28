@@ -6,24 +6,27 @@ import { createSelector } from '@reduxjs/toolkit';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { uniq } from 'es-toolkit';
-import { multipleVideoDndSource, singleVideoDndSource } from 'features/dnd/dnd';
+import { multipleImageDndSource, multipleVideoDndSource, singleVideoDndSource } from 'features/dnd/dnd';
 import type { DndDragPreviewMultipleVideoState } from 'features/dnd/DndDragPreviewMultipleVideo';
 import { createMultipleVideoDragPreview, setMultipleVideoDragPreview } from 'features/dnd/DndDragPreviewMultipleVideo';
 import type { DndDragPreviewSingleVideoState } from 'features/dnd/DndDragPreviewSingleVideo';
 import { createSingleVideoDragPreview, setSingleVideoDragPreview } from 'features/dnd/DndDragPreviewSingleVideo';
 import { firefoxDndFix } from 'features/dnd/util';
-import { useVideoContextMenu } from 'features/gallery/components/ContextMenu/VideoContextMenu';
-import { selectGetImageNamesQueryArgs, selectSelectedBoardId, selectSelection } from 'features/gallery/store/gallerySelectors';
+import {
+  selectGetImageNamesQueryArgs,
+  selectSelectedBoardId,
+  selectSelection,
+} from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectGallerySlice, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import type { MouseEvent, MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PiVideoBold } from 'react-icons/pi';
+import { PiImageBold, PiVideoBold } from 'react-icons/pi';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { VideoDTO } from 'services/api/types';
-
 import { GalleryItemHoverIcons } from './GalleryItemHoverIcons';
+import { useVideoContextMenu } from '../ContextMenu/VideoContextMenu';
 import { galleryItemContainerSX } from './galleryItemContainerSX';
 
 interface Props {

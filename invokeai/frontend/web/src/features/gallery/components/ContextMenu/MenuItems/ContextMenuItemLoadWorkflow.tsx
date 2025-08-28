@@ -26,7 +26,7 @@ export const ContextMenuItemLoadWorkflow = memo(() => {
     if (isImageDTO(itemDTO)) {
       return !itemDTO.has_workflow || !hasTemplates;
     }
-    return false;
+    return false
   }, [itemDTO, hasTemplates]);
 
   return (

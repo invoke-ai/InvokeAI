@@ -13,8 +13,8 @@ export const ContextMenuItemOpenInNewTab = memo(() => {
   const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
     if (isImageDTO(itemDTO)) {
-      window.open(itemDTO.image_url, '_blank');
-      dispatch(imageOpenedInNewTab());
+    window.open(itemDTO.image_url, '_blank');
+    dispatch(imageOpenedInNewTab());
     } else {
       window.open(itemDTO.video_url, '_blank');
     }

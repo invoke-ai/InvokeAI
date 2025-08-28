@@ -2,17 +2,22 @@ import { MenuDivider, MenuItem } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { isModalOpenChanged, videosToChangeSelected } from 'features/changeBoardModal/store/slice';
+import {  isModalOpenChanged, videosToChangeSelected } from 'features/changeBoardModal/store/slice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFoldersBold, PiStarBold, PiStarFill, PiTrashSimpleBold } from 'react-icons/pi';
-import { useDeleteVideosMutation, useStarVideosMutation, useUnstarVideosMutation } from 'services/api/endpoints/videos';
+import {
+  useDeleteVideosMutation,
+  useStarVideosMutation,
+  useUnstarVideosMutation,
+} from 'services/api/endpoints/videos';
 
 const MultipleSelectionMenuItems = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const selection = useAppSelector((s) => s.gallery.selection);
   const customStarUi = useStore($customStarUI);
+
 
   const [starVideos] = useStarVideosMutation();
   const [unstarVideos] = useUnstarVideosMutation();

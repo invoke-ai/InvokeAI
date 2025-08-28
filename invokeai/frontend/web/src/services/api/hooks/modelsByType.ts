@@ -10,6 +10,7 @@ import {
 import type { AnyModelConfig } from 'services/api/types';
 import {
   isChatGPT4oModelConfig,
+  isVeo3ModelConfig,
   isCLIPEmbedModelConfig,
   isCLIPVisionModelConfig,
   isCogView4MainModelModelConfig,
@@ -38,7 +39,6 @@ import {
   isT5EncoderModelConfig,
   isTIModelConfig,
   isVAEModelConfig,
-  isVeo3ModelConfig,
 } from 'services/api/types';
 
 type ModelHookArgs = { excludeSubmodels?: boolean };

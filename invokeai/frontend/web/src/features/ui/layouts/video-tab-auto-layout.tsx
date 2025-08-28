@@ -66,7 +66,7 @@ const initializeMainPanelLayout = (tab: TabName, api: DockviewApi) => {
       params: {
         tab,
         focusRegion: 'launchpad',
-        i18nKey: 'ui.panels.launchpad',
+        i18nKey: 'ui.panels.launchpad'
       },
     });
 
@@ -78,7 +78,7 @@ const initializeMainPanelLayout = (tab: TabName, api: DockviewApi) => {
       params: {
         tab,
         focusRegion: 'viewer',
-        i18nKey: 'ui.panels.imageViewer',
+        i18nKey: 'ui.panels.imageViewer'
       },
       position: {
         direction: 'within',
