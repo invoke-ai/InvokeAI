@@ -8,6 +8,7 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
+    QUEUE_ORDER_BY,
     Batch,
     BatchStatus,
     CancelAllExceptCurrentResult,
@@ -18,6 +19,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     DeleteByDestinationResult,
     EnqueueBatchResult,
     FieldIdentifier,
+    ItemIdsResult,
     PruneResult,
     RetryItemsResult,
     SessionQueueCountsByDestination,
@@ -26,6 +28,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueStatus,
 )
 from invokeai.app.services.shared.pagination import CursorPaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
 session_queue_router = APIRouter(prefix="/v1/queue", tags=["queue"])
 
@@ -77,9 +80,11 @@ async def enqueue_batch(
 )
 async def list_queue_items(
     queue_id: str = Path(description="The queue id to perform this operation on"),
-    limit: int = Query(default=50, description="The number of items to fetch"),
-    status: Optional[QUEUE_ITEM_STATUS] = Query(default=None, description="The status of items to fetch"),
     cursor: Optional[int] = Query(default=None, description="The pagination cursor"),
+    limit: int = Query(default=50, description="The number of queues per page"),
+    order_by: QUEUE_ORDER_BY = Query(default="item_id", description="The status of items to fetch"),
+    order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
+    status: Optional[QUEUE_ITEM_STATUS] = Query(default=None, description="The status of items to fetch"),
     priority: int = Query(default=0, description="The pagination cursor priority"),
     destination: Optional[str] = Query(default=None, description="The destination of queue items to fetch"),
 ) -> CursorPaginatedResults[SessionQueueItem]:
@@ -117,6 +122,27 @@ async def list_all_queue_items(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while listing all queue items: {e}")
+
+
+@session_queue_router.get(
+    "/{queue_id}/item_ids",
+    operation_id="get_queue_itemIds",
+    responses={
+        200: {"model": ItemIdsResult},
+    },
+)
+async def get_queue_itemIds(
+    queue_id: str = Path(description="The queue id to perform this operation on"),
+    order_by: QUEUE_ORDER_BY = Query(default="ITEM_ID", description="The sort field"),
+    order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
+) -> ItemIdsResult:
+    """Gets all queue item ids that match the given parameters"""
+    try:
+        return ApiDependencies.invoker.services.session_queue.get_queue_itemIds(
+            queue_id=queue_id, order_by=order_by, order_dir=order_dir
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error while listing all queue item ids: {e}")
 
 
 @session_queue_router.put(

@@ -1419,6 +1419,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queue/{queue_id}/item_ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Queue Itemids
+         * @description Gets all queue item ids that match the given parameters
+         */
+        get: operations["get_queue_itemIds"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/{queue_id}/processor/resume": {
         parameters: {
             query?: never;
@@ -12729,14 +12749,14 @@ export type components = {
              * Convert Cache Dir
              * Format: path
              * @description Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).
-             * @default models/.convert_cache
+             * @default models\.convert_cache
              */
             convert_cache_dir?: string;
             /**
              * Download Cache Dir
              * Format: path
              * @description Path to the directory that contains dynamically downloaded models.
-             * @default models/.download_cache
+             * @default models\.download_cache
              */
             download_cache_dir?: string;
             /**
@@ -13525,6 +13545,22 @@ export type components = {
              * @constant
              */
             type: "invokeai_img_val_thresholds";
+        };
+        /**
+         * ItemIdsResult
+         * @description Response containing ordered item ids with metadata for optimistic updates.
+         */
+        ItemIdsResult: {
+            /**
+             * Item Ids
+             * @description Ordered list of item ids
+             */
+            item_ids: number[];
+            /**
+             * Total Count
+             * @description Total number of queue items matching the query
+             */
+            total_count: number;
         };
         /**
          * IterateInvocation
@@ -25846,12 +25882,16 @@ export interface operations {
     list_queue_items: {
         parameters: {
             query?: {
-                /** @description The number of items to fetch */
-                limit?: number;
-                /** @description The status of items to fetch */
-                status?: ("pending" | "in_progress" | "completed" | "failed" | "canceled") | null;
                 /** @description The pagination cursor */
                 cursor?: number | null;
+                /** @description The number of queues per page */
+                limit?: number;
+                /** @description The status of items to fetch */
+                order_by?: "item_id" | "status" | "created_at";
+                /** @description The order of sort */
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                /** @description The status of items to fetch */
+                status?: ("pending" | "in_progress" | "completed" | "failed" | "canceled") | null;
                 /** @description The pagination cursor priority */
                 priority?: number;
                 /** @description The destination of queue items to fetch */
@@ -25908,6 +25948,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionQueueItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_queue_itemIds: {
+        parameters: {
+            query?: {
+                /** @description The sort field */
+                order_by?: "item_id" | "status" | "created_at";
+                /** @description The order of sort */
+                order_dir?: components["schemas"]["SQLiteDirection"];
+            };
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemIdsResult"];
                 };
             };
             /** @description Validation Error */
