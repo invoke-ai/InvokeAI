@@ -5,7 +5,7 @@ import type { SliceConfig } from 'app/store/types';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
 import { clamp } from 'es-toolkit/compat';
-import type { AspectRatioID, ParamsState, RgbaColor } from 'features/controlLayers/store/types';
+import type { AspectRatioID, ParamsState, RgbaColor, Veo3Duration } from 'features/controlLayers/store/types';
 import {
   ASPECT_RATIO_MAP,
   CHATGPT_ASPECT_RATIOS,
@@ -380,6 +380,9 @@ const slice = createSlice({
         state.dimensions.rect.height = bboxDims.height;
       }
     },
+    setVideoDuration: (state, action: PayloadAction<Veo3Duration>) => {
+      state.videoDuration = action.payload;
+    },
     paramsReset: (state) => resetState(state),
   },
 });
@@ -481,6 +484,7 @@ export const {
   syncedToOptimalDimension,
 
   paramsReset,
+  setVideoDuration,
 } = slice.actions;
 
 export const paramsSliceConfig: SliceConfig<typeof slice> = {
@@ -605,6 +609,7 @@ export const selectHeight = createParamsSelector((params) => params.dimensions.r
 export const selectAspectRatioID = createParamsSelector((params) => params.dimensions.aspectRatio.id);
 export const selectAspectRatioValue = createParamsSelector((params) => params.dimensions.aspectRatio.value);
 export const selectAspectRatioIsLocked = createParamsSelector((params) => params.dimensions.aspectRatio.isLocked);
+export const selectVideoDuration = createParamsSelector((params) => params.videoDuration);
 
 export const selectMainModelConfig = createSelector(
   selectModelConfigsQuery,

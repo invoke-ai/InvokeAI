@@ -9,7 +9,6 @@ import { useTranslation } from 'react-i18next';
 
 import { StartingFrameImage } from './StartingFrameImage';
 import { VideoModelPicker } from './VideoModelPicker';
-import { ParamResolution } from 'features/parameters/components/Video/ParamResolution';
 
 
 export const VideoSettingsAccordion = memo(() => {
@@ -34,7 +33,6 @@ export const VideoSettingsAccordion = memo(() => {
                     <Flex gap={4} flexDirection="column" width="full">
                         <VideoModelPicker />
                         <ParamDuration />
-                        <ParamResolution />
                     </Flex>
                 </Flex>
                 <Dimensions />
