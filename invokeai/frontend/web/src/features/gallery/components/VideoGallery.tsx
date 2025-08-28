@@ -51,11 +51,6 @@ const VideoAtPosition = memo(({ videoId }: { index: number; videoId: string }) =
    * - https://github.com/reduxjs/redux-toolkit/discussions/4213
    *
    * This essentially means "subscribe to the query once it has some data".
-   * One issue with this approach. When an item DTO is already cached - for example, because it is selected and
-   * rendered in the viewer - it will show up in the grid before the other items have loaded. This is most
-   * noticeable when first loading a board. The first item in the board is selected and rendered immediately in
-   * the viewer, caching the DTO. The gallery grid renders, and that first item displays as a thumbnail while the
-   * others are still placeholders. After a moment, the rest of the items load up and display as thumbnails.
    */
 
   // Use `currentData` instead of `data` to prevent a flash of previous image rendered at this index
