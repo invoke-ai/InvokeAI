@@ -22,7 +22,6 @@ import {
 import { fieldImageCollectionValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectFieldInputInstanceSafe, selectNodesSlice } from 'features/nodes/store/selectors';
 import { type FieldIdentifier, isImageFieldCollectionInputInstance } from 'features/nodes/types/field';
-import { startingFrameImageChanged } from 'features/parameters/store/videoSlice';
 import { expandPrompt } from 'features/prompt/PromptExpansion/expand';
 import { promptExpansionApi } from 'features/prompt/PromptExpansion/state';
 import type { ImageDTO } from 'services/api/types';
@@ -549,30 +548,6 @@ export const promptGenerationFromImageDndTarget: DndTarget<
 };
 //#endregion
 
-//#region Video Frame From Image
-const _videoFrameFromImage = buildTypeAndKey('video-frame-from-image');
-type VideoFrameFromImageDndTargetData = DndData<
-  typeof _videoFrameFromImage.type,
-  typeof _videoFrameFromImage.key,
-  { frame: 'start' | 'end' }
->;
-export const videoFrameFromImageDndTarget: DndTarget<VideoFrameFromImageDndTargetData, SingleImageDndSourceData> = {
-  ..._videoFrameFromImage,
-  typeGuard: buildTypeGuard(_videoFrameFromImage.key),
-  getData: buildGetData(_videoFrameFromImage.key, _videoFrameFromImage.type),
-  isValid: ({ sourceData }) => {
-    if (singleImageDndSource.typeGuard(sourceData)) {
-      return true;
-    }
-    return false;
-  },
-  handler: ({ sourceData, dispatch }) => {
-    const { imageDTO } = sourceData.payload;
-    dispatch(startingFrameImageChanged(imageDTOToImageWithDims(imageDTO)));
-  },
-};
-//#endregion
-
 export const dndTargets = [
   setGlobalReferenceImageDndTarget,
   addGlobalReferenceImageDndTarget,
@@ -587,7 +562,6 @@ export const dndTargets = [
   addImageToBoardDndTarget,
   removeImageFromBoardDndTarget,
   promptGenerationFromImageDndTarget,
-  videoFrameFromImageDndTarget,
 ] as const;
 
 export type AnyDndTarget = (typeof dndTargets)[number];
