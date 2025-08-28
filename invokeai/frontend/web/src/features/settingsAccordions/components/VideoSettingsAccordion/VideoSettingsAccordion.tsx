@@ -24,7 +24,7 @@ export const VideoSettingsAccordion = memo(() => {
       onToggle={onToggleAccordion}
     >
       <Flex p={4} w="full" h="full" flexDir="column" data-testid="upscale-settings-accordion">
-        <Flex flexDirection="column" width="full">
+        <Flex gap={1} flexDirection="column" width="full">
           <Flex gap={4}>
             <StartingFrameImage />
             <Flex gap={4} flexDirection="column" width="full">
