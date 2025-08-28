@@ -65,8 +65,8 @@ export const CurrentVideoButtons = memo(({ videoDTO }: { videoDTO: VideoDTO }) =
       <Menu isLazy>
         <MenuButton
           as={IconButton}
-          aria-label={t('parameters.imageActions')}
-          tooltip={t('parameters.imageActions')}
+          aria-label={t('parameters.videoActions')}
+          tooltip={t('parameters.videoActions')}
           isDisabled={!videoDTO}
           variant="link"
           alignSelf="stretch"
