@@ -66,27 +66,27 @@ const ChangeBoardModal = () => {
   }, [dispatch]);
 
   const handleChangeBoard = useCallback(() => {
-    if (!selectedBoardId || (imagesToChange.length === 0 && videosToChange.length === 0)) {
+    if (!selectedBoard || (imagesToChange.length === 0 && videosToChange.length === 0)) {
       return;
     }
 
     if (imagesToChange.length) {
-      if (selectedBoardId === 'none') {
+      if (selectedBoard === 'none') {
         removeImagesFromBoard({ image_names: imagesToChange });
       } else {
         addImagesToBoard({
           image_names: imagesToChange,
-          board_id: selectedBoardId,
+          board_id: selectedBoard,
         });
       }
     }
     if (videosToChange.length) {
-      if (selectedBoardId === 'none') {
+      if (selectedBoard === 'none') {
         removeVideosFromBoard({ video_ids: videosToChange });
       } else {
         addVideosToBoard({
           video_ids: videosToChange,
-          board_id: selectedBoardId,
+          board_id: selectedBoard,
         });
       }
     }
@@ -97,7 +97,7 @@ const ChangeBoardModal = () => {
     imagesToChange,
     videosToChange,
     removeImagesFromBoard,
-    selectedBoardId,
+    selectedBoard,
     addVideosToBoard,
     removeVideosFromBoard,
   ]);
