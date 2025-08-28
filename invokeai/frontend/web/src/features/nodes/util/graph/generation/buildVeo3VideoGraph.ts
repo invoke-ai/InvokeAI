@@ -29,7 +29,7 @@ export const buildVeo3VideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn =>
 
   
   const { seed, shouldRandomizeSeed } = params;
-  const { videoModel, videoResolution, videoDuration } = videoParams;
+  const { videoModel } = videoParams;
   const finalSeed = shouldRandomizeSeed ? undefined : seed;
 
   const g = new Graph(getPrefixedId('veo3_video_graph'));
@@ -45,9 +45,8 @@ export const buildVeo3VideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn =>
     id: getPrefixedId('google_veo_3_generate_video'),
     // @ts-expect-error: This node is not available in the OSS application
     type: 'google_veo_3_generate_video',
-    model: videoModel,
-    aspect_ratio: "16:9",
-    resolution: videoResolution,
+    model: videoParams.videoModel,
+    aspect_ratio: params.dimensions.aspectRatio.id,
     seed: finalSeed,
   });
 
@@ -66,7 +65,7 @@ export const buildVeo3VideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn =>
   g.upsertMetadata({
     positive_prompt: prompts.positive,
     negative_prompt: prompts.negative || '',
-    video_duration: videoDuration,
+    video_duration: params.videoDuration,
     video_aspect_ratio: params.dimensions.aspectRatio.id,
     seed: finalSeed,
     generation_type: 'image-to-video',
