@@ -7,7 +7,6 @@ import { useRangeBasedImageFetching } from 'features/gallery/hooks/useRangeBased
 import type { selectGetImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import {
   selectGalleryImageMinimumWidth,
-  selectGalleryView,
   selectImageToCompare,
   selectLastSelectedImage,
   selectSelection,
@@ -33,7 +32,6 @@ import { useDebounce } from 'use-debounce';
 import { GalleryImage, GalleryImagePlaceholder } from './ImageGrid/GalleryImage';
 import { GallerySelectionCountTag } from './ImageGrid/GallerySelectionCountTag';
 import { useGalleryImageNames } from './use-gallery-image-names';
-import { useGalleryVideoIds } from './use-gallery-video-ids';
 
 const log = logger('gallery');
 
@@ -528,11 +526,9 @@ export const NewGallery = memo(() => {
   const virtuosoRef = useRef<VirtuosoGridHandle>(null);
   const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
   const rootRef = useRef<HTMLDivElement>(null);
-  const galleryView = useAppSelector(selectGalleryView);
 
   // Get the ordered list of image names - this is our primary data source for virtualization
   const { queryArgs, imageNames, isLoading } = useGalleryImageNames();
-  const { queryArgs: videoQueryArgs, videoIds, isLoading: isLoadingVideos } = useGalleryVideoIds();
 
   // Use range-based fetching for bulk loading image DTOs into cache based on the visible range
   const { onRangeChanged } = useRangeBasedImageFetching({
@@ -557,7 +553,7 @@ export const NewGallery = memo(() => {
     [onRangeChanged]
   );
 
-  const context = useMemo<GridContext>(() => ({ imageNames, queryArgs, videoIds, videoQueryArgs }), [imageNames, queryArgs, videoIds, videoQueryArgs]);
+  const context = useMemo<GridContext>(() => ({ imageNames, queryArgs }), [imageNames, queryArgs]);
 
   if (isLoading) {
     return (
@@ -582,7 +578,7 @@ export const NewGallery = memo(() => {
       <VirtuosoGrid<string, GridContext>
         ref={virtuosoRef}
         context={context}
-        data={galleryView === 'images' ? imageNames : videoIds}
+        data={imageNames}
         increaseViewportBy={4096}
         itemContent={itemContent}
         computeItemKey={computeItemKey}
