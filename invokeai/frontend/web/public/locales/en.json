@@ -1251,6 +1251,7 @@
             "modelIncompatibleScaledBboxWidth": "Scaled bbox width is {{width}} but {{model}} requires multiple of {{multiple}}",
             "modelIncompatibleScaledBboxHeight": "Scaled bbox height is {{height}} but {{model}} requires multiple of {{multiple}}",
             "fluxModelMultipleControlLoRAs": "Can only use 1 Control LoRA at a time",
+            "fluxKontextMultipleReferenceImages": "Can only use 1 Reference Image at a time with FLUX Kontext via BFL API",
             "canvasIsFiltering": "Canvas is busy (filtering)",
             "canvasIsTransforming": "Canvas is busy (transforming)",
             "canvasIsRasterizing": "Canvas is busy (rasterizing)",
@@ -1281,7 +1282,6 @@
         "imageActions": "Image Actions",
         "sendToCanvas": "Send To Canvas",
         "sendToUpscale": "Send To Upscale",
-        "sendToVideo": "Send To Video",
         "showOptionsPanel": "Show Side Panel (O or T)",
         "shuffle": "Shuffle Seed",
         "steps": "Steps",
@@ -2565,15 +2565,13 @@
             "queue": "Queue",
             "upscaling": "Upscaling",
             "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)",
-            "video": "Video",
             "gallery": "Gallery"
         },
         "panels": {
             "launchpad": "Launchpad",
             "workflowEditor": "Workflow Editor",
             "imageViewer": "Image Viewer",
-            "canvas": "Canvas",
-            "video": "Video"
+            "canvas": "Canvas"
         },
         "launchpad": {
             "workflowsTitle": "Go deep with Workflows.",
@@ -2653,10 +2651,6 @@
                 }
             }
         }
-    },
-    "video": {
-        "noVideoSelected": "No video selected",
-        "selectFromGallery": "Select a video from the gallery to play"
     },
     "system": {
         "enableLogging": "Enable Logging",

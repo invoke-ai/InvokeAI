@@ -87,6 +87,3 @@ export const selectWithModelsTab = createSelector(selectDidLoad, selectDisabledT
 export const selectWithQueueTab = createSelector(selectDidLoad, selectDisabledTabs, (didLoad, disabledTabs) =>
   didLoad ? !disabledTabs.includes('queue') : false
 );
-export const selectWithVideoTab = createSelector(selectDidLoad, selectDisabledTabs, (didLoad, disabledTabs) =>
-  didLoad ? !disabledTabs.includes('video') : false
-);

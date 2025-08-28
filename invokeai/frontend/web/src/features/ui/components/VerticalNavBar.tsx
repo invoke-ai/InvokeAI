@@ -12,7 +12,6 @@ import {
   selectWithModelsTab,
   selectWithQueueTab,
   selectWithUpscalingTab,
-  selectWithVideoTab,
   selectWithWorkflowsTab,
 } from 'features/system/store/configSlice';
 import { memo } from 'react';
@@ -24,7 +23,6 @@ import {
   PiFrameCornersBold,
   PiQueueBold,
   PiTextAaBold,
-  PiVideoBold,
 } from 'react-icons/pi';
 
 import { Notifications } from './Notifications';
@@ -39,7 +37,6 @@ export const VerticalNavBar = memo(() => {
   const withWorkflowsTab = useAppSelector(selectWithWorkflowsTab);
   const withModelsTab = useAppSelector(selectWithModelsTab);
   const withQueueTab = useAppSelector(selectWithQueueTab);
-  const withVideoTab = useAppSelector(selectWithVideoTab);
 
   return (
     <Flex flexDir="column" alignItems="center" py={6} ps={4} pe={2} gap={4} minW={0} flexShrink={0}>
@@ -51,7 +48,6 @@ export const VerticalNavBar = memo(() => {
         {withWorkflowsTab && <TabButton tab="workflows" icon={<PiFlowArrowBold />} label={t('ui.tabs.workflows')} />}
         {withModelsTab && <TabButton tab="models" icon={<PiCubeBold />} label={t('ui.tabs.models')} />}
         {withQueueTab && <TabButton tab="queue" icon={<PiQueueBold />} label={t('ui.tabs.queue')} />}
-        {withVideoTab && <TabButton tab="video" icon={<PiVideoBold />} label={t('ui.tabs.video')} />}
       </Flex>
       <Spacer />
       <StatusIndicator />
