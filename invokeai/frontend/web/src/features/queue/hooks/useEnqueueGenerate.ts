@@ -37,14 +37,11 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
 
   const destination = 'generate';
 
-  const model = state.params.model;
-  if (!model) {
-    log.error('No model found in state');
-    return;
-  }
-  const base = model.base;
-
   const buildGraphResult = await withResultAsync(async () => {
+    const model = state.params.model;
+    assert(model, 'No model found in state');
+    const base = model.base;
+
     const graphBuilderArg: GraphBuilderArg = { generationMode: 'txt2img', state, manager: null };
 
     switch (base) {
