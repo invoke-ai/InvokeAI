@@ -55,7 +55,7 @@ export const VerticalNavBar = memo(() => {
       <StatusIndicator />
       {withModelsTab && <TabButton tab="models" icon={<PiCubeBold />} label={t('ui.tabs.models')} />}
       {withQueueTab && <TabButton tab="queue" icon={<PiQueueBold />} label={t('ui.tabs.queue')} />}
-      <Divider borderColor="base.200" />
+      <Divider />
 
       <Notifications />
       <VideosModalButton />
