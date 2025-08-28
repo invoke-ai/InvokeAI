@@ -2,7 +2,7 @@ import { Box, chakra, Flex, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useFocusRegion } from 'common/hooks/focus';
-import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
+import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { memo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import ReactPlayer from 'react-player';
@@ -10,11 +10,11 @@ import { useGetVideoDTOQuery } from 'services/api/endpoints/videos';
 
 const ChakraReactPlayer = chakra(ReactPlayer);
 
-export const VideoPlayer = memo(() => {
+export const VideoPlayerPanel = memo(() => {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
-  const lastSelectedItem = useAppSelector(selectLastSelectedItem);
-  const { data: videoDTO } = useGetVideoDTOQuery(lastSelectedItem?.id ?? skipToken);
+  const lastSelectedVideoId = useAppSelector(selectLastSelectedImage);
+  const { data: videoDTO } = useGetVideoDTOQuery(lastSelectedVideoId ?? skipToken);
 
   useFocusRegion('video', ref);
 
@@ -40,4 +40,4 @@ export const VideoPlayer = memo(() => {
   );
 });
 
-VideoPlayer.displayName = 'VideoPlayer';
+VideoPlayerPanel.displayName = 'VideoPlayerPanel';

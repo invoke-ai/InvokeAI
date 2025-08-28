@@ -1,7 +1,7 @@
 import { useAppDispatch } from 'app/store/storeHooks';
 import { IconMenuItem } from 'common/components/IconMenuItem';
 import { useItemDTOContext } from 'features/gallery/contexts/ItemDTOContext';
-import { imageToCompareChanged, itemSelected } from 'features/gallery/store/gallerySlice';
+import { imageSelected, imageToCompareChanged } from 'features/gallery/store/gallerySlice';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import { memo, useCallback } from 'react';
@@ -16,7 +16,7 @@ export const ContextMenuItemOpenInViewer = memo(() => {
   const onClick = useCallback(() => {
     if (isImageDTO(itemDTO)) {
       dispatch(imageToCompareChanged(null));
-      dispatch(itemSelected({ type: 'image', id: itemDTO.image_name }));
+      dispatch(imageSelected(itemDTO.image_name));
       navigationApi.focusPanelInActiveTab(VIEWER_PANEL_ID);
     } else {
       // TODO: Implement video open in viewer

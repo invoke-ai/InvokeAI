@@ -7,7 +7,7 @@ import { useRecallDimensions } from 'features/gallery/hooks/useRecallDimensions'
 import { useRecallPrompts } from 'features/gallery/hooks/useRecallPrompts';
 import { useRecallRemix } from 'features/gallery/hooks/useRecallRemix';
 import { useRecallSeed } from 'features/gallery/hooks/useRecallSeed';
-import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
+import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo } from 'react';
 import { useImageDTO } from 'services/api/endpoints/images';
@@ -15,8 +15,8 @@ import type { ImageDTO } from 'services/api/types';
 
 export const GlobalImageHotkeys = memo(() => {
   useAssertSingleton('GlobalImageHotkeys');
-  const lastSelectedItem = useAppSelector(selectLastSelectedItem);
-  const imageDTO = useImageDTO(lastSelectedItem?.id ?? null);
+  const imageName = useAppSelector(selectLastSelectedImage);
+  const imageDTO = useImageDTO(imageName);
 
   if (!imageDTO) {
     return null;

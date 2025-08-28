@@ -14,7 +14,7 @@ import { createSingleVideoDragPreview, setSingleVideoDragPreview } from 'feature
 import { firefoxDndFix } from 'features/dnd/util';
 import { useVideoContextMenu } from 'features/gallery/components/ContextMenu/VideoContextMenu';
 import {
-  selectGetVideoIdsQueryArgs,
+  selectGetImageNamesQueryArgs,
   selectSelectedBoardId,
   selectSelection,
 } from 'features/gallery/store/gallerySelectors';
@@ -24,7 +24,7 @@ import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import type { MouseEvent, MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PiVideoBold } from 'react-icons/pi';
-import { videosApi } from 'services/api/endpoints/videos';
+import { imagesApi } from 'services/api/endpoints/images';
 import type { VideoDTO } from 'services/api/types';
 
 import { galleryItemContainerSX } from './galleryItemContainerSX';
@@ -35,18 +35,18 @@ interface Props {
 }
 
 const buildOnClick =
-  (videoId: string, dispatch: AppDispatch, getState: AppGetState) => (e: MouseEvent<HTMLDivElement>) => {
+  (imageName: string, dispatch: AppDispatch, getState: AppGetState) => (e: MouseEvent<HTMLDivElement>) => {
     const { shiftKey, ctrlKey, metaKey, altKey } = e;
     const state = getState();
-    const queryArgs = selectGetVideoIdsQueryArgs(state);
-    const videoIds = videosApi.endpoints.getVideoIds.select(queryArgs)(state).data?.video_ids ?? [];
+    const queryArgs = selectGetImageNamesQueryArgs(state);
+    const imageNames = imagesApi.endpoints.getImageNames.select(queryArgs)(state).data?.image_names ?? [];
 
-    // If we don't have the video ids cached, we can't perform selection operations
-    // This can happen if the user clicks on a video before the ids are loaded
-    if (videoIds.length === 0) {
+    // If we don't have the image names cached, we can't perform selection operations
+    // This can happen if the user clicks on an image before the names are loaded
+    if (imageNames.length === 0) {
       // For basic click without modifiers, we can still set selection
       if (!shiftKey && !ctrlKey && !metaKey && !altKey) {
-        dispatch(selectionChanged([{ type: 'video', id: videoId }]));
+        dispatch(selectionChanged([imageName]));
       }
       return;
     }
@@ -54,31 +54,31 @@ const buildOnClick =
     const selection = state.gallery.selection;
 
     if (altKey) {
-      if (state.gallery.imageToCompare === videoId) {
+      if (state.gallery.imageToCompare === imageName) {
         dispatch(imageToCompareChanged(null));
       } else {
-        dispatch(imageToCompareChanged(videoId));
+        dispatch(imageToCompareChanged(imageName));
       }
     } else if (shiftKey) {
-      const rangeEndVideoId = videoId;
-      const lastSelectedVideo = selection.at(-1)?.id;
-      const lastClickedIndex = videoIds.findIndex((id) => id === lastSelectedVideo);
-      const currentClickedIndex = videoIds.findIndex((id) => id === rangeEndVideoId);
+      const rangeEndImageName = imageName;
+      const lastSelectedImage = selection.at(-1);
+      const lastClickedIndex = imageNames.findIndex((name) => name === lastSelectedImage);
+      const currentClickedIndex = imageNames.findIndex((name) => name === rangeEndImageName);
       if (lastClickedIndex > -1 && currentClickedIndex > -1) {
         // We have a valid range!
         const start = Math.min(lastClickedIndex, currentClickedIndex);
         const end = Math.max(lastClickedIndex, currentClickedIndex);
-        const videosToSelect = videoIds.slice(start, end + 1);
-        dispatch(selectionChanged(uniq(selection.concat(videosToSelect.map((id) => ({ type: 'video', id }))))));
+        const imagesToSelect = imageNames.slice(start, end + 1);
+        dispatch(selectionChanged(uniq(selection.concat(imagesToSelect))));
       }
     } else if (ctrlKey || metaKey) {
-      if (selection.some((n) => n.id === videoId) && selection.length > 1) {
-        dispatch(selectionChanged(uniq(selection.filter((n) => n.id !== videoId))));
+      if (selection.some((n) => n === imageName) && selection.length > 1) {
+        dispatch(selectionChanged(uniq(selection.filter((n) => n !== imageName))));
       } else {
-        dispatch(selectionChanged(uniq(selection.concat({ type: 'video', id: videoId }))));
+        dispatch(selectionChanged(uniq(selection.concat(imageName))));
       }
     } else {
-      dispatch(selectionChanged([{ type: 'video', id: videoId }]));
+      dispatch(selectionChanged([imageName]));
     }
   };
 
@@ -90,7 +90,7 @@ export const GalleryVideo = memo(({ videoDTO }: Props) => {
   >(null);
   const ref = useRef<HTMLDivElement>(null);
   const selectIsSelected = useMemo(
-    () => createSelector(selectGallerySlice, (gallery) => gallery.selection.some((s) => s.id === videoDTO.video_id)),
+    () => createSelector(selectGallerySlice, (gallery) => gallery.selection.includes(videoDTO.video_id)),
     [videoDTO.video_id]
   );
   const isSelected = useAppSelector(selectIsSelected);
@@ -110,9 +110,9 @@ export const GalleryVideo = memo(({ videoDTO }: Props) => {
 
           // When we have multiple images selected, and the dragged image is part of the selection, initiate a
           // multi-image drag.
-          if (selection.length > 1 && selection.some((s) => s.id === videoDTO.video_id)) {
+          if (selection.length > 1 && selection.includes(videoDTO.video_id)) {
             return multipleVideoDndSource.getData({
-              ids: selection.map((s) => s.id),
+              ids: selection,
               board_id: boardId,
             });
           } // Otherwise, initiate a single-image drag
