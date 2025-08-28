@@ -1,35 +1,39 @@
-import { Flex, Text } from '@invoke-ai/ui-library';
+import { Flex, FormLabel, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { UploadImageIconButton } from 'common/hooks/useImageUploadButton';
 import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
+import type { SetUpscaleInitialImageDndTargetData } from 'features/dnd/dnd';
+import { setUpscaleInitialImageDndTarget } from 'features/dnd/dnd';
+import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
 import { DndImageIcon } from 'features/dnd/DndImageIcon';
-import { selectStartingFrameImage, startingFrameImageChanged } from 'features/parameters/store/videoSlice';
+import { selectVideoLastFrameImage, videoLastFrameImageChanged } from 'features/parameters/store/videoSlice';
 import { t } from 'i18next';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 import { useImageDTO } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
-export const StartingFrameImage = () => {
+export const VideoLastFrameImage = () => {
   const dispatch = useAppDispatch();
-  const startingFrameImage = useAppSelector(selectStartingFrameImage);
-  const imageDTO = useImageDTO(startingFrameImage?.image_name);
- 
+  const videoLastFrameImage = useAppSelector(selectVideoLastFrameImage);
+  const imageDTO = useImageDTO(videoLastFrameImage?.image_name);
+  
 
   const onReset = useCallback(() => {
-    dispatch(startingFrameImageChanged(null));
+    dispatch(videoLastFrameImageChanged(null));
   }, [dispatch]);
 
   const onUpload = useCallback(
     (imageDTO: ImageDTO) => {
-      dispatch(startingFrameImageChanged(imageDTOToImageWithDims(imageDTO)));
+      dispatch(videoLastFrameImageChanged(imageDTOToImageWithDims(imageDTO)));
     },
     [dispatch]
   );
 
   return (
     <Flex justifyContent="flex-start" flexDir="column" gap={2}>
+      <FormLabel>Last Frame Image</FormLabel>
       <Flex position="relative" w={36} h={36} alignItems="center" justifyContent="center">
         {!imageDTO && <UploadImageIconButton w="full" h="full" isError={!imageDTO} onUpload={onUpload} fontSize={36} />}
         {imageDTO && (
@@ -59,7 +63,7 @@ export const StartingFrameImage = () => {
             >{`${imageDTO.width}x${imageDTO.height}`}</Text>
           </>
         )}
-        
+       
       </Flex>
     </Flex>
   );

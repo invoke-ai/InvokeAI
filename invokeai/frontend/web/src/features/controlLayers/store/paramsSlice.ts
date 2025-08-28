@@ -18,8 +18,6 @@ import {
   isFluxKontextAspectRatioID,
   isGemini2_5AspectRatioID,
   isImagenAspectRatioID,
-  isRunwayAspectRatioID,
-  RUNWAY_ASPECT_RATIOS,
   zParamsState,
 } from 'features/controlLayers/store/types';
 import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
@@ -41,7 +39,6 @@ import type {
   ParameterCLIPGEmbedModel,
   ParameterCLIPLEmbedModel,
   ParameterControlLoRAModel,
-  ParameterDuration,
   ParameterGuidance,
   ParameterModel,
   ParameterNegativePrompt,
@@ -383,9 +380,6 @@ const slice = createSlice({
         state.dimensions.rect.height = bboxDims.height;
       }
     },
-    setVideoDuration: (state, action: PayloadAction<ParameterDuration>) => {
-      state.videoDuration = action.payload;
-    },
     paramsReset: (state) => resetState(state),
   },
 });
@@ -487,7 +481,6 @@ export const {
   syncedToOptimalDimension,
 
   paramsReset,
-  setVideoDuration,
 } = slice.actions;
 
 export const paramsSliceConfig: SliceConfig<typeof slice> = {
@@ -612,7 +605,6 @@ export const selectHeight = createParamsSelector((params) => params.dimensions.r
 export const selectAspectRatioID = createParamsSelector((params) => params.dimensions.aspectRatio.id);
 export const selectAspectRatioValue = createParamsSelector((params) => params.dimensions.aspectRatio.value);
 export const selectAspectRatioIsLocked = createParamsSelector((params) => params.dimensions.aspectRatio.isLocked);
-export const selectVideoDuration = createParamsSelector((params) => params.videoDuration);
 
 export const selectMainModelConfig = createSelector(
   selectModelConfigsQuery,

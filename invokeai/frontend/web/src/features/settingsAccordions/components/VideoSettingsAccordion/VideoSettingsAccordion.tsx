@@ -1,15 +1,10 @@
 import { Flex, StandaloneAccordion } from '@invoke-ai/ui-library';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
-import { memo, useEffect } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ParamDuration } from 'features/parameters/components/Video/ParamDuration';
-import { ParamSeed } from 'features/parameters/components/Seed/ParamSeed';
-import { Dimensions } from 'features/parameters/components/Dimensions/Dimensions';
-import { RUNWAY_ASPECT_RATIOS } from 'features/controlLayers/store/types';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { widthChanged, heightChanged, aspectRatioIdChanged, aspectRatioLockToggled } from 'features/controlLayers/store/paramsSlice';
-import { StartingFrameImage } from './StartingFrameImage';
+import { VideoFirstFrameImage } from './VideoFirstFrameImage';
+import { VideoLastFrameImage } from './VideoLastFrameImage';
 
 
 export const VideoSettingsAccordion = memo(() => {
@@ -18,35 +13,26 @@ export const VideoSettingsAccordion = memo(() => {
         id: 'video-settings',
         defaultIsOpen: true,
     });
-    const dispatch = useAppDispatch();
-
-    useEffect(() => { // hack to get the default aspect ratio for runway models outside paramsSlice
-        const { width, height } = RUNWAY_ASPECT_RATIOS['16:9'];
-        dispatch(widthChanged({ width, updateAspectRatio: true, clamp: true }));
-        dispatch(heightChanged({ height, updateAspectRatio: true, clamp: true }));
-        dispatch(aspectRatioIdChanged({ id: '16:9' }));
-        dispatch(aspectRatioLockToggled());
-    }, [dispatch]);
 
 
     return (
         <StandaloneAccordion
-            label={"Video"}
+            label={t('upscaling.upscale')}
             badges={[]}
             isOpen={isOpenAccordion}
             onToggle={onToggleAccordion}
         >
             <Flex p={4} w="full" h="full" flexDir="column" data-testid="upscale-settings-accordion">
-                <Flex gap={4} flexDirection="column" width="full">
-                <Flex gap={4}>
-                    <StartingFrameImage />
-                    <Flex gap={4} flexDirection="column" width="full">
-                        <ParamDuration />
-                    </Flex>
+                <Flex  gap={4}>
+                 
+                        <VideoFirstFrameImage />
+                        <VideoLastFrameImage />
+                        
+
+         
+
                 </Flex>
-                <Dimensions />
-                <ParamSeed />
-                </Flex>
+
             </Flex>
         </StandaloneAccordion>
     );

@@ -9,7 +9,6 @@ import {
   zParameterCLIPGEmbedModel,
   zParameterCLIPLEmbedModel,
   zParameterControlLoRAModel,
-  zParameterDuration,
   zParameterGuidance,
   zParameterImageDimension,
   zParameterMaskBlurMethod,
@@ -483,19 +482,6 @@ export const FLUX_KONTEXT_ASPECT_RATIOS: Record<FluxKontextAspectRatio, Dimensio
   '1:1': { width: 1024, height: 1024 },
 };
 
-export const zRunwayAspectRatioID = z.enum(['16:9', '4:3', '1:1', '3:4', '9:16', '21:9']);
-type RunwayAspectRatio = z.infer<typeof zRunwayAspectRatioID>;
-export const isRunwayAspectRatioID = (v: unknown): v is RunwayAspectRatio =>
-  zRunwayAspectRatioID.safeParse(v).success;
-export const RUNWAY_ASPECT_RATIOS: Record<RunwayAspectRatio, Dimensions> = {
-  '16:9': { width: 1280, height: 720 },
-  '4:3': { width: 1104, height: 832 },
-  '1:1': { width: 960, height: 960 },
-  '3:4': { width: 832, height: 1104 }, 
-  '9:16': { width: 720, height: 1280 },
-  '21:9': { width: 1584, height: 672 },
-};
-
 const zAspectRatioConfig = z.object({
   id: zAspectRatioID,
   value: z.number().gt(0),
@@ -582,7 +568,6 @@ export const zParamsState = z.object({
   clipGEmbedModel: zParameterCLIPGEmbedModel.nullable(),
   controlLora: zParameterControlLoRAModel.nullable(),
   dimensions: zDimensionsState,
-  videoDuration: zParameterDuration,
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
@@ -633,7 +618,6 @@ export const getInitialParamsState = (): ParamsState => ({
     rect: { x: 0, y: 0, width: 512, height: 512 },
     aspectRatio: deepClone(DEFAULT_ASPECT_RATIO_CONFIG),
   },
-  videoDuration: 5,
 });
 
 const zInpaintMasks = z.object({

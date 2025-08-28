@@ -1,6 +1,6 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
-import {  startingFrameImageChanged } from 'features/parameters/store/videoSlice';
+import { selectVideoFirstFrameImage, videoFirstFrameImageChanged } from 'features/parameters/store/videoSlice';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +13,7 @@ export const ImageMenuItemSendToVideo = memo(() => {
   const dispatch = useDispatch();
 
   const onClick = useCallback(() => {
-    dispatch(startingFrameImageChanged(imageDTO));
+    dispatch(videoFirstFrameImageChanged(imageDTO));
     navigationApi.switchToTab('video');
   }, [imageDTO]);
 
