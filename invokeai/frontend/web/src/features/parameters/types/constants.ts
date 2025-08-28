@@ -19,7 +19,6 @@ export const MODEL_TYPE_MAP: Record<BaseModelType, string> = {
   'flux-kontext': 'Flux Kontext',
   'gemini-2.5': 'Gemini 2.5',
   veo3: 'Veo3',
-  runway: 'Runway',
 };
 
 /**
@@ -40,7 +39,6 @@ export const MODEL_TYPE_SHORT_MAP: Record<BaseModelType, string> = {
   'flux-kontext': 'Flux Kontext',
   'gemini-2.5': 'Gemini 2.5',
   veo3: 'Veo3',
-  runway: 'Runway',
 };
 
 /**
@@ -185,5 +183,3 @@ export const SUPPORTS_ASPECT_RATIO_BASE_MODELS: BaseModelType[] = [
   'flux-kontext',
   'chatgpt-4o',
 ];
-
-export const VIDEO_BASE_MODELS = ['veo3', 'runway'];

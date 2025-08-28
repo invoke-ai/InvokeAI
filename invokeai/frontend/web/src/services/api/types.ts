@@ -130,7 +130,6 @@ export type FLUXKontextModelConfig = MainModelConfig;
 export type ChatGPT4oModelConfig = ApiModelConfig;
 export type Gemini2_5ModelConfig = ApiModelConfig;
 export type Veo3ModelConfig = ApiModelConfig;
-export type RunwayModelConfig = ApiModelConfig;
 export type AnyModelConfig =
   | ControlLoRAModelConfig
   | LoRAModelConfig
@@ -298,10 +297,6 @@ export const isChatGPT4oModelConfig = (config: AnyModelConfig): config is ChatGP
 
 export const isVeo3ModelConfig = (config: AnyModelConfig): config is Veo3ModelConfig => {
   return config.type === 'main' && config.base === 'veo3';
-};
-
-export const isRunwayModelConfig = (config: AnyModelConfig): config is RunwayModelConfig => {
-  return config.type === 'main' && config.base === 'runway';
 };
 
 export const isImagen3ModelConfig = (config: AnyModelConfig): config is ApiModelConfig => {
