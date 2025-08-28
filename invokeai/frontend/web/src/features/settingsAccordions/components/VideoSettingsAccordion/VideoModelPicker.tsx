@@ -1,7 +1,6 @@
 import { Flex, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { zModelIdentifierField } from 'features/nodes/types/common';
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
 import { videoModelChanged } from 'features/parameters/store/videoSlice';
 import { memo, useCallback } from 'react';
@@ -17,7 +16,7 @@ export const VideoModelPicker = memo(() => {
   const selectedModelConfig = useSelectedVideoModelConfig();
   const onChange = useCallback(
     (modelConfig: VideoApiModelConfig) => {
-      dispatch(videoModelChanged({ videoModel: zModelIdentifierField.parse(modelConfig) }));
+      dispatch(videoModelChanged(modelConfig));
     },
     [dispatch]
   );
