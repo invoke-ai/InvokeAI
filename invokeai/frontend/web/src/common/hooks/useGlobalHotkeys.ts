@@ -13,6 +13,7 @@ import { getFocusedRegion } from './focus';
 
 export const useGlobalHotkeys = () => {
   const { dispatch, getState } = useAppStore();
+  const isVideoEnabled = useFeatureStatus('video');
   const isModelManagerEnabled = useFeatureStatus('modelManager');
   const queue = useInvoke();
 
@@ -89,6 +90,18 @@ export const useGlobalHotkeys = () => {
     category: 'app',
     callback: () => {
       navigationApi.switchToTab('upscaling');
+    },
+    dependencies: [dispatch],
+  });
+
+  useRegisteredHotkeys({
+    id: 'selectVideoTab',
+    category: 'app',
+    callback: () => {
+      navigationApi.switchToTab('video');
+    },
+    options: {
+      enabled: isVideoEnabled,
     },
     dependencies: [dispatch],
   });
