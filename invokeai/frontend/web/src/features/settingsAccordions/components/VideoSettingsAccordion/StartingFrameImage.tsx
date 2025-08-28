@@ -37,7 +37,7 @@ export const StartingFrameImage = () => {
         {!imageDTO && <UploadImageIconButton w="full" h="full" isError={!imageDTO} onUpload={onUpload} fontSize={36} />}
         {imageDTO && (
           <>
-            <DndImage imageDTO={imageDTO} borderRadius="base" />
+            <DndImage imageDTO={imageDTO} borderRadius="base" borderWidth={1} borderStyle="solid" />
             <Flex position="absolute" flexDir="column" top={1} insetInlineEnd={1} gap={1}>
               <DndImageIcon
                 onClick={onReset}
