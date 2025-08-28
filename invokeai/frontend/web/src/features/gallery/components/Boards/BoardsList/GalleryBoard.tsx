@@ -95,8 +95,7 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
               {board.archived && <Icon as={PiArchiveBold} fill="base.300" />}
               <Flex justifyContent="flex-end">
                 <Text variant="subtext">
-                  {board.image_count} | {isVideoEnabled && `${board.video_count} | `}
-                  {board.asset_count}
+                  {board.image_count} | {board.asset_count} {isVideoEnabled && `| ${board.video_count}`}
                 </Text>
               </Flex>
             </Flex>
