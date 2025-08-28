@@ -229,10 +229,7 @@ class ImageField(BaseModel):
 class VideoField(BaseModel):
     """A video primitive field"""
 
-    video_id: str = Field(description="The id of the video")
-    width: int = Field(description="The width of the video in pixels")
-    height: int = Field(description="The height of the video in pixels")
-    duration_seconds: float = Field(description="The duration of the video in seconds")
+    video_name: str = Field(description="The name of the video")
 
 
 class BoardField(BaseModel):
