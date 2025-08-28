@@ -13,12 +13,14 @@ import {
 import { refImageModelChanged, selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier, isFLUXReduxConfig, isIPAdapterConfig } from 'features/controlLayers/store/types';
+import { zModelIdentifierField } from 'features/nodes/types/common';
 import { modelSelected } from 'features/parameters/store/actions';
 import {
   postProcessingModelChanged,
   tileControlnetModelChanged,
   upscaleModelChanged,
 } from 'features/parameters/store/upscaleSlice';
+import { videoModelChanged } from 'features/parameters/store/videoSlice';
 import {
   zParameterCLIPEmbedModel,
   zParameterSpandrelImageToImageModel,
@@ -41,6 +43,7 @@ import {
   isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
   isT5EncoderModelConfig,
+  isVideoModelConfig,
 } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
@@ -81,6 +84,7 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
       handleCLIPEmbedModels(models, state, dispatch, log);
       handleFLUXVAEModels(models, state, dispatch, log);
       handleFLUXReduxModels(models, state, dispatch, log);
+      handleVideoModels(models, state, dispatch, log);
     },
   });
 };
@@ -191,6 +195,22 @@ const handleLoRAModels: ModelHandler = (models, state, dispatch, log) => {
     log.debug({ model: lora.model }, 'LoRA model is not available, clearing');
     dispatch(loraDeleted({ id: lora.id }));
   });
+};
+
+const handleVideoModels: ModelHandler = (models, state, dispatch, log) => {
+  const videoModels = models.filter(isVideoModelConfig);
+  const selectedVideoModel = state.video.videoModel;
+
+  if (selectedVideoModel && videoModels.some((m) => m.key === selectedVideoModel.key)) {
+    return;
+  }
+
+  const firstModel = videoModels[0] || null;
+  if (firstModel) {
+    log.debug({ firstModel }, 'No video model selected, selecting first available video model');
+    dispatch(videoModelChanged({ videoModel: zModelIdentifierField.parse(firstModel) }));
+    return;
+  }
 };
 
 const handleControlAdapterModels: ModelHandler = (models, state, dispatch, log) => {
