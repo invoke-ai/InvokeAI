@@ -3,6 +3,7 @@ from typing import Any, Coroutine, Optional
 
 from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
+    QUEUE_ORDER_BY,
     Batch,
     BatchStatus,
     CancelAllExceptCurrentResult,
@@ -15,6 +16,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     EnqueueBatchResult,
     IsEmptyResult,
     IsFullResult,
+    ItemIdsResult,
     PruneResult,
     RetryItemsResult,
     SessionQueueCountsByDestination,
@@ -23,6 +25,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
 )
 from invokeai.app.services.shared.graph import GraphExecutionState
 from invokeai.app.services.shared.pagination import CursorPaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
 
 class SessionQueueBase(ABC):
@@ -155,6 +158,16 @@ class SessionQueueBase(ABC):
         destination: Optional[str] = None,
     ) -> list[SessionQueueItem]:
         """Gets all queue items that match the given parameters"""
+        pass
+
+    @abstractmethod
+    def get_queue_itemIds(
+        self,
+        queue_id: str,
+        order_by: QUEUE_ORDER_BY = "item_id",
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+    ) -> ItemIdsResult:
+        """Gets all queue item ids that match the given parameters"""
         pass
 
     @abstractmethod
