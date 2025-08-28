@@ -1,7 +1,7 @@
 import { useAppStore } from 'app/store/storeHooks';
 import { useCallback, useEffect, useState } from 'react';
 import type { ListRange } from 'react-virtuoso';
-import { useGetVideoDTOsByNamesMutation, videosApi } from 'services/api/endpoints/videos';
+import { useGetVideoDTOsByNamesMutation,videosApi } from 'services/api/endpoints/videos';
 import { useThrottledCallback } from 'use-debounce';
 
 interface UseRangeBasedVideoFetchingArgs {
@@ -50,7 +50,7 @@ export const useRangeBasedVideoFetching = ({
       }
       const cachedVideoIds = videosApi.util.selectCachedArgsForQuery(store.getState(), 'getVideoDTO');
       const uncachedIds = getUncachedIds(videoIds, cachedVideoIds, ranges);
-      // console.log('uncachedIds', uncachedIds);
+      console.log('uncachedIds', uncachedIds);
       if (uncachedIds.length === 0) {
         return;
       }

@@ -1,10 +1,6 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import {
-  imagesToChangeSelected,
-  isModalOpenChanged,
-  videosToChangeSelected,
-} from 'features/changeBoardModal/store/slice';
+import { imagesToChangeSelected, isModalOpenChanged, videosToChangeSelected } from 'features/changeBoardModal/store/slice';
 import { useItemDTOContext } from 'features/gallery/contexts/ItemDTOContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

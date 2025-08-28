@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import { type ImageDTO, isImageDTO, isVideoDTO, type VideoDTO } from 'services/api/types';
+import { isImageDTO, isVideoDTO, type ImageDTO, type VideoDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 
 const ItemDTOContext = createContext<ImageDTO | VideoDTO | null>(null);

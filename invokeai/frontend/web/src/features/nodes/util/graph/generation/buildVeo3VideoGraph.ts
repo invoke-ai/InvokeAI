@@ -3,7 +3,7 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { zImageField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import {  selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { selectStartingFrameImage, selectVideoSlice } from 'features/parameters/store/videoSlice';
@@ -17,8 +17,8 @@ export const buildVeo3VideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn =>
 
   log.debug({ generationMode, manager: manager?.id }, 'Building Veo3 video graph');
 
-  const supportedModes = ['txt2img'];
-  if (!supportedModes.includes(generationMode)) {
+  const supportedModes = ['txt2img'] as const;
+  if (!supportedModes.includes(generationMode as any)) {
     throw new UnsupportedGenerationModeError(t('toast.veo3IncompatibleGenerationMode'));
   }
 
@@ -27,6 +27,7 @@ export const buildVeo3VideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn =>
   const prompts = selectPresetModifiedPrompts(state);
   assert(prompts.positive.length > 0, 'Veo3 video requires positive prompt to have at least one character');
 
+  
   const { seed, shouldRandomizeSeed } = params;
   const { videoModel, videoResolution, videoDuration } = videoParams;
   const finalSeed = shouldRandomizeSeed ? undefined : seed;
@@ -45,7 +46,7 @@ export const buildVeo3VideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn =>
     // @ts-expect-error: This node is not available in the OSS application
     type: 'google_veo_3_generate_video',
     model: videoModel,
-    aspect_ratio: '16:9',
+    aspect_ratio: "16:9",
     resolution: videoResolution,
     seed: finalSeed,
   });

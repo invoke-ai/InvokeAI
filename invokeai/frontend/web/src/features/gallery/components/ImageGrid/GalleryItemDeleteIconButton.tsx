@@ -6,7 +6,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleFill } from 'react-icons/pi';
 import { useDeleteVideosMutation } from 'services/api/endpoints/videos';
-import { type ImageDTO, isImageDTO, type VideoDTO } from 'services/api/types';
+import { isImageDTO, type ImageDTO, type VideoDTO } from 'services/api/types';
 
 type Props = {
   itemDTO: ImageDTO | VideoDTO;

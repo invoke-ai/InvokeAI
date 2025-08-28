@@ -15,9 +15,9 @@ export const ContextMenuItemOpenInViewer = memo(() => {
   const itemDTO = useItemDTOContext();
   const onClick = useCallback(() => {
     if (isImageDTO(itemDTO)) {
-      dispatch(imageToCompareChanged(null));
-      dispatch(imageSelected(itemDTO.image_name));
-      navigationApi.focusPanelInActiveTab(VIEWER_PANEL_ID);
+    dispatch(imageToCompareChanged(null));
+    dispatch(imageSelected(itemDTO.image_name));
+    navigationApi.focusPanelInActiveTab(VIEWER_PANEL_ID);
     } else {
       // TODO: Implement video open in viewer
     }

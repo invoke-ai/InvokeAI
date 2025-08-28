@@ -10,10 +10,10 @@ import type { Param0 } from 'tsafe';
 
 const ChakraImg = chakra('img');
 
-const DndDragPreviewSingleVideo = memo(({ videoDTO }: { videoDTO: VideoDTO }) => {
+const DndDragPreviewSingleVideo = memo(({ videoDTO }: { videoDTO: VideoDTO}) => {
   return (
-    <Flex w={DND_IMAGE_DRAG_PREVIEW_SIZE} h={DND_IMAGE_DRAG_PREVIEW_SIZE} bg="cyan">
-      <Text color="base.900">I AM A VIDEO</Text>
+    <Flex w={DND_IMAGE_DRAG_PREVIEW_SIZE} h={DND_IMAGE_DRAG_PREVIEW_SIZE} bg='cyan'>
+     <Text color='base.900'>I AM A VIDEO</Text>
       <ChakraImg
         margin="auto"
         maxW="full"
@@ -51,7 +51,7 @@ export const setSingleVideoDragPreview = ({
   const { nativeSetDragImage, source, location } = onGenerateDragPreviewArgs;
   setCustomNativeDragPreview({
     render({ container }) {
-      setDragPreviewState({ type: 'single-video', container, videoDTO: singleVideoDndData.payload.videoDTO });
+      setDragPreviewState({ type: 'single-video', container, videoDTO: singleVideoDndData.payload.videoDTO});
       return () => setDragPreviewState(null);
     },
     nativeSetDragImage,

@@ -1,12 +1,16 @@
-import { Flex, FormLabel } from '@invoke-ai/ui-library';
+import { Flex, FormLabel, Icon } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { UseDefaultSettingsButton } from 'features/parameters/components/MainModel/UseDefaultSettingsButton';
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
+import { modelSelected } from 'features/parameters/store/actions';
 import { selectVideoModel, videoModelChanged } from 'features/parameters/store/videoSlice';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useVeo3Models } from 'services/api/hooks/modelsByType';
-import type { Veo3ModelConfig } from 'services/api/types';
+import { MdMoneyOff } from 'react-icons/md';
+import { useMainModels, useVeo3Models } from 'services/api/hooks/modelsByType';
+import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
+import { type AnyModelConfig, isCheckpointMainModelConfig, Veo3ModelConfig } from 'services/api/types';
 
 export const VideoModelPicker = memo(() => {
   const { t } = useTranslation();

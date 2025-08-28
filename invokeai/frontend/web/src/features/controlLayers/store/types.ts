@@ -484,14 +484,16 @@ export const FLUX_KONTEXT_ASPECT_RATIOS: Record<FluxKontextAspectRatio, Dimensio
 
 export const zVeo3AspectRatioID = z.enum(['16:9']);
 type Veo3AspectRatio = z.infer<typeof zVeo3AspectRatioID>;
-export const isVeo3AspectRatioID = (v: unknown): v is Veo3AspectRatio => zVeo3AspectRatioID.safeParse(v).success;
+export const isVeo3AspectRatioID = (v: unknown): v is Veo3AspectRatio =>
+  zVeo3AspectRatioID.safeParse(v).success;
 export const VEO3_ASPECT_RATIOS: Record<Veo3AspectRatio, Dimensions> = {
   '16:9': { width: 1280, height: 720 },
 };
 
 export const zVeo3Resolution = z.enum(['720p', '1080p']);
 export type Veo3Resolution = z.infer<typeof zVeo3Resolution>;
-export const isVeo3Resolution = (v: unknown): v is Veo3Resolution => zVeo3Resolution.safeParse(v).success;
+export const isVeo3Resolution = (v: unknown): v is Veo3Resolution =>
+  zVeo3Resolution.safeParse(v).success;
 export const VEO3_RESOLUTIONS: Record<Veo3Resolution, Dimensions> = {
   '720p': { width: 1280, height: 720 },
   '1080p': { width: 1920, height: 1080 },
@@ -512,9 +514,11 @@ export const DEFAULT_ASPECT_RATIO_CONFIG: AspectRatioConfig = {
 
 export const zVeo3DurationID = z.enum(['8']);
 export type Veo3Duration = z.infer<typeof zVeo3DurationID>;
-export const isVeo3DurationID = (v: unknown): v is Veo3Duration => zVeo3DurationID.safeParse(v).success;
+export const isVeo3DurationID = (v: unknown): v is Veo3Duration =>
+  zVeo3DurationID.safeParse(v).success;
 export const VEO3_DURATIONS: Record<Veo3Duration, string> = {
   '8': '8 seconds',
+
 };
 
 const zBboxState = z.object({

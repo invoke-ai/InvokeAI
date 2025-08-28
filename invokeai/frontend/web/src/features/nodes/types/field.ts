@@ -1294,7 +1294,8 @@ export type Veo3ModelFieldValue = z.infer<typeof zVeo3ModelFieldValue>;
 export type Veo3ModelFieldInputInstance = z.infer<typeof zVeo3ModelFieldInputInstance>;
 export type Veo3ModelFieldInputTemplate = z.infer<typeof zVeo3ModelFieldInputTemplate>;
 export const isVeo3ModelFieldInputInstance = buildInstanceTypeGuard(zVeo3ModelFieldInputInstance);
-export const isVeo3ModelFieldInputTemplate = buildTemplateTypeGuard<Veo3ModelFieldInputTemplate>('Veo3ModelField');
+export const isVeo3ModelFieldInputTemplate =
+  buildTemplateTypeGuard<Veo3ModelFieldInputTemplate>('Veo3ModelField');
 // #endregion
 
 // #region SchedulerField

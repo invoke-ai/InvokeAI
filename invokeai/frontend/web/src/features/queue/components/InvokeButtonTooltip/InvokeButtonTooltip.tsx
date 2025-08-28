@@ -72,7 +72,7 @@ const VideoTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean })
       <StyledDivider />
       <AddingToText />
     </Flex>
-  );
+  )
 });
 VideoTabTooltipContent.displayName = 'VideoTabTooltipContent';
 

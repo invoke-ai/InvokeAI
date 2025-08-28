@@ -3,7 +3,7 @@ import { useAppStore } from 'app/store/storeHooks';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { useItemDTOContextImageOnly } from 'features/gallery/contexts/ItemDTOContext';
+import { useItemDTOContext, useItemDTOContextImageOnly } from 'features/gallery/contexts/ItemDTOContext';
 import { newCanvasFromImage } from 'features/imageActions/actions';
 import { toast } from 'features/toast/toast';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -11,6 +11,7 @@ import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFileBold, PiPlusBold } from 'react-icons/pi';
+import { isImageDTO } from 'services/api/types';
 
 export const ContextMenuItemNewCanvasFromImageSubMenu = memo(() => {
   const { t } = useTranslation();
@@ -70,8 +71,8 @@ export const ContextMenuItemNewCanvasFromImageSubMenu = memo(() => {
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
-      status: 'success',
-    });
+        status: 'success',
+      });
   }, [imageDTO, store, t]);
 
   const onClickNewCanvasWithControlLayerFromImageWithResize = useCallback(async () => {
@@ -88,8 +89,8 @@ export const ContextMenuItemNewCanvasFromImageSubMenu = memo(() => {
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
-      status: 'success',
-    });
+        status: 'success',
+      });
   }, [imageDTO, store, t]);
 
   return (

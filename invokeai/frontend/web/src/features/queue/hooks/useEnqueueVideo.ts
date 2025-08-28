@@ -54,7 +54,7 @@ const enqueueVideo = async (store: AppStore, prepend: boolean) => {
     return;
   }
 
-  const { g } = buildGraphResult.value;
+  const { g, seed, positivePrompt } = buildGraphResult.value;
 
   // const prepareBatchResult = withResult(() =>
   //   prepareLinearUIBatch({
@@ -75,6 +75,7 @@ const enqueueVideo = async (store: AppStore, prepend: boolean) => {
 
   // const batchConfig = prepareBatchResult.value;
 
+
   const batchConfig = {
     prepend,
     batch: {
@@ -86,10 +87,13 @@ const enqueueVideo = async (store: AppStore, prepend: boolean) => {
   };
 
   const req = dispatch(
-    queueApi.endpoints.enqueueBatch.initiate(batchConfig, {
-      ...enqueueMutationFixedCacheKeyOptions,
-      track: false,
-    })
+    queueApi.endpoints.enqueueBatch.initiate(
+      batchConfig,
+      {
+        ...enqueueMutationFixedCacheKeyOptions,
+        track: false,
+      }
+    )
   );
 
   const enqueueResult = await req.unwrap();
