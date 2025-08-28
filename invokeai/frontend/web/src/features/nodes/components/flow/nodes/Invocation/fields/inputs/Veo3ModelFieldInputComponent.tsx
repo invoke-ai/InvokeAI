@@ -4,7 +4,7 @@ import { fieldVeo3ModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type { Veo3ModelFieldInputInstance, Veo3ModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
 import { useVeo3Models } from 'services/api/hooks/modelsByType';
-import type { VideoApiModelConfig } from 'services/api/types';
+import type { ApiModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
@@ -17,7 +17,7 @@ const Veo3ModelFieldInputComponent = (
   const [modelConfigs, { isLoading }] = useVeo3Models();
 
   const onChange = useCallback(
-    (value: VideoApiModelConfig | null) => {
+    (value: ApiModelConfig | null) => {
       if (!value) {
         return;
       }
