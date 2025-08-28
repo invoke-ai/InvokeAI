@@ -1,7 +1,7 @@
 import { Button, Divider, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
-import SingleSelectionMenuItems from 'features/gallery/components/ContextMenu/SingleSelectionMenuItems';
+import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
 import { useDeleteImage } from 'features/gallery/hooks/useDeleteImage';
 import { useEditImage } from 'features/gallery/hooks/useEditImage';
 import { useLoadWorkflow } from 'features/gallery/hooks/useLoadWorkflow';

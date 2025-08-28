@@ -1,19 +1,18 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
-import { useItemDTOContext, useItemDTOContextImageOnly } from 'features/gallery/contexts/ItemDTOContext';
+import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { toast } from 'features/toast/toast';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiShareFatBold } from 'react-icons/pi';
-import { isImageDTO } from 'services/api/types';
 
-export const ContextMenuItemSendToUpscale = memo(() => {
+export const ImageMenuItemSendToUpscale = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const imageDTO = useItemDTOContextImageOnly();
+  const imageDTO = useImageDTOContext();
 
   const handleSendToCanvas = useCallback(() => {
     dispatch(upscaleInitialImageChanged(imageDTOToImageWithDims(imageDTO)));
@@ -32,4 +31,4 @@ export const ContextMenuItemSendToUpscale = memo(() => {
   );
 });
 
-ContextMenuItemSendToUpscale.displayName = 'ContextMenuItemSendToUpscale';
+ImageMenuItemSendToUpscale.displayName = 'ImageMenuItemSendToUpscale';
