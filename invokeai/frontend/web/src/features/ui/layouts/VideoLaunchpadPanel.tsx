@@ -18,9 +18,10 @@ export const VideoLaunchpadPanel = memo(() => {
 
   if (!isVideoEnabled) {
     return (
-      <LaunchpadContainer heading="">
+      <LaunchpadContainer heading={t('ui.launchpad.videoTitle')}>
+        <Grid gridTemplateColumns="1fr 1fr" gap={8}>
           {videoUpsellComponent}
-       
+        </Grid>
       </LaunchpadContainer>
     );
   }
