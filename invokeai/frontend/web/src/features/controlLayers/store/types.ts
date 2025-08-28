@@ -504,7 +504,7 @@ export const RUNWAY_ASPECT_RATIOS: Record<RunwayAspectRatio, Dimensions> = {
 export const zVeo3Resolution = z.enum(['720p', '1080p']);
 export type Veo3Resolution = z.infer<typeof zVeo3Resolution>;
 export const isVeo3Resolution = (v: unknown): v is Veo3Resolution => zVeo3Resolution.safeParse(v).success;
-export const RESOLUTION_MAP: Record<Veo3Resolution | RunwayResolution, Dimensions> = {
+export const VEO3_RESOLUTIONS: Record<Veo3Resolution, Dimensions> = {
   '720p': { width: 1280, height: 720 },
   '1080p': { width: 1920, height: 1080 },
 };
@@ -512,6 +512,9 @@ export const RESOLUTION_MAP: Record<Veo3Resolution | RunwayResolution, Dimension
 export const zRunwayResolution = z.enum(['720p']);
 export type RunwayResolution = z.infer<typeof zRunwayResolution>;
 export const isRunwayResolution = (v: unknown): v is RunwayResolution => zRunwayResolution.safeParse(v).success;
+export const RUNWAY_RESOLUTIONS: Record<RunwayResolution, Dimensions> = {
+  '720p': { width: 1280, height: 720 },
+};
 
 const zAspectRatioConfig = z.object({
   id: zAspectRatioID,
