@@ -43,8 +43,6 @@
         "move": "Move",
         "movingImagesToBoard_one": "Moving {{count}} image to board:",
         "movingImagesToBoard_other": "Moving {{count}} images to board:",
-        "movingVideosToBoard_one": "Moving {{count}} video to board:",
-        "movingVideosToBoard_other": "Moving {{count}} videos to board:",
         "myBoard": "My Board",
         "noBoards": "No {{boardType}} Boards",
         "noMatching": "No matching Boards",

@@ -7,7 +7,6 @@ import z from 'zod';
 const zChangeBoardModalState = z.object({
   isModalOpen: z.boolean().default(false),
   image_names: z.array(z.string()).default(() => []),
-  video_ids: z.array(z.string()).default(() => []),
 });
 type ChangeBoardModalState = z.infer<typeof zChangeBoardModalState>;
 
@@ -23,9 +22,6 @@ const slice = createSlice({
     imagesToChangeSelected: (state, action: PayloadAction<string[]>) => {
       state.image_names = action.payload;
     },
-    videosToChangeSelected: (state, action: PayloadAction<string[]>) => {
-      state.video_ids = action.payload;
-    },
     changeBoardReset: (state) => {
       state.image_names = [];
       state.isModalOpen = false;
@@ -33,7 +29,7 @@ const slice = createSlice({
   },
 });
 
-export const { isModalOpenChanged, imagesToChangeSelected, videosToChangeSelected, changeBoardReset } = slice.actions;
+export const { isModalOpenChanged, imagesToChangeSelected, changeBoardReset } = slice.actions;
 
 export const selectChangeBoardModalSlice = (state: RootState) => state.changeBoardModal;
 

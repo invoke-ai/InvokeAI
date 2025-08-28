@@ -1,6 +1,6 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { imagesToChangeSelected, isModalOpenChanged, videosToChangeSelected } from 'features/changeBoardModal/store/slice';
+import { imagesToChangeSelected, isModalOpenChanged } from 'features/changeBoardModal/store/slice';
 import { useItemDTOContext } from 'features/gallery/contexts/ItemDTOContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,7 +16,7 @@ export const ContextMenuItemChangeBoard = memo(() => {
     if (isImageDTO(itemDTO)) {
       dispatch(imagesToChangeSelected([itemDTO.image_name]));
     } else {
-      dispatch(videosToChangeSelected([itemDTO.video_id]));
+      // dispatch(videosToChangeSelected([itemDTO.video_id]));
     }
     dispatch(isModalOpenChanged(true));
   }, [dispatch, itemDTO]);
