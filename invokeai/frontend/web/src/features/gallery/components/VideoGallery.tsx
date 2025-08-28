@@ -1,7 +1,6 @@
 import { Box, Flex, forwardRef, Grid, GridItem, Spinner, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { logger } from 'app/logging/logger';
 import { $accountTypeText } from 'app/store/nanostores/accountTypeText';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { getFocusedRegion } from 'common/hooks/focus';
@@ -33,8 +32,6 @@ import { GalleryVideoPlaceholder } from './ImageGrid/GalleryVideoPlaceholder';
 import { scrollIntoView } from './scrollIntoView';
 import { useGalleryVideoIds } from './use-gallery-video-ids';
 import { useScrollableGallery } from './useScrollableGallery';
-
-export const log = logger('gallery');
 
 type ListVideoIdsQueryArgs = ReturnType<typeof selectGetVideoIdsQueryArgs>;
 
