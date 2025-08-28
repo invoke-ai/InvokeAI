@@ -95,7 +95,6 @@ assert<Equals<VideoDTO, S['VideoDTO']>>();
 export const isVideoDTO = (dto: ImageDTO | VideoDTO): dto is VideoDTO => {
   return 'video_id' in dto;
 };
-export type OffsetPaginatedResults_VideoDTO_ = S['OffsetPaginatedResults_VideoDTO_'];
 
 // Models
 export type ModelType = S['ModelType'];
@@ -130,8 +129,8 @@ export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig | Api
 export type FLUXKontextModelConfig = MainModelConfig;
 export type ChatGPT4oModelConfig = ApiModelConfig;
 export type Gemini2_5ModelConfig = ApiModelConfig;
-export type Veo3ModelConfig = VideoApiModelConfig;
-export type RunwayModelConfig = VideoApiModelConfig;
+type Veo3ModelConfig = VideoApiModelConfig;
+type RunwayModelConfig = VideoApiModelConfig;
 export type AnyModelConfig =
   | ControlLoRAModelConfig
   | LoRAModelConfig
@@ -423,7 +422,6 @@ export type OutputFields<T extends AnyInvocation> = Extract<
 
 // Node Outputs
 export type ImageOutput = S['ImageOutput'];
-export type VideoOutput = S['VideoOutput'];
 
 export type BoardRecordOrderBy = S['BoardRecordOrderBy'];
 export type StarterModel = S['StarterModel'];

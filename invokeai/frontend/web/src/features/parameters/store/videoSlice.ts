@@ -21,8 +21,8 @@ import {
   zVideoDuration,
   zVideoResolution,
 } from 'features/controlLayers/store/types';
-import type { ModelIdentifierField, VideoField } from 'features/nodes/types/common';
-import { zModelIdentifierField, zVideoField } from 'features/nodes/types/common';
+import type { ModelIdentifierField } from 'features/nodes/types/common';
+import { zModelIdentifierField } from 'features/nodes/types/common';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import { isVideoModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -31,7 +31,6 @@ import z from 'zod';
 const zVideoState = z.object({
   _version: z.literal(1),
   startingFrameImage: zImageWithDims.nullable(),
-  generatedVideo: zVideoField.nullable(),
   videoModel: zModelIdentifierField.nullable(),
   videoResolution: zVideoResolution,
   videoDuration: zVideoDuration,
@@ -44,7 +43,6 @@ const getInitialState = (): VideoState => {
   return {
     _version: 1,
     startingFrameImage: null,
-    generatedVideo: null,
     videoModel: null,
     videoResolution: '720p',
     videoDuration: '8',
@@ -58,11 +56,6 @@ const slice = createSlice({
   reducers: {
     startingFrameImageChanged: (state, action: PayloadAction<ImageWithDims | null>) => {
       state.startingFrameImage = action.payload;
-    },
-
-    generatedVideoChanged: (state, action: PayloadAction<{ videoField: VideoField | null }>) => {
-      const { videoField } = action.payload;
-      state.generatedVideo = videoField;
     },
 
     videoModelChanged: (state, action: PayloadAction<{ videoModel: ModelIdentifierField | null }>) => {
@@ -109,7 +102,6 @@ const slice = createSlice({
 
 export const {
   startingFrameImageChanged,
-  generatedVideoChanged,
   videoModelChanged,
   videoResolutionChanged,
   videoDurationChanged,
@@ -135,7 +127,6 @@ export const selectVideoSlice = (state: RootState) => state.video;
 const createVideoSelector = <T>(selector: Selector<VideoState, T>) => createSelector(selectVideoSlice, selector);
 
 export const selectStartingFrameImage = createVideoSelector((video) => video.startingFrameImage);
-export const selectGeneratedVideo = createVideoSelector((video) => video.generatedVideo);
 export const selectVideoModel = createVideoSelector((video) => video.videoModel);
 export const selectVideoModelKey = createVideoSelector((video) => video.videoModel?.key);
 export const selectVideoResolution = createVideoSelector((video) => video.videoResolution);

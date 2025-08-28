@@ -14,10 +14,10 @@ type ImageFieldCollection = z.infer<typeof zImageFieldCollection>;
 export const isImageFieldCollection = (field: unknown): field is ImageFieldCollection =>
   zImageFieldCollection.safeParse(field).success;
 
-export const zVideoField = z.object({
+const zVideoField = z.object({
   video_id: z.string().trim().min(1),
 });
-export type VideoField = z.infer<typeof zVideoField>;
+type VideoField = z.infer<typeof zVideoField>;
 export const isVideoField = (field: unknown): field is VideoField => zVideoField.safeParse(field).success;
 assert<Equals<VideoField, S['VideoField']>>();
 
@@ -204,12 +204,4 @@ export const zImageOutput = z.object({
   type: z.literal('image_output'),
 });
 export type ImageOutput = z.infer<typeof zImageOutput>;
-// #endregion
-
-// #region ImageOutput
-export const zVideoOutput = z.object({
-  video_id: z.string().trim().min(1),
-  type: z.literal('video_output'),
-});
-export type VideoOutput = z.infer<typeof zVideoOutput>;
 // #endregion
