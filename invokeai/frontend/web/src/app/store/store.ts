@@ -54,7 +54,6 @@ import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { addArchivedOrDeletedBoardListener } from './middleware/listenerMiddleware/listeners/addArchivedOrDeletedBoardListener';
 import { addImageUploadedFulfilledListener } from './middleware/listenerMiddleware/listeners/imageUploaded';
-import { videoSliceConfig } from 'features/parameters/store/videoSlice';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -79,7 +78,6 @@ const SLICE_CONFIGS = {
   [systemSliceConfig.slice.reducerPath]: systemSliceConfig,
   [uiSliceConfig.slice.reducerPath]: uiSliceConfig,
   [upscaleSliceConfig.slice.reducerPath]: upscaleSliceConfig,
-  [videoSliceConfig.slice.reducerPath]: videoSliceConfig,
   [workflowLibrarySliceConfig.slice.reducerPath]: workflowLibrarySliceConfig,
   [workflowSettingsSliceConfig.slice.reducerPath]: workflowSettingsSliceConfig,
 };
@@ -113,7 +111,6 @@ const ALL_REDUCERS = {
   [systemSliceConfig.slice.reducerPath]: systemSliceConfig.slice.reducer,
   [uiSliceConfig.slice.reducerPath]: uiSliceConfig.slice.reducer,
   [upscaleSliceConfig.slice.reducerPath]: upscaleSliceConfig.slice.reducer,
-  [videoSliceConfig.slice.reducerPath]: videoSliceConfig.slice.reducer,
   [workflowLibrarySliceConfig.slice.reducerPath]: workflowLibrarySliceConfig.slice.reducer,
   [workflowSettingsSliceConfig.slice.reducerPath]: workflowSettingsSliceConfig.slice.reducer,
 };
