@@ -19,7 +19,6 @@ import { ContextMenuItemUseAsPromptTemplate } from 'features/gallery/components/
 import { ContextMenuItemUseAsRefImage } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemUseAsRefImage';
 import { ContextMenuItemUseForPromptGeneration } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemUseForPromptGeneration';
 import { ItemDTOContextProvider } from 'features/gallery/contexts/ItemDTOContext';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { ImageDTO } from 'services/api/types';
 
@@ -32,7 +31,6 @@ type SingleSelectionMenuItemsProps = {
 
 const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) => {
   const tab = useAppSelector(selectActiveTab);
-  const isVideoEnabled = useFeatureStatus('video');
 
   return (
     <ItemDTOContextProvider value={imageDTO}>
@@ -50,7 +48,7 @@ const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) =
       {tab === 'upscaling' && <ContextMenuItemMetadataRecallActionsUpscaleTab />}
       <MenuDivider />
       <ContextMenuItemSendToUpscale />
-      {isVideoEnabled && <ContextMenuItemSendToVideo />}
+      <ContextMenuItemSendToVideo />
       <ContextMenuItemUseForPromptGeneration />
       {(tab === 'canvas' || tab === 'generate') && <ContextMenuItemUseAsRefImage />}
       <ContextMenuItemUseAsPromptTemplate />
