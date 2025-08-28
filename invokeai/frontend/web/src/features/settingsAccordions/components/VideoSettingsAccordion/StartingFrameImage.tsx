@@ -1,4 +1,4 @@
-import { Flex, Text } from '@invoke-ai/ui-library';
+import { Flex, FormLabel, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { UploadImageIconButton } from 'common/hooks/useImageUploadButton';
 import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
@@ -38,6 +38,7 @@ export const StartingFrameImage = () => {
 
   return (
     <Flex justifyContent="flex-start" flexDir="column" gap={2}>
+      <FormLabel>{t('parameters.startingFrameImage')}</FormLabel>
       <Flex position="relative" w={36} h={36} alignItems="center" justifyContent="center">
         {!imageDTO && (
           <UploadImageIconButton
