@@ -2,6 +2,7 @@ import { objectEquals } from '@observ33r/object-equals';
 import { Mutex } from 'async-mutex';
 import { deepClone } from 'common/util/deepClone';
 import { withResultAsync } from 'common/util/result';
+import { parseify } from 'common/util/serialize';
 import type { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityBufferObjectRenderer';
 import type { CanvasEntityFilterer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityFilterer';
 import type { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityObjectRenderer';
@@ -14,6 +15,7 @@ import type { CanvasImageState, Dimensions } from 'features/controlLayers/store/
 import { t } from 'i18next';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
+import { JsonObject } from 'roarr/dist/types';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
 
 type CanvasObjectImageConfig = {
@@ -129,7 +131,10 @@ export class CanvasObjectImage extends CanvasModuleBase {
     const imageElementResult = await withResultAsync(() => loadImage(imageDTO.image_url, true));
     if (imageElementResult.isErr()) {
       // Image loading failed (e.g. the URL to the "physical" image is invalid)
-      this.onFailedToLoadImage(t('controlLayers.unableToLoadImage', 'Unable to load image'));
+      this.onFailedToLoadImage(
+        t('controlLayers.unableToLoadImage', 'Unable to load image'),
+        parseify(imageElementResult.error)
+      );
       return;
     }
 
@@ -152,7 +157,10 @@ export class CanvasObjectImage extends CanvasModuleBase {
     const imageElementResult = await withResultAsync(() => loadImage(dataURL, false));
     if (imageElementResult.isErr()) {
       // Image loading failed (e.g. the URL to the "physical" image is invalid)
-      this.onFailedToLoadImage(t('controlLayers.unableToLoadImage', 'Unable to load image'));
+      this.onFailedToLoadImage(
+        t('controlLayers.unableToLoadImage', 'Unable to load image'),
+        parseify(imageElementResult.error)
+      );
       return;
     }
 
@@ -161,8 +169,8 @@ export class CanvasObjectImage extends CanvasModuleBase {
     this.updateImageElement();
   };
 
-  onFailedToLoadImage = (message: string) => {
-    this.log.error({ image: this.state.image }, message);
+  onFailedToLoadImage = (message: string, error?: JsonObject) => {
+    this.log.error({ image: this.state.image, error }, message);
     this.konva.image?.visible(false);
     this.isLoading = false;
     this.isError = true;
