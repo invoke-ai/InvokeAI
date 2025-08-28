@@ -109,8 +109,6 @@ import {
   isT5EncoderModelFieldInputTemplate,
   isVAEModelFieldInputInstance,
   isVAEModelFieldInputTemplate,
-  isVeo3ModelFieldInputInstance,
-  isVeo3ModelFieldInputTemplate,
 } from 'features/nodes/types/field';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import { memo } from 'react';
@@ -144,7 +142,6 @@ import SpandrelImageToImageModelFieldInputComponent from './inputs/SpandrelImage
 import T2IAdapterModelFieldInputComponent from './inputs/T2IAdapterModelFieldInputComponent';
 import T5EncoderModelFieldInputComponent from './inputs/T5EncoderModelFieldInputComponent';
 import VAEModelFieldInputComponent from './inputs/VAEModelFieldInputComponent';
-import Veo3ModelFieldInputComponent from './inputs/Veo3ModelFieldInputComponent';
 
 type Props = {
   nodeId: string;
@@ -435,13 +432,6 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
       return null;
     }
     return <ChatGPT4oModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
-  }
-
-  if (isVeo3ModelFieldInputTemplate(template)) {
-    if (!isVeo3ModelFieldInputInstance(field)) {
-      return null;
-    }
-    return <Veo3ModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
   }
 
   if (isColorFieldInputTemplate(template)) {

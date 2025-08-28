@@ -5,7 +5,7 @@ import type { SliceConfig } from 'app/store/types';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
 import { clamp } from 'es-toolkit/compat';
-import type { AspectRatioID, ParamsState, RgbaColor, Veo3Duration } from 'features/controlLayers/store/types';
+import type { AspectRatioID, ParamsState, RgbaColor } from 'features/controlLayers/store/types';
 import {
   ASPECT_RATIO_MAP,
   CHATGPT_ASPECT_RATIOS,
@@ -39,6 +39,7 @@ import type {
   ParameterCLIPGEmbedModel,
   ParameterCLIPLEmbedModel,
   ParameterControlLoRAModel,
+  ParameterDuration,
   ParameterGuidance,
   ParameterModel,
   ParameterNegativePrompt,
@@ -380,7 +381,7 @@ const slice = createSlice({
         state.dimensions.rect.height = bboxDims.height;
       }
     },
-    setVideoDuration: (state, action: PayloadAction<Veo3Duration>) => {
+    setVideoDuration: (state, action: PayloadAction<ParameterDuration>) => {
       state.videoDuration = action.payload;
     },
     paramsReset: (state) => resetState(state),
@@ -497,7 +498,7 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
 };
 
 export const selectParamsSlice = (state: RootState) => state.params;
-const createParamsSelector = <T,>(selector: Selector<ParamsState, T>) => createSelector(selectParamsSlice, selector);
+const createParamsSelector = <T>(selector: Selector<ParamsState, T>) => createSelector(selectParamsSlice, selector);
 
 export const selectBase = createParamsSelector((params) => params.model?.base);
 export const selectIsSDXL = createParamsSelector((params) => params.model?.base === 'sdxl');

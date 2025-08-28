@@ -6,33 +6,36 @@ import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {  selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
-import { selectStartingFrameImage, selectVideoSlice } from 'features/parameters/store/videoSlice';
+import { selectStartingFrameImage } from 'features/parameters/store/videoSlice';
 import { t } from 'i18next';
 import { assert } from 'tsafe';
 
 const log = logger('system');
 
-export const buildVeo3VideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn => {
+export const buildRunwayVideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn => {
   const { generationMode, state, manager } = arg;
 
-  log.debug({ generationMode, manager: manager?.id }, 'Building Veo3 video graph');
+  log.debug({ generationMode, manager: manager?.id }, 'Building Runway video graph');
 
   const supportedModes = ['txt2img'] as const;
   if (!supportedModes.includes(generationMode as any)) {
-    throw new UnsupportedGenerationModeError(t('toast.veo3IncompatibleGenerationMode'));
+    throw new UnsupportedGenerationModeError(t('toast.runwayIncompatibleGenerationMode'));
   }
 
   const params = selectParamsSlice(state);
-  const videoParams = selectVideoSlice(state);
   const prompts = selectPresetModifiedPrompts(state);
-  assert(prompts.positive.length > 0, 'Veo3 video requires positive prompt to have at least one character');
+  assert(prompts.positive.length > 0, 'Runway video requires positive prompt to have at least one character');
 
-  
+  const startingFrameImage = selectStartingFrameImage(state);
+
+  assert(startingFrameImage, 'Video starting frame is required for runway video generation');
+  const firstFrameImageField = zImageField.parse(startingFrameImage);
+
+  // Get seed from params
   const { seed, shouldRandomizeSeed } = params;
-  const { videoModel } = videoParams;
   const finalSeed = shouldRandomizeSeed ? undefined : seed;
 
-  const g = new Graph(getPrefixedId('veo3_video_graph'));
+  const g = new Graph(getPrefixedId('runway_video_graph'));
 
   const positivePrompt = g.addNode({
     id: getPrefixedId('positive_prompt'),
@@ -40,26 +43,19 @@ export const buildVeo3VideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn =>
     value: prompts.positive,
   });
 
-  // Create the veo3 video generation node
-  const veo3VideoNode = g.addNode({
-    id: getPrefixedId('google_veo_3_generate_video'),
+  // Create the runway video generation node
+  const runwayVideoNode = g.addNode({
+    id: getPrefixedId('runway_generate_video'),
     // @ts-expect-error: This node is not available in the OSS application
-    type: 'google_veo_3_generate_video',
-    model: videoParams.videoModel,
+    type: 'runway_generate_video',
+    duration: params.videoDuration,
     aspect_ratio: params.dimensions.aspectRatio.id,
     seed: finalSeed,
+    first_frame_image: firstFrameImageField,
   });
 
-  const startingFrameImage = selectStartingFrameImage(state);
-
-  if (startingFrameImage) {
-    const startingFrameImageField = zImageField.parse(startingFrameImage);
-    // @ts-expect-error: This node is not available in the OSS application
-    veo3VideoNode.starting_image = startingFrameImageField;
-  }
-
   // @ts-expect-error: This node is not available in the OSS application
-  g.addEdge(positivePrompt, 'value', veo3VideoNode, 'prompt');
+  g.addEdge(positivePrompt, 'value', runwayVideoNode, 'prompt');
 
   // Set up metadata
   g.upsertMetadata({
@@ -69,11 +65,12 @@ export const buildVeo3VideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn =>
     video_aspect_ratio: params.dimensions.aspectRatio.id,
     seed: finalSeed,
     generation_type: 'image-to-video',
-    starting_image: startingFrameImage,
-    video_model: videoParams.videoModel,
+    first_frame_image: startingFrameImage,
   });
 
-  g.setMetadataReceivingNode(veo3VideoNode);
+
+
+  g.setMetadataReceivingNode(runwayVideoNode);
 
   return {
     g,

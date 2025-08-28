@@ -5,7 +5,7 @@ import type { AppStore } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
 import { extractMessageFromAssertionError } from 'common/util/extractMessageFromAssertionError';
 import { withResultAsync } from 'common/util/result';
-import { buildVeo3VideoGraph } from 'features/nodes/util/graph/generation/buildVeo3VideoGraph';
+import { buildRunwayVideoGraph } from 'features/nodes/util/graph/generation/buildRunwayVideoGraph';
 import { selectCanvasDestination } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
@@ -30,7 +30,7 @@ const enqueueVideo = async (store: AppStore, prepend: boolean) => {
   const buildGraphResult = await withResultAsync(async () => {
     const graphBuilderArg: GraphBuilderArg = { generationMode: 'txt2img', state, manager: null };
 
-    return await buildVeo3VideoGraph(graphBuilderArg);
+    return await buildRunwayVideoGraph(graphBuilderArg);
   });
 
   if (buildGraphResult.isErr()) {

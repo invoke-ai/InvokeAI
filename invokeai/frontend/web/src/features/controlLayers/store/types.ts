@@ -9,6 +9,7 @@ import {
   zParameterCLIPGEmbedModel,
   zParameterCLIPLEmbedModel,
   zParameterControlLoRAModel,
+  zParameterDuration,
   zParameterGuidance,
   zParameterImageDimension,
   zParameterMaskBlurMethod,
@@ -482,12 +483,17 @@ export const FLUX_KONTEXT_ASPECT_RATIOS: Record<FluxKontextAspectRatio, Dimensio
   '1:1': { width: 1024, height: 1024 },
 };
 
-export const zVeo3AspectRatioID = z.enum(['16:9']);
-type Veo3AspectRatio = z.infer<typeof zVeo3AspectRatioID>;
-export const isVeo3AspectRatioID = (v: unknown): v is Veo3AspectRatio =>
-  zVeo3AspectRatioID.safeParse(v).success;
-export const VEO3_ASPECT_RATIOS: Record<Veo3AspectRatio, Dimensions> = {
+export const zRunwayAspectRatioID = z.enum(['16:9', '4:3', '1:1', '3:4', '9:16', '21:9']);
+type RunwayAspectRatio = z.infer<typeof zRunwayAspectRatioID>;
+export const isRunwayAspectRatioID = (v: unknown): v is RunwayAspectRatio =>
+  zRunwayAspectRatioID.safeParse(v).success;
+export const RUNWAY_ASPECT_RATIOS: Record<RunwayAspectRatio, Dimensions> = {
   '16:9': { width: 1280, height: 720 },
+  '4:3': { width: 1104, height: 832 },
+  '1:1': { width: 960, height: 960 },
+  '3:4': { width: 832, height: 1104 }, 
+  '9:16': { width: 720, height: 1280 },
+  '21:9': { width: 1584, height: 672 },
 };
 
 const zAspectRatioConfig = z.object({
@@ -501,15 +507,6 @@ export const DEFAULT_ASPECT_RATIO_CONFIG: AspectRatioConfig = {
   id: '1:1',
   value: 1,
   isLocked: false,
-};
-
-export const zVeo3DurationID = z.enum(['8']);
-export type Veo3Duration = z.infer<typeof zVeo3DurationID>;
-export const isVeo3DurationID = (v: unknown): v is Veo3Duration =>
-  zVeo3DurationID.safeParse(v).success;
-export const VEO3_DURATIONS: Record<Veo3Duration, string> = {
-  '8': '8 seconds',
-
 };
 
 const zBboxState = z.object({
@@ -585,7 +582,7 @@ export const zParamsState = z.object({
   clipGEmbedModel: zParameterCLIPGEmbedModel.nullable(),
   controlLora: zParameterControlLoRAModel.nullable(),
   dimensions: zDimensionsState,
-  videoDuration: zVeo3DurationID,
+  videoDuration: zParameterDuration,
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
@@ -636,7 +633,7 @@ export const getInitialParamsState = (): ParamsState => ({
     rect: { x: 0, y: 0, width: 512, height: 512 },
     aspectRatio: deepClone(DEFAULT_ASPECT_RATIO_CONFIG),
   },
-  videoDuration: '8',
+  videoDuration: 5,
 });
 
 const zInpaintMasks = z.object({
