@@ -16,7 +16,7 @@ export const ContextMenuItemOpenInNewTab = memo(() => {
     window.open(itemDTO.image_url, '_blank');
     dispatch(imageOpenedInNewTab());
     } else {
-      window.open(itemDTO.video_url, '_blank');
+      // TODO: Implement video open in new tab
     }
   }, [itemDTO, dispatch]);
 

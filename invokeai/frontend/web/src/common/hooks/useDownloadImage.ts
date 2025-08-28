@@ -5,15 +5,14 @@ import { imageDownloaded } from 'features/gallery/store/actions';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ImageDTO, VideoDTO } from 'services/api/types';
 
-export const useDownloadItem = (itemDTO: ImageDTO | VideoDTO) => {
+export const useDownloadImage = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const authToken = useStore($authToken);
 
-  const downloadItem = useCallback(
-    async (item_url: string, item_id: string) => {
+  const downloadImage = useCallback(
+    async (image_url: string, image_name: string) => {
       try {
         const requestOpts = authToken
           ? {
@@ -22,7 +21,7 @@ export const useDownloadItem = (itemDTO: ImageDTO | VideoDTO) => {
               },
             }
           : {};
-        const blob = await fetch(item_url, requestOpts).then((resp) => resp.blob());
+        const blob = await fetch(image_url, requestOpts).then((resp) => resp.blob());
         if (!blob) {
           throw new Error('Unable to create Blob');
         }
@@ -31,7 +30,7 @@ export const useDownloadItem = (itemDTO: ImageDTO | VideoDTO) => {
         const a = document.createElement('a');
         a.style.display = 'none';
         a.href = url;
-        a.download = item_id;
+        a.download = image_name;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
@@ -48,5 +47,5 @@ export const useDownloadItem = (itemDTO: ImageDTO | VideoDTO) => {
     [t, dispatch, authToken]
   );
 
-  return { downloadItem };
+  return { downloadImage };
 };
