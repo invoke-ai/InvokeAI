@@ -20,7 +20,7 @@ export const Prompts = memo(() => {
   return (
     <Flex flexDir="column" gap={2}>
       <ParamPositivePrompt />
-      {modelSupportsNegativePrompt && hasNegativePrompt && <ParamNegativePrompt />}
+      {activeTab !== 'video' && modelSupportsNegativePrompt && hasNegativePrompt && <ParamNegativePrompt />}
       {activeTab !== 'video' && modelSupportsRefImages && <RefImageList />}
     </Flex>
   );

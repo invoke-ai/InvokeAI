@@ -26,6 +26,7 @@ import {
 } from 'features/stylePresets/store/stylePresetSlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { selectAllowPromptExpansion } from 'features/system/store/configSlice';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import type { HotkeyCallback } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -45,6 +46,7 @@ export const ParamPositivePrompt = memo(() => {
   const modelSupportsNegativePrompt = useAppSelector(selectModelSupportsNegativePrompt);
   const { isPending: isPromptExpansionPending } = useStore(promptExpansionApi.$state);
   const isPromptExpansionEnabled = useAppSelector(selectAllowPromptExpansion);
+  const activeTab = useAppSelector(selectActiveTab);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   usePersistedTextAreaSize('positive_prompt', textareaRef, persistOptions);
@@ -116,7 +118,7 @@ export const ParamPositivePrompt = memo(() => {
             <Flex flexDir="column" gap={2} justifyContent="flex-start" alignItems="center">
               <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
               <ShowDynamicPromptsPreviewButton />
-              {modelSupportsNegativePrompt && <NegativePromptToggleButton />}
+              {activeTab !== 'video' && modelSupportsNegativePrompt && <NegativePromptToggleButton />}
             </Flex>
             {isPromptExpansionEnabled && <PromptExpansionMenu />}
           </PromptOverlayButtonWrapper>
