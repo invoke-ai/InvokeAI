@@ -25,12 +25,14 @@ import type {
 } from 'react-virtuoso';
 import { VirtuosoGrid } from 'react-virtuoso';
 import { imagesApi, useImageDTO, useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
+import { videosApi } from 'services/api/endpoints/videos';
 import { useDebounce } from 'use-debounce';
 
 import { getItemsPerRow } from '../../../../../../../getItemsPerRow';
 import { getItemIndex } from './getItemIndex';
 import { GalleryImage, GalleryImagePlaceholder } from './ImageGrid/GalleryImage';
 import { GallerySelectionCountTag } from './ImageGrid/GallerySelectionCountTag';
+import { GalleryVideo } from './ImageGrid/GalleryVideo';
 import { scrollIntoView } from './scrollIntoView';
 import { useGalleryImageNames } from './use-gallery-image-names';
 import { useScrollableGallery } from './useScrollableGallery';
