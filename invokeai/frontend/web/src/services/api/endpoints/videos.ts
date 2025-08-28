@@ -1,14 +1,14 @@
-import { getStore } from 'app/store/nanostores/store';
 import type { paths } from 'services/api/schema';
-import type { GetVideoIdsArgs, GetVideoIdsResult, VideoDTO } from 'services/api/types';
-import {
-  getTagsToInvalidateForBoardAffectingMutation,
-  getTagsToInvalidateForVideoMutation,
-} from 'services/api/util/tagInvalidation';
+import type {
+  GetVideoIdsArgs,
+  GetVideoIdsResult,
+  VideoDTO,
+} from 'services/api/types';
 import stableHash from 'stable-hash';
 import type { Param0 } from 'tsafe';
 
 import { api, buildV1Url, LIST_TAG } from '..';
+import { getTagsToInvalidateForBoardAffectingMutation, getTagsToInvalidateForImageMutation, getTagsToInvalidateForVideoMutation } from '../util/tagInvalidation';
 
 /**
  * Builds an endpoint URL for the videos router
@@ -16,10 +16,10 @@ import { api, buildV1Url, LIST_TAG } from '..';
  * buildVideosUrl('some-path')
  * // '/api/v1/videos/some-path'
  */
-const buildVideosUrl = (path: string = '', query?: Parameters<typeof buildV1Url>[1]) =>
+const buildVideosUrl  = (path: string = '', query?: Parameters<typeof buildV1Url>[1]) =>
   buildV1Url(`videos/${path}`, query);
 
-const buildBoardVideosUrl = (path: string = '') => buildV1Url(`board_videos/${path}`);
+const buildBoardVideosUrl = (path: string = '') => buildV1Url(`board_videos/${path}`);  
 
 export const videosApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -31,6 +31,7 @@ export const videosApi = api.injectEndpoints({
       query: (video_id) => ({ url: buildVideosUrl(`i/${video_id}`) }),
       providesTags: (result, error, video_id) => [{ type: 'Video', id: video_id }],
     }),
+    
 
     /**
      * Get ordered list of image names for selection operations
@@ -203,24 +204,4 @@ export const {
   useRemoveVideosFromBoardMutation,
 } = videosApi;
 
-/**
- * Imperative RTKQ helper to fetch an VideoDTO.
- * @param id The id of the video to fetch
- * @param options The options for the query. By default, the query will not subscribe to the store.
- * @returns The ImageDTO if found, otherwise null
- */
-export const getVideoDTOSafe = async (
-  id: string,
-  options?: Parameters<typeof videosApi.endpoints.getVideoDTOsByNames.initiate>[1]
-): Promise<VideoDTO | null> => {
-  const _options = {
-    subscribe: false,
-    ...options,
-  };
-  const req = getStore().dispatch(videosApi.endpoints.getVideoDTOsByNames.initiate({ video_ids: [id] }, _options));
-  try {
-    return (await req.unwrap())[0] ?? null;
-  } catch {
-    return null;
-  }
-};
+
