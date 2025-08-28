@@ -17,8 +17,8 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
       // Cancel any in-progress instances of this listener, we don't want to select an image from a previous board
       cancelActiveListeners();
 
-      if (boardIdSelected.match(action) && action.payload.select) {
-        // This action already has a resource selection - skip the below auto-selection logic
+      if (boardIdSelected.match(action) && action.payload.selectedImageName) {
+        // This action already has a selected image name, we trust it is valid
         return;
       }
 

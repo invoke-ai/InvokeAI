@@ -171,10 +171,7 @@ export const buildOnInvocationComplete = (
       dispatch(
         boardIdSelected({
           boardId: board_id,
-          select: {
-            selection: [{ type: 'image', id: image_name }],
-            galleryView: 'images',
-          },
+          selectedImageName: image_name,
         })
       );
     } else {
@@ -323,10 +320,7 @@ export const buildOnInvocationComplete = (
       dispatch(
         boardIdSelected({
           boardId: board_id,
-          select: {
-            selection: [{ type: 'video', id: video_id }],
-            galleryView: 'videos',
-          },
+          selectedImageName: video_id,
         })
       );
     } else {
