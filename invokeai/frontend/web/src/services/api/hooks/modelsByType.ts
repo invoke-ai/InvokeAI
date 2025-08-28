@@ -40,7 +40,6 @@ import {
   isTIModelConfig,
   isVAEModelConfig,
   isVeo3ModelConfig,
-  isVideoModelConfig,
 } from 'services/api/types';
 
 type ModelHookArgs = { excludeSubmodels?: boolean };
@@ -109,7 +108,7 @@ export const useChatGPT4oModels = buildModelsHook(isChatGPT4oModelConfig);
 export const useFluxKontextModels = buildModelsHook(isFluxKontextApiModelConfig);
 export const useVeo3Models = buildModelsHook(isVeo3ModelConfig);
 export const useRunwayModels = buildModelsHook(isRunwayModelConfig);
-export const useVideoModels = buildModelsHook(isVideoModelConfig);
+export const useVideoModels = buildModelsHook((config) => isVeo3ModelConfig(config) || isRunwayModelConfig(config));
 
 const buildModelsSelector =
   <T extends AnyModelConfig>(typeGuard: (config: AnyModelConfig) => config is T): Selector<RootState, T[]> =>
