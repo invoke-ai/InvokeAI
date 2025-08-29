@@ -5,6 +5,14 @@ import { $queueId } from 'app/store/nanostores/queueId';
 import { listParamsReset } from 'features/queue/store/queueSlice';
 import queryString from 'query-string';
 import type { components, paths } from 'services/api/schema';
+import type {
+  GetQueueItemDTOsByItemIdsArgs,
+  GetQueueItemDTOsByItemIdsResult,
+  GetQueueItemIdsArgs,
+  GetQueueItemIdsResult,
+} from 'services/api/types';
+import stableHash from 'stable-hash';
+import type { Param0 } from 'tsafe';
 
 import type { ApiTagDescription } from '..';
 import { api, buildV1Url, LIST_ALL_TAG, LIST_TAG } from '..';
@@ -428,6 +436,43 @@ export const queueApi = api.injectEndpoints({
         return tags;
       },
     }),
+    getQueueItemIds: build.query<GetQueueItemIdsResult, GetQueueItemIdsArgs>({
+      query: (queryArgs) => ({
+        url: buildQueueUrl(`item_ids?${queryString.stringify(queryArgs)}`),
+        method: 'GET',
+      }),
+      providesTags: (result, error, queryArgs) => [
+        'QueueItemIdList',
+        'FetchOnReconnect',
+        { type: 'QueueItemIdList', id: stableHash(queryArgs) },
+      ],
+    }),
+    getQueueItemDTOsByItemIds: build.mutation<GetQueueItemDTOsByItemIdsResult, GetQueueItemDTOsByItemIdsArgs>({
+      query: (body) => ({
+        url: buildQueueUrl('items_by_ids'),
+        method: 'POST',
+        body,
+      }),
+      // Don't provide cache tags - we'll manually upsert into individual getQueueItem caches
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          const { data: queueItems } = await queryFulfilled;
+
+          // Upsert each queue item into the individual item cache
+          const updates: Param0<typeof queueApi.util.upsertQueryEntries> = [];
+          for (const queueItem of queueItems) {
+            updates.push({
+              endpointName: 'getQueueItem',
+              arg: queueItem.item_id,
+              value: queueItem,
+            });
+          }
+          dispatch(queueApi.util.upsertQueryEntries(updates));
+        } catch {
+          // Handle error if needed
+        }
+      },
+    }),
     deleteQueueItem: build.mutation<void, { item_id: number }>({
       query: ({ item_id }) => ({
         url: buildQueueUrl(`i/${item_id}`),
@@ -484,6 +529,8 @@ export const {
   useGetQueueStatusQuery,
   useGetQueueItemQuery,
   useListQueueItemsQuery,
+  useGetQueueItemIdsQuery,
+  useGetQueueItemDTOsByItemIdsMutation,
   useCancelQueueItemMutation,
   useCancelQueueItemsByDestinationMutation,
   useGetCurrentQueueItemQuery,

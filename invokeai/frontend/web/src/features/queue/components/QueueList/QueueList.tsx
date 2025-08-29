@@ -1,89 +1,113 @@
-import { Flex, Heading } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { Flex, Heading, ListItem } from '@invoke-ai/ui-library';
 import { IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
-import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import {
-  listCursorChanged,
-  listPriorityChanged,
-  selectQueueListCursor,
-  selectQueueListPriority,
-} from 'features/queue/store/queueSlice';
-import { useOverlayScrollbars } from 'overlayscrollbars-react';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRangeBasedQueueItemFetching } from 'features/queue/hooks/useRangeBasedQueueItemFetching';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Components, ItemContent } from 'react-virtuoso';
+import type {
+  Components,
+  Components,
+  Components,
+  ComputeItemKey,
+  ItemContent,
+  ListRange,
+  ScrollSeekConfiguration,
+  VirtuosoHandle,
+} from 'react-virtuoso';
 import { Virtuoso } from 'react-virtuoso';
-import { queueItemsAdapterSelectors, useListQueueItemsQuery } from 'services/api/endpoints/queue';
-import type { S } from 'services/api/types';
+import { queueApi } from 'services/api/endpoints/queue';
 
-import QueueItemComponent from './QueueItemComponent';
+import QueueItemComponent, { QueueItemPlaceholder } from './QueueItemComponent';
 import QueueListComponent from './QueueListComponent';
 import QueueListHeader from './QueueListHeader';
 import type { ListContext } from './types';
+import { useQueueItemIds } from './useQueueItemIds';
+import { useScrollableQueueList } from './useScrollableQueueList';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type TableVirtuosoScrollerRef = (ref: HTMLElement | Window | null) => any;
+const QueueItemAtPosition = memo(
+  ({ index, itemId, context }: { index: number; itemId: number; context: ListContext }) => {
+    /*
+     * We rely on the useRangeBasedQueueItemFetching to fetch all queue items, caching them with RTK Query.
+     *
+     * In this component, we just want to consume that cache. Unforutnately, RTK Query does not provide a way to
+     * subscribe to a query without triggering a new fetch.
+     *
+     * There is a hack, though:
+     * - https://github.com/reduxjs/redux-toolkit/discussions/4213
+     *
+     * This essentially means "subscribe to the query once it has some data".
+     */
 
-const computeItemKey = (index: number, item: S['SessionQueueItem']): number => item.item_id;
+    // Use `currentData` instead of `data` to prevent a flash of previous queue item rendered at this index
+    const { currentData: queueItem, isUninitialized } = queueApi.endpoints.getQueueItem.useQueryState(itemId);
+    queueApi.endpoints.getQueueItem.useQuerySubscription(itemId, { skip: isUninitialized });
 
-const components: Components<S['SessionQueueItem'], ListContext> = {
-  List: QueueListComponent,
+    if (!queueItem) {
+      return <QueueItemPlaceholder item-id={itemId} />;
+    }
+
+    return <QueueItemComponent index={index} item={queueItem} context={context} />;
+  }
+);
+QueueItemAtPosition.displayName = 'QueueItemAtPosition';
+
+const computeItemKey: ComputeItemKey<number, ListContext> = (index, itemId, { queryArgs }) => {
+  return `${JSON.stringify(queryArgs)}-${itemId ?? index}`;
 };
 
-const itemContent: ItemContent<S['SessionQueueItem'], ListContext> = (index, item, context) => (
-  <QueueItemComponent index={index} item={item} context={context} />
+const itemContent: ItemContent<number, ListContext> = (index, itemId, context) => (
+  <QueueItemAtPosition index={index} itemId={itemId} context={context} />
 );
 
-const QueueList = () => {
-  const listCursor = useAppSelector(selectQueueListCursor);
-  const listPriority = useAppSelector(selectQueueListPriority);
-  const dispatch = useAppDispatch();
+const ScrollSeekPlaceholderComponent: Components<ListContext>['ScrollSeekPlaceholder'] = (props) => (
+  <ListItem aspectRatio="1/1" {...props}>
+    <QueueItemPlaceholder />
+  </ListItem>
+);
+
+ScrollSeekPlaceholderComponent.displayName = 'ScrollSeekPlaceholderComponent';
+
+const components: Components<number, ListContext> = {
+  List: QueueListComponent,
+  // ScrollSeekPlaceholder: ScrollSeekPlaceholderComponent,
+};
+
+const scrollSeekConfiguration: ScrollSeekConfiguration = {
+  enter: (velocity) => {
+    return Math.abs(velocity) > 2048;
+  },
+  exit: (velocity) => {
+    return velocity === 0;
+  },
+};
+
+export const QueueList = () => {
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
   const rootRef = useRef<HTMLDivElement>(null);
-  const [scroller, setScroller] = useState<HTMLElement | null>(null);
-  const [initialize, osInstance] = useOverlayScrollbars(overlayScrollbarsParams);
   const { t } = useTranslation();
 
-  useEffect(() => {
-    const { current: root } = rootRef;
-    if (scroller && root) {
-      initialize({
-        target: root,
-        elements: {
-          viewport: scroller,
-        },
-      });
-    }
-    return () => osInstance()?.destroy();
-  }, [scroller, initialize, osInstance]);
+  // Get the ordered list of queue item ids - this is our primary data source for virtualization
+  const { queryArgs, itemIds, isLoading } = useQueueItemIds();
 
-  const { data: listQueueItemsData, isLoading } = useListQueueItemsQuery(
-    {
-      cursor: listCursor,
-      priority: listPriority,
+  // Use range-based fetching for bulk loading queue items into cache based on the visible range
+  const { onRangeChanged } = useRangeBasedQueueItemFetching({
+    itemIds,
+    enabled: !isLoading,
+  });
+
+  const scrollerRef = useScrollableQueueList(rootRef) as (ref: HTMLElement | Window | null) => void;
+
+  /*
+   * We have to keep track of the visible range for keep-selected-image-in-view functionality and push the range to
+   * the range-based queue item fetching hook.
+   */
+  const handleRangeChanged = useCallback(
+    (range: ListRange) => {
+      rangeRef.current = range;
+      onRangeChanged(range);
     },
-    {
-      refetchOnMountOrArgChange: true,
-    }
+    [onRangeChanged]
   );
-
-  const queueItems = useMemo(() => {
-    if (!listQueueItemsData) {
-      return [];
-    }
-    return queueItemsAdapterSelectors.selectAll(listQueueItemsData);
-  }, [listQueueItemsData]);
-
-  const handleLoadMore = useCallback(() => {
-    if (!listQueueItemsData?.has_more) {
-      return;
-    }
-    const lastItem = queueItems[queueItems.length - 1];
-    if (!lastItem) {
-      return;
-    }
-    dispatch(listCursorChanged(lastItem.item_id));
-    dispatch(listPriorityChanged(lastItem.priority));
-  }, [dispatch, listQueueItemsData?.has_more, queueItems]);
 
   const [openQueueItems, setOpenQueueItems] = useState<number[]>([]);
 
@@ -96,13 +120,16 @@ const QueueList = () => {
     });
   }, []);
 
-  const context = useMemo<ListContext>(() => ({ openQueueItems, toggleQueueItem }), [openQueueItems, toggleQueueItem]);
+  const context = useMemo<ListContext>(
+    () => ({ queryArgs, openQueueItems, toggleQueueItem }),
+    [queryArgs, openQueueItems, toggleQueueItem]
+  );
 
   if (isLoading) {
     return <IAINoContentFallbackWithSpinner />;
   }
 
-  if (!queueItems.length) {
+  if (!itemIds.length) {
     return (
       <Flex w="full" h="full" alignItems="center" justifyContent="center">
         <Heading color="base.500">{t('queue.queueEmpty')}</Heading>
@@ -114,18 +141,18 @@ const QueueList = () => {
     <Flex w="full" h="full" flexDir="column">
       <QueueListHeader />
       <Flex ref={rootRef} w="full" h="full" alignItems="center" justifyContent="center">
-        <Virtuoso<S['SessionQueueItem'], ListContext>
-          data={queueItems}
-          endReached={handleLoadMore}
-          scrollerRef={setScroller as TableVirtuosoScrollerRef}
+        <Virtuoso<number, ListContext>
+          ref={virtuosoRef}
+          context={context}
+          data={itemIds}
           itemContent={itemContent}
           computeItemKey={computeItemKey}
           components={components}
-          context={context}
+          scrollerRef={scrollerRef}
+          scrollSeekConfiguration={scrollSeekConfiguration}
+          rangeChanged={handleRangeChanged}
         />
       </Flex>
     </Flex>
   );
 };
-
-export default memo(QueueList);
