@@ -165,7 +165,7 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                     WHERE images.is_intermediate = FALSE AND images.image_category IN ( {placeholders} )
                     AND board_images.board_id = ?;
                     """,
-                (board_id),
+                (*category_strings, board_id),
             )
             count = cast(int, cursor.fetchone()[0])
         return count
@@ -184,7 +184,7 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                     WHERE images.is_intermediate = FALSE AND images.image_category IN ( {placeholders} )
                     AND board_images.board_id = ?;
                     """,
-                (board_id),
+                (*category_strings, board_id),
             )
             count = cast(int, cursor.fetchone()[0])
         return count
