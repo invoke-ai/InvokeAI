@@ -677,7 +677,7 @@ class SqliteSessionQueue(SessionQueueBase):
     def get_queue_itemIds(
         self,
         queue_id: str,
-        order_by: QUEUE_ORDER_BY = "item_id",
+        order_by: QUEUE_ORDER_BY = "completed_at",
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
     ) -> ItemIdsResult:
         with self._db.transaction() as cursor_:
