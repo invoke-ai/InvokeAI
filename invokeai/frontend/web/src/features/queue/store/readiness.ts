@@ -9,10 +9,11 @@ import type { AppConfig } from 'app/types/invokeai';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { debounce, groupBy, upperFirst } from 'es-toolkit/compat';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
 import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import type { CanvasState, ParamsState, RefImagesState } from 'features/controlLayers/store/types';
+import type { CanvasState, LoRA, ParamsState, RefImagesState } from 'features/controlLayers/store/types';
 import {
   getControlLayerWarnings,
   getGlobalReferenceImageWarnings,
@@ -73,96 +74,124 @@ export type Reason = { prefix?: string; content: string };
 export const $reasonsWhyCannotEnqueue = atom<Reason[]>([]);
 export const $isReadyToEnqueue = computed($reasonsWhyCannotEnqueue, (reasons) => reasons.length === 0);
 
-const debouncedUpdateReasons = debounce(
-  async (
-    tab: TabName,
-    isConnected: boolean,
-    canvas: CanvasState,
-    params: ParamsState,
-    refImages: RefImagesState,
-    dynamicPrompts: DynamicPromptsState,
-    canvasIsFiltering: boolean,
-    canvasIsTransforming: boolean,
-    canvasIsRasterizing: boolean,
-    canvasIsCompositing: boolean,
-    canvasIsSelectingObject: boolean,
-    nodes: NodesState,
-    workflowSettings: WorkflowSettingsState,
-    templates: Templates,
-    upscale: UpscaleState,
-    config: AppConfig,
-    store: AppStore,
-    isInPublishFlow: boolean,
-    isChatGPT4oHighModelDisabled: (model: ParameterModel) => boolean,
-    isVideoEnabled: boolean,
-    promptExpansionRequest: PromptExpansionRequestState,
-    video: VideoState
-  ) => {
-    if (tab === 'generate') {
-      const model = selectMainModelConfig(store.getState());
-      const reasons = await getReasonsWhyCannotEnqueueGenerateTab({
-        isConnected,
-        model,
-        params,
-        refImages,
-        dynamicPrompts,
-        isChatGPT4oHighModelDisabled,
-        promptExpansionRequest,
-      });
-      $reasonsWhyCannotEnqueue.set(reasons);
-    } else if (tab === 'canvas') {
-      const model = selectMainModelConfig(store.getState());
-      const reasons = await getReasonsWhyCannotEnqueueCanvasTab({
-        isConnected,
-        model,
-        canvas,
-        params,
-        refImages,
-        dynamicPrompts,
-        canvasIsFiltering,
-        canvasIsTransforming,
-        canvasIsRasterizing,
-        canvasIsCompositing,
-        canvasIsSelectingObject,
-        isChatGPT4oHighModelDisabled,
-        promptExpansionRequest,
-      });
-      $reasonsWhyCannotEnqueue.set(reasons);
-    } else if (tab === 'workflows') {
-      const reasons = await getReasonsWhyCannotEnqueueWorkflowsTab({
-        dispatch: store.dispatch,
-        nodesState: nodes,
-        workflowSettingsState: workflowSettings,
-        isConnected,
-        templates,
-        isInPublishFlow,
-      });
-      $reasonsWhyCannotEnqueue.set(reasons);
-    } else if (tab === 'upscaling') {
-      const reasons = getReasonsWhyCannotEnqueueUpscaleTab({
-        isConnected,
-        upscale,
-        config,
-        params,
-        promptExpansionRequest,
-      });
-      $reasonsWhyCannotEnqueue.set(reasons);
-    } else if (tab === 'video') {
-      const reasons = getReasonsWhyCannotEnqueueVideoTab({
-        isConnected,
-        video,
-        params,
-        promptExpansionRequest,
-        dynamicPrompts,
-        isVideoEnabled,
-      });
-      $reasonsWhyCannotEnqueue.set(reasons);
-    } else {
-      $reasonsWhyCannotEnqueue.set(EMPTY_ARRAY);
-    }
-  },
-  300
-);
+type UpdateReasonsArg = {
+  tab: TabName;
+  isConnected: boolean;
+  canvas: CanvasState;
+  params: ParamsState;
+  refImages: RefImagesState;
+  dynamicPrompts: DynamicPromptsState;
+  canvasIsFiltering: boolean;
+  canvasIsTransforming: boolean;
+  canvasIsRasterizing: boolean;
+  canvasIsCompositing: boolean;
+  canvasIsSelectingObject: boolean;
+  nodes: NodesState;
+  workflowSettings: WorkflowSettingsState;
+  templates: Templates;
+  upscale: UpscaleState;
+  config: AppConfig;
+  loras: LoRA[];
+  store: AppStore;
+  isInPublishFlow: boolean;
+  isChatGPT4oHighModelDisabled: (model: ParameterModel) => boolean;
+  isVideoEnabled: boolean;
+  promptExpansionRequest: PromptExpansionRequestState;
+  video: VideoState;
+};
+
+const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
+  const {
+    tab,
+    isConnected,
+    canvas,
+    params,
+    refImages,
+    dynamicPrompts,
+    canvasIsFiltering,
+    canvasIsTransforming,
+    canvasIsRasterizing,
+    canvasIsCompositing,
+    canvasIsSelectingObject,
+    nodes,
+    workflowSettings,
+    templates,
+    upscale,
+    config,
+    loras,
+    store,
+    isInPublishFlow,
+    isChatGPT4oHighModelDisabled,
+    isVideoEnabled,
+    promptExpansionRequest,
+    video,
+  } = arg;
+  if (tab === 'generate') {
+    const model = selectMainModelConfig(store.getState());
+    const reasons = await getReasonsWhyCannotEnqueueGenerateTab({
+      isConnected,
+      model,
+      params,
+      refImages,
+      dynamicPrompts,
+      isChatGPT4oHighModelDisabled,
+      promptExpansionRequest,
+      loras,
+    });
+    $reasonsWhyCannotEnqueue.set(reasons);
+  } else if (tab === 'canvas') {
+    const model = selectMainModelConfig(store.getState());
+    const reasons = await getReasonsWhyCannotEnqueueCanvasTab({
+      isConnected,
+      model,
+      canvas,
+      params,
+      refImages,
+      dynamicPrompts,
+      canvasIsFiltering,
+      canvasIsTransforming,
+      canvasIsRasterizing,
+      canvasIsCompositing,
+      canvasIsSelectingObject,
+      isChatGPT4oHighModelDisabled,
+      promptExpansionRequest,
+      loras,
+    });
+    $reasonsWhyCannotEnqueue.set(reasons);
+  } else if (tab === 'workflows') {
+    const reasons = await getReasonsWhyCannotEnqueueWorkflowsTab({
+      dispatch: store.dispatch,
+      nodesState: nodes,
+      workflowSettingsState: workflowSettings,
+      isConnected,
+      templates,
+      isInPublishFlow,
+    });
+    $reasonsWhyCannotEnqueue.set(reasons);
+  } else if (tab === 'upscaling') {
+    const reasons = getReasonsWhyCannotEnqueueUpscaleTab({
+      isConnected,
+      upscale,
+      config,
+      params,
+      promptExpansionRequest,
+      loras,
+    });
+    $reasonsWhyCannotEnqueue.set(reasons);
+  } else if (tab === 'video') {
+    const reasons = getReasonsWhyCannotEnqueueVideoTab({
+      isConnected,
+      video,
+      params,
+      promptExpansionRequest,
+      dynamicPrompts,
+      isVideoEnabled,
+    });
+    $reasonsWhyCannotEnqueue.set(reasons);
+  } else {
+    $reasonsWhyCannotEnqueue.set(EMPTY_ARRAY);
+  }
+}, 300);
 
 export const useReadinessWatcher = () => {
   useAssertSingleton('useReadinessWatcher');
@@ -177,6 +206,7 @@ export const useReadinessWatcher = () => {
   const workflowSettings = useAppSelector(selectWorkflowSettingsSlice);
   const upscale = useAppSelector(selectUpscaleSlice);
   const config = useAppSelector(selectConfigSlice);
+  const loras = useAppSelector(selectAddedLoRAs);
   const templates = useStore($templates);
   const isConnected = useStore($isConnected);
   const canvasIsFiltering = useStore(canvasManager?.stateApi.$isFiltering ?? $false);
@@ -190,7 +220,7 @@ export const useReadinessWatcher = () => {
   const promptExpansionRequest = useStore(promptExpansionApi.$state);
   const video = useAppSelector(selectVideoSlice);
   useEffect(() => {
-    debouncedUpdateReasons(
+    debouncedUpdateReasons({
       tab,
       isConnected,
       canvas,
@@ -207,13 +237,14 @@ export const useReadinessWatcher = () => {
       templates,
       upscale,
       config,
+      loras,
       store,
       isInPublishFlow,
       isChatGPT4oHighModelDisabled,
       isVideoEnabled,
       promptExpansionRequest,
-      video
-    );
+      video,
+    });
   }, [
     store,
     canvas,
@@ -232,6 +263,7 @@ export const useReadinessWatcher = () => {
     templates,
     upscale,
     workflowSettings,
+    loras,
     isInPublishFlow,
     isChatGPT4oHighModelDisabled,
     isVideoEnabled,
@@ -289,6 +321,7 @@ const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   model: MainModelConfig | null | undefined;
   params: ParamsState;
   refImages: RefImagesState;
+  loras: LoRA[];
   dynamicPrompts: DynamicPromptsState;
   isChatGPT4oHighModelDisabled: (model: ParameterModel) => boolean;
   promptExpansionRequest: PromptExpansionRequestState;
@@ -298,6 +331,7 @@ const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     model,
     params,
     refImages,
+    loras,
     dynamicPrompts,
     isChatGPT4oHighModelDisabled,
     promptExpansionRequest,
@@ -331,6 +365,16 @@ const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
 
   if (model && isChatGPT4oHighModelDisabled(model)) {
     reasons.push({ content: i18n.t('parameters.invoke.modelDisabledForTrial', { modelName: model.name }) });
+  }
+
+  if (model) {
+    for (const lora of loras.filter(({ isEnabled }) => isEnabled === true)) {
+      if (model.base !== lora.model.base) {
+        reasons.push({ content: i18n.t('parameters.invoke.incompatibleLoRAs') });
+        // Just add the warning once.
+        break;
+      }
+    }
   }
 
   if (promptExpansionRequest.isPending) {
@@ -447,9 +491,10 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
   upscale: UpscaleState;
   config: AppConfig;
   params: ParamsState;
+  loras: LoRA[];
   promptExpansionRequest: PromptExpansionRequestState;
 }) => {
-  const { isConnected, upscale, config, params, promptExpansionRequest } = arg;
+  const { isConnected, upscale, config, params, loras, promptExpansionRequest } = arg;
   const reasons: Reason[] = [];
 
   if (!isConnected) {
@@ -484,6 +529,15 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
     if (!upscale.tileControlnetModel) {
       reasons.push({ content: i18n.t('upscaling.missingTileControlNetModel') });
     }
+    if (model) {
+      for (const lora of loras.filter(({ isEnabled }) => isEnabled === true)) {
+        if (model.base !== lora.model.base) {
+          reasons.push({ content: i18n.t('parameters.invoke.incompatibleLoRAs') });
+          // Just add the warning once.
+          break;
+        }
+      }
+    }
   }
 
   if (promptExpansionRequest.isPending) {
@@ -501,6 +555,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   canvas: CanvasState;
   params: ParamsState;
   refImages: RefImagesState;
+  loras: LoRA[];
   dynamicPrompts: DynamicPromptsState;
   canvasIsFiltering: boolean;
   canvasIsTransforming: boolean;
@@ -516,6 +571,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     canvas,
     params,
     refImages,
+    loras,
     dynamicPrompts,
     canvasIsFiltering,
     canvasIsTransforming,
@@ -652,6 +708,16 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
             multiple: gridSize,
           }),
         });
+      }
+    }
+  }
+
+  if (model) {
+    for (const lora of loras.filter(({ isEnabled }) => isEnabled === true)) {
+      if (model.base !== lora.model.base) {
+        reasons.push({ content: i18n.t('parameters.invoke.incompatibleLoRAs') });
+        // Just add the warning once.
+        break;
       }
     }
   }
