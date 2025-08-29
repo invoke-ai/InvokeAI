@@ -1419,6 +1419,46 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queue/{queue_id}/item_ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Queue Item Ids
+         * @description Gets all queue item ids that match the given parameters
+         */
+        get: operations["get_queue_itemIds"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/{queue_id}/items_by_ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Queue Items By Item Ids
+         * @description Gets queue items for the specified queue item ids. Maintains order of item ids.
+         */
+        post: operations["get_queue_items_by_item_ids"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/{queue_id}/processor/resume": {
         parameters: {
             query?: never;
@@ -2974,6 +3014,14 @@ export type components = {
              * @description Object containing list of image names to fetch DTOs for
              */
             image_names: string[];
+        };
+        /** Body_get_queue_items_by_item_ids */
+        Body_get_queue_items_by_item_ids: {
+            /**
+             * Item Ids
+             * @description Object containing list of queue item ids to fetch queue items for
+             */
+            item_ids: number[];
         };
         /** Body_get_videos_by_ids */
         Body_get_videos_by_ids: {
@@ -13525,6 +13573,22 @@ export type components = {
              * @constant
              */
             type: "invokeai_img_val_thresholds";
+        };
+        /**
+         * ItemIdsResult
+         * @description Response containing ordered item ids with metadata for optimistic updates.
+         */
+        ItemIdsResult: {
+            /**
+             * Item Ids
+             * @description Ordered list of item ids
+             */
+            item_ids: number[];
+            /**
+             * Total Count
+             * @description Total number of queue items matching the query
+             */
+            total_count: number;
         };
         /**
          * IterateInvocation
@@ -25886,6 +25950,79 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionQueueItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_queue_itemIds: {
+        parameters: {
+            query?: {
+                /** @description The sort field */
+                order_by?: "status" | "completed_at";
+                /** @description The order of sort */
+                order_dir?: components["schemas"]["SQLiteDirection"];
+            };
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemIdsResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_queue_items_by_item_ids: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_get_queue_items_by_item_ids"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

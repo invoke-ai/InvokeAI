@@ -1,5 +1,5 @@
-import type { ChakraProps, CollapseProps } from '@invoke-ai/ui-library';
-import { Badge, ButtonGroup, Collapse, Flex, IconButton, Text } from '@invoke-ai/ui-library';
+import type { ChakraProps, CollapseProps, FlexProps } from '@invoke-ai/ui-library';
+import { Badge, ButtonGroup, Collapse, Flex, Icon, IconButton, Text } from '@invoke-ai/ui-library';
 import QueueStatusBadge from 'features/queue/components/common/QueueStatusBadge';
 import { useDestinationText } from 'features/queue/components/QueueList/useDestinationText';
 import { useOriginText } from 'features/queue/components/QueueList/useOriginText';
@@ -11,7 +11,7 @@ import { selectShouldShowCredits } from 'features/system/store/configSlice';
 import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowCounterClockwiseBold, PiXBold } from 'react-icons/pi';
+import { PiArrowCounterClockwiseBold, PiImageBold, PiXBold } from 'react-icons/pi';
 import { useSelector } from 'react-redux';
 import type { S } from 'services/api/types';
 
@@ -83,11 +83,14 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
       data-testid="queue-item"
     >
       <Flex minH={9} alignItems="center" gap={4} p={1.5} cursor="pointer" onClick={handleToggle}>
-        <Flex w={COLUMN_WIDTHS.number} justifyContent="flex-end" alignItems="center" flexShrink={0}>
+        <Flex w={COLUMN_WIDTHS.number} alignItems="center" flexShrink={0}>
           <Text variant="subtext">{index + 1}</Text>
         </Flex>
         <Flex w={COLUMN_WIDTHS.statusBadge} alignItems="center" flexShrink={0}>
           <QueueStatusBadge status={item.status} />
+        </Flex>
+        <Flex w={COLUMN_WIDTHS.completedAt} alignItems="center" flexShrink={0}>
+          {item.completed_at || '-'}
         </Flex>
         <Flex w={COLUMN_WIDTHS.origin} flexShrink={0}>
           <Text overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" alignItems="center">
@@ -111,22 +114,6 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
           <Text overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" alignItems="center">
             {item.batch_id}
           </Text>
-        </Flex>
-        <Flex alignItems="center" overflow="hidden" flexGrow={1}>
-          {item.field_values && (
-            <Flex gap={2} w="full" whiteSpace="nowrap" textOverflow="ellipsis" overflow="hidden">
-              {item.field_values
-                .filter((v) => v.node_path !== 'metadata_accumulator')
-                .map(({ node_path, field_name, value }) => (
-                  <Text as="span" key={`${item.item_id}.${node_path}.${field_name}.${value}`}>
-                    <Text as="span" fontWeight="semibold">
-                      {node_path}.{field_name}
-                    </Text>
-                    : {JSON.stringify(value)}
-                  </Text>
-                ))}
-            </Flex>
-          )}
         </Flex>
         <Flex alignItems="center" w={COLUMN_WIDTHS.validationRun} flexShrink={0}>
           {isValidationRun && <Badge>{t('workflows.builder.publishingValidationRun')}</Badge>}
@@ -167,3 +154,11 @@ const transition: CollapseProps['transition'] = {
 };
 
 export default memo(QueueItemComponent);
+
+export const QueueItemPlaceholder = memo((props: FlexProps) => (
+  <Flex w="full" h="full" bg="base.850" borderRadius="base" alignItems="center" justifyContent="center" {...props}>
+    <Icon as={PiImageBold} boxSize={16} color="base.800" />
+  </Flex>
+));
+
+QueueItemPlaceholder.displayName = 'QueueItemPlaceholder';
