@@ -22,7 +22,7 @@ const QueueListHeader = () => {
       fontSize="sm"
       letterSpacing={1}
     >
-      <QueueListHeaderColumn field="item_id" displayName="#" w={COLUMN_WIDTHS.number} alignItems="center" />
+      <QueueListHeaderColumn displayName="#" w={COLUMN_WIDTHS.number} alignItems="center" />
       <QueueListHeaderColumn
         field="status"
         displayName={t('queue.status')}
