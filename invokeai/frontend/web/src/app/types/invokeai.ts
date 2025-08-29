@@ -127,6 +127,9 @@ export const zAppConfig = z.object({
   flux: z.object({
     guidance: zNumericalParameterConfig,
   }),
+  lora: z.object({
+    weight: zNumericalParameterConfig,
+  }),
 });
 
 export type AppConfig = z.infer<typeof zAppConfig>;
@@ -297,6 +300,17 @@ export const getDefaultAppConfig = (): AppConfig => ({
       numberInputMax: 20,
       fineStep: 0.1,
       coarseStep: 0.5,
+    },
+  },
+  lora: {
+    weight: {
+      initial: 0.75,
+      sliderMin: -1,
+      sliderMax: 2,
+      numberInputMin: -1,
+      numberInputMax: 2,
+      fineStep: 0.01,
+      coarseStep: 0.05,
     },
   },
 });

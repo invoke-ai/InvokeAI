@@ -1,5 +1,6 @@
 import { Box, Flex, SimpleGrid } from '@invoke-ai/ui-library';
 import { ControlAdapterModelDefaultSettings } from 'features/modelManagerV2/subpanels/ModelPanel/ControlAdapterModelDefaultSettings/ControlAdapterModelDefaultSettings';
+import { LoRAModelDefaultSettings } from 'features/modelManagerV2/subpanels/ModelPanel/LoRAModelDefaultSettings/LoRAModelDefaultSettings';
 import { ModelConvertButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelConvertButton';
 import { ModelEditButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelEditButton';
 import { ModelHeader } from 'features/modelManagerV2/subpanels/ModelPanel/ModelHeader';
@@ -79,9 +80,13 @@ export const ModelView = memo(({ modelConfig }: Props) => {
             {(modelConfig.type === 'controlnet' ||
               modelConfig.type === 't2i_adapter' ||
               modelConfig.type === 'control_lora') && <ControlAdapterModelDefaultSettings modelConfig={modelConfig} />}
-            {(modelConfig.type === 'main' || modelConfig.type === 'lora') && (
-              <TriggerPhrases modelConfig={modelConfig} />
+            {modelConfig.type === 'lora' && (
+              <>
+                <LoRAModelDefaultSettings modelConfig={modelConfig} />
+                <TriggerPhrases modelConfig={modelConfig} />
+              </>
             )}
+            {modelConfig.type === 'main' && <TriggerPhrases modelConfig={modelConfig} />}
           </Box>
         )}
         <Box overflowY="auto" layerStyle="second" borderRadius="base" p={4}>

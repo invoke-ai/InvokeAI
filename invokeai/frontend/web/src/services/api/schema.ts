@@ -14211,6 +14211,8 @@ export type components = {
              * @description Set of trigger phrases for this model
              */
             trigger_phrases?: string[] | null;
+            /** @description Default settings for this model */
+            default_settings?: components["schemas"]["LoraModelDefaultSettings"] | null;
         };
         /** LoRAField */
         LoRAField: {
@@ -14382,6 +14384,8 @@ export type components = {
              * @description Set of trigger phrases for this model
              */
             trigger_phrases?: string[] | null;
+            /** @description Default settings for this model */
+            default_settings?: components["schemas"]["LoraModelDefaultSettings"] | null;
         };
         /**
          * LoRAMetadataField
@@ -14476,6 +14480,8 @@ export type components = {
              * @description Set of trigger phrases for this model
              */
             trigger_phrases?: string[] | null;
+            /** @description Default settings for this model */
+            default_settings?: components["schemas"]["LoraModelDefaultSettings"] | null;
         };
         /**
          * Select LoRA
@@ -14558,6 +14564,14 @@ export type components = {
          * @enum {integer}
          */
         LogLevel: 0 | 10 | 20 | 30 | 40 | 50;
+        /** LoraModelDefaultSettings */
+        LoraModelDefaultSettings: {
+            /**
+             * Weight
+             * @description Default weight for this model
+             */
+            weight?: number | null;
+        };
         /** MDControlListOutput */
         MDControlListOutput: {
             /**
@@ -17351,7 +17365,7 @@ export type components = {
              * Default Settings
              * @description Default settings for this model
              */
-            default_settings?: components["schemas"]["MainModelDefaultSettings"] | components["schemas"]["ControlAdapterDefaultSettings"] | null;
+            default_settings?: components["schemas"]["MainModelDefaultSettings"] | components["schemas"]["LoraModelDefaultSettings"] | components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Variant
              * @description The variant of the model.

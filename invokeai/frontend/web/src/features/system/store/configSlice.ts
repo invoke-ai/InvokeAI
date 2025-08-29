@@ -61,6 +61,7 @@ export const selectInfillTileSizeConfig = createConfigSelector((config) => confi
 export const selectImg2imgStrengthConfig = createConfigSelector((config) => config.sd.img2imgStrength);
 export const selectMaxPromptsConfig = createConfigSelector((config) => config.sd.dynamicPrompts.maxPrompts);
 export const selectIterationsConfig = createConfigSelector((config) => config.sd.iterations);
+export const selectLoRAWeightConfig = createConfigSelector((config) => config.lora.weight);
 
 export const selectMaxUpscaleDimension = createConfigSelector((config) => config.maxUpscaleDimension);
 export const selectAllowPrivateStylePresets = createConfigSelector((config) => config.allowPrivateStylePresets);
