@@ -65,7 +65,7 @@ export const queueItemsAdapter = createEntityAdapter<components['schemas']['Sess
     return 0;
   },
 });
-export const queueItemsAdapterSelectors = queueItemsAdapter.getSelectors(undefined, getSelectorsOptions);
+const queueItemsAdapterSelectors = queueItemsAdapter.getSelectors(undefined, getSelectorsOptions);
 
 export const queueApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -528,7 +528,6 @@ export const {
   usePruneQueueMutation,
   useGetQueueStatusQuery,
   useGetQueueItemQuery,
-  useListQueueItemsQuery,
   useGetQueueItemIdsQuery,
   useGetQueueItemDTOsByItemIdsMutation,
   useCancelQueueItemMutation,
