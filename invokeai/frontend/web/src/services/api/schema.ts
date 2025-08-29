@@ -1427,12 +1427,32 @@ export type paths = {
             cookie?: never;
         };
         /**
-         * Get Queue Itemids
+         * Get Queue Item Ids
          * @description Gets all queue item ids that match the given parameters
          */
         get: operations["get_queue_itemIds"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/{queue_id}/items_by_ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Queue Items By Item Ids
+         * @description Gets queue items for the specified queue item ids. Maintains order of item ids.
+         */
+        post: operations["get_queue_items_by_item_ids"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3002,6 +3022,14 @@ export type components = {
              * @description Object containing list of video ids to fetch DTOs for
              */
             video_ids: string[];
+        };
+        /** Body_get_queue_items_by_item_ids */
+        Body_get_queue_items_by_item_ids: {
+            /**
+             * Item Ids
+             * @description Object containing list of queue item ids to fetch queue items for
+             */
+            item_ids: number[];
         };
         /** Body_import_style_presets */
         Body_import_style_presets: {
@@ -25882,16 +25910,12 @@ export interface operations {
     list_queue_items: {
         parameters: {
             query?: {
-                /** @description The pagination cursor */
-                cursor?: number | null;
-                /** @description The number of queues per page */
+                /** @description The number of items to fetch */
                 limit?: number;
                 /** @description The status of items to fetch */
-                order_by?: "item_id" | "status" | "created_at";
-                /** @description The order of sort */
-                order_dir?: components["schemas"]["SQLiteDirection"];
-                /** @description The status of items to fetch */
                 status?: ("pending" | "in_progress" | "completed" | "failed" | "canceled") | null;
+                /** @description The pagination cursor */
+                cursor?: number | null;
                 /** @description The pagination cursor priority */
                 priority?: number;
                 /** @description The destination of queue items to fetch */
@@ -25965,7 +25989,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description The sort field */
-                order_by?: "item_id" | "status" | "created_at";
+                order_by?: "status" | "completed_at";
                 /** @description The order of sort */
                 order_dir?: components["schemas"]["SQLiteDirection"];
             };
@@ -25985,6 +26009,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ItemIdsResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_queue_items_by_item_ids: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_get_queue_items_by_item_ids"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionQueueItem"][];
                 };
             };
             /** @description Validation Error */

@@ -33,30 +33,27 @@ const QueueListHeader = () => {
       <QueueListHeaderColumn
         field="completed_at"
         displayName={t('queue.completedAt')}
-        ps={0.5} w={COLUMN_WIDTHS.completedAt} alignItems="center"
+        ps={0.5}
+        w={COLUMN_WIDTHS.completedAt}
+        alignItems="center"
       />
-      <QueueListHeaderColumn
-        displayName={t('queue.origin')}
-        ps={0.5} w={COLUMN_WIDTHS.origin} alignItems="center"
-      />
+      <QueueListHeaderColumn displayName={t('queue.origin')} ps={0.5} w={COLUMN_WIDTHS.origin} alignItems="center" />
       <QueueListHeaderColumn
         displayName={t('queue.destination')}
-        ps={0.5} w={COLUMN_WIDTHS.destination} alignItems="center"
+        ps={0.5}
+        w={COLUMN_WIDTHS.destination}
+        alignItems="center"
       />
-      <QueueListHeaderColumn
-        displayName={t('queue.time')}
-        ps={0.5} w={COLUMN_WIDTHS.time} alignItems="center"
-      />
+      <QueueListHeaderColumn displayName={t('queue.time')} ps={0.5} w={COLUMN_WIDTHS.time} alignItems="center" />
       {shouldShowCredits && (
         <QueueListHeaderColumn
           displayName={t('queue.credits')}
-          ps={0.5} w={COLUMN_WIDTHS.credits} alignItems="center"
+          ps={0.5}
+          w={COLUMN_WIDTHS.credits}
+          alignItems="center"
         />
       )}
-      <QueueListHeaderColumn
-        displayName={t('queue.batch')}
-        ps={0.5} w={COLUMN_WIDTHS.batchId} alignItems="center"
-      />
+      <QueueListHeaderColumn displayName={t('queue.batch')} ps={0.5} w={COLUMN_WIDTHS.batchId} alignItems="center" />
     </Flex>
   );
 };

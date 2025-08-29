@@ -6,7 +6,7 @@ import {
   selectQueueSortBy,
   selectQueueSortOrder,
   sortByChanged,
-  sortOrderChanged
+  sortOrderChanged,
 } from 'features/queue/store/queueSlice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,7 +15,7 @@ import { useSelector } from 'react-redux';
 
 type QueueListHeaderColumnProps = {
   field?: SortBy;
-  displayName: string;  
+  displayName: string;
   alignItems?: CSS.Property.AlignItems;
   ps?: CSS.Property.PaddingInlineStart | number;
   w?: CSS.Property.Width | number;
@@ -65,15 +65,15 @@ const ColumnSortIcon = memo(({ field, displayName, isMouseHoveringColumn }: Colu
   const isShown = useMemo(() => isSortByColumn || isMouseHoveringColumn, [isSortByColumn, isMouseHoveringColumn]);
   const tooltip = useMemo(() => {
     if (isSortByColumn) {
-      return sortOrder === 'asc' ? t('queue.sortOrderDescending') : t('queue.sortOrderAscending');
+      return sortOrder === 'asc' ? t('queue.sortOrderAscending') : t('queue.sortOrderDescending');
     }
     return t('queue.sortBy', { column: displayName });
   }, [isSortByColumn, sortOrder, t, displayName]);
   const icon = useMemo(() => (sortOrder === 'asc' ? <PiSortAscendingBold /> : <PiSortDescendingBold />), [sortOrder]);
 
   const handleClickSortColumn = useCallback(() => {
-    if(isSortByColumn) {
-      if(sortOrder === 'asc') {
+    if (isSortByColumn) {
+      if (sortOrder === 'asc') {
         dispatch(sortOrderChanged('desc'));
       } else {
         dispatch(sortOrderChanged('asc'));
