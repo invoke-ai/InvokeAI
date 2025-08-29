@@ -1,5 +1,5 @@
-import type { ChakraProps, CollapseProps } from '@invoke-ai/ui-library';
-import { Badge, ButtonGroup, Collapse, Flex, IconButton, Text } from '@invoke-ai/ui-library';
+import type { ChakraProps, CollapseProps, FlexProps } from '@invoke-ai/ui-library';
+import { Badge, ButtonGroup, Collapse, Flex, Icon, IconButton, Text } from '@invoke-ai/ui-library';
 import QueueStatusBadge from 'features/queue/components/common/QueueStatusBadge';
 import { useDestinationText } from 'features/queue/components/QueueList/useDestinationText';
 import { useOriginText } from 'features/queue/components/QueueList/useOriginText';
@@ -11,7 +11,7 @@ import { selectShouldShowCredits } from 'features/system/store/configSlice';
 import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowCounterClockwiseBold, PiXBold } from 'react-icons/pi';
+import { PiArrowCounterClockwiseBold, PiImageBold, PiXBold } from 'react-icons/pi';
 import { useSelector } from 'react-redux';
 import type { S } from 'services/api/types';
 
@@ -154,3 +154,11 @@ const transition: CollapseProps['transition'] = {
 };
 
 export default memo(QueueItemComponent);
+
+export const QueueItemPlaceholder = memo((props: FlexProps) => (
+  <Flex w="full" h="full" bg="base.850" borderRadius="base" alignItems="center" justifyContent="center" {...props}>
+    <Icon as={PiImageBold} boxSize={16} color="base.800" />
+  </Flex>
+));
+
+QueueItemPlaceholder.displayName = 'QueueItemPlaceholder';

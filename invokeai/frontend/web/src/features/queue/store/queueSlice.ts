@@ -1,10 +1,12 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
+import type { GetQueueItemIdsArgs } from 'services/api/types';
 import z from 'zod';
 
-const zSortBy = z.enum(['item_id', 'status', 'completed_at']);
+const zSortBy = z.enum(['status', 'completed_at']);
 export type SortBy = z.infer<typeof zSortBy>;
 
 const zQueueState = z.object({
@@ -21,7 +23,7 @@ const getInitialState = (): QueueState => ({
   listCursor: undefined,
   listPriority: undefined,
   selectedQueueItem: undefined,
-  sortBy: 'item_id',
+  sortBy: 'completed_at',
   sortOrder: 'desc',
   resumeProcessorOnEnqueue: true,
 });
@@ -64,3 +66,10 @@ export const selectQueueListCursor = createQueueSelector((queue) => queue.listCu
 export const selectQueueListPriority = createQueueSelector((queue) => queue.listPriority);
 export const selectQueueSortBy = createQueueSelector((queue) => queue.sortBy);
 export const selectQueueSortOrder = createQueueSelector((queue) => queue.sortOrder);
+export const selectGetQueueItemIdsArgs = createMemoizedSelector(
+  [selectQueueSortBy, selectQueueSortOrder],
+  (order_by, order_dir): GetQueueItemIdsArgs => ({
+    order_by,
+    order_dir: order_dir === 'asc' ? 'ASC' : 'DESC',
+  })
+);

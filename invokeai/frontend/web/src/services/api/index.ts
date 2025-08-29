@@ -55,6 +55,7 @@ const tagTypes = [
   'StylePreset',
   'Schema',
   'QueueCountsByDestination',
+  'QueueItemIdList',
   'Video',
   'VideoMetadata',
   'VideoList',
