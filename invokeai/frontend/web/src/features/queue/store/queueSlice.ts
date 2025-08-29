@@ -62,8 +62,6 @@ export const queueSliceConfig: SliceConfig<typeof slice> = {
 
 const selectQueueSlice = (state: RootState) => state.queue;
 const createQueueSelector = <T>(selector: Selector<QueueState, T>) => createSelector(selectQueueSlice, selector);
-export const selectQueueListCursor = createQueueSelector((queue) => queue.listCursor);
-export const selectQueueListPriority = createQueueSelector((queue) => queue.listPriority);
 export const selectQueueSortBy = createQueueSelector((queue) => queue.sortBy);
 export const selectQueueSortOrder = createQueueSelector((queue) => queue.sortOrder);
 export const selectGetQueueItemIdsArgs = createMemoizedSelector(
