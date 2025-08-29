@@ -3015,14 +3015,6 @@ export type components = {
              */
             image_names: string[];
         };
-        /** Body_get_videos_by_ids */
-        Body_get_videos_by_ids: {
-            /**
-             * Video Ids
-             * @description Object containing list of video ids to fetch DTOs for
-             */
-            video_ids: string[];
-        };
         /** Body_get_queue_items_by_item_ids */
         Body_get_queue_items_by_item_ids: {
             /**
@@ -3030,6 +3022,14 @@ export type components = {
              * @description Object containing list of queue item ids to fetch queue items for
              */
             item_ids: number[];
+        };
+        /** Body_get_videos_by_ids */
+        Body_get_videos_by_ids: {
+            /**
+             * Video Ids
+             * @description Object containing list of video ids to fetch DTOs for
+             */
+            video_ids: string[];
         };
         /** Body_import_style_presets */
         Body_import_style_presets: {
