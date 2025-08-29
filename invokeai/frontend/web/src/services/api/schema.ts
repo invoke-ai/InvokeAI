@@ -3015,14 +3015,6 @@ export type components = {
              */
             image_names: string[];
         };
-        /** Body_get_videos_by_ids */
-        Body_get_videos_by_ids: {
-            /**
-             * Video Ids
-             * @description Object containing list of video ids to fetch DTOs for
-             */
-            video_ids: string[];
-        };
         /** Body_get_queue_items_by_item_ids */
         Body_get_queue_items_by_item_ids: {
             /**
@@ -3030,6 +3022,14 @@ export type components = {
              * @description Object containing list of queue item ids to fetch queue items for
              */
             item_ids: number[];
+        };
+        /** Body_get_videos_by_ids */
+        Body_get_videos_by_ids: {
+            /**
+             * Video Ids
+             * @description Object containing list of video ids to fetch DTOs for
+             */
+            video_ids: string[];
         };
         /** Body_import_style_presets */
         Body_import_style_presets: {
@@ -12777,14 +12777,14 @@ export type components = {
              * Convert Cache Dir
              * Format: path
              * @description Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).
-             * @default models/.convert_cache
+             * @default models\.convert_cache
              */
             convert_cache_dir?: string;
             /**
              * Download Cache Dir
              * Format: path
              * @description Path to the directory that contains dynamically downloaded models.
-             * @default models/.download_cache
+             * @default models\.download_cache
              */
             download_cache_dir?: string;
             /**
