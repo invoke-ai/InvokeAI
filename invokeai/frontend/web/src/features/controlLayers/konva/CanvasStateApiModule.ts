@@ -11,7 +11,8 @@ import { createReduxSubscription, getPrefixedId } from 'features/controlLayers/k
 import {
   selectCanvasSettingsSlice,
   settingsBrushWidthChanged,
-  settingsColorChanged,
+  settingsColor1Changed,
+  settingsColor2Changed,
   settingsEraserWidthChanged,
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import {
@@ -232,7 +233,9 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * Sets the drawing color, pushing state to redux.
    */
   setColor = (color: Partial<RgbaColor>) => {
-    return this.store.dispatch(settingsColorChanged(color));
+    return this.getSettings().activeColor === 'color1'
+      ? this.store.dispatch(settingsColor1Changed(color))
+      : this.store.dispatch(settingsColor2Changed(color));
   };
 
   /**
@@ -421,7 +424,8 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * consistency with conventional black and white mask images, we use black as the color for these entities.
    */
   getCurrentColor = (): RgbaColor => {
-    let color: RgbaColor = this.getSettings().color;
+    let color: RgbaColor =
+      this.getSettings().activeColor === 'color1' ? this.getSettings().color1 : this.getSettings().color2;
     const selectedEntity = this.getSelectedEntityAdapter();
     if (selectedEntity) {
       // These two entity types use a compositing rect for opacity. Their fill is always a solid color.
@@ -449,7 +453,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
       // selected entity's fill color with 50% opacity.
       return { ...selectedEntity.state.fill.color, a: 0.5 };
     } else {
-      return this.getSettings().color;
+      return this.getSettings().activeColor === 'color1' ? this.getSettings().color1 : this.getSettings().color2;
     }
   };
 
