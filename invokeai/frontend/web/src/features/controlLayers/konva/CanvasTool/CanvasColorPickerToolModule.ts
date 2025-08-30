@@ -328,6 +328,7 @@ export class CanvasColorPickerToolModule extends CanvasModuleBase {
     const colorPickerOuterRadius = this.manager.stage.unscale(this.config.RING_OUTER_RADIUS);
     const onePixel = this.manager.stage.unscale(1);
     const twoPixels = this.manager.stage.unscale(2);
+    const color = settings.activeColor === 'color1' ? settings.color1 : settings.color2;
 
     this.konva.ringCandidateColor.setAttrs({
       x,
@@ -339,7 +340,7 @@ export class CanvasColorPickerToolModule extends CanvasModuleBase {
     this.konva.ringCurrentColor.setAttrs({
       x,
       y,
-      fill: rgbColorToString(settings.color),
+      fill: rgbColorToString(color),
       innerRadius: colorPickerInnerRadius,
       outerRadius: colorPickerOuterRadius,
     });
