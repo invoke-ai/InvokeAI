@@ -2,6 +2,7 @@ import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
+import type { RgbaColor } from 'features/controlLayers/store/types';
 import { zRgbaColor } from 'features/controlLayers/store/types';
 import { z } from 'zod';
 
@@ -35,9 +36,11 @@ const zCanvasSettingsState = z.object({
    */
   eraserWidth: z.int().gt(0),
   /**
-   * The color to use when drawing lines or filling shapes.
+   * The colors to use when drawing lines or filling shapes.
    */
-  color: zRgbaColor,
+  activeColor: z.enum(['color1', 'color2']),
+  color1: zRgbaColor,
+  color2: zRgbaColor,
   /**
    * Whether to composite inpainted/outpainted regions back onto the source image when saving canvas generations.
    *
@@ -100,7 +103,9 @@ const getInitialState = (): CanvasSettingsState => ({
   invertScrollForToolWidth: false,
   brushWidth: 50,
   eraserWidth: 50,
-  color: { r: 31, g: 160, b: 224, a: 1 }, // invokeBlue.500
+  activeColor: 'color1',
+  color1: { r: 31, g: 160, b: 224, a: 1 }, // invokeBlue.500
+  color2: { r: 0, g: 0, b: 0, a: 1 }, // black
   outputOnlyMaskedRegions: true,
   autoProcess: true,
   snapToGrid: true,
@@ -134,8 +139,14 @@ const slice = createSlice({
     settingsEraserWidthChanged: (state, action: PayloadAction<CanvasSettingsState['eraserWidth']>) => {
       state.eraserWidth = Math.round(action.payload);
     },
-    settingsColorChanged: (state, action: PayloadAction<Partial<CanvasSettingsState['color']>>) => {
-      state.color = { ...state.color, ...action.payload };
+    settingsActiveColorToggled: (state) => {
+      state.activeColor = state.activeColor === 'color1' ? 'color2' : 'color1';
+    },
+    settingsColor1Changed: (state, action: PayloadAction<Partial<RgbaColor>>) => {
+      state.color1 = { ...state.color1, ...action.payload };
+    },
+    settingsColor2Changed: (state, action: PayloadAction<Partial<RgbaColor>>) => {
+      state.color2 = { ...state.color2, ...action.payload };
     },
     settingsInvertScrollForToolWidthChanged: (
       state,
@@ -191,7 +202,9 @@ export const {
   settingsShowHUDToggled,
   settingsBrushWidthChanged,
   settingsEraserWidthChanged,
-  settingsColorChanged,
+  settingsActiveColorToggled,
+  settingsColor1Changed,
+  settingsColor2Changed,
   settingsInvertScrollForToolWidthChanged,
   settingsOutputOnlyMaskedRegionsToggled,
   settingsAutoProcessToggled,
