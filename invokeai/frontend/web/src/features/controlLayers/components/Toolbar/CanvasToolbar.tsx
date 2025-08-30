@@ -1,6 +1,6 @@
 import { Divider, Flex } from '@invoke-ai/ui-library';
 import { CanvasSettingsPopover } from 'features/controlLayers/components/Settings/CanvasSettingsPopover';
-import { ToolColorPicker } from 'features/controlLayers/components/Tool/ToolFillColorPicker';
+import { ToolFillColorPicker } from 'features/controlLayers/components/Tool/ToolFillColorPicker';
 import { ToolSettings } from 'features/controlLayers/components/Tool/ToolSettings';
 import { CanvasToolbarFitBboxToLayersButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarFitBboxToLayersButton';
 import { CanvasToolbarFitBboxToMasksButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarFitBboxToMasksButton';
@@ -36,7 +36,7 @@ export const CanvasToolbar = memo(() => {
 
   return (
     <Flex w="full" gap={2} alignItems="center" px={2}>
-      <ToolColorPicker />
+      <ToolFillColorPicker />
       <ToolSettings />
       <Flex alignItems="center" h="full" flexGrow={1} justifyContent="flex-end">
         <CanvasToolbarScale />
