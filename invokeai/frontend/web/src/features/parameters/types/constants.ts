@@ -157,6 +157,7 @@ export const SUPPORTS_REF_IMAGES_BASE_MODELS: BaseModelType[] = [
 
 export const SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS: BaseModelType[] = [
   'sd-1',
+  'sd-2',
   'sdxl',
   'cogview4',
   'sd-3',
