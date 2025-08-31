@@ -801,6 +801,11 @@ const LoRAs: CollectionMetadataHandler<LoRA[]> = {
   type: 'LoRAs',
   parse: async (metadata, store) => {
     const rawArray = getProperty(metadata, 'loras');
+
+    if(!rawArray) {
+      return [];
+    }
+
     assert(isArray(rawArray));
 
     const loras: LoRA[] = [];
