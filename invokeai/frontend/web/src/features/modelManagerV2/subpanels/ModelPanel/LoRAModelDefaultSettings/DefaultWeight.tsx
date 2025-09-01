@@ -11,14 +11,14 @@ import type { LoRAModelDefaultSettingsFormData } from './LoRAModelDefaultSetting
 
 type DefaultWeight = LoRAModelDefaultSettingsFormData['weight'];
 
-export const DefaultWeight = memo((props: UseControllerProps<LoRAModelDefaultSettingsFormData>) => {
+export const DefaultWeight = memo((props: UseControllerProps<LoRAModelDefaultSettingsFormData, 'weight'>) => {
   const { field } = useController(props);
   const { t } = useTranslation();
 
   const onChange = useCallback(
     (v: number) => {
       const updatedValue = {
-        ...(field.value as DefaultWeight),
+        ...(field.value),
         value: v,
       };
       field.onChange(updatedValue);
@@ -27,11 +27,11 @@ export const DefaultWeight = memo((props: UseControllerProps<LoRAModelDefaultSet
   );
 
   const value = useMemo(() => {
-    return (field.value as DefaultWeight).value;
+    return (field.value).value;
   }, [field.value]);
 
   const isDisabled = useMemo(() => {
-    return !(field.value as DefaultWeight).isEnabled;
+    return !(field.value).isEnabled;
   }, [field.value]);
 
   return (
