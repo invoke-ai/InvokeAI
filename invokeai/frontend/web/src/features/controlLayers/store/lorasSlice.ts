@@ -4,6 +4,7 @@ import type { SliceConfig } from 'app/store/types';
 import { paramsReset } from 'features/controlLayers/store/paramsSlice';
 import { type LoRA, zLoRA } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
+import { DEFAULT_LORA_WEIGHT_CONFIG } from 'features/system/store/configSlice';
 import type { LoRAModelConfig } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
 import z from 'zod';
@@ -28,7 +29,7 @@ const slice = createSlice({
         const { model, id } = action.payload;
         const parsedModel = zModelIdentifierField.parse(model);
         const defaultLoRAConfig: Pick<LoRA, 'weight' | 'isEnabled'> = {
-          weight: model.default_settings?.weight ?? 0.75,
+          weight: model.default_settings?.weight ?? DEFAULT_LORA_WEIGHT_CONFIG.initial,
           isEnabled: true,
         };
         state.loras.push({ ...defaultLoRAConfig, model: parsedModel, id });

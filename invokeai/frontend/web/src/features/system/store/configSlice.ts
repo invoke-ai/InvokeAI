@@ -6,6 +6,17 @@ import { getDefaultAppConfig, type PartialAppConfig, zAppConfig } from 'app/type
 import { merge } from 'es-toolkit/compat';
 import z from 'zod';
 
+export const DEFAULT_LORA_WEIGHT_CONFIG = {
+  initial: 0.75,
+  sliderMin: -1,
+  sliderMax: 2,
+  marks: [-1, 0, 1, 2],
+  numberInputMin: -1,
+  numberInputMax: 2,
+  fineStep: 0.01,
+  coarseStep: 0.05,
+} as const;
+
 const zConfigState = z.object({
   ...zAppConfig.shape,
   didLoad: z.boolean(),
@@ -61,7 +72,6 @@ export const selectInfillTileSizeConfig = createConfigSelector((config) => confi
 export const selectImg2imgStrengthConfig = createConfigSelector((config) => config.sd.img2imgStrength);
 export const selectMaxPromptsConfig = createConfigSelector((config) => config.sd.dynamicPrompts.maxPrompts);
 export const selectIterationsConfig = createConfigSelector((config) => config.sd.iterations);
-export const selectLoRAWeightConfig = createConfigSelector((config) => config.lora.weight);
 
 export const selectMaxUpscaleDimension = createConfigSelector((config) => config.maxUpscaleDimension);
 export const selectAllowPrivateStylePresets = createConfigSelector((config) => config.allowPrivateStylePresets);
