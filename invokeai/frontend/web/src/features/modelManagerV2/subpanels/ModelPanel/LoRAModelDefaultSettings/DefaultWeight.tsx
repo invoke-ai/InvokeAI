@@ -18,7 +18,7 @@ export const DefaultWeight = memo((props: UseControllerProps<LoRAModelDefaultSet
   const onChange = useCallback(
     (v: number) => {
       const updatedValue = {
-        ...(field.value),
+        ...field.value,
         value: v,
       };
       field.onChange(updatedValue);
@@ -27,11 +27,11 @@ export const DefaultWeight = memo((props: UseControllerProps<LoRAModelDefaultSet
   );
 
   const value = useMemo(() => {
-    return (field.value).value;
+    return field.value.value;
   }, [field.value]);
 
   const isDisabled = useMemo(() => {
-    return !(field.value).isEnabled;
+    return !field.value.isEnabled;
   }, [field.value]);
 
   return (
