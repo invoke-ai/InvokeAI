@@ -18,12 +18,10 @@ import {
   loraWeightChanged,
 } from 'features/controlLayers/store/lorasSlice';
 import type { LoRA } from 'features/controlLayers/store/types';
-import { selectLoRAWeightConfig } from 'features/system/store/configSlice';
+import { DEFAULT_LORA_WEIGHT_CONFIG } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
-
-const marks = [-1, 0, 1, 2];
 
 export const LoRACard = memo((props: { id: string }) => {
   const selectLoRA = useMemo(() => buildSelectLoRA(props.id), [props.id]);
@@ -39,7 +37,6 @@ LoRACard.displayName = 'LoRACard';
 
 const LoRAContent = memo(({ lora }: { lora: LoRA }) => {
   const dispatch = useAppDispatch();
-  const config = useAppSelector(selectLoRAWeightConfig);
   const { data: loraConfig } = useGetModelConfigQuery(lora.model.key);
 
   const handleChange = useCallback(
@@ -81,22 +78,22 @@ const LoRAContent = memo(({ lora }: { lora: LoRA }) => {
           <CompositeSlider
             value={lora.weight}
             onChange={handleChange}
-            min={config.sliderMin}
-            max={config.sliderMax}
-            step={config.coarseStep}
-            marks={marks}
-            defaultValue={config.initial}
+            min={DEFAULT_LORA_WEIGHT_CONFIG.sliderMin}
+            max={DEFAULT_LORA_WEIGHT_CONFIG.sliderMax}
+            step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
+            marks={DEFAULT_LORA_WEIGHT_CONFIG.marks.slice()}
+            defaultValue={DEFAULT_LORA_WEIGHT_CONFIG.initial}
             isDisabled={!lora.isEnabled}
           />
           <CompositeNumberInput
             value={lora.weight}
             onChange={handleChange}
-            min={config.numberInputMin}
-            max={config.numberInputMax}
-            step={config.coarseStep}
+            min={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMin}
+            max={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMax}
+            step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
             w={20}
             flexShrink={0}
-            defaultValue={config.initial}
+            defaultValue={DEFAULT_LORA_WEIGHT_CONFIG.initial}
             isDisabled={!lora.isEnabled}
           />
         </CardBody>

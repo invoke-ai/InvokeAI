@@ -1,8 +1,7 @@
 import { CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/SettingToggle';
-import { selectLoRAWeightConfig } from 'features/system/store/configSlice';
+import { DEFAULT_LORA_WEIGHT_CONFIG } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
@@ -14,13 +13,7 @@ type DefaultWeight = LoRAModelDefaultSettingsFormData['weight'];
 
 export const DefaultWeight = memo((props: UseControllerProps<LoRAModelDefaultSettingsFormData>) => {
   const { field } = useController(props);
-
-  const config = useAppSelector(selectLoRAWeightConfig);
   const { t } = useTranslation();
-  const marks = useMemo(
-    () => [config.sliderMin, Math.floor(config.sliderMax / 2), config.sliderMax],
-    [config.sliderMax, config.sliderMin]
-  );
 
   const onChange = useCallback(
     (v: number) => {
@@ -53,20 +46,20 @@ export const DefaultWeight = memo((props: UseControllerProps<LoRAModelDefaultSet
       <Flex w="full" gap={4}>
         <CompositeSlider
           value={value}
-          min={config.sliderMin}
-          max={config.sliderMax}
-          step={config.coarseStep}
-          fineStep={config.fineStep}
+          min={DEFAULT_LORA_WEIGHT_CONFIG.sliderMin}
+          max={DEFAULT_LORA_WEIGHT_CONFIG.sliderMax}
+          step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
+          fineStep={DEFAULT_LORA_WEIGHT_CONFIG.fineStep}
           onChange={onChange}
-          marks={marks}
+          marks={DEFAULT_LORA_WEIGHT_CONFIG.marks.slice()}
           isDisabled={isDisabled}
         />
         <CompositeNumberInput
           value={value}
-          min={config.numberInputMin}
-          max={config.numberInputMax}
-          step={config.coarseStep}
-          fineStep={config.fineStep}
+          min={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMin}
+          max={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMax}
+          step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
+          fineStep={DEFAULT_LORA_WEIGHT_CONFIG.fineStep}
           onChange={onChange}
           isDisabled={isDisabled}
         />

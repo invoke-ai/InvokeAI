@@ -1,29 +1,17 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { useAppSelector } from 'app/store/storeHooks';
 import { isNil } from 'es-toolkit/compat';
-import { selectConfigSlice } from 'features/system/store/configSlice';
+import { DEFAULT_LORA_WEIGHT_CONFIG } from 'features/system/store/configSlice';
 import { useMemo } from 'react';
 import type { LoRAModelConfig } from 'services/api/types';
 
-const initialStatesSelector = createMemoizedSelector(selectConfigSlice, (config) => {
-  const { weight } = config.lora;
-
-  return {
-    initialWeight: weight.initial,
-  };
-});
-
 export const useLoRAModelDefaultSettings = (modelConfig: LoRAModelConfig) => {
-  const { initialWeight } = useAppSelector(initialStatesSelector);
-
   const defaultSettingsDefaults = useMemo(() => {
     return {
       weight: {
         isEnabled: !isNil(modelConfig?.default_settings?.weight),
-        value: modelConfig?.default_settings?.weight || initialWeight,
+        value: modelConfig?.default_settings?.weight ?? DEFAULT_LORA_WEIGHT_CONFIG.initial,
       },
     };
-  }, [modelConfig?.default_settings, initialWeight]);
+  }, [modelConfig?.default_settings]);
 
   return defaultSettingsDefaults;
 };
