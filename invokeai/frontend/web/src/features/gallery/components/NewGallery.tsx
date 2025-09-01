@@ -27,8 +27,8 @@ import { VirtuosoGrid } from 'react-virtuoso';
 import { imagesApi, useImageDTO, useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
 import { useDebounce } from 'use-debounce';
 
-import { getItemsPerRow } from '../../../../../../../getItemsPerRow';
 import { getItemIndex } from './getItemIndex';
+import { getItemsPerRow } from './getItemsPerRow';
 import { GalleryImage, GalleryImagePlaceholder } from './ImageGrid/GalleryImage';
 import { GallerySelectionCountTag } from './ImageGrid/GallerySelectionCountTag';
 import { scrollIntoView } from './scrollIntoView';

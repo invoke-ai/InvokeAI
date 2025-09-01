@@ -24,8 +24,8 @@ import { VirtuosoGrid } from 'react-virtuoso';
 import { videosApi } from 'services/api/endpoints/videos';
 import { useDebounce } from 'use-debounce';
 
-import { getItemsPerRow } from '../../../../../../../getItemsPerRow';
 import { getItemIndex } from './getItemIndex';
+import { getItemsPerRow } from './getItemsPerRow';
 import { GallerySelectionCountTag } from './ImageGrid/GallerySelectionCountTag';
 import { GalleryVideo } from './ImageGrid/GalleryVideo';
 import { GalleryVideoPlaceholder } from './ImageGrid/GalleryVideoPlaceholder';
