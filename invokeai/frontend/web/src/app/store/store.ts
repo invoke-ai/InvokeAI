@@ -21,7 +21,7 @@ import { deepClone } from 'common/util/deepClone';
 import { keys, mergeWith, omit, pick } from 'es-toolkit/compat';
 import { changeBoardModalSliceConfig } from 'features/changeBoardModal/store/slice';
 import { canvasSettingsSliceConfig } from 'features/controlLayers/store/canvasSettingsSlice';
-import { canvasSliceConfig } from 'features/controlLayers/store/canvasSlice';
+import { canvasesSliceConfig } from 'features/controlLayers/store/canvasesSlice';
 import { canvasSessionSliceConfig } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { lorasSliceConfig } from 'features/controlLayers/store/lorasSlice';
 import { paramsSliceConfig } from 'features/controlLayers/store/paramsSlice';
@@ -64,7 +64,7 @@ const log = logger('system');
 const SLICE_CONFIGS = {
   [canvasSessionSliceConfig.slice.reducerPath]: canvasSessionSliceConfig,
   [canvasSettingsSliceConfig.slice.reducerPath]: canvasSettingsSliceConfig,
-  [canvasSliceConfig.slice.reducerPath]: canvasSliceConfig,
+  [canvasesSliceConfig.slice.reducerPath]: canvasesSliceConfig,
   [changeBoardModalSliceConfig.slice.reducerPath]: changeBoardModalSliceConfig,
   [configSliceConfig.slice.reducerPath]: configSliceConfig,
   [dynamicPromptsSliceConfig.slice.reducerPath]: dynamicPromptsSliceConfig,
@@ -90,11 +90,8 @@ const ALL_REDUCERS = {
   [api.reducerPath]: api.reducer,
   [canvasSessionSliceConfig.slice.reducerPath]: canvasSessionSliceConfig.slice.reducer,
   [canvasSettingsSliceConfig.slice.reducerPath]: canvasSettingsSliceConfig.slice.reducer,
-  // Undoable!
-  [canvasSliceConfig.slice.reducerPath]: undoable(
-    canvasSliceConfig.slice.reducer,
-    canvasSliceConfig.undoableConfig?.reduxUndoOptions
-  ),
+  // No longer undoable here - canvasesSlice manages its own undoable instances
+  [canvasesSliceConfig.slice.reducerPath]: canvasesSliceConfig.slice.reducer,
   [changeBoardModalSliceConfig.slice.reducerPath]: changeBoardModalSliceConfig.slice.reducer,
   [configSliceConfig.slice.reducerPath]: configSliceConfig.slice.reducer,
   [dynamicPromptsSliceConfig.slice.reducerPath]: dynamicPromptsSliceConfig.slice.reducer,

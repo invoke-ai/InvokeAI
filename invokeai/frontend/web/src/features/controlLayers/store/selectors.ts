@@ -303,8 +303,14 @@ export const selectBookmarkedEntityIdentifier = createSelector(
   (canvas) => canvas.bookmarkedEntityIdentifier
 );
 
-export const selectCanvasMayUndo = (state: RootState) => state.canvas.past.length > 0;
-export const selectCanvasMayRedo = (state: RootState) => state.canvas.future.length > 0;
+export const selectCanvasMayUndo = (state: RootState) => {
+  const activeId = state.canvases.activeInstanceId;
+  return activeId ? (state.canvases.instances[activeId]?.past?.length ?? 0) > 0 : false;
+};
+export const selectCanvasMayRedo = (state: RootState) => {
+  const activeId = state.canvases.activeInstanceId;
+  return activeId ? (state.canvases.instances[activeId]?.future?.length ?? 0) > 0 : false;
+};
 export const selectSelectedEntityFill = createSelector(
   selectCanvasSlice,
   selectSelectedEntityIdentifier,

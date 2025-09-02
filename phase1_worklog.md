@@ -67,4 +67,16 @@ Implementing Phase 1 of the Canvas Multi-Instance Implementation Plan to refacto
 - Integrated migration into canvasesSlice persistConfig
 - Added helper functions for default instance creation
 
-#### All Phase 1 Tasks Completed - Ready for Testing
+#### Store Configuration Updates
+✅ **COMPLETED**: Updated store.ts configuration
+- Replaced canvasSliceConfig import with canvasesSliceConfig
+- Removed undoable wrapper from store level (now handled internally)
+- Updated undo/redo selectors for new state structure
+- Updated SLICE_CONFIGS and ALL_REDUCERS
+
+#### Import Updates Required
+⚠️ **IDENTIFIED**: Need to update imports across codebase
+- Found 50+ files importing actions from old canvasSlice
+- Need to update imports to use instanceActions from canvasInstanceSlice
+- All drawing actions now come from canvasInstanceSlice
+- Routing handled automatically by canvasesSlice extraReducers
