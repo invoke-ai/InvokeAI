@@ -1,5 +1,5 @@
 import { useAppSelector } from 'app/store/storeHooks';
-import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useCanvasManager } from 'features/controlLayers/hooks/useCanvasManager';
 import { fitRectToGrid } from 'features/controlLayers/konva/util';
 import { selectMaskBlur } from 'features/controlLayers/store/paramsSlice';
 import { useCallback } from 'react';

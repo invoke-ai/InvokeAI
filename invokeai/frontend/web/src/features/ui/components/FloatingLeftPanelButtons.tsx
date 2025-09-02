@@ -1,6 +1,5 @@
 import { ButtonGroup, Flex, Icon, IconButton, spinAnimation, Tooltip, useShiftModifier } from '@invoke-ai/ui-library';
 import { ToolChooser } from 'features/controlLayers/components/Tool/ToolChooser';
-import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useDeleteAllExceptCurrentQueueItemDialog } from 'features/queue/components/DeleteAllExceptCurrentQueueItemConfirmationAlertDialog';
 import { InvokeButtonTooltip } from 'features/queue/components/InvokeButtonTooltip/InvokeButtonTooltip';
 import { useDeleteCurrentQueueItem } from 'features/queue/hooks/useDeleteCurrentQueueItem';
@@ -36,9 +35,7 @@ FloatingLeftPanelButtons.displayName = 'FloatingLeftPanelButtons';
 export const FloatingCanvasLeftPanelButtons = memo(() => {
   return (
     <Flex pos="absolute" transform="translate(0, -50%)" top="50%" insetInlineStart={2} direction="column" gap={2}>
-      <CanvasManagerProviderGate>
-        <ToolChooser />
-      </CanvasManagerProviderGate>
+      <ToolChooser />
       <ButtonGroup orientation="vertical" h={48}>
         <ToggleLeftPanelButton />
         <InvokeIconButton />

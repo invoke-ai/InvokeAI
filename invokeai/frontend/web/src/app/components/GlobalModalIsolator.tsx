@@ -1,7 +1,6 @@
 import { GlobalImageHotkeys } from 'app/components/GlobalImageHotkeys';
 import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardModal';
 import { CanvasPasteModal } from 'features/controlLayers/components/CanvasPasteModal';
-import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { DeleteImageModal } from 'features/deleteImageModal/components/DeleteImageModal';
 import { DeleteVideoModal } from 'features/deleteVideoModal/components/DeleteVideoModal';
 import { FullscreenDropzone } from 'features/dnd/FullscreenDropzone';
@@ -54,9 +53,7 @@ export const GlobalModalIsolator = memo(() => {
       <FullscreenDropzone />
       <VideosModal />
       <SaveWorkflowAsDialog />
-      <CanvasManagerProviderGate>
-        <CanvasPasteModal />
-      </CanvasManagerProviderGate>
+      <CanvasPasteModal />
       <LoadWorkflowFromGraphModal />
     </>
   );

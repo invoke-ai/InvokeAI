@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react';
 import { ToolBrushWidth } from 'features/controlLayers/components/Tool/ToolBrushWidth';
 import { ToolEraserWidth } from 'features/controlLayers/components/Tool/ToolEraserWidth';
-import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useCanvasManager } from 'features/controlLayers/hooks/useCanvasManager';
 import { memo } from 'react';
 
 export const ToolSettings = memo(() => {

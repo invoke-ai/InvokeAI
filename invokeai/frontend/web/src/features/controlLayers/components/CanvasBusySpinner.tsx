@@ -1,7 +1,7 @@
 import type { SpinnerProps } from '@invoke-ai/ui-library';
 import { Spinner } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useCanvasManager } from 'features/controlLayers/hooks/useCanvasManager';
 import { useAllEntityAdapters } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { computed } from 'nanostores';
 import { memo, useMemo } from 'react';

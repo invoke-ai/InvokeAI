@@ -1,7 +1,7 @@
 import { IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { StagingAreaToolbarNewLayerFromImageMenuItems } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarMenuNewLayerFromImage';
-import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useCanvasManager } from 'features/controlLayers/hooks/useCanvasManager';
 import { memo } from 'react';
 import { PiDotsThreeVerticalBold } from 'react-icons/pi';
 

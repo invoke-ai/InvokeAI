@@ -1,7 +1,7 @@
 import { type Layer, type Psd, writePsd } from 'ag-psd';
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
-import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useCanvasManagerSafe } from 'features/controlLayers/hooks/useCanvasManager';
 import { downloadBlob } from 'features/controlLayers/konva/util';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';

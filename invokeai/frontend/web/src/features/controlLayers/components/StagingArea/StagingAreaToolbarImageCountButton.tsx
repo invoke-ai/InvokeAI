@@ -1,7 +1,7 @@
 import { Button } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useStagingAreaContext } from 'features/controlLayers/components/StagingArea/context';
-import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useCanvasManager } from 'features/controlLayers/hooks/useCanvasManager';
 import { memo, useMemo } from 'react';
 
 export const StagingAreaToolbarImageCountButton = memo(() => {

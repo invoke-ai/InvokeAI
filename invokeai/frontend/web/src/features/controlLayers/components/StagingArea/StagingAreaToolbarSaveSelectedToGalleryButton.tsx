@@ -3,7 +3,7 @@ import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { withResultAsync } from 'common/util/result';
 import { useStagingAreaContext } from 'features/controlLayers/components/StagingArea/context';
-import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useCanvasManager } from 'features/controlLayers/hooks/useCanvasManager';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';

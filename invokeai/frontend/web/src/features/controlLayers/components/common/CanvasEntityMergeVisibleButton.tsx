@@ -1,5 +1,5 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useCanvasManager } from 'features/controlLayers/hooks/useCanvasManager';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useVisibleEntityCountByType } from 'features/controlLayers/hooks/useVisibleEntityCountByType';
 import type { CanvasEntityType } from 'features/controlLayers/store/types';

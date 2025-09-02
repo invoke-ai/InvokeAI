@@ -2,7 +2,6 @@ import { Button, Collapse, Divider, Flex, IconButton } from '@invoke-ai/ui-libra
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { RefImagePreview } from 'features/controlLayers/components/RefImage/RefImagePreview';
-import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { RefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
 import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { useNewGlobalReferenceImageFromBbox } from 'features/controlLayers/hooks/saveCanvasHooks';
@@ -121,9 +120,7 @@ const AddRefImageDropTargetAndButton = memo(() => {
         <DndDropTarget label="Drop" dndTarget={addGlobalReferenceImageDndTarget} dndTargetData={dndTargetData} />
       </Button>
       {tab === 'canvas' && (
-        <CanvasManagerProviderGate>
-          <BboxButton />
-        </CanvasManagerProviderGate>
+        <BboxButton />
       )}
     </Flex>
   );

@@ -10,10 +10,7 @@ import { IPAdapterMethod } from 'features/controlLayers/components/RefImage/IPAd
 import { RefImageModel } from 'features/controlLayers/components/RefImage/RefImageModel';
 import { RefImageNoImageState } from 'features/controlLayers/components/RefImage/RefImageNoImageState';
 import { RefImageNoImageStateWithCanvasOptions } from 'features/controlLayers/components/RefImage/RefImageNoImageStateWithCanvasOptions';
-import {
-  CanvasManagerProviderGate,
-  useCanvasManagerSafe,
-} from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useCanvasManagerSafe } from 'features/controlLayers/hooks/useCanvasManager';
 import { useRefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
 import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import {
@@ -124,11 +121,7 @@ const RefImageSettingsContent = memo(() => {
         {isIPAdapterConfig(config) && (
           <IPAdapterCLIPVisionModel model={config.clipVisionModel} onChange={onChangeCLIPVisionModel} />
         )}
-        {tab === 'canvas' && (
-          <CanvasManagerProviderGate>
-            <PullBboxIntoRefImageIconButton />
-          </CanvasManagerProviderGate>
-        )}
+        {tab === 'canvas' && <PullBboxIntoRefImageIconButton />}
       </Flex>
       <Flex gap={2} w="full">
         {isIPAdapterConfig(config) && (
@@ -175,11 +168,7 @@ export const RefImageSettings = memo(() => {
   const hasImage = useAppSelector(selectIPAdapterHasImage);
 
   if (!hasImage && canvasManager && tab === 'canvas') {
-    return (
-      <CanvasManagerProviderGate>
-        <RefImageNoImageStateWithCanvasOptions />
-      </CanvasManagerProviderGate>
-    );
+    return <RefImageNoImageStateWithCanvasOptions />;
   }
 
   if (!hasImage) {

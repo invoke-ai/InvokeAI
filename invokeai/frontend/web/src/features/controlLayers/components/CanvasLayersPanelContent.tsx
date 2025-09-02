@@ -4,7 +4,6 @@ import { CanvasAddEntityButtons } from 'features/controlLayers/components/Canvas
 import { CanvasEntityList } from 'features/controlLayers/components/CanvasEntityList/CanvasEntityList';
 import { EntityListSelectedEntityActionBar } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBar';
 import { ActiveCanvasProvider } from 'features/controlLayers/contexts/ActiveCanvasProvider';
-import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectHasEntities } from 'features/controlLayers/store/selectors';
 import { memo } from 'react';
 
@@ -15,16 +14,14 @@ export const CanvasLayersPanel = memo(() => {
 
   return (
     <ActiveCanvasProvider>
-      <CanvasManagerProviderGate>
-        <Flex flexDir="column" gap={2} w="full" h="full">
-          <EntityListSelectedEntityActionBar />
-          <Divider py={0} />
-          <ParamDenoisingStrength />
-          <Divider py={0} />
-          {!hasEntities && <CanvasAddEntityButtons />}
-          {hasEntities && <CanvasEntityList />}
-        </Flex>
-      </CanvasManagerProviderGate>
+      <Flex flexDir="column" gap={2} w="full" h="full">
+        <EntityListSelectedEntityActionBar />
+        <Divider py={0} />
+        <ParamDenoisingStrength />
+        <Divider py={0} />
+        {!hasEntities && <CanvasAddEntityButtons />}
+        {hasEntities && <CanvasEntityList />}
+      </Flex>
     </ActiveCanvasProvider>
   );
 });

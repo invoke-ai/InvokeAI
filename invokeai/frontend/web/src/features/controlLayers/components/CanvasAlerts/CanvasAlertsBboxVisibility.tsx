@@ -1,6 +1,6 @@
 import { Alert, AlertIcon, AlertTitle } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useCanvasManager } from 'features/controlLayers/hooks/useCanvasManager';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 

@@ -5,7 +5,7 @@ import type { AppStore } from 'app/store/store';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { extractMessageFromAssertionError } from 'common/util/extractMessageFromAssertionError';
 import { withResult, withResultAsync } from 'common/util/result';
-import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useCanvasManagerSafe } from 'features/controlLayers/hooks/useCanvasManager';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { selectActiveCanvasId } from 'features/controlLayers/store/selectors';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';

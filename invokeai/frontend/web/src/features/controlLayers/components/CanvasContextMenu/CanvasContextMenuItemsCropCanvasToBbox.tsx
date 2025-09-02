@@ -1,5 +1,5 @@
 import { MenuItem } from '@invoke-ai/ui-library';
-import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useCanvasManager } from 'features/controlLayers/hooks/useCanvasManager';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

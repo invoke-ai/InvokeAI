@@ -2,7 +2,7 @@ import { Box, Flex, forwardRef } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { logger } from 'app/logging/logger';
 import { QueueItemPreviewMini } from 'features/controlLayers/components/StagingArea/QueueItemPreviewMini';
-import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useCanvasManager } from 'features/controlLayers/hooks/useCanvasManager';
 import { useOverlayScrollbars } from 'overlayscrollbars-react';
 import type { CSSProperties, RefObject } from 'react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';

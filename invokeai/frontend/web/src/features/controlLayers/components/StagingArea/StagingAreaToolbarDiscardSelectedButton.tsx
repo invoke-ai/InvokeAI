@@ -1,7 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useStagingAreaContext } from 'features/controlLayers/components/StagingArea/context';
-import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useCanvasManager } from 'features/controlLayers/hooks/useCanvasManager';
 import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';

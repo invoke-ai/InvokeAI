@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react';
 import { $false } from 'app/store/nanostores/util';
-import { useCanvasManager, useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useCanvasManager, useCanvasManagerSafe } from 'features/controlLayers/hooks/useCanvasManager';
 
 /**
  * Returns a boolena indicating whether the canvas is busy:

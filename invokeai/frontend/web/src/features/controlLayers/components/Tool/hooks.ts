@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react';
-import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useCanvasManager } from 'features/controlLayers/hooks/useCanvasManager';
 import type { Tool } from 'features/controlLayers/store/types';
 import { computed } from 'nanostores';
 import { useCallback } from 'react';
