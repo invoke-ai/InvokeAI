@@ -28,9 +28,11 @@ export const CanvasInstanceProvider = memo<{
   canvasName?: string;
   children: React.ReactNode;
 }>(({ canvasId, canvasName, children }) => {
+  console.log('CanvasInstanceProvider - providing canvasId:', canvasId);
   const store = useAppStore();
   const canvasManagers = useStore($canvasManagers);
   const manager = canvasManagers.get(canvasId);
+  console.log('CanvasInstanceProvider - manager found:', !!manager);
 
   // Enhanced dispatch function that automatically injects canvasId
   const dispatch = useCallback((action: CanvasAction) => {
@@ -60,23 +62,15 @@ export const CanvasInstanceProvider = memo<{
 
   // Memoize the context value to prevent unnecessary re-renders
   const value = useMemo(() => {
-    if (!manager) {
-      return null;
-    }
-    
+    // Even without a manager, we need to provide the context so InvokeCanvasComponent can create one
     return {
       canvasId,
       canvasName,
-      manager,
+      manager: manager as CanvasManager, // Will be undefined initially
       dispatch,
       useSelector,
     };
   }, [canvasId, canvasName, manager, dispatch, useSelector]);
-
-  // Don't render children if manager is not available
-  if (!value) {
-    return null;
-  }
 
   return (
     <CanvasInstanceContext.Provider value={value}>

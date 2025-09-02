@@ -82,8 +82,10 @@ const initializeCenterPanelLayout = (tab: TabName, api: DockviewApi, dispatch: R
     // Create first canvas instance
     const firstCanvasId = nanoid();
     dispatch(canvasInstanceAdded({ canvasId: firstCanvasId, name: 'Canvas 1' }));
+    // Set it as the active canvas
+    dispatch(activeCanvasChanged({ canvasId: firstCanvasId }));
     
-    api.addPanel<DockviewPanelParameters>({
+    const canvasPanel = api.addPanel<DockviewPanelParameters>({
       id: `${WORKSPACE_PANEL_ID}_${firstCanvasId}`,
       component: WORKSPACE_PANEL_ID,
       title: 'Canvas 1',
@@ -116,20 +118,25 @@ const initializeCenterPanelLayout = (tab: TabName, api: DockviewApi, dispatch: R
       },
     });
 
+    // Set the canvas panel as the active panel (not launchpad)
+    canvasPanel.api.setActive();
+
     // Track active canvas panel changes
     api.onDidActivePanelChange((panel) => {
+      console.log('Panel activated:', panel?.id, 'params:', panel?.params);
       if (panel?.id.startsWith(WORKSPACE_PANEL_ID)) {
         const canvasId = panel.params?.canvasId;
         if (canvasId) {
+          console.log('Setting active canvas:', canvasId);
           dispatch(activeCanvasChanged({ canvasId }));
         }
       } else {
         // When a non-canvas panel is activated, set active canvas to null
+        console.log('Setting active canvas to null');
         dispatch(activeCanvasChanged({ canvasId: null }));
       }
     });
 
-    launchpad.api.setActive();
   });
 };
 

@@ -16,8 +16,8 @@ import { SelectObject } from 'features/controlLayers/components/SelectObject/Sel
 import { StagingAreaContextProvider } from 'features/controlLayers/components/StagingArea/context';
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
+import { CanvasInstanceGate } from 'features/controlLayers/contexts/CanvasInstanceGate';
 import { CanvasInstanceProvider } from 'features/controlLayers/contexts/CanvasInstanceContext';
-import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { DockviewPanelProps } from 'features/ui/layouts/auto-layout-context';
@@ -29,12 +29,12 @@ import { StagingArea } from './StagingArea';
 
 const MenuContent = memo(() => {
   return (
-    <CanvasManagerProviderGate>
+    <CanvasInstanceGate>
       <MenuList>
         <CanvasContextMenuSelectedEntityMenuItems />
         <CanvasContextMenuGlobalMenuItems />
       </MenuList>
-    </CanvasManagerProviderGate>
+    </CanvasInstanceGate>
   );
 });
 MenuContent.displayName = 'MenuContent';
@@ -52,12 +52,15 @@ const canvasBgSx = {
 };
 
 const CanvasWorkspacePanelImpl = memo(({ params }: DockviewPanelProps) => {
+  console.log('CanvasWorkspacePanelImpl rendering with params:', params);
   const dynamicGrid = useAppSelector(selectDynamicGrid);
   const showHUD = useAppSelector(selectShowHUD);
   const sessionId = useAppSelector(selectCanvasSessionId);
   
   // Extract canvasId from dockview panel params
   const { canvasId } = params;
+  
+  console.log('CanvasWorkspacePanelImpl - canvasId:', canvasId);
   
   if (!canvasId) {
     // Fallback or error handling for missing canvasId
@@ -83,15 +86,15 @@ const CanvasWorkspacePanelImpl = memo(({ params }: DockviewPanelProps) => {
           justifyContent="center"
           overflow="hidden"
         >
-        <CanvasManagerProviderGate>
+        <CanvasInstanceGate>
           <CanvasToolbar />
-        </CanvasManagerProviderGate>
+        </CanvasInstanceGate>
         <Divider />
         <ContextMenu<HTMLDivElement> renderMenu={renderMenu} withLongPress={false}>
           {(ref) => (
             <Flex ref={ref} sx={canvasBgSx} data-dynamic-grid={dynamicGrid}>
               <InvokeCanvasComponent />
-              <CanvasManagerProviderGate>
+              <CanvasInstanceGate>
                 <Flex
                   position="absolute"
                   flexDir="column"
@@ -115,23 +118,23 @@ const CanvasWorkspacePanelImpl = memo(({ params }: DockviewPanelProps) => {
                   </Menu>
                 </Flex>
                 <CanvasBusySpinner position="absolute" insetInlineEnd={2} bottom={2} />
-              </CanvasManagerProviderGate>
+              </CanvasInstanceGate>
             </Flex>
           )}
         </ContextMenu>
-        <CanvasManagerProviderGate>
+        <CanvasInstanceGate>
           <StagingArea />
-        </CanvasManagerProviderGate>
+        </CanvasInstanceGate>
         <Flex position="absolute" bottom={4}>
-          <CanvasManagerProviderGate>
+          <CanvasInstanceGate>
             <Filter />
             <Transform />
             <SelectObject />
-          </CanvasManagerProviderGate>
+          </CanvasInstanceGate>
         </Flex>
-        <CanvasManagerProviderGate>
+        <CanvasInstanceGate>
           <CanvasDropArea />
-        </CanvasManagerProviderGate>
+        </CanvasInstanceGate>
       </Flex>
       </StagingAreaContextProvider>
     </CanvasInstanceProvider>
@@ -141,6 +144,7 @@ CanvasWorkspacePanelImpl.displayName = 'CanvasWorkspacePanelImpl';
 
 // Custom wrapper that provides dockview props to the canvas workspace panel
 export const CanvasWorkspacePanel = memo((props: DockviewPanelProps) => {
+  console.log('CanvasWorkspacePanel wrapper rendering with props:', props);
   return (
     <AutoLayoutPanelContainer {...props}>
       <CanvasWorkspacePanelImpl {...props} />

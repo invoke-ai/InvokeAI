@@ -56,6 +56,11 @@ const useSaveCanvas = ({ region, saveToGallery, toastOk, toastError, onSave, wit
   const { manager: canvasManager } = useCanvasContext();
 
   const saveCanvas = useCallback(async () => {
+    if (!canvasManager) {
+      // Canvas manager not initialized yet
+      return;
+    }
+    
     const bbox = canvasManager.stateApi.getBbox();
     if (!bbox) {
       toast({
@@ -129,8 +134,7 @@ const useSaveCanvas = ({ region, saveToGallery, toastOk, toastError, onSave, wit
       toast({ title: toastError, status: 'error' });
     }
   }, [
-    canvasManager.compositor,
-    canvasManager.stateApi,
+    canvasManager,
     onSave,
     region,
     saveToGallery,

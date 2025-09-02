@@ -1,5 +1,6 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { ActiveCanvasProvider } from 'features/controlLayers/contexts/ActiveCanvasProvider';
 import { RefImageList } from 'features/controlLayers/components/RefImage/RefImageList';
 import {
   selectHasNegativePrompt,
@@ -21,7 +22,11 @@ export const Prompts = memo(() => {
     <Flex flexDir="column" gap={2}>
       <ParamPositivePrompt />
       {activeTab !== 'video' && modelSupportsNegativePrompt && hasNegativePrompt && <ParamNegativePrompt />}
-      {activeTab !== 'video' && modelSupportsRefImages && <RefImageList />}
+      {activeTab !== 'video' && modelSupportsRefImages && (
+        <ActiveCanvasProvider>
+          <RefImageList />
+        </ActiveCanvasProvider>
+      )}
     </Flex>
   );
 });
