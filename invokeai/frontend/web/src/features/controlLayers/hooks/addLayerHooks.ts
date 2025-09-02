@@ -1,23 +1,15 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import type { AppGetState } from 'app/store/store';
-import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
+import { useCanvasContext } from 'features/controlLayers/contexts/CanvasInstanceContext';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
-  controlLayerAdded,
-  inpaintMaskAdded,
-  inpaintMaskDenoiseLimitAdded,
-  inpaintMaskNoiseAdded,
-  rasterLayerAdded,
-  rgAdded,
-  rgNegativePromptChanged,
-  rgPositivePromptChanged,
-  rgRefImageAdded,
-} from 'features/controlLayers/store/canvasSlice';
+  instanceActions,
+} from 'features/controlLayers/store/canvasInstanceSlice';
 import { selectBase, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import {
-  selectCanvasSlice,
   selectEntity,
   selectSelectedEntityIdentifier,
 } from 'features/controlLayers/store/selectors';
@@ -151,63 +143,64 @@ export const getDefaultRegionalGuidanceRefImageConfig = (getState: AppGetState):
 };
 
 export const useAddControlLayer = () => {
-  const dispatch = useAppDispatch();
-  const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
+  const { dispatch, useSelector } = useCanvasContext();
+  const selectedEntityIdentifier = useSelector(selectSelectedEntityIdentifier);
   const selectedControlLayer =
     selectedEntityIdentifier?.type === 'control_layer' ? selectedEntityIdentifier.id : undefined;
   const func = useCallback(() => {
     const overrides = { controlAdapter: deepClone(initialControlNet) };
-    dispatch(controlLayerAdded({ isSelected: true, overrides, addAfter: selectedControlLayer }));
+    dispatch(instanceActions.controlLayerAdded({ isSelected: true, overrides, addAfter: selectedControlLayer }));
   }, [dispatch, selectedControlLayer]);
 
   return func;
 };
 
 export const useAddRasterLayer = () => {
-  const dispatch = useAppDispatch();
-  const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
+  const { dispatch, useSelector } = useCanvasContext();
+  const selectedEntityIdentifier = useSelector(selectSelectedEntityIdentifier);
   const selectedRasterLayer =
     selectedEntityIdentifier?.type === 'raster_layer' ? selectedEntityIdentifier.id : undefined;
   const func = useCallback(() => {
-    dispatch(rasterLayerAdded({ isSelected: true, addAfter: selectedRasterLayer }));
+    dispatch(instanceActions.rasterLayerAdded({ isSelected: true, addAfter: selectedRasterLayer }));
   }, [dispatch, selectedRasterLayer]);
 
   return func;
 };
 
 export const useAddInpaintMask = () => {
-  const dispatch = useAppDispatch();
-  const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
+  const { dispatch, useSelector } = useCanvasContext();
+  const selectedEntityIdentifier = useSelector(selectSelectedEntityIdentifier);
   const selectedInpaintMask =
     selectedEntityIdentifier?.type === 'inpaint_mask' ? selectedEntityIdentifier.id : undefined;
   const func = useCallback(() => {
-    dispatch(inpaintMaskAdded({ isSelected: true, addAfter: selectedInpaintMask }));
+    dispatch(instanceActions.inpaintMaskAdded({ isSelected: true, addAfter: selectedInpaintMask }));
   }, [dispatch, selectedInpaintMask]);
 
   return func;
 };
 
 export const useAddRegionalGuidance = () => {
-  const dispatch = useAppDispatch();
-  const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
+  const { dispatch, useSelector } = useCanvasContext();
+  const selectedEntityIdentifier = useSelector(selectSelectedEntityIdentifier);
   const selectedRegionalGuidance =
     selectedEntityIdentifier?.type === 'regional_guidance' ? selectedEntityIdentifier.id : undefined;
   const func = useCallback(() => {
-    dispatch(rgAdded({ isSelected: true, addAfter: selectedRegionalGuidance }));
+    dispatch(instanceActions.rgAdded({ isSelected: true, addAfter: selectedRegionalGuidance }));
   }, [dispatch, selectedRegionalGuidance]);
 
   return func;
 };
 
 export const useAddNewRegionalGuidanceWithARefImage = () => {
-  const { dispatch, getState } = useAppStore();
+  const { dispatch } = useCanvasContext();
+  const { getState } = useAppStore();
 
   const func = useCallback(() => {
     const config = getDefaultRegionalGuidanceRefImageConfig(getState);
     const overrides: Partial<CanvasRegionalGuidanceState> = {
       referenceImages: [{ id: getPrefixedId('regional_guidance_reference_image'), config }],
     };
-    dispatch(rgAdded({ isSelected: true, overrides }));
+    dispatch(instanceActions.rgAdded({ isSelected: true, overrides }));
   }, [dispatch, getState]);
 
   return func;
@@ -216,10 +209,11 @@ export const useAddNewRegionalGuidanceWithARefImage = () => {
 export const useAddRefImageToExistingRegionalGuidance = (
   entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>
 ) => {
-  const { dispatch, getState } = useAppStore();
+  const { dispatch } = useCanvasContext();
+  const { getState } = useAppStore();
   const func = useCallback(() => {
     const config = getDefaultRegionalGuidanceRefImageConfig(getState);
-    dispatch(rgRefImageAdded({ entityIdentifier, overrides: { config } }));
+    dispatch(instanceActions.rgRefImageAdded({ entityIdentifier, overrides: { config } }));
   }, [dispatch, entityIdentifier, getState]);
 
   return func;
@@ -228,9 +222,9 @@ export const useAddRefImageToExistingRegionalGuidance = (
 export const useAddPositivePromptToExistingRegionalGuidance = (
   entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>
 ) => {
-  const dispatch = useAppDispatch();
+  const { dispatch } = useCanvasContext();
   const func = useCallback(() => {
-    dispatch(rgPositivePromptChanged({ entityIdentifier, prompt: '' }));
+    dispatch(instanceActions.rgPositivePromptChanged({ entityIdentifier, prompt: '' }));
   }, [dispatch, entityIdentifier]);
 
   return func;
@@ -239,27 +233,27 @@ export const useAddPositivePromptToExistingRegionalGuidance = (
 export const useAddNegativePromptToExistingRegionalGuidance = (
   entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>
 ) => {
-  const dispatch = useAppDispatch();
+  const { dispatch } = useCanvasContext();
   const runc = useCallback(() => {
-    dispatch(rgNegativePromptChanged({ entityIdentifier, prompt: '' }));
+    dispatch(instanceActions.rgNegativePromptChanged({ entityIdentifier, prompt: '' }));
   }, [dispatch, entityIdentifier]);
 
   return runc;
 };
 
 export const useAddInpaintMaskNoise = (entityIdentifier: CanvasEntityIdentifier<'inpaint_mask'>) => {
-  const dispatch = useAppDispatch();
+  const { dispatch } = useCanvasContext();
   const func = useCallback(() => {
-    dispatch(inpaintMaskNoiseAdded({ entityIdentifier }));
+    dispatch(instanceActions.inpaintMaskNoiseAdded({ entityIdentifier }));
   }, [dispatch, entityIdentifier]);
 
   return func;
 };
 
 export const useAddInpaintMaskDenoiseLimit = (entityIdentifier: CanvasEntityIdentifier<'inpaint_mask'>) => {
-  const dispatch = useAppDispatch();
+  const { dispatch } = useCanvasContext();
   const func = useCallback(() => {
-    dispatch(inpaintMaskDenoiseLimitAdded({ entityIdentifier }));
+    dispatch(instanceActions.inpaintMaskDenoiseLimitAdded({ entityIdentifier }));
   }, [dispatch, entityIdentifier]);
 
   return func;
