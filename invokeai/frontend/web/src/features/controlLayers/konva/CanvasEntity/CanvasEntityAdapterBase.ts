@@ -317,7 +317,7 @@ export abstract class CanvasEntityAdapterBase<T extends CanvasEntityState, U ext
    */
   selectState = createSelector(
     selectCanvasSlice,
-    (canvas) => selectEntity(canvas, this.entityIdentifier) as T | undefined
+    (canvas) => (canvas ? selectEntity(canvas, this.entityIdentifier) : undefined) as T | undefined
   );
 
   /**
@@ -337,7 +337,11 @@ export abstract class CanvasEntityAdapterBase<T extends CanvasEntityState, U ext
   };
 
   syncIntersectsBbox = () => {
-    const bboxRect = this.manager.stateApi.getBbox().rect;
+    const bbox = this.manager.stateApi.getBbox();
+    if (!bbox) {
+      return;
+    }
+    const bboxRect = bbox.rect;
     const intersectsBbox = this.checkIntersection(bboxRect);
     const prevIntersectsBbox = this.$intersectsBbox.get();
     this.$intersectsBbox.set(intersectsBbox);
@@ -569,7 +573,11 @@ export abstract class CanvasEntityAdapterBase<T extends CanvasEntityState, U ext
   };
 
   cropToBbox = async (): Promise<ImageDTO> => {
-    const { rect } = this.manager.stateApi.getBbox();
+    const bbox = this.manager.stateApi.getBbox();
+    if (!bbox) {
+      throw new Error('No bbox available');
+    }
+    const { rect } = bbox;
     const rasterizeResult = await withResultAsync(() =>
       this.renderer.rasterize({ rect, replaceObjects: true, attrs: { opacity: 1, filters: [] } })
     );

@@ -449,7 +449,11 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       );
       return;
     }
-    const { rect } = this.manager.stateApi.getBbox();
+    const bbox = this.manager.stateApi.getBbox();
+    if (!bbox) {
+      return;
+    }
+    const { rect } = bbox;
     const scaleX = rect.width / this.konva.proxyRect.width();
     const scaleY = rect.height / this.konva.proxyRect.height();
     this.konva.proxyRect.setAttrs({
@@ -472,7 +476,11 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       );
       return;
     }
-    const { rect } = this.manager.stateApi.getBbox();
+    const bbox = this.manager.stateApi.getBbox();
+    if (!bbox) {
+      return;
+    }
+    const { rect } = bbox;
     const gridSize = this.manager.stateApi.getPositionGridSize();
     const width = this.konva.proxyRect.width();
     const height = this.konva.proxyRect.height();
@@ -517,7 +525,11 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       );
       return;
     }
-    const { rect } = this.manager.stateApi.getBbox();
+    const bbox = this.manager.stateApi.getBbox();
+    if (!bbox) {
+      return;
+    }
+    const { rect } = bbox;
     const gridSize = this.manager.stateApi.getPositionGridSize();
     const width = this.konva.proxyRect.width();
     const height = this.konva.proxyRect.height();

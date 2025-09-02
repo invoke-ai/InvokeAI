@@ -95,24 +95,32 @@ const selectEntityCountAll = createActiveCanvasSelector((canvas) => {
 
 const isVisibleEntity = (entity: CanvasEntityState) => entity.isEnabled && entity.objects.length > 0;
 
-export const selectRasterLayerEntities = createActiveCanvasSelector((canvas) => canvas.rasterLayers.entities);
+export const selectRasterLayerEntities = createSelector(selectActiveCanvas, (canvas) => 
+  canvas ? canvas.rasterLayers.entities : []
+);
 export const selectActiveRasterLayerEntities = createSelector(selectRasterLayerEntities, (entities) =>
-  entities ? entities.filter(isVisibleEntity) : []
+  entities.filter(isVisibleEntity)
 );
 
-export const selectControlLayerEntities = createActiveCanvasSelector((canvas) => canvas.controlLayers.entities);
+export const selectControlLayerEntities = createSelector(selectActiveCanvas, (canvas) => 
+  canvas ? canvas.controlLayers.entities : []
+);
 export const selectActiveControlLayerEntities = createSelector(selectControlLayerEntities, (entities) =>
-  entities ? entities.filter(isVisibleEntity) : []
+  entities.filter(isVisibleEntity)
 );
 
-export const selectInpaintMaskEntities = createActiveCanvasSelector((canvas) => canvas.inpaintMasks.entities);
+export const selectInpaintMaskEntities = createSelector(selectActiveCanvas, (canvas) => 
+  canvas ? canvas.inpaintMasks.entities : []
+);
 export const selectActiveInpaintMaskEntities = createSelector(selectInpaintMaskEntities, (entities) =>
-  entities ? entities.filter(isVisibleEntity) : []
+  entities.filter(isVisibleEntity)
 );
 
-export const selectRegionalGuidanceEntities = createActiveCanvasSelector((canvas) => canvas.regionalGuidance.entities);
+export const selectRegionalGuidanceEntities = createSelector(selectActiveCanvas, (canvas) => 
+  canvas ? canvas.regionalGuidance.entities : []
+);
 export const selectActiveRegionalGuidanceEntities = createSelector(selectRegionalGuidanceEntities, (entities) =>
-  entities ? entities.filter(isVisibleEntity) : []
+  entities.filter(isVisibleEntity)
 );
 
 /**
@@ -337,10 +345,18 @@ export const selectSelectedEntityFill = createSelector(
   }
 );
 
-const selectRasterLayersIsHidden = createActiveCanvasSelector((canvas) => canvas.rasterLayers.isHidden);
-const selectControlLayersIsHidden = createActiveCanvasSelector((canvas) => canvas.controlLayers.isHidden);
-const selectInpaintMasksIsHidden = createActiveCanvasSelector((canvas) => canvas.inpaintMasks.isHidden);
-const selectRegionalGuidanceIsHidden = createActiveCanvasSelector((canvas) => canvas.regionalGuidance.isHidden);
+const selectRasterLayersIsHidden = createSelector(selectActiveCanvas, (canvas) => 
+  canvas ? canvas.rasterLayers.isHidden : false
+);
+const selectControlLayersIsHidden = createSelector(selectActiveCanvas, (canvas) => 
+  canvas ? canvas.controlLayers.isHidden : false
+);
+const selectInpaintMasksIsHidden = createSelector(selectActiveCanvas, (canvas) => 
+  canvas ? canvas.inpaintMasks.isHidden : false
+);
+const selectRegionalGuidanceIsHidden = createSelector(selectActiveCanvas, (canvas) => 
+  canvas ? canvas.regionalGuidance.isHidden : false
+);
 
 /**
  * Returns the hidden selector for the given entity type.

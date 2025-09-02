@@ -617,7 +617,11 @@ export class CanvasCompositorModule extends CanvasModuleBase {
    * @returns The generation mode
    */
   getGenerationMode = async (): Promise<GenerationMode> => {
-    const { rect } = this.manager.stateApi.getBbox();
+    const bbox = this.manager.stateApi.getBbox();
+    if (!bbox) {
+      throw new Error('No bbox available');
+    }
+    const { rect } = bbox;
 
     const rasterLayerAdapters = this.manager.compositor.getVisibleAdaptersOfType('raster_layer');
     const compositeRasterLayerHash = this.getCompositeHash(rasterLayerAdapters, { rect });
