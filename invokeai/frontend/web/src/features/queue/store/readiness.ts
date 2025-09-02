@@ -79,7 +79,9 @@ export const $isReadyToEnqueue = computed($reasonsWhyCannotEnqueue, (reasons) =>
 type UpdateReasonsArg = {
   tab: TabName;
   isConnected: boolean;
-  canvas: CanvasState;
+  activeCanvasId: string | null;
+  activeCanvas: CanvasState | null;
+  canvasManagers: Map<string, CanvasManager>;
   params: ParamsState;
   refImages: RefImagesState;
   dynamicPrompts: DynamicPromptsState;
@@ -106,7 +108,9 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
   const {
     tab,
     isConnected,
-    canvas,
+    activeCanvasId,
+    activeCanvas,
+    canvasManagers,
     params,
     refImages,
     dynamicPrompts,
@@ -146,7 +150,9 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
     const reasons = await getReasonsWhyCannotEnqueueCanvasTab({
       isConnected,
       model,
-      canvas,
+      activeCanvasId,
+      activeCanvas,
+      canvasManagers,
       params,
       refImages,
       dynamicPrompts,
@@ -198,9 +204,11 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
 export const useReadinessWatcher = () => {
   useAssertSingleton('useReadinessWatcher');
   const store = useAppStore();
-  const canvasManager = useCanvasManagerSafe();
+  const activeCanvasId = useAppSelector(selectActiveCanvasId);
+  const activeCanvas = useAppSelector(selectActiveCanvas);
+  const canvasManagers = useStore($canvasManagers);
+  const activeCanvasManager = activeCanvasId ? canvasManagers.get(activeCanvasId) : null;
   const tab = useAppSelector(selectActiveTab);
-  const canvas = useAppSelector(selectCanvasSlice);
   const params = useAppSelector(selectParamsSlice);
   const refImages = useAppSelector(selectRefImagesSlice);
   const dynamicPrompts = useAppSelector(selectDynamicPromptsSlice);
@@ -211,11 +219,11 @@ export const useReadinessWatcher = () => {
   const loras = useAppSelector(selectAddedLoRAs);
   const templates = useStore($templates);
   const isConnected = useStore($isConnected);
-  const canvasIsFiltering = useStore(canvasManager?.stateApi.$isFiltering ?? $false);
-  const canvasIsTransforming = useStore(canvasManager?.stateApi.$isTransforming ?? $false);
-  const canvasIsRasterizing = useStore(canvasManager?.stateApi.$isRasterizing ?? $false);
-  const canvasIsSelectingObject = useStore(canvasManager?.stateApi.$isSegmenting ?? $false);
-  const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $false);
+  const canvasIsFiltering = useStore(activeCanvasManager?.stateApi.$isFiltering ?? $false);
+  const canvasIsTransforming = useStore(activeCanvasManager?.stateApi.$isTransforming ?? $false);
+  const canvasIsRasterizing = useStore(activeCanvasManager?.stateApi.$isRasterizing ?? $false);
+  const canvasIsSelectingObject = useStore(activeCanvasManager?.stateApi.$isSegmenting ?? $false);
+  const canvasIsCompositing = useStore(activeCanvasManager?.compositor.$isBusy ?? $false);
   const isInPublishFlow = useStore($isInPublishFlow);
   const { isChatGPT4oHighModelDisabled } = useIsModelDisabled();
   const isVideoEnabled = useAppSelector(selectAllowVideo);
@@ -225,7 +233,9 @@ export const useReadinessWatcher = () => {
     debouncedUpdateReasons({
       tab,
       isConnected,
-      canvas,
+      activeCanvasId,
+      activeCanvas,
+      canvasManagers,
       params,
       refImages,
       dynamicPrompts,
@@ -249,7 +259,9 @@ export const useReadinessWatcher = () => {
     });
   }, [
     store,
-    canvas,
+    activeCanvasId,
+    activeCanvas,
+    canvasManagers,
     refImages,
     canvasIsCompositing,
     canvasIsFiltering,
@@ -554,7 +566,9 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
 const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   isConnected: boolean;
   model: MainModelConfig | null | undefined;
-  canvas: CanvasState;
+  activeCanvasId: string | null;
+  activeCanvas: CanvasState | null;
+  canvasManagers: Map<string, CanvasManager>;
   params: ParamsState;
   refImages: RefImagesState;
   loras: LoRA[];
