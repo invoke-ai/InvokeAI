@@ -1,7 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
-import { canvasRedo } from 'features/controlLayers/store/canvasSlice';
+import { canvasRedo } from 'features/controlLayers/store/canvasesSlice';
 import { selectCanvasMayRedo } from 'features/controlLayers/store/selectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +13,7 @@ export const CanvasToolbarRedoButton = memo(() => {
   const isBusy = useCanvasIsBusy();
   const mayRedo = useAppSelector(selectCanvasMayRedo);
   const onClick = useCallback(() => {
-    dispatch(canvasRedo());
+    dispatch(canvasRedo({}));
   }, [dispatch]);
 
   return (

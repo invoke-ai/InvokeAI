@@ -1,20 +1,19 @@
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
-import { canvasRedo, canvasUndo } from 'features/controlLayers/store/canvasSlice';
+import { canvasRedo, canvasUndo } from 'features/controlLayers/store/canvasesSlice';
 import { selectCanvasMayRedo, selectCanvasMayUndo } from 'features/controlLayers/store/selectors';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useCallback } from 'react';
-import { useDispatch } from 'react-redux';
 
 export const useCanvasUndoRedoHotkeys = () => {
   useAssertSingleton('useCanvasUndoRedo');
-  const dispatch = useDispatch();
+  const dispatch = useAppDispatch();
   const isBusy = useCanvasIsBusy();
 
   const mayUndo = useAppSelector(selectCanvasMayUndo);
   const handleUndo = useCallback(() => {
-    dispatch(canvasUndo());
+    dispatch(canvasUndo({}));
   }, [dispatch]);
   useRegisteredHotkeys({
     id: 'undo',
@@ -26,7 +25,7 @@ export const useCanvasUndoRedoHotkeys = () => {
 
   const mayRedo = useAppSelector(selectCanvasMayRedo);
   const handleRedo = useCallback(() => {
-    dispatch(canvasRedo());
+    dispatch(canvasRedo({}));
   }, [dispatch]);
   useRegisteredHotkeys({
     id: 'redo',

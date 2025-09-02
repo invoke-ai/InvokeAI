@@ -1,7 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
-import { canvasUndo } from 'features/controlLayers/store/canvasSlice';
+import { canvasUndo } from 'features/controlLayers/store/canvasesSlice';
 import { selectCanvasMayUndo } from 'features/controlLayers/store/selectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +13,7 @@ export const CanvasToolbarUndoButton = memo(() => {
   const isBusy = useCanvasIsBusy();
   const mayUndo = useAppSelector(selectCanvasMayUndo);
   const onClick = useCallback(() => {
-    dispatch(canvasUndo());
+    dispatch(canvasUndo({}));
   }, [dispatch]);
 
   return (
