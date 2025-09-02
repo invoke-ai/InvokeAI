@@ -484,20 +484,25 @@ export function getImageDataTransparency(imageData: ImageData): Transparency {
 export async function loadImage(src: string, fetchUrlFirst?: boolean): Promise<HTMLImageElement> {
   const authToken = $authToken.get();
 
-  let url = src;
   if (authToken && fetchUrlFirst) {
-    const response = await fetch(`${src}/url_only`, { credentials: 'include', cache: 'no-store' });
-    const data = await response.json();
-    url = data.url;
+    const response = await fetch(`${src}`, { credentials: 'include', cache: 'no-cache' });
+    const url = response.headers.get('Location') ?? src;
+    return new Promise((resolve, reject) => {
+      const imageElement = new Image();
+      imageElement.onload = () => resolve(imageElement);
+      imageElement.onerror = (error) => reject(error);
+      imageElement.crossOrigin = 'use-credentials';
+      imageElement.src = url;
+    });
+  } else {
+    return new Promise((resolve, reject) => {
+      const imageElement = new Image();
+      imageElement.onload = () => resolve(imageElement);
+      imageElement.onerror = (error) => reject(error);
+      imageElement.crossOrigin = authToken ? 'use-credentials' : 'anonymous';
+      imageElement.src = src;
+    });
   }
-
-  return new Promise((resolve, reject) => {
-    const imageElement = new Image();
-    imageElement.onload = () => resolve(imageElement);
-    imageElement.onerror = (error) => reject(error);
-    imageElement.crossOrigin = authToken ? 'use-credentials' : 'anonymous';
-    imageElement.src = url;
-  });
 }
 
 /**
