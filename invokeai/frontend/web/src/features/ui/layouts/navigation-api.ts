@@ -61,6 +61,11 @@ export class NavigationApi {
   private panels: Map<string, PanelType> = new Map();
 
   /**
+   * Map of registered containers (DockviewApi/GridviewApi), keyed by tab and container ID
+   */
+  private containers: Map<string, DockviewApi | GridviewApi> = new Map();
+
+  /**
    * Map of waiters for panel registration.
    */
   private waiters: Map<string, Waiter> = new Map();
@@ -219,6 +224,9 @@ export class NavigationApi {
     }
 
     const key = this._getContainerKey(tab, id);
+    
+    // Store the container API for later access
+    this.containers.set(key, api);
 
     const stored = this._app.storage.get(key);
     if (stored) {
@@ -708,18 +716,48 @@ export class NavigationApi {
   };
 
   /**
+   * Get a registered container API by tab and container ID.
+   * @param tab - The tab the container belongs to  
+   * @param id - The container ID
+   * @returns The DockviewApi or GridviewApi instance, or undefined if not found
+   */
+  getContainer = (tab: TabName, id: string): DockviewApi | GridviewApi | undefined => {
+    const key = this._getContainerKey(tab, id);
+    return this.containers.get(key);
+  };
+
+  /**
+   * Get a registered DockviewApi by tab and container ID.
+   * @param tab - The tab the container belongs to  
+   * @param id - The container ID
+   * @returns The DockviewApi instance, or undefined if not found or not a DockviewApi
+   */
+  getDockviewApi = (tab: TabName, id: string): DockviewApi | undefined => {
+    const container = this.getContainer(tab, id);
+    return container instanceof DockviewApi ? container : undefined;
+  };
+
+  /**
    * Unregister all panels for a tab. Any pending waiters for these panels will be rejected.
    * @param tab - The tab to unregister panels for
    */
   unregisterTab = (tab: TabName): void => {
-    const prefix = this._getPanelPrefix(tab);
-    const keysToDelete = Array.from(this.panels.keys()).filter((key) => key.startsWith(prefix));
+    const panelPrefix = this._getPanelPrefix(tab);
+    const panelKeysToDelete = Array.from(this.panels.keys()).filter((key) => key.startsWith(panelPrefix));
 
-    for (const key of keysToDelete) {
+    for (const key of panelKeysToDelete) {
       this.panels.delete(key);
     }
 
-    const promiseKeysToDelete = Array.from(this.waiters.keys()).filter((key) => key.startsWith(prefix));
+    // Clean up containers for this tab
+    const containerPrefix = this._getContainerPrefix(tab);
+    const containerKeysToDelete = Array.from(this.containers.keys()).filter((key) => key.startsWith(containerPrefix));
+
+    for (const key of containerKeysToDelete) {
+      this.containers.delete(key);
+    }
+
+    const promiseKeysToDelete = Array.from(this.waiters.keys()).filter((key) => key.startsWith(panelPrefix));
     for (const key of promiseKeysToDelete) {
       const waiter = this.waiters.get(key);
       if (waiter) {

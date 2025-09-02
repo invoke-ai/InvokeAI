@@ -47,6 +47,11 @@ export const selectActiveCanvasId = (state: RootState) => state.canvases.activeI
 export const selectCanvasCount = (state: RootState) => Object.keys(state.canvases.instances).length;
 
 /**
+ * Selects all canvas instances
+ */
+export const selectCanvasInstances = (state: RootState) => state.canvases.instances;
+
+/**
  * Legacy selector for backward compatibility - selects the active canvas
  * @deprecated Use selectActiveCanvas instead
  */

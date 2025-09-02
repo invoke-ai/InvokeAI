@@ -2,6 +2,12 @@ import { Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { canvasInstanceAdded } from 'features/controlLayers/store/canvasesSlice';
 import { selectCanvasCount } from 'features/controlLayers/store/selectors';
+import type { DockviewPanelParameters } from 'features/ui/layouts/auto-layout-context';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
+import { 
+  DOCKVIEW_TAB_CANVAS_WORKSPACE_ID, 
+  WORKSPACE_PANEL_ID 
+} from 'features/ui/layouts/shared';
 import { nanoid } from 'nanoid';
 import { memo, useCallback } from 'react';
 import { PiPlus } from 'react-icons/pi';
@@ -16,18 +22,38 @@ export const CanvasInstanceManager = memo(({ maxCanvases = 3 }: CanvasInstanceMa
   
   const addCanvas = useCallback(() => {
     if (canvasCount >= maxCanvases) {
-return;
-}
+      return;
+    }
     
     const canvasId = nanoid();
     const canvasName = `Canvas ${canvasCount + 1}`;
     
-    // For now, just add to Redux. The dockview panel creation will be handled
-    // by other parts of the system that have access to the dockview API
+    // Add to Redux first
     dispatch(canvasInstanceAdded({ canvasId, name: canvasName }));
     
-    // TODO: Trigger panel creation through a global event or state change
-    // that the dockview can listen to
+    // Get the dockview API and create the panel
+    const dockviewApi = navigationApi.getDockviewApi('canvas', 'main');
+    if (dockviewApi) {
+      const panelId = `${WORKSPACE_PANEL_ID}_${canvasId}`;
+      
+      // Create the dockview panel
+      dockviewApi.addPanel<DockviewPanelParameters>({
+        id: panelId,
+        component: WORKSPACE_PANEL_ID,
+        title: canvasName,
+        tabComponent: DOCKVIEW_TAB_CANVAS_WORKSPACE_ID,
+        params: {
+          tab: 'canvas',
+          canvasId,
+          focusRegion: 'canvas',
+          i18nKey: 'ui.panels.canvas',
+        },
+      });
+      
+      // Activate the new panel
+      const newPanel = dockviewApi.getPanel(panelId);
+      newPanel?.api.setActive();
+    }
   }, [canvasCount, maxCanvases, dispatch]);
   
   const canCanAddCanvas = canvasCount < maxCanvases;
