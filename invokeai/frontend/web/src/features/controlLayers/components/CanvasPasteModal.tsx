@@ -12,7 +12,7 @@ import {
 import { useStore } from '@nanostores/react';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import { useCanvasManager } from 'features/controlLayers/hooks/useCanvasManager';
+import { useCanvasManagerSafe } from 'features/controlLayers/hooks/useCanvasManager';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { createNewCanvasEntityFromImage } from 'features/imageActions/actions';
 import { toast } from 'features/toast/toast';
@@ -31,7 +31,7 @@ export const CanvasPasteModal = memo(() => {
   const { dispatch, getState } = useAppStore();
   const { t } = useTranslation();
   const imageToPaste = useStore($imageFile);
-  const canvasManager = useCanvasManager();
+  const canvasManager = useCanvasManagerSafe();
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const [uploadImage, { isLoading }] = useUploadImageMutation({ fixedCacheKey: 'canvasPasteModal' });
 
