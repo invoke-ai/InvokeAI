@@ -486,7 +486,7 @@ export async function loadImage(src: string, fetchUrlFirst?: boolean): Promise<H
 
   let url = src;
   if (authToken && fetchUrlFirst) {
-    const response = await fetch(`${src}?url_only=true`, { credentials: 'include', cache: 'no-store' });
+    const response = await fetch(`${src}/url_only`, { credentials: 'include', cache: 'no-store' });
     const data = await response.json();
     url = data.url;
   }
