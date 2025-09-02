@@ -100,6 +100,7 @@ const canvasInstanceSlice = createSlice({
   name: 'canvasInstance',
   initialState: getInitialCanvasState(),
   reducers: {
+    // undoable canvas state
     //#region Raster layers
     rasterLayerAdded: {
       reducer: (
@@ -1570,6 +1571,9 @@ const canvasInstanceSlice = createSlice({
       state.regionalGuidance.entities = regionalGuidance;
       return state;
     },
+    canvasUndo: () => {},
+    canvasRedo: () => {},
+    canvasClearHistory: () => {},
   },
   extraReducers(builder) {
     builder.addCase(canvasReset, (state) => {
@@ -1631,6 +1635,8 @@ const resetState = (state: CanvasState) => {
   return newState;
 };
 
+export const instanceActions = canvasInstanceSlice.actions;
+
 const syncScaledSize = (state: CanvasState) => {
   if (API_BASE_MODELS.includes(state.bbox.modelBase)) {
     // Imagen3 has fixed sizes. Scaled bbox is not supported.
@@ -1650,7 +1656,13 @@ const syncScaledSize = (state: CanvasState) => {
   }
 };
 
-const doNotGroupMatcher = isAnyOf(canvasInstanceSlice.actions.entityBrushLineAdded, canvasInstanceSlice.actions.entityEraserLineAdded, canvasInstanceSlice.actions.entityRectAdded);
+let filter = true;
+
+const doNotGroupMatcher = isAnyOf(
+  instanceActions.entityBrushLineAdded,
+  instanceActions.entityEraserLineAdded,
+  instanceActions.entityRectAdded
+);
 
 // Store rapid actions of the same type at most once every x time.
 // See: https://github.com/omnidan/redux-undo/blob/master/examples/throttled-drag/util/undoFilter.js
@@ -1676,6 +1688,27 @@ function actionsThrottlingFilter(action: UnknownAction) {
   return true;
 }
 
+const canvasInstanceUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
+  limit: 64,
+  undoType: instanceActions.canvasUndo.type,
+  redoType: instanceActions.canvasRedo.type,
+  clearHistoryType: instanceActions.canvasClearHistory.type,
+  filter: (action, _state, _history) => {
+    // Ignore all actions from other slices
+    if (!action.type.startsWith(canvasInstanceSlice.name)) {
+      return false;
+    }
+    // Throttle rapid actions of the same type
+    filter = actionsThrottlingFilter(action);
+    return filter;
+  },
+  // This is pretty spammy, leave commented out unless you need it
+  // debug: import.meta.env.MODE === 'development',
+};
+
+// Export the undoable reducer for a single instance
+export const undoableCanvasInstanceReducer = undoable(canvasInstanceSlice.reducer, canvasInstanceUndoableConfig);
+
 const reorderEntities = <T extends CanvasEntityType>(
   entities: CanvasEntityStateFromType<T>[],
   sortedEntityIdentifiers: CanvasEntityIdentifier<T>[]
@@ -1689,20 +1722,3 @@ const reorderEntities = <T extends CanvasEntityType>(
   }
   return sortedEntities;
 };
-
-// Undoable configuration
-const undoableConfig: UndoableOptions<CanvasState> = {
-  limit: 64,
-  filter: (action, _state, _history) => {
-    // Ignore all actions from other slices
-    if (!action.type.startsWith(canvasInstanceSlice.name)) {
-      return false;
-    }
-    // Throttle rapid actions of the same type
-    return actionsThrottlingFilter(action);
-  },
-};
-
-// Export the undoable reducer for a single instance
-export const undoableCanvasInstanceReducer = undoable(canvasInstanceSlice.reducer, undoableConfig);
-export const instanceActions = canvasInstanceSlice.actions;
