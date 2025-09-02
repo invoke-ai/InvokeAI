@@ -57,7 +57,7 @@ export const CanvasPasteModal = memo(() => {
         return { x, y };
       }
     },
-    [canvasManager?.compositor, canvasManager?.stateApi]
+    [canvasManager]
   );
 
   const handlePaste = useCallback(

@@ -1,7 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { bboxSizeOptimized } from 'features/controlLayers/store/canvasInstanceSlice';
-import { selectOptimalDimension, selectWidth, selectHeight } from 'features/controlLayers/store/selectors';
+import { selectHeight,selectOptimalDimension, selectWidth } from 'features/controlLayers/store/selectors';
 import { useIsBboxSizeLocked } from 'features/parameters/components/Bbox/use-is-bbox-size-locked';
 import { getIsSizeTooLarge, getIsSizeTooSmall } from 'features/parameters/util/optimalDimension';
 import { memo, useCallback, useMemo } from 'react';

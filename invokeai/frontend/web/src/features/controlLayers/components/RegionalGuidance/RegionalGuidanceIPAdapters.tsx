@@ -13,7 +13,9 @@ export const RegionalGuidanceIPAdapters = memo(() => {
   const selectIPAdapterIds = useMemo(
     () =>
       createMemoizedSelector(selectCanvasSlice, (canvas) => {
-        if (!canvas) return EMPTY_ARRAY;
+        if (!canvas) {
+return EMPTY_ARRAY;
+}
         const ipAdapterIds = selectEntityOrThrow(
           canvas,
           entityIdentifier,

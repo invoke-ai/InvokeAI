@@ -9,13 +9,6 @@ import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase'
 import type { SubscriptionHandler } from 'features/controlLayers/konva/util';
 import { createReduxSubscription, getPrefixedId } from 'features/controlLayers/konva/util';
 import {
-  selectCanvasSettingsSlice,
-  settingsBgColorChanged,
-  settingsBrushWidthChanged,
-  settingsEraserWidthChanged,
-  settingsFgColorChanged,
-} from 'features/controlLayers/store/canvasSettingsSlice';
-import {
   bboxChangedFromCanvas,
   controlLayerAdded,
   entityBrushLineAdded,
@@ -29,6 +22,13 @@ import {
   rasterLayerAdded,
   rgAdded,
 } from 'features/controlLayers/store/canvasInstanceSlice';
+import {
+  selectCanvasSettingsSlice,
+  settingsBgColorChanged,
+  settingsBrushWidthChanged,
+  settingsEraserWidthChanged,
+  settingsFgColorChanged,
+} from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectCanvasSessionSlice } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   selectAllRenderableEntities,

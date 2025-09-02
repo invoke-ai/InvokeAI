@@ -1,10 +1,10 @@
 import { useStore } from '@nanostores/react';
 import { useAppStore } from 'app/store/storeHooks';
+import { rasterLayerAdded } from 'features/controlLayers/store/canvasInstanceSlice';
 import {
   selectStagingAreaAutoSwitch,
   settingsStagingAreaAutoSwitchChanged,
 } from 'features/controlLayers/store/canvasSettingsSlice';
-import { rasterLayerAdded } from 'features/controlLayers/store/canvasInstanceSlice';
 import {
   buildSelectCanvasQueueItems,
   canvasQueueItemDiscarded,

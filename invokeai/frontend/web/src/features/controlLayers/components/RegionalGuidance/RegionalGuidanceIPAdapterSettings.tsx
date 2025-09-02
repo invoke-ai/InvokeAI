@@ -51,7 +51,9 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
   const selectConfig = useMemo(
     () =>
       createSelector(selectCanvasSlice, (canvas) => {
-        if (!canvas) return null;
+        if (!canvas) {
+return null;
+}
         const referenceImage = selectRegionalGuidanceReferenceImage(canvas, entityIdentifier, referenceImageId);
         assert(referenceImage, `Regional Guidance IP Adapter with id ${referenceImageId} not found`);
         return referenceImage.config;
@@ -59,10 +61,6 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
     [entityIdentifier, referenceImageId]
   );
   const config = useAppSelector(selectConfig);
-
-  if (!config) {
-    return null;
-  }
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {
@@ -117,13 +115,17 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
     () =>
       setRegionalGuidanceReferenceImageDndTarget.getData(
         { entityIdentifier, referenceImageId },
-        config.image?.image_name
+        config?.image?.image_name
       ),
-    [entityIdentifier, config.image?.image_name, referenceImageId]
+    [entityIdentifier, config?.image?.image_name, referenceImageId]
   );
 
   const pullBboxIntoIPAdapter = usePullBboxIntoRegionalGuidanceReferenceImage(entityIdentifier, referenceImageId);
   const isBusy = useCanvasIsBusy();
+
+  if (!config) {
+    return null;
+  }
 
   return (
     <Flex flexDir="column" gap={2}>
@@ -195,7 +197,9 @@ const buildSelectIPAdapterHasImage = (
   referenceImageId: string
 ) =>
   createSelector(selectCanvasSlice, (canvas) => {
-    if (!canvas) return false;
+    if (!canvas) {
+return false;
+}
     const referenceImage = selectRegionalGuidanceReferenceImage(canvas, entityIdentifier, referenceImageId);
     return !!referenceImage && referenceImage.config.image !== null;
   });
