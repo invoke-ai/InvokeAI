@@ -47,3 +47,24 @@ Implementing Phase 1 of the Canvas Multi-Instance Implementation Plan to refacto
 - Exported instanceActions and undoableCanvasInstanceReducer
 
 #### Starting 1.2: Canvases Management Slice
+✅ **COMPLETED**: Created canvasesSlice.ts
+- Implemented multi-instance management with routing
+- Added canvasInstanceAdded/Removed/activeCanvasChanged actions
+- Implemented undo/redo routing to specific instances
+- Used extraReducers to route instanceActions to correct canvas
+
+#### Starting 1.3: Selector Updates
+✅ **COMPLETED**: Updated selectors for new state shape
+- Added selectCanvasInstance, selectActiveCanvas, selectActiveCanvasId
+- Created new selector factories: createCanvasInstanceSelector, createActiveCanvasSelector
+- Maintained backward compatibility with legacy selectCanvasSlice
+- All selectors now handle Undoable state structure (.present access)
+
+#### Starting 1.4: Migration Script
+✅ **COMPLETED**: Created migration script
+- Created canvasMigration.ts with migrateCanvasV1ToV2 function
+- Handles wrapping old canvas state in new instances structure
+- Integrated migration into canvasesSlice persistConfig
+- Added helper functions for default instance creation
+
+#### All Phase 1 Tasks Completed - Ready for Testing

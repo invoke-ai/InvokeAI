@@ -18,11 +18,51 @@ import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 /**
- * Selects the canvas slice from the root state
+ * Selects the canvases slice from the root state
  */
-export const selectCanvasSlice = (state: RootState) => state.canvas.present;
+export const selectCanvasesSlice = (state: RootState) => state.canvases;
 
+/**
+ * Selects a specific canvas instance from the root state
+ */
+export const selectCanvasInstance = (state: RootState, canvasId: string) => 
+  state.canvases.instances[canvasId]?.present;
+
+/**
+ * Selects the active canvas instance from the root state
+ */
+export const selectActiveCanvas = (state: RootState) => {
+  const activeId = state.canvases.activeInstanceId;
+  return activeId ? state.canvases.instances[activeId]?.present : null;
+};
+
+/**
+ * Selects the active canvas ID
+ */
+export const selectActiveCanvasId = (state: RootState) => state.canvases.activeInstanceId;
+
+/**
+ * Legacy selector for backward compatibility - selects the active canvas
+ * @deprecated Use selectActiveCanvas instead
+ */
+export const selectCanvasSlice = (state: RootState) => {
+  const activeCanvas = selectActiveCanvas(state);
+  return activeCanvas || null;
+};
+
+// Legacy canvas selector factory for backward compatibility
 const createCanvasSelector = <T>(selector: Selector<CanvasState, T>) => createSelector(selectCanvasSlice, selector);
+
+// New parameterized canvas selector factory
+export const createCanvasInstanceSelector = <T>(selector: Selector<CanvasState, T>) => 
+  createSelector(
+    [selectCanvasInstance, (_state: RootState, canvasId: string) => canvasId],
+    (canvas, _canvasId) => canvas ? selector(canvas) : null
+  );
+
+// Active canvas selector factory
+export const createActiveCanvasSelector = <T>(selector: Selector<CanvasState, T>) => 
+  createSelector(selectActiveCanvas, (canvas) => canvas ? selector(canvas) : null);
 
 /**
  * Selects the total canvas entity count:
