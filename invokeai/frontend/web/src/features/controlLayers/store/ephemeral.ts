@@ -4,6 +4,6 @@ import { atom } from 'nanostores';
 // Ephemeral state for canvas - not persisted across sessions.
 
 /**
- * The global canvas manager instance.
+ * Registry of canvas manager instances keyed by canvasId.
  */
-export const $canvasManager = atom<CanvasManager | null>(null);
+export const $canvasManagers = atom<Map<string, CanvasManager>>(new Map());
