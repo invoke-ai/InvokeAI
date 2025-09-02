@@ -1,13 +1,11 @@
-import type { AppStore } from 'app/store/store';
+import { useStore } from '@nanostores/react';
+import type { UnknownAction } from '@reduxjs/toolkit';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { $canvasManagers } from 'features/controlLayers/store/ephemeral';
 import { selectCanvasInstance } from 'features/controlLayers/store/selectors';
 import type { CanvasState } from 'features/controlLayers/store/types';
-import { useStore } from '@nanostores/react';
-import type { PropsWithChildren } from 'react';
 import { createContext, memo, useCallback, useContext, useMemo } from 'react';
-import type { UnknownAction } from '@reduxjs/toolkit';
 import { assert } from 'tsafe';
 
 // Define the action type that includes canvasId

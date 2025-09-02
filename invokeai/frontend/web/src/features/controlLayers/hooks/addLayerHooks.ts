@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import type { AppGetState } from 'app/store/store';
-import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { useAppStore } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
 import { useCanvasContext } from 'features/controlLayers/contexts/CanvasInstanceContext';
 import { getPrefixedId } from 'features/controlLayers/konva/util';

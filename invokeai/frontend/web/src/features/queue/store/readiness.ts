@@ -8,13 +8,12 @@ import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import type { AppConfig } from 'app/types/invokeai';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { debounce, groupBy, upperFirst } from 'es-toolkit/compat';
-import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { $canvasManagers } from 'features/controlLayers/store/ephemeral';
 import { selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
 import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectActiveCanvas, selectActiveCanvasId } from 'features/controlLayers/store/selectors';
-import { $canvasManagers } from 'features/controlLayers/store/ephemeral';
 import type { CanvasState, LoRA, ParamsState, RefImagesState } from 'features/controlLayers/store/types';
 import {
   getControlLayerWarnings,
