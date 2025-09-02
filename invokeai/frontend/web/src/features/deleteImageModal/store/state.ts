@@ -220,7 +220,11 @@ const deleteNodesImages = (state: RootState, dispatch: AppDispatch, image_name: 
 };
 
 const deleteControlLayerImages = (state: RootState, dispatch: AppDispatch, image_name: string) => {
-  selectCanvasSlice(state).controlLayers.entities.forEach(({ id, objects }) => {
+  const canvas = selectCanvasSlice(state);
+  if (!canvas) {
+    return;
+  }
+  canvas.controlLayers.entities.forEach(({ id, objects }) => {
     let shouldDelete = false;
     for (const obj of objects) {
       if (obj.type === 'image' && 'image_name' in obj.image && obj.image.image_name === image_name) {
@@ -243,7 +247,11 @@ const deleteReferenceImages = (state: RootState, dispatch: AppDispatch, image_na
 };
 
 const deleteRasterLayerImages = (state: RootState, dispatch: AppDispatch, image_name: string) => {
-  selectCanvasSlice(state).rasterLayers.entities.forEach(({ id, objects }) => {
+  const canvas = selectCanvasSlice(state);
+  if (!canvas) {
+    return;
+  }
+  canvas.rasterLayers.entities.forEach(({ id, objects }) => {
     let shouldDelete = false;
     for (const obj of objects) {
       if (obj.type === 'image' && 'image_name' in obj.image && obj.image.image_name === image_name) {
@@ -259,7 +267,7 @@ const deleteRasterLayerImages = (state: RootState, dispatch: AppDispatch, image_
 
 export const getImageUsage = (
   nodes: NodesState,
-  canvas: CanvasState,
+  canvas: CanvasState | null,
   upscale: UpscaleState,
   refImages: RefImagesState,
   image_name: string
@@ -286,21 +294,21 @@ export const getImageUsage = (
 
   const isReferenceImage = refImages.entities.some(({ config }) => config.image?.image_name === image_name);
 
-  const isRasterLayerImage = canvas.rasterLayers.entities.some(({ objects }) =>
+  const isRasterLayerImage = canvas ? canvas.rasterLayers.entities.some(({ objects }) =>
     objects.some((obj) => obj.type === 'image' && 'image_name' in obj.image && obj.image.image_name === image_name)
-  );
+  ) : false;
 
-  const isControlLayerImage = canvas.controlLayers.entities.some(({ objects }) =>
+  const isControlLayerImage = canvas ? canvas.controlLayers.entities.some(({ objects }) =>
     objects.some((obj) => obj.type === 'image' && 'image_name' in obj.image && obj.image.image_name === image_name)
-  );
+  ) : false;
 
-  const isInpaintMaskImage = canvas.inpaintMasks.entities.some(({ objects }) =>
+  const isInpaintMaskImage = canvas ? canvas.inpaintMasks.entities.some(({ objects }) =>
     objects.some((obj) => obj.type === 'image' && 'image_name' in obj.image && obj.image.image_name === image_name)
-  );
+  ) : false;
 
-  const isRegionalGuidanceImage = canvas.regionalGuidance.entities.some(({ referenceImages }) =>
+  const isRegionalGuidanceImage = canvas ? canvas.regionalGuidance.entities.some(({ referenceImages }) =>
     referenceImages.some(({ config }) => config.image?.image_name === image_name)
-  );
+  ) : false;
 
   const imageUsage: ImageUsage = {
     isUpscaleImage,
