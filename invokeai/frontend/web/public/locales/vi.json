@@ -360,10 +360,6 @@
                 "desc": "Phóng to canvas lên 800%.",
                 "title": "Phóng To Vào 800%"
             },
-            "setFillToWhite": {
-                "title": "Chỉnh Màu Sang Trắng",
-                "desc": "Chỉnh màu hiện tại sang màu trắng."
-            },
             "transformSelected": {
                 "title": "Biến Đổi",
                 "desc": "Biến đổi layer được chọn."

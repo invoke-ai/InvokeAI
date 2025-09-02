@@ -358,10 +358,6 @@
                 "title": "Livello precedente",
                 "desc": "Seleziona il livello precedente nell'elenco."
             },
-            "setFillToWhite": {
-                "title": "Imposta il colore su bianco",
-                "desc": "Imposta il colore dello strumento corrente su bianco."
-            },
             "title": "Tela",
             "selectMoveTool": {
                 "title": "Strumento Sposta",

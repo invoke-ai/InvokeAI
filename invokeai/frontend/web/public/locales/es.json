@@ -591,10 +591,6 @@
                 "title": "Ajustar capas al lienzo",
                 "desc": "Escala y posiciona la vista para que se ajuste a todas las capas visibles."
             },
-            "setFillToWhite": {
-                "title": "Establecer color en blanco",
-                "desc": "Establece el color actual de la herramienta en blanco."
-            },
             "resetSelected": {
                 "title": "Restablecer capa",
                 "desc": "Restablecer la capa seleccionada. Solo se aplica a Máscara de retoque y Guía regional."
