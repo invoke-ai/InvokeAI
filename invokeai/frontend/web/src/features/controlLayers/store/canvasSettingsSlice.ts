@@ -3,7 +3,7 @@ import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import type { RgbaColor } from 'features/controlLayers/store/types';
-import { zRgbaColor } from 'features/controlLayers/store/types';
+import { RGBA_BLACK, RGBA_WHITE, zRgbaColor } from 'features/controlLayers/store/types';
 import { z } from 'zod';
 
 const zAutoSwitchMode = z.enum(['off', 'switch_on_start', 'switch_on_finish']);
@@ -38,9 +38,9 @@ const zCanvasSettingsState = z.object({
   /**
    * The colors to use when drawing lines or filling shapes.
    */
-  activeColor: z.enum(['color1', 'color2']),
-  color1: zRgbaColor,
-  color2: zRgbaColor,
+  activeColor: z.enum(['bgColor', 'fgColor']),
+  bgColor: zRgbaColor,
+  fgColor: zRgbaColor,
   /**
    * Whether to composite inpainted/outpainted regions back onto the source image when saving canvas generations.
    *
@@ -103,9 +103,9 @@ const getInitialState = (): CanvasSettingsState => ({
   invertScrollForToolWidth: false,
   brushWidth: 50,
   eraserWidth: 50,
-  activeColor: 'color1',
-  color1: { r: 31, g: 160, b: 224, a: 1 }, // invokeBlue.500
-  color2: { r: 0, g: 0, b: 0, a: 1 }, // black
+  activeColor: 'fgColor',
+  bgColor: RGBA_BLACK,
+  fgColor: RGBA_WHITE,
   outputOnlyMaskedRegions: true,
   autoProcess: true,
   snapToGrid: true,
@@ -140,13 +140,17 @@ const slice = createSlice({
       state.eraserWidth = Math.round(action.payload);
     },
     settingsActiveColorToggled: (state) => {
-      state.activeColor = state.activeColor === 'color1' ? 'color2' : 'color1';
+      state.activeColor = state.activeColor === 'bgColor' ? 'fgColor' : 'bgColor';
     },
-    settingsColor1Changed: (state, action: PayloadAction<Partial<RgbaColor>>) => {
-      state.color1 = { ...state.color1, ...action.payload };
+    settingsBgColorChanged: (state, action: PayloadAction<Partial<RgbaColor>>) => {
+      state.bgColor = { ...state.bgColor, ...action.payload };
     },
-    settingsColor2Changed: (state, action: PayloadAction<Partial<RgbaColor>>) => {
-      state.color2 = { ...state.color2, ...action.payload };
+    settingsFgColorChanged: (state, action: PayloadAction<Partial<RgbaColor>>) => {
+      state.fgColor = { ...state.fgColor, ...action.payload };
+    },
+    settingsColorsSetToDefault: (state) => {
+      state.bgColor = RGBA_BLACK;
+      state.fgColor = RGBA_WHITE;
     },
     settingsInvertScrollForToolWidthChanged: (
       state,
@@ -203,8 +207,9 @@ export const {
   settingsBrushWidthChanged,
   settingsEraserWidthChanged,
   settingsActiveColorToggled,
-  settingsColor1Changed,
-  settingsColor2Changed,
+  settingsBgColorChanged,
+  settingsFgColorChanged,
+  settingsColorsSetToDefault,
   settingsInvertScrollForToolWidthChanged,
   settingsOutputOnlyMaskedRegionsToggled,
   settingsAutoProcessToggled,

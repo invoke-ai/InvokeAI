@@ -589,6 +589,10 @@
                 "title": "Prev Layer",
                 "desc": "Select the previous layer in the list."
             },
+            "setFillColorsToDefault": {
+                "title": "Set Colors to Default",
+                "desc": "Set the current tool colors to default."
+            },
             "toggleFillColor": {
                 "title": "Toggle Fill Color",
                 "desc": "Toggle the current tool fill color."
@@ -2268,8 +2272,8 @@
         },
         "fill": {
             "fillColor": "Fill Color",
-            "fillColor1": "Color1",
-            "fillColor2": "Color2",
+            "bgFillColor": "Background Color",
+            "fgFillColor": "Foreground Color",
             "fillStyle": "Fill Style",
             "solid": "Solid",
             "grid": "Grid",
