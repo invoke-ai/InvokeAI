@@ -7,6 +7,7 @@ export const COLUMN_WIDTHS = {
   origin: '5rem',
   destination: '6rem',
   batchId: 'auto',
+  createdAt: '9.5rem',
   completedAt: '9.5rem',
   validationRun: 'auto',
   actions: 'auto',

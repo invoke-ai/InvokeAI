@@ -1,5 +1,5 @@
 import type { ChakraProps, CollapseProps, FlexProps } from '@invoke-ai/ui-library';
-import { Badge, ButtonGroup, Collapse, Flex, Icon, IconButton, Text } from '@invoke-ai/ui-library';
+import { Badge, ButtonGroup, Collapse, Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import QueueStatusBadge from 'features/queue/components/common/QueueStatusBadge';
 import { useDestinationText } from 'features/queue/components/QueueList/useDestinationText';
 import { useOriginText } from 'features/queue/components/QueueList/useOriginText';
@@ -11,7 +11,7 @@ import { selectShouldShowCredits } from 'features/system/store/configSlice';
 import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowCounterClockwiseBold, PiImageBold, PiXBold } from 'react-icons/pi';
+import { PiArrowCounterClockwiseBold, PiXBold } from 'react-icons/pi';
 import { useSelector } from 'react-redux';
 import type { S } from 'services/api/types';
 
@@ -89,6 +89,9 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
         <Flex w={COLUMN_WIDTHS.statusBadge} alignItems="center" flexShrink={0}>
           <QueueStatusBadge status={item.status} />
         </Flex>
+        <Flex w={COLUMN_WIDTHS.createdAt} alignItems="center" flexShrink={0}>
+          {item.completed_at || '-'}
+        </Flex>
         <Flex w={COLUMN_WIDTHS.completedAt} alignItems="center" flexShrink={0}>
           {item.completed_at || '-'}
         </Flex>
@@ -117,6 +120,9 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
         </Flex>
         <Flex alignItems="center" w={COLUMN_WIDTHS.validationRun} flexShrink={0}>
           {isValidationRun && <Badge>{t('workflows.builder.publishingValidationRun')}</Badge>}
+        </Flex>
+        <Flex w="full">
+          <Spacer />
         </Flex>
         <Flex alignItems="center" w={COLUMN_WIDTHS.actions} pe={3}>
           <ButtonGroup size="xs" variant="ghost">

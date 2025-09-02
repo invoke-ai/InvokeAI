@@ -325,6 +325,7 @@
         "generations_one": "Generation",
         "generations_other": "Generations",
         "batchSize": "Batch Size",
+        "createdAt": "Created At",
         "completedAt": "Completed At",
         "sortColumn": "Sort Column",
         "sortBy": "Sort by {{column}}",
