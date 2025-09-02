@@ -156,9 +156,7 @@ const transition: CollapseProps['transition'] = {
 export default memo(QueueItemComponent);
 
 export const QueueItemPlaceholder = memo((props: FlexProps) => (
-  <Flex w="full" h="full" bg="base.850" borderRadius="base" alignItems="center" justifyContent="center" {...props}>
-    <Icon as={PiImageBold} boxSize={16} color="base.800" />
-  </Flex>
+  <Flex h={9} w="full" bg="base.800" borderRadius="base" alignItems="center" justifyContent="center" {...props}></Flex>
 ));
 
 QueueItemPlaceholder.displayName = 'QueueItemPlaceholder';
