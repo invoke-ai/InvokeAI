@@ -9,7 +9,7 @@ export const CanvasHUDItemScaledBbox = memo(() => {
   const scaleMethod = useAppSelector(selectScaleMethod);
   const scaledSize = useAppSelector(selectScaledSize);
 
-  if (scaleMethod === 'none') {
+  if (scaleMethod === 'none' || !scaledSize) {
     return null;
   }
 

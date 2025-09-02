@@ -169,7 +169,12 @@ export class CanvasStageModule extends CanvasModuleBase {
    * Fits the bbox to the stage. This will center the bbox and scale it to fit the stage with some padding.
    */
   fitBboxToStage = (options?: { animate?: boolean; targetWidth?: number; targetHeight?: number }): void => {
-    const { rect } = this.manager.stateApi.getBbox();
+    const bbox = this.manager.stateApi.getBbox();
+    if (!bbox) {
+      this.log.warn('No bbox available, cannot fit to stage');
+      return;
+    }
+    const { rect } = bbox;
     this.log.trace({ rect }, 'Fitting bbox to stage');
     this.fitRect(rect, options);
   };
@@ -193,7 +198,13 @@ export class CanvasStageModule extends CanvasModuleBase {
    */
   fitBboxAndLayersToStage = (options?: { animate?: boolean; targetWidth?: number; targetHeight?: number }): void => {
     const layersRect = this.manager.compositor.getVisibleRectOfType();
-    const bboxRect = this.manager.stateApi.getBbox().rect;
+    const bbox = this.manager.stateApi.getBbox();
+    if (!bbox) {
+      this.log.warn('No bbox available, fitting layers only to stage');
+      this.fitRect(layersRect, options);
+      return;
+    }
+    const bboxRect = bbox.rect;
     const unionRect = getRectUnion(layersRect, bboxRect);
     this.log.trace({ bboxRect, layersRect, unionRect }, 'Fitting bbox and layers to stage');
     this.fitRect(unionRect, options);

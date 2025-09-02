@@ -128,7 +128,11 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * The state is stored in redux.
    */
   getCanvasState = (): CanvasState => {
-    return this.runSelector(selectCanvasSlice);
+    const canvasState = this.runSelector(selectCanvasSlice);
+    if (!canvasState) {
+      throw new Error('No canvas state available');
+    }
+    return canvasState;
   };
 
   /**

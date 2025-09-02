@@ -219,7 +219,12 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     try {
       this.log.trace('Rendering staging area');
 
-      const { x, y, width, height } = this.manager.stateApi.getBbox().rect;
+      const bbox = this.manager.stateApi.getBbox();
+      if (!bbox) {
+        this.log.warn('No bbox available for staging area');
+        return;
+      }
+      const { x, y, width, height } = bbox.rect;
       const shouldShowStagedImage = this.$shouldShowStagedImage.get();
       const isPending = this.$isPending.get();
 

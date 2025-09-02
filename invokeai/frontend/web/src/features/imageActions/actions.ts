@@ -86,7 +86,11 @@ export const createNewCanvasEntityFromImage = async (arg: {
 }) => {
   const { type, imageDTO, dispatch, getState, withResize, overrides: _overrides } = arg;
   const state = getState();
-  const { x, y } = selectBboxRect(state);
+  const bboxRect = selectBboxRect(state);
+  if (!bboxRect) {
+    return;
+  }
+  const { x, y } = bboxRect;
 
   const base = selectBboxModelBase(state);
   const ratio = imageDTO.width / imageDTO.height;
@@ -216,7 +220,7 @@ export const newCanvasFromImage = async (arg: {
       if (withInpaintMask) {
         dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
       }
-      dispatch(canvasClearHistory());
+      dispatch(canvasClearHistory({}));
       break;
     }
     case 'control_layer': {
@@ -233,7 +237,7 @@ export const newCanvasFromImage = async (arg: {
       if (withInpaintMask) {
         dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
       }
-      dispatch(canvasClearHistory());
+      dispatch(canvasClearHistory({}));
       break;
     }
     case 'inpaint_mask': {
@@ -249,7 +253,7 @@ export const newCanvasFromImage = async (arg: {
       if (withInpaintMask) {
         dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
       }
-      dispatch(canvasClearHistory());
+      dispatch(canvasClearHistory({}));
       break;
     }
     case 'regional_guidance': {
@@ -265,7 +269,7 @@ export const newCanvasFromImage = async (arg: {
       if (withInpaintMask) {
         dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
       }
-      dispatch(canvasClearHistory());
+      dispatch(canvasClearHistory({}));
       break;
     }
     case 'regional_guidance_with_reference_image': {
@@ -277,7 +281,7 @@ export const newCanvasFromImage = async (arg: {
       if (withInpaintMask) {
         dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
       }
-      dispatch(canvasClearHistory());
+      dispatch(canvasClearHistory({}));
       break;
     }
     default:
@@ -296,7 +300,11 @@ export const replaceCanvasEntityObjectsWithImage = (arg: {
 }) => {
   const { imageDTO, entityIdentifier, dispatch, getState } = arg;
   const imageObject = imageDTOToImageObject(imageDTO);
-  const { x, y } = selectBboxRect(getState());
+  const bboxRect = selectBboxRect(getState());
+  if (!bboxRect) {
+    return;
+  }
+  const { x, y } = bboxRect;
   dispatch(
     entityRasterized({
       entityIdentifier,

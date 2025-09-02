@@ -84,7 +84,11 @@ export const canvasesSlice = createSlice({
     // Handle canvas reset for active canvas - addCase must come before addMatcher
     builder.addCase(canvasReset, (state) => {
       if (state.activeInstanceId && state.instances[state.activeInstanceId]) {
-        const currentState = state.instances[state.activeInstanceId].present;
+        const instance = state.instances[state.activeInstanceId];
+        if (!instance) {
+          return;
+        }
+        const currentState = instance.present;
         const newState = getInitialCanvasState();
         
         // We need to retain the optimal dimension across resets, as it is changed only when the model changes.
@@ -111,8 +115,13 @@ export const canvasesSlice = createSlice({
         }
         
         // Replace the current state with the reset state
-        state.instances[state.activeInstanceId] = undoableCanvasInstanceReducer(undefined, { type: '@@INIT' });
-        state.instances[state.activeInstanceId].present = newState;
+        if (state.activeInstanceId) {
+          state.instances[state.activeInstanceId] = undoableCanvasInstanceReducer(undefined, { type: '@@INIT' });
+          const resetInstance = state.instances[state.activeInstanceId];
+          if (resetInstance) {
+            resetInstance.present = newState;
+          }
+        }
       }
     });
 

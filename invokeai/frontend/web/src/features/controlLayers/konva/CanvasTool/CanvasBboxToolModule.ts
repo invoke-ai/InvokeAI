@@ -112,7 +112,11 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
            */
 
           const stageRect = this.manager.stage.getScaledStageRect();
-          const bboxRect = this.manager.stateApi.runSelector(selectBbox).rect;
+          const bbox = this.manager.stateApi.runSelector(selectBbox);
+          if (!bbox) {
+            return;
+          }
+          const bboxRect = bbox.rect;
 
           ctx.beginPath();
           ctx.moveTo(stageRect.x, stageRect.y);
@@ -206,7 +210,12 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
   initialize = () => {
     this.log.debug('Initializing module');
     // We need to retain a copy of the bbox state because
-    const { width, height } = this.manager.stateApi.runSelector(selectBbox).rect;
+    const bbox = this.manager.stateApi.runSelector(selectBbox);
+    if (!bbox) {
+      this.log.warn('No bbox available for initialization');
+      return;
+    }
+    const { width, height } = bbox.rect;
     // Update the aspect ratio buffer with the initial aspect ratio
     this.$aspectRatioBuffer.set(width / height);
     this.render();
@@ -218,7 +227,12 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
   render = () => {
     const tool = this.manager.tool.$tool.get();
 
-    const { x, y, width, height } = this.manager.stateApi.runSelector(selectBbox).rect;
+    const bbox = this.manager.stateApi.runSelector(selectBbox);
+    if (!bbox) {
+      this.konva.group.visible(false);
+      return;
+    }
+    const { x, y, width, height } = bbox.rect;
 
     this.konva.group.visible(!this.$isBboxHidden.get());
 
@@ -289,6 +303,9 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
     // currently-selected model.
     const gridSize = this.manager.stateApi.getPositionGridSize();
     const bbox = this.manager.stateApi.getBbox();
+    if (!bbox) {
+      return;
+    }
     const bboxRect: Rect = {
       ...bbox.rect,
       x: roundToMultiple(this.konva.proxyRect.x(), gridSize),
@@ -351,12 +368,15 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
       // If alt is held, we are doing center-anchored transforming. In this case, maintaining aspect ratio is rather
       // complicated.
       shouldMaintainAspectRatio = false;
-    } else if (this.manager.stateApi.getBbox().aspectRatio.isLocked) {
-      // When the aspect ratio is locked, holding shift means we SHOULD NOT maintain the aspect ratio
-      shouldMaintainAspectRatio = !shift;
     } else {
-      // When the aspect ratio is not locked, holding shift means we SHOULD maintain aspect ratio
-      shouldMaintainAspectRatio = shift;
+      const bbox = this.manager.stateApi.getBbox();
+      if (bbox?.aspectRatio.isLocked) {
+        // When the aspect ratio is locked, holding shift means we SHOULD NOT maintain the aspect ratio
+        shouldMaintainAspectRatio = !shift;
+      } else {
+        // When the aspect ratio is not locked, holding shift means we SHOULD maintain aspect ratio
+        shouldMaintainAspectRatio = shift;
+      }
     }
 
     if (shouldMaintainAspectRatio) {

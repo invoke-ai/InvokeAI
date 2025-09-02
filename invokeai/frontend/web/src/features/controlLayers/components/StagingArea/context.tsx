@@ -71,6 +71,9 @@ export const StagingAreaContextProvider = memo(({ children, sessionId }: PropsWi
       },
       onAccept: (item, imageDTO) => {
         const bboxRect = selectBboxRect(store.getState());
+        if (!bboxRect) {
+          return;
+        }
         const { x, y } = bboxRect;
         const imageObject = imageDTOToImageObject(imageDTO);
         const selectedEntityIdentifier = selectSelectedEntityIdentifier(store.getState());

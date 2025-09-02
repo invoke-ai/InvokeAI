@@ -228,7 +228,11 @@ export class CanvasToolModule extends CanvasModuleBase {
     const settings = this.manager.stateApi.getSettings();
 
     if (settings.clipToBbox) {
-      const { x, y, width, height } = this.manager.stateApi.getBbox().rect;
+      const bbox = this.manager.stateApi.getBbox();
+      if (!bbox) {
+        return null;
+      }
+      const { x, y, width, height } = bbox.rect;
       return {
         x: x - entity.position.x,
         y: y - entity.position.y,

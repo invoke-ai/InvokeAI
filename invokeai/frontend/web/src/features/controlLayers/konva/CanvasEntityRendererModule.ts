@@ -63,7 +63,8 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
     this.createNewControlLayers(this.manager.stateApi.runSelector(selectControlLayerEntities));
     this.createNewRegionalGuidance(this.manager.stateApi.runSelector(selectRegionalGuidanceEntities));
     this.createNewInpaintMasks(this.manager.stateApi.runSelector(selectInpaintMaskEntities));
-    this.arrangeEntities(this.manager.stateApi.runSelector(selectCanvasSlice), null);
+    const canvasState = this.manager.stateApi.runSelector(selectCanvasSlice);
+    this.arrangeEntities(canvasState, null);
   };
 
   createNewRasterLayers = (entities: CanvasRasterLayerState[]) => {
@@ -102,7 +103,10 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
     }
   };
 
-  arrangeEntities = (state: CanvasState, prevState: CanvasState | null) => {
+  arrangeEntities = (state: CanvasState | null, prevState: CanvasState | null) => {
+    if (!state) {
+      return;
+    }
     if (
       !prevState ||
       state.rasterLayers.entities !== prevState.rasterLayers.entities ||

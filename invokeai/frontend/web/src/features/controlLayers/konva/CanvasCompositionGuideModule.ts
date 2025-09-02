@@ -109,7 +109,12 @@ export class CanvasCompositionGuideModule extends CanvasModuleBase {
    */
   render = () => {
     const ruleOfThirds = this.manager.stateApi.getSettings().ruleOfThirds;
-    const { x, y, width, height } = this.manager.stateApi.runSelector(selectBbox).rect;
+    const bbox = this.manager.stateApi.runSelector(selectBbox);
+    if (!bbox) {
+      this.konva.group.visible(false);
+      return;
+    }
+    const { x, y, width, height } = bbox.rect;
 
     this.konva.group.visible(ruleOfThirds);
 

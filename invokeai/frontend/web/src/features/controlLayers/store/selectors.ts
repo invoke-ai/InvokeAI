@@ -408,10 +408,10 @@ export const selectWidth = createActiveCanvasSelector((canvas) => canvas.bbox.re
 export const selectHeight = createActiveCanvasSelector((canvas) => canvas.bbox.rect.height);
 export const selectAspectRatioID = createActiveCanvasSelector((canvas) => canvas.bbox.aspectRatio.id);
 export const selectAspectRatioValue = createActiveCanvasSelector((canvas) => canvas.bbox.aspectRatio.value);
-export const selectScaledSize = createSelector(selectBbox, (bbox) => bbox.scaledSize);
-export const selectScaleMethod = createSelector(selectBbox, (bbox) => bbox.scaleMethod);
-export const selectBboxRect = createSelector(selectBbox, (bbox) => bbox.rect);
-export const selectBboxModelBase = createSelector(selectBbox, (bbox) => bbox.modelBase);
+export const selectScaledSize = createSelector(selectBbox, (bbox) => bbox?.scaledSize);
+export const selectScaleMethod = createSelector(selectBbox, (bbox) => bbox?.scaleMethod);
+export const selectBboxRect = createSelector(selectBbox, (bbox) => bbox?.rect);
+export const selectBboxModelBase = createSelector(selectBbox, (bbox) => bbox?.modelBase);
 
 export const selectCanvasMetadata = createSelector(
   selectActiveCanvas,
