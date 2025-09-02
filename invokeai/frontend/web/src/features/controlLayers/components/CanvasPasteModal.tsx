@@ -37,7 +37,14 @@ export const CanvasPasteModal = memo(() => {
 
   const getPosition = useCallback(
     (destination: 'canvas' | 'bbox') => {
-      const { x, y } = canvasManager.stateApi.getBbox().rect;
+      if (!canvasManager) {
+        return { x: 0, y: 0 };
+      }
+      const bbox = canvasManager.stateApi.getBbox();
+      if (!bbox) {
+        return { x: 0, y: 0 };
+      }
+      const { x, y } = bbox.rect;
       if (destination === 'bbox') {
         return { x, y };
       }
@@ -50,7 +57,7 @@ export const CanvasPasteModal = memo(() => {
         return { x, y };
       }
     },
-    [canvasManager.compositor, canvasManager.stateApi]
+    [canvasManager?.compositor, canvasManager?.stateApi]
   );
 
   const handlePaste = useCallback(

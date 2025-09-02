@@ -25,7 +25,11 @@ Started: 2025-09-02
 - ❌ Settings accordion property access errors
 
 ### Fixes Applied
-None yet.
+- ✅ **Import/Export Errors Fixed (2 commits)**
+  - Added missing `rasterLayerConverted*` action exports to canvasInstanceSlice
+  - Added missing bbox, entity, and drawing action exports
+  - Fixed `canvasClearHistory` import in imageActions to come from canvasesSlice  
+  - Fixed `rgAdded` export name (was incorrectly exported as `regionalGuidanceAdded`)
 
 ## Next Steps
 1. Fix missing rasterLayer conversion actions in canvasInstanceSlice

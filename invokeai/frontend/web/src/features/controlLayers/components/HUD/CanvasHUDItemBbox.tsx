@@ -5,7 +5,7 @@ import { selectBbox } from 'features/controlLayers/store/selectors';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selectBboxRect = createSelector(selectBbox, (bbox) => bbox.rect);
+const selectBboxRect = createSelector(selectBbox, (bbox) => bbox?.rect || { width: 0, height: 0 });
 
 export const CanvasHUDItemBbox = memo(() => {
   const { t } = useTranslation();
