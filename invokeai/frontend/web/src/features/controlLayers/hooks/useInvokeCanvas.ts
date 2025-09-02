@@ -3,7 +3,9 @@ import { logger } from 'app/logging/logger';
 import { useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { $canvasManager } from 'features/controlLayers/store/ephemeral';
+import { canvasManagerFactory } from 'features/controlLayers/konva/CanvasManagerFactory';
+import { $canvasManagers } from 'features/controlLayers/store/ephemeral';
+import { selectActiveCanvasId } from 'features/controlLayers/store/selectors';
 import Konva from 'konva';
 import { useLayoutEffect, useState } from 'react';
 import { $socket } from 'services/events/stores';
@@ -44,18 +46,37 @@ export const useInvokeCanvas = (): ((el: HTMLDivElement | null) => void) => {
       return () => {};
     }
 
-    const currentManager = $canvasManager.get();
-    if (currentManager) {
-      currentManager.stage.setContainer(container);
-      return;
+    // TODO: This is a temporary compatibility layer for Phase 2
+    // In Phase 3, this will be replaced with proper multi-instance support
+    const activeCanvasId = selectActiveCanvasId(store.getState());
+    
+    // For now, use a default canvas ID if none is active
+    const canvasId = activeCanvasId || 'default-canvas';
+    
+    // Check if we already have a manager for this canvas
+    const canvasManagers = $canvasManagers.get();
+    const existingManager = canvasManagers.get(canvasId);
+    
+    if (existingManager) {
+      existingManager.stage.setContainer(container);
+      return () => {};
     }
 
-    const manager = new CanvasManager(container, store, socket);
+    // Create new manager using the factory
+    const manager = canvasManagerFactory.createInstance(canvasId, container, store, socket);
     manager.initialize();
+    
+    // Update the registry
+    const updatedManagers = new Map(canvasManagers);
+    updatedManagers.set(canvasId, manager);
+    $canvasManagers.set(updatedManagers);
 
     return () => {
-      manager.destroy();
-      $canvasManager.set(null);
+      canvasManagerFactory.destroyInstance(canvasId);
+      const managers = $canvasManagers.get();
+      const newManagers = new Map(managers);
+      newManagers.delete(canvasId);
+      $canvasManagers.set(newManagers);
     };
   }, [container, socket, store]);
 

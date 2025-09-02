@@ -15,8 +15,8 @@ import { CanvasStagingAreaModule } from 'features/controlLayers/konva/CanvasStag
 import { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
 import { CanvasWorkerModule } from 'features/controlLayers/konva/CanvasWorkerModule.js';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { $canvasManager } from 'features/controlLayers/store/ephemeral';
-import type { CanvasEntityIdentifier, CanvasEntityType } from 'features/controlLayers/store/types';
+import { selectCanvasInstance } from 'features/controlLayers/store/selectors';
+import type { CanvasEntityIdentifier, CanvasEntityType, CanvasState } from 'features/controlLayers/store/types';
 import {
   isControlLayerEntityIdentifier,
   isInpaintMaskEntityIdentifier,
@@ -45,6 +45,7 @@ export class CanvasManager extends CanvasModuleBase {
 
   store: AppStore;
   socket: AppSocket;
+  canvasId: string;
 
   adapters = {
     rasterLayers: new SyncableMap<string, CanvasEntityAdapterRasterLayer>(),
@@ -75,7 +76,7 @@ export class CanvasManager extends CanvasModuleBase {
    */
   $isBusy: Atom<boolean>;
 
-  constructor(container: HTMLDivElement, store: AppStore, socket: AppSocket) {
+  constructor(container: HTMLDivElement, store: AppStore, socket: AppSocket, canvasId: string) {
     super();
     this.id = getPrefixedId(this.type);
     this.path = [this.id];
@@ -94,6 +95,7 @@ export class CanvasManager extends CanvasModuleBase {
 
     this.store = store;
     this.socket = socket;
+    this.canvasId = canvasId;
 
     this.stateApi = new CanvasStateApiModule(this.store, this);
     this.stage = new CanvasStageModule(container, this);
@@ -245,17 +247,21 @@ export class CanvasManager extends CanvasModuleBase {
   };
 
   initialize = () => {
-    this.log.debug('Initializing');
+    this.log.debug({ canvasId: this.canvasId }, 'Initializing');
 
     for (const canvasModule of this.getAllModules()) {
       canvasModule.initialize?.();
     }
 
-    $canvasManager.set(this);
+    // Initialize with current state if available
+    const initialState = selectCanvasInstance(this.store.getState(), this.canvasId);
+    if (initialState) {
+      this.onStateUpdated(initialState);
+    }
   };
 
   destroy = () => {
-    this.log.debug('Destroying module');
+    this.log.debug({ canvasId: this.canvasId }, 'Destroying module');
 
     for (const adapter of this.getAllAdapters()) {
       adapter.destroy();
@@ -264,8 +270,18 @@ export class CanvasManager extends CanvasModuleBase {
     for (const canvasModule of this.getAllModules()) {
       canvasModule.destroy();
     }
+  };
 
-    $canvasManager.set(null);
+  /**
+   * Called by the factory's listener middleware when this canvas instance's state changes.
+   * This replaces the previous pattern where the manager subscribed directly to the store.
+   * 
+   * @param state - The updated canvas state for this instance
+   */
+  onStateUpdated = (state: CanvasState): void => {
+    this.log.trace({ canvasId: this.canvasId }, 'State updated');
+    // All logic that used to be in the store.subscribe callback should go here.
+    // For now, this is a placeholder - specific state handling will be added as needed.
   };
 
   repr = () => {

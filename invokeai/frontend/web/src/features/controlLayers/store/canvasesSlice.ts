@@ -3,12 +3,13 @@ import type { SliceConfig } from 'app/store/types';
 import { canvasReset } from 'features/controlLayers/store/actions';
 import { modelChanged } from 'features/controlLayers/store/paramsSlice';
 import { undoableCanvasInstanceReducer, instanceActions } from './canvasInstanceSlice';
-import type { Undoable } from 'redux-undo';
+import type { StateWithHistory } from 'redux-undo';
 import type { CanvasState } from './types';
 import { getInitialCanvasState } from './types';
 import { isMainModelBase } from 'features/nodes/types/common';
 import { API_BASE_MODELS } from 'features/parameters/types/constants';
-import { getOptimalDimension, calculateNewSize } from 'features/parameters/util/optimalDimension';
+import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
+import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { getScaledBoundingBoxDimensions } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import type { UnknownAction } from '@reduxjs/toolkit';
 import { ActionCreators as UndoActionCreators } from 'redux-undo';
@@ -16,7 +17,7 @@ import { migrateCanvasState } from 'app/store/migrations/canvasMigration';
 import { z } from 'zod';
 
 interface CanvasesState {
-  instances: Record<string, Undoable<CanvasState>>;
+  instances: Record<string, StateWithHistory<CanvasState>>;
   activeInstanceId: string | null;
 }
 
@@ -45,7 +46,7 @@ export const canvasesSlice = createSlice({
       // If we removed the active instance, select another one
       if (state.activeInstanceId === canvasId) {
         const remainingIds = Object.keys(state.instances);
-        state.activeInstanceId = remainingIds.length > 0 ? remainingIds[0] : null;
+        state.activeInstanceId = remainingIds.length > 0 ? remainingIds[0]! : null;
       }
     },
     activeCanvasChanged: (state, action: PayloadAction<{ canvasId: string | null }>) => {

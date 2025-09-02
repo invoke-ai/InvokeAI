@@ -18,7 +18,7 @@ export class CanvasManagerFactory {
   private unsubscribers = new Map<string, () => void>();
 
   constructor() {
-    this.log = logger('canvasManagerFactory');
+    this.log = logger('canvas').child({ context: 'factory' });
   }
 
   /**
@@ -48,21 +48,21 @@ export class CanvasManagerFactory {
     this.managers.set(canvasId, manager);
 
     // Set up state listener for this specific canvas instance
-    const listener = listenerMiddleware.startListening({
+    const listenerInstance = listenerMiddleware.startListening({
       predicate: (action, currentState, previousState) => {
-        const oldState = selectCanvasInstance(previousState, canvasId);
-        const newState = selectCanvasInstance(currentState, canvasId);
+        const oldState = selectCanvasInstance(previousState as any, canvasId);
+        const newState = selectCanvasInstance(currentState as any, canvasId);
         return oldState !== newState;
       },
       effect: (action, listenerApi) => {
-        const latestState = selectCanvasInstance(listenerApi.getState(), canvasId);
+        const latestState = selectCanvasInstance(listenerApi.getState() as any, canvasId);
         if (latestState) {
           manager.onStateUpdated(latestState);
         }
       },
     });
 
-    this.unsubscribers.set(canvasId, listener.unsubscribe);
+    this.unsubscribers.set(canvasId, listenerInstance);
 
     this.log.debug({ canvasId, managersCount: this.managers.size }, 'Canvas manager instance created');
     return manager;

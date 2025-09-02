@@ -1,7 +1,7 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { allEntitiesDeleted, inpaintMaskAdded } from 'features/controlLayers/store/canvasSlice';
-import { $canvasManager } from 'features/controlLayers/store/ephemeral';
+import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { paramsReset } from 'features/controlLayers/store/paramsSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
@@ -13,11 +13,12 @@ export const SessionMenuItems = memo(() => {
   const dispatch = useAppDispatch();
   const tab = useAppSelector(selectActiveTab);
 
+  const canvasManager = useCanvasManagerSafe();
   const resetCanvasLayers = useCallback(() => {
     dispatch(allEntitiesDeleted());
     dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
-    $canvasManager.get()?.stage.fitBboxToStage();
-  }, [dispatch]);
+    canvasManager?.stage.fitBboxToStage();
+  }, [dispatch, canvasManager]);
   const resetGenerationSettings = useCallback(() => {
     dispatch(paramsReset());
   }, [dispatch]);
