@@ -25989,7 +25989,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description The sort field */
-                order_by?: "status" | "completed_at";
+                order_by?: "status" | "created_at" | "completed_at";
                 /** @description The order of sort */
                 order_dir?: components["schemas"]["SQLiteDirection"];
             };
