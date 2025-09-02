@@ -1,8 +1,6 @@
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { canvasToBlob, canvasToImageData } from 'features/controlLayers/konva/util';
-import { entityRasterized } from 'features/controlLayers/store/canvasSlice';
-import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
+import { useCanvasContext } from 'features/controlLayers/contexts/CanvasInstanceContext';
+import { instanceActions } from 'features/controlLayers/store/canvasInstanceSlice';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
@@ -11,9 +9,8 @@ import { uploadImage } from 'services/api/endpoints/images';
 
 export const useInvertMask = () => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const canvasManager = useCanvasManager();
-  const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
+  const { dispatch, manager: canvasManager, useSelector } = useCanvasContext();
+  const selectedEntityIdentifier = useSelector((state) => state.selectedEntityIdentifier);
 
   const invertMask = useCallback(async () => {
     try {
@@ -74,7 +71,7 @@ export const useInvertMask = () => {
 
       if (selectedEntityIdentifier) {
         dispatch(
-          entityRasterized({
+          instanceActions.entityRasterized({
             entityIdentifier: selectedEntityIdentifier,
             imageObject,
             position: { x: bboxRect.x, y: bboxRect.y },
