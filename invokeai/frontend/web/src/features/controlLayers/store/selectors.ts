@@ -42,6 +42,11 @@ export const selectActiveCanvas = (state: RootState) => {
 export const selectActiveCanvasId = (state: RootState) => state.canvases.activeInstanceId;
 
 /**
+ * Selects the total number of canvas instances
+ */
+export const selectCanvasCount = (state: RootState) => Object.keys(state.canvases.instances).length;
+
+/**
  * Legacy selector for backward compatibility - selects the active canvas
  * @deprecated Use selectActiveCanvas instead
  */
@@ -50,8 +55,8 @@ export const selectCanvasSlice = (state: RootState) => {
   return activeCanvas || null;
 };
 
-// Legacy canvas selector factory for backward compatibility
-const createCanvasSelector = <T>(selector: Selector<CanvasState, T>) => createSelector(selectCanvasSlice, selector);
+// Legacy canvas selector factory for backward compatibility - keeping for potential future use
+// const createCanvasSelector = <T>(selector: Selector<CanvasState, T>) => createSelector(selectCanvasSlice, selector);
 
 // New parameterized canvas selector factory
 export const createCanvasInstanceSelector = <T>(selector: Selector<CanvasState, T>) => 

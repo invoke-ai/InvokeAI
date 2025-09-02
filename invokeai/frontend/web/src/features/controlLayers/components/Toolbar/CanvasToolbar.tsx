@@ -20,6 +20,7 @@ import { useCanvasToggleNonRasterLayersHotkey } from 'features/controlLayers/hoo
 import { useCanvasTransformHotkey } from 'features/controlLayers/hooks/useCanvasTransformHotkey';
 import { useCanvasUndoRedoHotkeys } from 'features/controlLayers/hooks/useCanvasUndoRedoHotkeys';
 import { useNextPrevEntityHotkeys } from 'features/controlLayers/hooks/useNextPrevEntity';
+import { CanvasInstanceManager } from 'features/ui/components/CanvasInstanceManager';
 import { memo } from 'react';
 
 export const CanvasToolbar = memo(() => {
@@ -38,6 +39,7 @@ export const CanvasToolbar = memo(() => {
     <Flex w="full" gap={2} alignItems="center" px={2}>
       <ToolFillColorPicker />
       <ToolSettings />
+      <CanvasInstanceManager />
       <Flex alignItems="center" h="full" flexGrow={1} justifyContent="flex-end">
         <CanvasToolbarScale />
         <CanvasToolbarResetViewButton />

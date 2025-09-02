@@ -2,7 +2,6 @@ import { useStore } from '@nanostores/react';
 import { logger } from 'app/logging/logger';
 import { useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { canvasManagerFactory } from 'features/controlLayers/konva/CanvasManagerFactory';
 import { $canvasManagers } from 'features/controlLayers/store/ephemeral';
 import { selectActiveCanvasId } from 'features/controlLayers/store/selectors';

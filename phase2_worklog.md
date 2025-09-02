@@ -42,8 +42,32 @@ Implementing Phase 2 of the Canvas Multi-Instance Implementation Plan:
   - Singleton factory instance exported
 
 #### Section 2.3: Update Canvas Manager Architecture
-- [ ] Update CanvasManager to work with new architecture
-- [ ] Ensure proper instance isolation
+- [x] Update CanvasManager to work with new architecture
+  - Updated constructor to accept canvasId parameter
+  - Added onStateUpdated method for factory-managed state listening
+  - Removed singleton references from initialize/destroy
+  - Added proper logging with canvasId context
+- [x] Ensure proper instance isolation
+  - Each manager now has its own canvasId
+  - State listening managed by factory per instance
+- [x] Compatibility layer updates
+  - Updated SessionMenuItems.tsx to use hook-based manager access
+  - Fixed import references to new registry pattern
+
+#### Issues Resolved
+- [x] Fixed TypeScript compilation errors
+  - Updated CanvasManagerFactory logger and listener typing
+  - Fixed imports in canvasesSlice (Undoable -> StateWithHistory, calculateNewSize)
+  - Added proper type assertions for listener API
+- [x] Created compatibility layers
+  - Updated CanvasManagerProviderGate to use new registry
+  - Updated useCanvasManagerSafe hook for active canvas
+  - Modified useInvokeCanvas with temporary multi-instance compatibility
+
+#### Phase 2 Complete
+✅ All sections (2.0, 2.1, 2.2, 2.3) implemented successfully
+✅ TypeScript compilation passes
+✅ Backward compatibility maintained through adapter layers
 
 ## Notes
 - Working directory: /home/bat/git/InvokeAI/invokeai/frontend/web

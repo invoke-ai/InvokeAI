@@ -31,6 +31,7 @@ export type DockviewPanelParameters = {
   tab: TabName;
   focusRegion: FocusRegionName;
   i18nKey: string;
+  canvasId?: string; // Added for multi-instance canvas support
 };
 
 export type GridviewPanelParameters = {
@@ -51,6 +52,8 @@ export type RootLayoutGridviewComponents = Record<
   FunctionComponent<IGridviewPanelProps<GridviewPanelParameters>>
 >;
 type PanelProps = IDockviewPanelProps<DockviewPanelParameters> | IGridviewPanelProps<GridviewPanelParameters>;
+
+export type DockviewPanelProps = IDockviewPanelProps<DockviewPanelParameters>;
 
 export const withPanelContainer = (Component: FunctionComponent) =>
   /* eslint-disable-next-line  react/display-name */

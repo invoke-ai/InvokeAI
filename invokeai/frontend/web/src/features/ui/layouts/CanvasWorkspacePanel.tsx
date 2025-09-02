@@ -52,6 +52,9 @@ export const CanvasWorkspacePanel = memo(() => {
   const dynamicGrid = useAppSelector(selectDynamicGrid);
   const showHUD = useAppSelector(selectShowHUD);
   const sessionId = useAppSelector(selectCanvasSessionId);
+  
+  // TODO: Extract canvasId from dockview panel params when the context system is ready
+  // For now, this will work with the active canvas system from Phases 1-2
 
   const renderMenu = useCallback(() => {
     return <MenuContent />;

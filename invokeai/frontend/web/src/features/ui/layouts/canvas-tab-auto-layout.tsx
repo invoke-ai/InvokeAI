@@ -1,6 +1,8 @@
+import { useAppDispatch } from 'app/store/storeHooks';
 import type { DockviewApi, GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
 import { DockviewReact, GridviewReact, LayoutPriority, Orientation } from 'dockview';
 import { CanvasLayersPanel } from 'features/controlLayers/components/CanvasLayersPanelContent';
+import { activeCanvasChanged,canvasInstanceAdded } from 'features/controlLayers/store/canvasesSlice';
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
 import { GalleryPanel } from 'features/gallery/components/Gallery';
 import { ImageViewerPanel } from 'features/gallery/components/ImageViewer/ImageViewerPanel';
@@ -18,6 +20,7 @@ import { CanvasLaunchpadPanel } from 'features/ui/layouts/CanvasLaunchpadPanel';
 import type { TabName } from 'features/ui/store/uiTypes';
 import { dockviewTheme } from 'features/ui/styles/theme';
 import { t } from 'i18next';
+import { nanoid } from 'nanoid';
 import { memo, useCallback, useEffect } from 'react';
 
 import { CanvasTabLeftPanel } from './CanvasTabLeftPanel';
@@ -62,7 +65,7 @@ const mainPanelComponents: AutoLayoutDockviewComponents = {
   [VIEWER_PANEL_ID]: withPanelContainer(ImageViewerPanel),
 };
 
-const initializeCenterPanelLayout = (tab: TabName, api: DockviewApi) => {
+const initializeCenterPanelLayout = (tab: TabName, api: DockviewApi, dispatch: ReturnType<typeof useAppDispatch>) => {
   navigationApi.registerContainer(tab, 'main', api, () => {
     const launchpad = api.addPanel<DockviewPanelParameters>({
       id: LAUNCHPAD_PANEL_ID,
@@ -76,13 +79,18 @@ const initializeCenterPanelLayout = (tab: TabName, api: DockviewApi) => {
       },
     });
 
+    // Create first canvas instance
+    const firstCanvasId = nanoid();
+    dispatch(canvasInstanceAdded({ canvasId: firstCanvasId, name: 'Canvas 1' }));
+    
     api.addPanel<DockviewPanelParameters>({
-      id: WORKSPACE_PANEL_ID,
+      id: `${WORKSPACE_PANEL_ID}_${firstCanvasId}`,
       component: WORKSPACE_PANEL_ID,
-      title: t('ui.panels.canvas'),
+      title: 'Canvas 1',
       tabComponent: DOCKVIEW_TAB_CANVAS_WORKSPACE_ID,
       params: {
         tab,
+        canvasId: firstCanvasId,
         focusRegion: 'canvas',
         i18nKey: 'ui.panels.canvas',
       },
@@ -108,18 +116,32 @@ const initializeCenterPanelLayout = (tab: TabName, api: DockviewApi) => {
       },
     });
 
+    // Track active canvas panel changes
+    api.onDidActivePanelChange((panel) => {
+      if (panel?.id.startsWith(WORKSPACE_PANEL_ID)) {
+        const canvasId = panel.params?.canvasId;
+        if (canvasId) {
+          dispatch(activeCanvasChanged({ canvasId }));
+        }
+      } else {
+        // When a non-canvas panel is activated, set active canvas to null
+        dispatch(activeCanvasChanged({ canvasId: null }));
+      }
+    });
+
     launchpad.api.setActive();
   });
 };
 
 const MainPanel = memo(() => {
   const { tab } = useAutoLayoutContext();
+  const dispatch = useAppDispatch();
 
   const onReady = useCallback<IDockviewReactProps['onReady']>(
     ({ api }) => {
-      initializeCenterPanelLayout(tab, api);
+      initializeCenterPanelLayout(tab, api, dispatch);
     },
-    [tab]
+    [tab, dispatch]
   );
   return (
     <>

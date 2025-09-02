@@ -1,20 +1,19 @@
-import { createSlice, type PayloadAction, isAnyOf } from '@reduxjs/toolkit';
+import { createSlice, isAnyOf,type PayloadAction } from '@reduxjs/toolkit';
+import { migrateCanvasState } from 'app/store/migrations/canvasMigration';
 import type { SliceConfig } from 'app/store/types';
 import { canvasReset } from 'features/controlLayers/store/actions';
 import { modelChanged } from 'features/controlLayers/store/paramsSlice';
-import { undoableCanvasInstanceReducer, instanceActions } from './canvasInstanceSlice';
-import type { StateWithHistory } from 'redux-undo';
-import type { CanvasState } from './types';
-import { getInitialCanvasState } from './types';
+import { calculateNewSize , getScaledBoundingBoxDimensions } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { isMainModelBase } from 'features/nodes/types/common';
 import { API_BASE_MODELS } from 'features/parameters/types/constants';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
-import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
-import { getScaledBoundingBoxDimensions } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
-import type { UnknownAction } from '@reduxjs/toolkit';
+import type { StateWithHistory } from 'redux-undo';
 import { ActionCreators as UndoActionCreators } from 'redux-undo';
-import { migrateCanvasState } from 'app/store/migrations/canvasMigration';
 import { z } from 'zod';
+
+import { instanceActions,undoableCanvasInstanceReducer } from './canvasInstanceSlice';
+import type { CanvasState } from './types';
+import { getInitialCanvasState } from './types';
 
 interface CanvasesState {
   instances: Record<string, StateWithHistory<CanvasState>>;
