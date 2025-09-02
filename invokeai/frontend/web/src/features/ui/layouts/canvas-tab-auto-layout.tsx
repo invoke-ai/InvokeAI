@@ -61,7 +61,7 @@ const tabComponents = {
 
 const mainPanelComponents: AutoLayoutDockviewComponents = {
   [LAUNCHPAD_PANEL_ID]: withPanelContainer(CanvasLaunchpadPanel),
-  [WORKSPACE_PANEL_ID]: withPanelContainer(CanvasWorkspacePanel),
+  [WORKSPACE_PANEL_ID]: CanvasWorkspacePanel, // Custom wrapper that handles props
   [VIEWER_PANEL_ID]: withPanelContainer(ImageViewerPanel),
 };
 

@@ -16,9 +16,12 @@ import { SelectObject } from 'features/controlLayers/components/SelectObject/Sel
 import { StagingAreaContextProvider } from 'features/controlLayers/components/StagingArea/context';
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
+import { CanvasInstanceProvider } from 'features/controlLayers/contexts/CanvasInstanceContext';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import type { DockviewPanelProps } from 'features/ui/layouts/auto-layout-context';
+import { AutoLayoutPanelContainer } from 'features/ui/layouts/AutoLayoutPanelContainer';
 import { memo, useCallback } from 'react';
 import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
 
@@ -48,31 +51,38 @@ const canvasBgSx = {
   },
 };
 
-export const CanvasWorkspacePanel = memo(() => {
+const CanvasWorkspacePanelImpl = memo(({ params }: DockviewPanelProps) => {
   const dynamicGrid = useAppSelector(selectDynamicGrid);
   const showHUD = useAppSelector(selectShowHUD);
   const sessionId = useAppSelector(selectCanvasSessionId);
   
-  // TODO: Extract canvasId from dockview panel params when the context system is ready
-  // For now, this will work with the active canvas system from Phases 1-2
+  // Extract canvasId from dockview panel params
+  const { canvasId } = params;
+  
+  if (!canvasId) {
+    // Fallback or error handling for missing canvasId
+    console.error('CanvasWorkspacePanel: canvasId is required but not provided in params');
+    return null;
+  }
 
   const renderMenu = useCallback(() => {
     return <MenuContent />;
   }, []);
 
   return (
-    <StagingAreaContextProvider sessionId={sessionId}>
-      <Flex
-        borderRadius="base"
-        position="relative"
-        flexDirection="column"
-        height="full"
-        width="full"
-        gap={2}
-        alignItems="center"
-        justifyContent="center"
-        overflow="hidden"
-      >
+    <CanvasInstanceProvider canvasId={canvasId}>
+      <StagingAreaContextProvider sessionId={sessionId}>
+        <Flex
+          borderRadius="base"
+          position="relative"
+          flexDirection="column"
+          height="full"
+          width="full"
+          gap={2}
+          alignItems="center"
+          justifyContent="center"
+          overflow="hidden"
+        >
         <CanvasManagerProviderGate>
           <CanvasToolbar />
         </CanvasManagerProviderGate>
@@ -123,7 +133,18 @@ export const CanvasWorkspacePanel = memo(() => {
           <CanvasDropArea />
         </CanvasManagerProviderGate>
       </Flex>
-    </StagingAreaContextProvider>
+      </StagingAreaContextProvider>
+    </CanvasInstanceProvider>
+  );
+});
+CanvasWorkspacePanelImpl.displayName = 'CanvasWorkspacePanelImpl';
+
+// Custom wrapper that provides dockview props to the canvas workspace panel
+export const CanvasWorkspacePanel = memo((props: DockviewPanelProps) => {
+  return (
+    <AutoLayoutPanelContainer {...props}>
+      <CanvasWorkspacePanelImpl {...props} />
+    </AutoLayoutPanelContainer>
   );
 });
 CanvasWorkspacePanel.displayName = 'CanvasWorkspacePanel';
