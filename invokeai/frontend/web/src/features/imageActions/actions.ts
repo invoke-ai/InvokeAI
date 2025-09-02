@@ -6,7 +6,6 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasReset } from 'features/controlLayers/store/actions';
 import {
   bboxChangedFromCanvas,
-  canvasClearHistory,
   controlLayerAdded,
   entityRasterized,
   inpaintMaskAdded,
@@ -14,6 +13,7 @@ import {
   rgAdded,
   rgRefImageImageChanged,
 } from 'features/controlLayers/store/canvasInstanceSlice';
+import { canvasClearHistory } from 'features/controlLayers/store/canvasesSlice';
 import { refImageImageChanged } from 'features/controlLayers/store/refImagesSlice';
 import { selectBboxModelBase, selectBboxRect } from 'features/controlLayers/store/selectors';
 import type {

@@ -1627,6 +1627,7 @@ export const {
   bboxSizeOptimized,
   bboxSizeRecalled,
   bboxSyncedToOptimalDimension,
+  bboxChangedFromCanvas,
 
   // Entity actions
   entitySelected,
@@ -1641,6 +1642,16 @@ export const {
   entitiesReordered,
   entityFillColorChanged,
   entityFillStyleChanged,
+  entityArrangedForwardOne,
+  entityArrangedBackwardOne,
+  entityArrangedToFront,
+  entityArrangedToBack,
+  entityBrushLineAdded,
+  entityEraserLineAdded,
+  entityMovedBy,
+  entityMovedTo,
+  entityRasterized,
+  entityRectAdded,
 
   // Layer type actions
   allEntitiesDeleted,
@@ -1673,7 +1684,7 @@ export const {
   inpaintMaskConvertedToRegionalGuidance,
 
   // Regional guidance actions
-  regionalGuidanceAdded,
+  rgAdded,
   rgPositivePromptChanged,
   rgNegativePromptChanged,
   rgAutoNegativeToggled,
