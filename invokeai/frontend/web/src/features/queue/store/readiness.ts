@@ -9,10 +9,12 @@ import type { AppConfig } from 'app/types/invokeai';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { debounce, groupBy, upperFirst } from 'es-toolkit/compat';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
 import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas, selectActiveCanvasId } from 'features/controlLayers/store/selectors';
+import { $canvasManagers } from 'features/controlLayers/store/ephemeral';
 import type { CanvasState, LoRA, ParamsState, RefImagesState } from 'features/controlLayers/store/types';
 import {
   getControlLayerWarnings,
@@ -568,7 +570,9 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   const {
     isConnected,
     model,
-    canvas,
+    activeCanvasId,
+    activeCanvas,
+    canvasManagers,
     params,
     refImages,
     loras,
@@ -586,6 +590,19 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
 
   if (!isConnected) {
     reasons.push(disconnectedReason(i18n.t));
+  }
+
+  if (!activeCanvasId) {
+    reasons.push({ content: 'No active canvas' });
+    return reasons;
+  }
+
+  const canvas = activeCanvas;
+  const manager = canvasManagers.get(activeCanvasId);
+
+  if (!canvas || !manager) {
+    reasons.push({ content: 'Canvas not initialized' });
+    return reasons;
   }
 
   if (canvasIsFiltering) {

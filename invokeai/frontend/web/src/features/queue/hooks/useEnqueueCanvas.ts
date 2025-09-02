@@ -2,11 +2,12 @@ import type { AlertStatus } from '@invoke-ai/ui-library';
 import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
-import { useAppStore } from 'app/store/storeHooks';
+import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { extractMessageFromAssertionError } from 'common/util/extractMessageFromAssertionError';
 import { withResult, withResultAsync } from 'common/util/result';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { selectActiveCanvasId } from 'features/controlLayers/store/selectors';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildChatGPT4oGraph } from 'features/nodes/util/graph/generation/buildChatGPT4oGraph';
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
@@ -135,16 +136,17 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
 
 export const useEnqueueCanvas = () => {
   const store = useAppStore();
+  const activeCanvasId = useAppSelector(selectActiveCanvasId);
   const canvasManager = useCanvasManagerSafe();
   const enqueue = useCallback(
     (prepend: boolean) => {
-      if (!canvasManager) {
-        log.error('Canvas manager is not available');
+      if (!canvasManager || !activeCanvasId) {
+        log.error('No active canvas or canvas manager');
         return;
       }
       return enqueueCanvas(store, canvasManager, prepend);
     },
-    [canvasManager, store]
+    [canvasManager, activeCanvasId, store]
   );
   return enqueue;
 };
