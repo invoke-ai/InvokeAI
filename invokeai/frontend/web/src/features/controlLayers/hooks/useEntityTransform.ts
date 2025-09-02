@@ -1,6 +1,6 @@
 import { useCanvasManagerSafe } from 'features/controlLayers/hooks/useCanvasManager';
 import { useEntityAdapterSafe } from 'features/controlLayers/contexts/EntityAdapterContext';
-import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityIsEmpty } from 'features/controlLayers/hooks/useEntityIsEmpty';
 import { useEntityIsLocked } from 'features/controlLayers/hooks/useEntityIsLocked';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
@@ -10,7 +10,7 @@ import { useCallback, useMemo } from 'react';
 export const useEntityTransform = (entityIdentifier: CanvasEntityIdentifier | null) => {
   const canvasManager = useCanvasManagerSafe();
   const adapter = useEntityAdapterSafe(entityIdentifier);
-  const isBusy = useCanvasIsBusy();
+  const isBusy = useCanvasIsBusySafe();
   const isLocked = useEntityIsLocked(entityIdentifier);
   const isEmpty = useEntityIsEmpty(entityIdentifier);
 
