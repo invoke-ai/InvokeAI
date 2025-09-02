@@ -31,6 +31,13 @@ const QueueListHeader = () => {
         alignItems="center"
       />
       <QueueListHeaderColumn
+        field="created_at"
+        displayName={t('queue.createdAt')}
+        ps={0.5}
+        w={COLUMN_WIDTHS.completedAt}
+        alignItems="center"
+      />
+      <QueueListHeaderColumn
         field="completed_at"
         displayName={t('queue.completedAt')}
         ps={0.5}

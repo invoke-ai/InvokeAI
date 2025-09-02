@@ -131,7 +131,7 @@ async def list_all_queue_items(
 )
 async def get_queue_item_ids(
     queue_id: str = Path(description="The queue id to perform this operation on"),
-    order_by: QUEUE_ORDER_BY = Query(default="completed_at", description="The sort field"),
+    order_by: QUEUE_ORDER_BY = Query(default="created_at", description="The sort field"),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
 ) -> ItemIdsResult:
     """Gets all queue item ids that match the given parameters"""

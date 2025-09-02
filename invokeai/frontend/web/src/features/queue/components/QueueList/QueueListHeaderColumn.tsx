@@ -65,18 +65,20 @@ const ColumnSortIcon = memo(({ field, displayName, isMouseHoveringColumn }: Colu
   const isShown = useMemo(() => isSortByColumn || isMouseHoveringColumn, [isSortByColumn, isMouseHoveringColumn]);
   const tooltip = useMemo(() => {
     if (isSortByColumn) {
-      return sortOrder === 'asc' ? t('queue.sortOrderAscending') : t('queue.sortOrderDescending');
+      return sortOrder === 'ASC' ? t('queue.sortOrderAscending') : t('queue.sortOrderDescending');
     }
     return t('queue.sortBy', { column: displayName });
   }, [isSortByColumn, sortOrder, t, displayName]);
-  const icon = useMemo(() => (sortOrder === 'asc' ? <PiSortAscendingBold /> : <PiSortDescendingBold />), [sortOrder]);
+
+  // PiSortDescendingBold is used for ascending because the arrow points up
+  const icon = useMemo(() => (sortOrder === 'ASC' ? <PiSortDescendingBold /> : <PiSortAscendingBold />), [sortOrder]);
 
   const handleClickSortColumn = useCallback(() => {
     if (isSortByColumn) {
-      if (sortOrder === 'asc') {
-        dispatch(sortOrderChanged('desc'));
+      if (sortOrder === 'ASC') {
+        dispatch(sortOrderChanged('DESC'));
       } else {
-        dispatch(sortOrderChanged('asc'));
+        dispatch(sortOrderChanged('ASC'));
       }
     } else {
       dispatch(sortByChanged(field));

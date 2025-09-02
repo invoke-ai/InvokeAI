@@ -1,4 +1,4 @@
-import { Flex, Heading, ListItem } from '@invoke-ai/ui-library';
+import { Flex, Heading } from '@invoke-ai/ui-library';
 import { IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
 import { useRangeBasedQueueItemFetching } from 'features/queue/hooks/useRangeBasedQueueItemFetching';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
@@ -48,10 +48,6 @@ const QueueItemAtPosition = memo(
 );
 QueueItemAtPosition.displayName = 'QueueItemAtPosition';
 
-const computeItemKey: ComputeItemKey<number, ListContext> = (index, itemId, { queryArgs }) => {
-  return `${JSON.stringify(queryArgs)}-${itemId ?? index}`;
-};
-
 const itemContent: ItemContent<number, ListContext> = (index, itemId, context) => (
   <QueueItemAtPosition index={index} itemId={itemId} context={context} />
 );
@@ -66,7 +62,7 @@ ScrollSeekPlaceholderComponent.displayName = 'ScrollSeekPlaceholderComponent';
 
 const components: Components<number, ListContext> = {
   List: QueueListComponent,
-  // ScrollSeekPlaceholder: ScrollSeekPlaceholderComponent,
+  ScrollSeekPlaceholder: ScrollSeekPlaceholderComponent,
 };
 
 const scrollSeekConfiguration: ScrollSeekConfiguration = {
@@ -86,6 +82,13 @@ export const QueueList = () => {
 
   // Get the ordered list of queue item ids - this is our primary data source for virtualization
   const { queryArgs, itemIds, isLoading } = useQueueItemIds();
+
+  const computeItemKey: ComputeItemKey<number, ListContext> = useCallback(
+    (index, itemId) => {
+      return `${JSON.stringify(queryArgs)}-${itemId ?? index}`;
+    },
+    [queryArgs]
+  );
 
   // Use range-based fetching for bulk loading queue items into cache based on the visible range
   const { onRangeChanged } = useRangeBasedQueueItemFetching({
@@ -118,10 +121,7 @@ export const QueueList = () => {
     });
   }, []);
 
-  const context = useMemo<ListContext>(
-    () => ({ queryArgs, openQueueItems, toggleQueueItem }),
-    [queryArgs, openQueueItems, toggleQueueItem]
-  );
+  const context = useMemo<ListContext>(() => ({ openQueueItems, toggleQueueItem }), [openQueueItems, toggleQueueItem]);
 
   if (isLoading) {
     return <IAINoContentFallbackWithSpinner />;
@@ -143,6 +143,7 @@ export const QueueList = () => {
           ref={virtuosoRef}
           context={context}
           data={itemIds}
+          increaseViewportBy={4096}
           itemContent={itemContent}
           computeItemKey={computeItemKey}
           components={components}
