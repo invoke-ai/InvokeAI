@@ -81,31 +81,7 @@ export const canvasesSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    // Forward all instanceActions to the correct canvas instance
-    builder.addMatcher(
-      isAnyOf(...Object.values(instanceActions)),
-      (state, action) => {
-        // Check if the action has a canvasId in the payload
-        const actionWithCanvas = action as PayloadAction<{ canvasId?: string }>;
-        const canvasId = actionWithCanvas.payload?.canvasId ?? state.activeInstanceId;
-        
-        if (canvasId && state.instances[canvasId]) {
-          // Forward the action to the specific canvas instance (without the canvasId)
-          const { canvasId: _, ...payloadWithoutCanvasId } = actionWithCanvas.payload || {};
-          const forwardedAction = {
-            ...action,
-            payload: payloadWithoutCanvasId
-          };
-          
-          state.instances[canvasId] = undoableCanvasInstanceReducer(
-            state.instances[canvasId], 
-            forwardedAction
-          );
-        }
-      }
-    );
-
-    // Handle canvas reset for active canvas
+    // Handle canvas reset for active canvas - addCase must come before addMatcher
     builder.addCase(canvasReset, (state) => {
       if (state.activeInstanceId && state.instances[state.activeInstanceId]) {
         const currentState = state.instances[state.activeInstanceId].present;
@@ -185,6 +161,30 @@ export const canvasesSlice = createSlice({
         }
       });
     });
+
+    // Forward all instanceActions to the correct canvas instance - addMatcher must come after addCase
+    builder.addMatcher(
+      isAnyOf(...Object.values(instanceActions)),
+      (state, action) => {
+        // Check if the action has a canvasId in the payload
+        const actionWithCanvas = action as PayloadAction<{ canvasId?: string }>;
+        const canvasId = actionWithCanvas.payload?.canvasId ?? state.activeInstanceId;
+        
+        if (canvasId && state.instances[canvasId]) {
+          // Forward the action to the specific canvas instance (without the canvasId)
+          const { canvasId: _, ...payloadWithoutCanvasId } = actionWithCanvas.payload || {};
+          const forwardedAction = {
+            ...action,
+            payload: payloadWithoutCanvasId
+          };
+          
+          state.instances[canvasId] = undoableCanvasInstanceReducer(
+            state.instances[canvasId], 
+            forwardedAction
+          );
+        }
+      }
+    );
   },
 });
 

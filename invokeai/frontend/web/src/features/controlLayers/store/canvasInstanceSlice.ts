@@ -1649,6 +1649,9 @@ export const {
 
   // Raster layer actions
   rasterLayerAdded,
+  rasterLayerConvertedToControlLayer,
+  rasterLayerConvertedToInpaintMask,
+  rasterLayerConvertedToRegionalGuidance,
 
   // Control layer actions
   controlLayerAdded,
@@ -1676,7 +1679,13 @@ export const {
   rgAutoNegativeToggled,
   rgRefImageAdded,
   rgRefImageDeleted,
+  rgRefImageImageChanged,
+  rgRefImageIPAdapterWeightChanged,
+  rgRefImageIPAdapterBeginEndStepPctChanged,
+  rgRefImageIPAdapterMethodChanged,
+  rgRefImageFLUXReduxImageInfluenceChanged,
   rgRefImageModelChanged,
+  rgRefImageIPAdapterCLIPVisionModelChanged,
   rgConvertedToInpaintMask,
 
   // Canvas metadata actions
