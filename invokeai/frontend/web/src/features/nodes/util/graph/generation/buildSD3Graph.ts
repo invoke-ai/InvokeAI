@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
+import { selectSanitizedCanvasMetadata } from 'features/controlLayers/store/selectors';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
@@ -180,7 +180,10 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   g.updateNode(canvasOutput, selectCanvasOutputFields(state));
 
   if (selectActiveTab(state) === 'canvas') {
-    g.upsertMetadata(selectCanvasMetadata(state));
+    const canvasMetadata = selectSanitizedCanvasMetadata(state);
+    if (canvasMetadata) {
+      g.upsertMetadata(canvasMetadata);
+    }
   }
 
   g.setMetadataReceivingNode(canvasOutput);

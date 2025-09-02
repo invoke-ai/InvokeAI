@@ -2,7 +2,7 @@ import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectSanitizedCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { addControlNets, addT2IAdapters } from 'features/nodes/util/graph/generation/addControlAdapters';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
@@ -319,7 +319,7 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   g.updateNode(canvasOutput, selectCanvasOutputFields(state));
 
   if (selectActiveTab(state) === 'canvas') {
-    const metadata = selectCanvasMetadata(state);
+    const metadata = selectSanitizedCanvasMetadata(state);
     if (metadata) {
       g.upsertMetadata(metadata);
     }

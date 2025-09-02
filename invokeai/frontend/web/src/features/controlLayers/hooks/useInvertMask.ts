@@ -14,7 +14,17 @@ export const useInvertMask = () => {
 
   const invertMask = useCallback(async () => {
     try {
-      const bboxRect = canvasManager.stateApi.getBbox().rect;
+      const bbox = canvasManager.stateApi.getBbox();
+      if (!bbox) {
+        toast({
+          id: 'NO_BBOX',
+          title: t('toast.noBbox'),
+          description: t('toast.noBboxDesc'),
+          status: 'warning',
+        });
+        return;
+      }
+      const bboxRect = bbox.rect;
 
       const adapters = canvasManager.compositor.getVisibleAdaptersOfType('inpaint_mask');
 

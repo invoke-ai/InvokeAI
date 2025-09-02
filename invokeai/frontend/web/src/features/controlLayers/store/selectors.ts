@@ -414,6 +414,30 @@ export const selectCanvasMetadata = createSelector(
 );
 
 /**
+ * Sanitizes canvas metadata by replacing null values with appropriate defaults.
+ * This ensures the metadata is compatible with JsonObject requirements.
+ */
+export const selectSanitizedCanvasMetadata = createSelector(
+  selectCanvasMetadata,
+  (metadata): { canvas_v2_metadata: CanvasMetadata } | null => {
+    if (!metadata) {
+      return null;
+    }
+    
+    // Deep clone and sanitize metadata to ensure no null values
+    const sanitized = JSON.parse(JSON.stringify(metadata, (key, value) => {
+      // Convert null values to empty strings or appropriate defaults
+      if (value === null) {
+        return key === 'name' ? '' : undefined;
+      }
+      return value;
+    }));
+    
+    return sanitized;
+  }
+);
+
+/**
  * Selects whether all non-raster layer categories (control layers, inpaint masks, regional guidance) are hidden.
  * This is used to determine the state of the toggle button that shows/hides all non-raster layers.
  */

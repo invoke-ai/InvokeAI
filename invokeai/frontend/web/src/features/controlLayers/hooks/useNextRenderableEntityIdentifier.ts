@@ -9,6 +9,9 @@ export const useEntityIdentifierBelowThisOne = <T extends CanvasEntityIdentifier
   const selector = useMemo(
     () =>
       createMemoizedSelector(selectCanvasSlice, (canvas) => {
+        if (!canvas) {
+          return null;
+        }
         const nextEntity = selectEntityIdentifierBelowThisOne(canvas, entityIdentifier);
         if (!nextEntity) {
           return null;

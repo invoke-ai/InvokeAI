@@ -10,6 +10,9 @@ import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 const selectNextEntityIdentifier = createMemoizedSelector(selectCanvasSlice, (canvas) => {
+  if (!canvas) {
+    return null;
+  }
   const selectedEntityIdentifier = canvas.selectedEntityIdentifier;
   const allEntities = selectAllEntities(canvas);
   let nextEntity: CanvasEntityState | null = null;
@@ -26,6 +29,9 @@ const selectNextEntityIdentifier = createMemoizedSelector(selectCanvasSlice, (ca
 });
 
 const selectPrevEntityIdentifier = createMemoizedSelector(selectCanvasSlice, (canvas) => {
+  if (!canvas) {
+    return null;
+  }
   const selectedEntityIdentifier = canvas.selectedEntityIdentifier;
   const allEntities = selectAllEntities(canvas);
   let prevEntity: CanvasEntityState | null = null;

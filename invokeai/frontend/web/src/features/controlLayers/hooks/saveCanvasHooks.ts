@@ -18,7 +18,7 @@ import {
   selectSeed,
 } from 'features/controlLayers/store/paramsSlice';
 import { refImageAdded, refImageImageChanged } from 'features/controlLayers/store/refImagesSlice';
-import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
+import { selectSanitizedCanvasMetadata } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
   CanvasEntityIdentifier,
@@ -85,8 +85,9 @@ const useSaveCanvas = ({ region, saveToGallery, toastOk, toastError, onSave, wit
     const state = store.getState();
 
     if (withMetadata) {
-      metadata = selectCanvasMetadata(state);
-      if (metadata) {
+      const canvasMetadata = selectSanitizedCanvasMetadata(state);
+      if (canvasMetadata) {
+        metadata = canvasMetadata as JsonObject;
         metadata.positive_prompt = selectPositivePrompt(state);
         metadata.negative_prompt = selectNegativePrompt(state);
         metadata.seed = selectSeed(state);

@@ -2,7 +2,7 @@ import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
+import { selectSanitizedCanvasMetadata } from 'features/controlLayers/store/selectors';
 import { isChatGPT4oAspectRatioID, isChatGPT4oReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { type ImageField, zModelIdentifierField } from 'features/nodes/types/common';
@@ -130,7 +130,10 @@ export const buildChatGPT4oGraph = async (arg: GraphBuilderArg): Promise<GraphBu
     });
 
     if (selectActiveTab(state) === 'canvas') {
-      g.upsertMetadata(selectCanvasMetadata(state));
+      const canvasMetadata = selectSanitizedCanvasMetadata(state);
+      if (canvasMetadata) {
+        g.upsertMetadata(canvasMetadata);
+      }
     }
 
     g.setMetadataReceivingNode(gptImage);

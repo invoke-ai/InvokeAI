@@ -2,7 +2,7 @@ import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectSanitizedCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { isFluxKontextReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { zImageField } from 'features/nodes/types/common';
@@ -254,7 +254,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     assert<Equals<typeof generationMode, never>>(false);
   }
 
-  if (manager !== null) {
+  if (manager !== null && canvas) {
     const controlNetCollector = g.addNode({
       type: 'collect',
       id: getPrefixedId('control_net_collector'),
@@ -308,7 +308,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   });
   let totalReduxesAdded = fluxReduxResult.addedFLUXReduxes;
 
-  if (manager !== null) {
+  if (manager !== null && canvas) {
     const regionsResult = await addRegions({
       manager,
       regions: canvas.regionalGuidance.entities,
@@ -352,7 +352,10 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   g.updateNode(canvasOutput, selectCanvasOutputFields(state));
 
   if (selectActiveTab(state) === 'canvas') {
-    g.upsertMetadata(selectCanvasMetadata(state));
+    const canvasMetadata = selectSanitizedCanvasMetadata(state);
+    if (canvasMetadata) {
+      g.upsertMetadata(canvasMetadata);
+    }
   }
 
   g.setMetadataReceivingNode(canvasOutput);
