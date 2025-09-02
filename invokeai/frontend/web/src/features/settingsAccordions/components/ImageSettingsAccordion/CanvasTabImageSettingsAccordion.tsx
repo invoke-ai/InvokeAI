@@ -33,6 +33,10 @@ const selectBadges = createMemoizedSelector(
   (bbox, shouldRandomizeSeed, modelSupportsSeed, modelSupportsAspectRatio, modelSupportsPixelDimensions) => {
     const badges: string[] = [];
 
+    if (!bbox) {
+      return badges;
+    }
+
     const { aspectRatio, rect } = bbox;
     const { width, height } = rect;
 

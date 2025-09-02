@@ -37,6 +37,9 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
 
   const params = selectParamsSlice(state);
   const canvas = selectCanvasSlice(state);
+  if (!canvas) {
+    throw new Error('No canvas available');
+  }
   const refImages = selectRefImagesSlice(state);
 
   const {
@@ -316,7 +319,10 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   g.updateNode(canvasOutput, selectCanvasOutputFields(state));
 
   if (selectActiveTab(state) === 'canvas') {
-    g.upsertMetadata(selectCanvasMetadata(state));
+    const metadata = selectCanvasMetadata(state);
+    if (metadata) {
+      g.upsertMetadata(metadata);
+    }
   }
 
   g.setMetadataReceivingNode(canvasOutput);

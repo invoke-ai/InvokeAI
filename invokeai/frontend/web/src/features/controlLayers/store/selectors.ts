@@ -33,7 +33,7 @@ export const selectCanvasInstance = (state: RootState, canvasId: string) =>
  */
 export const selectActiveCanvas = (state: RootState) => {
   const activeId = state.canvases.activeInstanceId;
-  return activeId ? state.canvases.instances[activeId]?.present : null;
+  return activeId ? state.canvases.instances[activeId]?.present ?? null : null;
 };
 
 /**

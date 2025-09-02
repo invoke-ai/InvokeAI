@@ -124,6 +124,9 @@ export const getOriginalAndScaledSizesForTextToImage = (state: RootState) => {
   const canvas = selectCanvasSlice(state);
 
   if (tab === 'canvas') {
+    if (!canvas) {
+      throw new Error('No canvas available');
+    }
     const { rect, aspectRatio } = canvas.bbox;
     const { width, height } = rect;
     const originalSize = { width, height };
@@ -148,6 +151,10 @@ export const getOriginalAndScaledSizesForOtherModes = (state: RootState) => {
 
   assert(tab === 'canvas', `Cannot get sizes for tab ${tab} - this function is only for the Canvas tab`);
 
+  if (!canvas) {
+    throw new Error('No canvas available');
+  }
+  
   const { rect, aspectRatio } = canvas.bbox;
   const { width, height } = rect;
   const originalSize = { width, height };
