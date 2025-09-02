@@ -2,6 +2,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import type { DockviewApi, GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
 import { DockviewReact, GridviewReact, LayoutPriority, Orientation } from 'dockview';
 import { CanvasLayersPanel } from 'features/controlLayers/components/CanvasLayersPanelContent';
+import { ActiveCanvasProvider } from 'features/controlLayers/contexts/ActiveCanvasProvider';
 import { activeCanvasChanged,canvasInstanceAdded } from 'features/controlLayers/store/canvasesSlice';
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
 import { GalleryPanel } from 'features/gallery/components/Gallery';
@@ -162,7 +163,9 @@ const MainPanel = memo(() => {
         theme={dockviewTheme}
         tabComponents={tabComponents}
       />
-      <FloatingCanvasLeftPanelButtons />
+      <ActiveCanvasProvider>
+        <FloatingCanvasLeftPanelButtons />
+      </ActiveCanvasProvider>
       <FloatingRightPanelButtons />
       <PanelHotkeysLogical />
     </>
