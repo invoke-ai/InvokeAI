@@ -1,4 +1,5 @@
 import { createSlice, type PayloadAction, isAnyOf } from '@reduxjs/toolkit';
+import type { SliceConfig } from 'app/store/types';
 import { canvasReset } from 'features/controlLayers/store/actions';
 import { modelChanged } from 'features/controlLayers/store/paramsSlice';
 import { undoableCanvasInstanceReducer, instanceActions } from './canvasInstanceSlice';
@@ -11,6 +12,8 @@ import { getOptimalDimension, calculateNewSize } from 'features/parameters/util/
 import { getScaledBoundingBoxDimensions } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import type { UnknownAction } from '@reduxjs/toolkit';
 import { ActionCreators as UndoActionCreators } from 'redux-undo';
+import { migrateCanvasState } from 'app/store/migrations/canvasMigration';
+import { z } from 'zod';
 
 interface CanvasesState {
   instances: Record<string, Undoable<CanvasState>>;
@@ -193,3 +196,20 @@ export const {
   canvasRedo,
   canvasClearHistory,
 } = canvasesSlice.actions;
+
+// Define schema for CanvasesState
+const zCanvasesState = z.object({
+  instances: z.record(z.string(), z.any()), // Undoable<CanvasState> is complex, using z.any()
+  activeInstanceId: z.string().nullable(),
+});
+
+const getInitialCanvasesState = (): CanvasesState => initialCanvasesState;
+
+export const canvasesSliceConfig: SliceConfig<typeof canvasesSlice> = {
+  slice: canvasesSlice,
+  schema: zCanvasesState,
+  getInitialState: getInitialCanvasesState,
+  persistConfig: {
+    migrate: migrateCanvasState,
+  },
+};

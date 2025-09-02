@@ -31,7 +31,7 @@ import { simplifyFlatNumbersArray } from 'features/controlLayers/util/simplify';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { getGridSize, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
-import undoable, type { UndoableOptions } from 'redux-undo';
+import undoable, { type UndoableOptions } from 'redux-undo';
 import {
   type ControlLoRAModelConfig,
   type ControlNetModelConfig,

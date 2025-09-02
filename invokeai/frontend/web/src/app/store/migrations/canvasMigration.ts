@@ -1,7 +1,10 @@
 import { nanoid } from '@reduxjs/toolkit';
-import type { Undoable } from 'redux-undo';
+import type { StateWithHistory } from 'redux-undo';
 import type { CanvasState } from 'features/controlLayers/store/types';
 import { getInitialCanvasState } from 'features/controlLayers/store/types';
+
+// Type alias for backward compatibility
+type Undoable<T> = StateWithHistory<T>;
 
 /**
  * Migration from single canvas (v1) to multi-canvas (v2) state structure.

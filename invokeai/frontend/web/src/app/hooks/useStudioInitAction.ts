@@ -3,7 +3,7 @@ import { useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { withResultAsync } from 'common/util/result';
 import { canvasReset } from 'features/controlLayers/store/actions';
-import { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
+import { instanceActions } from 'features/controlLayers/store/canvasInstanceSlice';
 import { paramsReset } from 'features/controlLayers/store/paramsSlice';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
@@ -94,7 +94,7 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
       };
       await navigationApi.focusPanel('canvas', WORKSPACE_PANEL_ID);
       store.dispatch(canvasReset());
-      store.dispatch(rasterLayerAdded({ overrides, isSelected: true }));
+      store.dispatch(instanceActions.rasterLayerAdded({ overrides, isSelected: true }));
       store.dispatch(sentImageToCanvas());
       toast({
         title: t('toast.sentToCanvas'),
