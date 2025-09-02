@@ -2,7 +2,7 @@ import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useEntityTypeIsHidden } from 'features/controlLayers/hooks/useEntityTypeIsHidden';
 import { useEntityTypeString } from 'features/controlLayers/hooks/useEntityTypeString';
-import { allEntitiesOfTypeIsHiddenToggled } from 'features/controlLayers/store/canvasSlice';
+import { allEntitiesOfTypeIsHiddenToggled } from 'features/controlLayers/store/canvasInstanceSlice';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import type { MouseEventHandler } from 'react';
 import { memo, useCallback } from 'react';

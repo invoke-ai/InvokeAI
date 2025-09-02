@@ -21,7 +21,7 @@ import {
   rgRefImageIPAdapterMethodChanged,
   rgRefImageIPAdapterWeightChanged,
   rgRefImageModelChanged,
-} from 'features/controlLayers/store/canvasSlice';
+} from 'features/controlLayers/store/canvasInstanceSlice';
 import { selectCanvasSlice, selectRegionalGuidanceReferenceImage } from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityIdentifier,

@@ -16,7 +16,7 @@ import {
   controlLayerControlModeChanged,
   controlLayerModelChanged,
   controlLayerWeightChanged,
-} from 'features/controlLayers/store/canvasSlice';
+} from 'features/controlLayers/store/canvasInstanceSlice';
 import { getFilterForModel } from 'features/controlLayers/store/filters';
 import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';

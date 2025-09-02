@@ -1,7 +1,7 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { bboxHeightChanged } from 'features/controlLayers/store/canvasSlice';
+import { bboxHeightChanged } from 'features/controlLayers/store/canvasInstanceSlice';
 import { selectGridSize, selectHeight, selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { useIsBboxSizeLocked } from 'features/parameters/components/Bbox/use-is-bbox-size-locked';
 import { selectHeightConfig } from 'features/system/store/configSlice';

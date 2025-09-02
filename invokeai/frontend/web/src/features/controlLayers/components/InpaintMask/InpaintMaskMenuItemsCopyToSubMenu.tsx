@@ -4,7 +4,7 @@ import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { CanvasEntityMenuItemsCopyToClipboard } from 'features/controlLayers/components/common/CanvasEntityMenuItemsCopyToClipboard';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
-import { inpaintMaskConvertedToRegionalGuidance } from 'features/controlLayers/store/canvasSlice';
+import { inpaintMaskConvertedToRegionalGuidance } from 'features/controlLayers/store/canvasInstanceSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCopyBold } from 'react-icons/pi';

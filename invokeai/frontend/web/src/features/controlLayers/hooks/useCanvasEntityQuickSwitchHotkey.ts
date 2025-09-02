@@ -1,5 +1,5 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { entitySelected } from 'features/controlLayers/store/canvasSlice';
+import { entitySelected } from 'features/controlLayers/store/canvasInstanceSlice';
 import {
   selectBookmarkedEntityIdentifier,
   selectSelectedEntityIdentifier,

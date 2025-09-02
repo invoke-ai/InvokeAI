@@ -1,5 +1,5 @@
 import { useAppDispatch } from 'app/store/storeHooks';
-import { allNonRasterLayersIsHiddenToggled } from 'features/controlLayers/store/canvasSlice';
+import { allNonRasterLayersIsHiddenToggled } from 'features/controlLayers/store/canvasInstanceSlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useCallback } from 'react';
 

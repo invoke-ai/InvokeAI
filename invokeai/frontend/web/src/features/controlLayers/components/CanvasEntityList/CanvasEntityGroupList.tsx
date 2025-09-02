@@ -13,7 +13,7 @@ import { CanvasEntityTypeIsHiddenToggle } from 'features/controlLayers/component
 import { RasterLayerExportPSDButton } from 'features/controlLayers/components/RasterLayer/RasterLayerExportPSDButton';
 import { useEntityTypeInformationalPopover } from 'features/controlLayers/hooks/useEntityTypeInformationalPopover';
 import { useEntityTypeTitle } from 'features/controlLayers/hooks/useEntityTypeTitle';
-import { entitiesReordered } from 'features/controlLayers/store/canvasSlice';
+import { entitiesReordered } from 'features/controlLayers/store/canvasInstanceSlice';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { singleCanvasEntityDndSource } from 'features/dnd/dnd';
 import { triggerPostMoveFlash } from 'features/dnd/util';

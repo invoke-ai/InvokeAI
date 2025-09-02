@@ -33,13 +33,13 @@ type AlertData = {
 const buildSelectIsEnabled = (entityIdentifier: CanvasEntityIdentifier) =>
   createSelector(
     selectCanvasSlice,
-    (canvas) => selectEntityOrThrow(canvas, entityIdentifier, 'CanvasAlertsSelectedEntityStatusContent').isEnabled
+    (canvas) => canvas ? selectEntityOrThrow(canvas, entityIdentifier, 'CanvasAlertsSelectedEntityStatusContent').isEnabled : true
   );
 
 const buildSelectIsLocked = (entityIdentifier: CanvasEntityIdentifier) =>
   createSelector(
     selectCanvasSlice,
-    (canvas) => selectEntityOrThrow(canvas, entityIdentifier, 'CanvasAlertsSelectedEntityStatusContent').isLocked
+    (canvas) => canvas ? selectEntityOrThrow(canvas, entityIdentifier, 'CanvasAlertsSelectedEntityStatusContent').isLocked : false
   );
 
 const CanvasAlertsSelectedEntityStatusContent = memo(({ entityIdentifier, adapter }: ContentProps) => {

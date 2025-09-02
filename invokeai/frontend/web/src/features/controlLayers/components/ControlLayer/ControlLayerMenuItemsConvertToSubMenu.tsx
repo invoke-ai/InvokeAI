@@ -8,7 +8,7 @@ import {
   controlLayerConvertedToInpaintMask,
   controlLayerConvertedToRasterLayer,
   controlLayerConvertedToRegionalGuidance,
-} from 'features/controlLayers/store/canvasSlice';
+} from 'features/controlLayers/store/canvasInstanceSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiSwapBold } from 'react-icons/pi';

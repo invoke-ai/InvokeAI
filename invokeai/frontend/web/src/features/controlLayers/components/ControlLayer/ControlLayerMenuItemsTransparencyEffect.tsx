@@ -3,7 +3,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useEntityIsLocked } from 'features/controlLayers/hooks/useEntityIsLocked';
-import { controlLayerWithTransparencyEffectToggled } from 'features/controlLayers/store/canvasSlice';
+import { controlLayerWithTransparencyEffectToggled } from 'features/controlLayers/store/canvasInstanceSlice';
 import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';

@@ -4,7 +4,7 @@ import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityIsLocked } from 'features/controlLayers/hooks/useEntityIsLocked';
-import { inpaintMaskConvertedToRegionalGuidance } from 'features/controlLayers/store/canvasSlice';
+import { inpaintMaskConvertedToRegionalGuidance } from 'features/controlLayers/store/canvasInstanceSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiSwapBold } from 'react-icons/pi';

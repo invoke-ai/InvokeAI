@@ -9,7 +9,7 @@ import {
   rasterLayerConvertedToControlLayer,
   rasterLayerConvertedToInpaintMask,
   rasterLayerConvertedToRegionalGuidance,
-} from 'features/controlLayers/store/canvasSlice';
+} from 'features/controlLayers/store/canvasInstanceSlice';
 import { initialControlNet } from 'features/controlLayers/store/util';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

@@ -1,6 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { allNonRasterLayersIsHiddenToggled } from 'features/controlLayers/store/canvasSlice';
+import { allNonRasterLayersIsHiddenToggled } from 'features/controlLayers/store/canvasInstanceSlice';
 import { selectNonRasterLayersIsHidden } from 'features/controlLayers/store/selectors';
 import type { MouseEventHandler } from 'react';
 import { memo, useCallback } from 'react';

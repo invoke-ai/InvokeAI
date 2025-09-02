@@ -8,7 +8,7 @@ import {
   entityArrangedForwardOne,
   entityArrangedToBack,
   entityArrangedToFront,
-} from 'features/controlLayers/store/canvasSlice';
+} from 'features/controlLayers/store/canvasInstanceSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier, CanvasState } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';

@@ -1612,3 +1612,73 @@ const undoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
 // Export the undoable reducer for a single instance
 export const undoableCanvasInstanceReducer = undoable(canvasInstanceSlice.reducer, undoableConfig);
 export const instanceActions = canvasInstanceSlice.actions;
+
+// Export individual actions for convenience
+export const {
+  // Bbox actions
+  bboxHeightChanged,
+  bboxWidthChanged,
+  bboxScaledWidthChanged,
+  bboxScaledHeightChanged,
+  bboxAspectRatioIdChanged,
+  bboxAspectRatioLockToggled,
+  bboxDimensionsSwapped,
+  bboxScaleMethodChanged,
+  bboxSizeOptimized,
+  bboxSizeRecalled,
+  bboxSyncedToOptimalDimension,
+
+  // Entity actions
+  entitySelected,
+  bookmarkedEntityChanged,
+  entityDeleted,
+  entityDuplicated,
+  entityReset,
+  entityNameChanged,
+  entityIsEnabledToggled,
+  entityIsLockedToggled,
+  entityOpacityChanged,
+  entitiesReordered,
+  entityFillColorChanged,
+  entityFillStyleChanged,
+
+  // Layer type actions
+  allEntitiesDeleted,
+  allEntitiesOfTypeIsHiddenToggled,
+  allNonRasterLayersIsHiddenToggled,
+
+  // Raster layer actions
+  rasterLayerAdded,
+
+  // Control layer actions
+  controlLayerAdded,
+  controlLayerModelChanged,
+  controlLayerWeightChanged,
+  controlLayerBeginEndStepPctChanged,
+  controlLayerControlModeChanged,
+  controlLayerConvertedToInpaintMask,
+  controlLayerConvertedToRasterLayer,
+  controlLayerConvertedToRegionalGuidance,
+  controlLayerWithTransparencyEffectToggled,
+
+  // Inpaint mask actions
+  inpaintMaskAdded,
+  inpaintMaskDenoiseLimitChanged,
+  inpaintMaskDenoiseLimitDeleted,
+  inpaintMaskNoiseChanged,
+  inpaintMaskNoiseDeleted,
+  inpaintMaskConvertedToRegionalGuidance,
+
+  // Regional guidance actions
+  regionalGuidanceAdded,
+  rgPositivePromptChanged,
+  rgNegativePromptChanged,
+  rgAutoNegativeToggled,
+  rgRefImageAdded,
+  rgRefImageDeleted,
+  rgRefImageModelChanged,
+  rgConvertedToInpaintMask,
+
+  // Canvas metadata actions
+  canvasMetadataRecalled,
+} = canvasInstanceSlice.actions;

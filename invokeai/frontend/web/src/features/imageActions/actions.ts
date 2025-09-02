@@ -13,7 +13,7 @@ import {
   rasterLayerAdded,
   rgAdded,
   rgRefImageImageChanged,
-} from 'features/controlLayers/store/canvasSlice';
+} from 'features/controlLayers/store/canvasInstanceSlice';
 import { refImageImageChanged } from 'features/controlLayers/store/refImagesSlice';
 import { selectBboxModelBase, selectBboxRect } from 'features/controlLayers/store/selectors';
 import type {

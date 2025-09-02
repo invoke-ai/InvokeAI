@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import RgbColorPicker from 'common/components/ColorPicker/RgbColorPicker';
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { MaskFillStyle } from 'features/controlLayers/components/common/MaskFillStyle';
-import { entityFillColorChanged, entityFillStyleChanged } from 'features/controlLayers/store/canvasSlice';
+import { entityFillColorChanged, entityFillStyleChanged } from 'features/controlLayers/store/canvasInstanceSlice';
 import { selectSelectedEntityFill, selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { type FillStyle, isMaskEntityIdentifier, type RgbColor } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';

@@ -4,7 +4,7 @@ import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { usePullBboxIntoRegionalGuidanceReferenceImage } from 'features/controlLayers/hooks/saveCanvasHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
-import { rgRefImageDeleted } from 'features/controlLayers/store/canvasSlice';
+import { rgRefImageDeleted } from 'features/controlLayers/store/canvasInstanceSlice';
 import type { SetRegionalGuidanceReferenceImageDndTargetData } from 'features/dnd/dnd';
 import { setRegionalGuidanceReferenceImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';

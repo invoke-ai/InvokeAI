@@ -4,7 +4,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { useCanvasEntityListDnd } from 'features/controlLayers/components/CanvasEntityList/useCanvasEntityListDnd';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useEntityIsSelected } from 'features/controlLayers/hooks/useEntityIsSelected';
-import { entitySelected } from 'features/controlLayers/store/canvasSlice';
+import { entitySelected } from 'features/controlLayers/store/canvasInstanceSlice';
 import { DndListDropIndicator } from 'features/dnd/DndListDropIndicator';
 import type { PropsWithChildren } from 'react';
 import { memo, useCallback, useRef } from 'react';

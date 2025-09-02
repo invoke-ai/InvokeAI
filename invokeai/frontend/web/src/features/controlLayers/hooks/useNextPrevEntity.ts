@@ -1,7 +1,7 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import { entitySelected } from 'features/controlLayers/store/canvasSlice';
+import { entitySelected } from 'features/controlLayers/store/canvasInstanceSlice';
 import { selectAllEntities, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityState } from 'features/controlLayers/store/types';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';

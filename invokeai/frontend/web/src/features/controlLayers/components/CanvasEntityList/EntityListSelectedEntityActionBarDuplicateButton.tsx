@@ -1,7 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
-import { entityDuplicated } from 'features/controlLayers/store/canvasSlice';
+import { entityDuplicated } from 'features/controlLayers/store/canvasInstanceSlice';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

@@ -2,7 +2,7 @@ import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useEntityIsBookmarkedForQuickSwitch } from 'features/controlLayers/hooks/useEntityIsBookmarkedForQuickSwitch';
-import { bookmarkedEntityChanged } from 'features/controlLayers/store/canvasSlice';
+import { bookmarkedEntityChanged } from 'features/controlLayers/store/canvasInstanceSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBookmarkSimpleBold, PiBookmarkSimpleFill } from 'react-icons/pi';

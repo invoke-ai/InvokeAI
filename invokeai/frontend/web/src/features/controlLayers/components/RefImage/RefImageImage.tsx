@@ -3,7 +3,7 @@ import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { UploadImageIconButton } from 'common/hooks/useImageUploadButton';
-import { bboxSizeOptimized, bboxSizeRecalled } from 'features/controlLayers/store/canvasSlice';
+import { bboxSizeOptimized, bboxSizeRecalled } from 'features/controlLayers/store/canvasInstanceSlice';
 import { useCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { sizeOptimized, sizeRecalled } from 'features/controlLayers/store/paramsSlice';
 import type { ImageWithDims } from 'features/controlLayers/store/types';

@@ -4,7 +4,7 @@ import { useEditable } from 'common/hooks/useEditable';
 import { CanvasEntityTitle } from 'features/controlLayers/components/common/CanvasEntityTitle';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useEntityName, useEntityTypeName } from 'features/controlLayers/hooks/useEntityTitle';
-import { entityNameChanged } from 'features/controlLayers/store/canvasSlice';
+import { entityNameChanged } from 'features/controlLayers/store/canvasInstanceSlice';
 import { memo, useCallback, useRef } from 'react';
 
 export const CanvasEntityEditableTitle = memo(() => {

@@ -4,7 +4,7 @@ import {
   selectStagingAreaAutoSwitch,
   settingsStagingAreaAutoSwitchChanged,
 } from 'features/controlLayers/store/canvasSettingsSlice';
-import { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
+import { rasterLayerAdded } from 'features/controlLayers/store/canvasInstanceSlice';
 import {
   buildSelectCanvasQueueItems,
   canvasQueueItemDiscarded,

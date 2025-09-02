@@ -3,7 +3,7 @@ import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useEntityAdapterSafe } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityIsLocked } from 'features/controlLayers/hooks/useEntityIsLocked';
-import { entityReset } from 'features/controlLayers/store/canvasSlice';
+import { entityReset } from 'features/controlLayers/store/canvasInstanceSlice';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { isMaskEntityIdentifier } from 'features/controlLayers/store/types';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';

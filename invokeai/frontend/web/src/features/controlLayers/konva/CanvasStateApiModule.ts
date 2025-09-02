@@ -28,7 +28,7 @@ import {
   inpaintMaskAdded,
   rasterLayerAdded,
   rgAdded,
-} from 'features/controlLayers/store/canvasSlice';
+} from 'features/controlLayers/store/canvasInstanceSlice';
 import { selectCanvasSessionSlice } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   selectAllRenderableEntities,

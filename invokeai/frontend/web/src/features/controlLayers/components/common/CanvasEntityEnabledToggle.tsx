@@ -3,7 +3,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityIsEnabled } from 'features/controlLayers/hooks/useEntityIsEnabled';
-import { entityIsEnabledToggled } from 'features/controlLayers/store/canvasSlice';
+import { entityIsEnabledToggled } from 'features/controlLayers/store/canvasInstanceSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCircleBold, PiCircleFill } from 'react-icons/pi';

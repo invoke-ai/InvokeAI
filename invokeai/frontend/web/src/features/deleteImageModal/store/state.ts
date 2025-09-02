@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react';
 import type { AppDispatch, AppStore, RootState } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
 import { forEach, intersection, some } from 'es-toolkit/compat';
-import { entityDeleted } from 'features/controlLayers/store/canvasSlice';
+import { entityDeleted } from 'features/controlLayers/store/canvasInstanceSlice';
 import {
   refImageImageChanged,
   selectReferenceImageEntities,

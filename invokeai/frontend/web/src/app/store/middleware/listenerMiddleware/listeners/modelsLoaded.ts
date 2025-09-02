@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, AppStartListening, RootState } from 'app/store/store';
-import { controlLayerModelChanged, rgRefImageModelChanged } from 'features/controlLayers/store/canvasSlice';
+import { controlLayerModelChanged, rgRefImageModelChanged } from 'features/controlLayers/store/canvasInstanceSlice';
 import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
 import {
   clipEmbedModelSelected,

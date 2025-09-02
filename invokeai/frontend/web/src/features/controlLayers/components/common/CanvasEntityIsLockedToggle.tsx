@@ -3,7 +3,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityIsLocked } from 'features/controlLayers/hooks/useEntityIsLocked';
-import { entityIsLockedToggled } from 'features/controlLayers/store/canvasSlice';
+import { entityIsLockedToggled } from 'features/controlLayers/store/canvasInstanceSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiLockSimpleFill, PiLockSimpleOpenBold } from 'react-icons/pi';
