@@ -7,7 +7,7 @@ import type { CanvasEntityAdapterRegionalGuidance } from 'features/controlLayers
 import type { CanvasEntityAdapterFromType } from 'features/controlLayers/konva/CanvasEntity/types';
 import type { CanvasEntityIdentifier, CanvasEntityType } from 'features/controlLayers/store/types';
 import type { PropsWithChildren } from 'react';
-import { createContext, memo, useContext, useMemo, useSyncExternalStore } from 'react';
+import { createContext, memo, useCallback, useContext, useMemo, useSyncExternalStore } from 'react';
 import { assert } from 'tsafe';
 
 const EntityAdapterContext = createContext<
@@ -18,14 +18,32 @@ const EntityAdapterContext = createContext<
   | null
 >(null);
 
+// Stable fallback functions for when manager is null
+const noopSubscribe = () => () => {};
+const emptyMapSnapshot = () => new Map();
+
 export const RasterLayerAdapterGate = memo(({ children }: PropsWithChildren) => {
   const canvasManager = useCanvasManagerSafe();
   const entityIdentifier = useEntityIdentifierContext();
   
-  const adapters = useSyncExternalStore(
-    canvasManager?.adapters.rasterLayers.subscribe ?? (() => () => {}),
-    canvasManager?.adapters.rasterLayers.getSnapshot ?? (() => new Map())
+  const subscribe = useCallback(
+    (callback: () => void) => {
+      if (!canvasManager) {
+        return () => {};
+      }
+      return canvasManager.adapters.rasterLayers.subscribe(callback);
+    },
+    [canvasManager]
   );
+  
+  const getSnapshot = useCallback(() => {
+    if (!canvasManager) {
+      return new Map();
+    }
+    return canvasManager.adapters.rasterLayers.getSnapshot();
+  }, [canvasManager]);
+  
+  const adapters = useSyncExternalStore(subscribe, getSnapshot);
   
   const adapter = useMemo(() => {
     if (!canvasManager) {
@@ -47,10 +65,24 @@ export const ControlLayerAdapterGate = memo(({ children }: PropsWithChildren) =>
   const canvasManager = useCanvasManagerSafe();
   const entityIdentifier = useEntityIdentifierContext();
   
-  const adapters = useSyncExternalStore(
-    canvasManager?.adapters.controlLayers.subscribe ?? (() => () => {}),
-    canvasManager?.adapters.controlLayers.getSnapshot ?? (() => new Map())
+  const subscribe = useCallback(
+    (callback: () => void) => {
+      if (!canvasManager) {
+        return () => {};
+      }
+      return canvasManager.adapters.controlLayers.subscribe(callback);
+    },
+    [canvasManager]
   );
+  
+  const getSnapshot = useCallback(() => {
+    if (!canvasManager) {
+      return new Map();
+    }
+    return canvasManager.adapters.controlLayers.getSnapshot();
+  }, [canvasManager]);
+  
+  const adapters = useSyncExternalStore(subscribe, getSnapshot);
   
   const adapter = useMemo(() => {
     if (!canvasManager) {
@@ -72,10 +104,24 @@ export const InpaintMaskAdapterGate = memo(({ children }: PropsWithChildren) => 
   const canvasManager = useCanvasManagerSafe();
   const entityIdentifier = useEntityIdentifierContext();
   
-  const adapters = useSyncExternalStore(
-    canvasManager?.adapters.inpaintMasks.subscribe ?? (() => () => {}),
-    canvasManager?.adapters.inpaintMasks.getSnapshot ?? (() => new Map())
+  const subscribe = useCallback(
+    (callback: () => void) => {
+      if (!canvasManager) {
+        return () => {};
+      }
+      return canvasManager.adapters.inpaintMasks.subscribe(callback);
+    },
+    [canvasManager]
   );
+  
+  const getSnapshot = useCallback(() => {
+    if (!canvasManager) {
+      return new Map();
+    }
+    return canvasManager.adapters.inpaintMasks.getSnapshot();
+  }, [canvasManager]);
+  
+  const adapters = useSyncExternalStore(subscribe, getSnapshot);
   
   const adapter = useMemo(() => {
     if (!canvasManager) {
@@ -97,10 +143,24 @@ export const RegionalGuidanceAdapterGate = memo(({ children }: PropsWithChildren
   const canvasManager = useCanvasManagerSafe();
   const entityIdentifier = useEntityIdentifierContext();
   
-  const adapters = useSyncExternalStore(
-    canvasManager?.adapters.regionMasks.subscribe ?? (() => () => {}),
-    canvasManager?.adapters.regionMasks.getSnapshot ?? (() => new Map())
+  const subscribe = useCallback(
+    (callback: () => void) => {
+      if (!canvasManager) {
+        return () => {};
+      }
+      return canvasManager.adapters.regionMasks.subscribe(callback);
+    },
+    [canvasManager]
   );
+  
+  const getSnapshot = useCallback(() => {
+    if (!canvasManager) {
+      return new Map();
+    }
+    return canvasManager.adapters.regionMasks.getSnapshot();
+  }, [canvasManager]);
+  
+  const adapters = useSyncExternalStore(subscribe, getSnapshot);
   
   const adapter = useMemo(() => {
     if (!canvasManager) {
@@ -138,22 +198,79 @@ export const useEntityAdapterSafe = (
   | CanvasEntityAdapterRegionalGuidance
   | null => {
   const canvasManager = useCanvasManagerSafe();
-  const regionalGuidanceAdapters = useSyncExternalStore(
-    canvasManager?.adapters.regionMasks.subscribe ?? (() => () => {}),
-    canvasManager?.adapters.regionMasks.getSnapshot ?? (() => new Map())
+  
+  const subscribeRegion = useCallback(
+    (callback: () => void) => {
+      if (!canvasManager) {
+        return () => {};
+      }
+      return canvasManager.adapters.regionMasks.subscribe(callback);
+    },
+    [canvasManager]
   );
-  const rasterLayerAdapters = useSyncExternalStore(
-    canvasManager?.adapters.rasterLayers.subscribe ?? (() => () => {}),
-    canvasManager?.adapters.rasterLayers.getSnapshot ?? (() => new Map())
+  
+  const getSnapshotRegion = useCallback(() => {
+    if (!canvasManager) {
+      return new Map();
+    }
+    return canvasManager.adapters.regionMasks.getSnapshot();
+  }, [canvasManager]);
+  
+  const subscribeRaster = useCallback(
+    (callback: () => void) => {
+      if (!canvasManager) {
+        return () => {};
+      }
+      return canvasManager.adapters.rasterLayers.subscribe(callback);
+    },
+    [canvasManager]
   );
-  const controlLayerAdapters = useSyncExternalStore(
-    canvasManager?.adapters.controlLayers.subscribe ?? (() => () => {}),
-    canvasManager?.adapters.controlLayers.getSnapshot ?? (() => new Map())
+  
+  const getSnapshotRaster = useCallback(() => {
+    if (!canvasManager) {
+      return new Map();
+    }
+    return canvasManager.adapters.rasterLayers.getSnapshot();
+  }, [canvasManager]);
+  
+  const subscribeControl = useCallback(
+    (callback: () => void) => {
+      if (!canvasManager) {
+        return () => {};
+      }
+      return canvasManager.adapters.controlLayers.subscribe(callback);
+    },
+    [canvasManager]
   );
-  const inpaintMaskAdapters = useSyncExternalStore(
-    canvasManager?.adapters.inpaintMasks.subscribe ?? (() => () => {}),
-    canvasManager?.adapters.inpaintMasks.getSnapshot ?? (() => new Map())
+  
+  const getSnapshotControl = useCallback(() => {
+    if (!canvasManager) {
+      return new Map();
+    }
+    return canvasManager.adapters.controlLayers.getSnapshot();
+  }, [canvasManager]);
+  
+  const subscribeInpaint = useCallback(
+    (callback: () => void) => {
+      if (!canvasManager) {
+        return () => {};
+      }
+      return canvasManager.adapters.inpaintMasks.subscribe(callback);
+    },
+    [canvasManager]
   );
+  
+  const getSnapshotInpaint = useCallback(() => {
+    if (!canvasManager) {
+      return new Map();
+    }
+    return canvasManager.adapters.inpaintMasks.getSnapshot();
+  }, [canvasManager]);
+  
+  const regionalGuidanceAdapters = useSyncExternalStore(subscribeRegion, getSnapshotRegion);
+  const rasterLayerAdapters = useSyncExternalStore(subscribeRaster, getSnapshotRaster);
+  const controlLayerAdapters = useSyncExternalStore(subscribeControl, getSnapshotControl);
+  const inpaintMaskAdapters = useSyncExternalStore(subscribeInpaint, getSnapshotInpaint);
 
   const adapter = useMemo(() => {
     if (!entityIdentifier) {
@@ -191,22 +308,80 @@ export const useEntityAdapter = (
 
 export const useAllEntityAdapters = () => {
   const canvasManager = useCanvasManagerSafe();
-  const regionalGuidanceAdapters = useSyncExternalStore(
-    canvasManager?.adapters.regionMasks.subscribe ?? (() => () => {}),
-    canvasManager?.adapters.regionMasks.getSnapshot ?? (() => new Map())
+  
+  const subscribeRegion = useCallback(
+    (callback: () => void) => {
+      if (!canvasManager) {
+        return () => {};
+      }
+      return canvasManager.adapters.regionMasks.subscribe(callback);
+    },
+    [canvasManager]
   );
-  const rasterLayerAdapters = useSyncExternalStore(
-    canvasManager?.adapters.rasterLayers.subscribe ?? (() => () => {}),
-    canvasManager?.adapters.rasterLayers.getSnapshot ?? (() => new Map())
+  
+  const getSnapshotRegion = useCallback(() => {
+    if (!canvasManager) {
+      return new Map();
+    }
+    return canvasManager.adapters.regionMasks.getSnapshot();
+  }, [canvasManager]);
+  
+  const subscribeRaster = useCallback(
+    (callback: () => void) => {
+      if (!canvasManager) {
+        return () => {};
+      }
+      return canvasManager.adapters.rasterLayers.subscribe(callback);
+    },
+    [canvasManager]
   );
-  const controlLayerAdapters = useSyncExternalStore(
-    canvasManager?.adapters.controlLayers.subscribe ?? (() => () => {}),
-    canvasManager?.adapters.controlLayers.getSnapshot ?? (() => new Map())
+  
+  const getSnapshotRaster = useCallback(() => {
+    if (!canvasManager) {
+      return new Map();
+    }
+    return canvasManager.adapters.rasterLayers.getSnapshot();
+  }, [canvasManager]);
+  
+  const subscribeControl = useCallback(
+    (callback: () => void) => {
+      if (!canvasManager) {
+        return () => {};
+      }
+      return canvasManager.adapters.controlLayers.subscribe(callback);
+    },
+    [canvasManager]
   );
-  const inpaintMaskAdapters = useSyncExternalStore(
-    canvasManager?.adapters.inpaintMasks.subscribe ?? (() => () => {}),
-    canvasManager?.adapters.inpaintMasks.getSnapshot ?? (() => new Map())
+  
+  const getSnapshotControl = useCallback(() => {
+    if (!canvasManager) {
+      return new Map();
+    }
+    return canvasManager.adapters.controlLayers.getSnapshot();
+  }, [canvasManager]);
+  
+  const subscribeInpaint = useCallback(
+    (callback: () => void) => {
+      if (!canvasManager) {
+        return () => {};
+      }
+      return canvasManager.adapters.inpaintMasks.subscribe(callback);
+    },
+    [canvasManager]
   );
+  
+  const getSnapshotInpaint = useCallback(() => {
+    if (!canvasManager) {
+      return new Map();
+    }
+    return canvasManager.adapters.inpaintMasks.getSnapshot();
+  }, [canvasManager]);
+  
+  const regionalGuidanceAdapters = useSyncExternalStore(subscribeRegion, getSnapshotRegion);
+  const rasterLayerAdapters = useSyncExternalStore(subscribeRaster, getSnapshotRaster);
+  const controlLayerAdapters = useSyncExternalStore(subscribeControl, getSnapshotControl);
+  const inpaintMaskAdapters = useSyncExternalStore(subscribeInpaint, getSnapshotInpaint);
+  
   const allEntityAdapters = useMemo(() => {
     return [
       ...Array.from(rasterLayerAdapters.values()),
