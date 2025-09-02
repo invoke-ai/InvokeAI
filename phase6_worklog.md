@@ -60,6 +60,70 @@ Found **48 files** importing from `canvasSlice` that need to use `instanceAction
 ### Priority 3: Component Actions (~58 files)
 All components using useAppDispatch for canvas state updates
 
+## Progress Update - Phase 6.1 and 6.2 Core Hooks Complete ✅
+**Phase 6.1 Completed:**
+- [x] ✅ Updated undo/redo hotkeys hook  
+- [x] ✅ Updated undo/redo toolbar buttons
+- [x] ✅ Updated clear history button
+
+**Phase 6.2 Core Hooks Completed:**
+- [x] ✅ Updated `addLayerHooks.ts` - 10 hooks using context dispatch and instanceActions
+- [x] ✅ Updated `saveCanvasHooks.ts` - 9 hooks using context dispatch and instanceActions  
+- [x] ✅ Updated `useInvertMask.ts` - Mask inversion with context dispatch
+- [x] ✅ Fixed selector compatibility issues (context useSelector expects CanvasState, not RootState)
+- [x] ✅ Created atomic commits for each meaningful change
+
+**Current Status:**
+- ✅ All critical canvas drawing hooks updated
+- ✅ TypeScript errors resolved for updated hooks
+- ⚠️ ~60 components still need context migration
+- ⚠️ Null safety issues remain for components using legacy selectors
+
+**Key Learning:** 
+Context `useSelector` gets `CanvasState` directly, not `RootState`. 
+Use `useSelector((state) => state.selectedEntityIdentifier)` instead of `useSelector(selectSelectedEntityIdentifier)`.
+
+## Strategy for Remaining Component Updates:
+
+### Systematic Approach for 60+ Remaining Components:
+
+**Step 1: Identify Component Categories**
+1. **High-Priority:** Components with canvas drawing actions (entity manipulation, layer operations)
+2. **Medium-Priority:** Components that read canvas state (display, validation, UI state)
+3. **Low-Priority:** Components with settings/config changes (non-critical for core functionality)
+
+**Step 2: Update Patterns**
+
+For components inside canvas context (children of CanvasWorkspacePanel):
+```typescript
+// Old
+const dispatch = useAppDispatch();
+const canvas = useAppSelector(selectCanvasSlice);
+dispatch(rasterLayerAdded(...));
+
+// New  
+const { dispatch, useSelector } = useCanvasContext();
+const canvas = useSelector((state) => state);  // Direct canvas state access
+dispatch(instanceActions.rasterLayerAdded(...));
+```
+
+For components outside canvas context (global UI, hotkeys):
+```typescript
+// Keep useAppDispatch but use router actions for active canvas
+const dispatch = useAppDispatch();
+dispatch(canvasUndo({})); // Routes to active canvas
+```
+
+**Step 3: Selector Updates**
+- Replace `useAppSelector(selectCanvasSlice)` with context `useSelector((state) => state)`
+- Replace `useAppSelector(selectSelectedEntityIdentifier)` with `useSelector((state) => state.selectedEntityIdentifier)`
+- Add null checks for components that might not have canvas context
+
+**Step 4: Action Updates**  
+- Import `instanceActions` from `canvasInstanceSlice` instead of actions from `canvasSlice`
+- Use `dispatch(instanceActions.actionName(...))` within context
+- Actions automatically get `canvasId` injected by context dispatch
+
 ## Notes
 - Focus on components inside the canvas context (children of CanvasWorkspacePanel)
 - Components that dispatch canvas drawing actions are highest priority
