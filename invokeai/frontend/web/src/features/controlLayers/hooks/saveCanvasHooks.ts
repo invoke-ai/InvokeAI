@@ -1,20 +1,16 @@
 import { logger } from 'app/logging/logger';
-import { useAppDispatch, useAppStore } from 'app/store/storeHooks';
+import { useAppStore } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
 import { withResultAsync } from 'common/util/result';
-import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useCanvasContext } from 'features/controlLayers/contexts/CanvasInstanceContext';
 import {
   getDefaultRefImageConfig,
   getDefaultRegionalGuidanceRefImageConfig,
 } from 'features/controlLayers/hooks/addLayerHooks';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
-  controlLayerAdded,
-  entityRasterized,
-  rasterLayerAdded,
-  rgAdded,
-  rgRefImageImageChanged,
-} from 'features/controlLayers/store/canvasSlice';
+  instanceActions,
+} from 'features/controlLayers/store/canvasInstanceSlice';
 import {
   selectMainModelConfig,
   selectNegativePrompt,
@@ -57,8 +53,7 @@ type UseSaveCanvasArg = {
 const useSaveCanvas = ({ region, saveToGallery, toastOk, toastError, onSave, withMetadata }: UseSaveCanvasArg) => {
   const { t } = useTranslation();
   const store = useAppStore();
-
-  const canvasManager = useCanvasManager();
+  const { manager: canvasManager } = useCanvasContext();
 
   const saveCanvas = useCallback(async () => {
     const rect =
@@ -185,7 +180,7 @@ export const useNewRegionalReferenceImageFromBbox = () => {
         referenceImages: [ipAdapter],
       };
 
-      dispatch(rgAdded({ overrides, isSelected: true }));
+      dispatch(instanceActions.rgAdded({ overrides, isSelected: true }));
     };
 
     return {
@@ -229,14 +224,14 @@ export const useNewGlobalReferenceImageFromBbox = () => {
 
 export const useNewRasterLayerFromBbox = () => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
+  const { dispatch } = useCanvasContext();
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO, rect: Rect) => {
       const overrides: Partial<CanvasRasterLayerState> = {
         objects: [imageDTOToImageObject(imageDTO)],
         position: { x: rect.x, y: rect.y },
       };
-      dispatch(rasterLayerAdded({ overrides, isSelected: true }));
+      dispatch(instanceActions.rasterLayerAdded({ overrides, isSelected: true }));
     };
 
     return {
@@ -253,7 +248,7 @@ export const useNewRasterLayerFromBbox = () => {
 
 export const useNewControlLayerFromBbox = () => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
+  const { dispatch } = useCanvasContext();
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO, rect: Rect) => {
@@ -262,7 +257,7 @@ export const useNewControlLayerFromBbox = () => {
         controlAdapter: deepClone(initialControlNet),
         position: { x: rect.x, y: rect.y },
       };
-      dispatch(controlLayerAdded({ overrides, isSelected: true }));
+      dispatch(instanceActions.controlLayerAdded({ overrides, isSelected: true }));
     };
 
     return {
@@ -279,12 +274,12 @@ export const useNewControlLayerFromBbox = () => {
 
 export const usePullBboxIntoLayer = (entityIdentifier: CanvasEntityIdentifier<'control_layer' | 'raster_layer'>) => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
+  const { dispatch } = useCanvasContext();
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO, rect: Rect) => {
       dispatch(
-        entityRasterized({
+        instanceActions.entityRasterized({
           entityIdentifier,
           position: { x: rect.x, y: rect.y },
           imageObject: imageDTOToImageObject(imageDTO),
@@ -333,11 +328,11 @@ export const usePullBboxIntoRegionalGuidanceReferenceImage = (
   referenceImageId: string
 ) => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
+  const { dispatch } = useCanvasContext();
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO, _: Rect) => {
-      dispatch(rgRefImageImageChanged({ entityIdentifier, referenceImageId, imageDTO }));
+      dispatch(instanceActions.rgRefImageImageChanged({ entityIdentifier, referenceImageId, imageDTO }));
     };
 
     return {
