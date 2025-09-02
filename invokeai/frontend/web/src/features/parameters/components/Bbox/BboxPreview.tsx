@@ -11,7 +11,7 @@ export const BboxPreview = memo(() => {
   const [ref, dims] = useMeasure<HTMLDivElement>();
 
   const previewBoxSize = useMemo(() => {
-    if (!dims) {
+    if (!dims || bboxWidth == null || bboxHeight == null || aspectRatioValue == null) {
       return { width: 0, height: 0 };
     }
 

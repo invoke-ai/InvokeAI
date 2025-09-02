@@ -10,7 +10,7 @@ import { useIsBboxSizeLocked } from 'features/parameters/components/Bbox/use-is-
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selectScaleMethod = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.scaleMethod);
+const selectScaleMethod = createSelector(selectCanvasSlice, (canvas) => canvas ? canvas.bbox.scaleMethod : 'auto');
 
 const BboxScaleMethod = () => {
   const dispatch = useAppDispatch();

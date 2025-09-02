@@ -8,8 +8,8 @@ import { selectConfigSlice } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selectIsManual = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.scaleMethod === 'manual');
-const selectScaledHeight = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.scaledSize.height);
+const selectIsManual = createSelector(selectCanvasSlice, (canvas) => canvas ? canvas.bbox.scaleMethod === 'manual' : false);
+const selectScaledHeight = createSelector(selectCanvasSlice, (canvas) => canvas ? canvas.bbox.scaledSize.height : 512);
 const selectScaledBoundingBoxHeightConfig = createSelector(
   selectConfigSlice,
   (config) => config.sd.scaledBoundingBoxHeight

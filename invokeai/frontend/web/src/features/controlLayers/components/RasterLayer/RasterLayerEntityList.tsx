@@ -8,7 +8,7 @@ import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo } from 'react';
 
 const selectEntityIdentifiers = createMemoizedSelector(selectCanvasSlice, (canvas) => {
-  return canvas.rasterLayers.entities.map(getEntityIdentifier).toReversed();
+  return canvas ? canvas.rasterLayers.entities.map(getEntityIdentifier).toReversed() : [];
 });
 const selectIsSelected = createSelector(selectSelectedEntityIdentifier, (selectedEntityIdentifier) => {
   return selectedEntityIdentifier?.type === 'raster_layer';

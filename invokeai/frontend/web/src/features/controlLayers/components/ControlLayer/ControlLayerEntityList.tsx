@@ -8,7 +8,7 @@ import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo } from 'react';
 
 const selectEntityIdentifiers = createMemoizedSelector(selectCanvasSlice, (canvas) => {
-  return canvas.controlLayers.entities.map(getEntityIdentifier).toReversed();
+  return canvas ? canvas.controlLayers.entities.map(getEntityIdentifier).toReversed() : [];
 });
 
 const selectIsSelected = createSelector(selectSelectedEntityIdentifier, (selectedEntityIdentifier) => {

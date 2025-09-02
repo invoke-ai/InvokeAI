@@ -35,7 +35,7 @@ export const BboxHeight = memo(() => {
         <FormLabel>{t('parameters.height')}</FormLabel>
       </InformationalPopover>
       <CompositeSlider
-        value={height}
+        value={height ?? optimalDimension}
         defaultValue={optimalDimension}
         onChange={onChange}
         min={config.sliderMin}
@@ -45,7 +45,7 @@ export const BboxHeight = memo(() => {
         marks={marks}
       />
       <CompositeNumberInput
-        value={height}
+        value={height ?? optimalDimension}
         defaultValue={optimalDimension}
         onChange={onChange}
         min={config.numberInputMin}

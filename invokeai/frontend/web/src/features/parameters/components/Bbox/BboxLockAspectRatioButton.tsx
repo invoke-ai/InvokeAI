@@ -8,7 +8,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiLockSimpleFill, PiLockSimpleOpenBold } from 'react-icons/pi';
 
-const selectAspectRatioIsLocked = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.aspectRatio.isLocked);
+const selectAspectRatioIsLocked = createSelector(selectCanvasSlice, (canvas) => canvas ? canvas.bbox.aspectRatio.isLocked : false);
 
 export const BboxLockAspectRatioButton = memo(() => {
   const { t } = useTranslation();

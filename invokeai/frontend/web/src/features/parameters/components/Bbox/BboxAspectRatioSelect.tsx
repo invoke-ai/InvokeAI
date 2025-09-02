@@ -61,7 +61,7 @@ export const BboxAspectRatioSelect = memo(() => {
       <InformationalPopover feature="paramAspect">
         <FormLabel>{t('parameters.aspect')}</FormLabel>
       </InformationalPopover>
-      <Select size="sm" value={id} onChange={onChange} cursor="pointer" iconSize="0.75rem" icon={<PiCaretDownBold />}>
+      <Select size="sm" value={id ?? 'Free'} onChange={onChange} cursor="pointer" iconSize="0.75rem" icon={<PiCaretDownBold />}>
         {options.map((ratio) => (
           <option key={ratio} value={ratio}>
             {ratio}
