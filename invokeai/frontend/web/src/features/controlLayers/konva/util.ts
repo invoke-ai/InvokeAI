@@ -481,27 +481,26 @@ export function getImageDataTransparency(imageData: ImageData): Transparency {
  * @param fetchUrlFirst Whether to fetch the image's URL first, assuming the provided `src` will redirect to a different URL. This addresses an issue where CORS headers are dropped during a redirect.
  * @returns A promise that resolves with the loaded image element
  */
+function createImageLoader(url: string, crossOrigin: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const imageElement = new Image();
+    imageElement.onload = () => resolve(imageElement);
+    imageElement.onerror = (error) => reject(error);
+    imageElement.crossOrigin = crossOrigin;
+    imageElement.src = url;
+  });
+}
+
 export async function loadImage(src: string, fetchUrlFirst?: boolean): Promise<HTMLImageElement> {
   const authToken = $authToken.get();
 
   if (authToken && fetchUrlFirst) {
     const response = await fetch(`${src}`, { credentials: 'include', cache: 'no-cache' });
     const url = response.headers.get('Location') ?? src;
-    return new Promise((resolve, reject) => {
-      const imageElement = new Image();
-      imageElement.onload = () => resolve(imageElement);
-      imageElement.onerror = (error) => reject(error);
-      imageElement.crossOrigin = 'use-credentials';
-      imageElement.src = url;
-    });
+    return createImageLoader(url, 'use-credentials');
   } else {
-    return new Promise((resolve, reject) => {
-      const imageElement = new Image();
-      imageElement.onload = () => resolve(imageElement);
-      imageElement.onerror = (error) => reject(error);
-      imageElement.crossOrigin = authToken ? 'use-credentials' : 'anonymous';
-      imageElement.src = src;
-    });
+    const crossOrigin = authToken ? 'use-credentials' : 'anonymous';
+    return createImageLoader(src, crossOrigin);
   }
 }
 
