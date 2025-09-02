@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 const buildSelectWithTransparencyEffect = (entityIdentifier: CanvasEntityIdentifier<'control_layer'>) =>
   createSelector(
     selectCanvasSlice,
-    (canvas) => selectEntityOrThrow(canvas, entityIdentifier, 'ControlLayerBadgesContent').withTransparencyEffect
+    (canvas) => canvas ? selectEntityOrThrow(canvas, entityIdentifier, 'ControlLayerBadgesContent').withTransparencyEffect : false
   );
 
 const ControlLayerBadgesContent = memo(() => {

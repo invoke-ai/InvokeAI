@@ -22,7 +22,7 @@ export const RegionalGuidanceNegativePrompt = memo(() => {
     () =>
       createSelector(
         selectCanvasSlice,
-        (canvas) => selectEntityOrThrow(canvas, entityIdentifier, 'RegionalGuidanceNegativePrompt').negativePrompt ?? ''
+        (canvas) => canvas ? selectEntityOrThrow(canvas, entityIdentifier, 'RegionalGuidanceNegativePrompt').negativePrompt ?? '' : ''
       ),
     [entityIdentifier]
   );

@@ -309,5 +309,5 @@ const getMatchesType = (modelConfig: AnyModelConfig, filteredModelType: Filterab
     return false;
   }
 
-  return filteredModelType ? modelConfig.type === filteredModelType : true;
+  return filteredModelType ? modelConfig.type === filteredModelType : true
 };

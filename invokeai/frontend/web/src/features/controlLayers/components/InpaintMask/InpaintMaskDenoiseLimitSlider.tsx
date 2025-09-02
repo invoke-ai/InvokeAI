@@ -20,7 +20,7 @@ export const InpaintMaskDenoiseLimitSlider = memo(() => {
     () =>
       createSelector(
         selectCanvasSlice,
-        (canvas) => selectEntityOrThrow(canvas, entityIdentifier, 'InpaintMaskDenoiseLimitSlider').denoiseLimit
+        (canvas) => canvas ? selectEntityOrThrow(canvas, entityIdentifier, 'InpaintMaskDenoiseLimitSlider').denoiseLimit : undefined
       ),
     [entityIdentifier]
   );

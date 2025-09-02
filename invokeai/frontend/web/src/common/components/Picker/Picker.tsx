@@ -81,7 +81,7 @@ export type Group<T extends object> = {
   /**
    * A unique key used for type-checking the group. Use the `buildGroup` function to create a group, which will set this key.
    */
-  [uniqueGroupKey]: true;
+  [uniqueGroupKey]: true
 };
 
 type OptionOrGroup<T extends object> = T | Group<T>;

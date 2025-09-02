@@ -26,9 +26,13 @@ const buildSelectWarnings = (entityIdentifier: CanvasEntityIdentifier, t: TFunct
   return createSelector(selectCanvasSlice, selectMainModelConfig, (canvas, model) => {
     // This component is used within a <CanvasEntityStateGate /> so we can safely assume that the entity exists.
     // Should never throw.
-    const entity = selectEntityOrThrow(canvas, entityIdentifier, 'CanvasEntityHeaderWarnings');
+    const entity = canvas ? selectEntityOrThrow(canvas, entityIdentifier, 'CanvasEntityHeaderWarnings') : null;
 
     let warnings: string[] = [];
+
+    if (!entity) {
+      return warnings;
+    }
 
     const entityType = entity.type;
 

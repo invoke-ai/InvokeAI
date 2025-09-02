@@ -31,14 +31,14 @@ import { useClientSideUpload } from './useClientSideUpload';
 type UseImageUploadButtonArgs =
   | {
       isDisabled?: boolean;
-      allowMultiple: false;
+      allowMultiple: false
       onUpload?: (imageDTO: ImageDTO) => void;
       onUploadStarted?: (files: File) => void;
       onError?: (error: unknown) => void;
     }
   | {
       isDisabled?: boolean;
-      allowMultiple: true;
+      allowMultiple: true
       onUpload?: (imageDTOs: ImageDTO[]) => void;
       onUploadStarted?: (files: File[]) => void;
       onError?: (error: unknown) => void;

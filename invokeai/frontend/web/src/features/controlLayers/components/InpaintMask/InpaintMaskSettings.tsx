@@ -10,14 +10,14 @@ import { memo, useMemo } from 'react';
 
 const buildSelectHasDenoiseLimit = (entityIdentifier: CanvasEntityIdentifier<'inpaint_mask'>) =>
   createSelector(selectCanvasSlice, (canvas) => {
-    const entity = selectEntityOrThrow(canvas, entityIdentifier, 'InpaintMaskSettings');
-    return entity.denoiseLimit !== undefined;
+    const entity = canvas ? selectEntityOrThrow(canvas, entityIdentifier, 'InpaintMaskSettings') : null;
+    return entity ? entity.denoiseLimit !== undefined : false
   });
 
 const buildSelectHasNoiseLevel = (entityIdentifier: CanvasEntityIdentifier<'inpaint_mask'>) =>
   createSelector(selectCanvasSlice, (canvas) => {
-    const entity = selectEntityOrThrow(canvas, entityIdentifier, 'InpaintMaskSettings');
-    return entity.noiseLevel !== undefined;
+    const entity = canvas ? selectEntityOrThrow(canvas, entityIdentifier, 'InpaintMaskSettings') : null;
+    return entity ? entity.noiseLevel !== undefined : false
   });
 
 export const InpaintMaskSettings = memo(() => {

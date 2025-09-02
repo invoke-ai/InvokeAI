@@ -14,12 +14,12 @@ import { RegionalGuidancePositivePrompt } from './RegionalGuidancePositivePrompt
 
 const buildSelectFlags = (entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>) =>
   createMemoizedSelector(selectCanvasSlice, (canvas) => {
-    const entity = selectEntityOrThrow(canvas, entityIdentifier, 'RegionalGuidanceSettings');
-    return {
+    const entity = canvas ? selectEntityOrThrow(canvas, entityIdentifier, 'RegionalGuidanceSettings') : null;
+    return entity ? {
       hasPositivePrompt: entity.positivePrompt !== null,
       hasNegativePrompt: entity.negativePrompt !== null,
       hasIPAdapters: entity.referenceImages.length > 0,
-    };
+    } : { hasPositivePrompt: false, hasNegativePrompt: false, hasIPAdapters: false };
   });
 export const RegionalGuidanceSettings = memo(() => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');

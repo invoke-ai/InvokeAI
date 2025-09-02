@@ -14,7 +14,7 @@ const buildSelectWithTransparencyEffect = (entityIdentifier: CanvasEntityIdentif
   createSelector(
     selectCanvasSlice,
     (canvas) =>
-      selectEntityOrThrow(canvas, entityIdentifier, 'ControlLayerMenuItemsTransparencyEffect').withTransparencyEffect
+      canvas ? selectEntityOrThrow(canvas, entityIdentifier, 'ControlLayerMenuItemsTransparencyEffect').withTransparencyEffect : false
   );
 
 export const ControlLayerMenuItemsTransparencyEffect = memo(() => {

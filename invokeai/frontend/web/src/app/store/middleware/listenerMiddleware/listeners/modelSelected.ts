@@ -119,6 +119,9 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
 
         // All regional guidance entities are updated to use the same new model.
         const canvasState = selectCanvasSlice(state);
+        if (!canvasState) {
+          return;
+        }
         const canvasRegionalGuidanceEntities = selectAllEntitiesOfType(canvasState, 'regional_guidance');
         for (const entity of canvasRegionalGuidanceEntities) {
           for (const refImage of entity.referenceImages) {

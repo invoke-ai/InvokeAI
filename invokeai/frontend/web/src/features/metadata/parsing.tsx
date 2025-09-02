@@ -136,9 +136,9 @@ const getProperty = (obj: unknown, path: string): unknown => {
 };
 
 type UnparsedData = {
-  isParsed: false;
-  isSuccess: false;
-  isError: false;
+  isParsed: false
+  isSuccess: false
+  isError: false
   value: null;
   error: null;
 };
@@ -151,9 +151,9 @@ const buildUnparsedData = (): UnparsedData => ({
 });
 
 export type ParsedSuccessData<T> = {
-  isParsed: true;
-  isSuccess: true;
-  isError: false;
+  isParsed: true
+  isSuccess: true
+  isError: false
   value: T;
   error: null;
 };
@@ -166,9 +166,9 @@ const buildParsedSuccessData = <T,>(value: T): ParsedSuccessData<T> => ({
 });
 
 type ParsedErrorData = {
-  isParsed: true;
-  isSuccess: false;
-  isError: true;
+  isParsed: true
+  isSuccess: false
+  isError: true
   value: null;
   error: Error;
 };
@@ -187,7 +187,7 @@ type SingleMetadataValueProps<T> = {
   value: T;
 };
 export type SingleMetadataHandler<T> = {
-  [SingleMetadataKey]: true;
+  [SingleMetadataKey]: true
   type: string;
   parse: (metadata: unknown, store: AppStore) => Promise<T>;
   recall: (value: T, store: AppStore) => void;
@@ -201,7 +201,7 @@ type CollectionMetadataValueProps<T extends any[]> = {
   value: T[number];
 };
 export type CollectionMetadataHandler<T extends any[]> = {
-  [CollectionMetadataKey]: true;
+  [CollectionMetadataKey]: true
   type: string;
   parse: (metadata: unknown, store: AppStore) => Promise<T>;
   recall: (values: T, store: AppStore) => void;
@@ -216,7 +216,7 @@ type UnrecallableMetadataValueProps<T> = {
   value: T;
 };
 export type UnrecallableMetadataHandler<T> = {
-  [UnrecallableMetadataKey]: true;
+  [UnrecallableMetadataKey]: true
   type: string;
   parse: (metadata: unknown, store: AppStore) => Promise<T>;
   i18nKey: string;

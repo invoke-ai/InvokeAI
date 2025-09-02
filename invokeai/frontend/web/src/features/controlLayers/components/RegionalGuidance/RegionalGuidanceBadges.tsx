@@ -13,7 +13,7 @@ export const RegionalGuidanceBadges = memo(() => {
     () =>
       createSelector(
         selectCanvasSlice,
-        (canvas) => selectEntityOrThrow(canvas, entityIdentifier, 'RegionalGuidanceBadges').autoNegative
+        (canvas) => canvas ? selectEntityOrThrow(canvas, entityIdentifier, 'RegionalGuidanceBadges').autoNegative : false
       ),
     [entityIdentifier]
   );

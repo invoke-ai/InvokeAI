@@ -34,8 +34,8 @@ import type {
 
 const buildSelectControlAdapter = (entityIdentifier: CanvasEntityIdentifier<'control_layer'>) =>
   createSelector(selectCanvasSlice, (canvas) => {
-    const layer = selectEntityOrThrow(canvas, entityIdentifier, 'ControlLayerControlAdapter');
-    return layer.controlAdapter;
+    const layer = canvas ? selectEntityOrThrow(canvas, entityIdentifier, 'ControlLayerControlAdapter') : null;
+    return layer ? layer.controlAdapter : null;
   });
 
 export const ControlLayerControlAdapter = memo(() => {

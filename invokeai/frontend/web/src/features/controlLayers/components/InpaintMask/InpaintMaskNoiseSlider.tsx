@@ -17,7 +17,7 @@ export const InpaintMaskNoiseSlider = memo(() => {
     () =>
       createSelector(
         selectCanvasSlice,
-        (canvas) => selectEntityOrThrow(canvas, entityIdentifier, 'InpaintMaskNoiseSlider').noiseLevel
+        (canvas) => canvas ? selectEntityOrThrow(canvas, entityIdentifier, 'InpaintMaskNoiseSlider').noiseLevel : undefined
       ),
     [entityIdentifier]
   );

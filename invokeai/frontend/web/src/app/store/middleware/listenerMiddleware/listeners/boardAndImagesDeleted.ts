@@ -24,6 +24,9 @@ export const addDeleteBoardAndImagesFulfilledListener = (startAppListening: AppS
       const refImages = selectRefImagesSlice(state);
 
       deleted_images.forEach((image_name) => {
+        if (!canvas) {
+          return;
+        }
         const imageUsage = getImageUsage(nodes, canvas, upscale, refImages, image_name);
 
         if (imageUsage.isNodesImage && !wasNodeEditorReset) {

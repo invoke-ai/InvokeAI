@@ -16,7 +16,7 @@ export const RegionalGuidanceMenuItemsAutoNegative = memo(() => {
     () =>
       createSelector(
         selectCanvasSlice,
-        (canvas) => selectEntityOrThrow(canvas, entityIdentifier, 'RegionalGuidanceMenuItemsAutoNegative').autoNegative
+        (canvas) => canvas ? selectEntityOrThrow(canvas, entityIdentifier, 'RegionalGuidanceMenuItemsAutoNegative').autoNegative : false
       ),
     [entityIdentifier]
   );
