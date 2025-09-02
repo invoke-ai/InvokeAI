@@ -57,9 +57,9 @@ const itemContent: ItemContent<number, ListContext> = (index, itemId, context) =
 );
 
 const ScrollSeekPlaceholderComponent: Components<ListContext>['ScrollSeekPlaceholder'] = (props) => (
-  <ListItem aspectRatio="1/1" {...props}>
+  <Flex {...props}>
     <QueueItemPlaceholder />
-  </ListItem>
+  </Flex>
 );
 
 ScrollSeekPlaceholderComponent.displayName = 'ScrollSeekPlaceholderComponent';
