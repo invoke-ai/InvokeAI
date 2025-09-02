@@ -9,7 +9,7 @@ import { getSecondsFromTimestamps } from 'features/queue/util/getSecondsFromTime
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectShouldShowCredits } from 'features/system/store/configSlice';
 import type { MouseEvent } from 'react';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiXBold } from 'react-icons/pi';
 import { useSelector } from 'react-redux';
@@ -17,14 +17,12 @@ import type { S } from 'services/api/types';
 
 import { COLUMN_WIDTHS } from './constants';
 import QueueItemDetail from './QueueItemDetail';
-import type { ListContext } from './types';
 
 const selectedStyles = { bg: 'base.700' };
 
 type InnerItemProps = {
   index: number;
   item: S['SessionQueueItem'];
-  context: ListContext;
 };
 
 const sx: ChakraProps['sx'] = {
@@ -32,12 +30,18 @@ const sx: ChakraProps['sx'] = {
   "&[aria-selected='true']": selectedStyles,
 };
 
-const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
+const QueueItemComponent = ({ index, item }: InnerItemProps) => {
   const { t } = useTranslation();
   const isRetryEnabled = useFeatureStatus('retryQueueItem');
+  const [openQueueItems, setOpenQueueItems] = useState<number[]>([]);
   const handleToggle = useCallback(() => {
-    context.toggleQueueItem(item.item_id);
-  }, [context, item.item_id]);
+    setOpenQueueItems((prev) => {
+      if (prev.includes(item.item_id)) {
+        return prev.filter((id) => id !== item.item_id);
+      }
+      return [...prev, item.item_id];
+    });
+  }, [item]);
   const cancelQueueItem = useCancelQueueItem();
   const onClickCancelQueueItem = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
@@ -54,7 +58,7 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
     },
     [item.item_id, retryQueueItem]
   );
-  const isOpen = useMemo(() => context.openQueueItems.includes(item.item_id), [context.openQueueItems, item.item_id]);
+  const isOpen = useMemo(() => openQueueItems.includes(item.item_id), [openQueueItems, item.item_id]);
 
   const executionTime = useMemo(() => {
     if (!item.completed_at || !item.started_at) {
