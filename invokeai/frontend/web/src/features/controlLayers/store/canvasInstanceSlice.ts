@@ -5,8 +5,6 @@ import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
 import { merge } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { canvasReset } from 'features/controlLayers/store/actions';
-import { modelChanged } from 'features/controlLayers/store/paramsSlice';
 import {
   selectAllEntities,
   selectAllEntitiesOfType,
@@ -30,11 +28,10 @@ import {
   getScaledBoundingBoxDimensions,
 } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { simplifyFlatNumbersArray } from 'features/controlLayers/util/simplify';
-import { isMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
-import { API_BASE_MODELS } from 'features/parameters/types/constants';
-import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
+import { zModelIdentifierField } from 'features/nodes/types/common';
+import { getGridSize, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
-import undoable, { type UndoableOptions } from 'redux-undo';
+import undoable, type { UndoableOptions } from 'redux-undo';
 import {
   type ControlLoRAModelConfig,
   type ControlNetModelConfig,
@@ -68,18 +65,10 @@ import type {
 } from './types';
 import {
   ASPECT_RATIO_MAP,
-  CHATGPT_ASPECT_RATIOS,
   DEFAULT_ASPECT_RATIO_CONFIG,
-  FLUX_KONTEXT_ASPECT_RATIOS,
-  GEMINI_2_5_ASPECT_RATIOS,
   getEntityIdentifier,
   getInitialCanvasState,
-  IMAGEN_ASPECT_RATIOS,
-  isChatGPT4oAspectRatioID,
-  isFluxKontextAspectRatioID,
   isFLUXReduxConfig,
-  isGemini2_5AspectRatioID,
-  isImagenAspectRatioID,
   isIPAdapterConfig,
 } from './types';
 import {
@@ -1129,33 +1118,6 @@ const canvasInstanceSlice = createSlice({
       state.bbox.aspectRatio.id = id;
       if (id === 'Free') {
         state.bbox.aspectRatio.isLocked = false;
-      } else if (
-        (state.bbox.modelBase === 'imagen3' || state.bbox.modelBase === 'imagen4') &&
-        isImagenAspectRatioID(id)
-      ) {
-        const { width, height } = IMAGEN_ASPECT_RATIOS[id];
-        state.bbox.rect.width = width;
-        state.bbox.rect.height = height;
-        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
-        state.bbox.aspectRatio.isLocked = true;
-      } else if (state.bbox.modelBase === 'chatgpt-4o' && isChatGPT4oAspectRatioID(id)) {
-        const { width, height } = CHATGPT_ASPECT_RATIOS[id];
-        state.bbox.rect.width = width;
-        state.bbox.rect.height = height;
-        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
-        state.bbox.aspectRatio.isLocked = true;
-      } else if (state.bbox.modelBase === 'gemini-2.5' && isGemini2_5AspectRatioID(id)) {
-        const { width, height } = GEMINI_2_5_ASPECT_RATIOS[id];
-        state.bbox.rect.width = width;
-        state.bbox.rect.height = height;
-        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
-        state.bbox.aspectRatio.isLocked = true;
-      } else if (state.bbox.modelBase === 'flux-kontext' && isFluxKontextAspectRatioID(id)) {
-        const { width, height } = FLUX_KONTEXT_ASPECT_RATIOS[id];
-        state.bbox.rect.width = width;
-        state.bbox.rect.height = height;
-        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
-        state.bbox.aspectRatio.isLocked = true;
       } else {
         state.bbox.aspectRatio.isLocked = true;
         state.bbox.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
@@ -1211,16 +1173,15 @@ const canvasInstanceSlice = createSlice({
     bboxSyncedToOptimalDimension: (state) => {
       const optimalDimension = getOptimalDimension(state.bbox.modelBase);
 
-      if (!getIsSizeOptimal(state.bbox.rect.width, state.bbox.rect.height, state.bbox.modelBase)) {
-        const bboxDims = calculateNewSize(
-          state.bbox.aspectRatio.value,
-          optimalDimension * optimalDimension,
-          state.bbox.modelBase
-        );
-        state.bbox.rect.width = bboxDims.width;
-        state.bbox.rect.height = bboxDims.height;
-        syncScaledSize(state);
-      }
+      // Calculate new dimensions if current size is not optimal
+      const bboxDims = calculateNewSize(
+        state.bbox.aspectRatio.value,
+        optimalDimension * optimalDimension,
+        state.bbox.modelBase
+      );
+      state.bbox.rect.width = bboxDims.width;
+      state.bbox.rect.height = bboxDims.height;
+      syncScaledSize(state);
     },
     //#region Shared entity
     entitySelected: (state, action: PayloadAction<EntityIdentifierPayload>) => {
@@ -1571,77 +1532,10 @@ const canvasInstanceSlice = createSlice({
       state.regionalGuidance.entities = regionalGuidance;
       return state;
     },
-    canvasUndo: () => {},
-    canvasRedo: () => {},
-    canvasClearHistory: () => {},
-  },
-  extraReducers(builder) {
-    builder.addCase(canvasReset, (state) => {
-      return resetState(state);
-    });
-    builder.addCase(modelChanged, (state, action) => {
-      const { model } = action.payload;
-      /**
-       * Because the bbox depends in part on the model, it needs to be in sync with the model. However, due to
-       * complications with managing undo/redo history, we need to store the model in a separate slice from the canvas
-       * state.
-       *
-       * Unfortunately, this means we need to manually sync the model with the canvas state. We only care about the
-       * model base, so we only need to update the bbox's modelBase field.
-       *
-       * When we do this, we also want to update the bbox's dimensions - but only if we are not staging images on the
-       * canvas, during which time the bbox must stay the same.
-       *
-       * Unfortunately (again), the staging state is in a different slice, to prevent issues with undo/redo history.
-       *
-       * There's some fanagling we must do to handle this correctly:
-       * - Store the model base in this slice, so that we can access it when the user changes the bbox dimensions.
-       * - Avoid updating the bbox dimensions when we are staging - only update the model base.
-       * - Provide a separate action that will update the bbox dimensions and be careful to not dispatch it when staging.
-       */
-      const base = model?.base;
-      if (isMainModelBase(base) && state.bbox.modelBase !== base) {
-        state.bbox.modelBase = base;
-        if (API_BASE_MODELS.includes(base)) {
-          state.bbox.aspectRatio.isLocked = true;
-          state.bbox.aspectRatio.value = 1;
-          state.bbox.aspectRatio.id = '1:1';
-          state.bbox.rect.width = 1024;
-          state.bbox.rect.height = 1024;
-        }
-
-        syncScaledSize(state);
-      }
-    });
   },
 });
 
-const resetState = (state: CanvasState) => {
-  const newState = getInitialCanvasState();
-
-  // We need to retain the optimal dimension across resets, as it is changed only when the model changes. Copy it
-  // from the old state, then recalculate the bbox size & scaled size.
-  newState.bbox.modelBase = state.bbox.modelBase;
-  const optimalDimension = getOptimalDimension(newState.bbox.modelBase);
-  const rect = calculateNewSize(
-    newState.bbox.aspectRatio.value,
-    optimalDimension * optimalDimension,
-    newState.bbox.modelBase
-  );
-  newState.bbox.rect.width = rect.width;
-  newState.bbox.rect.height = rect.height;
-  syncScaledSize(newState);
-
-  return newState;
-};
-
-export const instanceActions = canvasInstanceSlice.actions;
-
 const syncScaledSize = (state: CanvasState) => {
-  if (API_BASE_MODELS.includes(state.bbox.modelBase)) {
-    // Imagen3 has fixed sizes. Scaled bbox is not supported.
-    return;
-  }
   if (state.bbox.scaleMethod === 'auto') {
     // Sync both aspect ratio and size
     const { width, height } = state.bbox.rect;
@@ -1656,12 +1550,24 @@ const syncScaledSize = (state: CanvasState) => {
   }
 };
 
-let filter = true;
+const reorderEntities = <T extends CanvasEntityType>(
+  entities: CanvasEntityStateFromType<T>[],
+  sortedEntityIdentifiers: CanvasEntityIdentifier<T>[]
+) => {
+  const sortedEntities: CanvasEntityStateFromType<T>[] = [];
+  for (const { id } of sortedEntityIdentifiers.toReversed()) {
+    const entity = entities.find((entity) => entity.id === id);
+    if (entity) {
+      sortedEntities.push(entity);
+    }
+  }
+  return sortedEntities;
+};
 
 const doNotGroupMatcher = isAnyOf(
-  instanceActions.entityBrushLineAdded,
-  instanceActions.entityEraserLineAdded,
-  instanceActions.entityRectAdded
+  canvasInstanceSlice.actions.entityBrushLineAdded,
+  canvasInstanceSlice.actions.entityEraserLineAdded,
+  canvasInstanceSlice.actions.entityRectAdded
 );
 
 // Store rapid actions of the same type at most once every x time.
@@ -1688,18 +1594,15 @@ function actionsThrottlingFilter(action: UnknownAction) {
   return true;
 }
 
-const canvasInstanceUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
+const undoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
   limit: 64,
-  undoType: instanceActions.canvasUndo.type,
-  redoType: instanceActions.canvasRedo.type,
-  clearHistoryType: instanceActions.canvasClearHistory.type,
   filter: (action, _state, _history) => {
     // Ignore all actions from other slices
     if (!action.type.startsWith(canvasInstanceSlice.name)) {
       return false;
     }
     // Throttle rapid actions of the same type
-    filter = actionsThrottlingFilter(action);
+    const filter = actionsThrottlingFilter(action);
     return filter;
   },
   // This is pretty spammy, leave commented out unless you need it
@@ -1707,18 +1610,5 @@ const canvasInstanceUndoableConfig: UndoableOptions<CanvasState, UnknownAction> 
 };
 
 // Export the undoable reducer for a single instance
-export const undoableCanvasInstanceReducer = undoable(canvasInstanceSlice.reducer, canvasInstanceUndoableConfig);
-
-const reorderEntities = <T extends CanvasEntityType>(
-  entities: CanvasEntityStateFromType<T>[],
-  sortedEntityIdentifiers: CanvasEntityIdentifier<T>[]
-) => {
-  const sortedEntities: CanvasEntityStateFromType<T>[] = [];
-  for (const { id } of sortedEntityIdentifiers.toReversed()) {
-    const entity = entities.find((entity) => entity.id === id);
-    if (entity) {
-      sortedEntities.push(entity);
-    }
-  }
-  return sortedEntities;
-};
+export const undoableCanvasInstanceReducer = undoable(canvasInstanceSlice.reducer, undoableConfig);
+export const instanceActions = canvasInstanceSlice.actions;
