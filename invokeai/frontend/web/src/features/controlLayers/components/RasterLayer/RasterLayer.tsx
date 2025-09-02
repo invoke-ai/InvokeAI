@@ -7,7 +7,7 @@ import { CanvasEntityEditableTitle } from 'features/controlLayers/components/com
 import { CanvasEntityStateGate } from 'features/controlLayers/contexts/CanvasEntityStateGate';
 import { RasterLayerAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import type { ReplaceCanvasEntityObjectsWithImageDndTargetData } from 'features/dnd/dnd';
 import { replaceCanvasEntityObjectsWithImageDndTarget } from 'features/dnd/dnd';
@@ -21,7 +21,7 @@ type Props = {
 
 export const RasterLayer = memo(({ id }: Props) => {
   const { t } = useTranslation();
-  const isBusy = useCanvasIsBusy();
+  const isBusy = useCanvasIsBusySafe();
   const entityIdentifier = useMemo<CanvasEntityIdentifier<'raster_layer'>>(() => ({ id, type: 'raster_layer' }), [id]);
   const dndTargetData = useMemo<ReplaceCanvasEntityObjectsWithImageDndTargetData>(
     () => replaceCanvasEntityObjectsWithImageDndTarget.getData({ entityIdentifier }, entityIdentifier.id),

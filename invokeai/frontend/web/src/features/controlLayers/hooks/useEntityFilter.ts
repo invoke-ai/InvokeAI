@@ -1,4 +1,4 @@
-import { useCanvasManager } from 'features/controlLayers/hooks/useCanvasManager';
+import { useCanvasManagerSafe } from 'features/controlLayers/hooks/useCanvasManager';
 import { useEntityAdapterSafe } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityIsEmpty } from 'features/controlLayers/hooks/useEntityIsEmpty';
@@ -8,7 +8,7 @@ import { isFilterableEntityIdentifier } from 'features/controlLayers/store/types
 import { useCallback, useMemo } from 'react';
 
 export const useEntityFilter = (entityIdentifier: CanvasEntityIdentifier | null) => {
-  const canvasManager = useCanvasManager();
+  const canvasManager = useCanvasManagerSafe();
   const adapter = useEntityAdapterSafe(entityIdentifier);
   const isBusy = useCanvasIsBusy();
   const isLocked = useEntityIsLocked(entityIdentifier);
@@ -44,6 +44,9 @@ export const useEntityFilter = (entityIdentifier: CanvasEntityIdentifier | null)
       return;
     }
     if (!isFilterableEntityIdentifier(entityIdentifier)) {
+      return;
+    }
+    if (!canvasManager) {
       return;
     }
     const adapter = canvasManager.getAdapter(entityIdentifier);

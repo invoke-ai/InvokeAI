@@ -1,4 +1,4 @@
-import { useCanvasManager } from 'features/controlLayers/hooks/useCanvasManager';
+import { useCanvasManagerSafe } from 'features/controlLayers/hooks/useCanvasManager';
 import { useEntityAdapterSafe } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityIsEmpty } from 'features/controlLayers/hooks/useEntityIsEmpty';
@@ -8,7 +8,7 @@ import { isTransformableEntityIdentifier } from 'features/controlLayers/store/ty
 import { useCallback, useMemo } from 'react';
 
 export const useEntityTransform = (entityIdentifier: CanvasEntityIdentifier | null) => {
-  const canvasManager = useCanvasManager();
+  const canvasManager = useCanvasManagerSafe();
   const adapter = useEntityAdapterSafe(entityIdentifier);
   const isBusy = useCanvasIsBusy();
   const isLocked = useEntityIsLocked(entityIdentifier);
@@ -46,6 +46,9 @@ export const useEntityTransform = (entityIdentifier: CanvasEntityIdentifier | nu
     if (!isTransformableEntityIdentifier(entityIdentifier)) {
       return;
     }
+    if (!canvasManager) {
+      return;
+    }
     const adapter = canvasManager.getAdapter(entityIdentifier);
     if (!adapter) {
       return;
@@ -61,6 +64,9 @@ export const useEntityTransform = (entityIdentifier: CanvasEntityIdentifier | nu
       return;
     }
     if (!isTransformableEntityIdentifier(entityIdentifier)) {
+      return;
+    }
+    if (!canvasManager) {
       return;
     }
     const adapter = canvasManager.getAdapter(entityIdentifier);

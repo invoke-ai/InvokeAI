@@ -1,6 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { useCanvasManager } from 'features/controlLayers/hooks/useCanvasManager';
-import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { useCanvasManagerSafe } from 'features/controlLayers/hooks/useCanvasManager';
+import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useVisibleEntityCountByType } from 'features/controlLayers/hooks/useVisibleEntityCountByType';
 import type { CanvasEntityType } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
@@ -13,12 +13,14 @@ type Props = {
 
 export const CanvasEntityMergeVisibleButton = memo(({ type }: Props) => {
   const { t } = useTranslation();
-  const canvasManager = useCanvasManager();
-  const isBusy = useCanvasIsBusy();
+  const canvasManager = useCanvasManagerSafe();
+  const isBusy = useCanvasIsBusySafe();
   const entityCount = useVisibleEntityCountByType(type);
   const mergeVisible = useCallback(() => {
-    canvasManager.compositor.mergeVisibleOfType(type);
-  }, [canvasManager.compositor, type]);
+    if (canvasManager) {
+      canvasManager.compositor.mergeVisibleOfType(type);
+    }
+  }, [canvasManager, type]);
 
   return (
     <IconButton
@@ -29,7 +31,7 @@ export const CanvasEntityMergeVisibleButton = memo(({ type }: Props) => {
       icon={<PiStackBold />}
       onClick={mergeVisible}
       alignSelf="stretch"
-      isDisabled={entityCount <= 1 || isBusy}
+      isDisabled={entityCount <= 1 || isBusy || !canvasManager}
     />
   );
 });

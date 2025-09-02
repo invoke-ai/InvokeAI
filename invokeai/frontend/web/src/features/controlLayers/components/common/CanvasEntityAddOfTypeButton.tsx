@@ -6,7 +6,7 @@ import {
   useAddRasterLayer,
   useAddRegionalGuidance,
 } from 'features/controlLayers/hooks/addLayerHooks';
-import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,7 +17,7 @@ type Props = {
 
 export const CanvasEntityAddOfTypeButton = memo(({ type }: Props) => {
   const { t } = useTranslation();
-  const isBusy = useCanvasIsBusy();
+  const isBusy = useCanvasIsBusySafe();
   const addInpaintMask = useAddInpaintMask();
   const addRegionalGuidance = useAddRegionalGuidance();
   const addRasterLayer = useAddRasterLayer();

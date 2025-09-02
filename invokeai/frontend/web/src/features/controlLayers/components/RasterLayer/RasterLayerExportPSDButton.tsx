@@ -1,5 +1,5 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useExportCanvasToPSD } from 'features/controlLayers/hooks/useExportCanvasToPSD';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -7,7 +7,7 @@ import { PiFileArrowDownBold } from 'react-icons/pi';
 
 export const RasterLayerExportPSDButton = memo(() => {
   const { t } = useTranslation();
-  const isBusy = useCanvasIsBusy();
+  const isBusy = useCanvasIsBusySafe();
   const { exportCanvasToPSD } = useExportCanvasToPSD();
 
   const onClick = useCallback(() => {

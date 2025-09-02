@@ -1,7 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useEntityAdapterSafe } from 'features/controlLayers/contexts/EntityAdapterContext';
-import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useSaveLayerToAssets } from 'features/controlLayers/hooks/useSaveLayerToAssets';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { isSaveableEntityIdentifier } from 'features/controlLayers/store/types';
@@ -11,7 +11,7 @@ import { PiFloppyDiskBold } from 'react-icons/pi';
 
 export const EntityListSelectedEntityActionBarSaveToAssetsButton = memo(() => {
   const { t } = useTranslation();
-  const isBusy = useCanvasIsBusy();
+  const isBusy = useCanvasIsBusySafe();
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const adapter = useEntityAdapterSafe(selectedEntityIdentifier);
   const saveLayerToAssets = useSaveLayerToAssets();

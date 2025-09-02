@@ -1,4 +1,4 @@
-import { useCanvasManager } from 'features/controlLayers/hooks/useCanvasManager';
+import { useCanvasManagerSafe } from 'features/controlLayers/hooks/useCanvasManager';
 import { useEntityAdapterSafe } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityIsEmpty } from 'features/controlLayers/hooks/useEntityIsEmpty';
@@ -8,7 +8,7 @@ import { isSegmentableEntityIdentifier } from 'features/controlLayers/store/type
 import { useCallback, useMemo } from 'react';
 
 export const useEntitySegmentAnything = (entityIdentifier: CanvasEntityIdentifier | null) => {
-  const canvasManager = useCanvasManager();
+  const canvasManager = useCanvasManagerSafe();
   const adapter = useEntityAdapterSafe(entityIdentifier);
   const isBusy = useCanvasIsBusy();
   const isLocked = useEntityIsLocked(entityIdentifier);
@@ -44,6 +44,9 @@ export const useEntitySegmentAnything = (entityIdentifier: CanvasEntityIdentifie
       return;
     }
     if (!isSegmentableEntityIdentifier(entityIdentifier)) {
+      return;
+    }
+    if (!canvasManager) {
       return;
     }
     const adapter = canvasManager.getAdapter(entityIdentifier);

@@ -1,4 +1,4 @@
-import { useCanvasManager } from 'features/controlLayers/hooks/useCanvasManager';
+import { useCanvasManagerSafe } from 'features/controlLayers/hooks/useCanvasManager';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterControlLayer';
 import type { CanvasEntityAdapterInpaintMask } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterInpaintMask';
@@ -19,15 +19,20 @@ const EntityAdapterContext = createContext<
 >(null);
 
 export const RasterLayerAdapterGate = memo(({ children }: PropsWithChildren) => {
-  const canvasManager = useCanvasManager();
+  const canvasManager = useCanvasManagerSafe();
   const entityIdentifier = useEntityIdentifierContext();
+  
   const adapters = useSyncExternalStore(
-    canvasManager.adapters.rasterLayers.subscribe,
-    canvasManager.adapters.rasterLayers.getSnapshot
+    canvasManager?.adapters.rasterLayers.subscribe ?? (() => () => {}),
+    canvasManager?.adapters.rasterLayers.getSnapshot ?? (() => new Map())
   );
+  
   const adapter = useMemo(() => {
+    if (!canvasManager) {
+      return null;
+    }
     return adapters.get(entityIdentifier.id) ?? null;
-  }, [adapters, entityIdentifier.id]);
+  }, [adapters, entityIdentifier.id, canvasManager]);
 
   if (!adapter) {
     return null;
@@ -39,15 +44,20 @@ export const RasterLayerAdapterGate = memo(({ children }: PropsWithChildren) => 
 RasterLayerAdapterGate.displayName = 'RasterLayerAdapterGate';
 
 export const ControlLayerAdapterGate = memo(({ children }: PropsWithChildren) => {
-  const canvasManager = useCanvasManager();
+  const canvasManager = useCanvasManagerSafe();
   const entityIdentifier = useEntityIdentifierContext();
+  
   const adapters = useSyncExternalStore(
-    canvasManager.adapters.controlLayers.subscribe,
-    canvasManager.adapters.controlLayers.getSnapshot
+    canvasManager?.adapters.controlLayers.subscribe ?? (() => () => {}),
+    canvasManager?.adapters.controlLayers.getSnapshot ?? (() => new Map())
   );
+  
   const adapter = useMemo(() => {
+    if (!canvasManager) {
+      return null;
+    }
     return adapters.get(entityIdentifier.id) ?? null;
-  }, [adapters, entityIdentifier.id]);
+  }, [adapters, entityIdentifier.id, canvasManager]);
 
   if (!adapter) {
     return null;
@@ -59,15 +69,20 @@ export const ControlLayerAdapterGate = memo(({ children }: PropsWithChildren) =>
 ControlLayerAdapterGate.displayName = 'ControlLayerAdapterGate';
 
 export const InpaintMaskAdapterGate = memo(({ children }: PropsWithChildren) => {
-  const canvasManager = useCanvasManager();
+  const canvasManager = useCanvasManagerSafe();
   const entityIdentifier = useEntityIdentifierContext();
+  
   const adapters = useSyncExternalStore(
-    canvasManager.adapters.inpaintMasks.subscribe,
-    canvasManager.adapters.inpaintMasks.getSnapshot
+    canvasManager?.adapters.inpaintMasks.subscribe ?? (() => () => {}),
+    canvasManager?.adapters.inpaintMasks.getSnapshot ?? (() => new Map())
   );
+  
   const adapter = useMemo(() => {
+    if (!canvasManager) {
+      return null;
+    }
     return adapters.get(entityIdentifier.id) ?? null;
-  }, [adapters, entityIdentifier.id]);
+  }, [adapters, entityIdentifier.id, canvasManager]);
 
   if (!adapter) {
     return null;
@@ -79,15 +94,20 @@ export const InpaintMaskAdapterGate = memo(({ children }: PropsWithChildren) => 
 InpaintMaskAdapterGate.displayName = 'InpaintMaskAdapterGate';
 
 export const RegionalGuidanceAdapterGate = memo(({ children }: PropsWithChildren) => {
-  const canvasManager = useCanvasManager();
+  const canvasManager = useCanvasManagerSafe();
   const entityIdentifier = useEntityIdentifierContext();
+  
   const adapters = useSyncExternalStore(
-    canvasManager.adapters.regionMasks.subscribe,
-    canvasManager.adapters.regionMasks.getSnapshot
+    canvasManager?.adapters.regionMasks.subscribe ?? (() => () => {}),
+    canvasManager?.adapters.regionMasks.getSnapshot ?? (() => new Map())
   );
+  
   const adapter = useMemo(() => {
+    if (!canvasManager) {
+      return null;
+    }
     return adapters.get(entityIdentifier.id) ?? null;
-  }, [adapters, entityIdentifier.id]);
+  }, [adapters, entityIdentifier.id, canvasManager]);
 
   if (!adapter) {
     return null;
@@ -117,22 +137,22 @@ export const useEntityAdapterSafe = (
   | CanvasEntityAdapterInpaintMask
   | CanvasEntityAdapterRegionalGuidance
   | null => {
-  const canvasManager = useCanvasManager();
+  const canvasManager = useCanvasManagerSafe();
   const regionalGuidanceAdapters = useSyncExternalStore(
-    canvasManager.adapters.regionMasks.subscribe,
-    canvasManager.adapters.regionMasks.getSnapshot
+    canvasManager?.adapters.regionMasks.subscribe ?? (() => () => {}),
+    canvasManager?.adapters.regionMasks.getSnapshot ?? (() => new Map())
   );
   const rasterLayerAdapters = useSyncExternalStore(
-    canvasManager.adapters.rasterLayers.subscribe,
-    canvasManager.adapters.rasterLayers.getSnapshot
+    canvasManager?.adapters.rasterLayers.subscribe ?? (() => () => {}),
+    canvasManager?.adapters.rasterLayers.getSnapshot ?? (() => new Map())
   );
   const controlLayerAdapters = useSyncExternalStore(
-    canvasManager.adapters.controlLayers.subscribe,
-    canvasManager.adapters.controlLayers.getSnapshot
+    canvasManager?.adapters.controlLayers.subscribe ?? (() => () => {}),
+    canvasManager?.adapters.controlLayers.getSnapshot ?? (() => new Map())
   );
   const inpaintMaskAdapters = useSyncExternalStore(
-    canvasManager.adapters.inpaintMasks.subscribe,
-    canvasManager.adapters.inpaintMasks.getSnapshot
+    canvasManager?.adapters.inpaintMasks.subscribe ?? (() => () => {}),
+    canvasManager?.adapters.inpaintMasks.getSnapshot ?? (() => new Map())
   );
 
   const adapter = useMemo(() => {
@@ -170,22 +190,22 @@ export const useEntityAdapter = (
 };
 
 export const useAllEntityAdapters = () => {
-  const canvasManager = useCanvasManager();
+  const canvasManager = useCanvasManagerSafe();
   const regionalGuidanceAdapters = useSyncExternalStore(
-    canvasManager.adapters.regionMasks.subscribe,
-    canvasManager.adapters.regionMasks.getSnapshot
+    canvasManager?.adapters.regionMasks.subscribe ?? (() => () => {}),
+    canvasManager?.adapters.regionMasks.getSnapshot ?? (() => new Map())
   );
   const rasterLayerAdapters = useSyncExternalStore(
-    canvasManager.adapters.rasterLayers.subscribe,
-    canvasManager.adapters.rasterLayers.getSnapshot
+    canvasManager?.adapters.rasterLayers.subscribe ?? (() => () => {}),
+    canvasManager?.adapters.rasterLayers.getSnapshot ?? (() => new Map())
   );
   const controlLayerAdapters = useSyncExternalStore(
-    canvasManager.adapters.controlLayers.subscribe,
-    canvasManager.adapters.controlLayers.getSnapshot
+    canvasManager?.adapters.controlLayers.subscribe ?? (() => () => {}),
+    canvasManager?.adapters.controlLayers.getSnapshot ?? (() => new Map())
   );
   const inpaintMaskAdapters = useSyncExternalStore(
-    canvasManager.adapters.inpaintMasks.subscribe,
-    canvasManager.adapters.inpaintMasks.getSnapshot
+    canvasManager?.adapters.inpaintMasks.subscribe ?? (() => () => {}),
+    canvasManager?.adapters.inpaintMasks.getSnapshot ?? (() => new Map())
   );
   const allEntityAdapters = useMemo(() => {
     return [

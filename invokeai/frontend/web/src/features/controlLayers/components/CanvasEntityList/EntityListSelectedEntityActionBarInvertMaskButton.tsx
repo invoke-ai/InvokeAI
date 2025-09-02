@@ -1,6 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useInvertMask } from 'features/controlLayers/hooks/useInvertMask';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { isInpaintMaskEntityIdentifier } from 'features/controlLayers/store/types';
@@ -11,7 +11,7 @@ import { PiSelectionInverseBold } from 'react-icons/pi';
 export const EntityListSelectedEntityActionBarInvertMaskButton = memo(() => {
   const { t } = useTranslation();
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
-  const isBusy = useCanvasIsBusy();
+  const isBusy = useCanvasIsBusySafe();
   const invertMask = useInvertMask();
 
   if (!selectedEntityIdentifier) {
