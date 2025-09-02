@@ -10,8 +10,8 @@ import {
 } from 'features/controlLayers/store/canvasInstanceSlice';
 import { selectBase, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import {
+  selectActiveCanvas,
   selectEntity,
-  selectSelectedEntityIdentifier,
 } from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityIdentifier,
@@ -144,7 +144,7 @@ export const getDefaultRegionalGuidanceRefImageConfig = (getState: AppGetState):
 
 export const useAddControlLayer = () => {
   const { dispatch, useSelector } = useCanvasContext();
-  const selectedEntityIdentifier = useSelector(selectSelectedEntityIdentifier);
+  const selectedEntityIdentifier = useSelector((state) => state.selectedEntityIdentifier);
   const selectedControlLayer =
     selectedEntityIdentifier?.type === 'control_layer' ? selectedEntityIdentifier.id : undefined;
   const func = useCallback(() => {
@@ -157,7 +157,7 @@ export const useAddControlLayer = () => {
 
 export const useAddRasterLayer = () => {
   const { dispatch, useSelector } = useCanvasContext();
-  const selectedEntityIdentifier = useSelector(selectSelectedEntityIdentifier);
+  const selectedEntityIdentifier = useSelector((state) => state.selectedEntityIdentifier);
   const selectedRasterLayer =
     selectedEntityIdentifier?.type === 'raster_layer' ? selectedEntityIdentifier.id : undefined;
   const func = useCallback(() => {
@@ -169,7 +169,7 @@ export const useAddRasterLayer = () => {
 
 export const useAddInpaintMask = () => {
   const { dispatch, useSelector } = useCanvasContext();
-  const selectedEntityIdentifier = useSelector(selectSelectedEntityIdentifier);
+  const selectedEntityIdentifier = useSelector((state) => state.selectedEntityIdentifier);
   const selectedInpaintMask =
     selectedEntityIdentifier?.type === 'inpaint_mask' ? selectedEntityIdentifier.id : undefined;
   const func = useCallback(() => {
@@ -181,7 +181,7 @@ export const useAddInpaintMask = () => {
 
 export const useAddRegionalGuidance = () => {
   const { dispatch, useSelector } = useCanvasContext();
-  const selectedEntityIdentifier = useSelector(selectSelectedEntityIdentifier);
+  const selectedEntityIdentifier = useSelector((state) => state.selectedEntityIdentifier);
   const selectedRegionalGuidance =
     selectedEntityIdentifier?.type === 'regional_guidance' ? selectedEntityIdentifier.id : undefined;
   const func = useCallback(() => {
@@ -262,7 +262,13 @@ export const useAddInpaintMaskDenoiseLimit = (entityIdentifier: CanvasEntityIden
 export const buildSelectValidRegionalGuidanceActions = (
   entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>
 ) => {
-  return createMemoizedSelector(selectCanvasSlice, (canvas) => {
+  return createMemoizedSelector(selectActiveCanvas, (canvas) => {
+    if (!canvas) {
+      return {
+        canAddPositivePrompt: false,
+        canAddNegativePrompt: false,
+      };
+    }
     const entity = selectEntity(canvas, entityIdentifier);
     return {
       canAddPositivePrompt: entity?.positivePrompt === null,
