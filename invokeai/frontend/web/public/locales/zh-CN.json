@@ -310,10 +310,6 @@
                 "title": "移动工具",
                 "desc": "选择移动工具。"
             },
-            "setFillToWhite": {
-                "title": "将颜色设置为白色",
-                "desc": "将当前工具的颜色设置为白色。"
-            },
             "cancelTransform": {
                 "desc": "取消待处理的变换。",
                 "title": "取消变换"

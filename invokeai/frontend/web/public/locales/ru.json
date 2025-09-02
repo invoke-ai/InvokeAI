@@ -285,10 +285,6 @@
                 "title": "Next Layer",
                 "desc": "Select the next layer in the list."
             },
-            "setFillToWhite": {
-                "title": "Set Color to White",
-                "desc": "Set the current tool color to white."
-            },
             "applyFilter": {
                 "title": "Apply Filter",
                 "desc": "Apply the pending filter to the selected layer."

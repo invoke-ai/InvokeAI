@@ -901,10 +901,6 @@
                 "desc": "Définit le zoom de la toile à 400 %.",
                 "title": "Zoomer à 400 %"
             },
-            "setFillToWhite": {
-                "title": "Définir la couleur sur blanc",
-                "desc": "Définir la couleur de l'outil actuel sur blanc."
-            },
             "transformSelected": {
                 "title": "Transformer",
                 "desc": "Transforme la couche sélectionnée."

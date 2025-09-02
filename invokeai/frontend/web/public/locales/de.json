@@ -210,10 +210,6 @@
                 "title": "Bbox Werkzeug",
                 "desc": "Bbox Werkzeug auswählen."
             },
-            "setFillToWhite": {
-                "title": "Farbe auf Weiß einstellen",
-                "desc": "Setzt die aktuelle Werkzeugfarbe auf weiß."
-            },
             "title": "Leinwand",
             "selectBrushTool": {
                 "title": "Pinselwerkzeug",
