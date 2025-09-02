@@ -8,6 +8,9 @@ export const useEntityTypeIsHidden = (type: CanvasEntityIdentifier['type']): boo
   const selectIsHidden = useMemo(
     () =>
       createSelector(selectCanvasSlice, (canvas) => {
+        if (!canvas) {
+          return false;
+        }
         switch (type) {
           case 'control_layer':
             return canvas.controlLayers.isHidden;

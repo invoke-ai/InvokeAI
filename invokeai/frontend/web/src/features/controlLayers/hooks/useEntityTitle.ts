@@ -8,6 +8,9 @@ import { assert } from 'tsafe';
 
 const createSelectName = (entityIdentifier: CanvasEntityIdentifier) =>
   createSelector(selectCanvasSlice, (canvas) => {
+    if (!canvas) {
+      return null;
+    }
     const entity = selectEntity(canvas, entityIdentifier);
     if (!entity) {
       return null;

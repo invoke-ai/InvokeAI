@@ -8,6 +8,9 @@ export const useEntityTypeCount = (type: CanvasEntityIdentifier['type']): number
   const selectEntityCount = useMemo(
     () =>
       createSelector(selectCanvasSlice, (canvas) => {
+        if (!canvas) {
+          return 0;
+        }
         switch (type) {
           case 'control_layer':
             return canvas.controlLayers.entities.length;
