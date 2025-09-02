@@ -829,7 +829,8 @@
             "promptExpansionResultPending": "Accetta o ignora il risultato dell'espansione del prompt",
             "promptExpansionPending": "Espansione del prompt in corso",
             "noStartingFrameImage": "Nessuna immagine del fotogramma iniziale",
-            "videoIsDisabled": "La generazione di video non è abilitata per gli account {{accountType}}."
+            "videoIsDisabled": "La generazione di video non è abilitata per gli account {{accountType}}.",
+            "incompatibleLoRAs": "Aggiunti LoRA incompatibili"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
