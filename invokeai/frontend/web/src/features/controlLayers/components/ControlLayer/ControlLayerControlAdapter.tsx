@@ -125,6 +125,10 @@ export const ControlLayerControlAdapter = memo(() => {
   );
   const uploadApi = useImageUploadButton(uploadOptions);
 
+  if (!controlAdapter) {
+    return null;
+  }
+
   return (
     <Flex flexDir="column" gap={3} position="relative" w="full">
       <Flex w="full" gap={2}>
@@ -162,7 +166,7 @@ export const ControlLayerControlAdapter = memo(() => {
         <input {...uploadApi.getUploadInputProps()} />
       </Flex>
       <Weight weight={controlAdapter.weight} onChange={onChangeWeight} />
-      {controlAdapter.type !== 'control_lora' && (
+      {(controlAdapter.type === 'controlnet' || controlAdapter.type === 't2i_adapter') && (
         <BeginEndStepPct beginEndStepPct={controlAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
       )}
       {controlAdapter.type === 'controlnet' && !isFLUX && (
