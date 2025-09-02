@@ -8,6 +8,9 @@ export const useEntityIsEnabled = (entityIdentifier: CanvasEntityIdentifier) => 
   const selectIsEnabled = useMemo(
     () =>
       createSelector(selectCanvasSlice, (canvas) => {
+        if (!canvas) {
+          return false;
+        }
         const entity = selectEntity(canvas, entityIdentifier);
         if (!entity) {
           return false;

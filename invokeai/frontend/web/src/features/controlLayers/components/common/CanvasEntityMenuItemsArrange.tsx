@@ -55,6 +55,14 @@ export const CanvasEntityMenuItemsArrange = memo(() => {
   const selectValidActions = useMemo(
     () =>
       createMemoizedSelector(selectCanvasSlice, (canvas) => {
+        if (!canvas) {
+          return {
+            canMoveForwardOne: false,
+            canMoveBackwardOne: false,
+            canMoveToFront: false,
+            canMoveToBack: false,
+          };
+        }
         const { index, count } = getIndexAndCount(canvas, entityIdentifier);
         return {
           canMoveForwardOne: index < count - 1,

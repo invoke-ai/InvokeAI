@@ -8,7 +8,7 @@ export const useEntityIsLocked = (entityIdentifier: CanvasEntityIdentifier | nul
   const selectIsLocked = useMemo(
     () =>
       createSelector(selectCanvasSlice, (canvas) => {
-        if (!entityIdentifier) {
+        if (!entityIdentifier || !canvas) {
           return false;
         }
         const entity = selectEntity(canvas, entityIdentifier);

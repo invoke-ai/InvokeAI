@@ -8,7 +8,7 @@ export const useEntityIsBookmarkedForQuickSwitch = (entityIdentifier: CanvasEnti
   const selectIsBookmarkedForQuickSwitch = useMemo(
     () =>
       createSelector(selectCanvasSlice, (canvas) => {
-        return canvas.bookmarkedEntityIdentifier?.id === entityIdentifier.id;
+        return canvas?.bookmarkedEntityIdentifier?.id === entityIdentifier.id;
       }),
     [entityIdentifier]
   );

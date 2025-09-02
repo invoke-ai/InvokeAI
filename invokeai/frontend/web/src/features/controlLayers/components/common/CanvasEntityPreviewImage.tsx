@@ -21,6 +21,9 @@ export const CanvasEntityPreviewImage = memo(() => {
   const selectMaskColor = useMemo(
     () =>
       createSelector(selectCanvasSlice, (state) => {
+        if (!state) {
+          return null;
+        }
         const entity = selectEntity(state, entityIdentifier);
         if (!entity) {
           return null;

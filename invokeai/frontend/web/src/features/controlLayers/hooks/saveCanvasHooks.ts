@@ -86,12 +86,14 @@ const useSaveCanvas = ({ region, saveToGallery, toastOk, toastError, onSave, wit
 
     if (withMetadata) {
       metadata = selectCanvasMetadata(state);
-      metadata.positive_prompt = selectPositivePrompt(state);
-      metadata.negative_prompt = selectNegativePrompt(state);
-      metadata.seed = selectSeed(state);
-      const model = selectMainModelConfig(state);
-      if (model) {
-        metadata.model = Graph.getModelMetadataField(model);
+      if (metadata) {
+        metadata.positive_prompt = selectPositivePrompt(state);
+        metadata.negative_prompt = selectNegativePrompt(state);
+        metadata.seed = selectSeed(state);
+        const model = selectMainModelConfig(state);
+        if (model) {
+          metadata.model = Graph.getModelMetadataField(model);
+        }
       }
     }
 
