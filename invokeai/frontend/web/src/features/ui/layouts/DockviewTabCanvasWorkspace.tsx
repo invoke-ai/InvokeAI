@@ -37,7 +37,7 @@ export const DockviewTabCanvasWorkspace = memo((props: IDockviewPanelHeaderProps
     setFocusedRegion(props.params.focusRegion);
   }, [props.params.focusRegion]);
 
-  const [title, setTitle] = useState(props.title || t(props.params.i18nKey));
+  const [title, setTitle] = useState(props.api.title || t(props.params.i18nKey));
 
   const handleClose = useCallback((e: MouseEvent) => {
     e.stopPropagation();
@@ -65,8 +65,8 @@ export const DockviewTabCanvasWorkspace = memo((props: IDockviewPanelHeaderProps
   }, [handleTitleChange]);
 
   const handleTitleCancel = useCallback(() => {
-    setTitle(props.title || t(props.params.i18nKey));
-  }, [props.title, props.params.i18nKey, t]);
+    setTitle(props.api.title || t(props.params.i18nKey));
+  }, [props.api.title, props.params.i18nKey, t]);
 
   // Show close button only if:
   // 1. This is a canvas panel with a canvasId (not launchpad or viewer)
