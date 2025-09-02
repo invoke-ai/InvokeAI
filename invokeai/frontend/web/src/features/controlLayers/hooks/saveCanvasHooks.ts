@@ -1,5 +1,5 @@
 import { logger } from 'app/logging/logger';
-import { useAppStore } from 'app/store/storeHooks';
+import { useAppDispatch, useAppStore } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
 import { withResultAsync } from 'common/util/result';
 import { useCanvasContext } from 'features/controlLayers/contexts/CanvasInstanceContext';
@@ -56,9 +56,19 @@ const useSaveCanvas = ({ region, saveToGallery, toastOk, toastError, onSave, wit
   const { manager: canvasManager } = useCanvasContext();
 
   const saveCanvas = useCallback(async () => {
+    const bbox = canvasManager.stateApi.getBbox();
+    if (!bbox) {
+      toast({
+        title: toastError,
+        description: t('controlLayers.regionIsEmpty'),
+        status: 'error',
+      });
+      return;
+    }
+    
     const rect =
       region === 'bbox'
-        ? canvasManager.stateApi.getBbox().rect
+        ? bbox.rect
         : canvasManager.compositor.getVisibleRectOfType('raster_layer');
 
     if (rect.width === 0 || rect.height === 0) {

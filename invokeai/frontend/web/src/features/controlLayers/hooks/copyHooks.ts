@@ -59,9 +59,18 @@ export const useCopyCanvasToClipboard = (region: 'canvas' | 'bbox') => {
   const clipboard = useClipboard();
   const canvasManager = useCanvasManager();
   const copyCanvasToClipboard = useCallback(async () => {
+    const bbox = canvasManager.stateApi.getBbox();
+    if (!bbox) {
+      toast({
+        title: t('controlLayers.copyRegionError', { region: startCase(region) }),
+        status: 'error',
+      });
+      return;
+    }
+    
     const rect =
       region === 'bbox'
-        ? canvasManager.stateApi.getBbox().rect
+        ? bbox.rect
         : canvasManager.compositor.getVisibleRectOfType('raster_layer');
 
     if (rect.width === 0 || rect.height === 0) {

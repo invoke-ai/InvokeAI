@@ -51,6 +51,7 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
   const selectConfig = useMemo(
     () =>
       createSelector(selectCanvasSlice, (canvas) => {
+        if (!canvas) return null;
         const referenceImage = selectRegionalGuidanceReferenceImage(canvas, entityIdentifier, referenceImageId);
         assert(referenceImage, `Regional Guidance IP Adapter with id ${referenceImageId} not found`);
         return referenceImage.config;
@@ -58,6 +59,10 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
     [entityIdentifier, referenceImageId]
   );
   const config = useAppSelector(selectConfig);
+
+  if (!config) {
+    return null;
+  }
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {
@@ -190,6 +195,7 @@ const buildSelectIPAdapterHasImage = (
   referenceImageId: string
 ) =>
   createSelector(selectCanvasSlice, (canvas) => {
+    if (!canvas) return false;
     const referenceImage = selectRegionalGuidanceReferenceImage(canvas, entityIdentifier, referenceImageId);
     return !!referenceImage && referenceImage.config.image !== null;
   });
