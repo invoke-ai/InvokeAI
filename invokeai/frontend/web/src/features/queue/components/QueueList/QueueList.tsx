@@ -1,7 +1,7 @@
 import { Flex, Heading } from '@invoke-ai/ui-library';
 import { IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
 import { useRangeBasedQueueItemFetching } from 'features/queue/hooks/useRangeBasedQueueItemFetching';
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type {
   Components,
@@ -17,42 +17,39 @@ import { queueApi } from 'services/api/endpoints/queue';
 import QueueItemComponent, { QueueItemPlaceholder } from './QueueItemComponent';
 import QueueListComponent from './QueueListComponent';
 import QueueListHeader from './QueueListHeader';
-import type { ListContext } from './types';
 import { useQueueItemIds } from './useQueueItemIds';
 import { useScrollableQueueList } from './useScrollableQueueList';
 
-const QueueItemAtPosition = memo(
-  ({ index, itemId, context }: { index: number; itemId: number; context: ListContext }) => {
-    /*
-     * We rely on the useRangeBasedQueueItemFetching to fetch all queue items, caching them with RTK Query.
-     *
-     * In this component, we just want to consume that cache. Unforutnately, RTK Query does not provide a way to
-     * subscribe to a query without triggering a new fetch.
-     *
-     * There is a hack, though:
-     * - https://github.com/reduxjs/redux-toolkit/discussions/4213
-     *
-     * This essentially means "subscribe to the query once it has some data".
-     */
+const QueueItemAtPosition = memo(({ index, itemId }: { index: number; itemId: number }) => {
+  /*
+   * We rely on the useRangeBasedQueueItemFetching to fetch all queue items, caching them with RTK Query.
+   *
+   * In this component, we just want to consume that cache. Unforutnately, RTK Query does not provide a way to
+   * subscribe to a query without triggering a new fetch.
+   *
+   * There is a hack, though:
+   * - https://github.com/reduxjs/redux-toolkit/discussions/4213
+   *
+   * This essentially means "subscribe to the query once it has some data".
+   */
 
-    // Use `currentData` instead of `data` to prevent a flash of previous queue item rendered at this index
-    const { currentData: queueItem, isUninitialized } = queueApi.endpoints.getQueueItem.useQueryState(itemId);
-    queueApi.endpoints.getQueueItem.useQuerySubscription(itemId, { skip: isUninitialized });
+  // Use `currentData` instead of `data` to prevent a flash of previous queue item rendered at this index
+  const { currentData: queueItem, isUninitialized } = queueApi.endpoints.getQueueItem.useQueryState(itemId);
+  queueApi.endpoints.getQueueItem.useQuerySubscription(itemId, { skip: isUninitialized });
 
-    if (!queueItem) {
-      return <QueueItemPlaceholder item-id={itemId} />;
-    }
-
-    return <QueueItemComponent index={index} item={queueItem} context={context} />;
+  if (!queueItem) {
+    return <QueueItemPlaceholder item-id={itemId} />;
   }
-);
+
+  return <QueueItemComponent index={index} item={queueItem} />;
+});
 QueueItemAtPosition.displayName = 'QueueItemAtPosition';
 
-const itemContent: ItemContent<number, ListContext> = (index, itemId, context) => (
-  <QueueItemAtPosition index={index} itemId={itemId} context={context} />
+const itemContent: ItemContent<number, unknown> = (index, itemId) => (
+  <QueueItemAtPosition index={index} itemId={itemId} />
 );
 
-const ScrollSeekPlaceholderComponent: Components<number, ListContext>['ScrollSeekPlaceholder'] = (props) => (
+const ScrollSeekPlaceholderComponent: Components<number>['ScrollSeekPlaceholder'] = (props) => (
   <Flex {...props}>
     <QueueItemPlaceholder />
   </Flex>
@@ -60,7 +57,7 @@ const ScrollSeekPlaceholderComponent: Components<number, ListContext>['ScrollSee
 
 ScrollSeekPlaceholderComponent.displayName = 'ScrollSeekPlaceholderComponent';
 
-const components: Components<number, ListContext> = {
+const components: Components<number> = {
   List: QueueListComponent,
   ScrollSeekPlaceholder: ScrollSeekPlaceholderComponent,
 };
@@ -83,8 +80,8 @@ export const QueueList = () => {
   // Get the ordered list of queue item ids - this is our primary data source for virtualization
   const { queryArgs, itemIds, isLoading } = useQueueItemIds();
 
-  const computeItemKey: ComputeItemKey<number, ListContext> = useCallback(
-    (index, itemId) => {
+  const computeItemKey: ComputeItemKey<number, unknown> = useCallback(
+    (index: number, itemId: number) => {
       return `${JSON.stringify(queryArgs)}-${itemId ?? index}`;
     },
     [queryArgs]
@@ -110,19 +107,6 @@ export const QueueList = () => {
     [onRangeChanged]
   );
 
-  const [openQueueItems, setOpenQueueItems] = useState<number[]>([]);
-
-  const toggleQueueItem = useCallback((item_id: number) => {
-    setOpenQueueItems((prev) => {
-      if (prev.includes(item_id)) {
-        return prev.filter((id) => id !== item_id);
-      }
-      return [...prev, item_id];
-    });
-  }, []);
-
-  const context = useMemo<ListContext>(() => ({ openQueueItems, toggleQueueItem }), [openQueueItems, toggleQueueItem]);
-
   if (isLoading) {
     return <IAINoContentFallbackWithSpinner />;
   }
@@ -139,9 +123,8 @@ export const QueueList = () => {
     <Flex w="full" h="full" flexDir="column">
       <QueueListHeader />
       <Flex ref={rootRef} w="full" h="full" alignItems="center" justifyContent="center">
-        <Virtuoso<number, ListContext>
+        <Virtuoso<number>
           ref={virtuosoRef}
-          context={context}
           data={itemIds}
           increaseViewportBy={4096}
           itemContent={itemContent}
