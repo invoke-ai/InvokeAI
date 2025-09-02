@@ -10,10 +10,10 @@ import type { SubscriptionHandler } from 'features/controlLayers/konva/util';
 import { createReduxSubscription, getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   selectCanvasSettingsSlice,
+  settingsBgColorChanged,
   settingsBrushWidthChanged,
-  settingsColor1Changed,
-  settingsColor2Changed,
   settingsEraserWidthChanged,
+  settingsFgColorChanged,
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import {
   bboxChangedFromCanvas,
@@ -233,9 +233,9 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * Sets the drawing color, pushing state to redux.
    */
   setColor = (color: Partial<RgbaColor>) => {
-    return this.getSettings().activeColor === 'color1'
-      ? this.store.dispatch(settingsColor1Changed(color))
-      : this.store.dispatch(settingsColor2Changed(color));
+    return this.getSettings().activeColor === 'bgColor'
+      ? this.store.dispatch(settingsBgColorChanged(color))
+      : this.store.dispatch(settingsFgColorChanged(color));
   };
 
   /**
@@ -425,7 +425,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    */
   getCurrentColor = (): RgbaColor => {
     let color: RgbaColor =
-      this.getSettings().activeColor === 'color1' ? this.getSettings().color1 : this.getSettings().color2;
+      this.getSettings().activeColor === 'bgColor' ? this.getSettings().bgColor : this.getSettings().fgColor;
     const selectedEntity = this.getSelectedEntityAdapter();
     if (selectedEntity) {
       // These two entity types use a compositing rect for opacity. Their fill is always a solid color.
@@ -453,7 +453,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
       // selected entity's fill color with 50% opacity.
       return { ...selectedEntity.state.fill.color, a: 0.5 };
     } else {
-      return this.getSettings().activeColor === 'color1' ? this.getSettings().color1 : this.getSettings().color2;
+      return this.getSettings().activeColor === 'bgColor' ? this.getSettings().bgColor : this.getSettings().fgColor;
     }
   };
 
