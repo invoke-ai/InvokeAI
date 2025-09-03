@@ -41,7 +41,7 @@ export class CanvasObjectImage extends CanvasModuleBase {
 
   state: CanvasImageState;
 
-  config: CanvasObjectImageConfig;
+  config: CanvasObjectImageConfig = DEFAULT_CONFIG;
 
   konva: {
     group: Konva.Group;
@@ -60,8 +60,7 @@ export class CanvasObjectImage extends CanvasModuleBase {
       | CanvasEntityBufferObjectRenderer
       | CanvasStagingAreaModule
       | CanvasSegmentAnythingModule
-      | CanvasEntityFilterer,
-    config = DEFAULT_CONFIG
+      | CanvasEntityFilterer
   ) {
     super();
     this.id = state.id;
@@ -69,7 +68,6 @@ export class CanvasObjectImage extends CanvasModuleBase {
     this.manager = parent.manager;
     this.path = this.manager.buildPath(this);
     this.log = this.manager.buildLogger(this);
-    this.config = config;
 
     this.log.debug({ state }, 'Creating module');
 
