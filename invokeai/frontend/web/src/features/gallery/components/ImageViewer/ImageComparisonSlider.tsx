@@ -1,4 +1,6 @@
 import { Box, Flex, Icon, Image } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
+import { $crossOrigin } from 'app/store/nanostores/authToken';
 import { useAppSelector } from 'app/store/storeHooks';
 import { preventDefault } from 'common/util/stopPropagation';
 import { TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
@@ -21,6 +23,7 @@ const HANDLE_LEFT_INITIAL_PX = `calc(${INITIAL_POS} - ${HANDLE_HITBOX / 2}px)`;
 
 export const ImageComparisonSlider = memo(({ firstImage, secondImage, rect }: ComparisonProps) => {
   const comparisonFit = useAppSelector(selectComparisonFit);
+  const crossOrigin = useStore($crossOrigin);
 
   // How far the handle is from the left - this will be a CSS calculation that takes into account the handle width
   const [left, setLeft] = useState(HANDLE_LEFT_INITIAL_PX);
@@ -132,6 +135,7 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage, rect }: Co
             id="image-comparison-second-image"
             src={secondImage.image_url}
             fallbackSrc={secondImage.thumbnail_url}
+            crossOrigin={crossOrigin}
             w={compareImageDims.width}
             h={compareImageDims.height}
             maxW={fittedDims.width}
@@ -154,6 +158,7 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage, rect }: Co
               id="image-comparison-first-image"
               src={firstImage.image_url}
               fallbackSrc={firstImage.thumbnail_url}
+              crossOrigin={crossOrigin}
               w={fittedDims.width}
               h={fittedDims.height}
               objectFit="cover"

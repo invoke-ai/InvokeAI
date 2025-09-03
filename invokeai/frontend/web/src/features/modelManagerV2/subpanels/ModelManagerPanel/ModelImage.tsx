@@ -1,4 +1,6 @@
 import { Flex, Icon, Image } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
+import { $crossOrigin } from 'app/store/nanostores/authToken';
 import { typedMemo } from 'common/util/typedMemo';
 import { PiImage } from 'react-icons/pi';
 
@@ -10,6 +12,8 @@ export const MODEL_IMAGE_THUMBNAIL_SIZE = '40px';
 const FALLBACK_ICON_SIZE = '24px';
 
 const ModelImage = ({ image_url }: Props) => {
+  const crossOrigin = useStore($crossOrigin);
+
   if (!image_url) {
     return (
       <Flex
@@ -27,6 +31,7 @@ const ModelImage = ({ image_url }: Props) => {
   return (
     <Image
       src={image_url}
+      crossOrigin={crossOrigin}
       objectFit="cover"
       objectPosition="50% 50%"
       height={MODEL_IMAGE_THUMBNAIL_SIZE}

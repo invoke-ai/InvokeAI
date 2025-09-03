@@ -2,6 +2,8 @@ import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { ImageProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Image } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
+import { $crossOrigin } from 'app/store/nanostores/authToken';
 import { useAppStore } from 'app/store/storeHooks';
 import { singleImageDndSource } from 'features/dnd/dnd';
 import type { DndDragPreviewSingleImageState } from 'features/dnd/DndDragPreviewSingleImage';
@@ -29,6 +31,8 @@ type Props = {
 export const DndImage = memo(
   forwardRef(({ imageDTO, asThumbnail, ...rest }: Props, forwardedRef) => {
     const store = useAppStore();
+    const crossOrigin = useStore($crossOrigin);
+
     const [isDragging, setIsDragging] = useState(false);
     const ref = useRef<HTMLImageElement>(null);
     useImperativeHandle(forwardedRef, () => ref.current!, []);
@@ -76,6 +80,7 @@ export const DndImage = memo(
           height={imageDTO.height}
           sx={sx}
           data-is-dragging={isDragging}
+          crossOrigin={crossOrigin}
           {...rest}
         />
         {dragPreviewState?.type === 'single-image' ? createSingleImageDragPreview(dragPreviewState) : null}

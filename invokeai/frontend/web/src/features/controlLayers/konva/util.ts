@@ -1,5 +1,5 @@
 import type { Selector, Store } from '@reduxjs/toolkit';
-import { $authToken } from 'app/store/nanostores/authToken';
+import { $authToken, $crossOrigin } from 'app/store/nanostores/authToken';
 import { roundDownToMultiple, roundUpToMultiple } from 'common/util/roundDownToMultiple';
 import { clamp } from 'es-toolkit/compat';
 import type {
@@ -494,7 +494,7 @@ export async function loadImage(src: string, fetchUrlFirst?: boolean): Promise<H
     const imageElement = new Image();
     imageElement.onload = () => resolve(imageElement);
     imageElement.onerror = (error) => reject(error);
-    imageElement.crossOrigin = $authToken.get() ? 'use-credentials' : 'anonymous';
+    imageElement.crossOrigin = $crossOrigin.get();
     imageElement.src = url;
   });
 }
