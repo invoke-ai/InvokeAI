@@ -1,5 +1,4 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { canvasRedo, canvasUndo } from 'features/controlLayers/store/canvasesSlice';
 import { selectCanvasMayRedo, selectCanvasMayUndo } from 'features/controlLayers/store/selectors';
@@ -7,7 +6,6 @@ import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/us
 import { useCallback } from 'react';
 
 export const useCanvasUndoRedoHotkeys = () => {
-  useAssertSingleton('useCanvasUndoRedo');
   const dispatch = useAppDispatch();
   const isBusy = useCanvasIsBusy();
 

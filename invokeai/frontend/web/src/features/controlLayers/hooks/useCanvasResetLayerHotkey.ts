@@ -1,5 +1,4 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useEntityAdapterSafe } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityIsLocked } from 'features/controlLayers/hooks/useEntityIsLocked';
@@ -10,7 +9,6 @@ import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/us
 import { useCallback, useMemo } from 'react';
 
 export function useCanvasResetLayerHotkey() {
-  useAssertSingleton(useCanvasResetLayerHotkey.name);
   const dispatch = useAppDispatch();
   const entityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const isBusy = useCanvasIsBusy();

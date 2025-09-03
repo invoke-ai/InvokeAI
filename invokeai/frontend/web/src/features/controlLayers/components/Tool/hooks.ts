@@ -1,4 +1,5 @@
 import { useStore } from '@nanostores/react';
+import { $false } from 'app/store/nanostores/util';
 import { useCanvasManagerSafe } from 'features/controlLayers/hooks/useCanvasManager';
 import type { Tool } from 'features/controlLayers/store/types';
 import { computed } from 'nanostores';
@@ -6,10 +7,7 @@ import { useCallback } from 'react';
 
 export const useToolIsSelected = (tool: Tool) => {
   const canvasManager = useCanvasManagerSafe();
-  if (!canvasManager) {
-    return false;
-  }
-  const isSelected = useStore(computed(canvasManager.tool.$tool, (t) => t === tool));
+  const isSelected = useStore(canvasManager ? computed(canvasManager.tool.$tool, (t) => t === tool) : $false);
   return isSelected;
 };
 

@@ -1,5 +1,4 @@
 import { useAppSelector } from 'app/store/storeHooks';
-import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useInvertMask } from 'features/controlLayers/hooks/useInvertMask';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
@@ -8,7 +7,6 @@ import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/us
 import { useMemo } from 'react';
 
 export const useCanvasInvertMaskHotkey = () => {
-  useAssertSingleton('useCanvasInvertMaskHotkey');
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const isBusy = useCanvasIsBusy();
   const invertMask = useInvertMask();

@@ -1,10 +1,11 @@
 import { useStore } from '@nanostores/react';
-import type { UnknownAction } from '@reduxjs/toolkit';
+import { createSelector, type UnknownAction } from '@reduxjs/toolkit';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { $canvasManagers } from 'features/controlLayers/store/ephemeral';
-import { selectCanvasInstance } from 'features/controlLayers/store/selectors';
+import { selectCanvasesSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasState } from 'features/controlLayers/store/types';
+import type { PropsWithChildren } from 'react';
 import { createContext, memo, useCallback, useContext, useMemo } from 'react';
 import { assert } from 'tsafe';
 
@@ -23,61 +24,73 @@ interface CanvasInstanceContextValue {
 
 const CanvasInstanceContext = createContext<CanvasInstanceContextValue | null>(null);
 
-export const CanvasInstanceProvider = memo<{
-  canvasId: string;
-  canvasName?: string;
-  children: React.ReactNode;
-}>(({ canvasId, canvasName, children }) => {
-  console.log('CanvasInstanceProvider - providing canvasId:', canvasId);
-  const store = useAppStore();
-  const canvasManagers = useStore($canvasManagers);
-  const manager = canvasManagers.get(canvasId);
-  console.log('CanvasInstanceProvider - manager found:', !!manager);
+export const CanvasInstanceProvider = memo(
+  ({
+    canvasId,
+    canvasName,
+    children,
+  }: PropsWithChildren<{
+    canvasId: string;
+    canvasName?: string;
+  }>) => {
+    console.log('CanvasInstanceProvider - providing canvasId:', canvasId);
+    const store = useAppStore();
+    const canvasManagers = useStore($canvasManagers);
+    const manager = canvasManagers.get(canvasId);
+    console.log('CanvasInstanceProvider - manager found:', !!manager);
 
-  // Enhanced dispatch function that automatically injects canvasId
-  const dispatch = useCallback((action: CanvasAction) => {
-    // Clone action and inject canvasId into payload
-    const actionWithCanvasId = {
-      ...action,
-      payload: {
-        ...(action.payload || {}),
-        canvasId,
+    const selectCanvasInstance = useMemo(
+      () => createSelector(selectCanvasesSlice, (canvases) => canvases.instances[canvasId]?.present),
+      [canvasId]
+    );
+
+    // Enhanced dispatch function that automatically injects canvasId
+    const dispatch = useCallback(
+      (action: CanvasAction) => {
+        // Clone action and inject canvasId into payload
+        const actionWithCanvasId = {
+          ...action,
+          payload: {
+            ...(action.payload || {}),
+            canvasId,
+          },
+        };
+        store.dispatch(actionWithCanvasId);
       },
-    };
-    store.dispatch(actionWithCanvasId);
-  }, [store, canvasId]);
+      [store, canvasId]
+    );
 
-  // Canvas instance-specific selector hook
-  const useSelector = useCallback(<T,>(selector: (state: CanvasState) => T): T => {
-    return useAppSelector((state) => {
-      const canvasInstance = selectCanvasInstance(state, canvasId);
-      if (!canvasInstance) {
-        // Return a default/empty value - this can be refined based on usage patterns
-        // For now, we'll throw as the components should handle this case
-        throw new Error(`Canvas instance ${canvasId} not found`);
-      }
-      return selector(canvasInstance);
-    });
-  }, [canvasId]);
+    // Canvas instance-specific selector hook
+    const useSelector = useCallback(
+      <T,>(selector: (state: CanvasState) => T): T => {
+        return useAppSelector((state) => {
+          const canvasInstance = selectCanvasInstance(state, canvasId);
+          if (!canvasInstance) {
+            // Return a default/empty value - this can be refined based on usage patterns
+            // For now, we'll throw as the components should handle this case
+            throw new Error(`Canvas instance ${canvasId} not found`);
+          }
+          return selector(canvasInstance);
+        });
+      },
+      [canvasId]
+    );
 
-  // Memoize the context value to prevent unnecessary re-renders
-  const value = useMemo(() => {
-    // Even without a manager, we need to provide the context so InvokeCanvasComponent can create one
-    return {
-      canvasId,
-      canvasName,
-      manager: manager as CanvasManager, // Will be undefined initially
-      dispatch,
-      useSelector,
-    };
-  }, [canvasId, canvasName, manager, dispatch, useSelector]);
+    // Memoize the context value to prevent unnecessary re-renders
+    const value = useMemo(() => {
+      // Even without a manager, we need to provide the context so InvokeCanvasComponent can create one
+      return {
+        canvasId,
+        canvasName,
+        manager: manager as CanvasManager, // Will be undefined initially
+        dispatch,
+        useSelector,
+      };
+    }, [canvasId, canvasName, manager, dispatch, useSelector]);
 
-  return (
-    <CanvasInstanceContext.Provider value={value}>
-      {children}
-    </CanvasInstanceContext.Provider>
-  );
-});
+    return <CanvasInstanceContext.Provider value={value}>{children}</CanvasInstanceContext.Provider>;
+  }
+);
 
 CanvasInstanceProvider.displayName = 'CanvasInstanceProvider';
 

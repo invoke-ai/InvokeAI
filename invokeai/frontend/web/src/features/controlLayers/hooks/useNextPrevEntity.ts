@@ -1,6 +1,5 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { entitySelected } from 'features/controlLayers/store/canvasInstanceSlice';
 import { selectAllEntities, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityState } from 'features/controlLayers/store/types';
@@ -48,7 +47,6 @@ const selectPrevEntityIdentifier = createMemoizedSelector(selectCanvasSlice, (ca
 });
 
 export const useNextPrevEntityHotkeys = () => {
-  useAssertSingleton('useNextPrevEntityHotkeys');
   const dispatch = useAppDispatch();
 
   const nextEntityIdentifier = useAppSelector(selectNextEntityIdentifier);

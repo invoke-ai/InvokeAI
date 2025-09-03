@@ -39,30 +39,39 @@ export const DockviewTabCanvasWorkspace = memo((props: IDockviewPanelHeaderProps
 
   const [title, setTitle] = useState(props.api.title || t(props.params.i18nKey));
 
-  const handleClose = useCallback((e: MouseEvent) => {
-    e.stopPropagation();
-    
-    if (props.params.canvasId) {
-      // Remove from Redux - this should also trigger panel removal
-      dispatch(canvasInstanceRemoved({ canvasId: props.params.canvasId }));
-      
-      // Close the dockview panel
-      props.api.close();
-    }
-  }, [dispatch, props.params.canvasId, props.api]);
+  const handleClose = useCallback(
+    (e: MouseEvent) => {
+      e.stopPropagation();
 
-  const handleTitleChange = useCallback((newTitle: string) => {
-    const trimmedTitle = newTitle.trim();
-    if (trimmedTitle.length > 0) {
-      setTitle(trimmedTitle);
-      // Update the dockview panel title
-      props.api.setTitle(trimmedTitle);
-    }
-  }, [props.api]);
+      if (props.params.canvasId) {
+        // Remove from Redux - this should also trigger panel removal
+        dispatch(canvasInstanceRemoved({ canvasId: props.params.canvasId }));
 
-  const handleTitleSubmit = useCallback((newTitle: string) => {
-    handleTitleChange(newTitle);
-  }, [handleTitleChange]);
+        // Close the dockview panel
+        props.api.close();
+      }
+    },
+    [dispatch, props.params.canvasId, props.api]
+  );
+
+  const handleTitleChange = useCallback(
+    (newTitle: string) => {
+      const trimmedTitle = newTitle.trim();
+      if (trimmedTitle.length > 0) {
+        setTitle(trimmedTitle);
+        // Update the dockview panel title
+        props.api.setTitle(trimmedTitle);
+      }
+    },
+    [props.api]
+  );
+
+  const handleTitleSubmit = useCallback(
+    (newTitle: string) => {
+      handleTitleChange(newTitle);
+    },
+    [handleTitleChange]
+  );
 
   const handleTitleCancel = useCallback(() => {
     setTitle(props.api.title || t(props.params.i18nKey));
@@ -88,16 +97,8 @@ export const DockviewTabCanvasWorkspace = memo((props: IDockviewPanelHeaderProps
           flex="1"
           fontSize="sm"
         >
-          <EditablePreview 
-            cursor="pointer"
-            _hover={{ bg: 'base.100' }}
-            borderRadius="md"
-            userSelect="none"
-          />
-          <EditableInput 
-            fontSize="sm"
-            _focus={{ bg: 'base.50' }}
-          />
+          <EditablePreview cursor="pointer" borderRadius="md" userSelect="none" />
+          <EditableInput fontSize="sm" />
         </Editable>
       ) : (
         <Text userSelect="none" px={4} flex="1" fontSize="sm">
@@ -105,14 +106,7 @@ export const DockviewTabCanvasWorkspace = memo((props: IDockviewPanelHeaderProps
         </Text>
       )}
       {canShowCloseButton && (
-        <IconButton
-          aria-label="Close Canvas"
-          icon={<PiX />}
-          size="xs"
-          variant="ghost"
-          onClick={handleClose}
-          mr={1}
-        />
+        <IconButton aria-label="Close Canvas" icon={<PiX />} size="xs" variant="ghost" onClick={handleClose} mr={1} />
       )}
       {currentQueueItemDestination === canvasSessionId && isGenerationInProgress && (
         <ProgressBar position="absolute" bottom={0} left={0} right={0} h={1} borderRadius="none" />
