@@ -476,6 +476,7 @@ export function getImageDataTransparency(imageData: ImageData): Transparency {
 }
 
 function createImageLoader(url: string, crossOrigin: string): Promise<HTMLImageElement> {
+  console.log("createImageLoader", url, crossOrigin);
   return new Promise((resolve, reject) => {
     const imageElement = new Image();
     imageElement.onload = () => resolve(imageElement);
@@ -495,10 +496,13 @@ export async function loadImage(src: string, fetchUrlFirst?: boolean): Promise<H
   const authToken = $authToken.get();
 
   if (authToken && fetchUrlFirst) {
-    const response = await fetch(`${src}`, { credentials: 'include', cache: 'no-cache' });
-    const url = response.headers.get('Location') ?? src;
-    return createImageLoader(url, 'use-credentials');
+    console.log("fetchUrlFirst", fetchUrlFirst);
+    const response = await fetch(`${src}?url_only=true`, { credentials: 'include', cache: 'no-cache' });
+    const data = await response.json();
+    const url = data.url;
+    return createImageLoader(url, 'Anonymous');
   } else {
+    console.log("no fetchUrlFirst", fetchUrlFirst);
     const crossOrigin = authToken ? 'use-credentials' : 'anonymous';
     return createImageLoader(src, crossOrigin);
   }
