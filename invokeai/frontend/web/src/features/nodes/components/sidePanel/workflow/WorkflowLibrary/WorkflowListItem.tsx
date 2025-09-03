@@ -1,5 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Badge, Flex, Icon, Image, Spacer, Text } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
+import { $crossOrigin } from 'app/store/nanostores/authToken';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { LockedWorkflowIcon } from 'features/nodes/components/sidePanel/workflow/WorkflowLibrary/WorkflowLibraryListItemActions/LockedWorkflowIcon';
 import { ShareWorkflowButton } from 'features/nodes/components/sidePanel/workflow/WorkflowLibrary/WorkflowLibraryListItemActions/ShareWorkflow';
@@ -36,6 +38,7 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
   const dispatch = useAppDispatch();
   const workflowId = useAppSelector(selectWorkflowId);
   const loadWorkflowWithDialog = useLoadWorkflowWithDialog();
+  const crossOrigin = useStore($crossOrigin);
 
   const isActive = useMemo(() => {
     return workflowId === workflow.workflow_id;
@@ -66,6 +69,7 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
       <Flex p={2} pr={0}>
         <Image
           src={workflow.thumbnail_url ?? undefined}
+          crossOrigin={crossOrigin}
           fallbackStrategy="beforeLoadOrError"
           fallback={workflow.category === 'default' ? <DefaultThumbnailFallback /> : <UserThumbnailFallback />}
           objectFit="cover"

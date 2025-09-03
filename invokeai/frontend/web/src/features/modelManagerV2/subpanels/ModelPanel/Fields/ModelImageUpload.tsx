@@ -1,4 +1,6 @@
 import { Box, IconButton, Image } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
+import { $crossOrigin } from 'app/store/nanostores/authToken';
 import { dropzoneAccept } from 'common/hooks/useImageUploadButton';
 import { typedMemo } from 'common/util/typedMemo';
 import { toast } from 'features/toast/toast';
@@ -14,6 +16,8 @@ type Props = {
 };
 
 const ModelImageUpload = ({ model_key, model_image }: Props) => {
+  const crossOrigin = useStore($crossOrigin);
+
   const [image, setImage] = useState<string | null>(model_image || null);
   const { t } = useTranslation();
 
@@ -84,6 +88,7 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
       <Box position="relative" flexShrink={0}>
         <Image
           src={image}
+          crossOrigin={crossOrigin}
           objectFit="cover"
           objectPosition="50% 50%"
           height={108}
