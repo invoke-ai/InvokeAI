@@ -9,6 +9,9 @@ import { z } from 'zod';
 const zAutoSwitchMode = z.enum(['off', 'switch_on_start', 'switch_on_finish']);
 export type AutoSwitchMode = z.infer<typeof zAutoSwitchMode>;
 
+export const zToolWidthSelector = z.enum(['dropDown', 'slider']);
+export type ToolWidthSelector = z.infer<typeof zToolWidthSelector>;
+
 const zCanvasSettingsState = z.object({
   /**
    * Whether to show HUD (Heads-Up Display) on the canvas.
@@ -93,6 +96,10 @@ const zCanvasSettingsState = z.object({
    * The auto-switch mode for the canvas staging area.
    */
   stagingAreaAutoSwitch: zAutoSwitchMode,
+  /**
+   * The tool width selector
+   */
+  toolWidthSelector: zToolWidthSelector,
 });
 
 type CanvasSettingsState = z.infer<typeof zCanvasSettingsState>;
@@ -118,6 +125,7 @@ const getInitialState = (): CanvasSettingsState => ({
   ruleOfThirds: false,
   saveAllImagesToGallery: false,
   stagingAreaAutoSwitch: 'switch_on_start',
+  toolWidthSelector: 'dropDown',
 });
 
 const slice = createSlice({
@@ -132,6 +140,9 @@ const slice = createSlice({
     },
     settingsShowHUDToggled: (state) => {
       state.showHUD = !state.showHUD;
+    },
+    settingsToolWidthSelectorChanged: (state, action: PayloadAction<ToolWidthSelector>) => {
+      state.toolWidthSelector = action.payload;
     },
     settingsBrushWidthChanged: (state, action: PayloadAction<CanvasSettingsState['brushWidth']>) => {
       state.brushWidth = Math.round(action.payload);
@@ -204,6 +215,7 @@ export const {
   settingsClipToBboxChanged,
   settingsDynamicGridToggled,
   settingsShowHUDToggled,
+  settingsToolWidthSelectorChanged,
   settingsBrushWidthChanged,
   settingsEraserWidthChanged,
   settingsActiveColorToggled,
@@ -256,3 +268,6 @@ export const selectPressureSensitivity = createCanvasSettingsSelector((settings)
 export const selectRuleOfThirds = createCanvasSettingsSelector((settings) => settings.ruleOfThirds);
 export const selectSaveAllImagesToGallery = createCanvasSettingsSelector((settings) => settings.saveAllImagesToGallery);
 export const selectStagingAreaAutoSwitch = createCanvasSettingsSelector((settings) => settings.stagingAreaAutoSwitch);
+export const selectToolWidthSelector = createCanvasSettingsSelector(
+  (canvasSettings) => canvasSettings.toolWidthSelector
+);
