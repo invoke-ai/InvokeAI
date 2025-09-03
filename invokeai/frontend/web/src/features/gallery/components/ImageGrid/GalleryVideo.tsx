@@ -1,9 +1,7 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { Flex, Image } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { $crossOrigin } from 'app/store/nanostores/authToken';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { uniq } from 'es-toolkit';
@@ -85,7 +83,6 @@ const buildOnClick =
 
 export const GalleryVideo = memo(({ videoDTO }: Props) => {
   const store = useAppStore();
-  const crossOrigin = useStore($crossOrigin);
 
   const [isDragging, setIsDragging] = useState(false);
   const [dragPreviewState, setDragPreviewState] = useState<
@@ -204,7 +201,6 @@ export const GalleryVideo = memo(({ videoDTO }: Props) => {
         <Image
           pointerEvents="none"
           src={videoDTO.thumbnail_url}
-          crossOrigin={crossOrigin}
           w={videoDTO.width}
           fallback={<GalleryVideoPlaceholder />}
           objectFit="contain"
