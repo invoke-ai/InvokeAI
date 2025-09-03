@@ -1,4 +1,6 @@
 import { Box, Flex, Image } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
+import { $crossOrigin } from 'app/store/nanostores/authToken';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useBoolean } from 'common/hooks/useBoolean';
 import { preventDefault } from 'common/util/stopPropagation';
@@ -12,6 +14,8 @@ import type { ComparisonProps } from './common';
 import { fitDimsToContainer, getSecondImageDims } from './common';
 
 export const ImageComparisonHover = memo(({ firstImage, secondImage, rect }: ComparisonProps) => {
+  const crossOrigin = useStore($crossOrigin);
+
   const comparisonFit = useAppSelector(selectComparisonFit);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const mouseOver = useBoolean(false);
@@ -53,6 +57,7 @@ export const ImageComparisonHover = memo(({ firstImage, secondImage, rect }: Com
             id="image-comparison-hover-first-image"
             src={firstImage.image_url}
             fallbackSrc={firstImage.thumbnail_url}
+            crossOrigin={crossOrigin}
             w={fittedDims.width}
             h={fittedDims.height}
             maxW="full"
@@ -89,6 +94,7 @@ export const ImageComparisonHover = memo(({ firstImage, secondImage, rect }: Com
               id="image-comparison-hover-second-image"
               src={secondImage.image_url}
               fallbackSrc={secondImage.thumbnail_url}
+              crossOrigin={crossOrigin}
               w={compareImageDims.width}
               h={compareImageDims.height}
               maxW={fittedDims.width}

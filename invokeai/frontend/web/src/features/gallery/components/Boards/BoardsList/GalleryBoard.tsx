@@ -1,6 +1,8 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Icon, Image, Text, Tooltip } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
+import { $crossOrigin } from 'app/store/nanostores/authToken';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { AddImageToBoardDndTargetData } from 'features/dnd/dnd';
 import { addImageToBoardDndTarget } from 'features/dnd/dnd';
@@ -34,6 +36,7 @@ interface GalleryBoardProps {
 const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const autoAssignBoardOnClick = useAppSelector(selectAutoAssignBoardOnClick);
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
@@ -111,12 +114,14 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
 export default memo(GalleryBoard);
 
 const CoverImage = ({ board }: { board: BoardDTO }) => {
+  const crossOrigin = useStore($crossOrigin);
   const { currentData: coverImage } = useGetImageDTOQuery(board.cover_image_name ?? skipToken);
 
   if (coverImage) {
     return (
       <Image
         src={coverImage.thumbnail_url}
+        crossOrigin={crossOrigin}
         draggable={false}
         objectFit="cover"
         w={10}

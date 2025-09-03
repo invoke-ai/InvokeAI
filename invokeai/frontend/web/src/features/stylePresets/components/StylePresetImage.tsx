@@ -1,4 +1,6 @@
 import { Flex, Icon, Image, Tooltip } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
+import { $crossOrigin } from 'app/store/nanostores/authToken';
 import { typedMemo } from 'common/util/typedMemo';
 import { PiImage } from 'react-icons/pi';
 
@@ -6,6 +8,8 @@ const IMAGE_THUMBNAIL_SIZE = '40px';
 const FALLBACK_ICON_SIZE = '24px';
 
 const StylePresetImage = ({ presetImageUrl, imageWidth }: { presetImageUrl: string | null; imageWidth?: number }) => {
+  const crossOrigin = useStore($crossOrigin);
+
   return (
     <Tooltip
       closeOnScroll
@@ -14,6 +18,7 @@ const StylePresetImage = ({ presetImageUrl, imageWidth }: { presetImageUrl: stri
         presetImageUrl && (
           <Image
             src={presetImageUrl}
+            crossOrigin={crossOrigin}
             draggable={false}
             objectFit="cover"
             maxW={150}
@@ -27,6 +32,7 @@ const StylePresetImage = ({ presetImageUrl, imageWidth }: { presetImageUrl: stri
     >
       <Image
         src={presetImageUrl || ''}
+        crossOrigin={crossOrigin}
         fallbackStrategy="beforeLoadOrError"
         fallback={
           <Flex

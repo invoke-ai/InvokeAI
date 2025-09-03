@@ -1,5 +1,6 @@
 import { Box, Flex, Image, Spinner, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { $crossOrigin } from 'app/store/nanostores/authToken';
 import { PromptExpansionResultOverlay } from 'features/prompt/PromptExpansion/PromptExpansionResultOverlay';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +11,7 @@ import { promptExpansionApi } from './state';
 export const PromptExpansionOverlay = memo(() => {
   const { isSuccess, isPending, result, imageDTO } = useStore(promptExpansionApi.$state);
   const { t } = useTranslation();
+  const crossOrigin = useStore($crossOrigin);
 
   // Show result overlay when completed
   if (isSuccess) {
@@ -48,7 +50,14 @@ export const PromptExpansionOverlay = memo(() => {
           borderRadius="base"
           overflow="hidden"
         >
-          <Image src={imageDTO.thumbnail_url} objectFit="contain" w="full" h="full" borderRadius="base" />
+          <Image
+            src={imageDTO.thumbnail_url}
+            crossOrigin={crossOrigin}
+            objectFit="contain"
+            w="full"
+            h="full"
+            borderRadius="base"
+          />
         </Box>
       )}
 

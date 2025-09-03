@@ -1,6 +1,8 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, Icon, IconButton, Image, Skeleton, Text, Tooltip } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
+import { $crossOrigin } from 'app/store/nanostores/authToken';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { round } from 'es-toolkit/compat';
 import { useRefImageEntity } from 'features/controlLayers/components/RefImage/useRefImageEntity';
@@ -68,6 +70,7 @@ export const RefImagePreview = memo(() => {
   const dispatch = useAppDispatch();
   const id = useRefImageIdContext();
   const entity = useRefImageEntity(id);
+  const crossOrigin = useStore($crossOrigin);
   const mainModelConfig = useAppSelector(selectMainModelConfig);
   const selectedEntityId = useAppSelector(selectSelectedRefEntityId);
   const isPanelOpen = useAppSelector(selectIsRefImagePanelOpen);
@@ -146,6 +149,7 @@ export const RefImagePreview = memo(() => {
       >
         <Image
           src={imageDTO?.thumbnail_url}
+          crossOrigin={crossOrigin}
           objectFit="contain"
           aspectRatio="1/1"
           height={imageDTO?.height}
