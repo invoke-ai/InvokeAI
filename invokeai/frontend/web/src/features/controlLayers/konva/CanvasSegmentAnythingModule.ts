@@ -847,15 +847,13 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   ): { graph: Graph; outputNodeId: string } => {
     const graph = new Graph(getPrefixedId('canvas_segment_anything'));
 
-    // TODO(psyche): When SAM2 is available in transformers, use it here
-    // See: https://github.com/huggingface/transformers/pull/32317
     const segmentAnything = graph.addNode({
       id: getPrefixedId('segment_anything'),
       type: 'segment_anything',
-      model: 'segment-anything-huge',
+      model: 'segment-anything-large',
       image: { image_name },
       point_lists: [{ points: points.map(({ x, y, label }) => ({ x, y, label })) }],
-      mask_filter: 'largest',
+      mask_filter: 'all',
     });
 
     // Apply the mask to the image, outputting an image w/ alpha transparency
