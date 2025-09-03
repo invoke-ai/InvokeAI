@@ -1,7 +1,7 @@
 import { Flex, Heading } from '@invoke-ai/ui-library';
 import { IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
 import { useRangeBasedQueueItemFetching } from 'features/queue/hooks/useRangeBasedQueueItemFetching';
-import { memo, useCallback, useRef } from 'react';
+import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type {
   Components,
@@ -17,6 +17,7 @@ import { queueApi } from 'services/api/endpoints/queue';
 import QueueItemComponent, { QueueItemPlaceholder } from './QueueItemComponent';
 import QueueListComponent from './QueueListComponent';
 import QueueListHeader from './QueueListHeader';
+import type { ListContext } from './types';
 import { useQueueItemIds } from './useQueueItemIds';
 import { useScrollableQueueList } from './useScrollableQueueList';
 
@@ -45,11 +46,15 @@ const QueueItemAtPosition = memo(({ index, itemId }: { index: number; itemId: nu
 });
 QueueItemAtPosition.displayName = 'QueueItemAtPosition';
 
-const itemContent: ItemContent<number, unknown> = (index, itemId) => (
+const computeItemKey: ComputeItemKey<number, ListContext> = (index: number, itemId: number, context: ListContext) => {
+  return `${JSON.stringify(context.queryArgs)}-${itemId ?? index}`;
+};
+
+const itemContent: ItemContent<number, ListContext> = (index, itemId) => (
   <QueueItemAtPosition index={index} itemId={itemId} />
 );
 
-const ScrollSeekPlaceholderComponent: Components<number>['ScrollSeekPlaceholder'] = (props) => (
+const ScrollSeekPlaceholderComponent: Components<number, ListContext>['ScrollSeekPlaceholder'] = (props) => (
   <Flex {...props}>
     <QueueItemPlaceholder />
   </Flex>
@@ -57,7 +62,7 @@ const ScrollSeekPlaceholderComponent: Components<number>['ScrollSeekPlaceholder'
 
 ScrollSeekPlaceholderComponent.displayName = 'ScrollSeekPlaceholderComponent';
 
-const components: Components<number> = {
+const components: Components<number, ListContext> = {
   List: QueueListComponent,
   ScrollSeekPlaceholder: ScrollSeekPlaceholderComponent,
 };
@@ -80,13 +85,6 @@ export const QueueList = () => {
   // Get the ordered list of queue item ids - this is our primary data source for virtualization
   const { queryArgs, itemIds, isLoading } = useQueueItemIds();
 
-  const computeItemKey: ComputeItemKey<number, unknown> = useCallback(
-    (index: number, itemId: number) => {
-      return `${JSON.stringify(queryArgs)}-${itemId ?? index}`;
-    },
-    [queryArgs]
-  );
-
   // Use range-based fetching for bulk loading queue items into cache based on the visible range
   const { onRangeChanged } = useRangeBasedQueueItemFetching({
     itemIds,
@@ -107,6 +105,8 @@ export const QueueList = () => {
     [onRangeChanged]
   );
 
+  const context = useMemo<ListContext>(() => ({ queryArgs }), [queryArgs]);
+
   if (isLoading) {
     return <IAINoContentFallbackWithSpinner />;
   }
@@ -125,6 +125,7 @@ export const QueueList = () => {
       <Flex ref={rootRef} w="full" h="full" alignItems="center" justifyContent="center">
         <Virtuoso<number>
           ref={virtuosoRef}
+          context={context}
           data={itemIds}
           increaseViewportBy={4096}
           itemContent={itemContent}
