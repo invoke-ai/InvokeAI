@@ -80,7 +80,7 @@ export const DndImage = memo(
           height={imageDTO.height}
           sx={sx}
           data-is-dragging={isDragging}
-          crossOrigin={crossOrigin}
+          crossOrigin={!asThumbnail ? crossOrigin : undefined}
           {...rest}
         />
         {dragPreviewState?.type === 'single-image' ? createSingleImageDragPreview(dragPreviewState) : null}

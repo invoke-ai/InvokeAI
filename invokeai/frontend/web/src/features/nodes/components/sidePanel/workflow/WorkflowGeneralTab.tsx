@@ -1,8 +1,6 @@
 import type { FormControlProps } from '@invoke-ai/ui-library';
 import { Box, Flex, FormControl, FormControlGroup, FormLabel, Image, Input, Textarea } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { $crossOrigin } from 'app/store/nanostores/authToken';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import {
@@ -150,7 +148,6 @@ const formControlProps: FormControlProps = {
 
 const Thumbnail = ({ id }: { id?: string | null }) => {
   const { t } = useTranslation();
-  const crossOrigin = useStore($crossOrigin);
 
   const { data } = useGetWorkflowQuery(id ?? skipToken);
 
@@ -166,7 +163,6 @@ const Thumbnail = ({ id }: { id?: string | null }) => {
         <Box position="relative" flexShrink={0}>
           <Image
             src={data.thumbnail_url}
-            crossOrigin={crossOrigin}
             objectFit="cover"
             objectPosition="50% 50%"
             w={100}
