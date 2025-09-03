@@ -82,6 +82,7 @@ export const queueApi = api.injectEndpoints({
         'CurrentSessionQueueItem',
         'NextSessionQueueItem',
         'QueueCountsByDestination',
+        'SessionQueueItemIdList',
         { type: 'SessionQueueItem', id: LIST_TAG },
         { type: 'SessionQueueItem', id: LIST_ALL_TAG },
       ],
@@ -132,6 +133,7 @@ export const queueApi = api.injectEndpoints({
       invalidatesTags: [
         'SessionQueueStatus',
         'BatchStatus',
+        'SessionQueueItemIdList',
         { type: 'SessionQueueItem', id: LIST_TAG },
         { type: 'SessionQueueItem', id: LIST_ALL_TAG },
       ],
@@ -160,6 +162,7 @@ export const queueApi = api.injectEndpoints({
         'CurrentSessionQueueItem',
         'NextSessionQueueItem',
         'QueueCountsByDestination',
+        'SessionQueueItemIdList',
         { type: 'SessionQueueItem', id: LIST_TAG },
         { type: 'SessionQueueItem', id: LIST_ALL_TAG },
       ],
@@ -279,6 +282,7 @@ export const queueApi = api.injectEndpoints({
           return [];
         }
         const tags: ApiTagDescription[] = [
+          'SessionQueueItemIdList',
           { type: 'SessionQueueItem', id: result.item_id },
           { type: 'BatchStatus', id: result.batch_id },
         ];
@@ -314,6 +318,7 @@ export const queueApi = api.injectEndpoints({
           'SessionQueueStatus',
           'BatchStatus',
           'QueueCountsByDestination',
+          'SessionQueueItemIdList',
           { type: 'SessionQueueItem', id: LIST_TAG },
           { type: 'SessionQueueItem', id: LIST_ALL_TAG },
           ...batch_ids.map((id) => ({ type: 'BatchStatus', id }) satisfies ApiTagDescription),
@@ -378,6 +383,7 @@ export const queueApi = api.injectEndpoints({
           'CurrentSessionQueueItem',
           'NextSessionQueueItem',
           'QueueCountsByDestination',
+          'SessionQueueItemIdList',
           { type: 'SessionQueueItem', id: LIST_TAG },
           { type: 'SessionQueueItem', id: LIST_ALL_TAG },
           ...item_ids.map((id) => ({ type: 'SessionQueueItem', id }) satisfies ApiTagDescription),
@@ -441,10 +447,10 @@ export const queueApi = api.injectEndpoints({
         url: buildQueueUrl(`item_ids?${queryString.stringify(queryArgs)}`),
         method: 'GET',
       }),
-      providesTags: (result, error, queryArgs) => [
-        'QueueItemIdList',
+      providesTags: (queryArgs) => [
         'FetchOnReconnect',
-        { type: 'QueueItemIdList', id: stableHash(queryArgs) },
+        'SessionQueueItemIdList',
+        { type: 'SessionQueueItemIdList', id: stableHash(queryArgs) },
       ],
     }),
     getQueueItemDTOsByItemIds: build.mutation<GetQueueItemDTOsByItemIdsResult, GetQueueItemDTOsByItemIdsArgs>({
