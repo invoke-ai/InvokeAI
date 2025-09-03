@@ -2224,6 +2224,9 @@
         "uploadOrDragAnImage": "Drag an image from the gallery or <UploadButton>upload an image</UploadButton>.",
         "imageNoise": "Image Noise",
         "denoiseLimit": "Denoise Limit",
+        "toolWidthSelector": "Tool Width Selector",
+        "toolWidthSelectorDropDown": "Drop-down",
+        "toolWidthSelectorSlider": "Slider",
         "warnings": {
             "problemsFound": "Problems found",
             "unsupportedModel": "layer not supported for selected base model",
