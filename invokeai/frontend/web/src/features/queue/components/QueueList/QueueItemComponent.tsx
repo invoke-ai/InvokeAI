@@ -33,15 +33,8 @@ const sx: ChakraProps['sx'] = {
 const QueueItemComponent = ({ index, item }: InnerItemProps) => {
   const { t } = useTranslation();
   const isRetryEnabled = useFeatureStatus('retryQueueItem');
-  const [openQueueItems, setOpenQueueItems] = useState<number[]>([]);
-  const handleToggle = useCallback(() => {
-    setOpenQueueItems((prev) => {
-      if (prev.includes(item.item_id)) {
-        return prev.filter((id) => id !== item.item_id);
-      }
-      return [...prev, item.item_id];
-    });
-  }, [item]);
+  const [isOpen, setIsOpen] = useState(false);
+  const handleToggle = useCallback(() => setIsOpen((s) => !s), [setIsOpen]);
   const cancelQueueItem = useCancelQueueItem();
   const onClickCancelQueueItem = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
@@ -58,7 +51,6 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
     },
     [item.item_id, retryQueueItem]
   );
-  const isOpen = useMemo(() => openQueueItems.includes(item.item_id), [openQueueItems, item.item_id]);
 
   const executionTime = useMemo(() => {
     if (!item.completed_at || !item.started_at) {
