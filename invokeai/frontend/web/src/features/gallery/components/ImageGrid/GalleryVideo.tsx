@@ -83,7 +83,6 @@ const buildOnClick =
 
 export const GalleryVideo = memo(({ videoDTO }: Props) => {
   const store = useAppStore();
-
   const [isDragging, setIsDragging] = useState(false);
   const [dragPreviewState, setDragPreviewState] = useState<
     DndDragPreviewSingleVideoState | DndDragPreviewMultipleVideoState | null

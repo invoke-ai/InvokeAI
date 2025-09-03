@@ -34,7 +34,6 @@ interface GalleryBoardProps {
 const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const autoAssignBoardOnClick = useAppSelector(selectAutoAssignBoardOnClick);
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
