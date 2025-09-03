@@ -16,7 +16,6 @@ type Props = {
 
 export const BoardTooltip = ({ board, boardCounts }: Props) => {
   const { t } = useTranslation();
-
   const isVideoEnabled = useFeatureStatus('video');
 
   const { currentData: coverImage } = useGetImageDTOQuery(board?.cover_image_name ?? skipToken);

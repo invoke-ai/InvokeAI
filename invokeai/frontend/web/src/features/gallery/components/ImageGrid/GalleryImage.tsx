@@ -87,7 +87,6 @@ const buildOnClick =
 
 export const GalleryImage = memo(({ imageDTO }: Props) => {
   const store = useAppStore();
-
   const [isDragging, setIsDragging] = useState(false);
   const [dragPreviewState, setDragPreviewState] = useState<
     DndDragPreviewSingleImageState | DndDragPreviewMultipleImageState | null
