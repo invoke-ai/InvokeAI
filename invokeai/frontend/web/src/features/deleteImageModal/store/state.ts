@@ -89,15 +89,15 @@ const handleDeletions = async (image_names: string[], store: AppStore) => {
     const newImageNames = data?.image_names.filter((name) => !deleted_images.includes(name)) || [];
     const newSelectedImage = newImageNames[index ?? 0] || null;
 
-    if (
-      intersection(
-        state.gallery.selection.map((s) => s.id),
-        image_names
-      ).length > 0 &&
-      newSelectedImage
-    ) {
-      // Some selected images were deleted, clear selection
-      dispatch(itemSelected({ type: 'image', id: newSelectedImage }));
+    const galleryImageNames = state.gallery.selection.map((s) => s.id);
+
+    if (intersection(galleryImageNames, image_names).length > 0) {
+      if (newSelectedImage) {
+        // Some selected images were deleted, clear selection
+        dispatch(itemSelected({ type: 'image', id: newSelectedImage }));
+      } else {
+        dispatch(itemSelected(null));
+      }
     }
 
     // We need to reset the features where the image is in use - none of these work if their image(s) don't exist
