@@ -6,7 +6,7 @@ import type { SliceConfig } from 'app/store/types';
 import { type GetQueueItemIdsArgs, zSQLiteDirection } from 'services/api/types';
 import z from 'zod';
 
-const zSortBy = z.enum(['status', 'created_at', 'completed_at']);
+const zSortBy = z.enum(['created_at', 'completed_at']);
 export type SortBy = z.infer<typeof zSortBy>;
 
 const zQueueState = z.object({
