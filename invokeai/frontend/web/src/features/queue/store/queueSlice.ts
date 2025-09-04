@@ -10,38 +10,20 @@ const zSortBy = z.enum(['created_at', 'completed_at']);
 export type SortBy = z.infer<typeof zSortBy>;
 
 const zQueueState = z.object({
-  listCursor: z.number().optional(),
-  listPriority: z.number().optional(),
-  selectedQueueItem: z.string().optional(),
   sortBy: zSortBy,
   sortOrder: zSQLiteDirection,
-  resumeProcessorOnEnqueue: z.boolean(),
 });
 type QueueState = z.infer<typeof zQueueState>;
 
 const getInitialState = (): QueueState => ({
-  listCursor: undefined,
-  listPriority: undefined,
-  selectedQueueItem: undefined,
   sortBy: 'created_at',
   sortOrder: 'DESC',
-  resumeProcessorOnEnqueue: true,
 });
 
 const slice = createSlice({
   name: 'queue',
   initialState: getInitialState(),
   reducers: {
-    listCursorChanged: (state, action: PayloadAction<number | undefined>) => {
-      state.listCursor = action.payload;
-    },
-    listPriorityChanged: (state, action: PayloadAction<number | undefined>) => {
-      state.listPriority = action.payload;
-    },
-    listParamsReset: (state) => {
-      state.listCursor = undefined;
-      state.listPriority = undefined;
-    },
     sortByChanged: (state, action: PayloadAction<SortBy>) => {
       state.sortBy = action.payload;
     },
@@ -51,7 +33,7 @@ const slice = createSlice({
   },
 });
 
-export const { listCursorChanged, listPriorityChanged, sortByChanged, sortOrderChanged } = slice.actions;
+export const { sortByChanged, sortOrderChanged } = slice.actions;
 
 export const queueSliceConfig: SliceConfig<typeof slice> = {
   slice,
