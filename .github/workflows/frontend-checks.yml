@@ -83,3 +83,20 @@ jobs:
         if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
         run: 'pnpm lint:knip'
         shell: bash
+
+      - name: translations
+        if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
+        run: |
+          echo "Checking for unused translations..."
+          if ! pnpm translations:check; then
+            echo ""
+            echo "❌ Translation file contains unused keys!"
+            echo ""
+            echo "To fix this, run:"
+            echo "  pnpm translations:clean"
+            echo "  pnpm fix"
+            echo ""
+            echo "Then commit the changes."
+            exit 1
+          fi
+        shell: bash
