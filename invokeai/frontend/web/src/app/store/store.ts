@@ -18,7 +18,8 @@ import { addModelsLoadedListener } from 'app/store/middleware/listenerMiddleware
 import { addSetDefaultSettingsListener } from 'app/store/middleware/listenerMiddleware/listeners/setDefaultSettings';
 import { addSocketConnectedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
 import { deepClone } from 'common/util/deepClone';
-import { keys, mergeWith, omit, pick } from 'es-toolkit/compat';
+import { merge } from 'es-toolkit';
+import { omit, pick } from 'es-toolkit/compat';
 import { changeBoardModalSliceConfig } from 'features/changeBoardModal/store/slice';
 import { canvasSettingsSliceConfig } from 'features/controlLayers/store/canvasSettingsSlice';
 import { canvasSliceConfig } from 'features/controlLayers/store/canvasSlice';
@@ -133,16 +134,14 @@ const unserialize: UnserializeFunction = (data, key) => {
     const initialState = getInitialState();
     const parsed = JSON.parse(data);
 
-    // strip out old keys
-    const stripped = pick(deepClone(parsed), keys(initialState));
-    /*
-     * Merge in initial state as default values, covering any missing keys. You might be tempted to use _.defaultsDeep,
-     * but that merges arrays by index and partial objects by key. Using an identity function as the customizer results
-     * in behaviour like defaultsDeep, but doesn't overwrite any values that are not undefined in the migrated state.
-     */
-    const unPersistDenylisted = mergeWith(stripped, initialState, (objVal) => objVal);
-    // run (additive) migrations
-    const migrated = persistConfig.migrate(unPersistDenylisted);
+    // We need to inject non-persisted values from initial state into the rehydrated state. These values always are
+    // required to be in the state, but won't be in the persisted data. Build an object that consists of only these
+    // values, then merge it with the rehydrated state.
+    const nonPersistedSubsetOfState = pick(initialState, persistConfig.persistDenylist ?? []);
+    const stateToMigrate = merge(deepClone(parsed), nonPersistedSubsetOfState);
+
+    // Run migrations to bring old state up to date with the current version.
+    const migrated = persistConfig.migrate(stateToMigrate);
 
     log.debug(
       {
