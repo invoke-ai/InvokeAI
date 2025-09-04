@@ -134,7 +134,6 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage, rect }: Co
             position="relative"
             id="image-comparison-second-image"
             src={secondImage.image_url}
-            fallbackSrc={secondImage.thumbnail_url}
             crossOrigin={crossOrigin}
             w={compareImageDims.width}
             h={compareImageDims.height}
@@ -157,7 +156,6 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage, rect }: Co
             <Image
               id="image-comparison-first-image"
               src={firstImage.image_url}
-              fallbackSrc={firstImage.thumbnail_url}
               crossOrigin={crossOrigin}
               w={fittedDims.width}
               h={fittedDims.height}

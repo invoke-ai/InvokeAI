@@ -55,7 +55,6 @@ const SideBySideImage = memo(({ imageDTO, type }: { imageDTO: ImageDTO; type: 'f
           maxW="full"
           maxH="full"
           src={imageDTO.image_url}
-          fallbackSrc={imageDTO.thumbnail_url}
           crossOrigin={crossOrigin}
           objectFit="contain"
           borderRadius="base"

@@ -56,7 +56,6 @@ export const ImageComparisonHover = memo(({ firstImage, secondImage, rect }: Com
           <Image
             id="image-comparison-hover-first-image"
             src={firstImage.image_url}
-            fallbackSrc={firstImage.thumbnail_url}
             crossOrigin={crossOrigin}
             w={fittedDims.width}
             h={fittedDims.height}
@@ -93,7 +92,6 @@ export const ImageComparisonHover = memo(({ firstImage, secondImage, rect }: Com
               position="relative"
               id="image-comparison-hover-second-image"
               src={secondImage.image_url}
-              fallbackSrc={secondImage.thumbnail_url}
               crossOrigin={crossOrigin}
               w={compareImageDims.width}
               h={compareImageDims.height}

@@ -75,7 +75,6 @@ export const DndImage = memo(
           role="button"
           ref={ref}
           src={asThumbnail ? imageDTO.thumbnail_url : imageDTO.image_url}
-          fallbackSrc={asThumbnail ? undefined : imageDTO.thumbnail_url}
           width={imageDTO.width}
           height={imageDTO.height}
           sx={sx}
