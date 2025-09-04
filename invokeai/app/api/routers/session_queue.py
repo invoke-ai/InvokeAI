@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import (
-    QUEUE_ITEM_STATUS,
     QUEUE_ORDER_BY,
     Batch,
     BatchStatus,
@@ -27,7 +26,6 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueItemNotFoundError,
     SessionQueueStatus,
 )
-from invokeai.app.services.shared.pagination import CursorPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
 session_queue_router = APIRouter(prefix="/v1/queue", tags=["queue"])
