@@ -72,36 +72,6 @@ async def enqueue_batch(
 
 
 @session_queue_router.get(
-    "/{queue_id}/list",
-    operation_id="list_queue_items",
-    responses={
-        200: {"model": CursorPaginatedResults[SessionQueueItem]},
-    },
-)
-async def list_queue_items(
-    queue_id: str = Path(description="The queue id to perform this operation on"),
-    limit: int = Query(default=50, description="The number of items to fetch"),
-    status: Optional[QUEUE_ITEM_STATUS] = Query(default=None, description="The status of items to fetch"),
-    cursor: Optional[int] = Query(default=None, description="The pagination cursor"),
-    priority: int = Query(default=0, description="The pagination cursor priority"),
-    destination: Optional[str] = Query(default=None, description="The destination of queue items to fetch"),
-) -> CursorPaginatedResults[SessionQueueItem]:
-    """Gets cursor-paginated queue items"""
-
-    try:
-        return ApiDependencies.invoker.services.session_queue.list_queue_items(
-            queue_id=queue_id,
-            limit=limit,
-            status=status,
-            cursor=cursor,
-            priority=priority,
-            destination=destination,
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Unexpected error while listing all items: {e}")
-
-
-@session_queue_router.get(
     "/{queue_id}/list_all",
     operation_id="list_all_queue_items",
     responses={

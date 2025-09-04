@@ -51,8 +51,7 @@ const slice = createSlice({
   },
 });
 
-export const { listCursorChanged, listPriorityChanged, listParamsReset, sortByChanged, sortOrderChanged } =
-  slice.actions;
+export const { listCursorChanged, listPriorityChanged, sortByChanged, sortOrderChanged } = slice.actions;
 
 export const queueSliceConfig: SliceConfig<typeof slice> = {
   slice,

@@ -23,7 +23,7 @@ import { LRUCache } from 'lru-cache';
 import type { ApiTagDescription } from 'services/api';
 import { api, LIST_ALL_TAG, LIST_TAG } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
-import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
+import { queueApi } from 'services/api/endpoints/queue';
 import { workflowsApi } from 'services/api/endpoints/workflows';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import { buildOnModelInstallError } from 'services/events/onModelInstallError';
@@ -364,20 +364,15 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
     // // Update this specific queue item in the list of queue items
     dispatch(
-      queueApi.util.updateQueryData('listQueueItems', undefined, (draft) => {
-        queueItemsAdapter.updateOne(draft, {
-          id: String(item_id),
-          changes: {
-            status,
-            started_at,
-            updated_at: updated_at ?? undefined,
-            completed_at: completed_at ?? undefined,
-            error_type,
-            error_message,
-            error_traceback,
-            credits,
-          },
-        });
+      queueApi.util.updateQueryData('getQueueItem', item_id, (draft) => {
+        draft.status = status;
+        draft.started_at = started_at;
+        draft.updated_at = updated_at;
+        draft.completed_at = completed_at;
+        draft.error_type = error_type;
+        draft.error_message = error_message;
+        draft.error_traceback = error_traceback;
+        draft.credits = credits;
       })
     );
 

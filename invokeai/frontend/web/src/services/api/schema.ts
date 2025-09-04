@@ -1379,26 +1379,6 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/queue/{queue_id}/list": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Queue Items
-         * @description Gets cursor-paginated queue items
-         */
-        get: operations["list_queue_items"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/queue/{queue_id}/list_all": {
         parameters: {
             query?: never;
@@ -6205,24 +6185,6 @@ export type components = {
              * @constant
              */
             type: "crop_latents";
-        };
-        /** CursorPaginatedResults[SessionQueueItem] */
-        CursorPaginatedResults_SessionQueueItem_: {
-            /**
-             * Limit
-             * @description Limit of items to get
-             */
-            limit: number;
-            /**
-             * Has More
-             * @description Whether there are more items available
-             */
-            has_more: boolean;
-            /**
-             * Items
-             * @description Items
-             */
-            items: components["schemas"]["SessionQueueItem"][];
         };
         /**
          * OpenCV Inpaint
@@ -18142,15 +18104,13 @@ export type components = {
             /**
              * Created At
              * @description The timestamp when the queue item was created
-             * @default null
              */
-            created_at: string | null;
+            created_at: string;
             /**
              * Updated At
              * @description The timestamp when the queue item was last updated
-             * @default null
              */
-            updated_at: string | null;
+            updated_at: string;
             /**
              * Started At
              * @description The timestamp when the queue item was started
@@ -25894,49 +25854,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnqueueBatchResult"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_queue_items: {
-        parameters: {
-            query?: {
-                /** @description The number of items to fetch */
-                limit?: number;
-                /** @description The status of items to fetch */
-                status?: ("pending" | "in_progress" | "completed" | "failed" | "canceled") | null;
-                /** @description The pagination cursor */
-                cursor?: number | null;
-                /** @description The pagination cursor priority */
-                priority?: number;
-                /** @description The destination of queue items to fetch */
-                destination?: string | null;
-            };
-            header?: never;
-            path: {
-                /** @description The queue id to perform this operation on */
-                queue_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CursorPaginatedResults_SessionQueueItem_"];
                 };
             };
             /** @description Validation Error */
