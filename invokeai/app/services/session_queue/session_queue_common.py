@@ -174,7 +174,7 @@ class Batch(BaseModel):
 
 DEFAULT_QUEUE_ID = "default"
 
-QUEUE_ORDER_BY = Literal["status", "created_at", "completed_at"]
+QUEUE_ORDER_BY = Literal["created_at", "completed_at"]
 QUEUE_ITEM_STATUS = Literal["pending", "in_progress", "completed", "failed", "canceled"]
 
 
