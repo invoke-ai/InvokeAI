@@ -1,6 +1,4 @@
 import { useStore } from '@nanostores/react';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { listCursorChanged, listPriorityChanged } from 'features/queue/store/queueSlice';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,7 +6,6 @@ import { useGetQueueStatusQuery, usePruneQueueMutation } from 'services/api/endp
 import { $isConnected } from 'services/events/stores';
 
 export const usePruneQueue = () => {
-  const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const isConnected = useStore($isConnected);
   const finishedCount = useFinishedCount();
@@ -24,8 +21,6 @@ export const usePruneQueue = () => {
         title: t('queue.pruneSucceeded', { item_count: data.deleted }),
         status: 'success',
       });
-      dispatch(listCursorChanged(undefined));
-      dispatch(listPriorityChanged(undefined));
     } catch {
       toast({
         id: 'PRUNE_FAILED',
@@ -33,7 +28,7 @@ export const usePruneQueue = () => {
         status: 'error',
       });
     }
-  }, [_trigger, dispatch, t]);
+  }, [_trigger, t]);
 
   return { trigger, isLoading, isDisabled: !isConnected || !finishedCount };
 };
