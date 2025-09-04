@@ -130,8 +130,7 @@ export const getOriginalAndScaledSizesForTextToImage = (state: RootState) => {
     const scaledSize = ['auto', 'manual'].includes(canvas.bbox.scaleMethod) ? canvas.bbox.scaledSize : originalSize;
     return { originalSize, scaledSize, aspectRatio };
   } else if (tab === 'generate') {
-    const { rect, aspectRatio } = params.dimensions;
-    const { width, height } = rect;
+    const { width, height, aspectRatio } = params.dimensions;
     return {
       originalSize: { width, height },
       scaledSize: { width, height },

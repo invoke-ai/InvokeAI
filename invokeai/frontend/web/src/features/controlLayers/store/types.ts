@@ -558,18 +558,13 @@ const zBboxState = z.object({
 });
 
 const zDimensionsState = z.object({
-  // TODO(psyche): There is no concept of x/y coords for the dimensions state here... It's just width and height.
-  // Remove the extraneous data.
-  rect: z.object({
-    x: z.number().int(),
-    y: z.number().int(),
-    width: zParameterImageDimension,
-    height: zParameterImageDimension,
-  }),
+  width: zParameterImageDimension,
+  height: zParameterImageDimension,
   aspectRatio: zAspectRatioConfig,
 });
 
 export const zParamsState = z.object({
+  _version: z.literal(1),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -617,6 +612,7 @@ export const zParamsState = z.object({
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
+  _version: 1,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -661,7 +657,8 @@ export const getInitialParamsState = (): ParamsState => ({
   clipGEmbedModel: null,
   controlLora: null,
   dimensions: {
-    rect: { x: 0, y: 0, width: 512, height: 512 },
+    width: 512,
+    height: 512,
     aspectRatio: deepClone(DEFAULT_ASPECT_RATIO_CONFIG),
   },
 });
