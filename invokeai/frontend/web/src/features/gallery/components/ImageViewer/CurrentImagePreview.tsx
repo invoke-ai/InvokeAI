@@ -49,7 +49,14 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       position="relative"
     >
       {imageDTO && (
-        <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center">
+        <Flex
+          key={imageDTO.image_name}
+          w="full"
+          h="full"
+          position="absolute"
+          alignItems="center"
+          justifyContent="center"
+        >
           <DndImage imageDTO={imageDTO} onLoad={onLoadImage} borderRadius="base" />
         </Flex>
       )}
