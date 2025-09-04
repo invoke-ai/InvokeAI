@@ -24,7 +24,6 @@ const QueueListHeader = () => {
     >
       <QueueListHeaderColumn displayName="#" w={COLUMN_WIDTHS.number} alignItems="center" />
       <QueueListHeaderColumn
-        field="status"
         displayName={t('queue.status')}
         ps={0.5}
         w={COLUMN_WIDTHS.statusBadge}

@@ -12777,14 +12777,14 @@ export type components = {
              * Convert Cache Dir
              * Format: path
              * @description Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).
-             * @default models/.convert_cache
+             * @default models\.convert_cache
              */
             convert_cache_dir?: string;
             /**
              * Download Cache Dir
              * Format: path
              * @description Path to the directory that contains dynamically downloaded models.
-             * @default models/.download_cache
+             * @default models\.download_cache
              */
             download_cache_dir?: string;
             /**
@@ -25989,7 +25989,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description The sort field */
-                order_by?: "status" | "created_at" | "completed_at";
+                order_by?: "created_at" | "completed_at";
                 /** @description The order of sort */
                 order_dir?: components["schemas"]["SQLiteDirection"];
             };
