@@ -86,7 +86,7 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
           <QueueStatusBadge status={item.status} />
         </Flex>
         <Flex w={COLUMN_WIDTHS.createdAt} alignItems="center" flexShrink={0}>
-          {item.completed_at || '-'}
+          {item.created_at}
         </Flex>
         <Flex w={COLUMN_WIDTHS.completedAt} alignItems="center" flexShrink={0}>
           {item.completed_at || '-'}
