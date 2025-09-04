@@ -48,6 +48,8 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
 
         if (imageToSelect) {
           dispatch(itemSelected({ type: 'image', id: imageToSelect }));
+        } else {
+          dispatch(itemSelected(null));
         }
       } else {
         const queryArgs = { ...selectGetVideoIdsQueryArgs(state), board_id };
@@ -70,6 +72,8 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
 
         if (videoToSelect) {
           dispatch(itemSelected({ type: 'video', id: videoToSelect }));
+        } else {
+          dispatch(itemSelected(null));
         }
       }
     },
