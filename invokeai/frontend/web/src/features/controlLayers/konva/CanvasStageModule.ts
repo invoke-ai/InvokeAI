@@ -125,9 +125,14 @@ export class CanvasStageModule extends CanvasModuleBase {
     this.konva.stage.on('dragmove', this.onStageDragMove);
     this.konva.stage.on('dragend', this.onStageDragEnd);
 
-    // Start dragging the stage when the middle mouse button is clicked. We do not need to listen for 'pointerdown' to
-    // do cleanup - that is done in onStageDragEnd.
+    // Start dragging the stage when the middle mouse button is clicked and stop dragging when it's released.
+    // We _also_ stop dragging on dragend - but in case the user doesn't actually start a drag (just clicks MMB once),
+    // we still need to stop dragging.
+    //
+    // Why start dragging on pointerdown instead of dragstart? Because it allows us to immediately show the cursor as
+    // grabbing, instead of waiting for the user to actually move the mouse to start the drag. Minor UX affordance.
     this.konva.stage.on('pointerdown', this.onStagePointerDown);
+    this.konva.stage.on('pointerup', this.onStagePointerUp);
 
     this.subscriptions.add(() => this.konva.stage.off('wheel', this.onStageMouseWheel));
     this.subscriptions.add(() => this.konva.stage.off('dragmove', this.onStageDragMove));
@@ -435,6 +440,13 @@ export class CanvasStageModule extends CanvasModuleBase {
     // If the middle mouse button is clicked and we are not already dragging, start dragging the stage
     if (e.evt.button === 1) {
       this.startDragging();
+    }
+  };
+
+  onStagePointerUp = (e: KonvaEventObject<PointerEvent>) => {
+    // If the middle mouse button is released and we are dragging, stop dragging the stage
+    if (e.evt.button === 1) {
+      this.stopDragging();
     }
   };
 
