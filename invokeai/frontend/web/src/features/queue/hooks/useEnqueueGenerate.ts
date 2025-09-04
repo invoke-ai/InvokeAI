@@ -35,8 +35,6 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
 
   const state = getState();
 
-  const destination = 'generate';
-
   const model = state.params.model;
   if (!model) {
     log.error('No model found in state');
@@ -105,8 +103,8 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
       prepend,
       seedNode: seed,
       positivePromptNode: positivePrompt,
-      origin: 'canvas',
-      destination,
+      origin: 'generate',
+      destination: 'generate',
     })
   );
 
