@@ -18,5 +18,6 @@
 
 - [ ] _The PR has a short but descriptive title, suitable for a changelog_
 - [ ] _Tests added / updated (if applicable)_
+- [ ] _❗Changes to a redux slice have a corresponding migration_
 - [ ] _Documentation added / updated (if applicable)_
 - [ ] _Updated `What's New` copy (if doing a release after this PR)_
