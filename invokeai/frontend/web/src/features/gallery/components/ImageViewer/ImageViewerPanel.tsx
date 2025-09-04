@@ -19,6 +19,10 @@ export const ImageViewerPanel = memo(() => {
 
   return (
     <ImageViewerContextProvider>
+      {
+        // The image viewer renders progress images - if no image is selected, show the image viewer anyway
+        !isComparing && !lastSelectedItem && <ImageViewer />
+      }
       {!isComparing && lastSelectedItem?.type === 'image' && <ImageViewer />}
       {!isComparing && lastSelectedItem?.type === 'video' && <VideoViewer />}
       {isComparing && <ImageComparison />}
