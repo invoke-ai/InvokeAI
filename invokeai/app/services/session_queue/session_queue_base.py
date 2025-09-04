@@ -139,19 +139,6 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def list_queue_items(
-        self,
-        queue_id: str,
-        limit: int,
-        priority: int,
-        cursor: Optional[int] = None,
-        status: Optional[QUEUE_ITEM_STATUS] = None,
-        destination: Optional[str] = None,
-    ) -> CursorPaginatedResults[SessionQueueItem]:
-        """Gets a page of session queue items"""
-        pass
-
-    @abstractmethod
     def list_all_queue_items(
         self,
         queue_id: str,

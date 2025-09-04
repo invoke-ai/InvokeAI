@@ -590,59 +590,6 @@ class SqliteSessionQueue(SessionQueueBase):
             )
         return self.get_queue_item(item_id)
 
-    def list_queue_items(
-        self,
-        queue_id: str,
-        limit: int,
-        priority: int,
-        cursor: Optional[int] = None,
-        status: Optional[QUEUE_ITEM_STATUS] = None,
-        destination: Optional[str] = None,
-    ) -> CursorPaginatedResults[SessionQueueItem]:
-        with self._db.transaction() as cursor_:
-            item_id = cursor
-            query = """--sql
-                SELECT *
-                FROM session_queue
-                WHERE queue_id = ?
-            """
-            params: list[Union[str, int]] = [queue_id]
-
-            if status is not None:
-                query += """--sql
-                    AND status = ?
-                    """
-                params.append(status)
-
-            if destination is not None:
-                query += """---sql
-                    AND destination = ?
-                """
-                params.append(destination)
-
-            if item_id is not None:
-                query += """--sql
-                    AND (priority < ?) OR (priority = ? AND item_id > ?)
-                    """
-                params.extend([priority, priority, item_id])
-
-            query += """--sql
-                ORDER BY
-                    priority DESC,
-                    item_id ASC
-                LIMIT ?
-                """
-            params.append(limit + 1)
-            cursor_.execute(query, params)
-            results = cast(list[sqlite3.Row], cursor_.fetchall())
-        items = [SessionQueueItem.queue_item_from_dict(dict(result)) for result in results]
-        has_more = False
-        if len(items) > limit:
-            # remove the extra item
-            items.pop()
-            has_more = True
-        return CursorPaginatedResults(items=items, limit=limit, has_more=has_more)
-
     def list_all_queue_items(
         self,
         queue_id: str,

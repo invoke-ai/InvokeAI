@@ -234,8 +234,8 @@ class QueueItemStatusChangedEvent(QueueItemEventBase):
     error_type: Optional[str] = Field(default=None, description="The error type, if any")
     error_message: Optional[str] = Field(default=None, description="The error message, if any")
     error_traceback: Optional[str] = Field(default=None, description="The error traceback, if any")
-    created_at: Optional[str] = Field(default=None, description="The timestamp when the queue item was created")
-    updated_at: Optional[str] = Field(default=None, description="The timestamp when the queue item was last updated")
+    created_at: str = Field(description="The timestamp when the queue item was created")
+    updated_at: str = Field(description="The timestamp when the queue item was last updated")
     started_at: Optional[str] = Field(default=None, description="The timestamp when the queue item was started")
     completed_at: Optional[str] = Field(default=None, description="The timestamp when the queue item was completed")
     batch_status: BatchStatus = Field(description="The status of the batch")
@@ -258,8 +258,8 @@ class QueueItemStatusChangedEvent(QueueItemEventBase):
             error_type=queue_item.error_type,
             error_message=queue_item.error_message,
             error_traceback=queue_item.error_traceback,
-            created_at=str(queue_item.created_at) if queue_item.created_at else None,
-            updated_at=str(queue_item.updated_at) if queue_item.updated_at else None,
+            created_at=str(queue_item.created_at),
+            updated_at=str(queue_item.updated_at),
             started_at=str(queue_item.started_at) if queue_item.started_at else None,
             completed_at=str(queue_item.completed_at) if queue_item.completed_at else None,
             batch_status=batch_status,
