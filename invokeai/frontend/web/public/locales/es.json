@@ -47,11 +47,8 @@
         "editor": "Editor",
         "orderBy": "Ordenar por",
         "file": "Archivo",
-        "goTo": "Ir a",
-        "imageFailedToLoad": "No se puede cargar la imagen",
         "saveAs": "Guardar Como",
         "somethingWentWrong": "Algo salió mal",
-        "nextPage": "Página Siguiente",
         "selected": "Seleccionado",
         "tab": "Tabulador",
         "positivePrompt": "Prompt Positivo",
@@ -61,7 +58,6 @@
         "unknown": "Desconocido",
         "input": "Entrada",
         "template": "Plantilla",
-        "prevPage": "Página Anterior",
         "red": "Rojo",
         "alpha": "Transparencia",
         "outputs": "Resultados",
@@ -94,8 +90,6 @@
         "edit": "Editar",
         "safetensors": "Safetensors",
         "toResolve": "Para resolver",
-        "localSystem": "Sistema local",
-        "notInstalled": "No $t(common.installed)",
         "outpaint": "outpaint",
         "simple": "Sencillo",
         "close": "Cerrar"
@@ -104,7 +98,6 @@
         "galleryImageSize": "Tamaño de la imagen",
         "gallerySettings": "Ajustes de la galería",
         "autoSwitchNewImages": "Auto seleccionar Imágenes nuevas",
-        "noImagesInGallery": "No hay imágenes para mostrar",
         "deleteImage_one": "Eliminar Imagen",
         "deleteImage_many": "Eliminar {{count}} Imágenes",
         "deleteImage_other": "Eliminar {{count}} Imágenes",
@@ -118,9 +111,7 @@
         "selectForCompare": "Seleccionar para comparar",
         "alwaysShowImageSizeBadge": "Mostrar siempre las dimensiones de la imagen",
         "currentlyInUse": "Esta imagen se utiliza actualmente con las siguientes funciones:",
-        "unableToLoad": "No se puede cargar la galería",
         "selectAllOnPage": "Seleccionar todo en la página",
-        "selectAnImageToCompare": "Seleccione una imagen para comparar",
         "bulkDownloadFailed": "Error en la descarga",
         "compareHelp2": "Presione <Kbd> M </Kbd> para recorrer los modos de comparación.",
         "move": "Mover",
@@ -145,7 +136,6 @@
         "exitBoardSearch": "Finalizar búsqueda",
         "exitSearch": "Salir de la búsqueda de imágenes",
         "featuresWillReset": "Si elimina esta imagen, dichas funciones se restablecerán inmediatamente.",
-        "jump": "Omitir",
         "loading": "Cargando",
         "newestFirst": "La más nueva primero",
         "unstarImage": "Dejar de ser favorita",
@@ -163,9 +153,7 @@
         "boardsSettings": "Ajustes de los tableros",
         "imagesSettings": "Configuración de imágenes de la galería",
         "compareHelp3": "Presione <Kbd> C </Kbd> para intercambiar las imágenes comparadas.",
-        "showArchivedBoards": "Mostrar paneles archivados",
-        "closeViewer": "Cerrar visor",
-        "openViewer": "Abrir visor"
+        "showArchivedBoards": "Mostrar paneles archivados"
     },
     "modelManager": {
         "modelManager": "Gestor de Modelos",
@@ -239,12 +227,10 @@
         "scaledHeight": "Alto escalado",
         "infillMethod": "Método de relleno",
         "tileSize": "Tamaño del mosaico",
-        "downloadImage": "Descargar imagen",
         "usePrompt": "Usar Entrada",
         "useSeed": "Usar Semilla",
         "useAll": "Usar Todo",
         "info": "Información",
-        "showOptionsPanel": "Mostrar panel lateral (O o T)",
         "symmetry": "Simetría",
         "copyImage": "Copiar la imagen",
         "general": "General",
@@ -323,8 +309,6 @@
         "hideMinimapnodes": "Ocultar el minimapa",
         "fitViewportNodes": "Ajustar la vista",
         "zoomOutNodes": "Alejar",
-        "hideLegendNodes": "Ocultar la leyenda del tipo de campo",
-        "showLegendNodes": "Mostrar la leyenda del tipo de campo",
         "showMinimapnodes": "Mostrar el minimapa",
         "reloadNodeTemplates": "Recargar las plantillas de nodos",
         "loadWorkflow": "Cargar el flujo de trabajo",
@@ -361,7 +345,6 @@
         "assetsWithCount_one": "{{count}} activo",
         "assetsWithCount_many": "{{count}} activos",
         "assetsWithCount_other": "{{count}} activos",
-        "hideBoards": "Ocultar paneles",
         "addPrivateBoard": "Agregar un panel privado",
         "addSharedBoard": "Añadir panel compartido",
         "boards": "Paneles",
@@ -372,7 +355,6 @@
         "noBoards": "No hay paneles {{boardType}}",
         "shared": "Paneles compartidos",
         "deletedPrivateBoardsCannotbeRestored": "Los paneles eliminados no se pueden restaurar. Al elegir \"Eliminar solo el panel\", las imágenes se colocan en un estado privado y sin categoría para el creador de la imagen.",
-        "viewBoards": "Ver paneles",
         "private": "Paneles privados",
         "updateBoardError": "No se pudo actualizar el panel"
     },
@@ -494,15 +476,11 @@
         "layer_one": "Capa",
         "layer_many": "Capas",
         "layer_other": "Capas",
-        "layer_withCount_one": "({{count}}) capa",
-        "layer_withCount_many": "({{count}}) capas",
-        "layer_withCount_other": "({{count}}) capas",
         "copyToClipboard": "Copiar al portapapeles"
     },
     "whatsNew": {
         "readReleaseNotes": "Leer las notas de la versión",
         "watchRecentReleaseVideos": "Ver videos de versiones recientes",
-        "watchUiUpdatesOverview": "Descripción general de las actualizaciones de la interfaz de usuario de Watch",
         "whatsNewInInvoke": "Novedades en Invoke",
         "items": [
             "<StrongComponent>SD 3.5</StrongComponent>: compatibilidad con SD 3.5 Medium y Large."
@@ -527,13 +505,11 @@
     },
     "hrf": {
         "hrf": "Solución de alta resolución",
-        "enableHrf": "Activar corrección de alta resolución",
         "metadata": {
             "enabled": "Corrección de alta resolución activada",
             "strength": "Forzar la corrección de alta resolución",
             "method": "Método de corrección de alta resolución"
-        },
-        "upscaleMethod": "Método de expansión"
+        }
     },
     "prompt": {
         "addPromptTrigger": "Añadir activador de los avisos",
@@ -864,10 +840,8 @@
         "seed": "Semilla",
         "strength": "Forzar imagen a imagen",
         "recallParameters": "Parámetros de recuperación",
-        "recallParameter": "Recuperar {{label}}",
         "steps": "Pasos",
-        "noRecallParameters": "Sin parámetros para recuperar",
-        "parsingFailed": "Error al analizar"
+        "noRecallParameters": "Sin parámetros para recuperar"
     },
     "system": {
         "logLevel": {

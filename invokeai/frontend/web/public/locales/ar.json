@@ -14,8 +14,7 @@
     "gallery": {
         "galleryImageSize": "حجم الصورة",
         "gallerySettings": "إعدادات المعرض",
-        "autoSwitchNewImages": "التبديل التلقائي إلى الصور الجديدة",
-        "noImagesInGallery": "لا توجد صور في المعرض"
+        "autoSwitchNewImages": "التبديل التلقائي إلى الصور الجديدة"
     },
     "modelManager": {
         "modelManager": "مدير النموذج",
@@ -62,12 +61,10 @@
         "infillMethod": "طريقة التعبئة",
         "tileSize": "حجم البلاطة",
         "copyImage": "نسخ الصورة",
-        "downloadImage": "تحميل الصورة",
         "usePrompt": "استخدم المحث",
         "useSeed": "استخدام البذور",
         "useAll": "استخدام الكل",
-        "info": "معلومات",
-        "showOptionsPanel": "إظهار لوحة الخيارات"
+        "info": "معلومات"
     },
     "settings": {
         "models": "موديلات",

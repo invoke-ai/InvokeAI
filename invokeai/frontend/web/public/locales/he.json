@@ -50,8 +50,7 @@
     "gallery": {
         "galleryImageSize": "גודל תמונה",
         "gallerySettings": "הגדרות גלריה",
-        "autoSwitchNewImages": "החלף אוטומטית לתמונות חדשות",
-        "noImagesInGallery": "אין תמונות בגלריה"
+        "autoSwitchNewImages": "החלף אוטומטית לתמונות חדשות"
     },
     "parameters": {
         "images": "תמונות",
@@ -70,12 +69,10 @@
         "tileSize": "גודל אריח",
         "symmetry": "סימטריה",
         "copyImage": "העתקת תמונה",
-        "downloadImage": "הורדת תמונה",
         "usePrompt": "שימוש בבקשה",
         "useSeed": "שימוש בזרע",
         "useAll": "שימוש בהכל",
         "info": "פרטים",
-        "showOptionsPanel": "הצג חלונית אפשרויות",
         "shuffle": "ערבוב",
         "noiseThreshold": "סף רעש",
         "perlinNoise": "רעש פרלין",

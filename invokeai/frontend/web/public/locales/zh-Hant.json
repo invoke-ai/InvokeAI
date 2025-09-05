@@ -19,7 +19,6 @@
         "folder": "資料夾",
         "installed": "已安裝",
         "accept": "接受",
-        "goTo": "前往",
         "input": "輸入",
         "random": "隨機",
         "selected": "已選擇",
@@ -29,8 +28,7 @@
         "copy": "複製",
         "error": "錯誤",
         "file": "檔案",
-        "format": "格式",
-        "imageFailedToLoad": "無法載入圖片"
+        "format": "格式"
     },
     "accessibility": {
         "invokeProgressBar": "Invoke 進度條",
@@ -179,8 +177,7 @@
         "workflowAuthor": "作者",
         "version": "版本",
         "executionStateCompleted": "已完成",
-        "edge": "邊緣",
-        "versionUnknown": " 版本未知"
+        "edge": "邊緣"
     },
     "sdxl": {
         "steps": "步數",

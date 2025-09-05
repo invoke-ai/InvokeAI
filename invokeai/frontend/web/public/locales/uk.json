@@ -22,8 +22,7 @@
     "gallery": {
         "galleryImageSize": "Розмір зображень",
         "gallerySettings": "Налаштування галереї",
-        "autoSwitchNewImages": "Автоматично вибирати нові",
-        "noImagesInGallery": "Зображень немає"
+        "autoSwitchNewImages": "Автоматично вибирати нові"
     },
     "modelManager": {
         "modelManager": "Менеджер моделей",
@@ -80,12 +79,10 @@
         "scaledHeight": "Масштаб В",
         "infillMethod": "Засіб заповнення",
         "tileSize": "Розмір області",
-        "downloadImage": "Завантажити",
         "usePrompt": "Використати запит",
         "useSeed": "Використати сід",
         "useAll": "Використати все",
         "info": "Метадані",
-        "showOptionsPanel": "Показати панель налаштувань",
         "general": "Основне",
         "denoisingStrength": "Сила шумоподавлення",
         "copyImage": "Копіювати зображення",

@@ -27,7 +27,6 @@
         "save": "저장",
         "created": "생성됨",
         "error": "에러",
-        "prevPage": "이전 페이지",
         "ipAdapter": "IP 어댑터",
         "installed": "설치됨",
         "accept": "수락",
@@ -42,7 +41,6 @@
         "outputs": "결과물",
         "unknownError": "알려지지 않은 에러",
         "linear": "선형",
-        "imageFailedToLoad": "이미지를 로드할 수 없음",
         "direction": "방향",
         "data": "데이터",
         "somethingWentWrong": "뭔가 잘못됐어요",
@@ -52,7 +50,6 @@
         "orderBy": "정렬 기준",
         "copyError": "$t(gallery.copy) 에러",
         "learnMore": "더 알아보기",
-        "nextPage": "다음 페이지",
         "saveAs": "다른 이름으로 저장",
         "loading": "불러오는 중",
         "random": "랜덤",
@@ -60,18 +57,15 @@
         "postprocessing": "후처리",
         "advanced": "고급",
         "input": "입력",
-        "details": "세부사항",
-        "notInstalled": "설치되지 않음"
+        "details": "세부사항"
     },
     "gallery": {
         "galleryImageSize": "이미지 크기",
         "gallerySettings": "갤러리 설정",
         "deleteSelection": "선택 항목 삭제",
         "featuresWillReset": "이 이미지를 삭제하면 해당 기능이 즉시 재설정됩니다.",
-        "noImagesInGallery": "보여줄 이미지가 없음",
         "autoSwitchNewImages": "새로운 이미지로 자동 전환",
         "loading": "불러오는 중",
-        "unableToLoad": "갤러리를 로드할 수 없음",
         "image": "이미지",
         "drop": "드랍",
         "downloadSelection": "선택 항목 다운로드",
@@ -151,8 +145,6 @@
         "loadWorkflow": "Workflow 불러오기",
         "noOutputRecorded": "기록된 출력 없음",
         "colorCodeEdgesHelp": "연결된 필드에 따른 색상 코드 선",
-        "hideLegendNodes": "필드 유형 범례 숨기기",
-        "addLinearView": "Linear View에 추가",
         "float": "실수",
         "targetNodeFieldDoesNotExist": "잘못된 모서리: 대상/입력 필드 {{node}}. {{field}}이(가) 없습니다",
         "animatedEdges": "애니메이션 모서리",
@@ -160,7 +152,6 @@
         "nodeTemplate": "노드 템플릿",
         "nodeOpacity": "노드 불투명도",
         "sourceNodeDoesNotExist": "잘못된 모서리: 소스/출력 노드 {{node}}이(가) 없습니다",
-        "noFieldsLinearview": "Linear View에 추가된 필드 없음",
         "nodeSearch": "노드 검색",
         "inputMayOnlyHaveOneConnection": "입력에 하나의 연결만 있을 수 있습니다",
         "notes": "메모",
@@ -195,7 +186,6 @@
         "notesDescription": "Workflow에 대한 메모 추가",
         "colorCodeEdges": "색상-코드 선",
         "targetNodeDoesNotExist": "잘못된 모서리: 대상/입력 노드 {{node}}이(가) 없습니다",
-        "mismatchedVersion": "잘못된 노드: {{type}} 유형의 {{node}} 노드에 일치하지 않는 버전이 있습니다(업데이트 해보시겠습니까?)",
         "addNodeToolTip": "노드 추가(Shift+A, Space)",
         "collectionOrScalarFieldType": "{{name}} 컬렉션|Scalar",
         "nodeVersion": "노드 버전",
@@ -296,8 +286,6 @@
         "cacheSize": "캐시 크기"
     },
     "hrf": {
-        "enableHrf": "이용 가능한 고해상도 고정",
-        "upscaleMethod": "업스케일 방법",
         "metadata": {
             "strength": "고해상도 고정 강도",
             "enabled": "고해상도 고정 사용",
@@ -308,12 +296,10 @@
     "models": {
         "noMatchingModels": "일치하는 모델 없음",
         "loading": "로딩중",
-        "noMatchingLoRAs": "일치하는 LoRA 없음",
         "noModelsAvailable": "사용 가능한 모델이 없음",
         "addLora": "LoRA 추가",
         "selectModel": "모델 선택",
-        "noRefinerModelsInstalled": "SDXL Refiner 모델이 설치되지 않음",
-        "noLoRAsInstalled": "설치된 LoRA 없음"
+        "noRefinerModelsInstalled": "SDXL Refiner 모델이 설치되지 않음"
     },
     "boards": {
         "autoAddBoard": "자동 추가 Board",

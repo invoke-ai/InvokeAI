@@ -17,8 +17,7 @@
     "gallery": {
         "galleryImageSize": "Tamanho da Imagem",
         "gallerySettings": "Configurações de Galeria",
-        "autoSwitchNewImages": "Trocar para Novas Imagens Automaticamente",
-        "noImagesInGallery": "Sem Imagens na Galeria"
+        "autoSwitchNewImages": "Trocar para Novas Imagens Automaticamente"
     },
     "modelManager": {
         "modelManager": "Gerente de Modelo",
@@ -74,12 +73,10 @@
         "scaledHeight": "A Escalada",
         "infillMethod": "Método de Preenchimento",
         "tileSize": "Tamanho do Ladrilho",
-        "downloadImage": "Baixar Imagem",
         "usePrompt": "Usar Prompt",
         "useSeed": "Usar Seed",
         "useAll": "Usar Todos",
         "info": "Informações",
-        "showOptionsPanel": "Mostrar Painel de Opções",
         "symmetry": "Simetria",
         "copyImage": "Copiar imagem",
         "denoisingStrength": "A força de remoção de ruído",
