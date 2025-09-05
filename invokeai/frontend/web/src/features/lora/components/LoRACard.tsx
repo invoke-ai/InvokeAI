@@ -80,7 +80,7 @@ const LoRAContent = memo(({ lora }: { lora: LoRA }) => {
             onChange={handleChange}
             min={DEFAULT_LORA_WEIGHT_CONFIG.sliderMin}
             max={DEFAULT_LORA_WEIGHT_CONFIG.sliderMax}
-            step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
+            step={DEFAULT_LORA_WEIGHT_CONFIG.fineStep}
             marks={DEFAULT_LORA_WEIGHT_CONFIG.marks.slice()}
             defaultValue={DEFAULT_LORA_WEIGHT_CONFIG.initial}
             isDisabled={!lora.isEnabled}
@@ -90,7 +90,7 @@ const LoRAContent = memo(({ lora }: { lora: LoRA }) => {
             onChange={handleChange}
             min={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMin}
             max={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMax}
-            step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
+            step={DEFAULT_LORA_WEIGHT_CONFIG.fineStep}
             w={20}
             flexShrink={0}
             defaultValue={DEFAULT_LORA_WEIGHT_CONFIG.initial}
