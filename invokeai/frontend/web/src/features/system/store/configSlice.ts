@@ -11,8 +11,8 @@ export const DEFAULT_LORA_WEIGHT_CONFIG = {
   sliderMin: -1,
   sliderMax: 2,
   marks: [-1, 0, 1, 2],
-  numberInputMin: -1,
-  numberInputMax: 2,
+  numberInputMin: -10,
+  numberInputMax: 10,
   fineStep: 0.01,
   coarseStep: 0.05,
 } as const;
