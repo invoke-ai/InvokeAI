@@ -28,7 +28,6 @@
     "gallery": {
         "galleryImageSize": "Kuvan koko",
         "gallerySettings": "Gallerian asetukset",
-        "autoSwitchNewImages": "Vaihda uusiin kuviin automaattisesti",
-        "noImagesInGallery": "Ei kuvia galleriassa"
+        "autoSwitchNewImages": "Vaihda uusiin kuviin automaattisesti"
     }
 }

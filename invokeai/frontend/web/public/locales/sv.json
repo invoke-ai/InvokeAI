@@ -28,7 +28,6 @@
     "gallery": {
         "galleryImageSize": "Bildstorlek",
         "gallerySettings": "Galleriinställningar",
-        "noImagesInGallery": "Inga bilder i galleriet",
         "autoSwitchNewImages": "Ändra automatiskt till nya bilder"
     }
 }

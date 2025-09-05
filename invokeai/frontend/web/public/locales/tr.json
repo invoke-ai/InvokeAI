@@ -36,12 +36,10 @@
         "communityLabel": "Topluluk",
         "back": "Geri",
         "areYouSure": "Emin misiniz?",
-        "notInstalled": "$t(common.installed) Değil",
         "openInNewTab": "Yeni Sekmede Aç",
         "aboutHeading": "Yaratıcı Gücünüzün Sahibi Olun",
         "load": "Yükle",
         "loading": "Yükleniyor",
-        "localSystem": "Yerel Sistem",
         "inpaint": "içboyama",
         "modelManager": "Model Yöneticisi",
         "orderBy": "Sırala",
@@ -65,11 +63,8 @@
         "format": "biçim",
         "details": "Ayrıntılar",
         "error": "Hata",
-        "imageFailedToLoad": "Görsel Yüklenemedi",
         "safetensors": "Safetensors",
         "upload": "Yükle",
-        "nextPage": "Sonraki Sayfa",
-        "prevPage": "Önceki Sayfa",
         "dontAskMeAgain": "Bir daha sorma",
         "delete": "Kaldır",
         "direction": "Yön",
@@ -207,12 +202,10 @@
         "image": "görsel",
         "galleryImageSize": "Görsel Boyutu",
         "copy": "Kopyala",
-        "noImagesInGallery": "Gösterilecek Görsel Yok",
         "autoSwitchNewImages": "Yeni Görseli Biter Bitmez Gör",
         "currentlyInUse": "Bu görsel şurada kullanımda:",
         "deleteImage_one": "Görseli Sil",
         "deleteImage_other": "",
-        "unableToLoad": "Galeri Yüklenemedi",
         "downloadSelection": "Seçileni İndir",
         "dropOrUpload": "$t(gallery.drop) ya da Yükle",
         "dropToUpload": "Yüklemek için $t(gallery.drop)",
@@ -220,13 +213,11 @@
     },
     "hrf": {
         "hrf": "Yüksek Çözünürlük Kürü",
-        "enableHrf": "Yüksek Çözünürlük Kürünü Aç",
         "metadata": {
             "enabled": "Yüksek Çözünürlük Kürü Açık",
             "strength": "Yüksek Çözünürlük Kürü Etkisi",
             "method": "Yüksek Çözünürlük Kürü Yöntemi"
-        },
-        "upscaleMethod": "Büyütme Yöntemi"
+        }
     },
     "hotkeys": {
         "noHotkeysFound": "Kısayol Tuşu Bulanamadı",
@@ -256,7 +247,6 @@
         "unknownErrorValidatingWorkflow": "İş akışını doğrulamada bilinmeyen bir sorun",
         "unableToGetWorkflowVersion": "İş akışı sürümüne ulaşılamadı",
         "newWorkflowDesc2": "Geçerli iş akışında kaydedilmemiş değişiklikler var.",
-        "unableToLoadWorkflow": "İş Akışı Yüklenemedi",
         "cannotConnectInputToInput": "Giriş girişe bağlanamaz",
         "zoomInNodes": "Yakınlaştır",
         "boolean": "Boole Değeri",
@@ -267,16 +257,12 @@
         "cannotDuplicateConnection": "Kopya bağlantılar yaratılamaz"
     },
     "workflows": {
-        "searchWorkflows": "İş Akışlarında Ara",
         "workflowName": "İş Akışı Adı",
         "problemSavingWorkflow": "İş Akışını Kaydetmede Sorun",
         "saveWorkflow": "İş Akışını Kaydet",
         "uploadWorkflow": "Dosyadan Yükle",
         "newWorkflowCreated": "Yeni İş Akışı Yaratıldı",
-        "problemLoading": "İş Akışlarını Yüklemede Sorun",
         "loading": "İş Akışları Yükleniyor",
-        "noDescription": "Tanımsız",
-        "clearWorkflowSearchFilter": "İş Akışı Aramasını Resetle",
         "workflowEditorMenu": "İş Akışı Düzenleyici Menüsü",
         "downloadWorkflow": "İndir",
         "saveWorkflowAs": "İş Akışını Farklı Kaydet",
@@ -328,7 +314,6 @@
         "noiseThreshold": "Gürültü Eşiği",
         "seed": "Tohum",
         "imageActions": "Görsel İşlemleri",
-        "showOptionsPanel": "Yan Paneli Göster (O ya da T)",
         "shuffle": "Kar",
         "usePrompt": "İstemi Kullan",
         "setToOptimalSizeTooSmall": "$t(parameters.setToOptimalSize) (çok küçük olabilir)",
@@ -346,7 +331,6 @@
         "perlinNoise": "Perlin Gürültüsü",
         "scaledWidth": "Ölçekli En",
         "seamlessXAxis": "Dikişsiz Döşeme X Ekseni",
-        "downloadImage": "Görseli İndir",
         "type": "Tür"
     },
     "modelManager": {
@@ -399,11 +383,9 @@
         "defaultVAE": "Varsayılan VAE",
         "lora": "LoRA",
         "noModelsAvailable": "Model yok",
-        "noMatchingLoRAs": "Uygun LoRA Yok",
         "noMatchingModels": "Uygun Model Yok",
         "loading": "yükleniyor",
-        "selectModel": "Model Seçin",
-        "noLoRAsInstalled": "LoRA Yok"
+        "selectModel": "Model Seçin"
     },
     "settings": {
         "generation": "Oluşturma"
@@ -411,7 +393,6 @@
     "sdxl": {
         "cfgScale": "CFG Ölçeği",
         "loading": "Yükleniyor...",
-        "denoisingStrength": "Arındırma Ölçüsü",
-        "concatPromptStyle": "İstem ve Stili Bitiştir"
+        "denoisingStrength": "Arındırma Ölçüsü"
     }
 }
