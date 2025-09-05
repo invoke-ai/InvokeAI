@@ -127,7 +127,7 @@ export const QueueList = () => {
           ref={virtuosoRef}
           context={context}
           data={itemIds}
-          increaseViewportBy={4096}
+          increaseViewportBy={512}
           itemContent={itemContent}
           computeItemKey={computeItemKey}
           components={components}
