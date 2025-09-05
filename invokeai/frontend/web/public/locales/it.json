@@ -428,6 +428,14 @@
             "toggleBbox": {
                 "title": "Attiva/disattiva la visibilità del riquadro di delimitazione",
                 "desc": "Nascondi o mostra il riquadro di delimitazione della generazione"
+            },
+            "setFillColorsToDefault": {
+                "title": "Imposta i colori come predefiniti",
+                "desc": "Imposta i colori degli strumenti correnti sui valori predefiniti."
+            },
+            "toggleFillColor": {
+                "title": "Attiva/disattiva colore di riempimento",
+                "desc": "Attiva/disattiva il colore di riempimento dello strumento corrente."
             }
         },
         "workflows": {
@@ -2344,7 +2352,9 @@
             "solid": "Solido",
             "vertical": "Verticale",
             "horizontal": "Orizzontale",
-            "diagonal": "Diagonale"
+            "diagonal": "Diagonale",
+            "bgFillColor": "Colore di sfondo",
+            "fgFillColor": "Colore di primo piano"
         },
         "rasterLayers_withCount_hidden": "Livelli raster ({{count}} nascosti)",
         "inpaintMasks_withCount_hidden": "Maschere Inpaint ({{count}} nascoste)",
@@ -2806,5 +2816,8 @@
     "video": {
         "noVideoSelected": "Nessun video selezionato",
         "selectFromGallery": "Seleziona un video dalla galleria per riprodurlo"
+    },
+    "lora": {
+        "weight": "Peso"
     }
 }
