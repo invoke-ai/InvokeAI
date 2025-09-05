@@ -36,9 +36,7 @@
     "build-storybook": "storybook build",
     "test": "vitest",
     "test:ui": "vitest --coverage --ui",
-    "test:no-watch": "vitest --no-watch",
-    "translations:check": "node scripts/clean-translations.js public/locales/en.json --mode check",
-    "translations:clean": "node scripts/clean-translations.js public/locales/en.json --mode clean"
+    "test:no-watch": "vitest --no-watch"
   },
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^1.7.4",
