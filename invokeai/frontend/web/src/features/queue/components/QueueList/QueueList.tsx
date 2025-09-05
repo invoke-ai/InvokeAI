@@ -54,11 +54,13 @@ const itemContent: ItemContent<number, ListContext> = (index, itemId) => (
   <QueueItemAtPosition index={index} itemId={itemId} />
 );
 
-const ScrollSeekPlaceholderComponent: Components<number, ListContext>['ScrollSeekPlaceholder'] = (props) => (
-  <Flex {...props}>
-    <QueueItemPlaceholder />
-  </Flex>
-);
+const ScrollSeekPlaceholderComponent: Components<number, ListContext>['ScrollSeekPlaceholder'] = (_props) => {
+  return (
+    <Flex>
+      <QueueItemPlaceholder />
+    </Flex>
+  );
+};
 
 ScrollSeekPlaceholderComponent.displayName = 'ScrollSeekPlaceholderComponent';
 
