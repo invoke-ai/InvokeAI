@@ -620,7 +620,7 @@ class SqliteSessionQueue(SessionQueueBase):
         items = [SessionQueueItem.queue_item_from_dict(dict(result)) for result in results]
         return items
 
-    def get_queue_itemIds(
+    def get_queue_item_ids(
         self,
         queue_id: str,
         order_by: QUEUE_ORDER_BY = "created_at",
