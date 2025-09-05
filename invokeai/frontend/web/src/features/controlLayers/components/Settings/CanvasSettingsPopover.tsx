@@ -33,8 +33,6 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCodeFill, PiEyeFill, PiGearSixFill, PiPencilFill, PiSquaresFourFill } from 'react-icons/pi';
 
-import { CanvasSettingsToolWidthSelectorDropdown } from './CanvasSettingsToolWidthSelectorDropdown';
-
 export const CanvasSettingsPopover = memo(() => {
   const { t } = useTranslation();
   return (
@@ -82,7 +80,6 @@ export const CanvasSettingsPopover = memo(() => {
               <CanvasSettingsIsolatedLayerPreviewSwitch />
               <CanvasSettingsBboxOverlaySwitch />
               <CanvasSettingsShowHUDSwitch />
-              <CanvasSettingsToolWidthSelectorDropdown />
             </Flex>
 
             <Divider />

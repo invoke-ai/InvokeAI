@@ -13,13 +13,21 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import useResizeObserver from '@react-hook/resize-observer';
+import { createSelector } from '@reduxjs/toolkit';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { clamp } from 'es-toolkit/compat';
-import { selectToolWidthSelector } from 'features/controlLayers/store/canvasSettingsSlice';
+import {
+  selectCanvasSettingsSlice,
+  settingsBrushWidthChanged,
+  settingsEraserWidthChanged,
+} from 'features/controlLayers/store/canvasSettingsSlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import type { KeyboardEvent } from 'react';
-import { memo, useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PiCaretDownBold } from 'react-icons/pi';
+
+import { useToolIsSelected } from './hooks';
 
 const formatPx = (v: number | string) => `${v} px`;
 
@@ -62,16 +70,33 @@ const marks = [
 
 const sliderDefaultValue = mapRawValueToSliderValue(50);
 
-interface ToolWidthSelectorProps {
+type ToolWidthPickerComponent = 'dropDown' | 'slider';
+const SLIDER_PICKER_WIDTH = 280;
+const DROPDOWN_PICKER_WIDTH = 76;
+const MIN_TOOLBAR_SPACE = 50;
+
+interface ToolWidthPickerComponentProps {
   localValue: number;
   onChangeSlider: (value: number) => void;
   onChangeInput: (value: number) => void;
   onBlur: () => void;
   onKeyDown: (value: KeyboardEvent<HTMLInputElement>) => void;
+  onComponentWidthChange: (value: number) => void;
 }
 
-const DropDownToolWidthSelector = memo(
-  ({ localValue, onChangeSlider, onChangeInput, onKeyDown, onBlur }: ToolWidthSelectorProps) => {
+const DropDownToolWidthPickerComponent = memo(
+  ({
+    localValue,
+    onChangeSlider,
+    onChangeInput,
+    onKeyDown,
+    onBlur,
+    onComponentWidthChange,
+  }: ToolWidthPickerComponentProps) => {
+    const ref = useRef(null);
+
+    useResizeObserver(ref, (entry) => onComponentWidthChange(entry.contentRect.width));
+
     const onChangeNumberInput = useCallback(
       (valueAsString: string, valueAsNumber: number) => {
         onChangeInput(valueAsNumber);
@@ -81,7 +106,7 @@ const DropDownToolWidthSelector = memo(
 
     return (
       <Popover>
-        <FormControl w="min-content" gap={2}>
+        <FormControl ref={ref} w="min-content" gap={2}>
           <PopoverAnchor>
             <NumberInput
               variant="outline"
@@ -92,7 +117,7 @@ const DropDownToolWidthSelector = memo(
               value={localValue}
               onChange={onChangeNumberInput}
               onBlur={onBlur}
-              w="76px"
+              w={DROPDOWN_PICKER_WIDTH}
               format={formatPx}
               defaultValue={50}
               onKeyDown={onKeyDown}
@@ -132,12 +157,23 @@ const DropDownToolWidthSelector = memo(
     );
   }
 );
-DropDownToolWidthSelector.displayName = 'DropDownToolWidthSelector';
+DropDownToolWidthPickerComponent.displayName = 'DropDownToolWidthPickerComponent';
 
-const SliderToolWidthSelector = memo(
-  ({ localValue, onChangeSlider, onChangeInput, onKeyDown, onBlur }: ToolWidthSelectorProps) => {
+const SliderToolWidthPickerComponent = memo(
+  ({
+    localValue,
+    onChangeSlider,
+    onChangeInput,
+    onKeyDown,
+    onBlur,
+    onComponentWidthChange,
+  }: ToolWidthPickerComponentProps) => {
+    const ref = useRef(null);
+
+    useResizeObserver(ref, (entry) => onComponentWidthChange(entry.contentRect.width));
+
     return (
-      <Flex w="full" gap={4} alignItems="center" px={4}>
+      <Flex ref={ref} w={SLIDER_PICKER_WIDTH} gap={4}>
         <CompositeSlider
           w={200}
           min={0}
@@ -150,13 +186,13 @@ const SliderToolWidthSelector = memo(
           alwaysShowMarks
         />
         <CompositeNumberInput
+          w={24}
           min={1}
           max={600}
           value={localValue}
           onChange={onChangeInput}
           onBlur={onBlur}
           onKeyDown={onKeyDown}
-          w={24}
           format={formatPx}
           defaultValue={50}
         />
@@ -164,22 +200,84 @@ const SliderToolWidthSelector = memo(
     );
   }
 );
-SliderToolWidthSelector.displayName = 'SliderToolWidthSelector';
+SliderToolWidthPickerComponent.displayName = 'SliderToolWidthPickerComponent';
 
-const selectorComponents = {
-  dropDown: DropDownToolWidthSelector,
-  slider: SliderToolWidthSelector,
+const components = {
+  dropDown: DropDownToolWidthPickerComponent,
+  slider: SliderToolWidthPickerComponent,
 } as const;
 
-interface ToolWidthProps {
-  isSelected: boolean;
-  width: number;
-  onValueChange: (value: number) => void;
+const calculateToolWidthPicker = (current: ToolWidthPickerComponent | undefined, toolBarAvailableSpace: number) => {
+  switch (current) {
+    case 'dropDown':
+      if (toolBarAvailableSpace + DROPDOWN_PICKER_WIDTH > SLIDER_PICKER_WIDTH + MIN_TOOLBAR_SPACE) {
+        return 'slider';
+      }
+      break;
+    case 'slider':
+      if (toolBarAvailableSpace < MIN_TOOLBAR_SPACE) {
+        return 'dropDown';
+      }
+      break;
+    default:
+      return toolBarAvailableSpace > SLIDER_PICKER_WIDTH + MIN_TOOLBAR_SPACE ? 'slider' : 'dropDown';
+  }
+
+  return current;
+};
+
+const useToolWidthPicker = (toolBarAvailableSpace: number) => {
+  const prevToolWidthPicker = useRef<ToolWidthPickerComponent>();
+  const toolWidthPicker = useMemo<ToolWidthPickerComponent>(() => {
+    const next = calculateToolWidthPicker(prevToolWidthPicker.current, toolBarAvailableSpace);
+
+    prevToolWidthPicker.current = next;
+
+    return next;
+  }, [toolBarAvailableSpace]);
+
+  return toolWidthPicker;
+};
+
+const selectBrushWidth = createSelector(selectCanvasSettingsSlice, (settings) => settings.brushWidth);
+const selectEraserWidth = createSelector(selectCanvasSettingsSlice, (settings) => settings.eraserWidth);
+
+interface ToolWidthPickerProps {
+  toolBarAvailableSpace: number;
+  onComponentWidthChange: (value: number) => void;
 }
 
-export const ToolWidth = memo(({ isSelected, width, onValueChange }: ToolWidthProps) => {
-  const toolWidthSelector = useAppSelector(selectToolWidthSelector);
+export const ToolWidthPicker = memo(({ toolBarAvailableSpace, onComponentWidthChange }: ToolWidthPickerProps) => {
+  const dispatch = useAppDispatch();
+  const isBrushSelected = useToolIsSelected('brush');
+  const isEraserSelected = useToolIsSelected('eraser');
+  const isToolSelected = useMemo(() => {
+    return isBrushSelected || isEraserSelected;
+  }, [isBrushSelected, isEraserSelected]);
+  const brushWidth = useAppSelector(selectBrushWidth);
+  const eraserWidth = useAppSelector(selectEraserWidth);
+  const width = useMemo(() => {
+    if (isBrushSelected) {
+      return brushWidth;
+    }
+    if (isEraserSelected) {
+      return eraserWidth;
+    }
+    return 0;
+  }, [isBrushSelected, isEraserSelected, brushWidth, eraserWidth]);
   const [localValue, setLocalValue] = useState(width);
+  const toolWidthPicker = useToolWidthPicker(toolBarAvailableSpace);
+
+  const onValueChange = useCallback(
+    (value: number) => {
+      if (isBrushSelected) {
+        dispatch(settingsBrushWidthChanged(value));
+      } else if (isEraserSelected) {
+        dispatch(settingsEraserWidthChanged(value));
+      }
+    },
+    [isBrushSelected, isEraserSelected, dispatch]
+  );
 
   const onChange = useCallback(
     (value: number) => {
@@ -241,28 +339,31 @@ export const ToolWidth = memo(({ isSelected, width, onValueChange }: ToolWidthPr
     id: 'decrementToolWidth',
     category: 'canvas',
     callback: decrement,
-    options: { enabled: isSelected },
-    dependencies: [decrement, isSelected],
+    options: { enabled: isToolSelected },
+    dependencies: [decrement, isToolSelected],
   });
   useRegisteredHotkeys({
     id: 'incrementToolWidth',
     category: 'canvas',
     callback: increment,
-    options: { enabled: isSelected },
-    dependencies: [increment, isSelected],
+    options: { enabled: isToolSelected },
+    dependencies: [increment, isToolSelected],
   });
 
-  const Component = selectorComponents[toolWidthSelector];
+  const Component = components[toolWidthPicker];
 
   return (
-    <Component
-      localValue={localValue}
-      onChangeSlider={onChangeSlider}
-      onChangeInput={onChangeInput}
-      onBlur={onBlur}
-      onKeyDown={onKeyDown}
-    />
+    <Flex px={4}>
+      <Component
+        localValue={localValue}
+        onChangeSlider={onChangeSlider}
+        onChangeInput={onChangeInput}
+        onBlur={onBlur}
+        onKeyDown={onKeyDown}
+        onComponentWidthChange={onComponentWidthChange}
+      />
+    </Flex>
   );
 });
 
-ToolWidth.displayName = 'ToolWidth';
+ToolWidthPicker.displayName = 'ToolWidthPicker';
