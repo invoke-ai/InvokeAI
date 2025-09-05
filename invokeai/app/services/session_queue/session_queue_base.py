@@ -146,7 +146,7 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def get_queue_itemIds(
+    def get_queue_item_ids(
         self,
         queue_id: str,
         order_by: QUEUE_ORDER_BY = "created_at",

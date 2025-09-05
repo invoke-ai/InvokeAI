@@ -104,7 +104,7 @@ async def get_queue_item_ids(
 ) -> ItemIdsResult:
     """Gets all queue item ids that match the given parameters"""
     try:
-        return ApiDependencies.invoker.services.session_queue.get_queue_itemIds(
+        return ApiDependencies.invoker.services.session_queue.get_queue_item_ids(
             queue_id=queue_id, order_by=order_by, order_dir=order_dir
         )
     except Exception as e:
