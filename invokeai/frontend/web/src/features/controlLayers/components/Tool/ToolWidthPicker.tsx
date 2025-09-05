@@ -173,7 +173,7 @@ const SliderToolWidthPickerComponent = memo(
     useResizeObserver(ref, (entry) => onComponentWidthChange(entry.contentRect.width));
 
     return (
-      <Flex ref={ref} w={SLIDER_PICKER_WIDTH} gap={4}>
+      <Flex ref={ref} w={SLIDER_PICKER_WIDTH} h={8} gap={4} >
         <CompositeSlider
           w={200}
           min={0}
@@ -187,6 +187,7 @@ const SliderToolWidthPickerComponent = memo(
         />
         <CompositeNumberInput
           w={24}
+          h={8}
           min={1}
           max={600}
           value={localValue}
