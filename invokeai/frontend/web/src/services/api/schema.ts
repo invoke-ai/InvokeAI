@@ -1379,26 +1379,6 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/queue/{queue_id}/list": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Queue Items
-         * @description Gets cursor-paginated queue items
-         */
-        get: operations["list_queue_items"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/queue/{queue_id}/list_all": {
         parameters: {
             query?: never;
@@ -1413,6 +1393,46 @@ export type paths = {
         get: operations["list_all_queue_items"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/{queue_id}/item_ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Queue Item Ids
+         * @description Gets all queue item ids that match the given parameters
+         */
+        get: operations["get_queue_itemIds"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/{queue_id}/items_by_ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Queue Items By Item Ids
+         * @description Gets queue items for the specified queue item ids. Maintains order of item ids.
+         */
+        post: operations["get_queue_items_by_item_ids"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2974,6 +2994,14 @@ export type components = {
              * @description Object containing list of image names to fetch DTOs for
              */
             image_names: string[];
+        };
+        /** Body_get_queue_items_by_item_ids */
+        Body_get_queue_items_by_item_ids: {
+            /**
+             * Item Ids
+             * @description Object containing list of queue item ids to fetch queue items for
+             */
+            item_ids: number[];
         };
         /** Body_get_videos_by_ids */
         Body_get_videos_by_ids: {
@@ -6157,24 +6185,6 @@ export type components = {
              * @constant
              */
             type: "crop_latents";
-        };
-        /** CursorPaginatedResults[SessionQueueItem] */
-        CursorPaginatedResults_SessionQueueItem_: {
-            /**
-             * Limit
-             * @description Limit of items to get
-             */
-            limit: number;
-            /**
-             * Has More
-             * @description Whether there are more items available
-             */
-            has_more: boolean;
-            /**
-             * Items
-             * @description Items
-             */
-            items: components["schemas"]["SessionQueueItem"][];
         };
         /**
          * OpenCV Inpaint
@@ -13527,6 +13537,22 @@ export type components = {
             type: "invokeai_img_val_thresholds";
         };
         /**
+         * ItemIdsResult
+         * @description Response containing ordered item ids with metadata for optimistic updates.
+         */
+        ItemIdsResult: {
+            /**
+             * Item Ids
+             * @description Ordered list of item ids
+             */
+            item_ids: number[];
+            /**
+             * Total Count
+             * @description Total number of queue items matching the query
+             */
+            total_count: number;
+        };
+        /**
          * IterateInvocation
          * @description Iterates over a list of items
          */
@@ -18078,15 +18104,13 @@ export type components = {
             /**
              * Created At
              * @description The timestamp when the queue item was created
-             * @default null
              */
-            created_at: string | null;
+            created_at: string;
             /**
              * Updated At
              * @description The timestamp when the queue item was last updated
-             * @default null
              */
-            updated_at: string | null;
+            updated_at: string;
             /**
              * Started At
              * @description The timestamp when the queue item was started
@@ -25843,17 +25867,9 @@ export interface operations {
             };
         };
     };
-    list_queue_items: {
+    list_all_queue_items: {
         parameters: {
             query?: {
-                /** @description The number of items to fetch */
-                limit?: number;
-                /** @description The status of items to fetch */
-                status?: ("pending" | "in_progress" | "completed" | "failed" | "canceled") | null;
-                /** @description The pagination cursor */
-                cursor?: number | null;
-                /** @description The pagination cursor priority */
-                priority?: number;
                 /** @description The destination of queue items to fetch */
                 destination?: string | null;
             };
@@ -25872,7 +25888,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CursorPaginatedResults_SessionQueueItem_"];
+                    "application/json": components["schemas"]["SessionQueueItem"][];
                 };
             };
             /** @description Validation Error */
@@ -25886,11 +25902,13 @@ export interface operations {
             };
         };
     };
-    list_all_queue_items: {
+    get_queue_itemIds: {
         parameters: {
             query?: {
-                /** @description The destination of queue items to fetch */
-                destination?: string | null;
+                /** @description The sort field */
+                order_by?: "created_at" | "completed_at";
+                /** @description The order of sort */
+                order_dir?: components["schemas"]["SQLiteDirection"];
             };
             header?: never;
             path: {
@@ -25900,6 +25918,42 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemIdsResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_queue_items_by_item_ids: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_get_queue_items_by_item_ids"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

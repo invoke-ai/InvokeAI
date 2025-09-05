@@ -1,4 +1,5 @@
+import type { GetQueueItemIdsArgs } from 'services/api/types';
+
 export type ListContext = {
-  openQueueItems: number[];
-  toggleQueueItem: (item_id: number) => void;
+  queryArgs: GetQueueItemIdsArgs;
 };

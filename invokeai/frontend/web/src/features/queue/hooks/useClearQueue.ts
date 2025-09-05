@@ -1,6 +1,4 @@
 import { useStore } from '@nanostores/react';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { listCursorChanged, listPriorityChanged } from 'features/queue/store/queueSlice';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +7,6 @@ import { $isConnected } from 'services/events/stores';
 
 export const useClearQueue = () => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
   const { data: queueStatus } = useGetQueueStatusQuery();
   const isConnected = useStore($isConnected);
   const [_trigger, { isLoading }] = useClearQueueMutation({
@@ -28,8 +25,6 @@ export const useClearQueue = () => {
         title: t('queue.clearSucceeded'),
         status: 'success',
       });
-      dispatch(listCursorChanged(undefined));
-      dispatch(listPriorityChanged(undefined));
     } catch {
       toast({
         id: 'QUEUE_CLEAR_FAILED',
@@ -37,7 +32,7 @@ export const useClearQueue = () => {
         status: 'error',
       });
     }
-  }, [queueStatus?.queue.total, _trigger, dispatch, t]);
+  }, [queueStatus?.queue.total, _trigger, t]);
 
   return { trigger, isLoading, isDisabled: !isConnected || !queueStatus?.queue.total };
 };

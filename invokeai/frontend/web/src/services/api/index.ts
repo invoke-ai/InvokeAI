@@ -30,6 +30,7 @@ const tagTypes = [
   'ImageCollection',
   'ImageMetadataFromFile',
   'IntermediatesCount',
+  'SessionQueueItemIdList',
   'SessionQueueItem',
   'SessionQueueStatus',
   'SessionProcessorStatus',

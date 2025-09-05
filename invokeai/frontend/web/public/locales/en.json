@@ -290,7 +290,6 @@
         "workflows": "Workflows",
         "other": "Other",
         "gallery": "Gallery",
-        "batchFieldValues": "Batch Field Values",
         "item": "Item",
         "session": "Session",
         "notReady": "Unable to Queue",
@@ -309,7 +308,13 @@
         "iterations_other": "Iterations",
         "generations_one": "Generation",
         "generations_other": "Generations",
-        "batchSize": "Batch Size"
+        "batchSize": "Batch Size",
+        "createdAt": "Created At",
+        "completedAt": "Completed At",
+        "sortColumn": "Sort Column",
+        "sortBy": "Sort by {{column}}",
+        "sortOrderAscending": "Ascending",
+        "sortOrderDescending": "Descending"
     },
     "invocationCache": {
         "invocationCache": "Invocation Cache",

@@ -3,7 +3,7 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 
 import InvocationCacheStatus from './InvocationCacheStatus';
-import QueueList from './QueueList/QueueList';
+import { QueueList } from './QueueList/QueueList';
 import QueueStatus from './QueueStatus';
 import QueueTabQueueControls from './QueueTabQueueControls';
 

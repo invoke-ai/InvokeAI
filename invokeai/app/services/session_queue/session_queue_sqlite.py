@@ -10,6 +10,7 @@ from invokeai.app.services.session_queue.session_queue_base import SessionQueueB
 from invokeai.app.services.session_queue.session_queue_common import (
     DEFAULT_QUEUE_ID,
     QUEUE_ITEM_STATUS,
+    QUEUE_ORDER_BY,
     Batch,
     BatchStatus,
     CancelAllExceptCurrentResult,
@@ -22,6 +23,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     EnqueueBatchResult,
     IsEmptyResult,
     IsFullResult,
+    ItemIdsResult,
     PruneResult,
     RetryItemsResult,
     SessionQueueCountsByDestination,
@@ -33,7 +35,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     prepare_values_to_insert,
 )
 from invokeai.app.services.shared.graph import GraphExecutionState
-from invokeai.app.services.shared.pagination import CursorPaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 
@@ -587,59 +589,6 @@ class SqliteSessionQueue(SessionQueueBase):
             )
         return self.get_queue_item(item_id)
 
-    def list_queue_items(
-        self,
-        queue_id: str,
-        limit: int,
-        priority: int,
-        cursor: Optional[int] = None,
-        status: Optional[QUEUE_ITEM_STATUS] = None,
-        destination: Optional[str] = None,
-    ) -> CursorPaginatedResults[SessionQueueItem]:
-        with self._db.transaction() as cursor_:
-            item_id = cursor
-            query = """--sql
-                SELECT *
-                FROM session_queue
-                WHERE queue_id = ?
-            """
-            params: list[Union[str, int]] = [queue_id]
-
-            if status is not None:
-                query += """--sql
-                    AND status = ?
-                    """
-                params.append(status)
-
-            if destination is not None:
-                query += """---sql
-                    AND destination = ?
-                """
-                params.append(destination)
-
-            if item_id is not None:
-                query += """--sql
-                    AND (priority < ?) OR (priority = ? AND item_id > ?)
-                    """
-                params.extend([priority, priority, item_id])
-
-            query += """--sql
-                ORDER BY
-                    priority DESC,
-                    item_id ASC
-                LIMIT ?
-                """
-            params.append(limit + 1)
-            cursor_.execute(query, params)
-            results = cast(list[sqlite3.Row], cursor_.fetchall())
-        items = [SessionQueueItem.queue_item_from_dict(dict(result)) for result in results]
-        has_more = False
-        if len(items) > limit:
-            # remove the extra item
-            items.pop()
-            has_more = True
-        return CursorPaginatedResults(items=items, limit=limit, has_more=has_more)
-
     def list_all_queue_items(
         self,
         queue_id: str,
@@ -670,6 +619,27 @@ class SqliteSessionQueue(SessionQueueBase):
             results = cast(list[sqlite3.Row], cursor.fetchall())
         items = [SessionQueueItem.queue_item_from_dict(dict(result)) for result in results]
         return items
+
+    def get_queue_item_ids(
+        self,
+        queue_id: str,
+        order_by: QUEUE_ORDER_BY = "created_at",
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+    ) -> ItemIdsResult:
+        with self._db.transaction() as cursor_:
+            query = f"""--sql
+                SELECT item_id
+                FROM session_queue
+                WHERE queue_id = ?
+                ORDER BY {order_by} {order_dir.value}
+                """
+            query_params = [queue_id]
+
+            cursor_.execute(query, query_params)
+            result = cast(list[sqlite3.Row], cursor_.fetchall())
+        item_ids = [row[0] for row in result]
+
+        return ItemIdsResult(item_ids=item_ids, total_count=len(item_ids))
 
     def get_queue_status(self, queue_id: str) -> SessionQueueStatus:
         with self._db.transaction() as cursor:
