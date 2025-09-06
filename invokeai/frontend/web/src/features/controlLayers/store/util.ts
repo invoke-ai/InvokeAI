@@ -187,6 +187,7 @@ export const getRasterLayerState = (
     objects: [],
     opacity: 1,
     position: { x: 0, y: 0 },
+    adjustments: null,
   };
   merge(entityState, overrides);
   return entityState;
