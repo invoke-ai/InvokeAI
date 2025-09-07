@@ -16,7 +16,7 @@ type AdjustmentSliderRowProps = {
 };
 
 const AdjustmentSliderRow = ({ label, value, onChange, min = -1, max = 1, step = 0.01 }: AdjustmentSliderRowProps) => (
-  <FormControl orientation="horizontal" mb={1} pr={2} w="full">
+  <FormControl orientation="horizontal" mb={1} w="full">
     <FormLabel m={0} minW="90px">
       {label}
     </FormLabel>
@@ -66,7 +66,7 @@ export const RasterLayerSimpleAdjustmentsEditor = memo(() => {
   );
 
   return (
-    <Flex px={4} direction="column">
+    <Flex px={8} direction="column">
       <AdjustmentSliderRow
         label={t('controlLayers.adjustments.brightness')}
         value={simple.brightness}
