@@ -36,15 +36,7 @@ const MARGIN_LEFT = 8;
 const MARGIN_RIGHT = 8;
 const MARGIN_TOP = 8;
 const MARGIN_BOTTOM = 10;
-// Inner size is now computed dynamically per current canvas size (see draw()).
 
-// NOTE: The helper conversion functions below were static. For responsive canvas resizing we now
-// compute conversions dynamically based on the *current* canvas size. The static helpers remain
-// only for fallback / reference to the base geometry. Dynamic versions are created in draw & event handlers.
-
-// (Removed unused static conversion helpers after refactor to fully dynamic sizing.)
-
-// Optional: stable canvas style from constants
 const CANVAS_STYLE: React.CSSProperties = {
   width: '100%',
   // Maintain aspect ratio while allowing responsive width. Height is set automatically via aspect-ratio.
@@ -414,7 +406,6 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
       </Text>
       <canvas
         ref={canvasRef}
-        // width/height attributes left out; backing store sized in draw() for responsiveness
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
