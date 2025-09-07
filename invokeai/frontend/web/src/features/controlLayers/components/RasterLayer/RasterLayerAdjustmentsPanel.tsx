@@ -15,7 +15,6 @@ import { RasterLayerCurvesEditor } from 'features/controlLayers/components/Raste
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import {
-  rasterLayerAdjustmentsCurvesUpdated,
   rasterLayerAdjustmentsSet,
   rasterLayerAdjustmentsSimpleUpdated,
 } from 'features/controlLayers/store/canvasSlice';
@@ -190,10 +189,18 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
           Adjustments
         </Text>
         <ButtonGroup size="sm" isAttached variant="outline">
-          <Button onClick={onClickModeSimple} isActive={mode === 'simple'}>
+          <Button
+            onClick={onClickModeSimple}
+            isActive={mode === 'simple'}
+            colorScheme={mode === 'simple' ? 'invokeBlue' : undefined}
+          >
             {t('controlLayers.adjustments.simple')}
           </Button>
-          <Button onClick={onClickModeCurves} isActive={mode === 'curves'}>
+          <Button
+            onClick={onClickModeCurves}
+            isActive={mode === 'curves'}
+            colorScheme={mode === 'curves' ? 'invokeBlue' : undefined}
+          >
             {t('controlLayers.adjustments.curves')}
           </Button>
         </ButtonGroup>

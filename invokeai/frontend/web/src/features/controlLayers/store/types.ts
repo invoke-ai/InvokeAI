@@ -401,10 +401,10 @@ const zCanvasRasterLayerState = zCanvasEntityBase.extend({
       }),
       curves: z.object({
         // Curves are arrays of [x, y] control points in 0..255 space (no strict monotonic checks here)
-        master: z.array(z.tuple([z.number().int().min(0).max(255), z.number().int().min(0).max(255)])).min(2),
-        r: z.array(z.tuple([z.number().int().min(0).max(255), z.number().int().min(0).max(255)])).min(2),
-        g: z.array(z.tuple([z.number().int().min(0).max(255), z.number().int().min(0).max(255)])).min(2),
-        b: z.array(z.tuple([z.number().int().min(0).max(255), z.number().int().min(0).max(255)])).min(2),
+        master: z.array(z.tuple([z.number().int().gte(0).lte(255), z.number().int().gte(0).lte(255)])).min(2),
+        r: z.array(z.tuple([z.number().int().gte(0).lte(255), z.number().int().gte(0).lte(255)])).min(2),
+        g: z.array(z.tuple([z.number().int().gte(0).lte(255), z.number().int().gte(0).lte(255)])).min(2),
+        b: z.array(z.tuple([z.number().int().gte(0).lte(255), z.number().int().gte(0).lte(255)])).min(2),
       }),
     })
     .optional(),
