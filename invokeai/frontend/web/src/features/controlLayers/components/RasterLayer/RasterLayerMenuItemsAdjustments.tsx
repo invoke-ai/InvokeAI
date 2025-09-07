@@ -1,7 +1,7 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { rasterLayerAdjustmentsReset, rasterLayerAdjustmentsSet } from 'features/controlLayers/store/canvasSlice';
+import { rasterLayerAdjustmentsCancel, rasterLayerAdjustmentsSet } from 'features/controlLayers/store/canvasSlice';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { makeDefaultRasterLayerAdjustments } from 'features/controlLayers/store/util';
 import { memo, useCallback } from 'react';
@@ -18,7 +18,7 @@ export const RasterLayerMenuItemsAdjustments = memo(() => {
   const hasAdjustments = Boolean(layer?.adjustments);
   const onToggleAdjustmentsPresence = useCallback(() => {
     if (hasAdjustments) {
-      dispatch(rasterLayerAdjustmentsReset({ entityIdentifier }));
+      dispatch(rasterLayerAdjustmentsCancel({ entityIdentifier }));
     } else {
       dispatch(
         rasterLayerAdjustmentsSet({

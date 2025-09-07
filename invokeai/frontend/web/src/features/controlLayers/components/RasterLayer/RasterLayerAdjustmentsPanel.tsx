@@ -1,20 +1,12 @@
-import {
-  Button,
-  ButtonGroup,
-  CompositeNumberInput,
-  CompositeSlider,
-  Flex,
-  FormControl,
-  FormLabel,
-  IconButton,
-  Switch,
-  Text,
-} from '@invoke-ai/ui-library';
+import { Button, ButtonGroup, Flex, IconButton, Switch, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { RasterLayerCurvesEditor } from 'features/controlLayers/components/RasterLayer/RasterLayerCurvesEditor';
+import { RasterLayerCurvesAdjustmentsEditor } from 'features/controlLayers/components/RasterLayer/RasterLayerCurvesAdjustmentsEditor';
+import { RasterLayerSimpleAdjustmentsEditor } from 'features/controlLayers/components/RasterLayer/RasterLayerSimpleAdjustmentsEditor';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import {
+  rasterLayerAdjustmentsCancel,
+  rasterLayerAdjustmentsCurvesUpdated,
   rasterLayerAdjustmentsSet,
   rasterLayerAdjustmentsSimpleUpdated,
 } from 'features/controlLayers/store/canvasSlice';
@@ -22,27 +14,7 @@ import { selectEntity } from 'features/controlLayers/store/selectors';
 import { makeDefaultRasterLayerAdjustments } from 'features/controlLayers/store/util';
 import React, { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCaretDownBold } from 'react-icons/pi';
-
-type AdjustmentSliderRowProps = {
-  label: string;
-  value: number;
-  onChange: (v: number) => void;
-  min?: number;
-  max?: number;
-  step?: number;
-};
-const AdjustmentSliderRow = ({ label, value, onChange, min = -1, max = 1, step = 0.01 }: AdjustmentSliderRowProps) => (
-  <FormControl pr={2}>
-    <Flex alignItems="center" gap={3} mb={1}>
-      <FormLabel m={0} flexShrink={0} minW="90px">
-        {label}
-      </FormLabel>
-      <CompositeNumberInput value={value} onChange={onChange} min={min} max={max} step={step} flex="0 0 96px" />
-    </Flex>
-    <CompositeSlider value={value} onChange={onChange} min={min} max={max} step={step} marks />
-  </FormControl>
-);
+import { PiArrowCounterClockwiseBold, PiCaretDownBold, PiCheckBold, PiTrashBold } from 'react-icons/pi';
 
 export const RasterLayerAdjustmentsPanel = memo(() => {
   const dispatch = useAppDispatch();
@@ -55,17 +27,11 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
   const enabled = Boolean(layer?.adjustments?.enabled);
   const collapsed = Boolean(layer?.adjustments?.collapsed);
   const mode = layer?.adjustments?.mode ?? 'simple';
-  const simple = layer?.adjustments?.simple ?? {
-    brightness: 0,
-    contrast: 0,
-    saturation: 0,
-    temperature: 0,
-    tint: 0,
-    sharpness: 0,
-  };
+  // simple adjustments handled by RasterLayerSimpleAdjustmentsEditor
 
   const onToggleEnabled = useCallback(
-    (v: boolean) => {
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const v = e.target.checked;
       const current = layer?.adjustments ?? makeDefaultRasterLayerAdjustments(mode);
       dispatch(
         rasterLayerAdjustmentsSet({
@@ -79,16 +45,33 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
 
   const onReset = useCallback(() => {
     // Reset values to defaults but keep adjustments present; preserve enabled/collapsed/mode
-    const current = layer?.adjustments ?? makeDefaultRasterLayerAdjustments(mode);
-    const defaults = makeDefaultRasterLayerAdjustments(current.mode ?? mode);
-
     dispatch(
-      rasterLayerAdjustmentsSet({
+      rasterLayerAdjustmentsSimpleUpdated({
         entityIdentifier,
-        adjustments: { ...current, simple: defaults.simple, curves: defaults.curves },
+        simple: {
+          brightness: 0,
+          contrast: 0,
+          saturation: 0,
+          temperature: 0,
+          tint: 0,
+          sharpness: 0,
+        },
       })
     );
-  }, [dispatch, entityIdentifier, layer?.adjustments, mode]);
+    const defaultPoints: Array<[number, number]> = [
+      [0, 0],
+      [255, 255],
+    ];
+    dispatch(rasterLayerAdjustmentsCurvesUpdated({ entityIdentifier, channel: 'master', points: defaultPoints }));
+    dispatch(rasterLayerAdjustmentsCurvesUpdated({ entityIdentifier, channel: 'r', points: defaultPoints }));
+    dispatch(rasterLayerAdjustmentsCurvesUpdated({ entityIdentifier, channel: 'g', points: defaultPoints }));
+    dispatch(rasterLayerAdjustmentsCurvesUpdated({ entityIdentifier, channel: 'b', points: defaultPoints }));
+  }, [dispatch, entityIdentifier]);
+
+  const onCancel = useCallback(() => {
+    // Clear out adjustments entirely
+    dispatch(rasterLayerAdjustmentsCancel({ entityIdentifier }));
+  }, [dispatch, entityIdentifier]);
 
   const onToggleCollapsed = useCallback(() => {
     const current = layer?.adjustments ?? makeDefaultRasterLayerAdjustments(mode);
@@ -119,36 +102,6 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
   // Memoized click handlers to avoid inline arrow functions in JSX
   const onClickModeSimple = useCallback(() => onSetMode('simple'), [onSetMode]);
   const onClickModeCurves = useCallback(() => onSetMode('curves'), [onSetMode]);
-
-  const onBrightness = useCallback(
-    (v: number) => dispatch(rasterLayerAdjustmentsSimpleUpdated({ entityIdentifier, simple: { brightness: v } })),
-    [dispatch, entityIdentifier]
-  );
-  const onContrast = useCallback(
-    (v: number) => dispatch(rasterLayerAdjustmentsSimpleUpdated({ entityIdentifier, simple: { contrast: v } })),
-    [dispatch, entityIdentifier]
-  );
-  const onSaturation = useCallback(
-    (v: number) => dispatch(rasterLayerAdjustmentsSimpleUpdated({ entityIdentifier, simple: { saturation: v } })),
-    [dispatch, entityIdentifier]
-  );
-  const onTemperature = useCallback(
-    (v: number) => dispatch(rasterLayerAdjustmentsSimpleUpdated({ entityIdentifier, simple: { temperature: v } })),
-    [dispatch, entityIdentifier]
-  );
-  const onTint = useCallback(
-    (v: number) => dispatch(rasterLayerAdjustmentsSimpleUpdated({ entityIdentifier, simple: { tint: v } })),
-    [dispatch, entityIdentifier]
-  );
-  const onSharpness = useCallback(
-    (v: number) => dispatch(rasterLayerAdjustmentsSimpleUpdated({ entityIdentifier, simple: { sharpness: v } })),
-    [dispatch, entityIdentifier]
-  );
-
-  const handleToggleEnabled = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => onToggleEnabled(e.target.checked),
-    [onToggleEnabled]
-  );
 
   const onFinish = useCallback(async () => {
     // Bake current visual into layer pixels, then clear adjustments
@@ -204,50 +157,38 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
             {t('controlLayers.adjustments.curves')}
           </Button>
         </ButtonGroup>
-        <Switch isChecked={enabled} onChange={handleToggleEnabled} />
-        <Button size="sm" onClick={onReset} isDisabled={!layer?.adjustments} colorScheme="red">
-          {t('controlLayers.adjustments.reset')}
-        </Button>
-        <Button size="sm" onClick={onFinish} isDisabled={!layer?.adjustments} colorScheme="green">
-          {t('controlLayers.adjustments.finish')}
-        </Button>
+        <Switch isChecked={enabled} onChange={onToggleEnabled} />
+        <IconButton
+          aria-label={t('controlLayers.adjustments.cancel')}
+          size="md"
+          onClick={onCancel}
+          isDisabled={!layer?.adjustments}
+          colorScheme="red"
+          icon={<PiTrashBold />}
+          variant="ghost"
+        />
+        <IconButton
+          aria-label={t('controlLayers.adjustments.reset')}
+          size="md"
+          onClick={onReset}
+          isDisabled={!layer?.adjustments}
+          icon={<PiArrowCounterClockwiseBold />}
+          variant="ghost"
+        />
+        <IconButton
+          aria-label={t('controlLayers.adjustments.finish')}
+          size="md"
+          onClick={onFinish}
+          isDisabled={!layer?.adjustments}
+          colorScheme="green"
+          icon={<PiCheckBold />}
+          variant="ghost"
+        />
       </Flex>
 
-      {!collapsed && mode === 'simple' && (
-        <>
-          <AdjustmentSliderRow
-            label={t('controlLayers.adjustments.brightness')}
-            value={simple.brightness}
-            onChange={onBrightness}
-          />
-          <AdjustmentSliderRow
-            label={t('controlLayers.adjustments.contrast')}
-            value={simple.contrast}
-            onChange={onContrast}
-          />
-          <AdjustmentSliderRow
-            label={t('controlLayers.adjustments.saturation')}
-            value={simple.saturation}
-            onChange={onSaturation}
-          />
-          <AdjustmentSliderRow
-            label={t('controlLayers.adjustments.temperature')}
-            value={simple.temperature}
-            onChange={onTemperature}
-          />
-          <AdjustmentSliderRow label={t('controlLayers.adjustments.tint')} value={simple.tint} onChange={onTint} />
-          <AdjustmentSliderRow
-            label={t('controlLayers.adjustments.sharpness')}
-            value={simple.sharpness}
-            onChange={onSharpness}
-            min={0}
-            max={1}
-            step={0.01}
-          />
-        </>
-      )}
+      {!collapsed && mode === 'simple' && <RasterLayerSimpleAdjustmentsEditor />}
 
-      {!collapsed && mode === 'curves' && <RasterLayerCurvesEditor />}
+      {!collapsed && mode === 'curves' && <RasterLayerCurvesAdjustmentsEditor />}
     </>
   );
 });
