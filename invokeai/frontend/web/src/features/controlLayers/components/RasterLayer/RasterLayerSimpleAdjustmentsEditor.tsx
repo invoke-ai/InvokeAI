@@ -20,8 +20,8 @@ const AdjustmentSliderRow = ({ label, value, onChange, min = -1, max = 1, step =
     <FormLabel m={0} minW="90px">
       {label}
     </FormLabel>
-    <CompositeSlider value={value} onChange={onChange} min={min} max={max} step={step} marks />
-    <CompositeNumberInput value={value} onChange={onChange} min={min} max={max} step={step} />
+    <CompositeSlider value={value} onChange={onChange} defaultValue={0} min={min} max={max} step={step} marks />
+    <CompositeNumberInput value={value} onChange={onChange} defaultValue={0} min={min} max={max} step={step} />
   </FormControl>
 );
 
