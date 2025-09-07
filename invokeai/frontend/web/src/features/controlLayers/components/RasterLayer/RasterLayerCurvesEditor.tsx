@@ -1,10 +1,10 @@
-import { Flex, Text, Box } from '@invoke-ai/ui-library';
+import { Box, Flex, Text } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEntityAdapterContext } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { rasterLayerAdjustmentsCurvesUpdated } from 'features/controlLayers/store/canvasSlice';
-import { selectEntity, selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import { createSelector } from '@reduxjs/toolkit';
+import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -307,8 +307,7 @@ export const RasterLayerCurvesEditor = memo(() => {
   const adapter = useEntityAdapterContext<'raster_layer'>('raster_layer');
   const { t } = useTranslation();
   const selectLayer = useMemo(
-    () =>
-      createSelector(selectCanvasSlice, (canvas) => selectEntity(canvas, entityIdentifier)),
+    () => createSelector(selectCanvasSlice, (canvas) => selectEntity(canvas, entityIdentifier)),
     [entityIdentifier]
   );
   const layer = useAppSelector(selectLayer);

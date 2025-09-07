@@ -20,6 +20,7 @@ import {
   rasterLayerAdjustmentsSimpleUpdated,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectEntity } from 'features/controlLayers/store/selectors';
+import { makeDefaultRasterLayerAdjustments } from 'features/controlLayers/store/util';
 import React, { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
@@ -66,10 +67,15 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
 
   const onToggleEnabled = useCallback(
     (v: boolean) => {
-      // Only toggle the enabled state; preserve current mode/collapsed so users can A/B compare
-      dispatch(rasterLayerAdjustmentsSet({ entityIdentifier, adjustments: { enabled: v } }));
+      const current = layer?.adjustments ?? makeDefaultRasterLayerAdjustments(mode);
+      dispatch(
+        rasterLayerAdjustmentsSet({
+          entityIdentifier,
+          adjustments: { ...current, enabled: v },
+        })
+      );
     },
-    [dispatch, entityIdentifier]
+    [dispatch, entityIdentifier, layer?.adjustments, mode]
   );
 
   const onReset = useCallback(() => {
@@ -98,26 +104,25 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
   }, [dispatch, entityIdentifier]);
 
   const onToggleCollapsed = useCallback(() => {
+    const current = layer?.adjustments ?? makeDefaultRasterLayerAdjustments(mode);
     dispatch(
       rasterLayerAdjustmentsSet({
         entityIdentifier,
-        adjustments: { collapsed: !collapsed },
+        adjustments: { ...current, collapsed: !collapsed },
       })
     );
-  }, [dispatch, entityIdentifier, collapsed]);
+  }, [dispatch, entityIdentifier, collapsed, layer?.adjustments, mode]);
 
   const onSetMode = useCallback(
     (nextMode: 'simple' | 'curves') => {
-      if (!layer?.adjustments) {
-        return;
-      }
       if (nextMode === mode) {
         return;
       }
+      const current = layer?.adjustments ?? makeDefaultRasterLayerAdjustments(nextMode);
       dispatch(
         rasterLayerAdjustmentsSet({
           entityIdentifier,
-          adjustments: { mode: nextMode },
+          adjustments: { ...current, mode: nextMode },
         })
       );
     },
@@ -215,12 +220,35 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
 
       {!collapsed && mode === 'simple' && (
         <>
-          <AdjustmentSliderRow label={t('controlLayers.adjustments.brightness')} value={simple.brightness} onChange={onBrightness} />
-          <AdjustmentSliderRow label={t('controlLayers.adjustments.contrast')} value={simple.contrast} onChange={onContrast} />
-          <AdjustmentSliderRow label={t('controlLayers.adjustments.saturation')} value={simple.saturation} onChange={onSaturation} />
-          <AdjustmentSliderRow label={t('controlLayers.adjustments.temperature')} value={simple.temperature} onChange={onTemperature} />
+          <AdjustmentSliderRow
+            label={t('controlLayers.adjustments.brightness')}
+            value={simple.brightness}
+            onChange={onBrightness}
+          />
+          <AdjustmentSliderRow
+            label={t('controlLayers.adjustments.contrast')}
+            value={simple.contrast}
+            onChange={onContrast}
+          />
+          <AdjustmentSliderRow
+            label={t('controlLayers.adjustments.saturation')}
+            value={simple.saturation}
+            onChange={onSaturation}
+          />
+          <AdjustmentSliderRow
+            label={t('controlLayers.adjustments.temperature')}
+            value={simple.temperature}
+            onChange={onTemperature}
+          />
           <AdjustmentSliderRow label={t('controlLayers.adjustments.tint')} value={simple.tint} onChange={onTint} />
-          <AdjustmentSliderRow label={t('controlLayers.adjustments.sharpness')} value={simple.sharpness} onChange={onSharpness} min={0} max={1} step={0.01} />
+          <AdjustmentSliderRow
+            label={t('controlLayers.adjustments.sharpness')}
+            value={simple.sharpness}
+            onChange={onSharpness}
+            min={0}
+            max={1}
+            step={0.01}
+          />
         </>
       )}
 
