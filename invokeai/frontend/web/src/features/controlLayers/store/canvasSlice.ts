@@ -96,6 +96,8 @@ import {
   initialFLUXRedux,
   initialIPAdapter,
   initialT2IAdapter,
+  makeDefaultRasterLayerAdjustments,
+  type RasterLayerAdjustments,
 } from './util';
 
 const slice = createSlice({
@@ -109,10 +111,7 @@ const slice = createSlice({
       action: PayloadAction<
         EntityIdentifierPayload<
           {
-            adjustments:
-              | NonNullable<CanvasRasterLayerState['adjustments']>
-              | { enabled?: boolean; collapsed?: boolean; mode?: 'simple' | 'curves' }
-              | null;
+            adjustments: RasterLayerAdjustments | null;
           },
           'raster_layer'
         >
@@ -124,43 +123,13 @@ const slice = createSlice({
         return;
       }
       if (adjustments === null) {
-        layer.adjustments = null;
+        delete layer.adjustments;
         return;
       }
-      if (layer.adjustments === null) {
-        layer.adjustments = {
-          version: 1,
-          enabled: true,
-          collapsed: false,
-          mode: 'simple',
-          simple: { brightness: 0, contrast: 0, saturation: 0, temperature: 0, tint: 0, sharpness: 0 },
-          curves: {
-            master: [
-              [0, 0],
-              [255, 255],
-            ],
-            r: [
-              [0, 0],
-              [255, 255],
-            ],
-            g: [
-              [0, 0],
-              [255, 255],
-            ],
-            b: [
-              [0, 0],
-              [255, 255],
-            ],
-          },
-        };
+      if (!layer.adjustments) {
+        layer.adjustments = makeDefaultRasterLayerAdjustments(adjustments.mode ?? 'simple');
       }
-      if (typeof adjustments === 'object' && adjustments !== null && 'version' in adjustments) {
-        layer.adjustments = merge(layer.adjustments, adjustments as NonNullable<CanvasRasterLayerState['adjustments']>);
-      } else {
-        // Shallow toggles only
-        const partial = adjustments as { enabled?: boolean; collapsed?: boolean; mode?: 'simple' | 'curves' };
-        layer.adjustments = merge(layer.adjustments, partial);
-      }
+      layer.adjustments = merge(layer.adjustments, adjustments);
     },
     rasterLayerAdjustmentsReset: (state, action: PayloadAction<EntityIdentifierPayload<void, 'raster_layer'>>) => {
       const { entityIdentifier } = action.payload;
@@ -168,14 +137,14 @@ const slice = createSlice({
       if (!layer) {
         return;
       }
-      layer.adjustments = null;
+      delete layer.adjustments;
     },
     rasterLayerAdjustmentsSimpleUpdated: (
       state,
       action: PayloadAction<
         EntityIdentifierPayload<
           {
-            simple: Partial<NonNullable<NonNullable<CanvasRasterLayerState['adjustments']>['simple']>>;
+            simple: Partial<RasterLayerAdjustments['simple']>;
           },
           'raster_layer'
         >
@@ -187,32 +156,7 @@ const slice = createSlice({
         return;
       }
       if (!layer.adjustments) {
-        // initialize baseline
-        layer.adjustments = {
-          version: 1,
-          enabled: true,
-          collapsed: false,
-          mode: 'simple',
-          simple: { brightness: 0, contrast: 0, saturation: 0, temperature: 0, tint: 0, sharpness: 0 },
-          curves: {
-            master: [
-              [0, 0],
-              [255, 255],
-            ],
-            r: [
-              [0, 0],
-              [255, 255],
-            ],
-            g: [
-              [0, 0],
-              [255, 255],
-            ],
-            b: [
-              [0, 0],
-              [255, 255],
-            ],
-          },
-        };
+        layer.adjustments = makeDefaultRasterLayerAdjustments('simple');
       }
       layer.adjustments.simple = merge(layer.adjustments.simple, simple);
     },
@@ -234,32 +178,7 @@ const slice = createSlice({
         return;
       }
       if (!layer.adjustments) {
-        // initialize baseline
-        layer.adjustments = {
-          version: 1,
-          enabled: true,
-          collapsed: false,
-          mode: 'curves',
-          simple: { brightness: 0, contrast: 0, saturation: 0, temperature: 0, tint: 0, sharpness: 0 },
-          curves: {
-            master: [
-              [0, 0],
-              [255, 255],
-            ],
-            r: [
-              [0, 0],
-              [255, 255],
-            ],
-            g: [
-              [0, 0],
-              [255, 255],
-            ],
-            b: [
-              [0, 0],
-              [255, 255],
-            ],
-          },
-        };
+        layer.adjustments = makeDefaultRasterLayerAdjustments('curves');
       }
       layer.adjustments.curves[channel] = points;
     },

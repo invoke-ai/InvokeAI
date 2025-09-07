@@ -383,7 +383,7 @@ const zCanvasRasterLayerState = zCanvasEntityBase.extend({
   position: zCoordinate,
   opacity: zOpacity,
   objects: z.array(zCanvasObjectState),
-  // Optional per-layer color adjustments (simple + curves). When null/undefined, no adjustments are applied.
+  // Optional per-layer color adjustments (simple + curves). When undefined, no adjustments are applied.
   adjustments: z
     .object({
       version: z.literal(1),
@@ -407,8 +407,7 @@ const zCanvasRasterLayerState = zCanvasEntityBase.extend({
         b: z.array(z.tuple([z.number().int().min(0).max(255), z.number().int().min(0).max(255)])).min(2),
       }),
     })
-    .optional()
-    .nullable(),
+    .optional(),
 });
 export type CanvasRasterLayerState = z.infer<typeof zCanvasRasterLayerState>;
 

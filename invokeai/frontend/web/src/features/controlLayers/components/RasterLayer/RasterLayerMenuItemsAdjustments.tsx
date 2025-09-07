@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { rasterLayerAdjustmentsReset, rasterLayerAdjustmentsSet } from 'features/controlLayers/store/canvasSlice';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
+import { makeDefaultRasterLayerAdjustments } from 'features/controlLayers/store/util';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiSlidersHorizontalBold } from 'react-icons/pi';
@@ -22,7 +23,7 @@ export const RasterLayerMenuItemsAdjustments = memo(() => {
       dispatch(
         rasterLayerAdjustmentsSet({
           entityIdentifier,
-          adjustments: { enabled: true, collapsed: false, mode: 'simple' },
+          adjustments: makeDefaultRasterLayerAdjustments('simple'),
         })
       );
     }
