@@ -29,28 +29,31 @@ const sortPoints = (pts: Array<[number, number]>) =>
     .sort((a, b) => a[0] - b[0])
     .map(([x, y]) => [clamp(Math.round(x), 0, 255), clamp(Math.round(y), 0, 255)] as [number, number]);
 
-// Extracted canvas constants and helpers out of the component
+// Base canvas logical coordinate system (used for aspect ratio & initial sizing)
 const CANVAS_WIDTH = 256;
 const CANVAS_HEIGHT = 160;
 const MARGIN_LEFT = 8;
 const MARGIN_RIGHT = 8;
 const MARGIN_TOP = 8;
 const MARGIN_BOTTOM = 10;
-const INNER_WIDTH = CANVAS_WIDTH - MARGIN_LEFT - MARGIN_RIGHT;
-const INNER_HEIGHT = CANVAS_HEIGHT - MARGIN_TOP - MARGIN_BOTTOM;
+// Inner size is now computed dynamically per current canvas size (see draw()).
 
-const valueToCanvasX = (x: number) => MARGIN_LEFT + (clamp(x, 0, 255) / 255) * INNER_WIDTH;
-const valueToCanvasY = (y: number) => MARGIN_TOP + INNER_HEIGHT - (clamp(y, 0, 255) / 255) * INNER_HEIGHT;
-const canvasToValueX = (cx: number) => clamp(Math.round(((cx - MARGIN_LEFT) / INNER_WIDTH) * 255), 0, 255);
-const canvasToValueY = (cy: number) => clamp(Math.round(255 - ((cy - MARGIN_TOP) / INNER_HEIGHT) * 255), 0, 255);
+// NOTE: The helper conversion functions below were static. For responsive canvas resizing we now
+// compute conversions dynamically based on the *current* canvas size. The static helpers remain
+// only for fallback / reference to the base geometry. Dynamic versions are created in draw & event handlers.
+
+// (Removed unused static conversion helpers after refactor to fully dynamic sizing.)
 
 // Optional: stable canvas style from constants
 const CANVAS_STYLE: React.CSSProperties = {
   width: '100%',
-  height: CANVAS_HEIGHT,
+  // Maintain aspect ratio while allowing responsive width. Height is set automatically via aspect-ratio.
+  aspectRatio: `${CANVAS_WIDTH} / ${CANVAS_HEIGHT}`,
+  height: 'auto',
   touchAction: 'none',
   borderRadius: 4,
   background: '#111',
+  display: 'block',
 };
 
 type CurveGraphProps = {
@@ -76,53 +79,79 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
     if (!c) {
       return;
     }
-    c.width = CANVAS_WIDTH;
-    c.height = CANVAS_HEIGHT;
+
+    // Use device pixel ratio for crisp rendering on HiDPI displays.
+    const dpr = window.devicePixelRatio || 1;
+    const cssWidth = c.clientWidth || CANVAS_WIDTH; // CSS pixels
+    const cssHeight = (cssWidth * CANVAS_HEIGHT) / CANVAS_WIDTH; // maintain aspect ratio
+
+    // Ensure the backing store matches current display size * dpr (only if changed).
+    const targetWidth = Math.round(cssWidth * dpr);
+    const targetHeight = Math.round(cssHeight * dpr);
+    if (c.width !== targetWidth || c.height !== targetHeight) {
+      c.width = targetWidth;
+      c.height = targetHeight;
+    }
+    // Guarantee the CSS height stays synced (width is 100%).
+    if (c.style.height !== `${cssHeight}px`) {
+      c.style.height = `${cssHeight}px`;
+    }
+
     const ctx = c.getContext('2d');
     if (!ctx) {
       return;
     }
 
-    // background
-    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    ctx.fillStyle = '#111';
-    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    // Reset transform then scale for dpr so we can draw in CSS pixel coordinates.
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
 
-    // grid inside inner rect
+    // Dynamic inner geometry (CSS pixel space)
+    const innerWidth = cssWidth - MARGIN_LEFT - MARGIN_RIGHT;
+    const innerHeight = cssHeight - MARGIN_TOP - MARGIN_BOTTOM;
+
+    const valueToCanvasX = (x: number) => MARGIN_LEFT + (clamp(x, 0, 255) / 255) * innerWidth;
+    const valueToCanvasY = (y: number) => MARGIN_TOP + innerHeight - (clamp(y, 0, 255) / 255) * innerHeight;
+
+    // Clear & background
+    ctx.clearRect(0, 0, cssWidth, cssHeight);
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, cssWidth, cssHeight);
+
+    // Grid
     ctx.strokeStyle = '#2a2a2a';
     ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
-      const y = MARGIN_TOP + (i * INNER_HEIGHT) / 4;
+      const y = MARGIN_TOP + (i * innerHeight) / 4;
       ctx.beginPath();
       ctx.moveTo(MARGIN_LEFT + 0.5, y + 0.5);
-      ctx.lineTo(MARGIN_LEFT + INNER_WIDTH - 0.5, y + 0.5);
+      ctx.lineTo(MARGIN_LEFT + innerWidth - 0.5, y + 0.5);
       ctx.stroke();
     }
     for (let i = 0; i <= 4; i++) {
-      const x = MARGIN_LEFT + (i * INNER_WIDTH) / 4;
+      const x = MARGIN_LEFT + (i * innerWidth) / 4;
       ctx.beginPath();
       ctx.moveTo(x + 0.5, MARGIN_TOP + 0.5);
-      ctx.lineTo(x + 0.5, MARGIN_TOP + INNER_HEIGHT - 0.5);
+      ctx.lineTo(x + 0.5, MARGIN_TOP + innerHeight - 0.5);
       ctx.stroke();
     }
 
-    // histogram
+    // Histogram
     if (histogram) {
-      // logarithmic histogram for readability when values vary widely
       const logHist = histogram.map((v) => Math.log10((v ?? 0) + 1));
       const max = Math.max(1e-6, ...logHist);
       ctx.fillStyle = '#5557';
-      const binW = Math.max(1, INNER_WIDTH / 256);
+      const binW = Math.max(1, innerWidth / 256);
       for (let i = 0; i < 256; i++) {
         const v = logHist[i] ?? 0;
-        const h = Math.round((v / max) * (INNER_HEIGHT - 2));
+        const h = Math.round((v / max) * (innerHeight - 2));
         const x = MARGIN_LEFT + Math.floor(i * binW);
-        const y = MARGIN_TOP + INNER_HEIGHT - h;
+        const y = MARGIN_TOP + innerHeight - h;
         ctx.fillRect(x, y, Math.ceil(binW), h);
       }
     }
 
-    // curve
+    // Curve
     const pts = sortPoints(localPoints);
     ctx.strokeStyle = channelColor[channel];
     ctx.lineWidth = 2;
@@ -139,7 +168,7 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
     }
     ctx.stroke();
 
-    // control points
+    // Control points
     for (let i = 0; i < pts.length; i++) {
       const [x, y] = pts[i]!;
       const cx = valueToCanvasX(x);
@@ -159,10 +188,19 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
   }, [draw]);
 
   const getNearestPointIndex = useCallback(
-    (mxCanvas: number, myCanvas: number) => {
-      // convert canvas px to value-space [0..255]
-      const xVal = canvasToValueX(mxCanvas);
-      const yVal = canvasToValueY(myCanvas);
+    (mx: number, my: number) => {
+      const c = canvasRef.current;
+      if (!c) {
+        return -1;
+      }
+      const cssWidth = c.clientWidth || CANVAS_WIDTH;
+      const cssHeight = c.clientHeight || CANVAS_HEIGHT;
+      const innerWidth = cssWidth - MARGIN_LEFT - MARGIN_RIGHT;
+      const innerHeight = cssHeight - MARGIN_TOP - MARGIN_BOTTOM;
+      const canvasToValueX = (cx: number) => clamp(Math.round(((cx - MARGIN_LEFT) / innerWidth) * 255), 0, 255);
+      const canvasToValueY = (cy: number) => clamp(Math.round(255 - ((cy - MARGIN_TOP) / innerHeight) * 255), 0, 255);
+      const xVal = canvasToValueX(mx);
+      const yVal = canvasToValueY(my);
       let best = -1;
       let bestDist = 9999;
       for (let i = 0; i < localPoints.length; i++) {
@@ -192,18 +230,21 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
         return;
       }
       const rect = c.getBoundingClientRect();
-      const scaleX = c.width / rect.width;
-      const scaleY = c.height / rect.height;
-      const mxCanvas = (e.clientX - rect.left) * scaleX;
-      const myCanvas = (e.clientY - rect.top) * scaleY;
-      const idx = getNearestPointIndex(mxCanvas, myCanvas);
+      const mx = e.clientX - rect.left; // CSS pixel coordinates
+      const my = e.clientY - rect.top;
+      const cssWidth = c.clientWidth || CANVAS_WIDTH;
+      const cssHeight = c.clientHeight || CANVAS_HEIGHT;
+      const innerWidth = cssWidth - MARGIN_LEFT - MARGIN_RIGHT;
+      const innerHeight = cssHeight - MARGIN_TOP - MARGIN_BOTTOM;
+      const canvasToValueX = (cx: number) => clamp(Math.round(((cx - MARGIN_LEFT) / innerWidth) * 255), 0, 255);
+      const canvasToValueY = (cy: number) => clamp(Math.round(255 - ((cy - MARGIN_TOP) / innerHeight) * 255), 0, 255);
+      const idx = getNearestPointIndex(mx, my);
       if (idx !== -1 && idx !== 0 && idx !== localPoints.length - 1) {
         setDragIndex(idx);
         return;
       }
-      // add new point
-      const xVal = canvasToValueX(mxCanvas);
-      const yVal = canvasToValueY(myCanvas);
+      const xVal = canvasToValueX(mx);
+      const yVal = canvasToValueY(my);
       const next = sortPoints([...localPoints, [xVal, yVal]]);
       setLocalPoints(next);
       setDragIndex(next.findIndex(([x, y]) => x === xVal && y === yVal));
@@ -223,21 +264,21 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
         return;
       }
       const rect = c.getBoundingClientRect();
-      const scaleX = c.width / rect.width;
-      const scaleY = c.height / rect.height;
-      const mxCanvas = (e.clientX - rect.left) * scaleX;
-      const myCanvas = (e.clientY - rect.top) * scaleY;
-      const mxVal = canvasToValueX(mxCanvas);
-      const myVal = canvasToValueY(myCanvas);
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const cssWidth = c.clientWidth || CANVAS_WIDTH;
+      const cssHeight = c.clientHeight || CANVAS_HEIGHT;
+      const innerWidth = cssWidth - MARGIN_LEFT - MARGIN_RIGHT;
+      const innerHeight = cssHeight - MARGIN_TOP - MARGIN_BOTTOM;
+      const canvasToValueX = (cx: number) => clamp(Math.round(((cx - MARGIN_LEFT) / innerWidth) * 255), 0, 255);
+      const canvasToValueY = (cy: number) => clamp(Math.round(255 - ((cy - MARGIN_TOP) / innerHeight) * 255), 0, 255);
+      const mxVal = canvasToValueX(mx);
+      const myVal = canvasToValueY(my);
       setLocalPoints((prev) => {
+        if (dragIndex === 0 || dragIndex === prev.length - 1) {
+          return prev;
+        } // immutable endpoints
         const next = [...prev];
-        // clamp endpoints to ends and keep them immutable
-        if (dragIndex === 0) {
-          return prev;
-        }
-        if (dragIndex === prev.length - 1) {
-          return prev;
-        }
         next[dragIndex] = [mxVal, myVal];
         return sortPoints(next);
       });
@@ -266,11 +307,9 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
         return;
       }
       const rect = c.getBoundingClientRect();
-      const scaleX = c.width / rect.width;
-      const scaleY = c.height / rect.height;
-      const mxCanvas = (e.clientX - rect.left) * scaleX;
-      const myCanvas = (e.clientY - rect.top) * scaleY;
-      const idx = getNearestPointIndex(mxCanvas, myCanvas);
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const idx = getNearestPointIndex(mx, my);
       if (idx > 0 && idx < localPoints.length - 1) {
         const next = localPoints.filter((_, i) => i !== idx);
         setLocalPoints(next);
@@ -279,6 +318,19 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
     },
     [commit, getNearestPointIndex, localPoints]
   );
+
+  // Observe size changes to redraw (responsive behavior)
+  useEffect(() => {
+    const c = canvasRef.current;
+    if (!c) {
+      return;
+    }
+    const ro = new ResizeObserver(() => {
+      draw();
+    });
+    ro.observe(c);
+    return () => ro.disconnect();
+  }, [draw]);
 
   const canvasStyle = useMemo<React.CSSProperties>(() => CANVAS_STYLE, []);
 
@@ -289,8 +341,7 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
       </Text>
       <canvas
         ref={canvasRef}
-        width={CANVAS_WIDTH}
-        height={CANVAS_HEIGHT}
+        // width/height attributes left out; backing store sized in draw() for responsiveness
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -301,7 +352,7 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
   );
 });
 
-export const RasterLayerCurvesEditor = memo(() => {
+export const RasterLayerCurvesAdjustmentsEditor = memo(() => {
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext<'raster_layer'>();
   const adapter = useEntityAdapterContext<'raster_layer'>('raster_layer');
@@ -403,4 +454,4 @@ export const RasterLayerCurvesEditor = memo(() => {
   );
 });
 
-RasterLayerCurvesEditor.displayName = 'RasterLayerCurvesEditor';
+RasterLayerCurvesAdjustmentsEditor.displayName = 'RasterLayerCurvesEditor';

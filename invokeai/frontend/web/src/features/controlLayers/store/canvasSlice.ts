@@ -131,7 +131,7 @@ const slice = createSlice({
       }
       layer.adjustments = merge(layer.adjustments, adjustments);
     },
-    rasterLayerAdjustmentsReset: (state, action: PayloadAction<EntityIdentifierPayload<void, 'raster_layer'>>) => {
+    rasterLayerAdjustmentsCancel: (state, action: PayloadAction<EntityIdentifierPayload<void, 'raster_layer'>>) => {
       const { entityIdentifier } = action.payload;
       const layer = selectEntity(state, entityIdentifier);
       if (!layer) {
@@ -1738,7 +1738,7 @@ export const {
   entityRectAdded,
   // Raster layer adjustments
   rasterLayerAdjustmentsSet,
-  rasterLayerAdjustmentsReset,
+  rasterLayerAdjustmentsCancel,
   rasterLayerAdjustmentsSimpleUpdated,
   rasterLayerAdjustmentsCurvesUpdated,
   entityDeleted,
