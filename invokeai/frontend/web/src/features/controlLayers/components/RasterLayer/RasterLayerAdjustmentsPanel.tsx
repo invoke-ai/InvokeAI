@@ -125,7 +125,7 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
 
   return (
     <>
-      <Flex alignItems="center" gap={3} mt={2} mb={2}>
+      <Flex px={4} alignItems="center" gap={3} mt={2} mb={2}>
         <IconButton
           aria-label={collapsed ? t('controlLayers.adjustments.expand') : t('controlLayers.adjustments.collapse')}
           size="sm"
