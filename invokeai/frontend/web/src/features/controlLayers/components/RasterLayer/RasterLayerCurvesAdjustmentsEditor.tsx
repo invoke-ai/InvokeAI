@@ -141,13 +141,42 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
       const logHist = histogram.map((v) => Math.log10((v ?? 0) + 1));
       const max = Math.max(1e-6, ...logHist);
       ctx.fillStyle = '#5557';
-      const binW = Math.max(1, innerWidth / 256);
-      for (let i = 0; i < 256; i++) {
-        const v = logHist[i] ?? 0;
-        const h = Math.round((v / max) * (innerHeight - 2));
-        const x = MARGIN_LEFT + Math.floor(i * binW);
-        const y = MARGIN_TOP + innerHeight - h;
-        ctx.fillRect(x, y, Math.ceil(binW), h);
+
+      // If there's enough horizontal room, draw each of the 256 bins with exact (possibly fractional) width so they tessellate.
+      // Otherwise, aggregate multiple bins into per-pixel columns to avoid aliasing.
+      if (innerWidth >= 256) {
+        for (let i = 0; i < 256; i++) {
+          const v = logHist[i] ?? 0;
+          const h = (v / max) * (innerHeight - 2);
+          // Exact fractional coordinates for seamless coverage (no gaps as width grows)
+          const x0 = MARGIN_LEFT + (i / 256) * innerWidth;
+          const x1 = MARGIN_LEFT + ((i + 1) / 256) * innerWidth;
+          const w = x1 - x0;
+          if (w <= 0) {
+            continue;
+          } // safety
+          const y = MARGIN_TOP + innerHeight - h;
+          ctx.fillRect(x0, y, w, h);
+        }
+      } else {
+        // Aggregate bins per CSS pixel column (similar to previous anti-moire approach)
+        const columns = Math.max(1, Math.round(innerWidth));
+        const binsPerCol = 256 / columns;
+        for (let col = 0; col < columns; col++) {
+          const startBin = Math.floor(col * binsPerCol);
+          const endBin = Math.min(255, Math.floor((col + 1) * binsPerCol - 1));
+          let acc = 0;
+          let count = 0;
+          for (let b = startBin; b <= endBin; b++) {
+            acc += logHist[b] ?? 0;
+            count++;
+          }
+          const v = count > 0 ? acc / count : 0;
+          const h = (v / max) * (innerHeight - 2);
+          const x = MARGIN_LEFT + col;
+          const y = MARGIN_TOP + innerHeight - h;
+          ctx.fillRect(x, y, 1, h);
+        }
       }
     }
 
@@ -229,6 +258,12 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
       if (!c) {
         return;
       }
+      // Capture the pointer so we still get pointerup even if released outside the canvas.
+      try {
+        c.setPointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
       const rect = c.getBoundingClientRect();
       const mx = e.clientX - rect.left; // CSS pixel coordinates
       const my = e.clientY - rect.top;
@@ -275,12 +310,21 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
       const mxVal = canvasToValueX(mx);
       const myVal = canvasToValueY(my);
       setLocalPoints((prev) => {
+        // Endpoints are immutable; safety check.
         if (dragIndex === 0 || dragIndex === prev.length - 1) {
           return prev;
-        } // immutable endpoints
+        }
+        const leftX = prev[dragIndex - 1]![0];
+        const rightX = prev[dragIndex + 1]![0];
+        // Constrain to strictly between neighbors so ordering is preserved & no crossing.
+        const minX = Math.min(254, leftX);
+        const maxX = Math.max(1, rightX);
+        const clampedX = clamp(mxVal, minX, maxX);
+        // If neighbors are adjacent (minX > maxX after adjustments), effectively lock X.
+        const finalX = minX > maxX ? leftX + 1 - 1 /* keep existing */ : clampedX;
         const next = [...prev];
-        next[dragIndex] = [mxVal, myVal];
-        return sortPoints(next);
+        next[dragIndex] = [finalX, myVal];
+        return next; // already ordered due to constraints
       });
     },
     [dragIndex]
@@ -293,10 +337,39 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
     [onChange]
   );
 
-  const handlePointerUp = useCallback(() => {
-    setDragIndex(null);
-    commit(localPoints);
-  }, [commit, localPoints]);
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const c = canvasRef.current;
+      if (c) {
+        try {
+          c.releasePointerCapture(e.pointerId);
+        } catch {
+          /* ignore */
+        }
+      }
+      setDragIndex(null);
+      commit(localPoints);
+    },
+    [commit, localPoints]
+  );
+
+  const handlePointerCancel = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
+      const c = canvasRef.current;
+      if (c) {
+        try {
+          c.releasePointerCapture(e.pointerId);
+        } catch {
+          /* ignore */
+        }
+      }
+      setDragIndex(null);
+      commit(localPoints);
+    },
+    [commit, localPoints]
+  );
 
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -345,6 +418,7 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
         onDoubleClick={handleDoubleClick}
         style={canvasStyle}
       />
@@ -437,8 +511,8 @@ export const RasterLayerCurvesAdjustmentsEditor = memo(() => {
   const onChangeB = useCallback((pts: Array<[number, number]>) => onChangePoints('b', pts), [onChangePoints]);
 
   return (
-    <Flex direction="column" gap={2}>
-      <Box display="grid" gridTemplateColumns="repeat(2, minmax(0, 1fr))" gap={8}>
+    <Flex direction="column" gap={2} style={{ paddingLeft: 8, paddingRight: 8, paddingBottom: 10 }}>
+      <Box display="grid" gridTemplateColumns="repeat(2, minmax(0, 1fr))" gap={4}>
         <CurveGraph
           title={t('controlLayers.adjustments.master')}
           channel="master"
