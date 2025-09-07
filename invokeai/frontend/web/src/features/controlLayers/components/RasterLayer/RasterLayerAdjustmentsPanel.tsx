@@ -27,7 +27,6 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
   const enabled = Boolean(layer?.adjustments?.enabled);
   const collapsed = Boolean(layer?.adjustments?.collapsed);
   const mode = layer?.adjustments?.mode ?? 'simple';
-  // simple adjustments handled by RasterLayerSimpleAdjustmentsEditor
 
   const onToggleEnabled = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
