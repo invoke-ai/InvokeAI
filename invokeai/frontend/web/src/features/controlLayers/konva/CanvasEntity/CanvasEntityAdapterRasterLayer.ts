@@ -88,7 +88,7 @@ export class CanvasEntityAdapterRasterLayer extends CanvasEntityAdapterBase<
     const group = this.renderer.konva.objectGroup;
     if (apply) {
       const filters = group.filters() ?? [];
-      let nextFilters = filters.filter((f: unknown) => f !== AdjustmentsSimpleFilter && f !== AdjustmentsCurvesFilter);
+      let nextFilters = filters.filter((f) => f !== AdjustmentsSimpleFilter && f !== AdjustmentsCurvesFilter);
       if (a.mode === 'simple') {
         group.setAttr('adjustmentsSimple', a.simple);
         group.setAttr('adjustmentsCurves', null);
@@ -108,7 +108,7 @@ export class CanvasEntityAdapterRasterLayer extends CanvasEntityAdapterBase<
     } else {
       // Remove our filter if present
       const filters = (group.filters() ?? []).filter(
-        (f: unknown) => f !== AdjustmentsSimpleFilter && f !== AdjustmentsCurvesFilter
+        (f) => f !== AdjustmentsSimpleFilter && f !== AdjustmentsCurvesFilter
       );
       group.filters(filters);
       group.setAttr('adjustmentsSimple', null);
