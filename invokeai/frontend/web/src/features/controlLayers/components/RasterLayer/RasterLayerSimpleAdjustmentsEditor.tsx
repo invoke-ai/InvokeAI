@@ -16,14 +16,12 @@ type AdjustmentSliderRowProps = {
 };
 
 const AdjustmentSliderRow = ({ label, value, onChange, min = -1, max = 1, step = 0.01 }: AdjustmentSliderRowProps) => (
-  <FormControl pr={2}>
-    <Flex alignItems="center" gap={3} mb={1}>
-      <FormLabel m={0} flexShrink={0} minW="90px">
-        {label}
-      </FormLabel>
-      <CompositeNumberInput value={value} onChange={onChange} min={min} max={max} step={step} flex="0 0 96px" />
-    </Flex>
+  <FormControl orientation="horizontal" mb={1} pr={2} w="full">
+    <FormLabel m={0} minW="90px">
+      {label}
+    </FormLabel>
     <CompositeSlider value={value} onChange={onChange} min={min} max={max} step={step} marks />
+    <CompositeNumberInput value={value} onChange={onChange} min={min} max={max} step={step} />
   </FormControl>
 );
 
@@ -68,7 +66,7 @@ export const RasterLayerSimpleAdjustmentsEditor = memo(() => {
   );
 
   return (
-    <>
+    <Flex px={4} direction="column">
       <AdjustmentSliderRow
         label={t('controlLayers.adjustments.brightness')}
         value={simple.brightness}
@@ -98,7 +96,7 @@ export const RasterLayerSimpleAdjustmentsEditor = memo(() => {
         max={1}
         step={0.01}
       />
-    </>
+    </Flex>
   );
 });
 

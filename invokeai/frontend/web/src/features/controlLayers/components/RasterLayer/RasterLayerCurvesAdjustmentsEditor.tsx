@@ -409,7 +409,7 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
 
   return (
     <Flex flexDir="column" gap={4}>
-      <Text fontSize="xs" color={channelColor[channel]}>
+      <Text fontSize="sm" color={channelColor[channel]}>
         {title}
       </Text>
       <canvas
