@@ -80,28 +80,16 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
 
   const onReset = useCallback(() => {
     // Reset values to defaults but keep adjustments present; preserve enabled/collapsed/mode
+    const current = layer?.adjustments ?? makeDefaultRasterLayerAdjustments(mode);
+    const defaults = makeDefaultRasterLayerAdjustments(current.mode ?? mode);
+
     dispatch(
-      rasterLayerAdjustmentsSimpleUpdated({
+      rasterLayerAdjustmentsSet({
         entityIdentifier,
-        simple: {
-          brightness: 0,
-          contrast: 0,
-          saturation: 0,
-          temperature: 0,
-          tint: 0,
-          sharpness: 0,
-        },
+        adjustments: { ...current, simple: defaults.simple, curves: defaults.curves },
       })
     );
-    const defaultPoints: Array<[number, number]> = [
-      [0, 0],
-      [255, 255],
-    ];
-    dispatch(rasterLayerAdjustmentsCurvesUpdated({ entityIdentifier, channel: 'master', points: defaultPoints }));
-    dispatch(rasterLayerAdjustmentsCurvesUpdated({ entityIdentifier, channel: 'r', points: defaultPoints }));
-    dispatch(rasterLayerAdjustmentsCurvesUpdated({ entityIdentifier, channel: 'g', points: defaultPoints }));
-    dispatch(rasterLayerAdjustmentsCurvesUpdated({ entityIdentifier, channel: 'b', points: defaultPoints }));
-  }, [dispatch, entityIdentifier]);
+  }, [dispatch, entityIdentifier, layer?.adjustments, mode]);
 
   const onToggleCollapsed = useCallback(() => {
     const current = layer?.adjustments ?? makeDefaultRasterLayerAdjustments(mode);
