@@ -850,7 +850,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     const segmentAnything = graph.addNode({
       id: getPrefixedId('segment_anything'),
       type: 'segment_anything',
-      model: 'segment-anything-large',
+      model: 'segment-anything-2-large',
       image: { image_name },
       point_lists: [{ points: points.map(({ x, y, label }) => ({ x, y, label })) }],
       mask_filter: 'all',
