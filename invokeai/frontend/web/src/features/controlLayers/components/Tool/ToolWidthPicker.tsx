@@ -13,7 +13,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@invoke-ai/ui-library';
-import useResizeObserver from '@react-hook/resize-observer';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { clamp } from 'es-toolkit/compat';
@@ -203,13 +202,27 @@ export const ToolWidthPicker = memo(() => {
   }, [isBrushSelected, isEraserSelected, brushWidth, eraserWidth]);
   const [localValue, setLocalValue] = useState(width);
   const [componentType, setComponentType] = useState<'slider' | 'dropdown' | null>(null);
-  useResizeObserver(ref, (entry) => {
-    if (entry.contentRect.width > SLIDER_PICKER_WIDTH) {
-      setComponentType('slider');
-    } else {
-      setComponentType('dropdown');
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) {
+      return;
     }
-  });
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        if (entry.contentRect.width > SLIDER_PICKER_WIDTH) {
+          setComponentType('slider');
+        } else {
+          setComponentType('dropdown');
+        }
+      }
+    });
+    observer.observe(el);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   const onValueChange = useCallback(
     (value: number) => {
