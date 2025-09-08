@@ -69,8 +69,7 @@ const marks = [
 
 const sliderDefaultValue = mapRawValueToSliderValue(50);
 
-const SLIDER_PICKER_WIDTH = 280;
-const DROPDOWN_PICKER_WIDTH = 76;
+const SLIDER_VS_DROPDOWN_CONTAINER_WIDTH_THRESHOLD = 280;
 
 interface ToolWidthPickerComponentProps {
   localValue: number;
@@ -102,7 +101,7 @@ const DropDownToolWidthPickerComponent = memo(
               value={localValue}
               onChange={onChangeNumberInput}
               onBlur={onBlur}
-              w={DROPDOWN_PICKER_WIDTH}
+              w={76}
               format={formatPx}
               defaultValue={50}
               onKeyDown={onKeyDown}
@@ -147,7 +146,7 @@ DropDownToolWidthPickerComponent.displayName = 'DropDownToolWidthPickerComponent
 const SliderToolWidthPickerComponent = memo(
   ({ localValue, onChangeSlider, onChangeInput, onKeyDown, onBlur }: ToolWidthPickerComponentProps) => {
     return (
-      <Flex w={SLIDER_PICKER_WIDTH} gap={4}>
+      <Flex w={SLIDER_VS_DROPDOWN_CONTAINER_WIDTH_THRESHOLD} gap={4}>
         <CompositeSlider
           w={200}
           h="unset"
@@ -210,7 +209,7 @@ export const ToolWidthPicker = memo(() => {
     }
     const observer = new ResizeObserver((entries) => {
       for (let entry of entries) {
-        if (entry.contentRect.width > SLIDER_PICKER_WIDTH) {
+        if (entry.contentRect.width > SLIDER_VS_DROPDOWN_CONTAINER_WIDTH_THRESHOLD) {
           setComponentType('slider');
         } else {
           setComponentType('dropdown');
