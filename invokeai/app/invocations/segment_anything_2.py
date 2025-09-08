@@ -21,13 +21,13 @@ from invokeai.backend.image_util.segment_anything.mask_refinement import mask_to
 from invokeai.backend.image_util.segment_anything.segment_anything_2_pipeline import SegmentAnything2Pipeline
 
 SegmentAnything2ModelKey = Literal[
-    "segment-anything-2-tiny", "segment-anything-2-base", "segment-anything-2-large", "segment-anything-2-huge"
+    "segment-anything-2-tiny", "segment-anything-2-small", "segment-anything-2-base", "segment-anything-2-large"
 ]
 SEGMENT_ANYTHING_2_MODEL_IDS: dict[SegmentAnything2ModelKey, str] = {
-    "segment-anything-2-tiny": "danelcsb/sam2.1_hiera_tiny",
-    "segment-anything-2-base": "facebook/sam2.1-hiera-base",
+    "segment-anything-2-tiny": "facebook/sam2.1-hiera-tiny",
+    "segment-anything-2-small": "facebook/sam2.1-hiera-small",
+    "segment-anything-2-base": "facebook/sam2.1-hiera-base-plus",
     "segment-anything-2-large": "facebook/sam2.1-hiera-large",
-    "segment-anything-2-huge": "facebook/sam2.1-hiera-huge",
 }
 
 
