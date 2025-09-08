@@ -186,8 +186,8 @@ const SliderToolWidthPickerComponent = memo(
           alwaysShowMarks
         />
         <CompositeNumberInput
-          w={24}
-          h={8}
+          w={28}
+          variant="outline"
           min={1}
           max={600}
           value={localValue}
