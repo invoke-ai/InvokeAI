@@ -8,7 +8,6 @@ import {
   PopoverTrigger,
   Tooltip,
 } from '@invoke-ai/ui-library';
-import useResizeObserver from '@react-hook/resize-observer';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import RgbaColorPicker from 'common/components/ColorPicker/RgbaColorPicker';
@@ -22,20 +21,15 @@ import {
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { RgbaColor } from 'features/controlLayers/store/types';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { memo, useCallback, useMemo, useRef } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selectActiveColor = createSelector(selectCanvasSettingsSlice, (settings) => settings.activeColor);
 const selectBgColor = createSelector(selectCanvasSettingsSlice, (settings) => settings.bgColor);
 const selectFgColor = createSelector(selectCanvasSettingsSlice, (settings) => settings.fgColor);
 
-interface ToolFillColorPickerProps {
-  onComponentWidthChange: (value: number) => void;
-}
-
-export const ToolFillColorPicker = memo(({ onComponentWidthChange }: ToolFillColorPickerProps) => {
+export const ToolFillColorPicker = memo(() => {
   const { t } = useTranslation();
-  const ref = useRef(null);
   const activeColorType = useAppSelector(selectActiveColor);
   const bgColor = useAppSelector(selectBgColor);
   const fgColor = useAppSelector(selectFgColor);
@@ -58,8 +52,6 @@ export const ToolFillColorPicker = memo(({ onComponentWidthChange }: ToolFillCol
     [activeColorType, dispatch]
   );
 
-  useResizeObserver(ref, (entry) => onComponentWidthChange(entry.contentRect.width));
-
   useRegisteredHotkeys({
     id: 'setFillColorsToDefault',
     category: 'canvas',
@@ -79,7 +71,7 @@ export const ToolFillColorPicker = memo(({ onComponentWidthChange }: ToolFillCol
   return (
     <Popover isLazy>
       <PopoverTrigger>
-        <Flex ref={ref} role="button" aria-label={t('controlLayers.fill.fillColor')} tabIndex={-1} minW={8} w={8} h={8}>
+        <Flex role="button" aria-label={t('controlLayers.fill.fillColor')} tabIndex={-1} minW={8} w={8} h={8}>
           <Tooltip label={tooltip}>
             <Flex alignItems="center" justifyContent="center" position="relative" w="full" h="full">
               <Box

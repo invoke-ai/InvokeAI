@@ -70,10 +70,8 @@ const marks = [
 
 const sliderDefaultValue = mapRawValueToSliderValue(50);
 
-type ToolWidthPickerComponent = 'dropDown' | 'slider';
 const SLIDER_PICKER_WIDTH = 280;
 const DROPDOWN_PICKER_WIDTH = 76;
-const MIN_TOOLBAR_SPACE = 50;
 
 interface ToolWidthPickerComponentProps {
   localValue: number;
@@ -81,22 +79,10 @@ interface ToolWidthPickerComponentProps {
   onChangeInput: (value: number) => void;
   onBlur: () => void;
   onKeyDown: (value: KeyboardEvent<HTMLInputElement>) => void;
-  onComponentWidthChange: (value: number) => void;
 }
 
 const DropDownToolWidthPickerComponent = memo(
-  ({
-    localValue,
-    onChangeSlider,
-    onChangeInput,
-    onKeyDown,
-    onBlur,
-    onComponentWidthChange,
-  }: ToolWidthPickerComponentProps) => {
-    const ref = useRef(null);
-
-    useResizeObserver(ref, (entry) => onComponentWidthChange(entry.contentRect.width));
-
+  ({ localValue, onChangeSlider, onChangeInput, onKeyDown, onBlur }: ToolWidthPickerComponentProps) => {
     const onChangeNumberInput = useCallback(
       (valueAsString: string, valueAsNumber: number) => {
         onChangeInput(valueAsNumber);
@@ -106,7 +92,7 @@ const DropDownToolWidthPickerComponent = memo(
 
     return (
       <Popover>
-        <FormControl ref={ref} w="min-content" gap={2}>
+        <FormControl w="min-content" gap={2} overflow="hidden">
           <PopoverAnchor>
             <NumberInput
               variant="outline"
@@ -160,22 +146,12 @@ const DropDownToolWidthPickerComponent = memo(
 DropDownToolWidthPickerComponent.displayName = 'DropDownToolWidthPickerComponent';
 
 const SliderToolWidthPickerComponent = memo(
-  ({
-    localValue,
-    onChangeSlider,
-    onChangeInput,
-    onKeyDown,
-    onBlur,
-    onComponentWidthChange,
-  }: ToolWidthPickerComponentProps) => {
-    const ref = useRef(null);
-
-    useResizeObserver(ref, (entry) => onComponentWidthChange(entry.contentRect.width));
-
+  ({ localValue, onChangeSlider, onChangeInput, onKeyDown, onBlur }: ToolWidthPickerComponentProps) => {
     return (
-      <Flex ref={ref} w={SLIDER_PICKER_WIDTH} h={8} gap={4}>
+      <Flex w={SLIDER_PICKER_WIDTH} gap={4}>
         <CompositeSlider
           w={200}
+          h="unset"
           min={0}
           max={100}
           value={mapRawValueToSliderValue(localValue)}
@@ -203,52 +179,11 @@ const SliderToolWidthPickerComponent = memo(
 );
 SliderToolWidthPickerComponent.displayName = 'SliderToolWidthPickerComponent';
 
-const components = {
-  dropDown: DropDownToolWidthPickerComponent,
-  slider: SliderToolWidthPickerComponent,
-} as const;
-
-const calculateToolWidthPicker = (current: ToolWidthPickerComponent | undefined, toolBarAvailableSpace: number) => {
-  switch (current) {
-    case 'dropDown':
-      if (toolBarAvailableSpace + DROPDOWN_PICKER_WIDTH > SLIDER_PICKER_WIDTH + MIN_TOOLBAR_SPACE) {
-        return 'slider';
-      }
-      break;
-    case 'slider':
-      if (toolBarAvailableSpace < MIN_TOOLBAR_SPACE) {
-        return 'dropDown';
-      }
-      break;
-    default:
-      return toolBarAvailableSpace > SLIDER_PICKER_WIDTH + MIN_TOOLBAR_SPACE ? 'slider' : 'dropDown';
-  }
-
-  return current;
-};
-
-const useToolWidthPicker = (toolBarAvailableSpace: number) => {
-  const prevToolWidthPicker = useRef<ToolWidthPickerComponent>();
-  const toolWidthPicker = useMemo<ToolWidthPickerComponent>(() => {
-    const next = calculateToolWidthPicker(prevToolWidthPicker.current, toolBarAvailableSpace);
-
-    prevToolWidthPicker.current = next;
-
-    return next;
-  }, [toolBarAvailableSpace]);
-
-  return toolWidthPicker;
-};
-
 const selectBrushWidth = createSelector(selectCanvasSettingsSlice, (settings) => settings.brushWidth);
 const selectEraserWidth = createSelector(selectCanvasSettingsSlice, (settings) => settings.eraserWidth);
 
-interface ToolWidthPickerProps {
-  toolBarAvailableSpace: number;
-  onComponentWidthChange: (value: number) => void;
-}
-
-export const ToolWidthPicker = memo(({ toolBarAvailableSpace, onComponentWidthChange }: ToolWidthPickerProps) => {
+export const ToolWidthPicker = memo(() => {
+  const ref = useRef<HTMLDivElement>(null);
   const dispatch = useAppDispatch();
   const isBrushSelected = useToolIsSelected('brush');
   const isEraserSelected = useToolIsSelected('eraser');
@@ -267,7 +202,14 @@ export const ToolWidthPicker = memo(({ toolBarAvailableSpace, onComponentWidthCh
     return 0;
   }, [isBrushSelected, isEraserSelected, brushWidth, eraserWidth]);
   const [localValue, setLocalValue] = useState(width);
-  const toolWidthPicker = useToolWidthPicker(toolBarAvailableSpace);
+  const [componentType, setComponentType] = useState<'slider' | 'dropdown' | null>(null);
+  useResizeObserver(ref, (entry) => {
+    if (entry.contentRect.width > SLIDER_PICKER_WIDTH) {
+      setComponentType('slider');
+    } else {
+      setComponentType('dropdown');
+    }
+  });
 
   const onValueChange = useCallback(
     (value: number) => {
@@ -351,18 +293,26 @@ export const ToolWidthPicker = memo(({ toolBarAvailableSpace, onComponentWidthCh
     dependencies: [increment, isToolSelected],
   });
 
-  const Component = components[toolWidthPicker];
-
   return (
-    <Flex px={4}>
-      <Component
-        localValue={localValue}
-        onChangeSlider={onChangeSlider}
-        onChangeInput={onChangeInput}
-        onBlur={onBlur}
-        onKeyDown={onKeyDown}
-        onComponentWidthChange={onComponentWidthChange}
-      />
+    <Flex ref={ref} alignItems="center" h="full" flexGrow={1} flexShrink={1} justifyContent="flex-start" px={4}>
+      {componentType === 'slider' && (
+        <SliderToolWidthPickerComponent
+          localValue={localValue}
+          onChangeSlider={onChangeSlider}
+          onChangeInput={onChangeInput}
+          onBlur={onBlur}
+          onKeyDown={onKeyDown}
+        />
+      )}
+      {componentType === 'dropdown' && (
+        <DropDownToolWidthPickerComponent
+          localValue={localValue}
+          onChangeSlider={onChangeSlider}
+          onChangeInput={onChangeInput}
+          onBlur={onBlur}
+          onKeyDown={onKeyDown}
+        />
+      )}
     </Flex>
   );
 });
