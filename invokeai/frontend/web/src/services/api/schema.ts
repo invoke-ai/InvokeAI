@@ -18344,7 +18344,7 @@ export type components = {
             qwen2_5_vl_model: components["schemas"]["ModelIdentifierField"];
             /**
              * VAE
-             * @description VAE model for Qwen-Image
+             * @description VAE model (uses Qwen-Image's bundled VAE if not specified)
              * @default null
              */
             vae_model?: components["schemas"]["ModelIdentifierField"] | null;
