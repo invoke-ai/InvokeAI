@@ -33,6 +33,7 @@ class BaseModelType(str, Enum):
     FluxKontext = "flux-kontext"
     Veo3 = "veo3"
     Runway = "runway"
+    QwenImage = "qwen-image"
 
 
 class ModelType(str, Enum):
