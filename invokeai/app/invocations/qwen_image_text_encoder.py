@@ -9,7 +9,6 @@ from invokeai.app.invocations.model import Qwen2_5VLField
 from invokeai.app.invocations.primitives import QwenImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
-from invokeai.backend.util.devices import TorchDevice
 
 
 @invocation(
@@ -33,14 +32,12 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> QwenImageConditioningOutput:
         """Encode the prompt using Qwen-Image's text encoder."""
         
-        device = TorchDevice.choose_torch_device()
+        # Load the text encoder info first to get the model
+        text_encoder_info = context.models.load(self.qwen2_5_vl.text_encoder)
         
-        # Load the Qwen2.5-VL tokenizer and text encoder
-        with context.models.load(self.qwen2_5_vl.tokenizer) as tokenizer_info, \
-             context.models.load(self.qwen2_5_vl.text_encoder) as text_encoder_info:
-            
-            tokenizer = tokenizer_info.model
-            text_encoder = text_encoder_info.model.to(device)
+        # Load the Qwen2.5-VL tokenizer and text encoder with proper device management
+        with text_encoder_info.model_on_device() as (cached_weights, text_encoder), \
+             context.models.load(self.qwen2_5_vl.tokenizer) as tokenizer:
             
             try:
                 # Tokenize the prompt
@@ -53,8 +50,8 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
                     return_tensors="pt",
                 )
                 
-                # Encode the text
-                text_embeddings = text_encoder(text_inputs.input_ids.to(device))[0]
+                # Encode the text (text_encoder is already on the correct device)
+                text_embeddings = text_encoder(text_inputs.input_ids.to(text_encoder.device))[0]
                 
                 # Create a simple conditioning info that stores the embeddings
                 # For now, we'll create a simple class to hold the data
