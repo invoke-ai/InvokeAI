@@ -77,9 +77,32 @@ git clone https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct invokeai/models/qwe
 The Qwen-Image VAE is bundled with the main model. You don't need to download or select a separate VAE - just leave the VAE field empty to use the bundled one.
 
 ### Memory Issues
-- Use bfloat16 precision for reduced memory usage
-- Consider quantization options (e.g., qwen-image-nf4 from diffusers)
-- Recommended: 24GB+ VRAM for full model
+Qwen-Image is a large model (20B parameters) and Qwen2.5-VL is 7B parameters. Together they require significant resources:
+
+**Memory Requirements:**
+- **Minimum**: 24GB VRAM (with optimizations)
+- **Recommended**: 32GB+ VRAM for smooth operation
+- **System RAM**: 32GB+ recommended
+
+**Optimization Tips:**
+1. **Use bfloat16 precision**: Reduces memory by ~50%
+   ```python
+   torch_dtype=torch.bfloat16
+   ```
+
+2. **Enable CPU offloading**: Move unused models to system RAM
+   - InvokeAI's model manager handles this automatically when configured
+
+3. **Use quantized versions**: 
+   - Try `diffusers/qwen-image-nf4` for 4-bit quantization
+   - Reduces memory usage by ~75% with minimal quality loss
+
+4. **Adjust cache settings**: In InvokeAI settings:
+   - Reduce `ram_cache_size` if running out of system RAM
+   - Reduce `vram_cache_size` if getting CUDA OOM errors
+
+5. **Load models sequentially**: Don't load all models at once
+   - The model manager now properly calculates sizes for better memory management
 
 ### Model Not Loading
 - Ensure the model is in the correct directory structure
