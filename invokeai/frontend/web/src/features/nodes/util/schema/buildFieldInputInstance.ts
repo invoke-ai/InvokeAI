@@ -16,6 +16,9 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   IntegerGeneratorField: undefined,
   StringGeneratorField: undefined,
   ImageGeneratorField: undefined,
+  QwenImageMainModelField: undefined,
+  QwenImageVAEModelField: undefined,
+  Qwen2_5VLModelField: undefined,
 };
 
 export const buildFieldInputInstance = (id: string, template: FieldInputTemplate): FieldInputInstance => {
