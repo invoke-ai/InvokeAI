@@ -35,6 +35,7 @@ export const IntegerFieldInput = memo(
           className={NO_DRAG_CLASS}
           flex="1 1 0"
           constrainValue={constrainValue}
+          allowMath
         />
         {showShuffle && (
           <Button size="sm" isDisabled={false} onClick={randomizeValue} leftIcon={<PiShuffleBold />} flexShrink={0}>

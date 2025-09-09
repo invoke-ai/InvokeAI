@@ -34,15 +34,15 @@ export const IntegerGeneratorArithmeticSequenceSettings = memo(
       <Flex gap={2} alignItems="flex-end">
         <FormControl orientation="vertical">
           <FormLabel>{t('common.start')}</FormLabel>
-          <CompositeNumberInput value={state.start} onChange={onChangeStart} min={-Infinity} max={Infinity} />
+          <CompositeNumberInput value={state.start} onChange={onChangeStart} min={-Infinity} max={Infinity} allowMath />
         </FormControl>
         <FormControl orientation="vertical">
           <FormLabel>{t('common.step')}</FormLabel>
-          <CompositeNumberInput value={state.step} onChange={onChangeStep} min={-Infinity} max={Infinity} />
+          <CompositeNumberInput value={state.step} onChange={onChangeStep} min={-Infinity} max={Infinity} allowMath />
         </FormControl>
         <FormControl orientation="vertical">
           <FormLabel>{t('common.count')}</FormLabel>
-          <CompositeNumberInput value={state.count} onChange={onChangeCount} min={1} max={Infinity} />
+          <CompositeNumberInput value={state.count} onChange={onChangeCount} min={1} max={Infinity} allowMath />
         </FormControl>
       </Flex>
     );

@@ -45,15 +45,15 @@ export const IntegerGeneratorUniformRandomDistributionSettings = memo(
         <Flex gap={2} alignItems="flex-end">
           <FormControl orientation="vertical">
             <FormLabel>{t('common.min')}</FormLabel>
-            <CompositeNumberInput value={state.min} onChange={onChangeMin} min={-Infinity} max={Infinity} />
+            <CompositeNumberInput value={state.min} onChange={onChangeMin} min={-Infinity} max={Infinity} allowMath />
           </FormControl>
           <FormControl orientation="vertical">
             <FormLabel>{t('common.max')}</FormLabel>
-            <CompositeNumberInput value={state.max} onChange={onChangeMax} min={-Infinity} max={Infinity} />
+            <CompositeNumberInput value={state.max} onChange={onChangeMax} min={-Infinity} max={Infinity} allowMath />
           </FormControl>
           <FormControl orientation="vertical">
             <FormLabel>{t('common.count')}</FormLabel>
-            <CompositeNumberInput value={state.count} onChange={onChangeCount} min={1} max={Infinity} />
+            <CompositeNumberInput value={state.count} onChange={onChangeCount} min={1} max={Infinity} allowMath />
           </FormControl>
           <FormControl orientation="vertical">
             <FormLabel alignItems="center" justifyContent="space-between" m={0} display="flex" w="full">
@@ -68,6 +68,7 @@ export const IntegerGeneratorUniformRandomDistributionSettings = memo(
               onChange={onChangeSeed}
               min={-Infinity}
               max={Infinity}
+              allowMath
             />
           </FormControl>
         </Flex>
