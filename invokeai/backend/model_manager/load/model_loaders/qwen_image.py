@@ -9,6 +9,7 @@ from diffusers import DiffusionPipeline
 from invokeai.backend.model_manager.config import AnyModelConfig, MainDiffusersConfig
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     BaseModelType,
@@ -21,6 +22,20 @@ from invokeai.backend.model_manager.taxonomy import (
 @ModelLoaderRegistry.register(base=BaseModelType.QwenImage, type=ModelType.Main, format=ModelFormat.Diffusers)
 class QwenImageLoader(ModelLoader):
     """Class to load Qwen-Image models."""
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        """Calculate the size of the Qwen-Image model on disk."""
+        if not isinstance(config, MainDiffusersConfig):
+            raise ValueError("Only MainDiffusersConfig models are currently supported here.")
+        
+        # For Qwen-Image, we need to calculate the size of the entire model or specific submodels
+        return calc_model_size_by_fs(
+            model_path=model_path,
+            subfolder=submodel_type.value if submodel_type else None,
+            variant=config.repo_variant.value if config.repo_variant else None,
+        )
 
     def _load_model(
         self,
