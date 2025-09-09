@@ -29,6 +29,8 @@ import {
   isLoRAModelConfig,
   isNonRefinerMainModelConfig,
   isNonSDXLMainModelConfig,
+  isQwenImageMainModelModelConfig,
+  isQwenImageVAEModelConfig,
   isRefinerMainModelModelConfig,
   isRunwayModelConfig,
   isSD3MainModelModelConfig,
@@ -69,6 +71,7 @@ export const useMainModels = buildModelsHook(isNonRefinerMainModelConfig);
 export const useNonSDXLMainModels = buildModelsHook(isNonSDXLMainModelConfig);
 export const useRefinerModels = buildModelsHook(isRefinerMainModelModelConfig);
 export const useFluxModels = buildModelsHook(isFluxMainModelModelConfig);
+export const useQwenImageModels = buildModelsHook(isQwenImageMainModelModelConfig);
 export const useSD3Models = buildModelsHook(isSD3MainModelModelConfig);
 export const useCogView4Models = buildModelsHook(isCogView4MainModelModelConfig);
 export const useSDXLModels = buildModelsHook(isSDXLMainModelModelConfig);
@@ -87,6 +90,8 @@ export const useEmbeddingModels = buildModelsHook(isTIModelConfig);
 export const useVAEModels = (args?: ModelHookArgs) => buildModelsHook(isVAEModelConfig, args?.excludeSubmodels)();
 export const useFluxVAEModels = (args?: ModelHookArgs) =>
   buildModelsHook(isFluxVAEModelConfig, args?.excludeSubmodels)();
+export const useQwenImageVAEModels = (args?: ModelHookArgs) =>
+  buildModelsHook(isQwenImageVAEModelConfig, args?.excludeSubmodels)();
 export const useCLIPVisionModels = buildModelsHook(isCLIPVisionModelConfig);
 export const useSigLipModels = buildModelsHook(isSigLipModelConfig);
 export const useFluxReduxModels = buildModelsHook(isFluxReduxModelConfig);

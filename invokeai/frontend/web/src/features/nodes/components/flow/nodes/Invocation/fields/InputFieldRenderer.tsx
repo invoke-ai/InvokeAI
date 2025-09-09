@@ -77,6 +77,12 @@ import {
   isIntegerGeneratorFieldInputTemplate,
   isIPAdapterModelFieldInputInstance,
   isIPAdapterModelFieldInputTemplate,
+  isQwen2_5VLModelFieldInputInstance,
+  isQwen2_5VLModelFieldInputTemplate,
+  isQwenImageMainModelFieldInputInstance,
+  isQwenImageMainModelFieldInputTemplate,
+  isQwenImageVAEModelFieldInputInstance,
+  isQwenImageVAEModelFieldInputTemplate,
   isLLaVAModelFieldInputInstance,
   isLLaVAModelFieldInputTemplate,
   isLoRAModelFieldInputInstance,
@@ -135,6 +141,9 @@ import FluxVAEModelFieldInputComponent from './inputs/FluxVAEModelFieldInputComp
 import ImageFieldInputComponent from './inputs/ImageFieldInputComponent';
 import IPAdapterModelFieldInputComponent from './inputs/IPAdapterModelFieldInputComponent';
 import LLaVAModelFieldInputComponent from './inputs/LLaVAModelFieldInputComponent';
+import Qwen2_5VLModelFieldInputComponent from './inputs/Qwen2_5VLModelFieldInputComponent';
+import QwenImageMainModelFieldInputComponent from './inputs/QwenImageMainModelFieldInputComponent';
+import QwenImageVAEModelFieldInputComponent from './inputs/QwenImageVAEModelFieldInputComponent';
 import LoRAModelFieldInputComponent from './inputs/LoRAModelFieldInputComponent';
 import MainModelFieldInputComponent from './inputs/MainModelFieldInputComponent';
 import RefinerModelFieldInputComponent from './inputs/RefinerModelFieldInputComponent';
@@ -480,6 +489,27 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
       return null;
     }
     return <CogView4MainModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isQwenImageMainModelFieldInputTemplate(template)) {
+    if (!isQwenImageMainModelFieldInputInstance(field)) {
+      return null;
+    }
+    return <QwenImageMainModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isQwenImageVAEModelFieldInputTemplate(template)) {
+    if (!isQwenImageVAEModelFieldInputInstance(field)) {
+      return null;
+    }
+    return <QwenImageVAEModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isQwen2_5VLModelFieldInputTemplate(template)) {
+    if (!isQwen2_5VLModelFieldInputInstance(field)) {
+      return null;
+    }
+    return <Qwen2_5VLModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
   }
 
   if (isSDXLMainModelFieldInputTemplate(template)) {

@@ -222,6 +222,13 @@ export const isFluxVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: 
   );
 };
 
+export const isQwenImageVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: boolean): config is VAEModelConfig => {
+  return (
+    (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
+    config.base === 'qwen-image'
+  );
+};
+
 export const isControlNetModelConfig = (config: AnyModelConfig): config is ControlNetModelConfig => {
   return config.type === 'controlnet';
 };
@@ -364,6 +371,10 @@ export const isCogView4MainModelModelConfig = (config: AnyModelConfig): config i
 
 export const isFluxMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base === 'flux';
+};
+
+export const isQwenImageMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'qwen-image';
 };
 
 export const isFluxFillMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
