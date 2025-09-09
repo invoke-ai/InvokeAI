@@ -6,7 +6,7 @@ from typing import Optional
 
 from diffusers import DiffusionPipeline
 
-from invokeai.backend.model_manager.config import AnyModelConfig, QwenImageConfig
+from invokeai.backend.model_manager.config import AnyModelConfig, MainDiffusersConfig
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import (
@@ -27,8 +27,11 @@ class QwenImageLoader(ModelLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if not isinstance(config, QwenImageConfig):
-            raise ValueError("Only QwenImageConfig models are currently supported here.")
+        if not isinstance(config, MainDiffusersConfig):
+            raise ValueError("Only MainDiffusersConfig models are currently supported here.")
+        
+        if config.base != BaseModelType.QwenImage:
+            raise ValueError("This loader only supports Qwen-Image models.")
         
         model_path = Path(config.path)
         
