@@ -45,7 +45,14 @@ export const FloatGeneratorArithmeticSequenceSettings = memo(
         </FormControl>
         <FormControl orientation="vertical">
           <FormLabel>{t('common.step')}</FormLabel>
-          <CompositeNumberInput value={state.step} onChange={onChangeStep} min={-Infinity} max={Infinity} step={0.01} allowMath />
+          <CompositeNumberInput
+            value={state.step}
+            onChange={onChangeStep}
+            min={-Infinity}
+            max={Infinity}
+            step={0.01}
+            allowMath
+          />
         </FormControl>
         <FormControl orientation="vertical">
           <FormLabel>{t('common.count')}</FormLabel>

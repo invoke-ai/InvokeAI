@@ -29,7 +29,14 @@ export const StringGeneratorDynamicPromptsCombinatorialSettings = memo(
       <Flex gap={2} flexDir="column">
         <FormControl orientation="vertical">
           <FormLabel>{t('dynamicPrompts.maxPrompts')}</FormLabel>
-          <CompositeNumberInput value={state.maxPrompts} onChange={onChangeMaxPrompts} min={1} max={1000} w="full" allowMath />
+          <CompositeNumberInput
+            value={state.maxPrompts}
+            onChange={onChangeMaxPrompts}
+            min={1}
+            max={1000}
+            w="full"
+            allowMath
+          />
         </FormControl>
         <GeneratorTextareaWithFileUpload value={state.input} onChange={onChangeInput} />
       </Flex>

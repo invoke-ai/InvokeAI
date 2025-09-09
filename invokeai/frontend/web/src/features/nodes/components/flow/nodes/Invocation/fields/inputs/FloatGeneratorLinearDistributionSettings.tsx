@@ -45,7 +45,14 @@ export const FloatGeneratorLinearDistributionSettings = memo(
         </FormControl>
         <FormControl orientation="vertical">
           <FormLabel>{t('common.end')}</FormLabel>
-          <CompositeNumberInput value={state.end} onChange={onChangeEnd} min={-Infinity} max={Infinity} step={0.01} allowMath />
+          <CompositeNumberInput
+            value={state.end}
+            onChange={onChangeEnd}
+            min={-Infinity}
+            max={Infinity}
+            step={0.01}
+            allowMath
+          />
         </FormControl>
         <FormControl orientation="vertical">
           <FormLabel>{t('common.count')}</FormLabel>

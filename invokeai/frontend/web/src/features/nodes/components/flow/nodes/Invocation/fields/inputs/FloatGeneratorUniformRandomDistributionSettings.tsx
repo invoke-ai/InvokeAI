@@ -45,11 +45,25 @@ export const FloatGeneratorUniformRandomDistributionSettings = memo(
         <Flex gap={2} alignItems="flex-end">
           <FormControl orientation="vertical">
             <FormLabel>{t('common.min')}</FormLabel>
-            <CompositeNumberInput value={state.min} onChange={onChangeMin} min={-Infinity} max={Infinity} step={0.01} allowMath />
+            <CompositeNumberInput
+              value={state.min}
+              onChange={onChangeMin}
+              min={-Infinity}
+              max={Infinity}
+              step={0.01}
+              allowMath
+            />
           </FormControl>
           <FormControl orientation="vertical">
             <FormLabel>{t('common.max')}</FormLabel>
-            <CompositeNumberInput value={state.max} onChange={onChangeMax} min={-Infinity} max={Infinity} step={0.01} allowMath />
+            <CompositeNumberInput
+              value={state.max}
+              onChange={onChangeMax}
+              min={-Infinity}
+              max={Infinity}
+              step={0.01}
+              allowMath
+            />
           </FormControl>
           <FormControl orientation="vertical">
             <FormLabel>{t('common.count')}</FormLabel>
