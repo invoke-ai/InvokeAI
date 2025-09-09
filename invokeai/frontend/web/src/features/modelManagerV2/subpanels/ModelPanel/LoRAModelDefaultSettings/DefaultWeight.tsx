@@ -1,13 +1,15 @@
 import { CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { DEFAULT_LORA_WEIGHT_CONFIG } from 'features/controlLayers/store/lorasSlice';
 import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/SettingToggle';
-import { DEFAULT_LORA_WEIGHT_CONFIG } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
 import type { LoRAModelDefaultSettingsFormData } from './LoRAModelDefaultSettings';
+
+const MARKS = [-1, 0, 1, 2];
 
 type DefaultWeight = LoRAModelDefaultSettingsFormData['weight'];
 
@@ -51,7 +53,7 @@ export const DefaultWeight = memo((props: UseControllerProps<LoRAModelDefaultSet
           step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
           fineStep={DEFAULT_LORA_WEIGHT_CONFIG.fineStep}
           onChange={onChange}
-          marks={DEFAULT_LORA_WEIGHT_CONFIG.marks.slice()}
+          marks={MARKS}
           isDisabled={isDisabled}
         />
         <CompositeNumberInput
