@@ -73,6 +73,9 @@ export const buildGemini2_5Graph = (arg: GraphBuilderArg): GraphBuilderReturn =>
   g.upsertMetadata({
     model: Graph.getModelMetadataField(model),
   });
+
+  g.setMetadataReceivingNode(geminiImage);
+
   return {
     g,
     positivePrompt,
