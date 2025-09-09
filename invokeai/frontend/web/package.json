@@ -45,7 +45,7 @@
     "@dagrejs/dagre": "^1.1.5",
     "@dagrejs/graphlib": "^2.2.4",
     "@fontsource-variable/inter": "^5.2.6",
-    "@invoke-ai/ui-library": "^0.0.46",
+    "@invoke-ai/ui-library": "^0.0.47",
     "@nanostores/react": "^1.0.0",
     "@observ33r/object-equals": "^1.1.5",
     "@reduxjs/toolkit": "2.8.2",

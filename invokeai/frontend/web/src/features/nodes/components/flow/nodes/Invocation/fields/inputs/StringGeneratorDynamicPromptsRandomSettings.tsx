@@ -51,11 +51,12 @@ export const StringGeneratorDynamicPromptsRandomSettings = memo(
               onChange={onChangeSeed}
               min={-Infinity}
               max={Infinity}
+              allowMath
             />
           </FormControl>
           <FormControl orientation="vertical">
             <FormLabel>{t('common.count')}</FormLabel>
-            <CompositeNumberInput value={state.count} onChange={onChangeCount} min={1} max={1000} />
+            <CompositeNumberInput value={state.count} onChange={onChangeCount} min={1} max={1000} allowMath />
           </FormControl>
         </Flex>
         <GeneratorTextareaWithFileUpload value={state.input} onChange={onChangeInput} />
