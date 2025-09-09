@@ -3,7 +3,7 @@ import { ModelFieldCombobox } from 'features/nodes/components/flow/nodes/Invocat
 import { fieldVaeModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type { QwenImageVAEModelFieldInputInstance, QwenImageVAEModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
-import { useQwenImageVAEModels } from 'services/api/hooks/modelsByType';
+import { useVAEModels } from 'services/api/hooks/modelsByType';
 import type { VAEModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
@@ -13,7 +13,7 @@ type Props = FieldComponentProps<QwenImageVAEModelFieldInputInstance, QwenImageV
 const QwenImageVAEModelFieldInputComponent = (props: Props) => {
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
-  const [modelConfigs, { isLoading }] = useQwenImageVAEModels();
+  const [modelConfigs, { isLoading }] = useVAEModels();
   const onChange = useCallback(
     (value: VAEModelConfig | null) => {
       if (!value) {

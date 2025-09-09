@@ -49,7 +49,7 @@ class QwenImageModelLoaderInvocation(BaseInvocation):
 
     vae_model: ModelIdentifierField = InputField(
         description="VAE model for Qwen-Image",
-        ui_type=UIType.QwenImageVAEModel,
+        ui_type=UIType.VAEModel,
         title="VAE"
     )
 
