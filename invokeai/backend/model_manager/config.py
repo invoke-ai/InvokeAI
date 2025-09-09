@@ -651,6 +651,36 @@ class LlavaOnevisionConfig(DiffusersConfigBase, ModelConfigBase):
         }
 
 
+class QwenImageConfig(DiffusersConfigBase, MainConfigBase, ModelConfigBase):
+    """Model config for Qwen-Image models."""
+
+    type: Literal[ModelType.Main] = ModelType.Main
+    format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+
+    @classmethod
+    def matches(cls, mod: ModelOnDisk) -> bool:
+        if mod.path.is_file():
+            return False
+
+        config_path = mod.path / "model_index.json"
+        try:
+            with open(config_path, "r") as file:
+                config = json.load(file)
+        except FileNotFoundError:
+            return False
+
+        # Check if this is a Qwen-Image diffusion pipeline
+        pipeline_class = config.get("_class_name")
+        return pipeline_class and "QwenImage" in pipeline_class
+
+    @classmethod
+    def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
+        return {
+            "base": BaseModelType.QwenImage,
+            "variant": ModelVariantType.Normal,
+        }
+
+
 class ApiModelConfig(MainConfigBase, ModelConfigBase):
     """Model config for API-based models."""
 
@@ -749,6 +779,7 @@ AnyModelConfig = Annotated[
         Annotated[SigLIPConfig, SigLIPConfig.get_tag()],
         Annotated[FluxReduxConfig, FluxReduxConfig.get_tag()],
         Annotated[LlavaOnevisionConfig, LlavaOnevisionConfig.get_tag()],
+        Annotated[QwenImageConfig, QwenImageConfig.get_tag()],
         Annotated[ApiModelConfig, ApiModelConfig.get_tag()],
         Annotated[VideoApiModelConfig, VideoApiModelConfig.get_tag()],
     ],

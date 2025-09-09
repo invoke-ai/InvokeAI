@@ -327,6 +327,12 @@ class CogView4ConditioningField(BaseModel):
     conditioning_name: str = Field(description="The name of conditioning tensor")
 
 
+class QwenImageConditioningField(BaseModel):
+    """A conditioning tensor primitive value for Qwen-Image"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
 class ConditioningField(BaseModel):
     """A conditioning tensor primitive value"""
 
