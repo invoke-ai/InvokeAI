@@ -16,6 +16,7 @@ export const BASE_COLOR_MAP: Record<BaseModelType, string> = {
   'sdxl-refiner': 'invokeBlue',
   flux: 'gold',
   cogview4: 'red',
+  'qwen-image': 'cyan',
   imagen3: 'pink',
   imagen4: 'pink',
   'chatgpt-4o': 'pink',

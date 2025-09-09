@@ -185,6 +185,18 @@ const zFluxMainModelFieldType = zFieldTypeBase.extend({
   name: z.literal('FluxMainModelField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zQwenImageMainModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('QwenImageMainModelField'),
+  originalType: zStatelessFieldType.optional(),
+});
+const zQwenImageVAEModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('QwenImageVAEModelField'),
+  originalType: zStatelessFieldType.optional(),
+});
+const zQwen2_5VLModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('Qwen2_5VLModelField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zSDXLRefinerModelFieldType = zFieldTypeBase.extend({
   name: z.literal('SDXLRefinerModelField'),
   originalType: zStatelessFieldType.optional(),
@@ -307,6 +319,9 @@ const zStatefulFieldType = z.union([
   zSD3MainModelFieldType,
   zCogView4MainModelFieldType,
   zFluxMainModelFieldType,
+  zQwenImageMainModelFieldType,
+  zQwenImageVAEModelFieldType,
+  zQwen2_5VLModelFieldType,
   zSDXLRefinerModelFieldType,
   zVAEModelFieldType,
   zLoRAModelFieldType,
@@ -351,6 +366,9 @@ const modelFieldTypeNames = [
   zSD3MainModelFieldType.shape.name.value,
   zCogView4MainModelFieldType.shape.name.value,
   zFluxMainModelFieldType.shape.name.value,
+  zQwenImageMainModelFieldType.shape.name.value,
+  zQwenImageVAEModelFieldType.shape.name.value,
+  zQwen2_5VLModelFieldType.shape.name.value,
   zSDXLRefinerModelFieldType.shape.name.value,
   zVAEModelFieldType.shape.name.value,
   zLoRAModelFieldType.shape.name.value,
@@ -900,6 +918,47 @@ export const isFluxMainModelFieldInputTemplate =
   buildTemplateTypeGuard<FluxMainModelFieldInputTemplate>('FluxMainModelField');
 // #endregion
 
+// #region QwenImageMainModelField
+const zQwenImageMainModelFieldValue = zMainModelFieldValue;
+const zQwenImageMainModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zQwenImageMainModelFieldValue,
+});
+const zQwenImageMainModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zQwenImageMainModelFieldType,
+  originalType: zFieldType.optional(),
+  default: zQwenImageMainModelFieldValue,
+});
+const zQwenImageMainModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zQwenImageMainModelFieldType,
+});
+export type QwenImageMainModelFieldInputInstance = z.infer<typeof zQwenImageMainModelFieldInputInstance>;
+export type QwenImageMainModelFieldInputTemplate = z.infer<typeof zQwenImageMainModelFieldInputTemplate>;
+export const isQwenImageMainModelFieldInputInstance = buildInstanceTypeGuard(zQwenImageMainModelFieldInputInstance);
+export const isQwenImageMainModelFieldInputTemplate =
+  buildTemplateTypeGuard<QwenImageMainModelFieldInputTemplate>('QwenImageMainModelField');
+// #endregion
+
+
+// #region Qwen2_5VLModelField
+const zQwen2_5VLModelFieldValue = zMainModelFieldValue;
+const zQwen2_5VLModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zQwen2_5VLModelFieldValue,
+});
+const zQwen2_5VLModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zQwen2_5VLModelFieldType,
+  originalType: zFieldType.optional(),
+  default: zQwen2_5VLModelFieldValue,
+});
+const zQwen2_5VLModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zQwen2_5VLModelFieldType,
+});
+export type Qwen2_5VLModelFieldInputInstance = z.infer<typeof zQwen2_5VLModelFieldInputInstance>;
+export type Qwen2_5VLModelFieldInputTemplate = z.infer<typeof zQwen2_5VLModelFieldInputTemplate>;
+export const isQwen2_5VLModelFieldInputInstance = buildInstanceTypeGuard(zQwen2_5VLModelFieldInputInstance);
+export const isQwen2_5VLModelFieldInputTemplate =
+  buildTemplateTypeGuard<Qwen2_5VLModelFieldInputTemplate>('Qwen2_5VLModelField');
+// #endregion
+
 // #region SDXLRefinerModelField
 /** @alias */ // tells knip to ignore this duplicate export
 export const zSDXLRefinerModelFieldValue = zMainModelFieldValue; // TODO: Narrow to SDXL Refiner models only.
@@ -961,6 +1020,26 @@ export type LoRAModelFieldInputInstance = z.infer<typeof zLoRAModelFieldInputIns
 export type LoRAModelFieldInputTemplate = z.infer<typeof zLoRAModelFieldInputTemplate>;
 export const isLoRAModelFieldInputInstance = buildInstanceTypeGuard(zLoRAModelFieldInputInstance);
 export const isLoRAModelFieldInputTemplate = buildTemplateTypeGuard<LoRAModelFieldInputTemplate>('LoRAModelField');
+// #endregion
+
+// #region QwenImageVAEModelField
+const zQwenImageVAEModelFieldValue = zVAEModelFieldValue;
+const zQwenImageVAEModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zQwenImageVAEModelFieldValue,
+});
+const zQwenImageVAEModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zQwenImageVAEModelFieldType,
+  originalType: zFieldType.optional(),
+  default: zQwenImageVAEModelFieldValue,
+});
+const zQwenImageVAEModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zQwenImageVAEModelFieldType,
+});
+export type QwenImageVAEModelFieldInputInstance = z.infer<typeof zQwenImageVAEModelFieldInputInstance>;
+export type QwenImageVAEModelFieldInputTemplate = z.infer<typeof zQwenImageVAEModelFieldInputTemplate>;
+export const isQwenImageVAEModelFieldInputInstance = buildInstanceTypeGuard(zQwenImageVAEModelFieldInputInstance);
+export const isQwenImageVAEModelFieldInputTemplate =
+  buildTemplateTypeGuard<QwenImageVAEModelFieldInputTemplate>('QwenImageVAEModelField');
 // #endregion
 
 // #region LLaVAModelField
@@ -1985,6 +2064,9 @@ const zStatefulFieldInputInstance = z.union([
   zModelIdentifierFieldInputInstance,
   zMainModelFieldInputInstance,
   zFluxMainModelFieldInputInstance,
+  zQwenImageMainModelFieldInputInstance,
+  zQwenImageVAEModelFieldInputInstance,
+  zQwen2_5VLModelFieldInputInstance,
   zSD3MainModelFieldInputInstance,
   zCogView4MainModelFieldInputInstance,
   zSDXLMainModelFieldInputInstance,
@@ -2050,6 +2132,9 @@ const zStatefulFieldInputTemplate = z.union([
   zImagen4ModelFieldInputTemplate,
   zChatGPT4oModelFieldInputTemplate,
   zFluxKontextModelFieldInputTemplate,
+  zQwenImageMainModelFieldInputTemplate,
+  zQwenImageVAEModelFieldInputTemplate,
+  zQwen2_5VLModelFieldInputTemplate,
   zVeo3ModelFieldInputTemplate,
   zRunwayModelFieldInputTemplate,
   zColorFieldInputTemplate,

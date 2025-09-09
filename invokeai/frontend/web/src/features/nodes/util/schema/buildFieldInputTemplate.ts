@@ -34,6 +34,9 @@ import type {
   LoRAModelFieldInputTemplate,
   MainModelFieldInputTemplate,
   ModelIdentifierFieldInputTemplate,
+  Qwen2_5VLModelFieldInputTemplate,
+  QwenImageMainModelFieldInputTemplate,
+  QwenImageVAEModelFieldInputTemplate,
   RunwayModelFieldInputTemplate,
   SchedulerFieldInputTemplate,
   SD3MainModelFieldInputTemplate,
@@ -669,6 +672,45 @@ const buildChatGPT4oModelFieldInputTemplate: FieldInputTemplateBuilder<ChatGPT4o
   return template;
 };
 
+const buildQwenImageMainModelFieldInputTemplate: FieldInputTemplateBuilder<QwenImageMainModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: QwenImageMainModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+  return template;
+};
+
+const buildQwenImageVAEModelFieldInputTemplate: FieldInputTemplateBuilder<QwenImageVAEModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: QwenImageVAEModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+  return template;
+};
+
+const buildQwen2_5VLModelFieldInputTemplate: FieldInputTemplateBuilder<Qwen2_5VLModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: Qwen2_5VLModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+  return template;
+};
+
 const buildBoardFieldInputTemplate: FieldInputTemplateBuilder<BoardFieldInputTemplate> = ({
   schemaObject,
   baseField,
@@ -885,6 +927,9 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   IntegerGeneratorField: buildIntegerGeneratorFieldInputTemplate,
   StringGeneratorField: buildStringGeneratorFieldInputTemplate,
   ImageGeneratorField: buildImageGeneratorFieldInputTemplate,
+  QwenImageMainModelField: buildQwenImageMainModelFieldInputTemplate,
+  QwenImageVAEModelField: buildQwenImageVAEModelFieldInputTemplate,
+  Qwen2_5VLModelField: buildQwen2_5VLModelFieldInputTemplate,
 } as const;
 
 export const buildFieldInputTemplate = (
