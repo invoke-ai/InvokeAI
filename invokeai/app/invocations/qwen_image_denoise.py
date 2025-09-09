@@ -4,7 +4,7 @@
 from typing import Optional
 
 import torch
-from diffusers import QwenImagePipeline
+from diffusers.pipelines import QwenImagePipeline
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import (
