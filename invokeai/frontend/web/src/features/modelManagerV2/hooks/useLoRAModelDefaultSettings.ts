@@ -1,5 +1,5 @@
 import { isNil } from 'es-toolkit/compat';
-import { DEFAULT_LORA_WEIGHT_CONFIG } from 'features/system/store/configSlice';
+import { DEFAULT_LORA_WEIGHT_CONFIG } from 'features/controlLayers/store/lorasSlice';
 import { useMemo } from 'react';
 import type { LoRAModelConfig } from 'services/api/types';
 
