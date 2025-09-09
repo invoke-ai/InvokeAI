@@ -7,9 +7,6 @@ from invokeai.app.invocations.baseinvocation import (
 from invokeai.app.invocations.fields import Input, InputField, OutputField
 from invokeai.app.invocations.model import ModelIdentifierField, Qwen2_5VLField, TransformerField, VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.config import (
-    CheckpointConfigBase,
-)
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
 
 
@@ -78,10 +75,6 @@ class QwenImageModelLoaderInvocation(BaseInvocation):
         # For Qwen-Image, we use Qwen2.5-VL as the text encoder
         tokenizer = self.qwen2_5_vl_model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
         text_encoder = self.qwen2_5_vl_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
-
-        # Get transformer config for any model-specific settings
-        transformer_config = context.models.get_config(transformer)
-        assert isinstance(transformer_config, CheckpointConfigBase)
 
         return QwenImageModelLoaderOutput(
             transformer=TransformerField(transformer=transformer, loras=[]),
