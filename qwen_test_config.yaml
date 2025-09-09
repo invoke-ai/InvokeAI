@@ -1,0 +1,26 @@
+# Qwen-Image Test Configuration with Memory Optimizations
+# This config helps test Qwen-Image with limited VRAM
+
+# Model Cache Settings - Adjust based on your system
+# These settings enable CPU offloading for large models
+Model:
+  # Reduce VRAM cache to force CPU offloading
+  vram_cache_size: 8.0  # GB - Keep only essential models in VRAM
+  
+  # Increase RAM cache for CPU offloading
+  ram_cache_size: 32.0  # GB - Adjust based on available system RAM
+  
+  # Enable sequential offloading
+  sequential_offload: true
+  
+  # Use bfloat16 by default for all models
+  precision: bfloat16
+
+# Recommended workflow for testing:
+# 1. Load only the Qwen-Image model first (not Qwen2.5-VL)
+# 2. Use a simple text prompt without the text encoder
+# 3. Test with smaller image sizes (512x512) initially
+
+# Alternative: Use quantized models
+# Download: huggingface-cli download diffusers/qwen-image-nf4
+# This reduces memory usage by ~75%
