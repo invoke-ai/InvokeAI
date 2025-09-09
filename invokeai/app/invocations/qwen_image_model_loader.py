@@ -36,20 +36,20 @@ class QwenImageModelLoaderInvocation(BaseInvocation):
 
     model: ModelIdentifierField = InputField(
         description="Qwen-Image main model",
-        ui_type=UIType.MainModel,  # Using MainModel as we haven't defined QwenImageMainModel UI type yet
+        ui_type=UIType.QwenImageMainModel,
         input=Input.Direct,
     )
 
     qwen2_5_vl_model: ModelIdentifierField = InputField(
         description="Qwen2.5-VL vision-language model",
-        ui_type=UIType.MainModel,  # Using MainModel for now
+        ui_type=UIType.Qwen2_5VLModel,
         input=Input.Direct,
         title="Qwen2.5-VL Model"
     )
 
     vae_model: ModelIdentifierField = InputField(
         description="VAE model for Qwen-Image",
-        ui_type=UIType.VAEModel,
+        ui_type=UIType.QwenImageVAEModel,
         title="VAE"
     )
 
