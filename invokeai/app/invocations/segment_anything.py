@@ -127,67 +127,26 @@ class SegmentAnythingInvocation(BaseInvocation):
         sam2_processor = Sam2Processor.from_pretrained(model_path, local_files_only=True)
         return SegmentAnything2Pipeline(sam2_model=sam2_model, sam2_processor=sam2_processor)
 
-    def _get_bounding_boxes(self) -> list[list[list[float]]] | None:
-        if self.bounding_boxes is None:
-            return None
-        return [[[bb.x_min, bb.y_min, bb.x_max, bb.y_max] for bb in self.bounding_boxes]]
-
-    def _get_sam_points_list(self) -> list[list[list[float]]] | None:
-        if not self.point_lists:
-            return None
-        return [p.to_list() for p in self.point_lists]
-
-    def _get_sam2_points_list_and_labels(
-        self,
-    ) -> tuple[list[list[list[list[float]]]], list[list[list[int]]]] | tuple[None, None]:
-        if not self.point_lists:
-            return None, None
-        point_lists: list[list[list[list[float]]]] = []
-        point_labels: list[list[list[int]]] = []
-        for point_list in self.point_lists:
-            object_points: list[list[float]] = []
-            object_labels: list[int] = []
-            for point in point_list.points:
-                object_points.append([point.x, point.y])
-                object_labels.append(point.label.value)
-            point_lists.append([object_points])
-            point_labels.append([object_labels])
-        return point_lists, point_labels
-
     def _segment(self, context: InvocationContext, image: Image.Image) -> list[torch.Tensor]:
         """Use Segment Anything (SAM or SAM2) to generate masks given an image + a set of bounding boxes."""
 
-        is_sam_2 = "segment-anything-2" in self.model
-
-        if is_sam_2:
-            source = SEGMENT_ANYTHING_MODEL_IDS[self.model]
-            loader = SegmentAnythingInvocation._load_sam_2_model
-            inputs: list[SAMInput] = []
-            for bbox_field, point_field in zip_longest(
-                self.bounding_boxes or [], self.point_lists or [], fillvalue=None
-            ):
-                inputs.append(
-                    SAMInput(
-                        bounding_box=bbox_field,
-                        points=point_field.points if point_field else None,
-                    )
+        source = SEGMENT_ANYTHING_MODEL_IDS[self.model]
+        inputs: list[SAMInput] = []
+        for bbox_field, point_field in zip_longest(self.bounding_boxes or [], self.point_lists or [], fillvalue=None):
+            inputs.append(
+                SAMInput(
+                    bounding_box=bbox_field,
+                    points=point_field.points if point_field else None,
                 )
+            )
+
+        if "sam2" in source:
+            loader = SegmentAnythingInvocation._load_sam_2_model
             with context.models.load_remote_model(source=source, loader=loader) as pipeline:
                 assert isinstance(pipeline, SegmentAnything2Pipeline)
                 masks = pipeline.segment(image=image, inputs=inputs)
         else:
-            source = SEGMENT_ANYTHING_MODEL_IDS[self.model]
             loader = SegmentAnythingInvocation._load_sam_model
-            inputs: list[SAMInput] = []
-            for bbox_field, point_field in zip_longest(
-                self.bounding_boxes or [], self.point_lists or [], fillvalue=None
-            ):
-                inputs.append(
-                    SAMInput(
-                        bounding_box=bbox_field,
-                        points=point_field.points if point_field else None,
-                    )
-                )
             with context.models.load_remote_model(source=source, loader=loader) as pipeline:
                 assert isinstance(pipeline, SegmentAnythingPipeline)
                 masks = pipeline.segment(image=image, inputs=inputs)
