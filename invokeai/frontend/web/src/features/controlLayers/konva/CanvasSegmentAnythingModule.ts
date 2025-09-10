@@ -437,6 +437,12 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
     // Handle manual drag detection for bbox rect
     this.konva.bboxRect.on('mousedown touchstart', (e) => {
+      // Only handle left mouse button (0) or touch events
+      // For mouse events, evt.button exists; for touch events, it doesn't
+      if ('button' in e.evt && e.evt.button !== 0) {
+        return;
+      }
+
       const data = this.$inputData.get();
       if (data.type !== 'visual') {
         return;
@@ -459,6 +465,11 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
     // Handle transformer interactions
     this.konva.bboxTransformer.on('mousedown touchstart', (e) => {
+      // Only handle left mouse button (0) or touch events
+      if ('button' in e.evt && e.evt.button !== 0) {
+        return;
+      }
+
       // Transformer handles its own dragging, just stop propagation
       e.cancelBubble = true;
     });
@@ -838,6 +849,13 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   onBboxDragMove = () => {
     const dragStart = this.$bboxDragStart.get();
     if (!dragStart) {
+      return;
+    }
+
+    // If the stage is being dragged (e.g., with middle mouse), clear our bbox drag state
+    if (this.manager.stage.getIsDragging()) {
+      this.$bboxDragStart.set(null);
+      this.$isBboxDragging.set(false);
       return;
     }
 
