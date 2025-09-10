@@ -436,10 +436,9 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     });
 
     // Handle manual drag detection for bbox rect
-    this.konva.bboxRect.on('mousedown touchstart', (e) => {
-      // Only handle left mouse button (0) or touch events
-      // For mouse events, evt.button exists; for touch events, it doesn't
-      if ('button' in e.evt && e.evt.button !== 0) {
+    this.konva.bboxRect.on('pointerdown', (e) => {
+      // Only handle left mouse button - other buttons are for panning or context menu
+      if (e.evt.button !== 0) {
         return;
       }
 
@@ -464,9 +463,9 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     });
 
     // Handle transformer interactions
-    this.konva.bboxTransformer.on('mousedown touchstart', (e) => {
-      // Only handle left mouse button (0) or touch events
-      if ('button' in e.evt && e.evt.button !== 0) {
+    this.konva.bboxTransformer.on('pointerdown', (e) => {
+      // Only handle left mouse button - other buttons are for panning or context menu
+      if (e.evt.button !== 0) {
         return;
       }
 
@@ -629,7 +628,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       return;
     }
 
-    // Only handle left-clicks (button 0). Ignore middle (1) and right (2) clicks
+    // Only handle left mouse button - other buttons are for panning or context menu
     if (e.evt.button !== 0) {
       return;
     }
@@ -732,7 +731,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
     // Handle visual mode
     if (data.type === 'visual') {
-      // Only handle left-clicks (button 0). Ignore middle (1) and right (2) clicks
+      // Only handle left mouse button - other buttons are for panning or context menu
       if (e.evt.button !== 0) {
         return;
       }
@@ -888,7 +887,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
    * Handles mouse/touch up for manual bbox dragging
    */
   onBboxDragEnd = (e: KonvaEventObject<PointerEvent>) => {
-    // Only handle left-clicks (button 0). Ignore middle (1) and right (2) clicks
+    // Only handle left mouse button - other buttons are for panning or context menu
     if (e.evt.button !== 0) {
       return;
     }
