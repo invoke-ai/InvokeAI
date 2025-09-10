@@ -45,7 +45,7 @@ const SelectObjectContent = memo(
     const hasInput = useStore(adapter.segmentAnything.$hasInputData);
     const hasImageState = useStore(adapter.segmentAnything.$hasImageState);
     const autoProcess = useAppSelector(selectAutoProcess);
-    const inputData = useStore(adapter.segmentAnything.$inputData);
+    const inputType = useStore(adapter.segmentAnything.$inputType);
 
     const saveAsInpaintMask = useCallback(() => {
       adapter.segmentAnything.saveAs('inpaint_mask');
@@ -118,15 +118,19 @@ const SelectObjectContent = memo(
         </Flex>
 
         <Flex w="full" justifyContent="space-between" py={2}>
-          <ButtonGroup>
-            <Button onClick={setInputToVisual}>Visual</Button>
-            <Button onClick={setInputToPrompt}>Prompt</Button>
+          <ButtonGroup size="sm" variant="outline">
+            <Button colorScheme={inputType === 'visual' ? 'invokeBlue' : undefined} onClick={setInputToVisual}>
+              Visual
+            </Button>
+            <Button colorScheme={inputType === 'prompt' ? 'invokeBlue' : undefined} onClick={setInputToPrompt}>
+              Prompt
+            </Button>
           </ButtonGroup>
-          {inputData.type === 'visual' && <SelectObjectPointType adapter={adapter} />}
           <SelectObjectInvert adapter={adapter} />
         </Flex>
 
-        <SelectObjectPrompt adapter={adapter} />
+        {inputType === 'visual' && <SelectObjectPointType adapter={adapter} />}
+        {inputType === 'prompt' && <SelectObjectPrompt adapter={adapter} />}
         <SelectObjectModel adapter={adapter} />
 
         <ButtonGroup isAttached={false} size="sm" w="full">
