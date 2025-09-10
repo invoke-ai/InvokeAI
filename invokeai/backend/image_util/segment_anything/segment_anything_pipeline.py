@@ -1,19 +1,12 @@
-from typing import Optional, TypeAlias
+from typing import Optional
 
 import torch
 from PIL import Image
 from transformers.models.sam import SamModel
 from transformers.models.sam.processing_sam import SamProcessor
 
+from invokeai.backend.image_util.segment_anything.shared import SAMInput
 from invokeai.backend.raw_model import RawModel
-
-# Type aliases for the inputs to the SAM model.
-ListOfBoundingBoxes: TypeAlias = list[list[int]]
-"""A list of bounding boxes. Each bounding box is in the format [xmin, ymin, xmax, ymax]."""
-ListOfPoints: TypeAlias = list[list[int]]
-"""A list of points. Each point is in the format [x, y]."""
-ListOfPointLabels: TypeAlias = list[int]
-"""A list of SAM point labels. Each label is an integer where -1 is background, 0 is neutral, and 1 is foreground."""
 
 
 class SegmentAnythingPipeline(RawModel):
@@ -38,8 +31,7 @@ class SegmentAnythingPipeline(RawModel):
     def segment(
         self,
         image: Image.Image,
-        bounding_boxes: list[list[int]] | None = None,
-        point_lists: list[list[list[int]]] | None = None,
+        inputs: list[SAMInput],
     ) -> torch.Tensor:
         """Run the SAM model.
 
@@ -57,36 +49,49 @@ class SegmentAnythingPipeline(RawModel):
             torch.Tensor: The segmentation masks. dtype: torch.bool. shape: [num_masks, channels, height, width].
         """
 
-        # Prep the inputs:
-        # - Create a list of bounding boxes or points and labels.
-        # - Add a batch dimension of 1 to the inputs.
-        if bounding_boxes:
-            input_boxes: list[ListOfBoundingBoxes] | None = [bounding_boxes]
-            input_points: list[ListOfPoints] | None = None
-            input_labels: list[ListOfPointLabels] | None = None
-        elif point_lists:
-            input_boxes: list[ListOfBoundingBoxes] | None = None
-            input_points: list[ListOfPoints] | None = []
-            input_labels: list[ListOfPointLabels] | None = []
-            for point_list in point_lists:
-                input_points.append([[p[0], p[1]] for p in point_list])
-                input_labels.append([p[2] for p in point_list])
+        input_boxes: list[list[list[float]]] = []
+        input_points: list[list[list[float]]] = []
+        input_labels: list[list[int]] = []
 
-        else:
-            raise ValueError("Either bounding_boxes or points and labels must be provided.")
+        for i in inputs:
+            box: list[float] | None = None
+            points: list[list[float]] | None = None
+            labels: list[int] | None = None
 
-        inputs = self._sam_processor(
+            if i.bounding_box is not None:
+                box: list[float] | None = [
+                    i.bounding_box.x_min,
+                    i.bounding_box.y_min,
+                    i.bounding_box.x_max,
+                    i.bounding_box.y_max,
+                ]
+
+            if i.points is not None:
+                points = []
+                labels = []
+                for point in i.points:
+                    points.append([point.x, point.y])
+                    labels.append(point.label.value)
+
+            if box is not None:
+                input_boxes.append([box])
+            if points is not None:
+                input_points.append(points)
+            if labels is not None:
+                input_labels.append(labels)
+
+        processed_inputs = self._sam_processor(
             images=image,
-            input_boxes=input_boxes,
-            input_points=input_points,
-            input_labels=input_labels,
+            input_boxes=input_boxes if input_boxes else None,
+            input_points=input_points if input_points else None,
+            input_labels=input_labels if input_labels else None,
             return_tensors="pt",
         ).to(self._sam_model.device)
-        outputs = self._sam_model(**inputs)
+        outputs = self._sam_model(**processed_inputs)
         masks = self._sam_processor.post_process_masks(
             masks=outputs.pred_masks,
-            original_sizes=inputs.original_sizes,
-            reshaped_input_sizes=inputs.reshaped_input_sizes,
+            original_sizes=processed_inputs.original_sizes,
+            reshaped_input_sizes=processed_inputs.reshaped_input_sizes,
         )
 
         # There should be only one batch.
