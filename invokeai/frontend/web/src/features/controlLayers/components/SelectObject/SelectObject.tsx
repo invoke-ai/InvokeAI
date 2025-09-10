@@ -63,16 +63,12 @@ const SelectObjectContent = memo(
       adapter.segmentAnything.saveAs('control_layer');
     }, [adapter.segmentAnything]);
 
-    const setInputToPoints = useCallback(() => {
-      adapter.segmentAnything.setInputType('points');
+    const setInputToVisual = useCallback(() => {
+      adapter.segmentAnything.setInputType('visual');
     }, [adapter.segmentAnything]);
 
     const setInputToPrompt = useCallback(() => {
       adapter.segmentAnything.setInputType('prompt');
-    }, [adapter.segmentAnything]);
-
-    const setInputToBoundingBox = useCallback(() => {
-      adapter.segmentAnything.setInputType('bounding_box');
     }, [adapter.segmentAnything]);
 
     useRegisteredHotkeys({
@@ -123,11 +119,10 @@ const SelectObjectContent = memo(
 
         <Flex w="full" justifyContent="space-between" py={2}>
           <ButtonGroup>
-            <Button onClick={setInputToPoints}>Points</Button>
+            <Button onClick={setInputToVisual}>Visual</Button>
             <Button onClick={setInputToPrompt}>Prompt</Button>
-            <Button onClick={setInputToBoundingBox}>Bounding Box</Button>
           </ButtonGroup>
-          {inputData.type === 'points' && <SelectObjectPointType adapter={adapter} />}
+          {inputData.type === 'visual' && <SelectObjectPointType adapter={adapter} />}
           <SelectObjectInvert adapter={adapter} />
         </Flex>
 
@@ -232,19 +227,20 @@ const SelectObjectHelpTooltipContent = memo(() => {
       <Text>
         <Trans i18nKey="controlLayers.selectObject.help2" components={{ Bold: <Bold /> }} />
       </Text>
-      <Text>
-        <Trans i18nKey="controlLayers.selectObject.help3" />
-      </Text>
+      <Text fontWeight="semibold">Visual Mode:</Text>
       <UnorderedList>
-        <ListItem>{t('controlLayers.selectObject.clickToAdd')}</ListItem>
-        <ListItem>{t('controlLayers.selectObject.dragToMove')}</ListItem>
-        <ListItem>{t('controlLayers.selectObject.clickToRemove')}</ListItem>
-      </UnorderedList>
-      <Text fontWeight="semibold">Bounding Box Mode:</Text>
-      <UnorderedList>
-        <ListItem>Click and drag to draw a bounding box around an object</ListItem>
+        <ListItem>Click to add include points (green)</ListItem>
+        <ListItem>Shift + Click to add exclude points (red)</ListItem>
+        <ListItem>Click and drag to draw a bounding box</ListItem>
+        <ListItem>Click on points to remove them</ListItem>
+        <ListItem>Drag points to reposition them</ListItem>
         <ListItem>Resize the box using the corner handles</ListItem>
         <ListItem>Drag the box to reposition it</ListItem>
+      </UnorderedList>
+      <Text fontWeight="semibold">Prompt Mode:</Text>
+      <UnorderedList>
+        <ListItem>Type a text description of the object to select</ListItem>
+        <ListItem>The AI will find and segment matching objects</ListItem>
       </UnorderedList>
     </Flex>
   );
