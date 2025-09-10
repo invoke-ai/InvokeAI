@@ -114,11 +114,23 @@ type PromptInputData = {
   prompt: string;
 };
 
-const hasInputData = (data: PointsInputData | PromptInputData): boolean => {
+type BoundingBoxInputData = {
+  type: 'bounding_box';
+  bbox: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null;
+};
+
+const hasInputData = (data: PointsInputData | PromptInputData | BoundingBoxInputData): boolean => {
   if (data.type === 'points') {
     return data.points.length > 0;
-  } else {
+  } else if (data.type === 'prompt') {
     return data.prompt.trim() !== '';
+  } else {
+    return data.bbox !== null;
   }
 };
 
@@ -140,11 +152,13 @@ const getSAMPoints = (data: PointsInputData): SAMPointWithId[] => {
   return points;
 };
 
-const getHashableInputData = (data: PointsInputData | PromptInputData) => {
+const getHashableInputData = (data: PointsInputData | PromptInputData | BoundingBoxInputData) => {
   if (data.type === 'points') {
     return { type: 'points', points: getSAMPoints(data) } as const;
-  } else {
+  } else if (data.type === 'prompt') {
     return { type: 'prompt', prompt: data.prompt } as const;
+  } else {
+    return { type: 'bounding_box', bbox: data.bbox } as const;
   }
 };
 
@@ -214,7 +228,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
    */
   $hasImageState = computed(this.$imageState, (imageState) => imageState !== null);
 
-  $inputData = atom<PointsInputData | PromptInputData>({ type: 'points', points: [] });
+  $inputData = atom<PointsInputData | PromptInputData | BoundingBoxInputData>({ type: 'points', points: [] });
 
   /**
    * Whether the module has points. This is a computed value based on $points.
@@ -225,6 +239,12 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
    * Whether the module should invert the mask image.
    */
   $invert = atom<boolean>(false);
+
+  /**
+   * State for bounding box drawing
+   */
+  $isBboxDrawing = atom<boolean>(false);
+  $bboxStartCoord = atom<Coordinate | null>(null);
 
   /**
    * The masked image object module, if it exists.
@@ -246,6 +266,20 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
      */
     pointGroup: Konva.Group;
     /**
+     * The Konva group node for the bounding box.
+     *
+     * This is a child of the main group node, rendered above the mask group.
+     */
+    bboxGroup: Konva.Group;
+    /**
+     * The Konva rect node for the bounding box.
+     */
+    bboxRect: Konva.Rect;
+    /**
+     * The Konva transformer for the bounding box.
+     */
+    bboxTransformer: Konva.Transformer;
+    /**
      * The Konva group node for the mask image and compositing rect.
      *
      * This is a child of the main group node, rendered below the point group.
@@ -266,6 +300,9 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   KONVA_CIRCLE_NAME = `${this.type}:circle`;
   KONVA_GROUP_NAME = `${this.type}:group`;
   KONVA_POINT_GROUP_NAME = `${this.type}:point_group`;
+  KONVA_BBOX_GROUP_NAME = `${this.type}:bbox_group`;
+  KONVA_BBOX_RECT_NAME = `${this.type}:bbox_rect`;
+  KONVA_BBOX_TRANSFORMER_NAME = `${this.type}:bbox_transformer`;
   KONVA_MASK_GROUP_NAME = `${this.type}:mask_group`;
   KONVA_COMPOSITING_RECT_NAME = `${this.type}:compositing_rect`;
 
@@ -283,6 +320,34 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.konva = {
       group: new Konva.Group({ name: this.KONVA_GROUP_NAME }),
       pointGroup: new Konva.Group({ name: this.KONVA_POINT_GROUP_NAME }),
+      bboxGroup: new Konva.Group({ name: this.KONVA_BBOX_GROUP_NAME, listening: true }),
+      bboxRect: new Konva.Rect({
+        name: this.KONVA_BBOX_RECT_NAME,
+        stroke: rgbaColorToString(this.config.MASK_COLOR),
+        strokeWidth: 2,
+        strokeScaleEnabled: false,
+        fill: rgbaColorToString({ ...this.config.MASK_COLOR, a: 0.2 }),
+        draggable: true,
+        listening: true,
+        visible: false,
+      }),
+      bboxTransformer: new Konva.Transformer({
+        name: this.KONVA_BBOX_TRANSFORMER_NAME,
+        borderDash: [5, 5],
+        borderStroke: rgbaColorToString(this.config.MASK_COLOR),
+        borderEnabled: true,
+        borderStrokeWidth: 1,
+        rotateEnabled: false,
+        keepRatio: false,
+        ignoreStroke: true,
+        flipEnabled: false,
+        anchorFill: rgbaColorToString(this.config.MASK_COLOR),
+        anchorStroke: 'rgb(42,42,42)',
+        anchorSize: 8,
+        anchorCornerRadius: 2,
+        listening: true,
+        visible: false,
+      }),
       maskGroup: new Konva.Group({ name: this.KONVA_MASK_GROUP_NAME, opacity: 0.6 }),
       compositingRect: new Konva.Rect({
         name: this.KONVA_COMPOSITING_RECT_NAME,
@@ -296,9 +361,82 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       maskTween: null,
     };
 
-    // Points should always be rendered above the mask group
+    // Points and bbox should always be rendered above the mask group
     this.konva.group.add(this.konva.maskGroup);
+    this.konva.group.add(this.konva.bboxGroup);
     this.konva.group.add(this.konva.pointGroup);
+
+    // Add bbox rect and transformer to bbox group
+    this.konva.bboxGroup.add(this.konva.bboxRect);
+    this.konva.bboxGroup.add(this.konva.bboxTransformer);
+
+    // Set the transformer to transform the bbox rect
+    this.konva.bboxTransformer.nodes([this.konva.bboxRect]);
+
+    // Add event handlers for bbox transformer
+    this.konva.bboxTransformer.on('transformend', () => {
+      const data = this.$inputData.get();
+      if (data.type !== 'bounding_box') {
+        return;
+      }
+
+      const x = this.konva.bboxRect.x();
+      const y = this.konva.bboxRect.y();
+      const width = this.konva.bboxRect.width() * this.konva.bboxRect.scaleX();
+      const height = this.konva.bboxRect.height() * this.konva.bboxRect.scaleY();
+
+      // Reset scale after transform
+      this.konva.bboxRect.setAttrs({
+        x: x,
+        y: y,
+        width: width,
+        height: height,
+        scaleX: 1,
+        scaleY: 1,
+      });
+
+      this.$inputData.set({
+        ...data,
+        bbox: {
+          x: x,
+          y: y,
+          width: width,
+          height: height,
+        },
+      });
+    });
+
+    // Stop event propagation when interacting with the bbox
+    this.konva.bboxRect.on('mousedown touchstart', (e) => {
+      e.cancelBubble = true;
+    });
+
+    this.konva.bboxTransformer.on('mousedown touchstart', (e) => {
+      e.cancelBubble = true;
+    });
+
+    // Add event handler for bbox rect drag
+    this.konva.bboxRect.on('dragend', () => {
+      const data = this.$inputData.get();
+      if (data.type !== 'bounding_box') {
+        return;
+      }
+
+      const x = this.konva.bboxRect.x();
+      const y = this.konva.bboxRect.y();
+      const width = this.konva.bboxRect.width();
+      const height = this.konva.bboxRect.height();
+
+      this.$inputData.set({
+        ...data,
+        bbox: {
+          x: x,
+          y: y,
+          width: width,
+          height: height,
+        },
+      });
+    });
 
     // Compositing rect is added to the mask group - will also be above the mask image, but that doesn't get created
     // until after processing
@@ -423,10 +561,163 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   };
 
   /**
-   * Handles the pointerup event on the stage. This is used to add a SAM point to the module.
+   * Handles the pointerdown event on the stage. This is used to start drawing a bounding box.
+   */
+  onStagePointerDown = (e: KonvaEventObject<PointerEvent>) => {
+    const data = this.$inputData.get();
+    if (data.type !== 'bounding_box') {
+      return;
+    }
+
+    // Only handle left-clicks
+    if (e.evt.button !== 0) {
+      return;
+    }
+
+    // Ignore if clicking on the bbox rect or transformer (let those handle their own events)
+    if (e.target !== this.manager.stage.konva.stage) {
+      return;
+    }
+
+    // Ignore if the stage is dragging/panning
+    if (this.manager.stage.getIsDragging()) {
+      return;
+    }
+
+    // Ignore if we are already processing
+    if (this.$isProcessing.get()) {
+      return;
+    }
+
+    // Ignore if the cursor is not within the stage
+    const cursorPos = this.manager.tool.$cursorPos.get();
+    if (!cursorPos) {
+      return;
+    }
+
+    // We need to offset the cursor position by the parent entity's position + pixel rect to get the correct position
+    const pixelRect = this.parent.transformer.$pixelRect.get();
+    const parentPosition = addCoords(this.parent.state.position, pixelRect);
+
+    // Normalize the cursor position to the parent entity's position
+    const normalizedPoint = offsetCoord(cursorPos.relative, parentPosition);
+
+    // Start drawing the bounding box
+    this.$isBboxDrawing.set(true);
+    this.$bboxStartCoord.set(normalizedPoint);
+
+    // Reset the bbox rect position and size
+    this.konva.bboxRect.setAttrs({
+      x: normalizedPoint.x,
+      y: normalizedPoint.y,
+      width: 0,
+      height: 0,
+      visible: true,
+    });
+    this.konva.bboxTransformer.visible(false);
+  };
+
+  /**
+   * Handles the pointermove event on the stage. This is used to update the bounding box while drawing.
+   */
+  onStagePointerMove = (e: KonvaEventObject<PointerEvent>) => {
+    const data = this.$inputData.get();
+    if (data.type !== 'bounding_box') {
+      return;
+    }
+
+    if (!this.$isBboxDrawing.get()) {
+      return;
+    }
+
+    const startCoord = this.$bboxStartCoord.get();
+    if (!startCoord) {
+      return;
+    }
+
+    // Get current cursor position
+    const cursorPos = this.manager.tool.$cursorPos.get();
+    if (!cursorPos) {
+      return;
+    }
+
+    // We need to offset the cursor position by the parent entity's position + pixel rect to get the correct position
+    const pixelRect = this.parent.transformer.$pixelRect.get();
+    const parentPosition = addCoords(this.parent.state.position, pixelRect);
+
+    // Normalize the cursor position to the parent entity's position
+    const currentPoint = offsetCoord(cursorPos.relative, parentPosition);
+
+    // Calculate the bbox dimensions
+    const x = Math.min(startCoord.x, currentPoint.x);
+    const y = Math.min(startCoord.y, currentPoint.y);
+    const width = Math.abs(currentPoint.x - startCoord.x);
+    const height = Math.abs(currentPoint.y - startCoord.y);
+
+    // Update the bbox rect
+    this.konva.bboxRect.setAttrs({
+      x,
+      y,
+      width,
+      height,
+    });
+  };
+
+  /**
+   * Handles the pointerup event on the stage. This is used to add a SAM point or finish drawing a bounding box.
    */
   onStagePointerUp = (e: KonvaEventObject<PointerEvent>) => {
     const data = this.$inputData.get();
+
+    // Handle bounding box mode
+    if (data.type === 'bounding_box') {
+      if (!this.$isBboxDrawing.get()) {
+        return;
+      }
+
+      // Only handle left-clicks
+      if (e.evt.button !== 0) {
+        return;
+      }
+
+      // Stop drawing
+      this.$isBboxDrawing.set(false);
+      this.$bboxStartCoord.set(null);
+
+      // Get the final bbox dimensions from the rect's attributes (not getClientRect which gives screen coords)
+      const x = this.konva.bboxRect.x();
+      const y = this.konva.bboxRect.y();
+      const width = this.konva.bboxRect.width() * this.konva.bboxRect.scaleX();
+      const height = this.konva.bboxRect.height() * this.konva.bboxRect.scaleY();
+
+      // Only save the bbox if it has a reasonable size (not just a click)
+      if (width > 5 && height > 5) {
+        this.$inputData.set({
+          ...data,
+          bbox: {
+            x: x,
+            y: y,
+            width: width,
+            height: height,
+          },
+        });
+
+        // Show the transformer for resizing
+        this.konva.bboxTransformer.visible(true);
+      } else {
+        // Too small, hide the bbox
+        this.konva.bboxRect.visible(false);
+        this.konva.bboxTransformer.visible(false);
+        this.$inputData.set({
+          ...data,
+          bbox: null,
+        });
+      }
+
+      return;
+    }
+
+    // Handle points mode
     if (data.type !== 'points') {
       return;
     }
@@ -487,8 +778,12 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
    * Adds event listeners needed while segmenting the entity.
    */
   subscribe = () => {
+    this.manager.stage.konva.stage.on('pointerdown', this.onStagePointerDown);
+    this.manager.stage.konva.stage.on('pointermove', this.onStagePointerMove);
     this.manager.stage.konva.stage.on('pointerup', this.onStagePointerUp);
     this.subscriptions.add(() => {
+      this.manager.stage.konva.stage.off('pointerdown', this.onStagePointerDown);
+      this.manager.stage.konva.stage.off('pointermove', this.onStagePointerMove);
       this.manager.stage.konva.stage.off('pointerup', this.onStagePointerUp);
     });
 
@@ -838,7 +1133,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.resetEphemeralState();
   };
 
-  setInputType = (type: PointsInputData['type'] | PromptInputData['type']) => {
+  setInputType = (type: PointsInputData['type'] | PromptInputData['type'] | BoundingBoxInputData['type']) => {
     const data = this.$inputData.get();
     if (data.type === type) {
       return;
@@ -846,8 +1141,13 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.reset();
     if (type === 'points') {
       this.$inputData.set({ type: 'points', points: [] });
-    } else {
+    } else if (type === 'prompt') {
       this.$inputData.set({ type: 'prompt', prompt: '' });
+    } else {
+      this.$inputData.set({ type: 'bounding_box', bbox: null });
+      // Hide bbox nodes when switching to bbox mode (they'll be shown when drawing)
+      this.konva.bboxRect.visible(false);
+      this.konva.bboxTransformer.visible(false);
     }
   };
 
@@ -901,6 +1201,12 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       for (const point of data.points) {
         point.konva.circle.destroy();
       }
+    } else if (data.type === 'bounding_box') {
+      // Hide bounding box nodes
+      this.konva.bboxRect.visible(false);
+      this.konva.bboxTransformer.visible(false);
+      this.$isBboxDrawing.set(false);
+      this.$bboxStartCoord.set(null);
     }
 
     // If the image module exists, and is a child of the group, destroy it. It might not be a child of the group if
@@ -932,7 +1238,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
    */
   static buildGraph = (
     { image_name }: ImageDTO,
-    inputData: PointsInputData | PromptInputData,
+    inputData: PointsInputData | PromptInputData | BoundingBoxInputData,
     invert: boolean,
     model: SAMModel
   ): { graph: Graph; outputNodeId: string } => {
@@ -952,7 +1258,18 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
         inputData.type === 'points'
           ? [{ points: getSAMPoints(inputData).map(({ x, y, label }) => ({ x, y, label })) }]
           : undefined,
-      mask_filter: 'all',
+      bounding_boxes:
+        inputData.type === 'bounding_box' && inputData.bbox
+          ? [
+              {
+                x_min: Math.round(inputData.bbox.x),
+                y_min: Math.round(inputData.bbox.y),
+                x_max: Math.round(inputData.bbox.x + inputData.bbox.width),
+                y_max: Math.round(inputData.bbox.y + inputData.bbox.height),
+              },
+            ]
+          : undefined,
+      mask_filter: 'largest',
       apply_polygon_refinement: false,
     });
 
@@ -1000,19 +1317,25 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
   repr = () => {
     const data = this.$inputData.get();
+    let inputData: any;
+    if (data.type === 'points') {
+      inputData = data.points.map(({ id, konva, label }) => ({
+        id,
+        label,
+        circle: getKonvaNodeDebugAttrs(konva.circle),
+      }));
+    } else if (data.type === 'prompt') {
+      inputData = { type: 'prompt', prompt: data.prompt };
+    } else {
+      inputData = { type: 'bounding_box', bbox: data.bbox || null };
+    }
+
     return {
       id: this.id,
       type: this.type,
       path: this.path,
       parent: this.parent.id,
-      inputData:
-        data.type === 'points'
-          ? data.points.map(({ id, konva, label }) => ({
-              id,
-              label,
-              circle: getKonvaNodeDebugAttrs(konva.circle),
-            }))
-          : { type: 'prompt', prompt: data.prompt },
+      inputData,
       imageState: deepClone(this.$imageState.get()),
       imageModule: this.imageModule?.repr() ?? null,
       config: deepClone(this.config),
