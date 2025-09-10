@@ -102,9 +102,7 @@ async def get_queue_item_ids(
 ) -> ItemIdsResult:
     """Gets all queue item ids that match the given parameters"""
     try:
-        return ApiDependencies.invoker.services.session_queue.get_queue_item_ids(
-            queue_id=queue_id, order_dir=order_dir
-        )
+        return ApiDependencies.invoker.services.session_queue.get_queue_item_ids(queue_id=queue_id, order_dir=order_dir)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while listing all queue item ids: {e}")
 
@@ -129,7 +127,7 @@ async def get_queue_items_by_item_ids(
         for item_id in item_ids:
             try:
                 queue_item = session_queue_service.get_queue_item(item_id=item_id)
-                if queue_item.queue_id != queue_id: # Auth protection for items from other queues
+                if queue_item.queue_id != queue_id:  # Auth protection for items from other queues
                     continue
                 queue_items.append(queue_item)
             except Exception:
