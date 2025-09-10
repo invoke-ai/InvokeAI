@@ -1,0 +1,266 @@
+{
+  "nodes": {
+    // Input Nodes
+    "input_image": {
+      "type": "image",
+      "id": "input_image",
+      "image": "{{your_base_image}}"
+    },
+    "mask_image": {
+      "type": "image", 
+      "id": "mask_image",
+      "image": "{{your_mask_image}}"
+    },
+    "prompt_input": {
+      "type": "string",
+      "id": "prompt_input",
+      "value": "{{your_prompt}}"
+    },
+    
+    // Step 1: Create mask outline/edge
+    "mask_edge": {
+      "type": "mask_edge",
+      "id": "mask_edge",
+      "image": {
+        "node_id": "mask_image",
+        "field": "image"
+      },
+      "edge_size": 8,
+      "edge_blur": 2,
+      "low_threshold": 50,
+      "high_threshold": 150
+    },
+    
+    // Step 2: Create colored outline (optional - make outline more visible)
+    "outline_color": {
+      "type": "blank_image",
+      "id": "outline_color",
+      "width": 1024,
+      "height": 1024,
+      "mode": "RGB",
+      "color": {
+        "r": 255,
+        "g": 0,
+        "b": 0,
+        "a": 255
+      }
+    },
+    
+    // Step 3: Apply color to outline using multiply blend
+    "colored_outline": {
+      "type": "invokeai_img_blend",
+      "id": "colored_outline",
+      "layer_base": {
+        "node_id": "outline_color",
+        "field": "image"
+      },
+      "layer_upper": {
+        "node_id": "mask_edge",
+        "field": "image"
+      },
+      "blend_mode": "Multiply",
+      "opacity": 1.0,
+      "fit_to_width": true,
+      "fit_to_height": true,
+      "color_space": "RGB"
+    },
+    
+    // Step 4: Composite outline onto base image
+    "reference_image": {
+      "type": "invokeai_img_blend",
+      "id": "reference_image", 
+      "layer_base": {
+        "node_id": "input_image",
+        "field": "image"
+      },
+      "layer_upper": {
+        "node_id": "colored_outline",
+        "field": "image"
+      },
+      "blend_mode": "Screen",
+      "opacity": 0.8,
+      "fit_to_width": true,
+      "fit_to_height": true,
+      "color_space": "RGB"
+    },
+    
+    // Step 5: Load the main model
+    "main_model": {
+      "type": "main_model_loader",
+      "id": "main_model",
+      "model": {
+        "key": "{{your_model_key}}",
+        "hash": "{{your_model_hash}}",
+        "name": "{{your_model_name}}",
+        "base": "sd-1",
+        "type": "main"
+      }
+    },
+    
+    // Step 6: Setup text conditioning
+    "positive_conditioning": {
+      "type": "compel",
+      "id": "positive_conditioning",
+      "prompt": {
+        "node_id": "prompt_input",
+        "field": "value"
+      },
+      "clip": {
+        "node_id": "main_model",
+        "field": "clip"
+      }
+    },
+    
+    "negative_conditioning": {
+      "type": "compel",
+      "id": "negative_conditioning", 
+      "prompt": "blurry, low quality, distorted",
+      "clip": {
+        "node_id": "main_model",
+        "field": "clip"
+      }
+    },
+    
+    // Step 7: Setup IP-Adapter for reference image
+    "ip_adapter": {
+      "type": "ip_adapter",
+      "id": "ip_adapter",
+      "image": {
+        "node_id": "reference_image",
+        "field": "image"
+      },
+      "ip_adapter_model": {
+        "key": "{{ip_adapter_model_key}}",
+        "hash": "{{ip_adapter_model_hash}}",
+        "name": "IP-Adapter",
+        "base": "sd-1",
+        "type": "ip_adapter"
+      },
+      "clip_vision_model": "ViT-H",
+      "weight": 0.7,
+      "method": "full",
+      "begin_step_percent": 0.0,
+      "end_step_percent": 1.0
+    },
+    
+    // Step 8: Generate noise
+    "noise": {
+      "type": "noise",
+      "id": "noise",
+      "seed": 42,
+      "width": 1024,
+      "height": 1024,
+      "use_cpu": true
+    },
+    
+    // Step 9: Run denoising with reference image
+    "denoise": {
+      "type": "denoise_latents",
+      "id": "denoise",
+      "positive_conditioning": {
+        "node_id": "positive_conditioning",
+        "field": "conditioning"
+      },
+      "negative_conditioning": {
+        "node_id": "negative_conditioning", 
+        "field": "conditioning"
+      },
+      "noise": {
+        "node_id": "noise",
+        "field": "noise"
+      },
+      "steps": 30,
+      "cfg_scale": 7.5,
+      "denoising_start": 0.0,
+      "denoising_end": 1.0,
+      "scheduler": "euler",
+      "unet": {
+        "node_id": "main_model",
+        "field": "unet"
+      },
+      "ip_adapter": {
+        "node_id": "ip_adapter",
+        "field": "ip_adapter"
+      }
+    },
+    
+    // Step 10: Convert latents to final image
+    "final_image": {
+      "type": "l2i",
+      "id": "final_image",
+      "latents": {
+        "node_id": "denoise",
+        "field": "latents"
+      },
+      "vae": {
+        "node_id": "main_model",
+        "field": "vae"
+      },
+      "tiled": false,
+      "fp32": false
+    }
+  },
+  
+  "edges": [
+    {
+      "source": {
+        "node_id": "mask_image",
+        "field": "image"
+      },
+      "destination": {
+        "node_id": "mask_edge",
+        "field": "image"
+      }
+    },
+    {
+      "source": {
+        "node_id": "mask_edge", 
+        "field": "image"
+      },
+      "destination": {
+        "node_id": "colored_outline",
+        "field": "layer_upper"
+      }
+    },
+    {
+      "source": {
+        "node_id": "colored_outline",
+        "field": "image"
+      },
+      "destination": {
+        "node_id": "reference_image",
+        "field": "layer_upper"
+      }
+    },
+    {
+      "source": {
+        "node_id": "reference_image",
+        "field": "image"
+      },
+      "destination": {
+        "node_id": "ip_adapter",
+        "field": "image"
+      }
+    },
+    {
+      "source": {
+        "node_id": "ip_adapter",
+        "field": "ip_adapter"
+      },
+      "destination": {
+        "node_id": "denoise",
+        "field": "ip_adapter"
+      }
+    },
+    {
+      "source": {
+        "node_id": "denoise",
+        "field": "latents"
+      },
+      "destination": {
+        "node_id": "final_image",
+        "field": "latents"
+      }
+    }
+  ]
+}

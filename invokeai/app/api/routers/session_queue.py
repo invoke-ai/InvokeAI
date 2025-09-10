@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import (
-    QUEUE_ORDER_BY,
     Batch,
     BatchStatus,
     CancelAllExceptCurrentResult,
@@ -92,20 +91,19 @@ async def list_all_queue_items(
 
 @session_queue_router.get(
     "/{queue_id}/item_ids",
-    operation_id="get_queue_itemIds",
+    operation_id="get_queue_item_ids",
     responses={
         200: {"model": ItemIdsResult},
     },
 )
 async def get_queue_item_ids(
     queue_id: str = Path(description="The queue id to perform this operation on"),
-    order_by: QUEUE_ORDER_BY = Query(default="created_at", description="The sort field"),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
 ) -> ItemIdsResult:
     """Gets all queue item ids that match the given parameters"""
     try:
         return ApiDependencies.invoker.services.session_queue.get_queue_item_ids(
-            queue_id=queue_id, order_by=order_by, order_dir=order_dir
+            queue_id=queue_id, order_dir=order_dir
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while listing all queue item ids: {e}")
@@ -130,7 +128,9 @@ async def get_queue_items_by_item_ids(
         queue_items: list[SessionQueueItem] = []
         for item_id in item_ids:
             try:
-                queue_item = session_queue_service.get_queue_item(item_id)
+                queue_item = session_queue_service.get_queue_item(item_id=item_id)
+                if queue_item.queue_id != queue_id: # Auth protection for items from other queues
+                    continue
                 queue_items.append(queue_item)
             except Exception:
                 # Skip missing queue items - they may have been deleted between item id fetch and queue item fetch
@@ -376,7 +376,10 @@ async def get_queue_item(
 ) -> SessionQueueItem:
     """Gets a queue item"""
     try:
-        return ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
+        queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id=item_id)
+        if queue_item.queue_id != queue_id:
+            raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
+        return queue_item
     except SessionQueueItemNotFoundError:
         raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
     except Exception as e:

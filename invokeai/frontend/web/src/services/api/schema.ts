@@ -1410,7 +1410,7 @@ export type paths = {
          * Get Queue Item Ids
          * @description Gets all queue item ids that match the given parameters
          */
-        get: operations["get_queue_itemIds"];
+        get: operations["get_queue_item_ids"];
         put?: never;
         post?: never;
         delete?: never;
@@ -25902,11 +25902,9 @@ export interface operations {
             };
         };
     };
-    get_queue_itemIds: {
+    get_queue_item_ids: {
         parameters: {
             query?: {
-                /** @description The sort field */
-                order_by?: "created_at" | "completed_at";
                 /** @description The order of sort */
                 order_dir?: components["schemas"]["SQLiteDirection"];
             };
