@@ -1,15 +1,15 @@
-from enum import Enum
+from itertools import zip_longest
 from pathlib import Path
 from typing import Literal
 
 import numpy as np
 import torch
 from PIL import Image
-from pydantic import BaseModel, Field
-from transformers import AutoProcessor
+from pydantic import BaseModel, Field, model_validator
 from transformers.models.sam import SamModel
 from transformers.models.sam.processing_sam import SamProcessor
 from transformers.models.sam2 import Sam2Model
+from transformers.models.sam2.processing_sam2 import Sam2Processor
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import BoundingBoxField, ImageField, InputField, TensorField
@@ -18,6 +18,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.segment_anything.mask_refinement import mask_to_polygon, polygon_to_mask
 from invokeai.backend.image_util.segment_anything.segment_anything_2_pipeline import SegmentAnything2Pipeline
 from invokeai.backend.image_util.segment_anything.segment_anything_pipeline import SegmentAnythingPipeline
+from invokeai.backend.image_util.segment_anything.shared import SAMInput, SAMPoint
 
 SegmentAnythingModelKey = Literal[
     "segment-anything-base",
@@ -39,22 +40,10 @@ SEGMENT_ANYTHING_MODEL_IDS: dict[SegmentAnythingModelKey, str] = {
 }
 
 
-class SAMPointLabel(Enum):
-    negative = -1
-    neutral = 0
-    positive = 1
-
-
-class SAMPoint(BaseModel):
-    x: int = Field(..., description="The x-coordinate of the point")
-    y: int = Field(..., description="The y-coordinate of the point")
-    label: SAMPointLabel = Field(..., description="The label of the point")
-
-
 class SAMPointsField(BaseModel):
-    points: list[SAMPoint] = Field(..., description="The points of the object")
+    points: list[SAMPoint] = Field(..., description="The points of the object", min_length=1)
 
-    def to_list(self) -> list[list[int]]:
+    def to_list(self) -> list[list[float]]:
         return [[point.x, point.y, point.label.value] for point in self.points]
 
 
@@ -91,13 +80,17 @@ class SegmentAnythingInvocation(BaseInvocation):
         default="all",
     )
 
+    @model_validator(mode="after")
+    def validate_points_and_boxes_len(self):
+        if self.point_lists is not None and self.bounding_boxes is not None:
+            if len(self.point_lists) != len(self.bounding_boxes):
+                raise ValueError("If both point_lists and bounding_boxes are provided, they must have the same length.")
+        return self
+
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> MaskOutput:
         # The models expect a 3-channel RGB image.
         image_pil = context.images.get_pil(self.image.image_name, mode="RGB")
-
-        if self.point_lists is not None and self.bounding_boxes is not None:
-            raise ValueError("Only one of point_lists or bounding_box can be provided.")
 
         if (not self.bounding_boxes or len(self.bounding_boxes) == 0) and (
             not self.point_lists or len(self.point_lists) == 0
@@ -118,91 +111,86 @@ class SegmentAnythingInvocation(BaseInvocation):
 
     @staticmethod
     def _load_sam_model(model_path: Path):
-        """Load either SAM or SAM2 model based on the model path."""
-        model_path_str = str(model_path).lower()
+        sam_model = SamModel.from_pretrained(
+            model_path,
+            local_files_only=True,
+            # TODO(ryand): Setting the torch_dtype here doesn't work. Investigate whether fp16 is supported by the
+            # model, and figure out how to make it work in the pipeline.
+            # torch_dtype=TorchDevice.choose_torch_dtype(),
+        )
+        sam_processor = SamProcessor.from_pretrained(model_path, local_files_only=True)
+        return SegmentAnythingPipeline(sam_model=sam_model, sam_processor=sam_processor)
 
-        if "sam2" in model_path_str:
-            # Load SAM2 model
-            try:
-                sam2_model = Sam2Model.from_pretrained(
-                    model_path,
-                    local_files_only=True,
-                    # TODO: Investigate whether fp16 is supported by SAM2
-                    # torch_dtype=TorchDevice.choose_torch_dtype(),
-                )
-            except Exception as e:
-                raise RuntimeError(f"Failed to load SAM2 model from {model_path}. Error: {str(e)}")
+    @staticmethod
+    def _load_sam_2_model(model_path: Path):
+        sam2_model = Sam2Model.from_pretrained(model_path, local_files_only=True)
+        sam2_processor = Sam2Processor.from_pretrained(model_path, local_files_only=True)
+        return SegmentAnything2Pipeline(sam2_model=sam2_model, sam2_processor=sam2_processor)
 
-            try:
-                sam2_processor = AutoProcessor.from_pretrained(model_path, local_files_only=True)
-                # Log what type of processor we got for debugging
-                processor_type = type(sam2_processor).__name__
-                print(f"Loaded processor type: {processor_type} for model {model_path}")
-            except Exception as e:
-                raise RuntimeError(f"Failed to load processor from {model_path}. Error: {str(e)}")
+    def _get_bounding_boxes(self) -> list[list[list[float]]] | None:
+        if self.bounding_boxes is None:
+            return None
+        return [[[bb.x_min, bb.y_min, bb.x_max, bb.y_max] for bb in self.bounding_boxes]]
 
-            return SegmentAnything2Pipeline(sam2_model=sam2_model, sam2_processor=sam2_processor)
-        else:
-            # Load SAM model
-            sam_model = SamModel.from_pretrained(
-                model_path,
-                local_files_only=True,
-                # TODO(ryand): Setting the torch_dtype here doesn't work. Investigate whether fp16 is supported by the
-                # model, and figure out how to make it work in the pipeline.
-                # torch_dtype=TorchDevice.choose_torch_dtype(),
-            )
+    def _get_sam_points_list(self) -> list[list[list[float]]] | None:
+        if not self.point_lists:
+            return None
+        return [p.to_list() for p in self.point_lists]
 
-            sam_processor = AutoProcessor.from_pretrained(model_path, local_files_only=True)
-            assert isinstance(sam_processor, SamProcessor)
-            return SegmentAnythingPipeline(sam_model=sam_model, sam_processor=sam_processor)
+    def _get_sam2_points_list_and_labels(
+        self,
+    ) -> tuple[list[list[list[list[float]]]], list[list[list[int]]]] | tuple[None, None]:
+        if not self.point_lists:
+            return None, None
+        point_lists: list[list[list[list[float]]]] = []
+        point_labels: list[list[list[int]]] = []
+        for point_list in self.point_lists:
+            object_points: list[list[float]] = []
+            object_labels: list[int] = []
+            for point in point_list.points:
+                object_points.append([point.x, point.y])
+                object_labels.append(point.label.value)
+            point_lists.append([object_points])
+            point_labels.append([object_labels])
+        return point_lists, point_labels
 
     def _segment(self, context: InvocationContext, image: Image.Image) -> list[torch.Tensor]:
         """Use Segment Anything (SAM or SAM2) to generate masks given an image + a set of bounding boxes."""
-        # Convert the bounding boxes to the input format.
-        bounding_boxes = (
-            [[bb.x_min, bb.y_min, bb.x_max, bb.y_max] for bb in self.bounding_boxes] if self.bounding_boxes else None
-        )
 
-        # Convert points to the format expected by the specific model
-        # We'll determine the format based on the actual pipeline type after loading
-        if self.point_lists:
-            # Prepare both formats - we'll use the appropriate one based on pipeline type
-            # SAM2 format: [[[[x, y]]]] and [[[label]]]
-            sam2_point_lists = []
-            sam2_point_labels = []
-            for point_list in self.point_lists:
-                object_points = []
-                object_labels = []
-                for point in point_list.points:
-                    object_points.append([point.x, point.y])
-                    object_labels.append(point.label.value)
-                sam2_point_lists.append([object_points])
-                sam2_point_labels.append([object_labels])
+        is_sam_2 = "segment-anything-2" in self.model
 
-            # SAM format: [[x, y, label]]
-            sam_point_lists = [p.to_list() for p in self.point_lists]
-        else:
-            sam2_point_lists = None
-            sam2_point_labels = None
-            sam_point_lists = None
-
-        with (
-            context.models.load_remote_model(
-                source=SEGMENT_ANYTHING_MODEL_IDS[self.model], loader=SegmentAnythingInvocation._load_sam_model
-            ) as pipeline,
-        ):
-            # Check pipeline type dynamically and use appropriate point format
-            if isinstance(pipeline, SegmentAnything2Pipeline):
-                masks = pipeline.segment(
-                    image=image,
-                    bounding_boxes=bounding_boxes,
-                    point_lists=sam2_point_lists,
-                    point_labels=sam2_point_labels,
+        if is_sam_2:
+            source = SEGMENT_ANYTHING_MODEL_IDS[self.model]
+            loader = SegmentAnythingInvocation._load_sam_2_model
+            inputs: list[SAMInput] = []
+            for bbox_field, point_field in zip_longest(
+                self.bounding_boxes or [], self.point_lists or [], fillvalue=None
+            ):
+                inputs.append(
+                    SAMInput(
+                        bounding_box=bbox_field,
+                        points=point_field.points if point_field else None,
+                    )
                 )
-            elif isinstance(pipeline, SegmentAnythingPipeline):
-                masks = pipeline.segment(image=image, bounding_boxes=bounding_boxes, point_lists=sam_point_lists)
-            else:
-                raise RuntimeError(f"Unknown pipeline type: {type(pipeline)}")
+            with context.models.load_remote_model(source=source, loader=loader) as pipeline:
+                assert isinstance(pipeline, SegmentAnything2Pipeline)
+                masks = pipeline.segment(image=image, inputs=inputs)
+        else:
+            source = SEGMENT_ANYTHING_MODEL_IDS[self.model]
+            loader = SegmentAnythingInvocation._load_sam_model
+            inputs: list[SAMInput] = []
+            for bbox_field, point_field in zip_longest(
+                self.bounding_boxes or [], self.point_lists or [], fillvalue=None
+            ):
+                inputs.append(
+                    SAMInput(
+                        bounding_box=bbox_field,
+                        points=point_field.points if point_field else None,
+                    )
+                )
+            with context.models.load_remote_model(source=source, loader=loader) as pipeline:
+                assert isinstance(pipeline, SegmentAnythingPipeline)
+                masks = pipeline.segment(image=image, inputs=inputs)
 
         masks = self._process_masks(masks)
         if self.apply_polygon_refinement:

@@ -1,11 +1,12 @@
 from enum import Enum
 from typing import Any, Callable, Optional, Tuple
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel, TypeAdapter, model_validator
+from pydantic import BaseModel, ConfigDict, Field, RootModel, TypeAdapter
 from pydantic.fields import _Unset
 from pydantic_core import PydanticUndefined
 
 from invokeai.app.util.metaenum import MetaEnum
+from invokeai.backend.image_util.segment_anything.shared import BoundingBox
 from invokeai.backend.util.logging import InvokeAILogger
 
 logger = InvokeAILogger.get_logger()
@@ -331,13 +332,8 @@ class ConditioningField(BaseModel):
     )
 
 
-class BoundingBoxField(BaseModel):
+class BoundingBoxField(BoundingBox):
     """A bounding box primitive value."""
-
-    x_min: int = Field(ge=0, description="The minimum x-coordinate of the bounding box (inclusive).")
-    x_max: int = Field(ge=0, description="The maximum x-coordinate of the bounding box (exclusive).")
-    y_min: int = Field(ge=0, description="The minimum y-coordinate of the bounding box (inclusive).")
-    y_max: int = Field(ge=0, description="The maximum y-coordinate of the bounding box (exclusive).")
 
     score: Optional[float] = Field(
         default=None,
@@ -346,21 +342,6 @@ class BoundingBoxField(BaseModel):
         description="The score associated with the bounding box. In the range [0, 1]. This value is typically set "
         "when the bounding box was produced by a detector and has an associated confidence score.",
     )
-
-    @model_validator(mode="after")
-    def check_coords(self):
-        if self.x_min > self.x_max:
-            raise ValueError(f"x_min ({self.x_min}) is greater than x_max ({self.x_max}).")
-        if self.y_min > self.y_max:
-            raise ValueError(f"y_min ({self.y_min}) is greater than y_max ({self.y_max}).")
-        return self
-
-    def tuple(self) -> Tuple[int, int, int, int]:
-        """
-        Returns the bounding box as a tuple suitable for use with PIL's `Image.crop()` method.
-        This method returns a tuple of the form (left, upper, right, lower) == (x_min, y_min, x_max, y_max).
-        """
-        return (self.x_min, self.y_min, self.x_max, self.y_max)
 
 
 class MetadataField(RootModel[dict[str, Any]]):
