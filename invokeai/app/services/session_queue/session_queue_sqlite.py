@@ -10,7 +10,6 @@ from invokeai.app.services.session_queue.session_queue_base import SessionQueueB
 from invokeai.app.services.session_queue.session_queue_common import (
     DEFAULT_QUEUE_ID,
     QUEUE_ITEM_STATUS,
-    QUEUE_ORDER_BY,
     Batch,
     BatchStatus,
     CancelAllExceptCurrentResult,
@@ -623,7 +622,6 @@ class SqliteSessionQueue(SessionQueueBase):
     def get_queue_item_ids(
         self,
         queue_id: str,
-        order_by: QUEUE_ORDER_BY = "created_at",
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
     ) -> ItemIdsResult:
         with self._db.transaction() as cursor_:
@@ -631,7 +629,7 @@ class SqliteSessionQueue(SessionQueueBase):
                 SELECT item_id
                 FROM session_queue
                 WHERE queue_id = ?
-                ORDER BY {order_by} {order_dir.value}
+                ORDER BY created_at {order_dir.value}
                 """
             query_params = [queue_id]
 

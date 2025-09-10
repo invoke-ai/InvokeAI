@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from typing import Any, Coroutine, Optional
 
 from invokeai.app.services.session_queue.session_queue_common import (
-    QUEUE_ORDER_BY,
     Batch,
     BatchStatus,
     CancelAllExceptCurrentResult,
@@ -149,7 +148,6 @@ class SessionQueueBase(ABC):
     def get_queue_item_ids(
         self,
         queue_id: str,
-        order_by: QUEUE_ORDER_BY = "created_at",
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
     ) -> ItemIdsResult:
         """Gets all queue item ids that match the given parameters"""
@@ -157,7 +155,7 @@ class SessionQueueBase(ABC):
 
     @abstractmethod
     def get_queue_item(self, item_id: int) -> SessionQueueItem:
-        """Gets a session queue item by ID"""
+        """Gets a session queue item by ID for a given queue"""
         pass
 
     @abstractmethod
