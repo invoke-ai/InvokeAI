@@ -32,6 +32,7 @@ import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { toast } from 'features/toast/toast';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
+import type { Rect } from 'konva/lib/shapes/Rect';
 import type { Atom } from 'nanostores';
 import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
@@ -385,6 +386,11 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
     // Set the transformer to transform the bbox rect
     this.konva.bboxTransformer.nodes([this.konva.bboxRect]);
+
+    // Increase the hit area for the bbox transformer anchors to make them easier to grab
+    this.konva.bboxTransformer.find<Rect>('._anchor').forEach((node) => {
+      node.hitStrokeWidth(12);
+    });
 
     // Add event handlers for bbox transformer
     this.konva.bboxTransformer.on('transformend', () => {
