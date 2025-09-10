@@ -24,7 +24,7 @@ export const SelectObjectPointType = memo(
       <FormControl w="min-content">
         <FormLabel m={0}>{t('controlLayers.selectObject.pointType')}</FormLabel>
         <RadioGroup value={pointType} onChange={onChange} w="full" size="md">
-          <Flex alignItems="center" w="full" gap={4} fontWeight="semibold" color="base.300">
+          <Flex alignItems="center" w="full" gap={4} color="base.300">
             <Radio value="foreground">
               <Text>{t('controlLayers.selectObject.include')}</Text>
             </Radio>
