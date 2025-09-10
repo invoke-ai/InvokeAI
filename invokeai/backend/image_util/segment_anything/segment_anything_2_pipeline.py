@@ -5,8 +5,6 @@ from PIL import Image
 
 # Import SAM2 components - these should be available in transformers 4.56.0+
 from transformers.models.sam2 import Sam2Model
-from transformers.models.sam2.processing_sam2 import Sam2Processor
-
 
 from invokeai.backend.raw_model import RawModel
 

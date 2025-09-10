@@ -10,24 +10,23 @@ from transformers import AutoProcessor
 from transformers.models.sam import SamModel
 from transformers.models.sam.processing_sam import SamProcessor
 from transformers.models.sam2 import Sam2Model
-from transformers.models.sam2.processing_sam2 import Sam2Processor
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import BoundingBoxField, ImageField, InputField, TensorField
 from invokeai.app.invocations.primitives import MaskOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.segment_anything.mask_refinement import mask_to_polygon, polygon_to_mask
-from invokeai.backend.image_util.segment_anything.segment_anything_pipeline import SegmentAnythingPipeline
 from invokeai.backend.image_util.segment_anything.segment_anything_2_pipeline import SegmentAnything2Pipeline
+from invokeai.backend.image_util.segment_anything.segment_anything_pipeline import SegmentAnythingPipeline
 
 SegmentAnythingModelKey = Literal[
-    "segment-anything-base", 
-    "segment-anything-large", 
+    "segment-anything-base",
+    "segment-anything-large",
     "segment-anything-huge",
     "segment-anything-2-tiny",
-    "segment-anything-2-small", 
+    "segment-anything-2-small",
     "segment-anything-2-base",
-    "segment-anything-2-large"
+    "segment-anything-2-large",
 ]
 SEGMENT_ANYTHING_MODEL_IDS: dict[SegmentAnythingModelKey, str] = {
     "segment-anything-base": "facebook/sam-vit-base",
@@ -121,7 +120,7 @@ class SegmentAnythingInvocation(BaseInvocation):
     def _load_sam_model(model_path: Path):
         """Load either SAM or SAM2 model based on the model path."""
         model_path_str = str(model_path).lower()
-        
+
         if "sam2" in model_path_str:
             # Load SAM2 model
             try:
@@ -163,7 +162,7 @@ class SegmentAnythingInvocation(BaseInvocation):
         bounding_boxes = (
             [[bb.x_min, bb.y_min, bb.x_max, bb.y_max] for bb in self.bounding_boxes] if self.bounding_boxes else None
         )
-        
+
         # Convert points to the format expected by the specific model
         # We'll determine the format based on the actual pipeline type after loading
         if self.point_lists:
@@ -179,7 +178,7 @@ class SegmentAnythingInvocation(BaseInvocation):
                     object_labels.append(point.label.value)
                 sam2_point_lists.append([object_points])
                 sam2_point_labels.append([object_labels])
-            
+
             # SAM format: [[x, y, label]]
             sam_point_lists = [p.to_list() for p in self.point_lists]
         else:
@@ -195,10 +194,10 @@ class SegmentAnythingInvocation(BaseInvocation):
             # Check pipeline type dynamically and use appropriate point format
             if isinstance(pipeline, SegmentAnything2Pipeline):
                 masks = pipeline.segment(
-                    image=image, 
-                    bounding_boxes=bounding_boxes, 
-                    point_lists=sam2_point_lists, 
-                    point_labels=sam2_point_labels
+                    image=image,
+                    bounding_boxes=bounding_boxes,
+                    point_lists=sam2_point_lists,
+                    point_labels=sam2_point_labels,
                 )
             elif isinstance(pipeline, SegmentAnythingPipeline):
                 masks = pipeline.segment(image=image, bounding_boxes=bounding_boxes, point_lists=sam_point_lists)
