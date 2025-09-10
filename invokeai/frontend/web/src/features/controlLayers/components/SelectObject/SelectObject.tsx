@@ -45,6 +45,7 @@ const SelectObjectContent = memo(
     const hasInput = useStore(adapter.segmentAnything.$hasInputData);
     const hasImageState = useStore(adapter.segmentAnything.$hasImageState);
     const autoProcess = useAppSelector(selectAutoProcess);
+    const inputData = useStore(adapter.segmentAnything.$inputData);
 
     const saveAsInpaintMask = useCallback(() => {
       adapter.segmentAnything.saveAs('inpaint_mask');
@@ -68,6 +69,10 @@ const SelectObjectContent = memo(
 
     const setInputToPrompt = useCallback(() => {
       adapter.segmentAnything.setInputType('prompt');
+    }, [adapter.segmentAnything]);
+
+    const setInputToBoundingBox = useCallback(() => {
+      adapter.segmentAnything.setInputType('bounding_box');
     }, [adapter.segmentAnything]);
 
     useRegisteredHotkeys({
@@ -120,8 +125,9 @@ const SelectObjectContent = memo(
           <ButtonGroup>
             <Button onClick={setInputToPoints}>Points</Button>
             <Button onClick={setInputToPrompt}>Prompt</Button>
+            <Button onClick={setInputToBoundingBox}>Bounding Box</Button>
           </ButtonGroup>
-          <SelectObjectPointType adapter={adapter} />
+          {inputData.type === 'points' && <SelectObjectPointType adapter={adapter} />}
           <SelectObjectInvert adapter={adapter} />
         </Flex>
 
@@ -233,6 +239,12 @@ const SelectObjectHelpTooltipContent = memo(() => {
         <ListItem>{t('controlLayers.selectObject.clickToAdd')}</ListItem>
         <ListItem>{t('controlLayers.selectObject.dragToMove')}</ListItem>
         <ListItem>{t('controlLayers.selectObject.clickToRemove')}</ListItem>
+      </UnorderedList>
+      <Text fontWeight="semibold">Bounding Box Mode:</Text>
+      <UnorderedList>
+        <ListItem>Click and drag to draw a bounding box around an object</ListItem>
+        <ListItem>Resize the box using the corner handles</ListItem>
+        <ListItem>Drag the box to reposition it</ListItem>
       </UnorderedList>
     </Flex>
   );
