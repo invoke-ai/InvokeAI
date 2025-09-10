@@ -1269,6 +1269,7 @@
         "infillColorValue": "Fill Color",
         "info": "Info",
         "startingFrameImage": "Start Frame",
+        "startingFrameImageAspectRatioWarning": "Image aspect ratio does not match the video aspect ratio ({{videoAspectRatio}}). This could lead to unexpected cropping during video generation.",
         "invoke": {
             "addingImagesTo": "Adding images to",
             "modelDisabledForTrial": "Generating with {{modelName}} is not available on trial accounts. Visit your account settings to upgrade.",
