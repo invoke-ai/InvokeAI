@@ -40,6 +40,7 @@ import type { ImageDTO } from 'services/api/types';
 import stableHash from 'stable-hash';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
+import type { JsonObject } from 'type-fest';
 
 type CanvasSegmentAnythingModuleConfig = {
   /**
@@ -580,7 +581,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     if (data.type !== 'visual') {
       return;
     }
-    
+
     if (data.bbox) {
       // Update bbox position and size
       this.konva.bboxRect.setAttrs({
@@ -652,7 +653,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   /**
    * Handles the pointermove event on the stage. This is used to update the bounding box while drawing.
    */
-  onStagePointerMove = (e: KonvaEventObject<PointerEvent>) => {
+  onStagePointerMove = () => {
     const data = this.$inputData.get();
     if (data.type !== 'visual') {
       return;
@@ -690,7 +691,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     if (width > 5 || height > 5) {
       // Now we know it's a drag for a new bbox, hide the transformer
       this.konva.bboxTransformer.visible(false);
-      
+
       // Update and show the new bbox rect
       this.konva.bboxRect.setAttrs({
         x,
@@ -718,7 +719,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       // Check if we started a potential bbox draw
       if (this.$isBboxDrawing.get()) {
         const startCoord = this.$bboxStartCoord.get();
-        
+
         // Check if we actually dragged by calculating from start position
         const cursorPos = this.manager.tool.$cursorPos.get();
         if (!cursorPos || !startCoord) {
@@ -727,15 +728,15 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
           this.$bboxStartCoord.set(null);
           return;
         }
-        
+
         // Stop tracking (after we've used the values)
         this.$isBboxDrawing.set(false);
         this.$bboxStartCoord.set(null);
-        
+
         const pixelRect = this.parent.transformer.$pixelRect.get();
         const parentPosition = addCoords(this.parent.state.position, pixelRect);
         const currentPoint = offsetCoord(cursorPos.relative, parentPosition);
-        
+
         const dragWidth = Math.abs(currentPoint.x - startCoord.x);
         const dragHeight = Math.abs(currentPoint.y - startCoord.y);
 
@@ -763,7 +764,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
           // It was just a click, not a drag - add a point instead
           // Make sure existing bbox stays visible
           this.syncBboxVisibility();
-          
+
           // Ignore if the stage is dragging/panning
           if (this.manager.stage.getIsDragging()) {
             return;
@@ -792,17 +793,17 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
             // Default to include point
             pointType = 1;
           }
-          
+
           const point = this.createPoint(startCoord, pointType);
           const newPoints = [...data.points, point];
           this.$inputData.set({ ...data, points: newPoints });
-          
+
           // Ensure bbox remains visible if it exists
           this.syncBboxVisibility();
         }
         return;
       }
-      
+
       return;
     }
 
@@ -849,7 +850,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       this.$inputData.listen((inputData) => {
         // Always sync bbox visibility when input data changes
         this.syncBboxVisibility();
-        
+
         if (!hasInputData(inputData)) {
           return;
         }
@@ -1289,21 +1290,23 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     // For visual mode, we may have points, bbox, or both
     let pointLists = undefined;
     let boundingBoxes = undefined;
-    
+
     if (inputData.type === 'visual') {
       // If we have points, add them
       if (inputData.points.length > 0) {
         pointLists = [{ points: getSAMPoints(inputData).map(({ x, y, label }) => ({ x, y, label })) }];
       }
-      
+
       // If we have a bbox, add it
       if (inputData.bbox) {
-        boundingBoxes = [{
-          x_min: Math.round(inputData.bbox.x),
-          y_min: Math.round(inputData.bbox.y),
-          x_max: Math.round(inputData.bbox.x + inputData.bbox.width),
-          y_max: Math.round(inputData.bbox.y + inputData.bbox.height),
-        }];
+        boundingBoxes = [
+          {
+            x_min: Math.round(inputData.bbox.x),
+            y_min: Math.round(inputData.bbox.y),
+            x_max: Math.round(inputData.bbox.x + inputData.bbox.width),
+            y_max: Math.round(inputData.bbox.y + inputData.bbox.height),
+          },
+        ];
       }
     }
 
@@ -1361,7 +1364,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
   repr = () => {
     const data = this.$inputData.get();
-    let inputData: any;
+    let inputData: JsonObject;
     if (data.type === 'prompt') {
       inputData = { type: 'prompt', prompt: data.prompt };
     } else {
