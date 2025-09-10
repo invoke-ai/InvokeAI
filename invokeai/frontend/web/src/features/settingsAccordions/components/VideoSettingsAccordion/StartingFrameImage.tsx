@@ -1,4 +1,4 @@
-import { Flex, FormLabel, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Box, Flex, FormLabel, Icon, IconButton, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { UploadImageIconButton } from 'common/hooks/useImageUploadButton';
 import { ASPECT_RATIO_MAP } from 'features/controlLayers/store/types';
@@ -6,7 +6,8 @@ import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
 import { videoFrameFromImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
-import { DndImageIcon } from 'features/dnd/DndImageIcon';
+import { DndImageIcon, imageButtonSx } from 'features/dnd/DndImageIcon';
+import { $imageName, $isOpen } from 'features/editImageModal/store';
 import {
   selectStartingFrameImage,
   selectVideoAspectRatio,
@@ -15,7 +16,7 @@ import {
 } from 'features/parameters/store/videoSlice';
 import { t } from 'i18next';
 import { useCallback, useMemo } from 'react';
-import { PiArrowCounterClockwiseBold, PiWarningBold } from 'react-icons/pi';
+import { PiArrowCounterClockwiseBold, PiCropBold, PiWarningBold } from 'react-icons/pi';
 import { useImageDTO } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
@@ -39,19 +40,35 @@ export const StartingFrameImage = () => {
     [dispatch]
   );
 
+  const onOpenEditImageModal = useCallback(() => {
+    $isOpen.set(true);
+    $imageName.set(imageDTO?.image_name ?? null);
+  }, [imageDTO]);
+
+
   const fitsCurrentAspectRatio = useMemo(() => {
     if (!imageDTO) {
       return true;
     }
-    console.log('imageDTO.width / imageDTO.height', imageDTO.width / imageDTO.height);
-    console.log('ASPECT_RATIO_MAP[videoAspectRatio]?.ratio', ASPECT_RATIO_MAP[videoAspectRatio]?.ratio);
-    console.log('fitsCurrentAspectRatio', imageDTO.width / imageDTO.height === ASPECT_RATIO_MAP[videoAspectRatio]?.ratio);
+
     return imageDTO.width / imageDTO.height === ASPECT_RATIO_MAP[videoAspectRatio]?.ratio;
   }, [imageDTO, videoAspectRatio]);
 
   return (
     <Flex justifyContent="flex-start" flexDir="column" gap={2}>
-      <FormLabel>{t('parameters.startingFrameImage')}</FormLabel>
+      <FormLabel display="flex" alignItems="center" gap={2}><Text>{t('parameters.startingFrameImage')}</Text>
+        <Tooltip
+          label={t('parameters.startingFrameImageAspectRatioWarning', { videoAspectRatio: videoAspectRatio })}
+        >
+          <Box >
+            <Icon
+              as={PiWarningBold}
+              size={16}
+              color="warning.500"
+            />
+          </Box>
+        </Tooltip>
+      </FormLabel>
       <Flex position="relative" w={36} h={36} alignItems="center" justifyContent="center" borderWidth={1} borderStyle="solid" borderColor={fitsCurrentAspectRatio ? 'base.500' : 'warning.500'}>
         {!imageDTO && (
           <UploadImageIconButton
@@ -73,17 +90,18 @@ export const StartingFrameImage = () => {
               />
             </Flex>
 
-            {!fitsCurrentAspectRatio && <Tooltip
-              label={t('parameters.startingFrameImageAspectRatioWarning', { videoAspectRatio: videoAspectRatio })}
-            >
-              <Flex position="absolute" flexDir="column" top={1} insetInlineStart={1} gap={1}>
-                <Icon
-                  as={PiWarningBold}
-                  size={16}
-                  color="warning.500"
-                />
-              </Flex>
-            </Tooltip>}
+            <Flex position="absolute" flexDir="column" top={1} insetInlineStart={1} gap={1}>
+              <IconButton
+                variant="link"
+                sx={imageButtonSx}
+                aria-label={t('common.crop')}
+                onClick={onOpenEditImageModal}
+                icon={<PiCropBold size={16} />}
+                tooltip={t('common.crop')}
+              />
+            </Flex>
+
+
 
             <Text
               position="absolute"
