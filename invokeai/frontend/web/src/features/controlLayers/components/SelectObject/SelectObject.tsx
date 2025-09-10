@@ -227,20 +227,13 @@ const SelectObjectHelpTooltipContent = memo(() => {
       <Text>
         <Trans i18nKey="controlLayers.selectObject.help2" components={{ Bold: <Bold /> }} />
       </Text>
-      <Text fontWeight="semibold">Visual Mode:</Text>
+      <Text>
+        <Trans i18nKey="controlLayers.selectObject.help3" />
+      </Text>
       <UnorderedList>
-        <ListItem>Click to add include points (green)</ListItem>
-        <ListItem>Shift + Click to add exclude points (red)</ListItem>
-        <ListItem>Click and drag to draw a bounding box</ListItem>
-        <ListItem>Click on points to remove them</ListItem>
-        <ListItem>Drag points to reposition them</ListItem>
-        <ListItem>Resize the box using the corner handles</ListItem>
-        <ListItem>Drag the box to reposition it</ListItem>
-      </UnorderedList>
-      <Text fontWeight="semibold">Prompt Mode:</Text>
-      <UnorderedList>
-        <ListItem>Type a text description of the object to select</ListItem>
-        <ListItem>The AI will find and segment matching objects</ListItem>
+        <ListItem>{t('controlLayers.selectObject.clickToAdd')}</ListItem>
+        <ListItem>{t('controlLayers.selectObject.dragToMove')}</ListItem>
+        <ListItem>{t('controlLayers.selectObject.clickToRemove')}</ListItem>
       </UnorderedList>
     </Flex>
   );
