@@ -41,25 +41,19 @@ class SegmentAnything2Pipeline(RawModel):
         image: Image.Image,
         inputs: list[SAMInput],
     ) -> torch.Tensor:
-        """Segment an image using the SAM2 model.
-
-        Either bounding_boxes or point_lists must be provided. If both are provided, bounding_boxes will be used and
-        point_lists will be ignored.
+        """Segment the image using the provided inputs.
 
         Args:
-            image (Image.Image): The image to segment.
-            bounding_boxes (list[list[int]]): The bounding box prompts. Each bounding box is in the format
-                [xmin, ymin, xmax, ymax].
-            point_lists (list[list[list[int]]]): The points prompts. Each point is in the format [x, y, label].
-                `label` is an integer where -1 is background, 0 is neutral, and 1 is foreground.
+            image: The image to segment.
+            inputs: A list of SAMInput objects containing bounding boxes and/or point lists.
 
         Returns:
             torch.Tensor: The segmentation masks. dtype: torch.bool. shape: [num_masks, channels, height, width].
         """
 
+        input_boxes: list[list[float]] = []
         input_points: list[list[list[float]]] = []
         input_labels: list[list[int]] = []
-        input_boxes: list[list[float]] = []
 
         for i in inputs:
             box: list[float] | None = None
