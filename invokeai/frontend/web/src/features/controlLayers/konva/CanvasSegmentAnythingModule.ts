@@ -241,6 +241,12 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   $bboxStartCoord = atom<Coordinate | null>(null);
 
   /**
+   * State for manual bbox dragging
+   */
+  $bboxDragStart = atom<{ x: number; y: number } | null>(null);
+  $isBboxDragging = atom<boolean>(false);
+
+  /**
    * The masked image object module, if it exists.
    */
   imageModule: CanvasObjectImage | null = null;
@@ -317,11 +323,12 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       bboxGroup: new Konva.Group({ name: this.KONVA_BBOX_GROUP_NAME, listening: true }),
       bboxRect: new Konva.Rect({
         name: this.KONVA_BBOX_RECT_NAME,
+        borderDash: [5, 5],
         stroke: rgbaColorToString(this.config.MASK_COLOR),
         strokeWidth: 2,
         strokeScaleEnabled: false,
-        fill: rgbaColorToString({ ...this.config.MASK_COLOR, a: 0.2 }),
-        draggable: true,
+        fill: rgbaColorToString({ ...this.config.MASK_COLOR, a: 0.1 }),
+        draggable: false, // Start with draggable disabled, we'll handle drag manually
         listening: true,
         visible: false,
       }),
@@ -337,8 +344,8 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
         flipEnabled: false,
         anchorFill: rgbaColorToString(this.config.MASK_COLOR),
         anchorStroke: 'rgb(42,42,42)',
-        anchorSize: 8,
-        anchorCornerRadius: 2,
+        anchorSize: 12,
+        anchorCornerRadius: 3,
         listening: true,
         visible: false,
       }),
@@ -423,36 +430,32 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       });
     });
 
-    // Stop event propagation when interacting with the bbox
+    // Handle manual drag detection for bbox rect
     this.konva.bboxRect.on('mousedown touchstart', (e) => {
-      e.cancelBubble = true;
-    });
-
-    this.konva.bboxTransformer.on('mousedown touchstart', (e) => {
-      e.cancelBubble = true;
-    });
-
-    // Add event handler for bbox rect drag
-    this.konva.bboxRect.on('dragend', () => {
       const data = this.$inputData.get();
       if (data.type !== 'visual') {
         return;
       }
 
-      const x = this.konva.bboxRect.x();
-      const y = this.konva.bboxRect.y();
-      const width = this.konva.bboxRect.width();
-      const height = this.konva.bboxRect.height();
+      // Get the position of the mouse/touch relative to the stage
+      const stage = this.manager.stage.konva.stage;
+      const pointerPos = stage.getPointerPosition();
+      if (!pointerPos) {
+        return;
+      }
 
-      this.$inputData.set({
-        ...data,
-        bbox: {
-          x: x,
-          y: y,
-          width: width,
-          height: height,
-        },
-      });
+      // Store the initial position for drag detection
+      this.$bboxDragStart.set({ x: pointerPos.x, y: pointerPos.y });
+      this.$isBboxDragging.set(false);
+
+      // Don't bubble the event yet - we'll decide what to do on move/up
+      e.cancelBubble = true;
+    });
+
+    // Handle transformer interactions
+    this.konva.bboxTransformer.on('mousedown touchstart', (e) => {
+      // Transformer handles its own dragging, just stop propagation
+      e.cancelBubble = true;
     });
 
     // Compositing rect is added to the mask group - will also be above the mask image, but that doesn't get created
@@ -811,16 +814,125 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   };
 
   /**
+   * Handles mouse/touch move for manual bbox dragging detection
+   */
+  onBboxDragMove = () => {
+    const dragStart = this.$bboxDragStart.get();
+    if (!dragStart) {
+      return;
+    }
+
+    // If we're already dragging, no need to check again
+    if (this.$isBboxDragging.get()) {
+      return;
+    }
+
+    const stage = this.manager.stage.konva.stage;
+    const pointerPos = stage.getPointerPosition();
+    if (!pointerPos) {
+      return;
+    }
+
+    // Calculate the distance moved
+    const dx = Math.abs(pointerPos.x - dragStart.x);
+    const dy = Math.abs(pointerPos.y - dragStart.y);
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // If moved more than 5 pixels, start dragging
+    if (distance > 5) {
+      this.$isBboxDragging.set(true);
+      // Enable dragging and start the drag programmatically
+      this.konva.bboxRect.draggable(true);
+      this.konva.bboxRect.startDrag();
+    }
+  };
+
+  /**
+   * Handles mouse/touch up for manual bbox dragging
+   */
+  onBboxDragEnd = (e: KonvaEventObject<PointerEvent>) => {
+    const dragStart = this.$bboxDragStart.get();
+    if (!dragStart) {
+      return;
+    }
+
+    // Clear the drag state
+    this.$bboxDragStart.set(null);
+
+    // If we didn't drag, it was a click - allow point creation
+    if (!this.$isBboxDragging.get()) {
+      // Get the pointer position from the stage to create a point at the correct location
+      const stage = this.manager.stage.konva.stage;
+      const pointerPos = stage.getPointerPosition();
+      if (pointerPos) {
+        // Convert stage coordinates to relative coordinates
+        const stageTransform = stage.getAbsoluteTransform().copy().invert();
+        const relativePos = stageTransform.point(pointerPos);
+
+        // Offset by parent position to get the correct point location
+        const pixelRect = this.parent.transformer.$pixelRect.get();
+        const parentPosition = addCoords(this.parent.state.position, pixelRect);
+        const normalizedPoint = offsetCoord(relativePos, parentPosition);
+
+        const data = this.$inputData.get();
+        if (data.type === 'visual') {
+          // Create a point based on shift key
+          let pointType: -1 | 0 | 1;
+          if (e.evt.shiftKey) {
+            pointType = -1;
+          } else {
+            pointType = 1;
+          }
+
+          const point = this.createPoint(normalizedPoint, pointType);
+          const newPoints = [...data.points, point];
+          this.$inputData.set({ ...data, points: newPoints });
+        }
+      }
+    } else {
+      // We did drag - disable dragging again for next time
+      this.konva.bboxRect.draggable(false);
+      // Update the bbox data after drag
+      const data = this.$inputData.get();
+      if (data.type === 'visual') {
+        const x = this.konva.bboxRect.x();
+        const y = this.konva.bboxRect.y();
+        const width = this.konva.bboxRect.width();
+        const height = this.konva.bboxRect.height();
+
+        this.$inputData.set({
+          ...data,
+          bbox: {
+            x: x,
+            y: y,
+            width: width,
+            height: height,
+          },
+        });
+      }
+    }
+
+    this.$isBboxDragging.set(false);
+  };
+
+  /**
    * Adds event listeners needed while segmenting the entity.
    */
   subscribe = () => {
     this.manager.stage.konva.stage.on('pointerdown', this.onStagePointerDown);
     this.manager.stage.konva.stage.on('pointermove', this.onStagePointerMove);
     this.manager.stage.konva.stage.on('pointerup', this.onStagePointerUp);
+
+    // Add global listeners for bbox drag detection
+    this.manager.stage.konva.stage.on('mousemove touchmove', this.onBboxDragMove);
+    this.manager.stage.konva.stage.on('mouseup touchend', this.onBboxDragEnd);
+
     this.subscriptions.add(() => {
       this.manager.stage.konva.stage.off('pointerdown', this.onStagePointerDown);
       this.manager.stage.konva.stage.off('pointermove', this.onStagePointerMove);
       this.manager.stage.konva.stage.off('pointerup', this.onStagePointerUp);
+      this.manager.stage.konva.stage.off('mousemove touchmove', this.onBboxDragMove);
+      this.manager.stage.konva.stage.off('mouseup touchend', this.onBboxDragEnd);
     });
 
     // When we change the processing status, we should update the cursor style and the layer's listening status. For
@@ -1239,11 +1351,15 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       for (const point of data.points) {
         point.konva.circle.destroy();
       }
-      // Hide bounding box nodes
+
+      // Hide bounding box nodes and reset drag state
       this.konva.bboxRect.visible(false);
+      this.konva.bboxRect.draggable(false); // Ensure draggable is reset
       this.konva.bboxTransformer.visible(false);
       this.$isBboxDrawing.set(false);
       this.$bboxStartCoord.set(null);
+      this.$bboxDragStart.set(null);
+      this.$isBboxDragging.set(false);
     }
 
     // If the image module exists, and is a child of the group, destroy it. It might not be a child of the group if
