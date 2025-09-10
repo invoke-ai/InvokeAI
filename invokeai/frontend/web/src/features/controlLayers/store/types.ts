@@ -116,6 +116,9 @@ export type SAMPointLabel = z.infer<typeof zSAMPointLabel>;
 export const zSAMPointLabelString = z.enum(['background', 'neutral', 'foreground']);
 export type SAMPointLabelString = z.infer<typeof zSAMPointLabelString>;
 
+export const zSAMModel = z.enum(['SAM1', 'SAM2']);
+export type SAMModel = z.infer<typeof zSAMModel>;
+
 /**
  * A mapping of SAM point labels (as numbers) to their string representations.
  */

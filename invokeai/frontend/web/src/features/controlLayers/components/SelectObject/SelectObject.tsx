@@ -32,6 +32,9 @@ import { memo, useCallback, useRef } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiCaretDownBold, PiInfoBold } from 'react-icons/pi';
 
+import { SelectObjectModel } from './SelectObjectModel';
+import { SelectObjectPrompt } from './SelectObjectPrompt';
+
 const SelectObjectContent = memo(
   ({ adapter }: { adapter: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer }) => {
     const { t } = useTranslation();
@@ -39,7 +42,7 @@ const SelectObjectContent = memo(
     useFocusRegion('canvas', ref, { focusOnMount: true });
     const isCanvasFocused = useIsRegionFocused('canvas');
     const isProcessing = useStore(adapter.segmentAnything.$isProcessing);
-    const hasPoints = useStore(adapter.segmentAnything.$hasPoints);
+    const hasInput = useStore(adapter.segmentAnything.$hasInputData);
     const hasImageState = useStore(adapter.segmentAnything.$hasImageState);
     const autoProcess = useAppSelector(selectAutoProcess);
 
@@ -57,6 +60,14 @@ const SelectObjectContent = memo(
 
     const saveAsControlLayer = useCallback(() => {
       adapter.segmentAnything.saveAs('control_layer');
+    }, [adapter.segmentAnything]);
+
+    const setInputToPoints = useCallback(() => {
+      adapter.segmentAnything.setInputType('points');
+    }, [adapter.segmentAnything]);
+
+    const setInputToPrompt = useCallback(() => {
+      adapter.segmentAnything.setInputType('prompt');
     }, [adapter.segmentAnything]);
 
     useRegisteredHotkeys({
@@ -106,16 +117,23 @@ const SelectObjectContent = memo(
         </Flex>
 
         <Flex w="full" justifyContent="space-between" py={2}>
+          <ButtonGroup>
+            <Button onClick={setInputToPoints}>Points</Button>
+            <Button onClick={setInputToPrompt}>Prompt</Button>
+          </ButtonGroup>
           <SelectObjectPointType adapter={adapter} />
           <SelectObjectInvert adapter={adapter} />
         </Flex>
+
+        <SelectObjectPrompt adapter={adapter} />
+        <SelectObjectModel adapter={adapter} />
 
         <ButtonGroup isAttached={false} size="sm" w="full">
           <Button
             onClick={adapter.segmentAnything.processImmediate}
             loadingText={t('controlLayers.selectObject.process')}
             variant="ghost"
-            isDisabled={isProcessing || !hasPoints || (autoProcess && hasImageState)}
+            isDisabled={isProcessing || !hasInput || (autoProcess && hasImageState)}
           >
             {t('controlLayers.selectObject.process')}
             {isProcessing && <Spinner ms={3} boxSize={5} color="base.600" />}
@@ -123,7 +141,7 @@ const SelectObjectContent = memo(
           <Spacer />
           <Button
             onClick={adapter.segmentAnything.reset}
-            isDisabled={isProcessing || !hasPoints}
+            isDisabled={isProcessing || !hasInput}
             loadingText={t('controlLayers.selectObject.reset')}
             variant="ghost"
           >

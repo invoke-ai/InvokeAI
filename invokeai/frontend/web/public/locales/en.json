@@ -2458,7 +2458,10 @@
             "help3": "Invert the selection to select everything except the target object.",
             "clickToAdd": "Click on the layer to add a point",
             "dragToMove": "Drag a point to move it",
-            "clickToRemove": "Click on a point to remove it"
+            "clickToRemove": "Click on a point to remove it",
+            "model": "Model",
+            "segmentAnything1": "Segment Anything 1",
+            "segmentAnything2": "Segment Anything 2"
         },
         "settings": {
             "snapToGrid": {

@@ -21,6 +21,7 @@ import type {
   CanvasImageState,
   Coordinate,
   RgbaColor,
+  SAMModel,
   SAMPointLabel,
   SAMPointLabelString,
   SAMPointWithId,
@@ -103,6 +104,50 @@ type SAMPointState = {
   };
 };
 
+type PointsInputData = {
+  type: 'points';
+  points: SAMPointState[];
+};
+
+type PromptInputData = {
+  type: 'prompt';
+  prompt: string;
+};
+
+const hasInputData = (data: PointsInputData | PromptInputData): boolean => {
+  if (data.type === 'points') {
+    return data.points.length > 0;
+  } else {
+    return data.prompt.trim() !== '';
+  }
+};
+
+/**
+ * Gets the SAM points in the format expected by the segment-anything API. The x and y values are rounded to integers.
+ */
+const getSAMPoints = (data: PointsInputData): SAMPointWithId[] => {
+  const points: SAMPointWithId[] = [];
+
+  for (const { id, coord, label } of data.points) {
+    points.push({
+      id,
+      x: coord.x,
+      y: coord.y,
+      label,
+    });
+  }
+
+  return points;
+};
+
+const getHashableInputData = (data: PointsInputData | PromptInputData) => {
+  if (data.type === 'points') {
+    return { type: 'points', points: getSAMPoints(data) } as const;
+  } else {
+    return { type: 'prompt', prompt: data.prompt } as const;
+  }
+};
+
 export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   readonly type = 'canvas_segment_anything';
   readonly id: string;
@@ -141,6 +186,11 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   $pointType = atom<SAMPointLabel>(1);
 
   /**
+   * The type of point to create when segmenting. This is a number representation of the SAMPointLabel enum.
+   */
+  $model = atom<SAMModel>('SAM2');
+
+  /**
    * The type of point to create when segmenting, as a string. This is a computed value based on $pointType.
    */
   $pointTypeString = computed<SAMPointLabelString, Atom<SAMPointLabel>>(
@@ -164,15 +214,12 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
    */
   $hasImageState = computed(this.$imageState, (imageState) => imageState !== null);
 
-  /**
-   * The current input points. A listener is added to this atom to process the points when they change.
-   */
-  $points = atom<SAMPointState[]>([]);
+  $inputData = atom<PointsInputData | PromptInputData>({ type: 'points', points: [] });
 
   /**
    * Whether the module has points. This is a computed value based on $points.
    */
-  $hasPoints = computed(this.$points, (points) => points.length > 0);
+  $hasInputData = computed(this.$inputData, hasInputData);
 
   /**
    * Whether the module should invert the mask image.
@@ -307,11 +354,16 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       e.cancelBubble = true;
       circle.destroy();
 
-      const newPoints = this.$points.get().filter((point) => point.id !== id);
+      const data = this.$inputData.get();
+      if (data.type !== 'points') {
+        return;
+      }
+
+      const newPoints = data.points.filter((point) => point.id !== id);
       if (newPoints.length === 0) {
         this.resetEphemeralState();
       } else {
-        this.$points.set(newPoints);
+        this.$inputData.set({ ...data, points: newPoints });
       }
     });
 
@@ -325,14 +377,19 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       this.log.trace({ ...roundedCoord, label: SAM_POINT_LABEL_NUMBER_TO_STRING[label] }, 'Moved SAM point');
       this.$isDraggingPoint.set(false);
 
-      const newPoints = this.$points.get().map((point) => {
+      const data = this.$inputData.get();
+      if (data.type !== 'points') {
+        return;
+      }
+
+      const newPoints = data.points.map((point) => {
         if (point.id === id) {
           return { ...point, coord: roundedCoord };
         }
         return point;
       });
 
-      this.$points.set(newPoints);
+      this.$inputData.set({ ...data, points: newPoints });
     });
 
     this.konva.pointGroup.add(circle);
@@ -353,36 +410,27 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
    * SAM points are always the same size, regardless of the stage scale.
    */
   syncPointScales = () => {
+    const data = this.$inputData.get();
+    if (data.type !== 'points') {
+      return;
+    }
     const radius = this.manager.stage.unscale(this.config.SAM_POINT_RADIUS);
     const borderWidth = this.manager.stage.unscale(this.config.SAM_POINT_BORDER_WIDTH);
-    for (const point of this.$points.get()) {
+    for (const point of data.points) {
       point.konva.circle.radius(radius);
       point.konva.circle.strokeWidth(borderWidth);
     }
   };
 
   /**
-   * Gets the SAM points in the format expected by the segment-anything API. The x and y values are rounded to integers.
-   */
-  getSAMPoints = (): SAMPointWithId[] => {
-    const points: SAMPointWithId[] = [];
-
-    for (const { id, coord, label } of this.$points.get()) {
-      points.push({
-        id,
-        x: coord.x,
-        y: coord.y,
-        label,
-      });
-    }
-
-    return points;
-  };
-
-  /**
    * Handles the pointerup event on the stage. This is used to add a SAM point to the module.
    */
   onStagePointerUp = (e: KonvaEventObject<PointerEvent>) => {
+    const data = this.$inputData.get();
+    if (data.type !== 'points') {
+      return;
+    }
+
     // Only handle left-clicks
     if (e.evt.button !== 0) {
       return;
@@ -431,8 +479,8 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       pointType = this.$pointType.get();
     }
     const point = this.createPoint(normalizedPoint, pointType);
-    const newPoints = [...this.$points.get(), point];
-    this.$points.set(newPoints);
+    const newPoints = [...data.points, point];
+    this.$inputData.set({ ...data, points: newPoints });
   };
 
   /**
@@ -468,8 +516,8 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
     // When the points change, process them if autoProcess is enabled
     this.subscriptions.add(
-      this.$points.listen((points) => {
-        if (points.length === 0) {
+      this.$inputData.listen((inputData) => {
+        if (!hasInputData(inputData)) {
           return;
         }
 
@@ -482,7 +530,20 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     // When the invert flag changes, process if autoProcess is enabled
     this.subscriptions.add(
       this.$invert.listen(() => {
-        if (this.$points.get().length === 0) {
+        if (!hasInputData(this.$inputData.get())) {
+          return;
+        }
+
+        if (this.manager.stateApi.getSettings().autoProcess) {
+          this.process();
+        }
+      })
+    );
+
+    // When the model changes, process if autoProcess is enabled
+    this.subscriptions.add(
+      this.$model.listen(() => {
+        if (!hasInputData(this.$inputData.get())) {
           return;
         }
 
@@ -495,7 +556,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     // When auto-process is enabled, process the points if they have not been processed
     this.subscriptions.add(
       this.manager.stateApi.createStoreSubscription(selectAutoProcess, (autoProcess) => {
-        if (this.$points.get().length === 0) {
+        if (!hasInputData(this.$inputData.get())) {
           return;
         }
         if (autoProcess) {
@@ -563,24 +624,24 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       return;
     }
 
-    const points = this.getSAMPoints();
+    const data = this.$inputData.get();
+    const invert = this.$invert.get();
+    const model = this.$model.get();
 
-    if (points.length === 0) {
-      this.log.trace('No points to segment');
+    if (!hasInputData(data)) {
+      this.log.trace('No points to segment and no prompt provided');
       return;
     }
 
-    const invert = this.$invert.get();
-
-    const hash = stableHash({ points, invert });
+    const hash = stableHash({ inputData: getHashableInputData(data), invert, model });
     if (hash === this.$lastProcessedHash.get()) {
-      this.log.trace('Already processed points');
+      this.log.trace('Already processed inputs');
       return;
     }
 
     this.$isProcessing.set(true);
 
-    this.log.trace({ points }, 'Segmenting');
+    this.log.trace({ inputData: getHashableInputData(data), invert, model }, 'Segmenting');
 
     // Rasterize the entity in its current state
     const rect = this.parent.transformer.getRelativeRect();
@@ -600,7 +661,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.abortController = controller;
 
     // Build the graph for segmenting the image, using the rasterized image DTO
-    const { graph, outputNodeId } = CanvasSegmentAnythingModule.buildGraph(rasterizeResult.value, points, invert);
+    const { graph, outputNodeId } = CanvasSegmentAnythingModule.buildGraph(rasterizeResult.value, data, invert, model);
 
     // Run the graph and get the segmented image output
     const segmentResult = await withResultAsync(() =>
@@ -777,6 +838,19 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.resetEphemeralState();
   };
 
+  setInputType = (type: PointsInputData['type'] | PromptInputData['type']) => {
+    const data = this.$inputData.get();
+    if (data.type === type) {
+      return;
+    }
+    this.reset();
+    if (type === 'points') {
+      this.$inputData.set({ type: 'points', points: [] });
+    } else {
+      this.$inputData.set({ type: 'prompt', prompt: '' });
+    }
+  };
+
   /**
    * Cancels the segmenting process.
    */
@@ -822,8 +896,11 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.abortController = null;
 
     // Destroy ephemeral konva nodes
-    for (const point of this.$points.get()) {
-      point.konva.circle.destroy();
+    const data = this.$inputData.get();
+    if (data.type === 'points') {
+      for (const point of data.points) {
+        point.konva.circle.destroy();
+      }
     }
 
     // If the image module exists, and is a child of the group, destroy it. It might not be a child of the group if
@@ -838,7 +915,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     }
 
     // Empty internal module state
-    this.$points.set([]);
+    this.$inputData.set({ type: 'points', points: [] });
     this.$imageState.set(null);
     this.$pointType.set(1);
     this.$invert.set(false);
@@ -855,19 +932,42 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
    */
   static buildGraph = (
     { image_name }: ImageDTO,
-    points: SAMPointWithId[],
-    invert: boolean
+    inputData: PointsInputData | PromptInputData,
+    invert: boolean,
+    model: SAMModel
   ): { graph: Graph; outputNodeId: string } => {
     const graph = new Graph(getPrefixedId('canvas_segment_anything'));
+
+    const imagePrimitive = graph.addNode({
+      id: getPrefixedId('image_primitive'),
+      type: 'image',
+      image: { image_name },
+    });
 
     const segmentAnything = graph.addNode({
       id: getPrefixedId('segment_anything'),
       type: 'segment_anything',
-      model: 'segment-anything-2-large',
-      image: { image_name },
-      point_lists: [{ points: points.map(({ x, y, label }) => ({ x, y, label })) }],
+      model: model === 'SAM1' ? 'segment-anything-huge' : 'segment-anything-2-large',
+      point_lists:
+        inputData.type === 'points'
+          ? [{ points: getSAMPoints(inputData).map(({ x, y, label }) => ({ x, y, label })) }]
+          : undefined,
       mask_filter: 'all',
+      apply_polygon_refinement: false,
     });
+
+    graph.addEdge(imagePrimitive, 'image', segmentAnything, 'image');
+
+    if (inputData.type === 'prompt') {
+      const groundingDino = graph.addNode({
+        id: getPrefixedId('grounding_dino'),
+        type: 'grounding_dino',
+        model: 'grounding-dino-base',
+        prompt: inputData.prompt,
+      });
+      graph.addEdge(imagePrimitive, 'image', groundingDino, 'image');
+      graph.addEdge(groundingDino, 'collection', segmentAnything, 'bounding_boxes');
+    }
 
     // Apply the mask to the image, outputting an image w/ alpha transparency
     const applyMask = graph.addNode({
@@ -899,16 +999,20 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   }
 
   repr = () => {
+    const data = this.$inputData.get();
     return {
       id: this.id,
       type: this.type,
       path: this.path,
       parent: this.parent.id,
-      points: this.$points.get().map(({ id, konva, label }) => ({
-        id,
-        label,
-        circle: getKonvaNodeDebugAttrs(konva.circle),
-      })),
+      inputData:
+        data.type === 'points'
+          ? data.points.map(({ id, konva, label }) => ({
+              id,
+              label,
+              circle: getKonvaNodeDebugAttrs(konva.circle),
+            }))
+          : { type: 'prompt', prompt: data.prompt },
       imageState: deepClone(this.$imageState.get()),
       imageModule: this.imageModule?.repr() ?? null,
       config: deepClone(this.config),
