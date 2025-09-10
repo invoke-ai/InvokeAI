@@ -385,7 +385,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       const y = this.konva.bboxRect.y();
       const scaleX = this.konva.bboxRect.scaleX();
       const scaleY = this.konva.bboxRect.scaleY();
-      
+
       // Apply scale to dimensions, ensuring minimum size to prevent issues
       const width = Math.max(1, this.konva.bboxRect.width() * scaleX);
       const height = Math.max(1, this.konva.bboxRect.height() * scaleY);
@@ -598,6 +598,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
         width: data.bbox.width,
         height: data.bbox.height,
         visible: true,
+        listening: true, // Ensure existing bboxes are interactive
       });
       this.konva.bboxTransformer.visible(true);
     } else {
@@ -707,6 +708,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
         width,
         height,
         visible: true,
+        listening: false, // Disable listening during drawing to prevent event interception
       });
     }
   };
@@ -756,7 +758,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
           // Get the actual dimensions, accounting for any scale
           const width = Math.max(1, this.konva.bboxRect.width() * this.konva.bboxRect.scaleX());
           const height = Math.max(1, this.konva.bboxRect.height() * this.konva.bboxRect.scaleY());
-          
+
           // Reset scale to prevent accumulation issues
           this.konva.bboxRect.setAttrs({
             width: width,
@@ -764,7 +766,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
             scaleX: 1,
             scaleY: 1,
           });
-          
+
           // It was a drag - save the bbox
           this.$inputData.set({
             ...data,
@@ -778,6 +780,8 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
           // Show the transformer for resizing
           this.konva.bboxTransformer.visible(true);
+          // Enable listening now that drawing is complete
+          this.konva.bboxRect.listening(true);
         } else {
           // It was just a click, not a drag - add a point instead
           // Make sure existing bbox stays visible
@@ -939,15 +943,15 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.manager.stage.konva.stage.on('pointerup', this.onStagePointerUp);
 
     // Add global listeners for bbox drag detection
-    this.manager.stage.konva.stage.on('mousemove touchmove', this.onBboxDragMove);
-    this.manager.stage.konva.stage.on('mouseup touchend', this.onBboxDragEnd);
+    this.manager.stage.konva.stage.on('pointermove', this.onBboxDragMove);
+    this.manager.stage.konva.stage.on('pointerup', this.onBboxDragEnd);
 
     this.subscriptions.add(() => {
       this.manager.stage.konva.stage.off('pointerdown', this.onStagePointerDown);
       this.manager.stage.konva.stage.off('pointermove', this.onStagePointerMove);
       this.manager.stage.konva.stage.off('pointerup', this.onStagePointerUp);
-      this.manager.stage.konva.stage.off('mousemove touchmove', this.onBboxDragMove);
-      this.manager.stage.konva.stage.off('mouseup touchend', this.onBboxDragEnd);
+      this.manager.stage.konva.stage.off('pointermove', this.onBboxDragMove);
+      this.manager.stage.konva.stage.off('pointerup', this.onBboxDragEnd);
     });
 
     // When we change the processing status, we should update the cursor style and the layer's listening status. For
