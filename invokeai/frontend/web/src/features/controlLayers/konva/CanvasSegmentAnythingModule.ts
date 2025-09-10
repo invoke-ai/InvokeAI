@@ -828,17 +828,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
             return;
           }
 
-          // Create a SAM point at the click position
-          let pointType: -1 | 0 | 1;
-          // If shift key is held, create an exclude point
-          if (e.evt.shiftKey) {
-            pointType = -1;
-          } else {
-            // Default to include point
-            pointType = 1;
-          }
-
-          const point = this.createPoint(startCoord, pointType);
+          const point = this.createPoint(startCoord, this.getPointType(e));
           const newPoints = [...data.points, point];
           this.$inputData.set({ ...data, points: newPoints });
 
@@ -895,6 +885,14 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     }
   };
 
+  getPointType = (e: KonvaEventObject<PointerEvent>): SAMPointLabel => {
+    let pointType = this.$pointType.get();
+    if (e.evt.shiftKey) {
+      pointType = pointType === 1 ? -1 : 1; // Invert the point type if shift is held
+    }
+    return pointType;
+  };
+
   /**
    * Handles mouse/touch up for manual bbox dragging
    */
@@ -929,15 +927,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
         const data = this.$inputData.get();
         if (data.type === 'visual') {
-          // Create a point based on shift key
-          let pointType: -1 | 0 | 1;
-          if (e.evt.shiftKey) {
-            pointType = -1;
-          } else {
-            pointType = 1;
-          }
-
-          const point = this.createPoint(normalizedPoint, pointType);
+          const point = this.createPoint(normalizedPoint, this.getPointType(e));
           const newPoints = [...data.points, point];
           this.$inputData.set({ ...data, points: newPoints });
         }
