@@ -2,7 +2,7 @@ import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectCanvasMetadata, selectSelectedCanvas } from 'features/controlLayers/store/selectors';
 import { isFluxKontextReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { zImageField } from 'features/nodes/types/common';
@@ -40,7 +40,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   assert(model.base === 'flux', 'Selected model is not a FLUX model');
 
   const params = selectParamsSlice(state);
-  const canvas = selectCanvasSlice(state);
+  const canvas = selectSelectedCanvas(state);
   const refImages = selectRefImagesSlice(state);
 
   const { guidance: baseGuidance, steps, fluxVAE, t5EncoderModel, clipEmbedModel } = params;

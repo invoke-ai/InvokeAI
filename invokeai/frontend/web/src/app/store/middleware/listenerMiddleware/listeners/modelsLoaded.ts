@@ -11,7 +11,7 @@ import {
   vaeSelected,
 } from 'features/controlLayers/store/paramsSlice';
 import { refImageModelChanged, selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectSelectedCanvas } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier, isFLUXReduxConfig, isIPAdapterConfig } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { modelSelected } from 'features/parameters/store/actions';
@@ -215,7 +215,7 @@ const handleVideoModels: ModelHandler = (models, state, dispatch, log) => {
 
 const handleControlAdapterModels: ModelHandler = (models, state, dispatch, log) => {
   const caModels = models.filter(isControlLayerModelConfig);
-  selectCanvasSlice(state).controlLayers.entities.forEach((entity) => {
+  selectSelectedCanvas(state).controlLayers.entities.forEach((entity) => {
     const selectedControlAdapterModel = entity.controlAdapter.model;
     // `null` is a valid control adapter model - no need to do anything.
     if (!selectedControlAdapterModel) {
@@ -250,7 +250,7 @@ const handleIPAdapterModels: ModelHandler = (models, state, dispatch, log) => {
     dispatch(refImageModelChanged({ id: entity.id, modelConfig: null }));
   });
 
-  selectCanvasSlice(state).regionalGuidance.entities.forEach((entity) => {
+  selectSelectedCanvas(state).regionalGuidance.entities.forEach((entity) => {
     entity.referenceImages.forEach(({ id: referenceImageId, config }) => {
       if (!isIPAdapterConfig(config)) {
         return;
@@ -293,7 +293,7 @@ const handleFLUXReduxModels: ModelHandler = (models, state, dispatch, log) => {
     dispatch(refImageModelChanged({ id: entity.id, modelConfig: null }));
   });
 
-  selectCanvasSlice(state).regionalGuidance.entities.forEach((entity) => {
+  selectSelectedCanvas(state).regionalGuidance.entities.forEach((entity) => {
     entity.referenceImages.forEach(({ id: referenceImageId, config }) => {
       if (!isFLUXReduxConfig(config)) {
         return;
