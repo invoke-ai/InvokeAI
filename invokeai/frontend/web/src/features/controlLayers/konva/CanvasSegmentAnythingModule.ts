@@ -618,7 +618,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       return;
     }
 
-    // Only handle left-clicks
+    // Only handle left-clicks (button 0). Ignore middle (1) and right (2) clicks
     if (e.evt.button !== 0) {
       return;
     }
@@ -721,7 +721,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
     // Handle visual mode
     if (data.type === 'visual') {
-      // Only handle left-clicks
+      // Only handle left-clicks (button 0). Ignore middle (1) and right (2) clicks
       if (e.evt.button !== 0) {
         return;
       }
@@ -870,6 +870,11 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
    * Handles mouse/touch up for manual bbox dragging
    */
   onBboxDragEnd = (e: KonvaEventObject<PointerEvent>) => {
+    // Only handle left-clicks (button 0). Ignore middle (1) and right (2) clicks
+    if (e.evt.button !== 0) {
+      return;
+    }
+
     const dragStart = this.$bboxDragStart.get();
     if (!dragStart) {
       return;
