@@ -5,10 +5,10 @@ from pydantic.fields import Field
 
 
 class BoundingBox(BaseModel):
-    x_min: int = Field(ge=0, description="The minimum x-coordinate of the bounding box (inclusive).")
-    x_max: int = Field(ge=0, description="The maximum x-coordinate of the bounding box (exclusive).")
-    y_min: int = Field(ge=0, description="The minimum y-coordinate of the bounding box (inclusive).")
-    y_max: int = Field(ge=0, description="The maximum y-coordinate of the bounding box (exclusive).")
+    x_min: int = Field(..., description="The minimum x-coordinate of the bounding box (inclusive).")
+    x_max: int = Field(..., description="The maximum x-coordinate of the bounding box (exclusive).")
+    y_min: int = Field(..., description="The minimum y-coordinate of the bounding box (inclusive).")
+    y_max: int = Field(..., description="The maximum y-coordinate of the bounding box (exclusive).")
 
     @model_validator(mode="after")
     def check_coords(self):
