@@ -148,7 +148,7 @@ const getSAMPoints = (data: VisualInputData): SAMPointWithId[] => {
   return points;
 };
 
-const getHashableInputData = (data: PromptInputData | VisualInputData) => {
+const getHashableInputData = (data: PromptInputData | VisualInputData): JsonObject => {
   if (data.type === 'prompt') {
     return { type: 'prompt', prompt: data.prompt } as const;
   } else {
@@ -222,6 +222,10 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
    */
   $hasImageState = computed(this.$imageState, (imageState) => imageState !== null);
 
+  /**
+   * The input data for the module. This includes the points and bounding box for visual mode, or the prompt for
+   * prompt mode.
+   */
   $inputData = atom<PromptInputData | VisualInputData>({ type: 'visual', points: [], bbox: null });
 
   /**
@@ -235,15 +239,23 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   $invert = atom<boolean>(false);
 
   /**
-   * State for bounding box drawing
+   * State for bounding box drawing (i.e. the initial drag to create a bbox - not resizing or moving an existing one)
    */
   $isBboxDrawing = atom<boolean>(false);
+
+  /**
+   * The coordinate where bbox drawing started, or null if not drawing.
+   */
   $bboxStartCoord = atom<Coordinate | null>(null);
 
   /**
-   * State for manual bbox dragging
+   * The coordinate where bbox dragging started, or null if not dragging.
    */
   $bboxDragStart = atom<{ x: number; y: number } | null>(null);
+
+  /**
+   * State for bbox dragging (i.e. moving an existing bbox, not drawing a new one or resizing)
+   */
   $isBboxDragging = atom<boolean>(false);
 
   /**
