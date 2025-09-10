@@ -417,7 +417,20 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     const normalizedPoint = offsetCoord(cursorPos.relative, parentPosition);
 
     // Create a SAM point at the normalized position
-    const point = this.createPoint(normalizedPoint, this.$pointType.get());
+    let pointType: -1 | 0 | 1;
+    // If the shift key is held, invert the point type
+    if (e.evt.shiftKey) {
+      if (this.$pointType.get() === 1) {
+        pointType = -1;
+      } else if (this.$pointType.get() === -1) {
+        pointType = 1;
+      } else {
+        pointType = 0;
+      }
+    } else {
+      pointType = this.$pointType.get();
+    }
+    const point = this.createPoint(normalizedPoint, pointType);
     const newPoints = [...this.$points.get(), point];
     this.$points.set(newPoints);
   };
