@@ -801,8 +801,9 @@ const zRegionalGuidance = z.object({
   isHidden: z.boolean(),
   entities: z.array(zCanvasRegionalGuidanceState),
 });
-export const zCanvasState = z.object({
-  _version: z.literal(3),
+const zCanvasState = z.object({
+  id: zId,
+  name: z.string().min(1),
   selectedEntityIdentifier: zCanvasEntityIdentifer.nullable(),
   bookmarkedEntityIdentifier: zCanvasEntityIdentifer.nullable(),
   inpaintMasks: zInpaintMasks,
@@ -812,23 +813,12 @@ export const zCanvasState = z.object({
   bbox: zBboxState,
 });
 export type CanvasState = z.infer<typeof zCanvasState>;
-export const getInitialCanvasState = (): CanvasState => ({
-  _version: 3,
-  selectedEntityIdentifier: null,
-  bookmarkedEntityIdentifier: null,
-  inpaintMasks: { isHidden: false, entities: [] },
-  rasterLayers: { isHidden: false, entities: [] },
-  controlLayers: { isHidden: false, entities: [] },
-  regionalGuidance: { isHidden: false, entities: [] },
-  bbox: {
-    rect: { x: 0, y: 0, width: 512, height: 512 },
-    aspectRatio: deepClone(DEFAULT_ASPECT_RATIO_CONFIG),
-    scaleMethod: 'auto',
-    scaledSize: { width: 512, height: 512 },
-    modelBase: 'sd-1',
-  },
+export const zCanvasesState = z.object({
+  _version: z.literal(3),
+  selectedCanvasId: zId,
+  canvases: z.array(zCanvasState),
 });
-
+export type CanvasesState = z.infer<typeof zCanvasesState>;
 export const zRefImagesState = z.object({
   selectedEntityId: z.string().nullable(),
   isPanelOpen: z.boolean(),
