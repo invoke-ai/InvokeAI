@@ -19707,7 +19707,7 @@ export type components = {
         };
         /**
          * Segment Anything
-         * @description Runs a Segment Anything Model.
+         * @description Runs a Segment Anything Model (SAM or SAM2).
          */
         SegmentAnythingInvocation: {
             /**
@@ -19729,10 +19729,10 @@ export type components = {
             use_cache?: boolean;
             /**
              * Model
-             * @description The Segment Anything model to use.
+             * @description The Segment Anything model to use (SAM or SAM2).
              * @default null
              */
-            model?: ("segment-anything-base" | "segment-anything-large" | "segment-anything-huge") | null;
+            model?: ("segment-anything-base" | "segment-anything-large" | "segment-anything-huge" | "segment-anything-2-tiny" | "segment-anything-2-small" | "segment-anything-2-base" | "segment-anything-2-large") | null;
             /**
              * @description The image to segment.
              * @default null
@@ -19740,13 +19740,13 @@ export type components = {
             image?: components["schemas"]["ImageField"] | null;
             /**
              * Bounding Boxes
-             * @description The bounding boxes to prompt the SAM model with.
+             * @description The bounding boxes to prompt the model with.
              * @default null
              */
             bounding_boxes?: components["schemas"]["BoundingBoxField"][] | null;
             /**
              * Point Lists
-             * @description The list of point lists to prompt the SAM model with. Each list of points represents a single object.
+             * @description The list of point lists to prompt the model with. Each list of points represents a single object.
              * @default null
              */
             point_lists?: components["schemas"]["SAMPointsField"][] | null;
