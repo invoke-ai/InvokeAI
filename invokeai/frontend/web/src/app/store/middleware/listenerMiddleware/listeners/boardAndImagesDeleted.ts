@@ -1,6 +1,6 @@
 import type { AppStartListening } from 'app/store/store';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectSelectedCanvas } from 'features/controlLayers/store/selectors';
 import { getImageUsage } from 'features/deleteImageModal/store/state';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
@@ -19,7 +19,7 @@ export const addDeleteBoardAndImagesFulfilledListener = (startAppListening: AppS
 
       const state = getState();
       const nodes = selectNodesSlice(state);
-      const canvas = selectCanvasSlice(state);
+      const canvas = selectSelectedCanvas(state);
       const upscale = selectUpscaleSlice(state);
       const refImages = selectRefImagesSlice(state);
 
