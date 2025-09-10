@@ -13,7 +13,7 @@ import {
   getPrefixedId,
 } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectSelectedCanvas } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
   CanvasInpaintMaskState,
@@ -136,7 +136,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.subscriptions.add(this.manager.stage.$stageAttrs.listen(this.render));
     this.subscriptions.add(this.manager.$isBusy.listen(this.render));
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSettingsSlice, this.render));
-    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSlice, this.render));
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectSelectedCanvas, this.render));
     this.subscriptions.add(
       this.$tool.listen(() => {
         // On tool switch, reset mouse state

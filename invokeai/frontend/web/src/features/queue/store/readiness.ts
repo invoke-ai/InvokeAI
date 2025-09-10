@@ -12,7 +12,7 @@ import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasMana
 import { selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
 import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectSelectedCanvas } from 'features/controlLayers/store/selectors';
 import type { CanvasState, LoRA, ParamsState, RefImagesState } from 'features/controlLayers/store/types';
 import {
   getControlLayerWarnings,
@@ -198,7 +198,7 @@ export const useReadinessWatcher = () => {
   const store = useAppStore();
   const canvasManager = useCanvasManagerSafe();
   const tab = useAppSelector(selectActiveTab);
-  const canvas = useAppSelector(selectCanvasSlice);
+  const canvas = useAppSelector(selectSelectedCanvas);
   const params = useAppSelector(selectParamsSlice);
   const refImages = useAppSelector(selectRefImagesSlice);
   const dynamicPrompts = useAppSelector(selectDynamicPromptsSlice);

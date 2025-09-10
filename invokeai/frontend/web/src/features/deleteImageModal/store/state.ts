@@ -8,7 +8,7 @@ import {
   selectReferenceImageEntities,
   selectRefImagesSlice,
 } from 'features/controlLayers/store/refImagesSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectSelectedCanvas } from 'features/controlLayers/store/selectors';
 import type { CanvasState, RefImagesState } from 'features/controlLayers/store/types';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { selectGetImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
@@ -156,7 +156,7 @@ const getImageUsageFromImageNames = (image_names: string[], state: RootState): I
   }
 
   const nodes = selectNodesSlice(state);
-  const canvas = selectCanvasSlice(state);
+  const canvas = selectSelectedCanvas(state);
   const upscale = selectUpscaleSlice(state);
   const refImages = selectRefImagesSlice(state);
 
@@ -220,7 +220,7 @@ const deleteNodesImages = (state: RootState, dispatch: AppDispatch, image_name: 
 };
 
 const deleteControlLayerImages = (state: RootState, dispatch: AppDispatch, image_name: string) => {
-  selectCanvasSlice(state).controlLayers.entities.forEach(({ id, objects }) => {
+  selectSelectedCanvas(state).controlLayers.entities.forEach(({ id, objects }) => {
     let shouldDelete = false;
     for (const obj of objects) {
       if (obj.type === 'image' && 'image_name' in obj.image && obj.image.image_name === image_name) {
@@ -246,7 +246,7 @@ const deleteReferenceImages = (state: RootState, dispatch: AppDispatch, image_na
 };
 
 const deleteRasterLayerImages = (state: RootState, dispatch: AppDispatch, image_name: string) => {
-  selectCanvasSlice(state).rasterLayers.entities.forEach(({ id, objects }) => {
+  selectSelectedCanvas(state).rasterLayers.entities.forEach(({ id, objects }) => {
     let shouldDelete = false;
     for (const obj of objects) {
       if (obj.type === 'image' && 'image_name' in obj.image && obj.image.image_name === image_name) {

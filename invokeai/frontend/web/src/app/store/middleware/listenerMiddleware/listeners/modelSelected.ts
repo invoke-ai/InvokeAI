@@ -8,7 +8,7 @@ import { refImageModelChanged, selectReferenceImageEntities } from 'features/con
 import {
   selectAllEntitiesOfType,
   selectBboxModelBase,
-  selectCanvasSlice,
+  selectSelectedCanvas,
 } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { modelSelected } from 'features/parameters/store/actions';
@@ -118,7 +118,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         const newRegionalRefImageModel = selectRegionalRefImageModels(state)[0] ?? null;
 
         // All regional guidance entities are updated to use the same new model.
-        const canvasState = selectCanvasSlice(state);
+        const canvasState = selectSelectedCanvas(state);
         const canvasRegionalGuidanceEntities = selectAllEntitiesOfType(canvasState, 'regional_guidance');
         for (const entity of canvasRegionalGuidanceEntities) {
           for (const refImage of entity.referenceImages) {

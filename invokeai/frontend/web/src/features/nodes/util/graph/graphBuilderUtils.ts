@@ -11,7 +11,7 @@ import {
   selectRefinerModel,
   selectRefinerStart,
 } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectSelectedCanvas } from 'features/controlLayers/store/selectors';
 import type { ParamsState } from 'features/controlLayers/store/types';
 import type { BoardField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
@@ -121,7 +121,7 @@ export const selectPresetModifiedPrompts = createSelector(
 export const getOriginalAndScaledSizesForTextToImage = (state: RootState) => {
   const tab = selectActiveTab(state);
   const params = selectParamsSlice(state);
-  const canvas = selectCanvasSlice(state);
+  const canvas = selectSelectedCanvas(state);
 
   if (tab === 'canvas') {
     const { rect, aspectRatio } = canvas.bbox;
@@ -143,7 +143,7 @@ export const getOriginalAndScaledSizesForTextToImage = (state: RootState) => {
 
 export const getOriginalAndScaledSizesForOtherModes = (state: RootState) => {
   const tab = selectActiveTab(state);
-  const canvas = selectCanvasSlice(state);
+  const canvas = selectSelectedCanvas(state);
 
   assert(tab === 'canvas', `Cannot get sizes for tab ${tab} - this function is only for the Canvas tab`);
 
