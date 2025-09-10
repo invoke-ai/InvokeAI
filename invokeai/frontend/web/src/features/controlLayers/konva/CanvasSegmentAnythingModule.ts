@@ -197,7 +197,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   /**
    * The type of point to create when segmenting. This is a number representation of the SAMPointLabel enum.
    */
-  $model = atom<SAMModel>('SAM2');
+  $model = atom<SAMModel>('SAM1');
 
   /**
    * The type of point to create when segmenting, as a string. This is a computed value based on $pointType.
@@ -228,6 +228,11 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
    * prompt mode.
    */
   $inputData = atom<PromptInputData | VisualInputData>({ type: 'visual', points: [], bbox: null });
+
+  /**
+   * The type of input data. This is a computed value based on $inputData.
+   */
+  $inputType = computed(this.$inputData, (data) => data.type);
 
   /**
    * Whether the module has points. This is a computed value based on $points.

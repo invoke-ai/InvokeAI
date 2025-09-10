@@ -2461,7 +2461,8 @@
             "clickToRemove": "Click on a point to remove it",
             "model": "Model",
             "segmentAnything1": "Segment Anything 1",
-            "segmentAnything2": "Segment Anything 2"
+            "segmentAnything2": "Segment Anything 2",
+            "prompt": "Selection Prompt"
         },
         "settings": {
             "snapToGrid": {
