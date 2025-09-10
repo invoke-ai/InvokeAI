@@ -383,8 +383,12 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
       const x = this.konva.bboxRect.x();
       const y = this.konva.bboxRect.y();
-      const width = this.konva.bboxRect.width() * this.konva.bboxRect.scaleX();
-      const height = this.konva.bboxRect.height() * this.konva.bboxRect.scaleY();
+      const scaleX = this.konva.bboxRect.scaleX();
+      const scaleY = this.konva.bboxRect.scaleY();
+      
+      // Apply scale to dimensions, ensuring minimum size to prevent issues
+      const width = Math.max(1, this.konva.bboxRect.width() * scaleX);
+      const height = Math.max(1, this.konva.bboxRect.height() * scaleY);
 
       // Reset scale after transform
       this.konva.bboxRect.setAttrs({
@@ -416,6 +420,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
       const x = this.konva.bboxRect.x();
       const y = this.konva.bboxRect.y();
+      // When dragging (not transforming), scale should be 1, but let's be safe
       const width = this.konva.bboxRect.width() * this.konva.bboxRect.scaleX();
       const height = this.konva.bboxRect.height() * this.konva.bboxRect.scaleY();
 
@@ -748,8 +753,18 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
           // Get the final bbox dimensions from the rect's attributes
           const x = this.konva.bboxRect.x();
           const y = this.konva.bboxRect.y();
-          const width = this.konva.bboxRect.width() * this.konva.bboxRect.scaleX();
-          const height = this.konva.bboxRect.height() * this.konva.bboxRect.scaleY();
+          // Get the actual dimensions, accounting for any scale
+          const width = Math.max(1, this.konva.bboxRect.width() * this.konva.bboxRect.scaleX());
+          const height = Math.max(1, this.konva.bboxRect.height() * this.konva.bboxRect.scaleY());
+          
+          // Reset scale to prevent accumulation issues
+          this.konva.bboxRect.setAttrs({
+            width: width,
+            height: height,
+            scaleX: 1,
+            scaleY: 1,
+          });
+          
           // It was a drag - save the bbox
           this.$inputData.set({
             ...data,
