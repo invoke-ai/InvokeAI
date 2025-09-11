@@ -284,7 +284,6 @@
         "completed": "Zakończono",
         "item": "Pozycja",
         "failed": "Niepowodzenie",
-        "batchFieldValues": "Masowe Wartości pól",
         "graphFailedToQueue": "NIe udało się dodać tabeli do kolejki",
         "workflows": "Przepływy pracy",
         "next": "Następny",

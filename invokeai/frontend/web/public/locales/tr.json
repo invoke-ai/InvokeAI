@@ -176,7 +176,6 @@
         "session": "Oturum",
         "batchQueued": "Toplu İş Sıraya Alındı",
         "notReady": "Sıraya Alınamadı",
-        "batchFieldValues": "Toplu İş Değişkenleri",
         "graphFailedToQueue": "Çizge sıraya alınamadı",
         "graphQueued": "Çizge sıraya alındı"
     },

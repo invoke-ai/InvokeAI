@@ -957,7 +957,6 @@
         "session": "会话",
         "enqueueing": "队列中的批次",
         "graphFailedToQueue": "节点图加入队列失败",
-        "batchFieldValues": "批处理值",
         "time": "时间",
         "openQueue": "打开队列",
         "prompts_other": "提示词",

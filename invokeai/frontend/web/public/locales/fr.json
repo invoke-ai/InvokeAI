@@ -645,7 +645,6 @@
         "batchQueued": "Lot ajouté à la file d'attente",
         "gallery": "Galerie",
         "notReady": "Impossible d'ajouter à la file d'attente",
-        "batchFieldValues": "Valeurs Champ Lot",
         "front": "début",
         "graphQueued": "Graph ajouté à la file d'attente",
         "other": "Autre",
@@ -2098,10 +2097,7 @@
             "pointType": "Type de point",
             "exclude": "Exclure",
             "process": "Traiter",
-            "reset": "Réinitialiser",
-            "help1": "Sélectionnez un seul objet cible. Ajoutez des points <Bold>Inclure</Bold> et <Bold>Exclure</Bold> pour indiquer quelles parties de la couche font partie de l'objet cible.",
-            "help2": "Commencez par un point <Bold>Inclure</Bold> au sein de l'objet cible. Ajoutez d'autres points pour affiner la sélection. Moins de points produisent généralement de meilleurs résultats.",
-            "help3": "Inversez la sélection pour sélectionner tout sauf l'objet cible."
+            "reset": "Réinitialiser"
         },
         "convertRegionalGuidanceTo": "Convertir $t(controlLayers.regionalGuidance) vers",
         "copyRasterLayerTo": "Copier $t(controlLayers.rasterLayer) vers",
