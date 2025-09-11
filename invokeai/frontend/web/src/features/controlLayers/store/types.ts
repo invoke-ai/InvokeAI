@@ -470,7 +470,7 @@ export const zLoRA = z.object({
   id: z.string(),
   isEnabled: z.boolean(),
   model: zModelIdentifierField,
-  weight: z.number().gte(-1).lte(2),
+  weight: z.number().gte(-10).lte(10),
 });
 export type LoRA = z.infer<typeof zLoRA>;
 
