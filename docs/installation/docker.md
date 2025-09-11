@@ -22,6 +22,35 @@ Ensure your Docker setup is able to use your GPU. Then:
 
 Once the container starts up, open <http://localhost:9090> in your browser, install some models, and start generating.
 
+## Docker image for AMD ROCm devices
+
+!!! warning "MISSING RENDER_GROUP_ID VARIABLE"
+
+    Because of the way the invoke wrapper command script do work, it can't automatically detect your host devices render group.
+    In order for invoke wrapper command to successfully detect your AMD devices, you need to give him the host render group_id:
+    ```bash
+    docker run -e "RENDER_GROUP_ID=$(getent group render | cut -d':' -f 3)
+    ```
+
+AMD GPUs users need to get **BOTH** `kfd` and `dri` devices mounted on their container, otherwise Invoke won't be able to detect them properly:
+
+    ```bash
+    docker run -e "RENDER_GROUP_ID=<YOUR_HOST_RENDER_GROUP_ID>" --device /dev/kfd --device /dev/dri ghcr.io/invoke-ai/invokeai:v6.4.0-rocm
+    ```
+!!! tip "KFD/DRI DEVICES"
+
+    `kfd` device created by the AMD linux kernel module, which provides your container with the ability for an application to use specific ROCm/HSA components such as the HSA Runtime and send them computation kernels.
+    `dri` device created by the AMD linux kernel module, which provides your container the ability to control the GPU card rendering interface.
+    For more information about HSA Kernels and HSA architectures, look at AMD [documentation](https://github.com/HSAFoundation/HSA-Runtime-AMD)
+    For more information about DRI (Direct Rendering Interface) framework, look at FreeDesktop/MESA/Khronos [documentation](https://dri.freedesktop.org/wiki/)
+
+!!! tip "AMD LEGACY RX CARDS"
+
+    AMD GPUs such as RX6600 can be used by passing passing additional specific `HCC_AMDGPU_TARGET=gfx1030` and `HSA_OVERRIDE_GFX_VERSION=10.3.0` environment variables:
+    ```bash
+    docker run -e "HCC_AMDGPU_TARGET=gfx1030" -e "HSA_OVERRIDE_GFX_VERSION=10.3.0" -e "RENDER_GROUP_ID=<YOUR_HOST_RENDER_GROUP_ID>" --device /dev/kfd --device /dev/dri ghcr.io/invoke-ai/invokeai:v6.4.0-rocm
+    ```
+
 ## Build-It-Yourself
 
 All the docker materials are located inside the [docker](https://github.com/invoke-ai/InvokeAI/tree/main/docker) directory in the Git repo.
