@@ -124,7 +124,14 @@
         "fullView": "Vista completa",
         "removeNegativePrompt": "Rimuovi prompt negativo",
         "addNegativePrompt": "Aggiungi prompt negativo",
-        "selectYourModel": "Seleziona il modello"
+        "selectYourModel": "Seleziona il modello",
+        "goTo": "Vai a",
+        "imageFailedToLoad": "Impossibile caricare l'immagine",
+        "localSystem": "Sistema locale",
+        "notInstalled": "Non $t(common.installed)",
+        "prevPage": "Pagina precedente",
+        "nextPage": "Pagina successiva",
+        "resetToDefaults": "Ripristina impostazioni predefinite"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -194,7 +201,14 @@
         "deleteVideo_other": "Elimina {{count}} video",
         "deleteVideoPermanent": "I video eliminati non possono essere ripristinati.",
         "videos": "Video",
-        "videosTab": "Video creati e salvati in Invoke."
+        "videosTab": "Video creati e salvati in Invoke.",
+        "jump": "Salta",
+        "noVideoSelected": "Nessun video selezionato",
+        "noImagesInGallery": "Nessuna immagine da visualizzare",
+        "unableToLoad": "Impossibile caricare la Galleria",
+        "selectAnImageToCompare": "Seleziona un'immagine da confrontare",
+        "openViewer": "Apri Visualizzatore",
+        "closeViewer": "Chiudi Visualizzatore"
     },
     "hotkeys": {
         "searchHotkeys": "Cerca tasti di scelta rapida",
@@ -718,12 +732,18 @@
             "recommendedModels": "Modelli consigliati",
             "exploreStarter": "Oppure sfoglia tutti i modelli iniziali disponibili",
             "welcome": "Benvenuti in Gestione Modelli",
-            "bundleDescription": "Ogni pacchetto include modelli essenziali per ogni famiglia di modelli e modelli base selezionati per iniziare."
+            "bundleDescription": "Ogni pacchetto include modelli essenziali per ogni famiglia di modelli e modelli base selezionati per iniziare.",
+            "quickStart": "Pacchetti di avvio rapido",
+            "browseAll": "Oppure sfoglia tutti i modelli disponibili:"
         },
         "launchpadTab": "Rampa di lancio",
         "installBundle": "Installa pacchetto",
         "installBundleMsg1": "Vuoi davvero installare il pacchetto {{bundleName}}?",
-        "installBundleMsg2": "Questo pacchetto installerà i seguenti {{count}} modelli:"
+        "installBundleMsg2": "Questo pacchetto installerà i seguenti {{count}} modelli:",
+        "filterModels": "Filtra i modelli",
+        "ipAdapters": "Adattatori IP",
+        "showOnlyRelatedModels": "Correlati",
+        "starterModelsInModelManager": "I modelli di avvio possono essere trovati in Gestione Modelli"
     },
     "parameters": {
         "images": "Immagini",
@@ -807,7 +827,12 @@
             "promptExpansionPending": "Espansione del prompt in corso",
             "noStartingFrameImage": "Nessuna immagine del fotogramma iniziale",
             "videoIsDisabled": "La generazione di video non è abilitata per gli account {{accountType}}.",
-            "incompatibleLoRAs": "Aggiunti LoRA incompatibili"
+            "incompatibleLoRAs": "Aggiunti LoRA incompatibili",
+            "emptyBatches": "lotti vuoti",
+            "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), la larghezza del riquadro è {{width}}",
+            "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), l'altezza del riquadro è {{height}}",
+            "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), la larghezza ridimensionata del riquadro è {{width}}",
+            "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), l'altezza ridimensionata del riquadro è {{height}}"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -848,7 +873,9 @@
         "videoActions": "Azioni video",
         "sendToVideo": "Invia al Video",
         "video": "Video",
-        "resolution": "Risoluzione"
+        "resolution": "Risoluzione",
+        "downloadImage": "Scarica l'immagine",
+        "showOptionsPanel": "Mostra pannello laterale (O o T)"
     },
     "settings": {
         "models": "Modelli",
@@ -886,7 +913,9 @@
         "confirmOnNewSession": "Conferma su nuova sessione",
         "enableModelDescriptions": "Abilita le descrizioni dei modelli nei menu a discesa",
         "showDetailedInvocationProgress": "Mostra dettagli avanzamento",
-        "enableHighlightFocusedRegions": "Evidenzia le regioni interessate"
+        "enableHighlightFocusedRegions": "Evidenzia le regioni interessate",
+        "modelDescriptionsDisabled": "Descrizioni dei modelli nei menu a discesa disabilitate",
+        "modelDescriptionsDisabledDesc": "Le descrizioni dei modelli nei menu a discesa sono state disattivate. Abilitale nelle Impostazioni."
     },
     "toast": {
         "uploadFailed": "Caricamento fallito",
@@ -967,7 +996,27 @@
         "noVisibleMasksDesc": "Crea o abilita almeno una maschera inpaint da invertire",
         "noVisibleMasks": "Nessuna maschera visibile",
         "maskInvertFailed": "Impossibile invertire la maschera",
-        "maskInverted": "Maschera invertita"
+        "maskInverted": "Maschera invertita",
+        "uploadFailedInvalidUploadDesc_withCount_one": "Deve essere presente al massimo 1 immagine PNG, JPEG o WEBP.",
+        "uploadFailedInvalidUploadDesc_withCount_many": "Devono essere presenti al massimo {{count}} immagini PNG, JPEG o WEBP.",
+        "uploadFailedInvalidUploadDesc_withCount_other": "Devono essere presenti al massimo {{count}} immagini PNG, JPEG o WEBP.",
+        "imageNotLoadedDesc": "Impossibile trovare l'immagine",
+        "imageSaved": "Immagine salvata",
+        "imageSavingFailed": "Salvataggio dell'immagine non riuscito",
+        "invalidUpload": "Caricamento non valido",
+        "layerSavedToAssets": "Livello salvato nelle risorse",
+        "noRasterLayers": "Nessun livello raster trovato",
+        "noRasterLayersDesc": "Crea almeno un livello raster da esportare in PSD",
+        "noActiveRasterLayers": "Nessun livello raster attivo",
+        "noActiveRasterLayersDesc": "Abilita almeno un livello raster da esportare in PSD",
+        "failedToProcessLayers": "Impossibile elaborare i livelli",
+        "noValidLayerAdapters": "Nessun adattatore di livello valido trovato",
+        "setControlImage": "Imposta come immagine di controllo",
+        "setNodeField": "Imposta come campo nodo",
+        "noInpaintMaskSelected": "Nessuna maschera di inpaint selezionata",
+        "noInpaintMaskSelectedDesc": "Seleziona una maschera di inpaint da invertire",
+        "invalidBbox": "Riquadro di delimitazione non valido",
+        "invalidBboxDesc": "Il riquadro di delimitazione non ha dimensioni valide"
     },
     "accessibility": {
         "invokeProgressBar": "Barra di avanzamento generazione",
@@ -1017,7 +1066,7 @@
         "workflowVersion": "Versione",
         "workflow": "Flusso di lavoro",
         "noWorkflow": "Nessun flusso di lavoro",
-        "workflowTags": "Tag",
+        "workflowTags": "Etichette",
         "workflowValidation": "Errore di convalida del flusso di lavoro",
         "workflowAuthor": "Autore",
         "workflowName": "Nome",
@@ -1048,7 +1097,7 @@
         "cannotConnectToSelf": "Impossibile connettersi a se stesso",
         "loadingNodes": "Caricamento nodi...",
         "enum": "Enumeratore",
-        "float": "In virgola mobile",
+        "float": "Decimale",
         "currentImageDescription": "Visualizza l'immagine corrente nell'editor dei nodi",
         "fieldTypesMustMatch": "I tipi di campo devono corrispondere",
         "edge": "Collegamento",
@@ -1161,7 +1210,23 @@
             "alignmentUL": "In alto a sinistra",
             "alignmentDL": "In basso a sinistra",
             "alignmentUR": "In alto a destra"
-        }
+        },
+        "generatorLoading": "caricamento",
+        "addLinearView": "Aggiungi alla vista lineare",
+        "hideLegendNodes": "Nascondi legenda tipo di campo",
+        "mismatchedVersion": "Nodo non valido: il nodo {{node}} di tipo {{type}} ha una versione non corrispondente (provare ad aggiornare?)",
+        "noFieldsLinearview": "Nessun campo aggiunto alla vista lineare",
+        "removeLinearView": "Rimuovi dalla vista lineare",
+        "reorderLinearView": "Riordina vista lineare",
+        "showLegendNodes": "Mostra legenda tipo di campo",
+        "unableToLoadWorkflow": "Impossibile caricare il flusso di lavoro",
+        "unknownTemplate": "Modello sconosciuto",
+        "unknownInput": "Input sconosciuto: {{name}}",
+        "loadingTemplates": "Caricamento in corso {{name}}",
+        "versionUnknown": " Versione sconosciuta",
+        "generateValues": "Genera valori",
+        "floatRangeGenerator": "Generatore di intervallo di numeri decimali",
+        "integerRangeGenerator": "Generatore di intervallo di numeri interi"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1213,7 +1278,10 @@
         "movingVideosToBoard_other": "Spostamento di {{count}} video sulla bacheca:",
         "videosWithCount_one": "{{count}} video",
         "videosWithCount_many": "{{count}} video",
-        "videosWithCount_other": "{{count}} video"
+        "videosWithCount_other": "{{count}} video",
+        "deletedImagesCannotBeRestored": "Le immagini eliminate non possono essere ripristinate.",
+        "hideBoards": "Nascondi bacheche",
+        "viewBoards": "Visualizza le bacheche"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
@@ -1298,7 +1366,13 @@
         "retryItem": "Riesegui elemento",
         "retryFailed": "Problema riesecuzione elemento",
         "credits": "Crediti",
-        "cancelAllExceptCurrent": "Annulla tutto tranne quello corrente"
+        "cancelAllExceptCurrent": "Annulla tutto tranne quello corrente",
+        "sortColumn": "Ordina colonna",
+        "sortBy": "Ordina per {{column}}",
+        "sortOrderAscending": "Ascendente",
+        "sortOrderDescending": "Discendente",
+        "createdAt": "Creato",
+        "completedAt": "Completato"
     },
     "models": {
         "noMatchingModels": "Nessun modello corrispondente",
@@ -1310,7 +1384,9 @@
         "defaultVAE": "VAE predefinito",
         "concepts": "Concetti",
         "lora": "LoRA",
-        "noCompatibleLoRAs": "Nessun LoRA compatibile"
+        "noCompatibleLoRAs": "Nessun LoRA compatibile",
+        "noMatchingLoRAs": "Nessun LoRA corrispondente",
+        "noLoRAsInstalled": "Nessun LoRA installato"
     },
     "invocationCache": {
         "disable": "Disabilita",
@@ -1341,7 +1417,8 @@
         "dynamicPrompts": "Prompt dinamici",
         "promptsPreview": "Anteprima dei prompt",
         "showDynamicPrompts": "Mostra prompt dinamici",
-        "loading": "Generazione prompt dinamici..."
+        "loading": "Generazione prompt dinamici...",
+        "promptsToGenerate": "Prompt da generare"
     },
     "popovers": {
         "paramScheduler": {
@@ -1795,7 +1872,11 @@
         "negAestheticScore": "Punteggio estetico negativo",
         "refinermodel": "Modello Affinatore",
         "posAestheticScore": "Punteggio estetico positivo",
-        "refinerSteps": "Passi Affinamento"
+        "refinerSteps": "Passi Affinamento",
+        "concatPromptStyle": "Collegamento di prompt e stile",
+        "freePromptStyle": "Prompt manuale Stile",
+        "negStylePrompt": "Prompt di stile negativo",
+        "posStylePrompt": "Prompt di stile positivo"
     },
     "metadata": {
         "positivePrompt": "Prompt positivo",
@@ -1832,7 +1913,9 @@
         "videoModel": "Modello",
         "videoDuration": "Durata",
         "videoAspectRatio": "Proporzioni",
-        "videoResolution": "Risoluzione"
+        "videoResolution": "Risoluzione",
+        "parsingFailed": "Analisi non riuscita",
+        "recallParameter": "Richiama {{label}}"
     },
     "hrf": {
         "metadata": {
@@ -1840,7 +1923,9 @@
             "enabled": "Correzione Alta Risoluzione Abilitata",
             "method": "Metodo della Correzione Alta Risoluzione"
         },
-        "hrf": "Correzione Alta Risoluzione"
+        "hrf": "Correzione Alta Risoluzione",
+        "enableHrf": "Abilita correzione ad alta risoluzione",
+        "upscaleMethod": "Metodo di ampliamento"
     },
     "workflows": {
         "saveWorkflowAs": "Salva flusso di lavoro come",
@@ -1961,7 +2046,12 @@
         "view": "Visualizza",
         "recommended": "Consigliato per te",
         "emptyStringPlaceholder": "<stringa vuota>",
-        "published": "Pubblicato"
+        "published": "Pubblicato",
+        "defaultWorkflows": "Flussi di lavoro predefiniti",
+        "userWorkflows": "Flussi di lavoro dell'utente",
+        "projectWorkflows": "Flussi di lavoro del progetto",
+        "allLoaded": "Tutti i flussi di lavoro caricati",
+        "filterByTags": "Filtra per etichetta"
     },
     "accordions": {
         "compositing": {
@@ -1992,7 +2082,10 @@
         "expandingPrompt": "Espansione del prompt...",
         "uploadImageForPromptGeneration": "Carica l'immagine per la generazione del prompt",
         "expandCurrentPrompt": "Espandi il prompt corrente",
-        "generateFromImage": "Genera prompt dall'immagine"
+        "generateFromImage": "Genera prompt dall'immagine",
+        "resultTitle": "Espansione del prompt completata",
+        "resultSubtitle": "Scegli come gestire il prompt espanso:",
+        "insert": "Inserisci"
     },
     "controlLayers": {
         "addLayer": "Aggiungi Livello",
@@ -2299,8 +2392,8 @@
             "accept": "Accetta",
             "saveToGallery": "Salva nella Galleria",
             "previous": "Precedente",
-            "showResultsOn": "Risultati visualizzati",
-            "showResultsOff": "Risultati nascosti"
+            "showResultsOn": "Visualizzare i risultati",
+            "showResultsOff": "Nascondere i risultati"
         },
         "HUD": {
             "bbox": "Riquadro di delimitazione",
@@ -2426,7 +2519,13 @@
         "invertMask": "Inverti maschera",
         "fitBboxToMasks": "Adatta il riquadro di delimitazione alle maschere",
         "maxRefImages": "Max Immagini di rif.to",
-        "useAsReferenceImage": "Usa come immagine di riferimento"
+        "useAsReferenceImage": "Usa come immagine di riferimento",
+        "globalReferenceImage_withCount_one": "$t(controlLayers.globalReferenceImage)",
+        "globalReferenceImage_withCount_many": "Immagini di riferimento globali",
+        "globalReferenceImage_withCount_other": "Immagini di riferimento globali",
+        "layer_withCount_one": "Livello ({{count}})",
+        "layer_withCount_many": "Livelli ({{count}})",
+        "layer_withCount_other": "Livelli ({{count}})"
     },
     "ui": {
         "tabs": {
@@ -2620,8 +2719,8 @@
         "readReleaseNotes": "Leggi le note di rilascio",
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "items": [
-            "Tela: Color Picker non campiona l'alfa, il riquadro di delimitazione rispetta il blocco delle proporzioni quando si ridimensiona il pulsante Mescola per i campi numerici nel generatore di flusso di lavoro, nasconde i cursori delle dimensioni dei pixel quando si utilizza un modello che non li supporta",
-            "Flussi di lavoro: aggiunto un pulsante Mescola ai campi di input numerici"
+            "Tela: separa i colori di primo piano e di sfondo - attiva con 'x', ripristina in bianco e nero con 'd'",
+            "LoRA: imposta i pesi predefiniti per i singoli LoRA nella scheda Gestione modelli"
         ]
     },
     "system": {
