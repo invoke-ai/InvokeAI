@@ -707,10 +707,9 @@ describe('StagingAreaApi', () => {
 
         // Should end up with the last set of items
         expect(api.$items.get()).toBe(items2);
-        // The selectedItemId retains the old value (1) but $selectedItem will be null
-        // because item 1 is no longer in the items list
-        expect(api.$selectedItemId.get()).toBe(1);
-        expect(api.$selectedItem.get()).toBe(null);
+        // We expect the selection to have moved to the next existent item
+        expect(api.$selectedItemId.get()).toBe(2);
+        expect(api.$selectedItem.get()?.item.item_id).toBe(2);
       });
 
       it('should handle multiple progress events for same item', () => {
