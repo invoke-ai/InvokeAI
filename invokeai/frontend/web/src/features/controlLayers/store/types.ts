@@ -378,36 +378,41 @@ const zControlLoRAConfig = z.object({
 });
 export type ControlLoRAConfig = z.infer<typeof zControlLoRAConfig>;
 
+const zSimpleConfig = z.object({
+  // All simple params normalized to [-1, 1] except sharpness [0, 1]
+  brightness: z.number().gte(-1).lte(1),
+  contrast: z.number().gte(-1).lte(1),
+  saturation: z.number().gte(-1).lte(1),
+  temperature: z.number().gte(-1).lte(1),
+  tint: z.number().gte(-1).lte(1),
+  sharpness: z.number().gte(0).lte(1),
+});
+export type SimpleConfig = z.infer<typeof zSimpleConfig>;
+
+const zUint8 = z.number().int().min(0).max(255);
+const zChannelPoints = z.array(z.tuple([zUint8, zUint8])).min(2);
+const zChannelName = z.enum(['master', 'r', 'g', 'b']);
+const zCurvesConfig = z.record(zChannelName, zChannelPoints);
+export type ChannelName = z.infer<typeof zChannelName>;
+export type ChannelPoints = z.infer<typeof zChannelPoints>;
+
+const zRasterLayerAdjustments = z.object({
+  version: z.literal(1),
+  enabled: z.boolean(),
+  collapsed: z.boolean(),
+  mode: z.enum(['simple', 'curves']),
+  simple: zSimpleConfig,
+  curves: zCurvesConfig,
+});
+export type RasterLayerAdjustments = z.infer<typeof zRasterLayerAdjustments>;
+
 const zCanvasRasterLayerState = zCanvasEntityBase.extend({
   type: z.literal('raster_layer'),
   position: zCoordinate,
   opacity: zOpacity,
   objects: z.array(zCanvasObjectState),
   // Optional per-layer color adjustments (simple + curves). When undefined, no adjustments are applied.
-  adjustments: z
-    .object({
-      version: z.literal(1),
-      enabled: z.boolean(),
-      collapsed: z.boolean(),
-      mode: z.enum(['simple', 'curves']),
-      simple: z.object({
-        // All simple params normalized to [-1, 1] except sharpness [0, 1]
-        brightness: z.number().gte(-1).lte(1),
-        contrast: z.number().gte(-1).lte(1),
-        saturation: z.number().gte(-1).lte(1),
-        temperature: z.number().gte(-1).lte(1),
-        tint: z.number().gte(-1).lte(1),
-        sharpness: z.number().gte(0).lte(1),
-      }),
-      curves: z.object({
-        // Curves are arrays of [x, y] control points in 0..255 space (no strict monotonic checks here)
-        master: z.array(z.tuple([z.number().int().gte(0).lte(255), z.number().int().gte(0).lte(255)])).min(2),
-        r: z.array(z.tuple([z.number().int().gte(0).lte(255), z.number().int().gte(0).lte(255)])).min(2),
-        g: z.array(z.tuple([z.number().int().gte(0).lte(255), z.number().int().gte(0).lte(255)])).min(2),
-        b: z.array(z.tuple([z.number().int().gte(0).lte(255), z.number().int().gte(0).lte(255)])).min(2),
-      }),
-    })
-    .optional(),
+  adjustments: zRasterLayerAdjustments.optional(),
 });
 export type CanvasRasterLayerState = z.infer<typeof zCanvasRasterLayerState>;
 

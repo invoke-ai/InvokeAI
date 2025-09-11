@@ -5,20 +5,19 @@ import { useEntityAdapterContext } from 'features/controlLayers/contexts/EntityA
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { rasterLayerAdjustmentsCurvesUpdated } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
+import type { ChannelName, ChannelPoints } from 'features/controlLayers/store/types';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 
-const DEFAULT_POINTS: Array<[number, number]> = [
+const DEFAULT_POINTS: ChannelPoints = [
   [0, 0],
   [255, 255],
 ];
 
-type Channel = 'master' | 'r' | 'g' | 'b';
+type ChannelHistograms = Record<ChannelName, number[] | null>;
 
-type ChannelHistograms = Record<Channel, number[] | null>;
-
-const channelColor: Record<Channel, string> = {
+const channelColor: Record<ChannelName, string> = {
   master: '#888',
   r: '#e53e3e',
   g: '#38a169',
@@ -27,7 +26,7 @@ const channelColor: Record<Channel, string> = {
 
 const clamp = (v: number, min: number, max: number) => (v < min ? min : v > max ? max : v);
 
-const sortPoints = (pts: Array<[number, number]>) =>
+const sortPoints = (pts: ChannelPoints) =>
   [...pts]
     .sort((a, b) => {
       const xDiff = a[0] - b[0];
@@ -63,17 +62,17 @@ const CANVAS_STYLE: React.CSSProperties = {
 
 type CurveGraphProps = {
   title: string;
-  channel: Channel;
-  points: Array<[number, number]> | undefined;
+  channel: ChannelName;
+  points: ChannelPoints | undefined;
   histogram: number[] | null;
-  onChange: (pts: Array<[number, number]>) => void;
+  onChange: (pts: ChannelPoints) => void;
 };
 
 const drawHistogram = (
   c: HTMLCanvasElement,
-  channel: Channel,
+  channel: ChannelName,
   histogram: number[] | null,
-  points: Array<[number, number]>
+  points: ChannelPoints
 ) => {
   // Use device pixel ratio for crisp rendering on HiDPI displays.
   const dpr = window.devicePixelRatio || 1;
@@ -207,7 +206,7 @@ const drawHistogram = (
   }
 };
 
-const getNearestPointIndex = (c: HTMLCanvasElement, points: Array<[number, number]>, mx: number, my: number) => {
+const getNearestPointIndex = (c: HTMLCanvasElement, points: ChannelPoints, mx: number, my: number) => {
   const cssWidth = c.clientWidth || CANVAS_WIDTH;
   const cssHeight = c.clientHeight || CANVAS_HEIGHT;
   const innerWidth = cssWidth - MARGIN_LEFT - MARGIN_RIGHT;
@@ -249,7 +248,7 @@ const canvasYToValueY = (c: HTMLCanvasElement, cy: number) => {
 const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
   const { title, channel, points, histogram, onChange } = props;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [localPoints, setLocalPoints] = useState<Array<[number, number]>>(sortPoints(points ?? DEFAULT_POINTS));
+  const [localPoints, setLocalPoints] = useState<ChannelPoints>(sortPoints(points ?? DEFAULT_POINTS));
   const [dragIndex, setDragIndex] = useState<number | null>(null);
 
   useEffect(() => {
@@ -333,7 +332,7 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
   );
 
   const commit = useCallback(
-    (pts: Array<[number, number]>) => {
+    (pts: ChannelPoints) => {
       onChange(sortPoints(pts));
     },
     [onChange]
@@ -534,17 +533,17 @@ export const RasterLayerCurvesAdjustmentsEditor = memo(() => {
   }, [layer?.objects, layer?.adjustments, recalcHistogram]);
 
   const onChangePoints = useCallback(
-    (channel: Channel, pts: Array<[number, number]>) => {
+    (channel: ChannelName, pts: ChannelPoints) => {
       dispatch(rasterLayerAdjustmentsCurvesUpdated({ entityIdentifier, channel, points: pts }));
     },
     [dispatch, entityIdentifier]
   );
 
   // Memoize per-channel change handlers to avoid inline lambdas in JSX
-  const onChangeMaster = useCallback((pts: Array<[number, number]>) => onChangePoints('master', pts), [onChangePoints]);
-  const onChangeR = useCallback((pts: Array<[number, number]>) => onChangePoints('r', pts), [onChangePoints]);
-  const onChangeG = useCallback((pts: Array<[number, number]>) => onChangePoints('g', pts), [onChangePoints]);
-  const onChangeB = useCallback((pts: Array<[number, number]>) => onChangePoints('b', pts), [onChangePoints]);
+  const onChangeMaster = useCallback((pts: ChannelPoints) => onChangePoints('master', pts), [onChangePoints]);
+  const onChangeR = useCallback((pts: ChannelPoints) => onChangePoints('r', pts), [onChangePoints]);
+  const onChangeG = useCallback((pts: ChannelPoints) => onChangePoints('g', pts), [onChangePoints]);
+  const onChangeB = useCallback((pts: ChannelPoints) => onChangePoints('b', pts), [onChangePoints]);
 
   return (
     <Flex

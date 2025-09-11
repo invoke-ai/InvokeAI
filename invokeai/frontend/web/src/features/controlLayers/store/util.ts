@@ -15,6 +15,7 @@ import type {
   Gemini2_5ReferenceImageConfig,
   ImageWithDims,
   IPAdapterConfig,
+  RasterLayerAdjustments,
   RefImageState,
   RgbColor,
   T2IAdapterConfig,
@@ -117,8 +118,6 @@ export const initialControlLoRA: ControlLoRAConfig = {
   model: null,
   weight: 0.75,
 };
-
-export type RasterLayerAdjustments = NonNullable<CanvasRasterLayerState['adjustments']>;
 
 export const makeDefaultRasterLayerAdjustments = (mode: 'simple' | 'curves' = 'simple'): RasterLayerAdjustments => ({
   version: 1,
