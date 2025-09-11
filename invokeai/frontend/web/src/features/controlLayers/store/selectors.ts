@@ -22,6 +22,17 @@ import { assert } from 'tsafe';
 const selectCanvasSlice = (state: RootState) => state.canvas.present;
 
 /**
+ * Selects the canvases
+ */
+export const selectCanvases = createSelector(selectCanvasSlice, (state) =>
+  state.canvases.map((canvas) => ({
+    ...canvas,
+    isSelected: canvas.id === state.selectedCanvasId,
+    canDelete: state.canvases.length > 1,
+  }))
+);
+
+/**
  * Selects the selected canvas
  */
 export const selectSelectedCanvas = createSelector(
