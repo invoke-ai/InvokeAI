@@ -130,13 +130,11 @@ const slice = createSlice({
     rasterLayerAdjustmentsReset: (state, action: PayloadAction<EntityIdentifierPayload<void, 'raster_layer'>>) => {
       const { entityIdentifier } = action.payload;
       const layer = selectEntity(state, entityIdentifier);
-      if (!layer) {
+      if (!layer?.adjustments) {
         return;
       }
-      if (layer.adjustments) {
-        layer.adjustments.simple = makeDefaultRasterLayerAdjustments('simple').simple;
-        layer.adjustments.curves = makeDefaultRasterLayerAdjustments('curves').curves;
-      }
+      layer.adjustments.simple = makeDefaultRasterLayerAdjustments('simple').simple;
+      layer.adjustments.curves = makeDefaultRasterLayerAdjustments('curves').curves;
     },
     rasterLayerAdjustmentsCancel: (state, action: PayloadAction<EntityIdentifierPayload<void, 'raster_layer'>>) => {
       const { entityIdentifier } = action.payload;
@@ -146,17 +144,25 @@ const slice = createSlice({
       }
       delete layer.adjustments;
     },
+    rasterLayerAdjustmentsModeChanged: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<{ mode: 'simple' | 'curves' }, 'raster_layer'>>
+    ) => {
+      const { entityIdentifier, mode } = action.payload;
+      const layer = selectEntity(state, entityIdentifier);
+      if (!layer?.adjustments) {
+        return;
+      }
+      layer.adjustments.mode = mode;
+    },
     rasterLayerAdjustmentsSimpleUpdated: (
       state,
       action: PayloadAction<EntityIdentifierPayload<{ simple: Partial<SimpleAdjustmentsConfig> }, 'raster_layer'>>
     ) => {
       const { entityIdentifier, simple } = action.payload;
       const layer = selectEntity(state, entityIdentifier);
-      if (!layer) {
+      if (!layer?.adjustments) {
         return;
-      }
-      if (!layer.adjustments) {
-        layer.adjustments = makeDefaultRasterLayerAdjustments('simple');
       }
       layer.adjustments.simple = merge(layer.adjustments.simple, simple);
     },
@@ -166,13 +172,32 @@ const slice = createSlice({
     ) => {
       const { entityIdentifier, channel, points } = action.payload;
       const layer = selectEntity(state, entityIdentifier);
-      if (!layer) {
+      if (!layer?.adjustments) {
         return;
       }
-      if (!layer.adjustments) {
-        layer.adjustments = makeDefaultRasterLayerAdjustments('curves');
-      }
       layer.adjustments.curves[channel] = points;
+    },
+    rasterLayerAdjustmentsEnabledToggled: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<void, 'raster_layer'>>
+    ) => {
+      const { entityIdentifier } = action.payload;
+      const layer = selectEntity(state, entityIdentifier);
+      if (!layer?.adjustments) {
+        return;
+      }
+      layer.adjustments.enabled = !layer.adjustments.enabled;
+    },
+    rasterLayerAdjustmentsCollapsedToggled: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<void, 'raster_layer'>>
+    ) => {
+      const { entityIdentifier } = action.payload;
+      const layer = selectEntity(state, entityIdentifier);
+      if (!layer?.adjustments) {
+        return;
+      }
+      layer.adjustments.collapsed = !layer.adjustments.collapsed;
     },
     rasterLayerAdded: {
       reducer: (
@@ -1732,6 +1757,9 @@ export const {
   rasterLayerAdjustmentsSet,
   rasterLayerAdjustmentsCancel,
   rasterLayerAdjustmentsReset,
+  rasterLayerAdjustmentsModeChanged,
+  rasterLayerAdjustmentsEnabledToggled,
+  rasterLayerAdjustmentsCollapsedToggled,
   rasterLayerAdjustmentsSimpleUpdated,
   rasterLayerAdjustmentsCurvesUpdated,
   entityDeleted,

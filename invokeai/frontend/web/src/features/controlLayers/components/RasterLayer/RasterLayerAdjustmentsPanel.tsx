@@ -7,44 +7,56 @@ import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerP
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import {
   rasterLayerAdjustmentsCancel,
+  rasterLayerAdjustmentsCollapsedToggled,
+  rasterLayerAdjustmentsEnabledToggled,
+  rasterLayerAdjustmentsModeChanged,
   rasterLayerAdjustmentsReset,
   rasterLayerAdjustmentsSet,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
-import { makeDefaultRasterLayerAdjustments } from 'features/controlLayers/store/util';
 import React, { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiCaretDownBold, PiCheckBold, PiTrashBold } from 'react-icons/pi';
 
 export const RasterLayerAdjustmentsPanel = memo(() => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext<'raster_layer'>();
   const canvasManager = useCanvasManager();
-  const selectAdjustments = useMemo(() => {
-    return createSelector(selectCanvasSlice, (canvas) => selectEntity(canvas, entityIdentifier)?.adjustments);
+
+  const selectHasAdjustments = useMemo(() => {
+    return createSelector(selectCanvasSlice, (canvas) => Boolean(selectEntity(canvas, entityIdentifier)?.adjustments));
   }, [entityIdentifier]);
 
-  const adjustments = useAppSelector(selectAdjustments);
-  const { t } = useTranslation();
+  const hasAdjustments = useAppSelector(selectHasAdjustments);
 
-  const hasAdjustments = Boolean(adjustments);
-  const enabled = Boolean(adjustments?.enabled);
-  const collapsed = Boolean(adjustments?.collapsed);
-  const mode = adjustments?.mode ?? 'simple';
+  const selectMode = useMemo(() => {
+    return createSelector(
+      selectCanvasSlice,
+      (canvas) => selectEntity(canvas, entityIdentifier)?.adjustments?.mode ?? 'simple'
+    );
+  }, [entityIdentifier]);
+  const mode = useAppSelector(selectMode);
 
-  const onToggleEnabled = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const v = e.target.checked;
-      const current = adjustments ?? makeDefaultRasterLayerAdjustments(mode);
-      dispatch(
-        rasterLayerAdjustmentsSet({
-          entityIdentifier,
-          adjustments: { ...current, enabled: v },
-        })
-      );
-    },
-    [dispatch, entityIdentifier, adjustments, mode]
-  );
+  const selectEnabled = useMemo(() => {
+    return createSelector(
+      selectCanvasSlice,
+      (canvas) => selectEntity(canvas, entityIdentifier)?.adjustments?.enabled ?? false
+    );
+  }, [entityIdentifier]);
+  const enabled = useAppSelector(selectEnabled);
+
+  const selectCollapsed = useMemo(() => {
+    return createSelector(
+      selectCanvasSlice,
+      (canvas) => selectEntity(canvas, entityIdentifier)?.adjustments?.collapsed ?? false
+    );
+  }, [entityIdentifier]);
+  const collapsed = useAppSelector(selectCollapsed);
+
+  const onToggleEnabled = useCallback(() => {
+    dispatch(rasterLayerAdjustmentsEnabledToggled({ entityIdentifier }));
+  }, [dispatch, entityIdentifier]);
 
   const onReset = useCallback(() => {
     // Reset values to defaults but keep adjustments present; preserve enabled/collapsed/mode
@@ -57,34 +69,18 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
   }, [dispatch, entityIdentifier]);
 
   const onToggleCollapsed = useCallback(() => {
-    const current = adjustments ?? makeDefaultRasterLayerAdjustments(mode);
-    dispatch(
-      rasterLayerAdjustmentsSet({
-        entityIdentifier,
-        adjustments: { ...current, collapsed: !collapsed },
-      })
-    );
-  }, [dispatch, entityIdentifier, collapsed, adjustments, mode]);
+    dispatch(rasterLayerAdjustmentsCollapsedToggled({ entityIdentifier }));
+  }, [dispatch, entityIdentifier]);
 
-  const onSetMode = useCallback(
-    (nextMode: 'simple' | 'curves') => {
-      if (nextMode === mode) {
-        return;
-      }
-      const current = adjustments ?? makeDefaultRasterLayerAdjustments(nextMode);
-      dispatch(
-        rasterLayerAdjustmentsSet({
-          entityIdentifier,
-          adjustments: { ...current, mode: nextMode },
-        })
-      );
-    },
-    [dispatch, entityIdentifier, adjustments, mode]
+  const onClickModeSimple = useCallback(
+    () => dispatch(rasterLayerAdjustmentsModeChanged({ entityIdentifier, mode: 'simple' })),
+    [dispatch, entityIdentifier]
   );
 
-  // Memoized click handlers to avoid inline arrow functions in JSX
-  const onClickModeSimple = useCallback(() => onSetMode('simple'), [onSetMode]);
-  const onClickModeCurves = useCallback(() => onSetMode('curves'), [onSetMode]);
+  const onClickModeCurves = useCallback(
+    () => dispatch(rasterLayerAdjustmentsModeChanged({ entityIdentifier, mode: 'curves' })),
+    [dispatch, entityIdentifier]
+  );
 
   const onFinish = useCallback(async () => {
     // Bake current visual into layer pixels, then clear adjustments
@@ -137,7 +133,7 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
           aria-label={t('controlLayers.adjustments.cancel')}
           size="md"
           onClick={onCancel}
-          isDisabled={!adjustments}
+          isDisabled={!hasAdjustments}
           colorScheme="red"
           icon={<PiTrashBold />}
           variant="ghost"
@@ -146,7 +142,7 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
           aria-label={t('controlLayers.adjustments.reset')}
           size="md"
           onClick={onReset}
-          isDisabled={!adjustments}
+          isDisabled={!hasAdjustments}
           icon={<PiArrowCounterClockwiseBold />}
           variant="ghost"
         />
@@ -154,7 +150,7 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
           aria-label={t('controlLayers.adjustments.finish')}
           size="md"
           onClick={onFinish}
-          isDisabled={!adjustments}
+          isDisabled={!hasAdjustments}
           colorScheme="green"
           icon={<PiCheckBold />}
           variant="ghost"
