@@ -106,9 +106,8 @@ export const RasterLayerSimpleAdjustmentsEditor = memo(() => {
         label={t('controlLayers.adjustments.sharpness')}
         value={simple.sharpness}
         onChange={onSharpness}
-        min={-0.5}
-        max={0.5}
-        step={0.01}
+        min={0}
+        max={1}
       />
     </Flex>
   );
