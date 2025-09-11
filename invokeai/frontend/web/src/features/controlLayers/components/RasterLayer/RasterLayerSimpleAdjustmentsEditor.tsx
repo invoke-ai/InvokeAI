@@ -1,9 +1,10 @@
 import { CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { rasterLayerAdjustmentsSimpleUpdated } from 'features/controlLayers/store/canvasSlice';
-import { selectEntity } from 'features/controlLayers/store/selectors';
-import React, { memo, useCallback } from 'react';
+import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
+import React, { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type AdjustmentSliderRowProps = {
@@ -25,20 +26,33 @@ const AdjustmentSliderRow = ({ label, value, onChange, min = -1, max = 1, step =
   </FormControl>
 );
 
+const DEFAULT_SIMPLE_ADJUSTMENTS = {
+  brightness: 0,
+  contrast: 0,
+  saturation: 0,
+  temperature: 0,
+  tint: 0,
+  sharpness: 0,
+};
+
 export const RasterLayerSimpleAdjustmentsEditor = memo(() => {
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext<'raster_layer'>();
   const { t } = useTranslation();
-  const layer = useAppSelector((s) => selectEntity(s.canvas.present, entityIdentifier));
-
-  const simple = layer?.adjustments?.simple ?? {
-    brightness: 0,
-    contrast: 0,
-    saturation: 0,
-    temperature: 0,
-    tint: 0,
-    sharpness: 0,
-  };
+  const selectSimpleAdjustments = useMemo(() => {
+    return createSelector(
+      selectCanvasSlice,
+      (canvas) => selectEntity(canvas, entityIdentifier)?.adjustments?.simple ?? DEFAULT_SIMPLE_ADJUSTMENTS
+    );
+  }, [entityIdentifier]);
+  const simple = useAppSelector(selectSimpleAdjustments);
+  const selectIsDisabled = useMemo(() => {
+    return createSelector(
+      selectCanvasSlice,
+      (canvas) => selectEntity(canvas, entityIdentifier)?.adjustments?.enabled !== true
+    );
+  }, [entityIdentifier]);
+  const isDisabled = useAppSelector(selectIsDisabled);
 
   const onBrightness = useCallback(
     (v: number) => dispatch(rasterLayerAdjustmentsSimpleUpdated({ entityIdentifier, simple: { brightness: v } })),
@@ -66,7 +80,7 @@ export const RasterLayerSimpleAdjustmentsEditor = memo(() => {
   );
 
   return (
-    <Flex px={8} direction="column">
+    <Flex px={3} pb={2} direction="column" opacity={isDisabled ? 0.3 : 1} pointerEvents={isDisabled ? 'none' : 'auto'}>
       <AdjustmentSliderRow
         label={t('controlLayers.adjustments.brightness')}
         value={simple.brightness}

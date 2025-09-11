@@ -1,4 +1,5 @@
 import { Button, ButtonGroup, Flex, IconButton, Switch, Text } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { RasterLayerCurvesAdjustmentsEditor } from 'features/controlLayers/components/RasterLayer/RasterLayerCurvesAdjustmentsEditor';
 import { RasterLayerSimpleAdjustmentsEditor } from 'features/controlLayers/components/RasterLayer/RasterLayerSimpleAdjustmentsEditor';
@@ -10,9 +11,9 @@ import {
   rasterLayerAdjustmentsSet,
   rasterLayerAdjustmentsSimpleUpdated,
 } from 'features/controlLayers/store/canvasSlice';
-import { selectEntity } from 'features/controlLayers/store/selectors';
+import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
 import { makeDefaultRasterLayerAdjustments } from 'features/controlLayers/store/util';
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiCaretDownBold, PiCheckBold, PiTrashBold } from 'react-icons/pi';
 
@@ -20,18 +21,22 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext<'raster_layer'>();
   const canvasManager = useCanvasManager();
-  const layer = useAppSelector((s) => selectEntity(s.canvas.present, entityIdentifier));
+  const selectAdjustments = useMemo(() => {
+    return createSelector(selectCanvasSlice, (canvas) => selectEntity(canvas, entityIdentifier)?.adjustments);
+  }, [entityIdentifier]);
+
+  const adjustments = useAppSelector(selectAdjustments);
   const { t } = useTranslation();
 
-  const hasAdjustments = Boolean(layer?.adjustments);
-  const enabled = Boolean(layer?.adjustments?.enabled);
-  const collapsed = Boolean(layer?.adjustments?.collapsed);
-  const mode = layer?.adjustments?.mode ?? 'simple';
+  const hasAdjustments = Boolean(adjustments);
+  const enabled = Boolean(adjustments?.enabled);
+  const collapsed = Boolean(adjustments?.collapsed);
+  const mode = adjustments?.mode ?? 'simple';
 
   const onToggleEnabled = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const v = e.target.checked;
-      const current = layer?.adjustments ?? makeDefaultRasterLayerAdjustments(mode);
+      const current = adjustments ?? makeDefaultRasterLayerAdjustments(mode);
       dispatch(
         rasterLayerAdjustmentsSet({
           entityIdentifier,
@@ -39,7 +44,7 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
         })
       );
     },
-    [dispatch, entityIdentifier, layer?.adjustments, mode]
+    [dispatch, entityIdentifier, adjustments, mode]
   );
 
   const onReset = useCallback(() => {
@@ -73,21 +78,21 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
   }, [dispatch, entityIdentifier]);
 
   const onToggleCollapsed = useCallback(() => {
-    const current = layer?.adjustments ?? makeDefaultRasterLayerAdjustments(mode);
+    const current = adjustments ?? makeDefaultRasterLayerAdjustments(mode);
     dispatch(
       rasterLayerAdjustmentsSet({
         entityIdentifier,
         adjustments: { ...current, collapsed: !collapsed },
       })
     );
-  }, [dispatch, entityIdentifier, collapsed, layer?.adjustments, mode]);
+  }, [dispatch, entityIdentifier, collapsed, adjustments, mode]);
 
   const onSetMode = useCallback(
     (nextMode: 'simple' | 'curves') => {
       if (nextMode === mode) {
         return;
       }
-      const current = layer?.adjustments ?? makeDefaultRasterLayerAdjustments(nextMode);
+      const current = adjustments ?? makeDefaultRasterLayerAdjustments(nextMode);
       dispatch(
         rasterLayerAdjustmentsSet({
           entityIdentifier,
@@ -95,7 +100,7 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
         })
       );
     },
-    [dispatch, entityIdentifier, layer?.adjustments, mode]
+    [dispatch, entityIdentifier, adjustments, mode]
   );
 
   // Memoized click handlers to avoid inline arrow functions in JSX
@@ -125,7 +130,7 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
 
   return (
     <>
-      <Flex px={4} alignItems="center" gap={3} mt={2} mb={2}>
+      <Flex p={2} alignItems="center" gap={2}>
         <IconButton
           aria-label={collapsed ? t('controlLayers.adjustments.expand') : t('controlLayers.adjustments.collapse')}
           size="sm"
@@ -141,18 +146,10 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
           Adjustments
         </Text>
         <ButtonGroup size="sm" isAttached variant="outline">
-          <Button
-            onClick={onClickModeSimple}
-            isActive={mode === 'simple'}
-            colorScheme={mode === 'simple' ? 'invokeBlue' : undefined}
-          >
+          <Button onClick={onClickModeSimple} colorScheme={mode === 'simple' ? 'invokeBlue' : undefined}>
             {t('controlLayers.adjustments.simple')}
           </Button>
-          <Button
-            onClick={onClickModeCurves}
-            isActive={mode === 'curves'}
-            colorScheme={mode === 'curves' ? 'invokeBlue' : undefined}
-          >
+          <Button onClick={onClickModeCurves} colorScheme={mode === 'curves' ? 'invokeBlue' : undefined}>
             {t('controlLayers.adjustments.curves')}
           </Button>
         </ButtonGroup>
@@ -161,7 +158,7 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
           aria-label={t('controlLayers.adjustments.cancel')}
           size="md"
           onClick={onCancel}
-          isDisabled={!layer?.adjustments}
+          isDisabled={!adjustments}
           colorScheme="red"
           icon={<PiTrashBold />}
           variant="ghost"
@@ -170,7 +167,7 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
           aria-label={t('controlLayers.adjustments.reset')}
           size="md"
           onClick={onReset}
-          isDisabled={!layer?.adjustments}
+          isDisabled={!adjustments}
           icon={<PiArrowCounterClockwiseBold />}
           variant="ghost"
         />
@@ -178,7 +175,7 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
           aria-label={t('controlLayers.adjustments.finish')}
           size="md"
           onClick={onFinish}
-          isDisabled={!layer?.adjustments}
+          isDisabled={!adjustments}
           colorScheme="green"
           icon={<PiCheckBold />}
           variant="ghost"

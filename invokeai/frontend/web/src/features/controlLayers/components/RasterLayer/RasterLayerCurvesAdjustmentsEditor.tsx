@@ -1,4 +1,4 @@
-import { Box, Flex, Text } from '@invoke-ai/ui-library';
+import { Box, Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEntityAdapterContext } from 'features/controlLayers/contexts/EntityAdapterContext';
@@ -7,6 +7,7 @@ import { rasterLayerAdjustmentsCurvesUpdated } from 'features/controlLayers/stor
 import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 
 const DEFAULT_POINTS: Array<[number, number]> = [
   [0, 0],
@@ -397,13 +398,25 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
     return () => ro.disconnect();
   }, [draw]);
 
-  const canvasStyle = useMemo<React.CSSProperties>(() => CANVAS_STYLE, []);
+  const resetPoints = useCallback(() => {
+    setLocalPoints(sortPoints(DEFAULT_POINTS));
+    commit(DEFAULT_POINTS);
+  }, [commit]);
 
   return (
-    <Flex flexDir="column" gap={4}>
-      <Text fontSize="sm" color={channelColor[channel]}>
-        {title}
-      </Text>
+    <Flex flexDir="column" gap={2}>
+      <Flex justifyContent="space-between">
+        <Text fontSize="sm" color={channelColor[channel]} fontWeight="semibold">
+          {title}
+        </Text>
+        <IconButton
+          icon={<PiArrowCounterClockwiseBold />}
+          aria-label="Reset"
+          size="sm"
+          variant="link"
+          onClick={resetPoints}
+        />
+      </Flex>
       <canvas
         ref={canvasRef}
         onPointerDown={handlePointerDown}
@@ -411,7 +424,7 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
         onDoubleClick={handleDoubleClick}
-        style={canvasStyle}
+        style={CANVAS_STYLE}
       />
     </Flex>
   );
@@ -427,6 +440,13 @@ export const RasterLayerCurvesAdjustmentsEditor = memo(() => {
     [entityIdentifier]
   );
   const layer = useAppSelector(selectLayer);
+  const selectIsDisabled = useMemo(() => {
+    return createSelector(
+      selectCanvasSlice,
+      (canvas) => selectEntity(canvas, entityIdentifier)?.adjustments?.enabled !== true
+    );
+  }, [entityIdentifier]);
+  const isDisabled = useAppSelector(selectIsDisabled);
 
   const [histMaster, setHistMaster] = useState<number[] | null>(null);
   const [histR, setHistR] = useState<number[] | null>(null);
@@ -502,7 +522,14 @@ export const RasterLayerCurvesAdjustmentsEditor = memo(() => {
   const onChangeB = useCallback((pts: Array<[number, number]>) => onChangePoints('b', pts), [onChangePoints]);
 
   return (
-    <Flex direction="column" gap={2} style={{ paddingLeft: 8, paddingRight: 8, paddingBottom: 10 }}>
+    <Flex
+      direction="column"
+      gap={2}
+      px={3}
+      pb={3}
+      opacity={isDisabled ? 0.3 : 1}
+      pointerEvents={isDisabled ? 'none' : 'auto'}
+    >
       <Box display="grid" gridTemplateColumns="repeat(2, minmax(0, 1fr))" gap={4}>
         <CurveGraph
           title={t('controlLayers.adjustments.master')}
