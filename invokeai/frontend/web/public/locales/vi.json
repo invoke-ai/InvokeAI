@@ -53,7 +53,12 @@
         "assetsWithCount_other": "{{count}} tài nguyên",
         "uncategorizedImages": "Ảnh Chưa Sắp Xếp",
         "deleteAllUncategorizedImages": "Xoá Tất Cả Ảnh Chưa Sắp Xếp",
-        "locateInGalery": "Vị Trí Ở Thư Viện Ảnh"
+        "locateInGalery": "Vị Trí Ở Thư Viện Ảnh",
+        "deletedImagesCannotBeRestored": "Ảnh đã xóa không thể khôi phục lại.",
+        "hideBoards": "Ẩn Bảng",
+        "movingVideosToBoard_other": "Di chuyển {{count}} video vào bảng:",
+        "viewBoards": "Xem Bảng",
+        "videosWithCount_other": "{{count}} video"
     },
     "gallery": {
         "swapImages": "Đổi Hình Ảnh",
@@ -84,7 +89,7 @@
         "newestFirst": "Mới Nhất Trước",
         "showStarredImagesFirst": "Hiển Thị Ảnh Gắn Sao Trước",
         "bulkDownloadRequestedDesc": "Yêu cầu tải xuống đang được chuẩn bị. Vui lòng chờ trong giây lát.",
-        "starImage": "Gắn Sao Cho Ảnh",
+        "starImage": "Gắn Sao",
         "viewerImage": "Trình Xem Ảnh",
         "sideBySide": "Cạnh Nhau",
         "alwaysShowImageSizeBadge": "Luôn Hiển Thị Kích Thước Ảnh",
@@ -109,13 +114,24 @@
         "exitCompare": "Ngừng So Sánh",
         "stretchToFit": "Kéo Dài Cho Vừa Vặn",
         "sortDirection": "Cách Sắp Xếp",
-        "unstarImage": "Ngừng Gắn Sao Cho Ảnh",
+        "unstarImage": "Bỏ Gắn Sao",
         "compareHelp2": "Nhấn <Kbd>M</Kbd> để tuần hoàn trong chế độ so sánh.",
         "boardsSettings": "Thiết Lập Bảng",
         "imagesSettings": "Cài Đặt Ảnh Trong Thư Viện Ảnh",
         "assets": "Tài Nguyên",
         "images": "Hình Ảnh",
-        "useForPromptGeneration": "Dùng Để Tạo Sinh Lệnh"
+        "useForPromptGeneration": "Dùng Để Tạo Sinh Lệnh",
+        "deleteVideo_other": "Xóa {{count}} Video",
+        "deleteVideoPermanent": "Video đã xóa không thể khôi phục lại.",
+        "jump": "Nhảy Đến",
+        "noVideoSelected": "Không Có Video Được Chọn",
+        "noImagesInGallery": "Không Có Ảnh Để Hiển Thị",
+        "unableToLoad": "Không Thể Tải Thư Viện Ảnh",
+        "selectAnImageToCompare": "Chọn Ảnh Để So Sánh",
+        "openViewer": "Mở Trình Xem",
+        "closeViewer": "Đóng Trình Xem",
+        "videos": "Video",
+        "videosTab": "Video bạn tạo và được lưu trong Invoke."
     },
     "common": {
         "ipAdapter": "IP Adapter",
@@ -147,7 +163,7 @@
         "dontAskMeAgain": "Không hỏi lại",
         "error": "Lỗi",
         "or": "hoặc",
-        "installed": "Đã Tải Xuống",
+        "installed": "Được Tải Xuống Sẵn",
         "simple": "Cơ Bản",
         "linear": "Tuyến Tính",
         "safetensors": "Safetensors",
@@ -240,7 +256,14 @@
         "options_withCount_other": "{{count}} thiết lập",
         "removeNegativePrompt": "Xóa Lệnh Tiêu Cực",
         "addNegativePrompt": "Thêm Lệnh Tiêu Cực",
-        "selectYourModel": "Chọn Model"
+        "selectYourModel": "Chọn Model",
+        "goTo": "Đi Đến",
+        "imageFailedToLoad": "Không Thể Tải Ảnh",
+        "localSystem": "Hệ Thống Máy Chủ",
+        "notInstalled": "Chưa $t(common.installed)",
+        "prevPage": "Trang Trước",
+        "nextPage": "Trang Sau",
+        "resetToDefaults": "Tải Lại Mặc Định"
     },
     "prompt": {
         "addPromptTrigger": "Thêm Trigger Cho Lệnh",
@@ -251,7 +274,10 @@
         "uploadImageForPromptGeneration": "Tải Ảnh Để Tạo Sinh Lệnh",
         "expandingPrompt": "Đang mở rộng lệnh...",
         "replace": "Thay Thế",
-        "discard": "Huỷ Bỏ"
+        "discard": "Huỷ Bỏ",
+        "resultTitle": "Mở Rộng Lệnh Hoàn Tất",
+        "resultSubtitle": "Chọn phương thức mở rộng lệnh:",
+        "insert": "Chèn"
     },
     "queue": {
         "resume": "Tiếp Tục",
@@ -328,7 +354,13 @@
         "retryFailed": "Có Vấn Đề Khi Thử Lại Mục",
         "retryItem": "Thử Lại Mục",
         "credits": "Nguồn",
-        "cancelAllExceptCurrent": "Huỷ Bỏ Tất Cả Ngoại Trừ Mục Hiện Tại"
+        "cancelAllExceptCurrent": "Huỷ Bỏ Tất Cả Ngoại Trừ Mục Hiện Tại",
+        "createdAt": "Tạo tại",
+        "completedAt": "Hoàn Thành Tại",
+        "sortColumn": "Sắp Xếp Cột",
+        "sortBy": "Sắp Xếp Theo {{column}}",
+        "sortOrderAscending": "Tăng Dần",
+        "sortOrderDescending": "Giảm Dần"
     },
     "hotkeys": {
         "canvas": {
@@ -480,6 +512,14 @@
             "toggleBbox": {
                 "title": "Bật/Tắt Hiển Thị Hộp Giới Hạn",
                 "desc": "Ẩn hoặc hiện hộp giới hạn tạo sinh"
+            },
+            "setFillColorsToDefault": {
+                "title": "Đặt Màu Lại Mặc Định",
+                "desc": "Chỉnh công cụ màu hiện tại về mặc định."
+            },
+            "toggleFillColor": {
+                "title": "Bật/Tắt Màu Lấp Đầy",
+                "desc": "Bật/Tắt công cụ đổ màu hiện tại."
             }
         },
         "workflows": {
@@ -677,12 +717,19 @@
                 "title": "Chọn Tab Tạo Sinh",
                 "desc": "Chọn tab Tạo Sinh.",
                 "key": "1"
+            },
+            "selectVideoTab": {
+                "title": "Chọn Thẻ Video",
+                "desc": "Chọn thẻ Video."
             }
         },
         "searchHotkeys": "Tìm Phím tắt",
         "noHotkeysFound": "Không Tìm Thấy Phím Tắt",
         "clearSearch": "Làm Sạch Thanh Tìm Kiếm",
-        "hotkeys": "Phím Tắt"
+        "hotkeys": "Phím Tắt",
+        "video": {
+            "title": "Video"
+        }
     },
     "modelManager": {
         "modelConverted": "Model Đã Được Chuyển Đổi",
@@ -844,11 +891,19 @@
             "recommendedModels": "Model Khuyến Nghị",
             "exploreStarter": "Hoặc duyệt tất cả model khởi đầu có sẵn",
             "bundleDescription": "Các gói đều bao gồm những model cần thiết cho từng nhánh model và những model cơ sở đã chọn lọc để bắt đầu.",
-            "sdxl": "SDXL"
+            "sdxl": "SDXL",
+            "quickStart": "Gói Khởi Đầu Nhanh",
+            "browseAll": "Hoặc duyệt tất cả model có sẵn:",
+            "stableDiffusion15": "Stable Diffusion 1.5",
+            "fluxDev": "FLUX.1 dev"
         },
         "installBundle": "Tải Xuống Gói",
         "installBundleMsg1": "Bạn có chắc chắn muốn tải xuống gói {{bundleName}}?",
-        "installBundleMsg2": "Gói này sẽ tải xuống {{count}} model sau đây:"
+        "installBundleMsg2": "Gói này sẽ tải xuống {{count}} model sau đây:",
+        "filterModels": "Lọc Model",
+        "ipAdapters": "IP Adapters",
+        "showOnlyRelatedModels": "Liên Quan",
+        "starterModelsInModelManager": "Model Khởi Đầu có thể tìm thấy ở Trình Quản Lý Model"
     },
     "metadata": {
         "guidance": "Hướng Dẫn",
@@ -860,7 +915,7 @@
         "positivePrompt": "Lệnh Tích Cực",
         "seed": "Hạt Giống",
         "negativePrompt": "Lệnh Tiêu Cực",
-        "noImageDetails": "Không tìm thấy chí tiết ảnh",
+        "noImageDetails": "Không tìm thấy chi tiết ảnh",
         "strength": "Mức độ mạnh từ ảnh sang ảnh",
         "Threshold": "Ngưỡng Nhiễu",
         "width": "Chiều Rộng",
@@ -880,7 +935,15 @@
         "scheduler": "Scheduler",
         "noMetaData": "Không tìm thấy metadata",
         "imageDimensions": "Kích Thước Ảnh",
-        "clipSkip": "$t(parameters.clipSkip)"
+        "clipSkip": "$t(parameters.clipSkip)",
+        "videoDetails": "Chi Tiết Video",
+        "noVideoDetails": "Không tìm thấy chi tiết video",
+        "parsingFailed": "Lỗi Cú Pháp",
+        "recallParameter": "Gợi Nhớ {{label}}",
+        "videoModel": "Model",
+        "videoDuration": "Thời Lượng",
+        "videoAspectRatio": "Tỉ Lệ",
+        "videoResolution": "Độ Phân Giải"
     },
     "accordions": {
         "generation": {
@@ -925,7 +988,9 @@
             "strength": "Mức Độ Mạnh Của Sửa Độ Phân Giải Cao",
             "method": "Cách Thức Sửa Độ Phân Giải Cao"
         },
-        "hrf": "Sửa Độ Phân Giải Cao"
+        "hrf": "Sửa Độ Phân Giải Cao",
+        "enableHrf": "Bật Chế Độ Chỉnh Sửa Phân Giải Cao",
+        "upscaleMethod": "Phương Thức Upscale"
     },
     "nodes": {
         "validateConnectionsHelp": "Ngăn chặn những kết nối không hợp lý được tạo ra, và đồ thị không hợp lệ bị kích hoạt",
@@ -1098,7 +1163,23 @@
             "alignmentDL": "Dưới Cùng Bên Trái",
             "alignmentUR": "Trên Cùng Bên Phải",
             "alignmentDR": "Dưới Cùng Bên Phải"
-        }
+        },
+        "generatorLoading": "đang tải",
+        "addLinearView": "Thêm Vào Chế Độ Xem Tuyến Tính (Linear View)",
+        "hideLegendNodes": "Ẩn Vùng Nhập",
+        "mismatchedVersion": "Node không hợp lệ: node {{node}} thuộc loại {{type}} có phiên bản không khớp (thử cập nhật?)",
+        "noFieldsLinearview": "Không có vùng được thêm vào Chế Độ Xem Tuyến Tính",
+        "removeLinearView": "Xoá Khỏi Chế Độ Xem Tuyến Tính",
+        "reorderLinearView": "Sắp Xếp Lại Chế Độ Xem Tuyến Tính",
+        "showLegendNodes": "Hiển Thị Vùng Nhập",
+        "unableToLoadWorkflow": "Không Thể Tải Workflow",
+        "unknownTemplate": "Mẫu Trình Bày Không Rõ",
+        "unknownInput": "Đầu Vào Không Rõ: {{name}}",
+        "loadingTemplates": "Đang Tải {{name}}",
+        "versionUnknown": " Phiên Bản Không Rõ",
+        "generateValues": "Giá Trị Tạo Sinh",
+        "floatRangeGenerator": "Phạm Vị Tạo Sinh Số Thực",
+        "integerRangeGenerator": "Phạm Vị Tạo Sinh Số Nguyên"
     },
     "popovers": {
         "paramCFGRescaleMultiplier": {
@@ -1551,7 +1632,9 @@
         "noMatchingModels": "Không có Model phù hợp",
         "noModelsAvailable": "Không có model",
         "selectModel": "Chọn Model",
-        "noCompatibleLoRAs": "Không Có LoRAs Tương Thích"
+        "noCompatibleLoRAs": "Không Có LoRAs Tương Thích",
+        "noMatchingLoRAs": "Không có LoRA phù hợp",
+        "noLoRAsInstalled": "Chưa có LoRA được tải xuống"
     },
     "parameters": {
         "postProcessing": "Xử Lý Hậu Kỳ (Shift + U)",
@@ -1599,7 +1682,15 @@
             "modelIncompatibleScaledBboxWidth": "Chiều rộng hộp giới hạn theo tỉ lệ là {{width}} nhưng {{model}} yêu cầu bội số của {{multiple}}",
             "modelDisabledForTrial": "Tạo sinh với {{modelName}} là không thể với tài khoản trial. Vào phần thiết lập tài khoản để nâng cấp.",
             "promptExpansionPending": "Trong quá trình mở rộng lệnh",
-            "promptExpansionResultPending": "Hãy chấp thuận hoặc huỷ bỏ kết quả mở rộng lệnh của bạn"
+            "promptExpansionResultPending": "Hãy chấp thuận hoặc huỷ bỏ kết quả mở rộng lệnh của bạn",
+            "emptyBatches": "lô trống",
+            "noStartingFrameImage": "Chưa có khung hình ảnh đầu",
+            "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), chiều rộng hộp giới hạn là {{width}}",
+            "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), chiều cao hộp giới hạn là {{height}}",
+            "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), tỉ lệ chiều rộng hộp giới hạn là {{width}}",
+            "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), tỉ lệ chiều cao hộp giới hạn là {{height}}",
+            "incompatibleLoRAs": "LoRA không tương thích bị thêm vào",
+            "videoIsDisabled": "Trình tạo sinh Video không được mở cho tài khoản {{accountType}}."
         },
         "cfgScale": "Thang CFG",
         "useSeed": "Dùng Hạt Giống",
@@ -1662,7 +1753,17 @@
         "tileSize": "Kích Thước Khối",
         "disabledNoRasterContent": "Đã Tắt (Không Có Nội Dung Dạng Raster)",
         "modelDisabledForTrial": "Tạo sinh với {{modelName}} là không thể với tài khoản trial. Vào phần <LinkComponent>thiết lập tài khoản</LinkComponent> để nâng cấp.",
-        "useClipSkip": "Dùng CLIP Skip"
+        "useClipSkip": "Dùng CLIP Skip",
+        "duration": "Thời Lượng",
+        "downloadImage": "Tải Xuống Hình Ảnh",
+        "images_withCount_other": "Hình Ảnh",
+        "videos_withCount_other": "Video",
+        "startingFrameImage": "Khung Hình Bắt Đầu",
+        "videoActions": "Hành Động Với Video",
+        "sendToVideo": "Gửi Vào Video",
+        "showOptionsPanel": "Hiển Thị Bảng Bên Cạnh (O hoặc T)",
+        "video": "Video",
+        "resolution": "Độ Phân Giải"
     },
     "dynamicPrompts": {
         "seedBehaviour": {
@@ -1676,7 +1777,8 @@
         "showDynamicPrompts": "HIện Dynamic Prompt",
         "maxPrompts": "Số Lệnh Tối Đa",
         "promptsPreview": "Xem Trước Lệnh",
-        "dynamicPrompts": "Dynamic Prompt"
+        "dynamicPrompts": "Dynamic Prompt",
+        "promptsToGenerate": "Lệnh Để Tạo Sinh"
     },
     "settings": {
         "beta": "Beta",
@@ -1710,7 +1812,9 @@
         "intermediatesClearedFailed": "Có Vấn Đề Khi Dọn Sạch Sản Phẩm Trung Gian",
         "enableInvisibleWatermark": "Bật Chế Độ Ẩn Watermark",
         "showDetailedInvocationProgress": "Hiện Dữ Liệu Xử Lý",
-        "enableHighlightFocusedRegions": "Nhấn Mạnh Khu Vực Chỉ Định"
+        "enableHighlightFocusedRegions": "Nhấn Mạnh Khu Vực Chỉ Định",
+        "modelDescriptionsDisabled": "Trình Mô Tả Model Bằng Hộp Thả Đã Tắt",
+        "modelDescriptionsDisabledDesc": "Trình mô tả model bằng hộp thả đã tắt. Bật lại trong Cài đặt."
     },
     "sdxl": {
         "loading": "Đang Tải...",
@@ -1724,7 +1828,11 @@
         "refiner": "Refiner",
         "cfgScale": "Thang CFG",
         "negAestheticScore": "Điểm Khác Tiêu Chuẩn",
-        "noModelsAvailable": "Không có sẵn model"
+        "noModelsAvailable": "Không có sẵn model",
+        "concatPromptStyle": "Liên Kết Lệnh & Phong Cách",
+        "freePromptStyle": "Viết Thủ Công Lệnh Phong Cách",
+        "negStylePrompt": "Điểm Tiêu Cực Cho Lệnh Phong Cách",
+        "posStylePrompt": "Điểm Tích Cực Cho Lệnh Phong Cách"
     },
     "controlLayers": {
         "width": "Chiều Rộng",
@@ -1816,7 +1924,9 @@
             "horizontal": "Đường Ngang",
             "crosshatch": "Đường Chéo Song Song (Crosshatch)",
             "vertical": "Đường Dọc",
-            "solid": "Chắc Chắn"
+            "solid": "Chắc Chắn",
+            "bgFillColor": "Màu Nền",
+            "fgFillColor": "Màu Nổi"
         },
         "addControlLayer": "Thêm $t(controlLayers.controlLayer)",
         "inpaintMask": "Lớp Phủ Inpaint",
@@ -2148,12 +2258,45 @@
         "showNonRasterLayers": "Hiển Thị Layer Không Thuộc Dạng Raster (Shift + H)",
         "hideNonRasterLayers": "Ẩn Layer Không Thuộc Dạng Raster (Shift + H)",
         "autoSwitch": {
-            "off": "Tắt"
+            "off": "Tắt",
+            "switchOnStart": "Khi Bắt Đầu",
+            "switchOnFinish": "Khi Kết Thúc"
         },
         "fitBboxToMasks": "Xếp Vừa Hộp Giới Hạn Vào Lớp Phủ",
         "invertMask": "Đảo Ngược Lớp Phủ",
         "maxRefImages": "Ảnh Mẫu Tối Đa",
-        "useAsReferenceImage": "Dùng Làm Ảnh Mẫu"
+        "useAsReferenceImage": "Dùng Làm Ảnh Mẫu",
+        "deletePrompt": "Xoá Lệnh",
+        "addGlobalReferenceImage": "Thêm $t(controlLayers.globalReferenceImage)",
+        "referenceImageGlobal": "Ảnh Mẫu (Toàn Vùng)",
+        "sendingToCanvas": "Chuyển Ảnh Tạo Sinh Vào Canvas",
+        "sendingToGallery": "Chuyển Ảnh Tạo Sinh Vào Thư Viện Ảnh",
+        "sendToGallery": "Chuyển Tới Thư Viện Ảnh",
+        "sendToGalleryDesc": "Bấm 'Kích Hoạt' sẽ tiến hành tạo sinh và lưu ảnh vào thư viện ảnh.",
+        "newImg2ImgCanvasFromImage": "Chuyển Đổi Ảnh Sang Ảnh Mới Từ Ảnh",
+        "sendToCanvasDesc": "Bấm 'Kích Hoạt' sẽ hiển thị công việc đang xử lý của bạn lên canvas.",
+        "viewProgressInViewer": "Xem quá trình xử lý và ảnh đầu ra trong <Btn>Trình Xem Ảnh</Btn>.",
+        "viewProgressOnCanvas": "Xem quá trình xử lý và ảnh đầu ra trong <Btn>Canvas</Btn>.",
+        "globalReferenceImage_withCount_other": "$t(controlLayers.globalReferenceImage)",
+        "regionalGuidance_withCount_hidden": "Chỉ Dẫn Khu Vực ({{count}} đang ẩn)",
+        "controlLayers_withCount_hidden": "Layer Điều Khiển Được ({{count}} đang ẩn)",
+        "rasterLayers_withCount_hidden": "Layer Dạng Raster ({{count}} đang ẩn)",
+        "globalReferenceImages_withCount_hidden": "Ảnh Mẫu Toàn Vùng ({{count}} đang ẩn)",
+        "inpaintMasks_withCount_hidden": "Lớp Phủ Inpaint ({{count}} đang ẩn)",
+        "regionalGuidance_withCount_visible": "Chỉ Dẫn Khu Vực ({{count}})",
+        "controlLayers_withCount_visible": "Layer Điều Khiển Được ({{count}})",
+        "rasterLayers_withCount_visible": "Layer Dạng Raster ({{count}})",
+        "globalReferenceImages_withCount_visible": "Ảnh Mẫu Toàn Vùng ({{count}})",
+        "inpaintMasks_withCount_visible": "Lớp Phủ Inpaint ({{count}})",
+        "layer_withCount_other": "Layer ({{count}})",
+        "pastedTo": "Dán Vào {{destination}}",
+        "stagingOnCanvas": "Hiển thị hình ảnh lên",
+        "newGallerySession": "Phiên Thư Viện Ảnh Mới",
+        "newGallerySessionDesc": "Nó sẽ dọn sạch canvas và các thiết lập trừ model được chọn. Các ảnh được tạo sinh sẽ được chuyển đến thư viện ảnh.",
+        "newCanvasSession": "Phiên Canvas Mới",
+        "newCanvasSessionDesc": "Nó sẽ dọn sạch canvas và các thiết lập trừ model được chọn. Các ảnh được tạo sinh sẽ được chuyển đến canvas.",
+        "replaceCurrent": "Thay Đổi Cái Hiện Tại",
+        "uploadOrDragAnImage": "Kéo ảnh từ thư viện ảnh hoặc <UploadButton>tải lên ảnh</UploadButton>."
     },
     "stylePresets": {
         "negativePrompt": "Lệnh Tiêu Cực",
@@ -2264,7 +2407,7 @@
         "errorCopied": "Lỗi Khi Sao Chép",
         "prunedQueue": "Cắt Bớt Hàng Đợi",
         "imagesWillBeAddedTo": "Ảnh đã tải lên sẽ được thêm vào tài nguyên của bảng {{boardName}}.",
-        "baseModelChangedCleared_other": "Dọn sạch hoặc tắt {{count}} model phụ không tương thích",
+        "baseModelChangedCleared_other": "Cập nhật, dọn sạch hoặc tắt {{count}} model phụ không tương thích",
         "canceled": "Quá Trình Xử Lý Đã Huỷ",
         "baseModelChanged": "Model Cơ Sở Đã Đổi",
         "addedToUncategorized": "Thêm vào tài nguyên của bảng $t(boards.uncategorized)",
@@ -2305,7 +2448,25 @@
         "maskInverted": "Đã Đảo Ngược Lớp Phủ",
         "maskInvertFailed": "Thất Bại Khi Đảo Ngược Lớp Phủ",
         "noVisibleMasks": "Không Có Lớp Phủ Đang Hiển Thị",
-        "noVisibleMasksDesc": "Tạo hoặc bật ít nhất một lớp phủ inpaint để đảo ngược"
+        "noVisibleMasksDesc": "Tạo hoặc bật ít nhất một lớp phủ inpaint để đảo ngược",
+        "imageNotLoadedDesc": "Không thể tìm thấy ảnh",
+        "imageSaved": "Ảnh Đã Lưu",
+        "imageSavingFailed": "Lưu Ảnh Thất Bại",
+        "invalidUpload": "Dữ Liệu Tải Lên Không Hợp Lệ",
+        "layerSavedToAssets": "Lưu Layer Vào Khu Tài Nguyên",
+        "noRasterLayers": "Không Tìm Thấy Layer Dạng Raster",
+        "noRasterLayersDesc": "Tạo ít nhất một layer dạng raster để xuất file PSD",
+        "noActiveRasterLayers": "Không Có Layer Dạng Raster Hoạt Động",
+        "noActiveRasterLayersDesc": "Bật ít nhất một layer dạng raster để xuất file PSD",
+        "failedToProcessLayers": "Thất Bại Khi Xử Lý Layer",
+        "noValidLayerAdapters": "Không có Layer Adaper Phù Hợp",
+        "setControlImage": "Đặt làm ảnh điều khiển được",
+        "setNodeField": "Đặt làm vùng node",
+        "uploadFailedInvalidUploadDesc_withCount_other": "Cần tối đa {{count}} ảnh PNG, JPEG, hoặc WEBP.",
+        "noInpaintMaskSelected": "Không Có Lớp Phủ Inpant Được Chọn",
+        "noInpaintMaskSelectedDesc": "Chọn một lớp phủ inpaint để đảo ngược",
+        "invalidBbox": "Hộp Giới Hạn Không Hợp Lệ",
+        "invalidBboxDesc": "Hợp giới hạn có kích thước không hợp lệ"
     },
     "ui": {
         "tabs": {
@@ -2318,7 +2479,8 @@
             "queue": "Queue (Hàng Đợi)",
             "workflows": "Workflow (Luồng Làm Việc)",
             "workflowsTab": "$t(common.tab) $t(ui.tabs.workflows)",
-            "generate": "Tạo Sinh"
+            "generate": "Tạo Sinh",
+            "video": "Video"
         },
         "launchpad": {
             "workflowsTitle": "Đi sâu hơn với Workflow.",
@@ -2396,13 +2558,23 @@
             "generate": {
                 "canvasCalloutTitle": "Đang tìm cách để điều khiển, chỉnh sửa, và làm lại ảnh?",
                 "canvasCalloutLink": "Vào Canvas cho nhiều tính năng hơn."
+            },
+            "videoTitle": "Tạo sinh video từ lệnh chữ.",
+            "video": {
+                "startingFrameCalloutTitle": "Thêm Khung Hình Bắt Đầu",
+                "startingFrameCalloutDesc": "Thêm ảnh nhằm điều khiển khung hình đầu của video."
+            },
+            "addStartingFrame": {
+                "title": "Thêm Khung Hình Bắt Đầu",
+                "description": "Thêm ảnh nhằm điều khiển khung hình đầu của video."
             }
         },
         "panels": {
             "launchpad": "Launchpad",
             "workflowEditor": "Trình Biên Tập Workflow",
-            "imageViewer": "Trình Xem Ảnh",
-            "canvas": "Canvas"
+            "imageViewer": "Trình Xem",
+            "canvas": "Canvas",
+            "video": "Video"
         }
     },
     "workflows": {
@@ -2509,7 +2681,9 @@
             "errorWorkflowHasUnpublishableNodes": "Workflow có lô node, node sản sinh, hoặc node tách metadata",
             "removeFromForm": "Xóa Khỏi Vùng Nhập",
             "showShuffle": "Hiện Xáo Trộn",
-            "shuffle": "Xáo Trộn"
+            "shuffle": "Xáo Trộn",
+            "emptyRootPlaceholderViewMode": "Chọn Chỉnh Sửa để bắt đầu tạo nên một vùng nhập cho workflow này.",
+            "workflowBuilderAlphaWarning": "Trình tạo vùng nhập đang trong giai đoạn alpha. Nó có thể xuất hiện những thay đổi đột ngột trước khi chính thức được phát hành."
         },
         "yourWorkflows": "Workflow Của Bạn",
         "browseWorkflows": "Khám Phá Workflow",
@@ -2524,7 +2698,19 @@
         "deselectAll": "Huỷ Chọn Tất Cả",
         "recommended": "Có Thể Bạn Sẽ Cần",
         "emptyStringPlaceholder": "<xâu ký tự trống>",
-        "published": "Đã Đăng"
+        "published": "Đã Đăng",
+        "defaultWorkflows": "Workflow Mặc Định",
+        "userWorkflows": "Workflow Của Người Dùng",
+        "projectWorkflows": "Dự Án Workflow",
+        "allLoaded": "Đã Tải Tất Cả Workflow",
+        "filterByTags": "Lọc Theo Nhãn",
+        "noRecentWorkflows": "Không Có Workflows Gần Đây",
+        "openWorkflow": "Mở Workflow",
+        "problemLoading": "Có Vấn Đề Khi Tải Workflow",
+        "noDescription": "Không có mô tả",
+        "searchWorkflows": "Tìm Workflow",
+        "clearWorkflowSearchFilter": "Xoá Workflow Khỏi Bộ Lọc Tìm Kiếm",
+        "openLibrary": "Mở Thư Viện"
     },
     "upscaling": {
         "missingUpscaleInitialImage": "Thiếu ảnh dùng để upscale",
@@ -2562,9 +2748,10 @@
         "readReleaseNotes": "Đọc Ghi Chú Phát Hành",
         "watchRecentReleaseVideos": "Xem Video Phát Hành Mới Nhất",
         "items": [
-            "Misc QoL: Bật/Tắt hiển thị hộp giới hạn, đánh dấu node bị lỗi, chặn lỗi thêm node vào vùng nhập nhiều lần, khả năng đọc lại metadata của CLIP Skip",
-            "Giảm lượng tiêu thụ VRAM cho các ảnh mẫu Kontext và mã hóa VAE"
-        ]
+            "Canvas: Chia tách màu nổi và màu nền - bật/tắt với 'x', khởi động lại về dạng đen trắng với 'd'",
+            "LoRA: Đặt khối lượng mặc định cho LoRA trong Trình Quản Lý Model"
+        ],
+        "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng"
     },
     "upsell": {
         "professional": "Chuyên Nghiệp",
@@ -2592,5 +2779,12 @@
         "clearSucceeded": "Cache Model Đã Được Dọn",
         "clearFailed": "Có Vấn Đề Khi Dọn Cache Model",
         "clear": "Dọn Cache Model"
+    },
+    "lora": {
+        "weight": "Trọng Lượng"
+    },
+    "video": {
+        "noVideoSelected": "Không có video được chọn",
+        "selectFromGallery": "Chọn một video trong thư viện để xem"
     }
 }
