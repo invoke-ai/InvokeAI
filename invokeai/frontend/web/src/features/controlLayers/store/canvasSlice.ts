@@ -19,12 +19,16 @@ import type {
   CanvasEntityType,
   CanvasInpaintMaskState,
   CanvasMetadata,
+  ChannelName,
+  ChannelPoints,
   ControlLoRAConfig,
   EntityMovedByPayload,
   FillStyle,
   FLUXReduxImageInfluence,
+  RasterLayerAdjustments,
   RegionalGuidanceRefImageState,
   RgbColor,
+  SimpleConfig,
 } from 'features/controlLayers/store/types';
 import {
   calculateNewSize,
@@ -97,7 +101,6 @@ import {
   initialIPAdapter,
   initialT2IAdapter,
   makeDefaultRasterLayerAdjustments,
-  type RasterLayerAdjustments,
 } from './util';
 
 const slice = createSlice({
@@ -108,14 +111,7 @@ const slice = createSlice({
     //#region Raster layers
     rasterLayerAdjustmentsSet: (
       state,
-      action: PayloadAction<
-        EntityIdentifierPayload<
-          {
-            adjustments: RasterLayerAdjustments | null;
-          },
-          'raster_layer'
-        >
-      >
+      action: PayloadAction<EntityIdentifierPayload<{ adjustments: RasterLayerAdjustments | null }, 'raster_layer'>>
     ) => {
       const { entityIdentifier, adjustments } = action.payload;
       const layer = selectEntity(state, entityIdentifier);
@@ -152,14 +148,7 @@ const slice = createSlice({
     },
     rasterLayerAdjustmentsSimpleUpdated: (
       state,
-      action: PayloadAction<
-        EntityIdentifierPayload<
-          {
-            simple: Partial<RasterLayerAdjustments['simple']>;
-          },
-          'raster_layer'
-        >
-      >
+      action: PayloadAction<EntityIdentifierPayload<{ simple: Partial<SimpleConfig> }, 'raster_layer'>>
     ) => {
       const { entityIdentifier, simple } = action.payload;
       const layer = selectEntity(state, entityIdentifier);
@@ -173,15 +162,7 @@ const slice = createSlice({
     },
     rasterLayerAdjustmentsCurvesUpdated: (
       state,
-      action: PayloadAction<
-        EntityIdentifierPayload<
-          {
-            channel: 'master' | 'r' | 'g' | 'b';
-            points: Array<[number, number]>;
-          },
-          'raster_layer'
-        >
-      >
+      action: PayloadAction<EntityIdentifierPayload<{ channel: ChannelName; points: ChannelPoints }, 'raster_layer'>>
     ) => {
       const { entityIdentifier, channel, points } = action.payload;
       const layer = selectEntity(state, entityIdentifier);
