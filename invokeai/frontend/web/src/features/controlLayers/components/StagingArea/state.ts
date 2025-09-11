@@ -361,6 +361,27 @@ export class StagingAreaApi {
       }
     }
 
+    const selectedItemId = this.$selectedItemId.get();
+    if (selectedItemId !== null && !items.find(({ item_id }) => item_id === selectedItemId)) {
+      // If the selected item no longer exists, select the next best item.
+      // Prefer the next item in the list - must check oldItems to determine this
+      const nextItemIndex = oldItems.findIndex(({ item_id }) => item_id === selectedItemId);
+      if (nextItemIndex !== -1) {
+        const nextItem = items[nextItemIndex] ?? items[nextItemIndex - 1];
+        if (nextItem) {
+          this.$selectedItemId.set(nextItem.item_id);
+        }
+      } else {
+        // Next, if there is an in-progress item, select that.
+        const inProgressItem = items.find(({ status }) => status === 'in_progress');
+        if (inProgressItem) {
+          this.$selectedItemId.set(inProgressItem.item_id);
+        }
+        // Finally just select the first item.
+        this.$selectedItemId.set(items[0]?.item_id ?? null);
+      }
+    }
+
     this.$items.set(items);
   };
 
