@@ -196,7 +196,8 @@ const slice = createSlice({
       action: PayloadAction<EntityIdentifierPayload<{ adjustments: RasterLayerAdjustments | null }, 'raster_layer'>>
     ) => {
       const { entityIdentifier, adjustments } = action.payload;
-      const layer = selectEntity(state, entityIdentifier);
+      const canvas = getSelectedCanvas(state);
+      const layer = selectEntity(canvas, entityIdentifier);
       if (!layer) {
         return;
       }
@@ -211,7 +212,8 @@ const slice = createSlice({
     },
     rasterLayerAdjustmentsReset: (state, action: PayloadAction<EntityIdentifierPayload<void, 'raster_layer'>>) => {
       const { entityIdentifier } = action.payload;
-      const layer = selectEntity(state, entityIdentifier);
+      const canvas = getSelectedCanvas(state);
+      const layer = selectEntity(canvas, entityIdentifier);
       if (!layer?.adjustments) {
         return;
       }
@@ -220,7 +222,8 @@ const slice = createSlice({
     },
     rasterLayerAdjustmentsCancel: (state, action: PayloadAction<EntityIdentifierPayload<void, 'raster_layer'>>) => {
       const { entityIdentifier } = action.payload;
-      const layer = selectEntity(state, entityIdentifier);
+      const canvas = getSelectedCanvas(state);
+      const layer = selectEntity(canvas, entityIdentifier);
       if (!layer) {
         return;
       }
@@ -231,7 +234,8 @@ const slice = createSlice({
       action: PayloadAction<EntityIdentifierPayload<{ mode: 'simple' | 'curves' }, 'raster_layer'>>
     ) => {
       const { entityIdentifier, mode } = action.payload;
-      const layer = selectEntity(state, entityIdentifier);
+      const canvas = getSelectedCanvas(state);
+      const layer = selectEntity(canvas, entityIdentifier);
       if (!layer?.adjustments) {
         return;
       }
@@ -242,7 +246,8 @@ const slice = createSlice({
       action: PayloadAction<EntityIdentifierPayload<{ simple: Partial<SimpleAdjustmentsConfig> }, 'raster_layer'>>
     ) => {
       const { entityIdentifier, simple } = action.payload;
-      const layer = selectEntity(state, entityIdentifier);
+      const canvas = getSelectedCanvas(state);
+      const layer = selectEntity(canvas, entityIdentifier);
       if (!layer?.adjustments) {
         return;
       }
@@ -253,7 +258,8 @@ const slice = createSlice({
       action: PayloadAction<EntityIdentifierPayload<{ channel: ChannelName; points: ChannelPoints }, 'raster_layer'>>
     ) => {
       const { entityIdentifier, channel, points } = action.payload;
-      const layer = selectEntity(state, entityIdentifier);
+      const canvas = getSelectedCanvas(state);
+      const layer = selectEntity(canvas, entityIdentifier);
       if (!layer?.adjustments) {
         return;
       }
@@ -264,7 +270,8 @@ const slice = createSlice({
       action: PayloadAction<EntityIdentifierPayload<void, 'raster_layer'>>
     ) => {
       const { entityIdentifier } = action.payload;
-      const layer = selectEntity(state, entityIdentifier);
+      const canvas = getSelectedCanvas(state);
+      const layer = selectEntity(canvas, entityIdentifier);
       if (!layer?.adjustments) {
         return;
       }
@@ -275,7 +282,8 @@ const slice = createSlice({
       action: PayloadAction<EntityIdentifierPayload<void, 'raster_layer'>>
     ) => {
       const { entityIdentifier } = action.payload;
-      const layer = selectEntity(state, entityIdentifier);
+      const canvas = getSelectedCanvas(state);
+      const layer = selectEntity(canvas, entityIdentifier);
       if (!layer?.adjustments) {
         return;
       }
