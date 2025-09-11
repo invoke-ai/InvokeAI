@@ -4,6 +4,7 @@
  */
 
 import { clamp } from 'es-toolkit/compat';
+import { zCurvesAdjustmentsLUTs, zSimpleAdjustmentsConfig } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 
 /**
@@ -24,25 +25,18 @@ export const LightnessToAlphaFilter = (imageData: ImageData): void => {
   }
 };
 
-type SimpleAdjustParams = {
-  brightness: number; // -1..1 (additive)
-  contrast: number; // -1..1 (scale around 128)
-  saturation: number; // -1..1
-  temperature: number; // -1..1 (blue<->yellow approx)
-  tint: number; // -1..1 (green<->magenta approx)
-  sharpness: number; // -1..1 (light unsharp mask)
-};
-
 /**
  * Per-layer simple adjustments filter (brightness, contrast, saturation, temp, tint, sharpness).
  *
  * Parameters are read from the Konva node attr `adjustmentsSimple` set by the adapter.
  */
 export const AdjustmentsSimpleFilter = function (this: Konva.Node, imageData: ImageData): void {
-  const params = (this?.getAttr?.('adjustmentsSimple') as SimpleAdjustParams | undefined) ?? null;
-  if (!params) {
+  const paramsRaw = this.getAttr('adjustmentsSimple');
+  const parseResult = zSimpleAdjustmentsConfig.safeParse(paramsRaw);
+  if (!parseResult.success) {
     return;
   }
+  const params = parseResult.data;
 
   const { brightness, contrast, saturation, temperature, tint, sharpness } = params;
 
@@ -172,19 +166,19 @@ export const buildCurveLUT = (points: Array<[number, number]>): number[] => {
   return lut;
 };
 
-type CurvesAdjustParams = {
-  master: number[];
-  r: number[];
-  g: number[];
-  b: number[];
-};
-
-// Curves filter: apply master curve, then per-channel curves
+/**
+ * Per-layer curves adjustments filter (master, r, g, b)
+ *
+ * Parameters are read from the Konva node attr `adjustmentsCurves` set by the adapter.
+ */
 export const AdjustmentsCurvesFilter = function (this: Konva.Node, imageData: ImageData): void {
-  const params = (this?.getAttr?.('adjustmentsCurves') as CurvesAdjustParams | undefined) ?? null;
-  if (!params) {
+  const paramsRaw = this.getAttr('adjustmentsCurves');
+  const parseResult = zCurvesAdjustmentsLUTs.safeParse(paramsRaw);
+  if (!parseResult.success) {
     return;
   }
+  const params = parseResult.data;
+
   const { master, r, g, b } = params;
   if (!master || !r || !g || !b) {
     return;

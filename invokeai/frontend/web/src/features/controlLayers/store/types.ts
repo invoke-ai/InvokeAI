@@ -378,8 +378,17 @@ const zControlLoRAConfig = z.object({
 });
 export type ControlLoRAConfig = z.infer<typeof zControlLoRAConfig>;
 
-const zSimpleConfig = z.object({
-  // All simple params normalized to [-1, 1] except sharpness [0, 1]
+/**
+ * All simple params normalized to `[-1, 1]` except sharpness `[0, 1]`.
+ *
+ * - Brightness: -1 (darken) to 1 (brighten)
+ * - Contrast: -1 (decrease contrast) to 1 (increase contrast)
+ * - Saturation: -1 (desaturate) to 1 (saturate)
+ * - Temperature: -1 (cooler/blue) to 1 (warmer/yellow)
+ * - Tint: -1 (greener) to 1 (more magenta)
+ * - Sharpness: 0 (no sharpening) to 1 (maximum sharpening)
+ */
+export const zSimpleAdjustmentsConfig = z.object({
   brightness: z.number().gte(-1).lte(1),
   contrast: z.number().gte(-1).lte(1),
   saturation: z.number().gte(-1).lte(1),
@@ -387,22 +396,28 @@ const zSimpleConfig = z.object({
   tint: z.number().gte(-1).lte(1),
   sharpness: z.number().gte(0).lte(1),
 });
-export type SimpleConfig = z.infer<typeof zSimpleConfig>;
+export type SimpleAdjustmentsConfig = z.infer<typeof zSimpleAdjustmentsConfig>;
 
 const zUint8 = z.number().int().min(0).max(255);
 const zChannelPoints = z.array(z.tuple([zUint8, zUint8])).min(2);
 const zChannelName = z.enum(['master', 'r', 'g', 'b']);
-const zCurvesConfig = z.record(zChannelName, zChannelPoints);
+const zCurvesAdjustmentsConfig = z.record(zChannelName, zChannelPoints);
 export type ChannelName = z.infer<typeof zChannelName>;
 export type ChannelPoints = z.infer<typeof zChannelPoints>;
+
+/**
+ * The curves adjustments are stored as LUTs in the Konva node attributes. Konva will use these values when applying
+ * the filter.
+ */
+export const zCurvesAdjustmentsLUTs = z.record(zChannelName, z.array(zUint8));
 
 const zRasterLayerAdjustments = z.object({
   version: z.literal(1),
   enabled: z.boolean(),
   collapsed: z.boolean(),
   mode: z.enum(['simple', 'curves']),
-  simple: zSimpleConfig,
-  curves: zCurvesConfig,
+  simple: zSimpleAdjustmentsConfig,
+  curves: zCurvesAdjustmentsConfig,
 });
 export type RasterLayerAdjustments = z.infer<typeof zRasterLayerAdjustments>;
 
