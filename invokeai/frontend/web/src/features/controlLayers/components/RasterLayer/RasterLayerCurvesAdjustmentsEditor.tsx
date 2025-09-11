@@ -16,6 +16,8 @@ const DEFAULT_POINTS: Array<[number, number]> = [
 
 type Channel = 'master' | 'r' | 'g' | 'b';
 
+type ChannelHistograms = Record<Channel, number[] | null>;
+
 const channelColor: Record<Channel, string> = {
   master: '#888',
   r: '#e53e3e',
@@ -57,6 +59,183 @@ type CurveGraphProps = {
   onChange: (pts: Array<[number, number]>) => void;
 };
 
+const drawHistogram = (
+  c: HTMLCanvasElement,
+  channel: Channel,
+  histogram: number[] | null,
+  points: Array<[number, number]>
+) => {
+  // Use device pixel ratio for crisp rendering on HiDPI displays.
+  const dpr = window.devicePixelRatio || 1;
+  const cssWidth = c.clientWidth || CANVAS_WIDTH; // CSS pixels
+  const cssHeight = (cssWidth * CANVAS_HEIGHT) / CANVAS_WIDTH; // maintain aspect ratio
+
+  // Ensure the backing store matches current display size * dpr (only if changed).
+  const targetWidth = Math.round(cssWidth * dpr);
+  const targetHeight = Math.round(cssHeight * dpr);
+  if (c.width !== targetWidth || c.height !== targetHeight) {
+    c.width = targetWidth;
+    c.height = targetHeight;
+  }
+  // Guarantee the CSS height stays synced (width is 100%).
+  if (c.style.height !== `${cssHeight}px`) {
+    c.style.height = `${cssHeight}px`;
+  }
+
+  const ctx = c.getContext('2d');
+  if (!ctx) {
+    return;
+  }
+
+  // Reset transform then scale for dpr so we can draw in CSS pixel coordinates.
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(dpr, dpr);
+
+  // Dynamic inner geometry (CSS pixel space)
+  const innerWidth = cssWidth - MARGIN_LEFT - MARGIN_RIGHT;
+  const innerHeight = cssHeight - MARGIN_TOP - MARGIN_BOTTOM;
+
+  const valueToCanvasX = (x: number) => MARGIN_LEFT + (clamp(x, 0, 255) / 255) * innerWidth;
+  const valueToCanvasY = (y: number) => MARGIN_TOP + innerHeight - (clamp(y, 0, 255) / 255) * innerHeight;
+
+  // Clear & background
+  ctx.clearRect(0, 0, cssWidth, cssHeight);
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, cssWidth, cssHeight);
+
+  // Grid
+  ctx.strokeStyle = '#2a2a2a';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = MARGIN_TOP + (i * innerHeight) / 4;
+    ctx.beginPath();
+    ctx.moveTo(MARGIN_LEFT + 0.5, y + 0.5);
+    ctx.lineTo(MARGIN_LEFT + innerWidth - 0.5, y + 0.5);
+    ctx.stroke();
+  }
+  for (let i = 0; i <= 4; i++) {
+    const x = MARGIN_LEFT + (i * innerWidth) / 4;
+    ctx.beginPath();
+    ctx.moveTo(x + 0.5, MARGIN_TOP + 0.5);
+    ctx.lineTo(x + 0.5, MARGIN_TOP + innerHeight - 0.5);
+    ctx.stroke();
+  }
+
+  // Histogram
+  if (histogram) {
+    const logHist = histogram.map((v) => Math.log10((v ?? 0) + 1));
+    const max = Math.max(1e-6, ...logHist);
+    ctx.fillStyle = '#5557';
+
+    // If there's enough horizontal room, draw each of the 256 bins with exact (possibly fractional) width so they tessellate.
+    // Otherwise, aggregate multiple bins into per-pixel columns to avoid aliasing.
+    if (innerWidth >= 256) {
+      for (let i = 0; i < 256; i++) {
+        const v = logHist[i] ?? 0;
+        const h = (v / max) * (innerHeight - 2);
+        // Exact fractional coordinates for seamless coverage (no gaps as width grows)
+        const x0 = MARGIN_LEFT + (i / 256) * innerWidth;
+        const x1 = MARGIN_LEFT + ((i + 1) / 256) * innerWidth;
+        const w = x1 - x0;
+        if (w <= 0) {
+          continue;
+        } // safety
+        const y = MARGIN_TOP + innerHeight - h;
+        ctx.fillRect(x0, y, w, h);
+      }
+    } else {
+      // Aggregate bins per CSS pixel column (similar to previous anti-moire approach)
+      const columns = Math.max(1, Math.round(innerWidth));
+      const binsPerCol = 256 / columns;
+      for (let col = 0; col < columns; col++) {
+        const startBin = Math.floor(col * binsPerCol);
+        const endBin = Math.min(255, Math.floor((col + 1) * binsPerCol - 1));
+        let acc = 0;
+        let count = 0;
+        for (let b = startBin; b <= endBin; b++) {
+          acc += logHist[b] ?? 0;
+          count++;
+        }
+        const v = count > 0 ? acc / count : 0;
+        const h = (v / max) * (innerHeight - 2);
+        const x = MARGIN_LEFT + col;
+        const y = MARGIN_TOP + innerHeight - h;
+        ctx.fillRect(x, y, 1, h);
+      }
+    }
+  }
+
+  // Curve
+  const pts = sortPoints(points);
+  ctx.strokeStyle = channelColor[channel];
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < pts.length; i++) {
+    const [x, y] = pts[i]!;
+    const cx = valueToCanvasX(x);
+    const cy = valueToCanvasY(y);
+    if (i === 0) {
+      ctx.moveTo(cx, cy);
+    } else {
+      ctx.lineTo(cx, cy);
+    }
+  }
+  ctx.stroke();
+
+  // Control points
+  for (let i = 0; i < pts.length; i++) {
+    const [x, y] = pts[i]!;
+    const cx = valueToCanvasX(x);
+    const cy = valueToCanvasY(y);
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = channelColor[channel];
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+};
+
+const getNearestPointIndex = (c: HTMLCanvasElement, points: Array<[number, number]>, mx: number, my: number) => {
+  const cssWidth = c.clientWidth || CANVAS_WIDTH;
+  const cssHeight = c.clientHeight || CANVAS_HEIGHT;
+  const innerWidth = cssWidth - MARGIN_LEFT - MARGIN_RIGHT;
+  const innerHeight = cssHeight - MARGIN_TOP - MARGIN_BOTTOM;
+  const canvasToValueX = (cx: number) => clamp(Math.round(((cx - MARGIN_LEFT) / innerWidth) * 255), 0, 255);
+  const canvasToValueY = (cy: number) => clamp(Math.round(255 - ((cy - MARGIN_TOP) / innerHeight) * 255), 0, 255);
+  const xVal = canvasToValueX(mx);
+  const yVal = canvasToValueY(my);
+  let best = -1;
+  let bestDist = 9999;
+  for (let i = 0; i < points.length; i++) {
+    const [px, py] = points[i]!;
+    const dx = px - xVal;
+    const dy = py - yVal;
+    const d = dx * dx + dy * dy;
+    if (d < bestDist) {
+      best = i;
+      bestDist = d;
+    }
+  }
+  if (best !== -1 && bestDist <= 20 * 20) {
+    return best;
+  }
+  return -1;
+};
+
+const canvasXToValueX = (c: HTMLCanvasElement, cx: number): number => {
+  const cssWidth = c.clientWidth || CANVAS_WIDTH;
+  const innerWidth = cssWidth - MARGIN_LEFT - MARGIN_RIGHT;
+  return clamp(Math.round(((cx - MARGIN_LEFT) / innerWidth) * 255), 0, 255);
+};
+
+const canvasYToValueY = (c: HTMLCanvasElement, cy: number) => {
+  const cssHeight = c.clientHeight || CANVAS_HEIGHT;
+  const innerHeight = cssHeight - MARGIN_TOP - MARGIN_BOTTOM;
+  return clamp(Math.round(255 - ((cy - MARGIN_TOP) / innerHeight) * 255), 0, 255);
+};
+
 const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
   const { title, channel, points, histogram, onChange } = props;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -67,181 +246,13 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
     setLocalPoints(sortPoints(points ?? DEFAULT_POINTS));
   }, [points]);
 
-  const draw = useCallback(() => {
+  useEffect(() => {
     const c = canvasRef.current;
     if (!c) {
       return;
     }
-
-    // Use device pixel ratio for crisp rendering on HiDPI displays.
-    const dpr = window.devicePixelRatio || 1;
-    const cssWidth = c.clientWidth || CANVAS_WIDTH; // CSS pixels
-    const cssHeight = (cssWidth * CANVAS_HEIGHT) / CANVAS_WIDTH; // maintain aspect ratio
-
-    // Ensure the backing store matches current display size * dpr (only if changed).
-    const targetWidth = Math.round(cssWidth * dpr);
-    const targetHeight = Math.round(cssHeight * dpr);
-    if (c.width !== targetWidth || c.height !== targetHeight) {
-      c.width = targetWidth;
-      c.height = targetHeight;
-    }
-    // Guarantee the CSS height stays synced (width is 100%).
-    if (c.style.height !== `${cssHeight}px`) {
-      c.style.height = `${cssHeight}px`;
-    }
-
-    const ctx = c.getContext('2d');
-    if (!ctx) {
-      return;
-    }
-
-    // Reset transform then scale for dpr so we can draw in CSS pixel coordinates.
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.scale(dpr, dpr);
-
-    // Dynamic inner geometry (CSS pixel space)
-    const innerWidth = cssWidth - MARGIN_LEFT - MARGIN_RIGHT;
-    const innerHeight = cssHeight - MARGIN_TOP - MARGIN_BOTTOM;
-
-    const valueToCanvasX = (x: number) => MARGIN_LEFT + (clamp(x, 0, 255) / 255) * innerWidth;
-    const valueToCanvasY = (y: number) => MARGIN_TOP + innerHeight - (clamp(y, 0, 255) / 255) * innerHeight;
-
-    // Clear & background
-    ctx.clearRect(0, 0, cssWidth, cssHeight);
-    ctx.fillStyle = '#111';
-    ctx.fillRect(0, 0, cssWidth, cssHeight);
-
-    // Grid
-    ctx.strokeStyle = '#2a2a2a';
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= 4; i++) {
-      const y = MARGIN_TOP + (i * innerHeight) / 4;
-      ctx.beginPath();
-      ctx.moveTo(MARGIN_LEFT + 0.5, y + 0.5);
-      ctx.lineTo(MARGIN_LEFT + innerWidth - 0.5, y + 0.5);
-      ctx.stroke();
-    }
-    for (let i = 0; i <= 4; i++) {
-      const x = MARGIN_LEFT + (i * innerWidth) / 4;
-      ctx.beginPath();
-      ctx.moveTo(x + 0.5, MARGIN_TOP + 0.5);
-      ctx.lineTo(x + 0.5, MARGIN_TOP + innerHeight - 0.5);
-      ctx.stroke();
-    }
-
-    // Histogram
-    if (histogram) {
-      const logHist = histogram.map((v) => Math.log10((v ?? 0) + 1));
-      const max = Math.max(1e-6, ...logHist);
-      ctx.fillStyle = '#5557';
-
-      // If there's enough horizontal room, draw each of the 256 bins with exact (possibly fractional) width so they tessellate.
-      // Otherwise, aggregate multiple bins into per-pixel columns to avoid aliasing.
-      if (innerWidth >= 256) {
-        for (let i = 0; i < 256; i++) {
-          const v = logHist[i] ?? 0;
-          const h = (v / max) * (innerHeight - 2);
-          // Exact fractional coordinates for seamless coverage (no gaps as width grows)
-          const x0 = MARGIN_LEFT + (i / 256) * innerWidth;
-          const x1 = MARGIN_LEFT + ((i + 1) / 256) * innerWidth;
-          const w = x1 - x0;
-          if (w <= 0) {
-            continue;
-          } // safety
-          const y = MARGIN_TOP + innerHeight - h;
-          ctx.fillRect(x0, y, w, h);
-        }
-      } else {
-        // Aggregate bins per CSS pixel column (similar to previous anti-moire approach)
-        const columns = Math.max(1, Math.round(innerWidth));
-        const binsPerCol = 256 / columns;
-        for (let col = 0; col < columns; col++) {
-          const startBin = Math.floor(col * binsPerCol);
-          const endBin = Math.min(255, Math.floor((col + 1) * binsPerCol - 1));
-          let acc = 0;
-          let count = 0;
-          for (let b = startBin; b <= endBin; b++) {
-            acc += logHist[b] ?? 0;
-            count++;
-          }
-          const v = count > 0 ? acc / count : 0;
-          const h = (v / max) * (innerHeight - 2);
-          const x = MARGIN_LEFT + col;
-          const y = MARGIN_TOP + innerHeight - h;
-          ctx.fillRect(x, y, 1, h);
-        }
-      }
-    }
-
-    // Curve
-    const pts = sortPoints(localPoints);
-    ctx.strokeStyle = channelColor[channel];
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    for (let i = 0; i < pts.length; i++) {
-      const [x, y] = pts[i]!;
-      const cx = valueToCanvasX(x);
-      const cy = valueToCanvasY(y);
-      if (i === 0) {
-        ctx.moveTo(cx, cy);
-      } else {
-        ctx.lineTo(cx, cy);
-      }
-    }
-    ctx.stroke();
-
-    // Control points
-    for (let i = 0; i < pts.length; i++) {
-      const [x, y] = pts[i]!;
-      const cx = valueToCanvasX(x);
-      const cy = valueToCanvasY(y);
-      ctx.fillStyle = '#000';
-      ctx.beginPath();
-      ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = channelColor[channel];
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-    }
+    drawHistogram(c, channel, histogram, localPoints);
   }, [channel, histogram, localPoints]);
-
-  useEffect(() => {
-    draw();
-  }, [draw]);
-
-  const getNearestPointIndex = useCallback(
-    (mx: number, my: number) => {
-      const c = canvasRef.current;
-      if (!c) {
-        return -1;
-      }
-      const cssWidth = c.clientWidth || CANVAS_WIDTH;
-      const cssHeight = c.clientHeight || CANVAS_HEIGHT;
-      const innerWidth = cssWidth - MARGIN_LEFT - MARGIN_RIGHT;
-      const innerHeight = cssHeight - MARGIN_TOP - MARGIN_BOTTOM;
-      const canvasToValueX = (cx: number) => clamp(Math.round(((cx - MARGIN_LEFT) / innerWidth) * 255), 0, 255);
-      const canvasToValueY = (cy: number) => clamp(Math.round(255 - ((cy - MARGIN_TOP) / innerHeight) * 255), 0, 255);
-      const xVal = canvasToValueX(mx);
-      const yVal = canvasToValueY(my);
-      let best = -1;
-      let bestDist = 9999;
-      for (let i = 0; i < localPoints.length; i++) {
-        const [px, py] = localPoints[i]!;
-        const dx = px - xVal;
-        const dy = py - yVal;
-        const d = dx * dx + dy * dy;
-        if (d < bestDist) {
-          best = i;
-          bestDist = d;
-        }
-      }
-      if (best !== -1 && bestDist <= 20 * 20) {
-        return best;
-      }
-      return -1;
-    },
-    [localPoints]
-  );
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -260,24 +271,18 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
       const rect = c.getBoundingClientRect();
       const mx = e.clientX - rect.left; // CSS pixel coordinates
       const my = e.clientY - rect.top;
-      const cssWidth = c.clientWidth || CANVAS_WIDTH;
-      const cssHeight = c.clientHeight || CANVAS_HEIGHT;
-      const innerWidth = cssWidth - MARGIN_LEFT - MARGIN_RIGHT;
-      const innerHeight = cssHeight - MARGIN_TOP - MARGIN_BOTTOM;
-      const canvasToValueX = (cx: number) => clamp(Math.round(((cx - MARGIN_LEFT) / innerWidth) * 255), 0, 255);
-      const canvasToValueY = (cy: number) => clamp(Math.round(255 - ((cy - MARGIN_TOP) / innerHeight) * 255), 0, 255);
-      const idx = getNearestPointIndex(mx, my);
+      const idx = getNearestPointIndex(c, localPoints, mx, my);
       if (idx !== -1 && idx !== 0 && idx !== localPoints.length - 1) {
         setDragIndex(idx);
         return;
       }
-      const xVal = canvasToValueX(mx);
-      const yVal = canvasToValueY(my);
+      const xVal = canvasXToValueX(c, mx);
+      const yVal = canvasYToValueY(c, my);
       const next = sortPoints([...localPoints, [xVal, yVal]]);
       setLocalPoints(next);
       setDragIndex(next.findIndex(([x, y]) => x === xVal && y === yVal));
     },
-    [getNearestPointIndex, localPoints]
+    [localPoints]
   );
 
   const handlePointerMove = useCallback(
@@ -294,14 +299,8 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
       const rect = c.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
-      const cssWidth = c.clientWidth || CANVAS_WIDTH;
-      const cssHeight = c.clientHeight || CANVAS_HEIGHT;
-      const innerWidth = cssWidth - MARGIN_LEFT - MARGIN_RIGHT;
-      const innerHeight = cssHeight - MARGIN_TOP - MARGIN_BOTTOM;
-      const canvasToValueX = (cx: number) => clamp(Math.round(((cx - MARGIN_LEFT) / innerWidth) * 255), 0, 255);
-      const canvasToValueY = (cy: number) => clamp(Math.round(255 - ((cy - MARGIN_TOP) / innerHeight) * 255), 0, 255);
-      const mxVal = canvasToValueX(mx);
-      const myVal = canvasToValueY(my);
+      const mxVal = canvasXToValueX(c, mx);
+      const myVal = canvasYToValueY(c, my);
       setLocalPoints((prev) => {
         // Endpoints are immutable; safety check.
         if (dragIndex === 0 || dragIndex === prev.length - 1) {
@@ -375,14 +374,14 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
       const rect = c.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
-      const idx = getNearestPointIndex(mx, my);
+      const idx = getNearestPointIndex(c, localPoints, mx, my);
       if (idx > 0 && idx < localPoints.length - 1) {
         const next = localPoints.filter((_, i) => i !== idx);
         setLocalPoints(next);
         commit(next);
       }
     },
-    [commit, getNearestPointIndex, localPoints]
+    [commit, localPoints]
   );
 
   // Observe size changes to redraw (responsive behavior)
@@ -392,11 +391,11 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
       return;
     }
     const ro = new ResizeObserver(() => {
-      draw();
+      drawHistogram(c, channel, histogram, localPoints);
     });
     ro.observe(c);
     return () => ro.disconnect();
-  }, [draw]);
+  }, [channel, histogram, localPoints]);
 
   const resetPoints = useCallback(() => {
     setLocalPoints(sortPoints(DEFAULT_POINTS));
@@ -429,6 +428,45 @@ const CurveGraph = memo(function CurveGraph(props: CurveGraphProps) {
     </Flex>
   );
 });
+
+const calculateHistogramsFromImageData = (imageData: ImageData): ChannelHistograms | null => {
+  try {
+    const data = imageData.data;
+    const len = data.length / 4;
+    const master = new Array<number>(256).fill(0);
+    const r = new Array<number>(256).fill(0);
+    const g = new Array<number>(256).fill(0);
+    const b = new Array<number>(256).fill(0);
+    // sample every 4th pixel to lighten work
+    for (let i = 0; i < len; i += 4) {
+      const idx = i * 4;
+      const rv = data[idx] as number;
+      const gv = data[idx + 1] as number;
+      const bv = data[idx + 2] as number;
+      const m = Math.round(0.2126 * rv + 0.7152 * gv + 0.0722 * bv);
+      if (m >= 0 && m < 256) {
+        master[m] = (master[m] ?? 0) + 1;
+      }
+      if (rv >= 0 && rv < 256) {
+        r[rv] = (r[rv] ?? 0) + 1;
+      }
+      if (gv >= 0 && gv < 256) {
+        g[gv] = (g[gv] ?? 0) + 1;
+      }
+      if (bv >= 0 && bv < 256) {
+        b[bv] = (b[bv] ?? 0) + 1;
+      }
+    }
+    return {
+      master,
+      r,
+      g,
+      b,
+    };
+  } catch {
+    return null;
+  }
+};
 
 export const RasterLayerCurvesAdjustmentsEditor = memo(() => {
   const dispatch = useAppDispatch();
@@ -469,36 +507,13 @@ export const RasterLayerCurvesAdjustmentsEditor = memo(() => {
         return;
       }
       const imageData = adapter.renderer.getImageData({ rect });
-      const data = imageData.data;
-      const len = data.length / 4;
-      const master = new Array<number>(256).fill(0);
-      const r = new Array<number>(256).fill(0);
-      const g = new Array<number>(256).fill(0);
-      const b = new Array<number>(256).fill(0);
-      // sample every 4th pixel to lighten work
-      for (let i = 0; i < len; i += 4) {
-        const idx = i * 4;
-        const rv = data[idx] as number;
-        const gv = data[idx + 1] as number;
-        const bv = data[idx + 2] as number;
-        const m = Math.round(0.2126 * rv + 0.7152 * gv + 0.0722 * bv);
-        if (m >= 0 && m < 256) {
-          master[m] = (master[m] ?? 0) + 1;
-        }
-        if (rv >= 0 && rv < 256) {
-          r[rv] = (r[rv] ?? 0) + 1;
-        }
-        if (gv >= 0 && gv < 256) {
-          g[gv] = (g[gv] ?? 0) + 1;
-        }
-        if (bv >= 0 && bv < 256) {
-          b[bv] = (b[bv] ?? 0) + 1;
-        }
+      const h = calculateHistogramsFromImageData(imageData);
+      if (h) {
+        setHistMaster(h.master);
+        setHistR(h.r);
+        setHistG(h.g);
+        setHistB(h.b);
       }
-      setHistMaster(master);
-      setHistR(r);
-      setHistG(g);
-      setHistB(b);
     } catch {
       // ignore
     }
