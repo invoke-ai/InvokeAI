@@ -29,8 +29,18 @@ const clamp = (v: number, min: number, max: number) => (v < min ? min : v > max 
 
 const sortPoints = (pts: Array<[number, number]>) =>
   [...pts]
-    .sort((a, b) => a[0] - b[0])
-    .map(([x, y]) => [clamp(Math.round(x), 0, 255), clamp(Math.round(y), 0, 255)] as [number, number]);
+    .sort((a, b) => {
+      const xDiff = a[0] - b[0];
+      if (xDiff) {
+        return xDiff;
+      }
+      if (a[0] === 0 || a[0] === 255) {
+        return a[1] - b[1];
+      }
+      return 0;
+    })
+    // Finally, clamp to valid range and round to integers
+    .map(([x, y]) => [clamp(Math.round(x), 0, 255), clamp(Math.round(y), 0, 255)] satisfies [number, number]);
 
 // Base canvas logical coordinate system (used for aspect ratio & initial sizing)
 const CANVAS_WIDTH = 256;
