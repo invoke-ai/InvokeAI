@@ -1270,7 +1270,6 @@
         "clearQueueAlertDialog2": "Sei sicuro di voler cancellare la coda?",
         "item": "Elemento",
         "graphFailedToQueue": "Impossibile mettere in coda il grafico",
-        "batchFieldValues": "Valori Campi Lotto",
         "time": "Tempo",
         "openQueue": "Apri coda",
         "iterations_one": "Iterazione",
@@ -2340,7 +2339,6 @@
             "dragToMove": "Trascina un punto per spostarlo",
             "clickToAdd": "Fare clic sul livello per aggiungere un punto",
             "clickToRemove": "Clicca su un punto per rimuoverlo",
-            "help3": "Inverte la selezione per selezionare tutto tranne l'oggetto di destinazione.",
             "pointType": "Tipo punto",
             "apply": "Applica",
             "reset": "Reimposta",
@@ -2351,9 +2349,7 @@
             "include": "Includi",
             "neutral": "Neutro",
             "saveAs": "Salva come",
-            "process": "Elabora",
-            "help1": "Seleziona un singolo oggetto di destinazione. Aggiungi i punti <Bold>Includi</Bold> e <Bold>Escludi</Bold> per indicare quali parti del livello fanno parte dell'oggetto di destinazione.",
-            "help2": "Inizia con un punto <Bold>Include</Bold> all'interno dell'oggetto di destinazione. Aggiungi altri punti per perfezionare la selezione. Meno punti in genere producono risultati migliori."
+            "process": "Elabora"
         },
         "convertControlLayerTo": "Converti $t(controlLayers.controlLayer) in",
         "newRasterLayer": "Nuovo $t(controlLayers.rasterLayer)",

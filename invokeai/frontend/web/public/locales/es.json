@@ -443,7 +443,6 @@
         "other": "Otro",
         "queueFront": "Añadir al principio de la cola",
         "gallery": "Galería",
-        "batchFieldValues": "Valores de procesamiento por lotes",
         "session": "Sesión",
         "notReady": "La cola aún no está lista",
         "graphQueued": "Gráfico en cola",
