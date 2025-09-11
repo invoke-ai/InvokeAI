@@ -1018,6 +1018,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
         this.syncBboxVisibility();
 
         if (!hasInputData(inputData)) {
+          this.resetEphemeralState();
           return;
         }
 
@@ -1031,6 +1032,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.subscriptions.add(
       this.$invert.listen(() => {
         if (!hasInputData(this.$inputData.get())) {
+          this.resetEphemeralState();
           return;
         }
 
@@ -1044,6 +1046,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.subscriptions.add(
       this.$model.listen(() => {
         if (!hasInputData(this.$inputData.get())) {
+          this.resetEphemeralState();
           return;
         }
 
@@ -1057,6 +1060,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.subscriptions.add(
       this.manager.stateApi.createStoreSubscription(selectAutoProcess, (autoProcess) => {
         if (!hasInputData(this.$inputData.get())) {
+          this.resetEphemeralState();
           return;
         }
         if (autoProcess) {
@@ -1428,7 +1432,10 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     }
 
     // Empty internal module state - default to visual mode
-    this.$inputData.set({ type: 'visual', points: [], bbox: null });
+    // Careful! If we set input data here and it was already empty, it will trigger an infinite loop of resets. So only set if needed.
+    if (hasInputData(this.$inputData.get())) {
+      this.$inputData.set({ type: 'visual', points: [], bbox: null });
+    }
     this.$imageState.set(null);
     this.$pointType.set(1);
     this.$invert.set(false);
