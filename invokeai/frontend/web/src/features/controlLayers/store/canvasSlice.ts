@@ -4,6 +4,7 @@ import type { SliceConfig } from 'app/store/types';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
+import { isPlainObject } from 'es-toolkit';
 import { merge } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasReset } from 'features/controlLayers/store/actions';
@@ -17,7 +18,8 @@ import {
 import type {
   CanvasEntityStateFromType,
   CanvasEntityType,
-  CanvasesState,
+  CanvasesStateWithHistory,
+  CanvasesStateWithoutHistory,
   CanvasInpaintMaskState,
   CanvasMetadata,
   ChannelName,
@@ -40,7 +42,8 @@ import { isMainModelBase, zModelIdentifierField } from 'features/nodes/types/com
 import { API_BASE_MODELS } from 'features/parameters/types/constants';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
-import type { UndoableOptions } from 'redux-undo';
+import type { StateWithHistory, UndoableOptions } from 'redux-undo';
+import undoable, { newHistory } from 'redux-undo';
 import {
   type ControlLoRAModelConfig,
   type ControlNetModelConfig,
@@ -51,6 +54,7 @@ import {
   isIPAdapterModelConfig,
   type T2IAdapterModelConfig,
 } from 'services/api/types';
+import { assert } from 'tsafe';
 
 import type {
   AspectRatioID,
@@ -86,7 +90,8 @@ import {
   isImagenAspectRatioID,
   isRegionalGuidanceFLUXReduxConfig,
   isRegionalGuidanceIPAdapterConfig,
-  zCanvasesState,
+  zCanvasesStateWithHistory,
+  zCanvasesStateWithoutHistory,
 } from './types';
 import {
   converters,
@@ -104,19 +109,7 @@ import {
   makeDefaultRasterLayerAdjustments,
 } from './util';
 
-const getInitialCanvasesState = (): CanvasesState => {
-  const canvasId = getPrefixedId('canvas');
-  const canvasName = 'default';
-  const canvas = getCanvasState(canvasId, canvasName);
-
-  return {
-    _version: 3,
-    selectedCanvasId: canvas.id,
-    canvases: [canvas],
-  };
-};
-
-const getCanvasState = (id: string, name: string): CanvasState => ({
+const getInitialCanvasState = (id: string, name: string): CanvasState => ({
   id,
   name,
   selectedEntityIdentifier: null,
@@ -134,19 +127,44 @@ const getCanvasState = (id: string, name: string): CanvasState => ({
   },
 });
 
-const slice = createSlice({
+const getInitialCanvasHistoryState = (id: string, name: string): StateWithHistory<CanvasState> => {
+  const canvas = getInitialCanvasState(id, name);
+
+  return newHistory([], canvas, []);
+};
+
+const getInitialCanvasesState = (): CanvasesStateWithoutHistory => {
+  const canvasId = getPrefixedId('canvas');
+  const canvasName = 'default';
+  const canvas = getInitialCanvasState(canvasId, canvasName);
+
+  return {
+    _version: 4,
+    selectedCanvasId: canvasId,
+    canvases: [canvas],
+  };
+};
+
+const getInitialCanvasesHistoryState = (): CanvasesStateWithHistory => {
+  const state = getInitialCanvasesState();
+
+  return {
+    ...state,
+    canvases: state.canvases.map((canvas) => newHistory([], canvas, [])),
+  };
+};
+
+const canvasesSlice = createSlice({
   name: 'canvas',
-  initialState: getInitialCanvasesState(),
+  initialState: getInitialCanvasesHistoryState(),
   reducers: {
-    // undoable canvases state
-    //#region Canvases
     canvasAdded: {
       reducer: (state, action: PayloadAction<{ id: string; isSelected?: boolean }>) => {
         const { id, isSelected } = action.payload;
 
         const name = 'default';
-        const canvasState = getCanvasState(id, name);
-        state.canvases.push(canvasState);
+        const canvas = getInitialCanvasHistoryState(id, name);
+        state.canvases.push(canvas);
 
         if (isSelected) {
           state.selectedCanvasId = id;
@@ -185,12 +203,19 @@ const slice = createSlice({
         throw new Error('Last canvas cannot be deleted');
       }
 
-      const index = state.canvases.findIndex((canvas) => canvas.id === id);
+      const index = state.canvases.findIndex((canvas) => canvas.present.id === id);
       const nextIndex = (index + 1) % state.canvases.length;
 
-      state.selectedCanvasId = state.canvases[nextIndex]!.id;
-      state.canvases = state.canvases.filter((canvas) => canvas.id !== id);
+      state.selectedCanvasId = state.canvases[nextIndex]!.present.id;
+      state.canvases = state.canvases.filter((canvas) => canvas.present.id !== id);
     },
+  },
+});
+
+const canvasSlice = createSlice({
+  name: 'canvas',
+  initialState: {} as CanvasState,
+  reducers: {
     //#region Raster layers
     rasterLayerAdjustmentsSet: (
       state,
@@ -295,16 +320,15 @@ const slice = createSlice({
         }>
       ) => {
         const { id, overrides, isSelected, isBookmarked, mergedEntitiesToDelete = [], addAfter } = action.payload;
-        const canvas = getSelectedCanvas(state);
         const entityState = getRasterLayerState(id, overrides);
 
         const index = addAfter
-          ? canvas.rasterLayers.entities.findIndex((e) => e.id === addAfter) + 1
-          : canvas.rasterLayers.entities.length;
-        canvas.rasterLayers.entities.splice(index, 0, entityState);
+          ? state.rasterLayers.entities.findIndex((e) => e.id === addAfter) + 1
+          : state.rasterLayers.entities.length;
+        state.rasterLayers.entities.splice(index, 0, entityState);
 
         if (mergedEntitiesToDelete.length > 0) {
-          canvas.rasterLayers.entities = canvas.rasterLayers.entities.filter(
+          state.rasterLayers.entities = state.rasterLayers.entities.filter(
             (entity) => !mergedEntitiesToDelete.includes(entity.id)
           );
         }
@@ -312,11 +336,11 @@ const slice = createSlice({
         const entityIdentifier = getEntityIdentifier(entityState);
 
         if (isSelected || mergedEntitiesToDelete.length > 0) {
-          canvas.selectedEntityIdentifier = entityIdentifier;
+          state.selectedEntityIdentifier = entityIdentifier;
         }
 
         if (isBookmarked) {
-          canvas.bookmarkedEntityIdentifier = entityIdentifier;
+          state.bookmarkedEntityIdentifier = entityIdentifier;
         }
       },
       prepare: (payload: {
@@ -331,10 +355,8 @@ const slice = createSlice({
     },
     rasterLayerRecalled: (state, action: PayloadAction<{ data: CanvasRasterLayerState }>) => {
       const { data } = action.payload;
-      const canvas = getSelectedCanvas(state);
-
-      canvas.rasterLayers.entities.push(data);
-      canvas.selectedEntityIdentifier = getEntityIdentifier(data);
+      state.rasterLayers.entities.push(data);
+      state.selectedEntityIdentifier = getEntityIdentifier(data);
     },
     rasterLayerConvertedToControlLayer: {
       reducer: (
@@ -347,8 +369,7 @@ const slice = createSlice({
         >
       ) => {
         const { entityIdentifier, newId, overrides, replace } = action.payload;
-        const canvas = getSelectedCanvas(state);
-        const layer = selectEntity(canvas, entityIdentifier);
+        const layer = selectEntity(state, entityIdentifier);
         if (!layer) {
           return;
         }
@@ -358,15 +379,13 @@ const slice = createSlice({
 
         if (replace) {
           // Remove the raster layer
-          canvas.rasterLayers.entities = canvas.rasterLayers.entities.filter(
-            (layer) => layer.id !== entityIdentifier.id
-          );
+          state.rasterLayers.entities = state.rasterLayers.entities.filter((layer) => layer.id !== entityIdentifier.id);
         }
 
         // Add the converted control layer
-        canvas.controlLayers.entities.push(controlLayerState);
+        state.controlLayers.entities.push(controlLayerState);
 
-        canvas.selectedEntityIdentifier = { type: controlLayerState.type, id: controlLayerState.id };
+        state.selectedEntityIdentifier = { type: controlLayerState.type, id: controlLayerState.id };
       },
       prepare: (
         payload: EntityIdentifierPayload<
@@ -388,8 +407,7 @@ const slice = createSlice({
         >
       ) => {
         const { entityIdentifier, newId, overrides, replace } = action.payload;
-        const canvas = getSelectedCanvas(state);
-        const layer = selectEntity(canvas, entityIdentifier);
+        const layer = selectEntity(state, entityIdentifier);
         if (!layer) {
           return;
         }
@@ -399,15 +417,13 @@ const slice = createSlice({
 
         if (replace) {
           // Remove the raster layer
-          canvas.rasterLayers.entities = canvas.rasterLayers.entities.filter(
-            (layer) => layer.id !== entityIdentifier.id
-          );
+          state.rasterLayers.entities = state.rasterLayers.entities.filter((layer) => layer.id !== entityIdentifier.id);
         }
 
         // Add the converted inpaint mask
-        canvas.inpaintMasks.entities.push(inpaintMaskState);
+        state.inpaintMasks.entities.push(inpaintMaskState);
 
-        canvas.selectedEntityIdentifier = { type: inpaintMaskState.type, id: inpaintMaskState.id };
+        state.selectedEntityIdentifier = { type: inpaintMaskState.type, id: inpaintMaskState.id };
       },
       prepare: (
         payload: EntityIdentifierPayload<
@@ -429,8 +445,7 @@ const slice = createSlice({
         >
       ) => {
         const { entityIdentifier, newId, overrides, replace } = action.payload;
-        const canvas = getSelectedCanvas(state);
-        const layer = selectEntity(canvas, entityIdentifier);
+        const layer = selectEntity(state, entityIdentifier);
         if (!layer) {
           return;
         }
@@ -440,15 +455,13 @@ const slice = createSlice({
 
         if (replace) {
           // Remove the raster layer
-          canvas.rasterLayers.entities = canvas.rasterLayers.entities.filter(
-            (layer) => layer.id !== entityIdentifier.id
-          );
+          state.rasterLayers.entities = state.rasterLayers.entities.filter((layer) => layer.id !== entityIdentifier.id);
         }
 
         // Add the converted inpaint mask
-        canvas.regionalGuidance.entities.push(regionalGuidanceState);
+        state.regionalGuidance.entities.push(regionalGuidanceState);
 
-        canvas.selectedEntityIdentifier = { type: regionalGuidanceState.type, id: regionalGuidanceState.id };
+        state.selectedEntityIdentifier = { type: regionalGuidanceState.type, id: regionalGuidanceState.id };
       },
       prepare: (
         payload: EntityIdentifierPayload<
@@ -474,27 +487,26 @@ const slice = createSlice({
       ) => {
         const { id, overrides, isSelected, isBookmarked, mergedEntitiesToDelete = [], addAfter } = action.payload;
 
-        const canvas = getSelectedCanvas(state);
         const entityState = getControlLayerState(id, overrides);
 
         const index = addAfter
-          ? canvas.controlLayers.entities.findIndex((e) => e.id === addAfter) + 1
-          : canvas.controlLayers.entities.length;
-        canvas.controlLayers.entities.splice(index, 0, entityState);
+          ? state.controlLayers.entities.findIndex((e) => e.id === addAfter) + 1
+          : state.controlLayers.entities.length;
+        state.controlLayers.entities.splice(index, 0, entityState);
 
         if (mergedEntitiesToDelete.length > 0) {
-          canvas.controlLayers.entities = canvas.controlLayers.entities.filter(
+          state.controlLayers.entities = state.controlLayers.entities.filter(
             (entity) => !mergedEntitiesToDelete.includes(entity.id)
           );
         }
         const entityIdentifier = getEntityIdentifier(entityState);
 
         if (isSelected || mergedEntitiesToDelete.length > 0) {
-          canvas.selectedEntityIdentifier = entityIdentifier;
+          state.selectedEntityIdentifier = entityIdentifier;
         }
 
         if (isBookmarked) {
-          canvas.bookmarkedEntityIdentifier = entityIdentifier;
+          state.bookmarkedEntityIdentifier = entityIdentifier;
         }
       },
       prepare: (payload: {
@@ -509,10 +521,8 @@ const slice = createSlice({
     },
     controlLayerRecalled: (state, action: PayloadAction<{ data: CanvasControlLayerState }>) => {
       const { data } = action.payload;
-      const canvas = getSelectedCanvas(state);
-
-      canvas.controlLayers.entities.push(data);
-      canvas.selectedEntityIdentifier = { type: 'control_layer', id: data.id };
+      state.controlLayers.entities.push(data);
+      state.selectedEntityIdentifier = { type: 'control_layer', id: data.id };
     },
     controlLayerConvertedToRasterLayer: {
       reducer: (
@@ -525,9 +535,7 @@ const slice = createSlice({
         >
       ) => {
         const { entityIdentifier, newId, overrides, replace } = action.payload;
-
-        const canvas = getSelectedCanvas(state);
-        const layer = selectEntity(canvas, entityIdentifier);
+        const layer = selectEntity(state, entityIdentifier);
         if (!layer) {
           return;
         }
@@ -537,15 +545,15 @@ const slice = createSlice({
 
         if (replace) {
           // Remove the control layer
-          canvas.controlLayers.entities = canvas.controlLayers.entities.filter(
+          state.controlLayers.entities = state.controlLayers.entities.filter(
             (layer) => layer.id !== entityIdentifier.id
           );
         }
 
         // Add the new raster layer
-        canvas.rasterLayers.entities.push(rasterLayerState);
+        state.rasterLayers.entities.push(rasterLayerState);
 
-        canvas.selectedEntityIdentifier = { type: rasterLayerState.type, id: rasterLayerState.id };
+        state.selectedEntityIdentifier = { type: rasterLayerState.type, id: rasterLayerState.id };
       },
       prepare: (
         payload: EntityIdentifierPayload<
@@ -567,9 +575,7 @@ const slice = createSlice({
         >
       ) => {
         const { entityIdentifier, newId, overrides, replace } = action.payload;
-
-        const canvas = getSelectedCanvas(state);
-        const layer = selectEntity(canvas, entityIdentifier);
+        const layer = selectEntity(state, entityIdentifier);
         if (!layer) {
           return;
         }
@@ -579,15 +585,15 @@ const slice = createSlice({
 
         if (replace) {
           // Remove the control layer
-          canvas.controlLayers.entities = canvas.controlLayers.entities.filter(
+          state.controlLayers.entities = state.controlLayers.entities.filter(
             (layer) => layer.id !== entityIdentifier.id
           );
         }
 
         // Add the new inpaint mask
-        canvas.inpaintMasks.entities.push(inpaintMaskState);
+        state.inpaintMasks.entities.push(inpaintMaskState);
 
-        canvas.selectedEntityIdentifier = { type: inpaintMaskState.type, id: inpaintMaskState.id };
+        state.selectedEntityIdentifier = { type: inpaintMaskState.type, id: inpaintMaskState.id };
       },
       prepare: (
         payload: EntityIdentifierPayload<
@@ -609,9 +615,7 @@ const slice = createSlice({
         >
       ) => {
         const { entityIdentifier, newId, overrides, replace } = action.payload;
-
-        const canvas = getSelectedCanvas(state);
-        const layer = selectEntity(canvas, entityIdentifier);
+        const layer = selectEntity(state, entityIdentifier);
         if (!layer) {
           return;
         }
@@ -621,15 +625,15 @@ const slice = createSlice({
 
         if (replace) {
           // Remove the control layer
-          canvas.controlLayers.entities = canvas.controlLayers.entities.filter(
+          state.controlLayers.entities = state.controlLayers.entities.filter(
             (layer) => layer.id !== entityIdentifier.id
           );
         }
 
         // Add the new regional guidance
-        canvas.regionalGuidance.entities.push(regionalGuidanceState);
+        state.regionalGuidance.entities.push(regionalGuidanceState);
 
-        canvas.selectedEntityIdentifier = { type: regionalGuidanceState.type, id: regionalGuidanceState.id };
+        state.selectedEntityIdentifier = { type: regionalGuidanceState.type, id: regionalGuidanceState.id };
       },
       prepare: (
         payload: EntityIdentifierPayload<
@@ -652,9 +656,7 @@ const slice = createSlice({
       >
     ) => {
       const { entityIdentifier, modelConfig } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const layer = selectEntity(canvas, entityIdentifier);
+      const layer = selectEntity(state, entityIdentifier);
       if (!layer || !layer.controlAdapter) {
         return;
       }
@@ -734,9 +736,7 @@ const slice = createSlice({
       action: PayloadAction<EntityIdentifierPayload<{ controlMode: ControlModeV2 }, 'control_layer'>>
     ) => {
       const { entityIdentifier, controlMode } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const layer = selectEntity(canvas, entityIdentifier);
+      const layer = selectEntity(state, entityIdentifier);
       if (!layer || !layer.controlAdapter || layer.controlAdapter.type !== 'controlnet') {
         return;
       }
@@ -747,9 +747,7 @@ const slice = createSlice({
       action: PayloadAction<EntityIdentifierPayload<{ weight: number }, 'control_layer'>>
     ) => {
       const { entityIdentifier, weight } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const layer = selectEntity(canvas, entityIdentifier);
+      const layer = selectEntity(state, entityIdentifier);
       if (!layer || !layer.controlAdapter) {
         return;
       }
@@ -760,9 +758,7 @@ const slice = createSlice({
       action: PayloadAction<EntityIdentifierPayload<{ beginEndStepPct: [number, number] }, 'control_layer'>>
     ) => {
       const { entityIdentifier, beginEndStepPct } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const layer = selectEntity(canvas, entityIdentifier);
+      const layer = selectEntity(state, entityIdentifier);
       if (!layer || !layer.controlAdapter || layer.controlAdapter.type === 'control_lora') {
         return;
       }
@@ -773,9 +769,7 @@ const slice = createSlice({
       action: PayloadAction<EntityIdentifierPayload<void, 'control_layer'>>
     ) => {
       const { entityIdentifier } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const layer = selectEntity(canvas, entityIdentifier);
+      const layer = selectEntity(state, entityIdentifier);
       if (!layer) {
         return;
       }
@@ -796,27 +790,26 @@ const slice = createSlice({
       ) => {
         const { id, overrides, isSelected, isBookmarked, mergedEntitiesToDelete = [], addAfter } = action.payload;
 
-        const canvas = getSelectedCanvas(state);
         const entityState = getRegionalGuidanceState(id, overrides);
 
         const index = addAfter
-          ? canvas.regionalGuidance.entities.findIndex((e) => e.id === addAfter) + 1
-          : canvas.regionalGuidance.entities.length;
-        canvas.regionalGuidance.entities.splice(index, 0, entityState);
+          ? state.regionalGuidance.entities.findIndex((e) => e.id === addAfter) + 1
+          : state.regionalGuidance.entities.length;
+        state.regionalGuidance.entities.splice(index, 0, entityState);
 
         if (mergedEntitiesToDelete.length > 0) {
-          canvas.regionalGuidance.entities = canvas.regionalGuidance.entities.filter(
+          state.regionalGuidance.entities = state.regionalGuidance.entities.filter(
             (entity) => !mergedEntitiesToDelete.includes(entity.id)
           );
         }
         const entityIdentifier = getEntityIdentifier(entityState);
 
         if (isSelected || mergedEntitiesToDelete.length > 0) {
-          canvas.selectedEntityIdentifier = entityIdentifier;
+          state.selectedEntityIdentifier = entityIdentifier;
         }
 
         if (isBookmarked) {
-          canvas.bookmarkedEntityIdentifier = entityIdentifier;
+          state.bookmarkedEntityIdentifier = entityIdentifier;
         }
       },
       prepare: (payload?: {
@@ -831,10 +824,8 @@ const slice = createSlice({
     },
     rgRecalled: (state, action: PayloadAction<{ data: CanvasRegionalGuidanceState }>) => {
       const { data } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      canvas.regionalGuidance.entities.push(data);
-      canvas.selectedEntityIdentifier = { type: 'regional_guidance', id: data.id };
+      state.regionalGuidance.entities.push(data);
+      state.selectedEntityIdentifier = { type: 'regional_guidance', id: data.id };
     },
     rgConvertedToInpaintMask: {
       reducer: (
@@ -847,9 +838,7 @@ const slice = createSlice({
         >
       ) => {
         const { entityIdentifier, newId, overrides, replace } = action.payload;
-
-        const canvas = getSelectedCanvas(state);
-        const layer = selectEntity(canvas, entityIdentifier);
+        const layer = selectEntity(state, entityIdentifier);
         if (!layer) {
           return;
         }
@@ -859,15 +848,15 @@ const slice = createSlice({
 
         if (replace) {
           // Remove the regional guidance
-          canvas.regionalGuidance.entities = canvas.regionalGuidance.entities.filter(
+          state.regionalGuidance.entities = state.regionalGuidance.entities.filter(
             (layer) => layer.id !== entityIdentifier.id
           );
         }
 
         // Add the new inpaint mask
-        canvas.inpaintMasks.entities.push(inpaintMaskState);
+        state.inpaintMasks.entities.push(inpaintMaskState);
 
-        canvas.selectedEntityIdentifier = { type: inpaintMaskState.type, id: inpaintMaskState.id };
+        state.selectedEntityIdentifier = { type: inpaintMaskState.type, id: inpaintMaskState.id };
       },
       prepare: (
         payload: EntityIdentifierPayload<
@@ -883,9 +872,7 @@ const slice = createSlice({
       action: PayloadAction<EntityIdentifierPayload<{ prompt: string | null }, 'regional_guidance'>>
     ) => {
       const { entityIdentifier, prompt } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
@@ -896,9 +883,7 @@ const slice = createSlice({
       action: PayloadAction<EntityIdentifierPayload<{ prompt: string | null }, 'regional_guidance'>>
     ) => {
       const { entityIdentifier, prompt } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
@@ -906,9 +891,7 @@ const slice = createSlice({
     },
     rgAutoNegativeToggled: (state, action: PayloadAction<EntityIdentifierPayload<void, 'regional_guidance'>>) => {
       const { entityIdentifier } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const rg = selectEntity(canvas, entityIdentifier);
+      const rg = selectEntity(state, entityIdentifier);
       if (!rg) {
         return;
       }
@@ -925,9 +908,7 @@ const slice = createSlice({
         >
       ) => {
         const { entityIdentifier, overrides, referenceImageId } = action.payload;
-
-        const canvas = getSelectedCanvas(state);
-        const entity = selectEntity(canvas, entityIdentifier);
+        const entity = selectEntity(state, entityIdentifier);
         if (!entity) {
           return;
         }
@@ -946,9 +927,7 @@ const slice = createSlice({
       action: PayloadAction<EntityIdentifierPayload<{ referenceImageId: string }, 'regional_guidance'>>
     ) => {
       const { entityIdentifier, referenceImageId } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
@@ -961,9 +940,7 @@ const slice = createSlice({
       >
     ) => {
       const { entityIdentifier, referenceImageId, imageDTO } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const referenceImage = selectRegionalGuidanceReferenceImage(canvas, entityIdentifier, referenceImageId);
+      const referenceImage = selectRegionalGuidanceReferenceImage(state, entityIdentifier, referenceImageId);
       if (!referenceImage) {
         return;
       }
@@ -974,9 +951,7 @@ const slice = createSlice({
       action: PayloadAction<EntityIdentifierPayload<{ referenceImageId: string; weight: number }, 'regional_guidance'>>
     ) => {
       const { entityIdentifier, referenceImageId, weight } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const referenceImage = selectRegionalGuidanceReferenceImage(canvas, entityIdentifier, referenceImageId);
+      const referenceImage = selectRegionalGuidanceReferenceImage(state, entityIdentifier, referenceImageId);
       if (!referenceImage) {
         return;
       }
@@ -993,9 +968,7 @@ const slice = createSlice({
       >
     ) => {
       const { entityIdentifier, referenceImageId, beginEndStepPct } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const referenceImage = selectRegionalGuidanceReferenceImage(canvas, entityIdentifier, referenceImageId);
+      const referenceImage = selectRegionalGuidanceReferenceImage(state, entityIdentifier, referenceImageId);
       if (!referenceImage) {
         return;
       }
@@ -1011,9 +984,7 @@ const slice = createSlice({
       >
     ) => {
       const { entityIdentifier, referenceImageId, method } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const referenceImage = selectRegionalGuidanceReferenceImage(canvas, entityIdentifier, referenceImageId);
+      const referenceImage = selectRegionalGuidanceReferenceImage(state, entityIdentifier, referenceImageId);
       if (!referenceImage) {
         return;
       }
@@ -1032,9 +1003,7 @@ const slice = createSlice({
       >
     ) => {
       const { entityIdentifier, referenceImageId, imageInfluence } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const referenceImage = selectRegionalGuidanceReferenceImage(canvas, entityIdentifier, referenceImageId);
+      const referenceImage = selectRegionalGuidanceReferenceImage(state, entityIdentifier, referenceImageId);
       if (!referenceImage) {
         return;
       }
@@ -1057,9 +1026,7 @@ const slice = createSlice({
       >
     ) => {
       const { entityIdentifier, referenceImageId, modelConfig } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const referenceImage = selectRegionalGuidanceReferenceImage(canvas, entityIdentifier, referenceImageId);
+      const referenceImage = selectRegionalGuidanceReferenceImage(state, entityIdentifier, referenceImageId);
       if (!referenceImage) {
         return;
       }
@@ -1108,9 +1075,7 @@ const slice = createSlice({
       >
     ) => {
       const { entityIdentifier, referenceImageId, clipVisionModel } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const referenceImage = selectRegionalGuidanceReferenceImage(canvas, entityIdentifier, referenceImageId);
+      const referenceImage = selectRegionalGuidanceReferenceImage(state, entityIdentifier, referenceImageId);
       if (!referenceImage) {
         return;
       }
@@ -1134,27 +1099,26 @@ const slice = createSlice({
       ) => {
         const { id, overrides, isSelected, isBookmarked, mergedEntitiesToDelete = [], addAfter } = action.payload;
 
-        const canvas = getSelectedCanvas(state);
         const entityState = getInpaintMaskState(id, overrides);
 
         const index = addAfter
-          ? canvas.inpaintMasks.entities.findIndex((e) => e.id === addAfter) + 1
-          : canvas.inpaintMasks.entities.length;
-        canvas.inpaintMasks.entities.splice(index, 0, entityState);
+          ? state.inpaintMasks.entities.findIndex((e) => e.id === addAfter) + 1
+          : state.inpaintMasks.entities.length;
+        state.inpaintMasks.entities.splice(index, 0, entityState);
 
         if (mergedEntitiesToDelete.length > 0) {
-          canvas.inpaintMasks.entities = canvas.inpaintMasks.entities.filter(
+          state.inpaintMasks.entities = state.inpaintMasks.entities.filter(
             (entity) => !mergedEntitiesToDelete.includes(entity.id)
           );
         }
         const entityIdentifier = getEntityIdentifier(entityState);
 
         if (isSelected || mergedEntitiesToDelete.length > 0) {
-          canvas.selectedEntityIdentifier = entityIdentifier;
+          state.selectedEntityIdentifier = entityIdentifier;
         }
 
         if (isBookmarked) {
-          canvas.bookmarkedEntityIdentifier = entityIdentifier;
+          state.bookmarkedEntityIdentifier = entityIdentifier;
         }
       },
       prepare: (payload?: {
@@ -1169,16 +1133,12 @@ const slice = createSlice({
     },
     inpaintMaskRecalled: (state, action: PayloadAction<{ data: CanvasInpaintMaskState }>) => {
       const { data } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      canvas.inpaintMasks.entities = [data];
-      canvas.selectedEntityIdentifier = { type: 'inpaint_mask', id: data.id };
+      state.inpaintMasks.entities = [data];
+      state.selectedEntityIdentifier = { type: 'inpaint_mask', id: data.id };
     },
     inpaintMaskNoiseAdded: (state, action: PayloadAction<EntityIdentifierPayload<void, 'inpaint_mask'>>) => {
       const { entityIdentifier } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (entity && entity.type === 'inpaint_mask') {
         entity.noiseLevel = 0.15; // Default noise level
       }
@@ -1188,18 +1148,14 @@ const slice = createSlice({
       action: PayloadAction<EntityIdentifierPayload<{ noiseLevel: number }, 'inpaint_mask'>>
     ) => {
       const { entityIdentifier, noiseLevel } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (entity && entity.type === 'inpaint_mask') {
         entity.noiseLevel = noiseLevel;
       }
     },
     inpaintMaskNoiseDeleted: (state, action: PayloadAction<EntityIdentifierPayload<void, 'inpaint_mask'>>) => {
       const { entityIdentifier } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (entity && entity.type === 'inpaint_mask') {
         entity.noiseLevel = undefined;
       }
@@ -1215,9 +1171,7 @@ const slice = createSlice({
         >
       ) => {
         const { entityIdentifier, newId, overrides, replace } = action.payload;
-
-        const canvas = getSelectedCanvas(state);
-        const layer = selectEntity(canvas, entityIdentifier);
+        const layer = selectEntity(state, entityIdentifier);
         if (!layer) {
           return;
         }
@@ -1227,15 +1181,13 @@ const slice = createSlice({
 
         if (replace) {
           // Remove the inpaint mask
-          canvas.inpaintMasks.entities = canvas.inpaintMasks.entities.filter(
-            (layer) => layer.id !== entityIdentifier.id
-          );
+          state.inpaintMasks.entities = state.inpaintMasks.entities.filter((layer) => layer.id !== entityIdentifier.id);
         }
 
         // Add the new regional guidance
-        canvas.regionalGuidance.entities.push(regionalGuidanceState);
+        state.regionalGuidance.entities.push(regionalGuidanceState);
 
-        canvas.selectedEntityIdentifier = { type: regionalGuidanceState.type, id: regionalGuidanceState.id };
+        state.selectedEntityIdentifier = { type: regionalGuidanceState.type, id: regionalGuidanceState.id };
       },
       prepare: (
         payload: EntityIdentifierPayload<
@@ -1248,9 +1200,7 @@ const slice = createSlice({
     },
     inpaintMaskDenoiseLimitAdded: (state, action: PayloadAction<EntityIdentifierPayload<void, 'inpaint_mask'>>) => {
       const { entityIdentifier } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (entity && entity.type === 'inpaint_mask') {
         entity.denoiseLimit = 1.0; // Default denoise limit
       }
@@ -1260,66 +1210,58 @@ const slice = createSlice({
       action: PayloadAction<EntityIdentifierPayload<{ denoiseLimit: number }, 'inpaint_mask'>>
     ) => {
       const { entityIdentifier, denoiseLimit } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (entity && entity.type === 'inpaint_mask') {
         entity.denoiseLimit = denoiseLimit;
       }
     },
     inpaintMaskDenoiseLimitDeleted: (state, action: PayloadAction<EntityIdentifierPayload<void, 'inpaint_mask'>>) => {
       const { entityIdentifier } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (entity && entity.type === 'inpaint_mask') {
         entity.denoiseLimit = undefined;
       }
     },
     //#region BBox
     bboxScaledWidthChanged: (state, action: PayloadAction<number>) => {
-      const canvas = getSelectedCanvas(state);
-      const gridSize = getGridSize(canvas.bbox.modelBase);
+      const gridSize = getGridSize(state.bbox.modelBase);
 
-      canvas.bbox.scaledSize.width = roundToMultiple(action.payload, gridSize);
+      state.bbox.scaledSize.width = roundToMultiple(action.payload, gridSize);
 
-      if (canvas.bbox.aspectRatio.isLocked) {
-        canvas.bbox.scaledSize.height = roundToMultiple(
-          canvas.bbox.scaledSize.width / canvas.bbox.aspectRatio.value,
+      if (state.bbox.aspectRatio.isLocked) {
+        state.bbox.scaledSize.height = roundToMultiple(
+          state.bbox.scaledSize.width / state.bbox.aspectRatio.value,
           gridSize
         );
       }
     },
     bboxScaledHeightChanged: (state, action: PayloadAction<number>) => {
-      const canvas = getSelectedCanvas(state);
-      const gridSize = getGridSize(canvas.bbox.modelBase);
+      const gridSize = getGridSize(state.bbox.modelBase);
 
-      canvas.bbox.scaledSize.height = roundToMultiple(action.payload, gridSize);
+      state.bbox.scaledSize.height = roundToMultiple(action.payload, gridSize);
 
-      if (canvas.bbox.aspectRatio.isLocked) {
-        canvas.bbox.scaledSize.width = roundToMultiple(
-          canvas.bbox.scaledSize.height * canvas.bbox.aspectRatio.value,
+      if (state.bbox.aspectRatio.isLocked) {
+        state.bbox.scaledSize.width = roundToMultiple(
+          state.bbox.scaledSize.height * state.bbox.aspectRatio.value,
           gridSize
         );
       }
     },
     bboxScaleMethodChanged: (state, action: PayloadAction<BoundingBoxScaleMethod>) => {
-      const canvas = getSelectedCanvas(state);
-      canvas.bbox.scaleMethod = action.payload;
-      syncScaledSize(canvas);
+      state.bbox.scaleMethod = action.payload;
+      syncScaledSize(state);
     },
     bboxChangedFromCanvas: (state, action: PayloadAction<IRect>) => {
-      const canvas = getSelectedCanvas(state);
       const newBboxRect = action.payload;
-      const oldBboxRect = canvas.bbox.rect;
+      const oldBboxRect = state.bbox.rect;
 
-      canvas.bbox.rect = newBboxRect;
+      state.bbox.rect = newBboxRect;
 
       if (newBboxRect.width === oldBboxRect.width && newBboxRect.height === oldBboxRect.height) {
         return;
       }
 
-      const oldAspectRatio = canvas.bbox.aspectRatio.value;
+      const oldAspectRatio = state.bbox.aspectRatio.value;
       const newAspectRatio = newBboxRect.width / newBboxRect.height;
 
       if (oldAspectRatio === newAspectRatio) {
@@ -1329,206 +1271,188 @@ const slice = createSlice({
       // TODO(psyche): Figure out a way to handle this without resetting the aspect ratio on every change.
       // This action is dispatched when the user resizes or moves the bbox from the canvas. For now, when the user
       // resizes the bbox from the canvas, we unlock the aspect ratio.
-      canvas.bbox.aspectRatio.value = canvas.bbox.rect.width / canvas.bbox.rect.height;
-      canvas.bbox.aspectRatio.id = 'Free';
+      state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
+      state.bbox.aspectRatio.id = 'Free';
 
-      syncScaledSize(canvas);
+      syncScaledSize(state);
     },
     bboxWidthChanged: (
       state,
       action: PayloadAction<{ width: number; updateAspectRatio?: boolean; clamp?: boolean }>
     ) => {
       const { width, updateAspectRatio, clamp } = action.payload;
+      const gridSize = getGridSize(state.bbox.modelBase);
+      state.bbox.rect.width = clamp ? Math.max(roundDownToMultiple(width, gridSize), 64) : width;
 
-      const canvas = getSelectedCanvas(state);
-      const gridSize = getGridSize(canvas.bbox.modelBase);
-      canvas.bbox.rect.width = clamp ? Math.max(roundDownToMultiple(width, gridSize), 64) : width;
-
-      if (canvas.bbox.aspectRatio.isLocked) {
-        canvas.bbox.rect.height = roundToMultiple(canvas.bbox.rect.width / canvas.bbox.aspectRatio.value, gridSize);
+      if (state.bbox.aspectRatio.isLocked) {
+        state.bbox.rect.height = roundToMultiple(state.bbox.rect.width / state.bbox.aspectRatio.value, gridSize);
       }
 
-      if (updateAspectRatio || !canvas.bbox.aspectRatio.isLocked) {
-        canvas.bbox.aspectRatio.value = canvas.bbox.rect.width / canvas.bbox.rect.height;
-        canvas.bbox.aspectRatio.id = 'Free';
-        canvas.bbox.aspectRatio.isLocked = false;
+      if (updateAspectRatio || !state.bbox.aspectRatio.isLocked) {
+        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
+        state.bbox.aspectRatio.id = 'Free';
+        state.bbox.aspectRatio.isLocked = false;
       }
 
-      syncScaledSize(canvas);
+      syncScaledSize(state);
     },
     bboxHeightChanged: (
       state,
       action: PayloadAction<{ height: number; updateAspectRatio?: boolean; clamp?: boolean }>
     ) => {
       const { height, updateAspectRatio, clamp } = action.payload;
+      const gridSize = getGridSize(state.bbox.modelBase);
+      state.bbox.rect.height = clamp ? Math.max(roundDownToMultiple(height, gridSize), 64) : height;
 
-      const canvas = getSelectedCanvas(state);
-      const gridSize = getGridSize(canvas.bbox.modelBase);
-      canvas.bbox.rect.height = clamp ? Math.max(roundDownToMultiple(height, gridSize), 64) : height;
-
-      if (canvas.bbox.aspectRatio.isLocked) {
-        canvas.bbox.rect.width = roundToMultiple(canvas.bbox.rect.height * canvas.bbox.aspectRatio.value, gridSize);
+      if (state.bbox.aspectRatio.isLocked) {
+        state.bbox.rect.width = roundToMultiple(state.bbox.rect.height * state.bbox.aspectRatio.value, gridSize);
       }
 
-      if (updateAspectRatio || !canvas.bbox.aspectRatio.isLocked) {
-        canvas.bbox.aspectRatio.value = canvas.bbox.rect.width / canvas.bbox.rect.height;
-        canvas.bbox.aspectRatio.id = 'Free';
-        canvas.bbox.aspectRatio.isLocked = false;
+      if (updateAspectRatio || !state.bbox.aspectRatio.isLocked) {
+        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
+        state.bbox.aspectRatio.id = 'Free';
+        state.bbox.aspectRatio.isLocked = false;
       }
 
-      syncScaledSize(canvas);
+      syncScaledSize(state);
     },
     bboxSizeRecalled: (state, action: PayloadAction<{ width: number; height: number }>) => {
       const { width, height } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const gridSize = getGridSize(canvas.bbox.modelBase);
-      canvas.bbox.rect.width = Math.max(roundDownToMultiple(width, gridSize), 64);
-      canvas.bbox.rect.height = Math.max(roundDownToMultiple(height, gridSize), 64);
-      canvas.bbox.aspectRatio.value = canvas.bbox.rect.width / canvas.bbox.rect.height;
-      canvas.bbox.aspectRatio.id = 'Free';
-      canvas.bbox.aspectRatio.isLocked = true;
+      const gridSize = getGridSize(state.bbox.modelBase);
+      state.bbox.rect.width = Math.max(roundDownToMultiple(width, gridSize), 64);
+      state.bbox.rect.height = Math.max(roundDownToMultiple(height, gridSize), 64);
+      state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
+      state.bbox.aspectRatio.id = 'Free';
+      state.bbox.aspectRatio.isLocked = true;
     },
     bboxAspectRatioLockToggled: (state) => {
-      const canvas = getSelectedCanvas(state);
-      canvas.bbox.aspectRatio.isLocked = !canvas.bbox.aspectRatio.isLocked;
-      syncScaledSize(canvas);
+      state.bbox.aspectRatio.isLocked = !state.bbox.aspectRatio.isLocked;
+      syncScaledSize(state);
     },
     bboxAspectRatioIdChanged: (state, action: PayloadAction<{ id: AspectRatioID }>) => {
       const { id } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      canvas.bbox.aspectRatio.id = id;
+      state.bbox.aspectRatio.id = id;
       if (id === 'Free') {
-        canvas.bbox.aspectRatio.isLocked = false;
+        state.bbox.aspectRatio.isLocked = false;
       } else if (
-        (canvas.bbox.modelBase === 'imagen3' || canvas.bbox.modelBase === 'imagen4') &&
+        (state.bbox.modelBase === 'imagen3' || state.bbox.modelBase === 'imagen4') &&
         isImagenAspectRatioID(id)
       ) {
         const { width, height } = IMAGEN_ASPECT_RATIOS[id];
-        canvas.bbox.rect.width = width;
-        canvas.bbox.rect.height = height;
-        canvas.bbox.aspectRatio.value = canvas.bbox.rect.width / canvas.bbox.rect.height;
-        canvas.bbox.aspectRatio.isLocked = true;
-      } else if (canvas.bbox.modelBase === 'chatgpt-4o' && isChatGPT4oAspectRatioID(id)) {
+        state.bbox.rect.width = width;
+        state.bbox.rect.height = height;
+        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
+        state.bbox.aspectRatio.isLocked = true;
+      } else if (state.bbox.modelBase === 'chatgpt-4o' && isChatGPT4oAspectRatioID(id)) {
         const { width, height } = CHATGPT_ASPECT_RATIOS[id];
-        canvas.bbox.rect.width = width;
-        canvas.bbox.rect.height = height;
-        canvas.bbox.aspectRatio.value = canvas.bbox.rect.width / canvas.bbox.rect.height;
-        canvas.bbox.aspectRatio.isLocked = true;
-      } else if (canvas.bbox.modelBase === 'gemini-2.5' && isGemini2_5AspectRatioID(id)) {
+        state.bbox.rect.width = width;
+        state.bbox.rect.height = height;
+        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
+        state.bbox.aspectRatio.isLocked = true;
+      } else if (state.bbox.modelBase === 'gemini-2.5' && isGemini2_5AspectRatioID(id)) {
         const { width, height } = GEMINI_2_5_ASPECT_RATIOS[id];
-        canvas.bbox.rect.width = width;
-        canvas.bbox.rect.height = height;
-        canvas.bbox.aspectRatio.value = canvas.bbox.rect.width / canvas.bbox.rect.height;
-        canvas.bbox.aspectRatio.isLocked = true;
-      } else if (canvas.bbox.modelBase === 'flux-kontext' && isFluxKontextAspectRatioID(id)) {
+        state.bbox.rect.width = width;
+        state.bbox.rect.height = height;
+        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
+        state.bbox.aspectRatio.isLocked = true;
+      } else if (state.bbox.modelBase === 'flux-kontext' && isFluxKontextAspectRatioID(id)) {
         const { width, height } = FLUX_KONTEXT_ASPECT_RATIOS[id];
-        canvas.bbox.rect.width = width;
-        canvas.bbox.rect.height = height;
-        canvas.bbox.aspectRatio.value = canvas.bbox.rect.width / canvas.bbox.rect.height;
-        canvas.bbox.aspectRatio.isLocked = true;
+        state.bbox.rect.width = width;
+        state.bbox.rect.height = height;
+        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
+        state.bbox.aspectRatio.isLocked = true;
       } else {
-        canvas.bbox.aspectRatio.isLocked = true;
-        canvas.bbox.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
+        state.bbox.aspectRatio.isLocked = true;
+        state.bbox.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
         const { width, height } = calculateNewSize(
-          canvas.bbox.aspectRatio.value,
-          canvas.bbox.rect.width * canvas.bbox.rect.height,
-          canvas.bbox.modelBase
+          state.bbox.aspectRatio.value,
+          state.bbox.rect.width * state.bbox.rect.height,
+          state.bbox.modelBase
         );
-        canvas.bbox.rect.width = width;
-        canvas.bbox.rect.height = height;
+        state.bbox.rect.width = width;
+        state.bbox.rect.height = height;
       }
 
-      syncScaledSize(canvas);
+      syncScaledSize(state);
     },
     bboxDimensionsSwapped: (state) => {
-      const canvas = getSelectedCanvas(state);
-      canvas.bbox.aspectRatio.value = 1 / canvas.bbox.aspectRatio.value;
-      if (canvas.bbox.aspectRatio.id === 'Free') {
-        const newWidth = canvas.bbox.rect.height;
-        const newHeight = canvas.bbox.rect.width;
-        canvas.bbox.rect.width = newWidth;
-        canvas.bbox.rect.height = newHeight;
+      state.bbox.aspectRatio.value = 1 / state.bbox.aspectRatio.value;
+      if (state.bbox.aspectRatio.id === 'Free') {
+        const newWidth = state.bbox.rect.height;
+        const newHeight = state.bbox.rect.width;
+        state.bbox.rect.width = newWidth;
+        state.bbox.rect.height = newHeight;
       } else {
         const { width, height } = calculateNewSize(
-          canvas.bbox.aspectRatio.value,
-          canvas.bbox.rect.width * canvas.bbox.rect.height,
-          canvas.bbox.modelBase
+          state.bbox.aspectRatio.value,
+          state.bbox.rect.width * state.bbox.rect.height,
+          state.bbox.modelBase
         );
-        canvas.bbox.rect.width = width;
-        canvas.bbox.rect.height = height;
-        canvas.bbox.aspectRatio.id = ASPECT_RATIO_MAP[canvas.bbox.aspectRatio.id].inverseID;
+        state.bbox.rect.width = width;
+        state.bbox.rect.height = height;
+        state.bbox.aspectRatio.id = ASPECT_RATIO_MAP[state.bbox.aspectRatio.id].inverseID;
       }
 
-      syncScaledSize(canvas);
+      syncScaledSize(state);
     },
     bboxSizeOptimized: (state) => {
-      const canvas = getSelectedCanvas(state);
-      const optimalDimension = getOptimalDimension(canvas.bbox.modelBase);
-      if (canvas.bbox.aspectRatio.isLocked) {
+      const optimalDimension = getOptimalDimension(state.bbox.modelBase);
+      if (state.bbox.aspectRatio.isLocked) {
         const { width, height } = calculateNewSize(
-          canvas.bbox.aspectRatio.value,
+          state.bbox.aspectRatio.value,
           optimalDimension * optimalDimension,
-          canvas.bbox.modelBase
+          state.bbox.modelBase
         );
-        canvas.bbox.rect.width = width;
-        canvas.bbox.rect.height = height;
+        state.bbox.rect.width = width;
+        state.bbox.rect.height = height;
       } else {
-        canvas.bbox.aspectRatio = deepClone(DEFAULT_ASPECT_RATIO_CONFIG);
-        canvas.bbox.rect.width = optimalDimension;
-        canvas.bbox.rect.height = optimalDimension;
+        state.bbox.aspectRatio = deepClone(DEFAULT_ASPECT_RATIO_CONFIG);
+        state.bbox.rect.width = optimalDimension;
+        state.bbox.rect.height = optimalDimension;
       }
 
-      syncScaledSize(canvas);
+      syncScaledSize(state);
     },
     bboxSyncedToOptimalDimension: (state) => {
-      const canvas = getSelectedCanvas(state);
-      const optimalDimension = getOptimalDimension(canvas.bbox.modelBase);
+      const optimalDimension = getOptimalDimension(state.bbox.modelBase);
 
-      if (!getIsSizeOptimal(canvas.bbox.rect.width, canvas.bbox.rect.height, canvas.bbox.modelBase)) {
+      if (!getIsSizeOptimal(state.bbox.rect.width, state.bbox.rect.height, state.bbox.modelBase)) {
         const bboxDims = calculateNewSize(
-          canvas.bbox.aspectRatio.value,
+          state.bbox.aspectRatio.value,
           optimalDimension * optimalDimension,
-          canvas.bbox.modelBase
+          state.bbox.modelBase
         );
-        canvas.bbox.rect.width = bboxDims.width;
-        canvas.bbox.rect.height = bboxDims.height;
-        syncScaledSize(canvas);
+        state.bbox.rect.width = bboxDims.width;
+        state.bbox.rect.height = bboxDims.height;
+        syncScaledSize(state);
       }
     },
     //#region Shared entity
     entitySelected: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         // Cannot select a non-existent entity
         return;
       }
-      canvas.selectedEntityIdentifier = entityIdentifier;
+      state.selectedEntityIdentifier = entityIdentifier;
     },
     bookmarkedEntityChanged: (state, action: PayloadAction<{ entityIdentifier: CanvasEntityIdentifier | null }>) => {
       const { entityIdentifier } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
       if (!entityIdentifier) {
-        canvas.bookmarkedEntityIdentifier = null;
+        state.bookmarkedEntityIdentifier = null;
         return;
       }
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         // Cannot select a non-existent entity
         return;
       }
-      canvas.bookmarkedEntityIdentifier = entityIdentifier;
+      state.bookmarkedEntityIdentifier = entityIdentifier;
     },
     entityNameChanged: (state, action: PayloadAction<EntityIdentifierPayload<{ name: string | null }>>) => {
       const { entityIdentifier, name } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
@@ -1536,9 +1460,7 @@ const slice = createSlice({
     },
     entityReset: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
@@ -1548,9 +1470,7 @@ const slice = createSlice({
     },
     entityDuplicated: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
@@ -1562,14 +1482,14 @@ const slice = createSlice({
       switch (newEntity.type) {
         case 'raster_layer': {
           newEntity.id = getPrefixedId('raster_layer');
-          const newEntityIndex = canvas.rasterLayers.entities.findIndex((e) => e.id === entityIdentifier.id) + 1;
-          canvas.rasterLayers.entities.splice(newEntityIndex, 0, newEntity);
+          const newEntityIndex = state.rasterLayers.entities.findIndex((e) => e.id === entityIdentifier.id) + 1;
+          state.rasterLayers.entities.splice(newEntityIndex, 0, newEntity);
           break;
         }
         case 'control_layer': {
           newEntity.id = getPrefixedId('control_layer');
-          const newEntityIndex = canvas.controlLayers.entities.findIndex((e) => e.id === entityIdentifier.id) + 1;
-          canvas.controlLayers.entities.splice(newEntityIndex, 0, newEntity);
+          const newEntityIndex = state.controlLayers.entities.findIndex((e) => e.id === entityIdentifier.id) + 1;
+          state.controlLayers.entities.splice(newEntityIndex, 0, newEntity);
           break;
         }
         case 'regional_guidance': {
@@ -1577,25 +1497,23 @@ const slice = createSlice({
           for (const refImage of newEntity.referenceImages) {
             refImage.id = getPrefixedId('regional_guidance_ip_adapter');
           }
-          const newEntityIndex = canvas.regionalGuidance.entities.findIndex((e) => e.id === entityIdentifier.id) + 1;
-          canvas.regionalGuidance.entities.splice(newEntityIndex, 0, newEntity);
+          const newEntityIndex = state.regionalGuidance.entities.findIndex((e) => e.id === entityIdentifier.id) + 1;
+          state.regionalGuidance.entities.splice(newEntityIndex, 0, newEntity);
           break;
         }
         case 'inpaint_mask': {
           newEntity.id = getPrefixedId('inpaint_mask');
-          const newEntityIndex = canvas.inpaintMasks.entities.findIndex((e) => e.id === entityIdentifier.id) + 1;
-          canvas.inpaintMasks.entities.splice(newEntityIndex, 0, newEntity);
+          const newEntityIndex = state.inpaintMasks.entities.findIndex((e) => e.id === entityIdentifier.id) + 1;
+          state.inpaintMasks.entities.splice(newEntityIndex, 0, newEntity);
           break;
         }
       }
 
-      canvas.selectedEntityIdentifier = getEntityIdentifier(newEntity);
+      state.selectedEntityIdentifier = getEntityIdentifier(newEntity);
     },
     entityIsEnabledToggled: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
@@ -1603,9 +1521,7 @@ const slice = createSlice({
     },
     entityIsLockedToggled: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
@@ -1616,9 +1532,7 @@ const slice = createSlice({
       action: PayloadAction<EntityIdentifierPayload<{ color: RgbColor }, 'inpaint_mask' | 'regional_guidance'>>
     ) => {
       const { color, entityIdentifier } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
@@ -1629,9 +1543,7 @@ const slice = createSlice({
       action: PayloadAction<EntityIdentifierPayload<{ style: FillStyle }, 'inpaint_mask' | 'regional_guidance'>>
     ) => {
       const { style, entityIdentifier } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
@@ -1639,9 +1551,7 @@ const slice = createSlice({
     },
     entityMovedTo: (state, action: PayloadAction<EntityMovedToPayload>) => {
       const { entityIdentifier, position } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
@@ -1650,9 +1560,7 @@ const slice = createSlice({
     },
     entityMovedBy: (state, action: PayloadAction<EntityMovedByPayload>) => {
       const { entityIdentifier, offset } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
@@ -1662,9 +1570,7 @@ const slice = createSlice({
     },
     entityRasterized: (state, action: PayloadAction<EntityRasterizedPayload>) => {
       const { entityIdentifier, imageObject, position, replaceObjects, isSelected } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
@@ -1675,14 +1581,12 @@ const slice = createSlice({
       }
 
       if (isSelected) {
-        canvas.selectedEntityIdentifier = entityIdentifier;
+        state.selectedEntityIdentifier = entityIdentifier;
       }
     },
     entityBrushLineAdded: (state, action: PayloadAction<EntityBrushLineAddedPayload>) => {
       const { entityIdentifier, brushLine } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
@@ -1697,9 +1601,7 @@ const slice = createSlice({
     },
     entityEraserLineAdded: (state, action: PayloadAction<EntityEraserLineAddedPayload>) => {
       const { entityIdentifier, eraserLine } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
@@ -1714,9 +1616,7 @@ const slice = createSlice({
     },
     entityRectAdded: (state, action: PayloadAction<EntityRectAddedPayload>) => {
       const { entityIdentifier, rect } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
@@ -1729,8 +1629,7 @@ const slice = createSlice({
       const { entityIdentifier } = action.payload;
 
       let selectedEntityIdentifier: CanvasState['selectedEntityIdentifier'] = null;
-      const canvas = getSelectedCanvas(state);
-      const allEntities = selectAllEntities(canvas);
+      const allEntities = selectAllEntities(state);
       const index = allEntities.findIndex((entity) => entity.id === entityIdentifier.id);
       const nextIndex = allEntities.length > 1 ? (index + 1) % allEntities.length : -1;
       if (nextIndex !== -1) {
@@ -1742,96 +1641,84 @@ const slice = createSlice({
 
       switch (entityIdentifier.type) {
         case 'raster_layer':
-          canvas.rasterLayers.entities = canvas.rasterLayers.entities.filter(
-            (layer) => layer.id !== entityIdentifier.id
-          );
+          state.rasterLayers.entities = state.rasterLayers.entities.filter((layer) => layer.id !== entityIdentifier.id);
           break;
         case 'control_layer':
-          canvas.controlLayers.entities = canvas.controlLayers.entities.filter((rg) => rg.id !== entityIdentifier.id);
+          state.controlLayers.entities = state.controlLayers.entities.filter((rg) => rg.id !== entityIdentifier.id);
           break;
         case 'regional_guidance':
-          canvas.regionalGuidance.entities = canvas.regionalGuidance.entities.filter(
+          state.regionalGuidance.entities = state.regionalGuidance.entities.filter(
             (rg) => rg.id !== entityIdentifier.id
           );
           break;
         case 'inpaint_mask':
-          canvas.inpaintMasks.entities = canvas.inpaintMasks.entities.filter((rg) => rg.id !== entityIdentifier.id);
+          state.inpaintMasks.entities = state.inpaintMasks.entities.filter((rg) => rg.id !== entityIdentifier.id);
           break;
       }
 
-      canvas.selectedEntityIdentifier = selectedEntityIdentifier;
+      state.selectedEntityIdentifier = selectedEntityIdentifier;
     },
     entityArrangedForwardOne: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
-      moveOneToEnd(selectAllEntitiesOfType(canvas, entity.type), entity);
+      moveOneToEnd(selectAllEntitiesOfType(state, entity.type), entity);
     },
     entityArrangedToFront: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
-      moveToEnd(selectAllEntitiesOfType(canvas, entity.type), entity);
+      moveToEnd(selectAllEntitiesOfType(state, entity.type), entity);
     },
     entityArrangedBackwardOne: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
-      moveOneToStart(selectAllEntitiesOfType(canvas, entity.type), entity);
+      moveOneToStart(selectAllEntitiesOfType(state, entity.type), entity);
     },
     entityArrangedToBack: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
-      moveToStart(selectAllEntitiesOfType(canvas, entity.type), entity);
+      moveToStart(selectAllEntitiesOfType(state, entity.type), entity);
     },
     entitiesReordered: <T extends CanvasEntityType>(
-      state: CanvasesState,
+      state: CanvasState,
       action: PayloadAction<{ type: T; entityIdentifiers: CanvasEntityIdentifier<T>[] }>
     ) => {
       const { type, entityIdentifiers } = action.payload;
 
-      const canvas = getSelectedCanvas(state);
-
       switch (type) {
         case 'raster_layer': {
-          canvas.rasterLayers.entities = reorderEntities(
-            canvas.rasterLayers.entities,
+          state.rasterLayers.entities = reorderEntities(
+            state.rasterLayers.entities,
             entityIdentifiers as CanvasEntityIdentifier<'raster_layer'>[]
           );
           break;
         }
         case 'control_layer':
-          canvas.controlLayers.entities = reorderEntities(
-            canvas.controlLayers.entities,
+          state.controlLayers.entities = reorderEntities(
+            state.controlLayers.entities,
             entityIdentifiers as CanvasEntityIdentifier<'control_layer'>[]
           );
           break;
         case 'inpaint_mask':
-          canvas.inpaintMasks.entities = reorderEntities(
-            canvas.inpaintMasks.entities,
+          state.inpaintMasks.entities = reorderEntities(
+            state.inpaintMasks.entities,
             entityIdentifiers as CanvasEntityIdentifier<'inpaint_mask'>[]
           );
           break;
         case 'regional_guidance':
-          canvas.regionalGuidance.entities = reorderEntities(
-            canvas.regionalGuidance.entities,
+          state.regionalGuidance.entities = reorderEntities(
+            state.regionalGuidance.entities,
             entityIdentifiers as CanvasEntityIdentifier<'regional_guidance'>[]
           );
           break;
@@ -1839,9 +1726,7 @@ const slice = createSlice({
     },
     entityOpacityChanged: (state, action: PayloadAction<EntityIdentifierPayload<{ opacity: number }>>) => {
       const { entityIdentifier, opacity } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      const entity = selectEntity(canvas, entityIdentifier);
+      const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
@@ -1850,51 +1735,45 @@ const slice = createSlice({
     allEntitiesOfTypeIsHiddenToggled: (state, action: PayloadAction<{ type: CanvasEntityIdentifier['type'] }>) => {
       const { type } = action.payload;
 
-      const canvas = getSelectedCanvas(state);
-
       switch (type) {
         case 'raster_layer':
-          canvas.rasterLayers.isHidden = !canvas.rasterLayers.isHidden;
+          state.rasterLayers.isHidden = !state.rasterLayers.isHidden;
           break;
         case 'control_layer':
-          canvas.controlLayers.isHidden = !canvas.controlLayers.isHidden;
+          state.controlLayers.isHidden = !state.controlLayers.isHidden;
           break;
         case 'inpaint_mask':
-          canvas.inpaintMasks.isHidden = !canvas.inpaintMasks.isHidden;
+          state.inpaintMasks.isHidden = !state.inpaintMasks.isHidden;
           break;
         case 'regional_guidance':
-          canvas.regionalGuidance.isHidden = !canvas.regionalGuidance.isHidden;
+          state.regionalGuidance.isHidden = !state.regionalGuidance.isHidden;
           break;
       }
     },
     allNonRasterLayersIsHiddenToggled: (state) => {
-      const canvas = getSelectedCanvas(state);
       const hasVisibleNonRasterLayers =
-        !canvas.controlLayers.isHidden || !canvas.inpaintMasks.isHidden || !canvas.regionalGuidance.isHidden;
+        !state.controlLayers.isHidden || !state.inpaintMasks.isHidden || !state.regionalGuidance.isHidden;
 
       const shouldHide = hasVisibleNonRasterLayers;
 
-      canvas.controlLayers.isHidden = shouldHide;
-      canvas.inpaintMasks.isHidden = shouldHide;
-      canvas.regionalGuidance.isHidden = shouldHide;
+      state.controlLayers.isHidden = shouldHide;
+      state.inpaintMasks.isHidden = shouldHide;
+      state.regionalGuidance.isHidden = shouldHide;
     },
     allEntitiesDeleted: (state) => {
-      const canvas = getSelectedCanvas(state);
       // Deleting all entities is equivalent to resetting the state for each entity type
-      const initialState = getCanvasState('dummyID', 'dummyName');
-      canvas.rasterLayers = initialState.rasterLayers;
-      canvas.controlLayers = initialState.controlLayers;
-      canvas.inpaintMasks = initialState.inpaintMasks;
-      canvas.regionalGuidance = initialState.regionalGuidance;
+      const initialState = getInitialCanvasState('dummyId', 'dummyName');
+      state.rasterLayers = initialState.rasterLayers;
+      state.controlLayers = initialState.controlLayers;
+      state.inpaintMasks = initialState.inpaintMasks;
+      state.regionalGuidance = initialState.regionalGuidance;
     },
     canvasMetadataRecalled: (state, action: PayloadAction<CanvasMetadata>) => {
       const { controlLayers, inpaintMasks, rasterLayers, regionalGuidance } = action.payload;
-
-      const canvas = getSelectedCanvas(state);
-      canvas.controlLayers.entities = controlLayers;
-      canvas.inpaintMasks.entities = inpaintMasks;
-      canvas.rasterLayers.entities = rasterLayers;
-      canvas.regionalGuidance.entities = regionalGuidance;
+      state.controlLayers.entities = controlLayers;
+      state.inpaintMasks.entities = inpaintMasks;
+      state.rasterLayers.entities = rasterLayers;
+      state.regionalGuidance.entities = regionalGuidance;
       return state;
     },
     canvasUndo: () => {},
@@ -1903,11 +1782,9 @@ const slice = createSlice({
   },
   extraReducers(builder) {
     builder.addCase(canvasReset, (state) => {
-      const canvas = getSelectedCanvas(state);
-      resetCanvasState(canvas);
+      return resetCanvasState(state);
     });
     builder.addCase(modelChanged, (state, action) => {
-      const canvas = getSelectedCanvas(state);
       const { model } = action.payload;
       /**
        * Because the bbox depends in part on the model, it needs to be in sync with the model. However, due to
@@ -1928,24 +1805,24 @@ const slice = createSlice({
        * - Provide a separate action that will update the bbox dimensions and be careful to not dispatch it when staging.
        */
       const base = model?.base;
-      if (isMainModelBase(base) && canvas.bbox.modelBase !== base) {
-        canvas.bbox.modelBase = base;
+      if (isMainModelBase(base) && state.bbox.modelBase !== base) {
+        state.bbox.modelBase = base;
         if (API_BASE_MODELS.includes(base)) {
-          canvas.bbox.aspectRatio.isLocked = true;
-          canvas.bbox.aspectRatio.value = 1;
-          canvas.bbox.aspectRatio.id = '1:1';
-          canvas.bbox.rect.width = 1024;
-          canvas.bbox.rect.height = 1024;
+          state.bbox.aspectRatio.isLocked = true;
+          state.bbox.aspectRatio.value = 1;
+          state.bbox.aspectRatio.id = '1:1';
+          state.bbox.rect.width = 1024;
+          state.bbox.rect.height = 1024;
         }
 
-        syncScaledSize(canvas);
+        syncScaledSize(state);
       }
     });
   },
 });
 
 const resetCanvasState = (state: CanvasState) => {
-  const newState = getCanvasState(state.id, state.name);
+  const newState = getInitialCanvasState(state.id, state.name);
 
   // We need to retain the optimal dimension across resets, as it is changed only when the model changes. Copy it
   // from the old state, then recalculate the bbox size & scaled size.
@@ -1962,19 +1839,41 @@ const resetCanvasState = (state: CanvasState) => {
   syncScaledSize(newState);
 };
 
-const getCanvasById = (state: CanvasesState, id: string) => state.canvases.find((canvas) => canvas.id === id);
-const getSelectedCanvas = (state: CanvasesState) => getCanvasById(state, state.selectedCanvasId)!;
+const syncScaledSize = (state: CanvasState) => {
+  if (API_BASE_MODELS.includes(state.bbox.modelBase)) {
+    // Imagen3 has fixed sizes. Scaled bbox is not supported.
+    return;
+  }
+  if (state.bbox.scaleMethod === 'auto') {
+    // Sync both aspect ratio and size
+    const { width, height } = state.bbox.rect;
+    state.bbox.scaledSize = getScaledBoundingBoxDimensions({ width, height }, state.bbox.modelBase);
+  } else if (state.bbox.scaleMethod === 'manual' && state.bbox.aspectRatio.isLocked) {
+    // Only sync the aspect ratio if manual & locked
+    state.bbox.scaledSize = calculateNewSize(
+      state.bbox.aspectRatio.value,
+      state.bbox.scaledSize.width * state.bbox.scaledSize.height,
+      state.bbox.modelBase
+    );
+  }
+};
+
+const getCanvasById = (state: CanvasesStateWithHistory, id: string) =>
+  state.canvases.find((canvas) => canvas.present.id === id)?.present;
+
+export const {
+  // Canvas
+  canvasAdded,
+  canvasSelected,
+  canvasNameChanged,
+  canvasDeleted,
+} = canvasesSlice.actions;
 
 export const {
   canvasMetadataRecalled,
   canvasUndo,
   canvasRedo,
   canvasClearHistory,
-  // Canvas
-  canvasAdded,
-  canvasSelected,
-  canvasNameChanged,
-  canvasDeleted,
   // All entities
   entitySelected,
   bookmarkedEntityChanged,
@@ -2066,37 +1965,20 @@ export const {
   inpaintMaskDenoiseLimitChanged,
   inpaintMaskDenoiseLimitDeleted,
   // inpaintMaskRecalled,
-} = slice.actions;
+} = canvasSlice.actions;
 
-const syncScaledSize = (canvas: CanvasState) => {
-  if (API_BASE_MODELS.includes(canvas.bbox.modelBase)) {
-    // Imagen3 has fixed sizes. Scaled bbox is not supported.
-    return;
-  }
-  if (canvas.bbox.scaleMethod === 'auto') {
-    // Sync both aspect ratio and size
-    const { width, height } = canvas.bbox.rect;
-    canvas.bbox.scaledSize = getScaledBoundingBoxDimensions({ width, height }, canvas.bbox.modelBase);
-  } else if (canvas.bbox.scaleMethod === 'manual' && canvas.bbox.aspectRatio.isLocked) {
-    // Only sync the aspect ratio if manual & locked
-    canvas.bbox.scaledSize = calculateNewSize(
-      canvas.bbox.aspectRatio.value,
-      canvas.bbox.scaledSize.width * canvas.bbox.scaledSize.height,
-      canvas.bbox.modelBase
-    );
-  }
-};
+const isCanvasSliceAction = isAnyOf(...Object.values(canvasSlice.actions));
 
 let filter = true;
 
-const canvasUndoableConfig: UndoableOptions<CanvasesState, UnknownAction> = {
+const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
   limit: 64,
   undoType: canvasUndo.type,
   redoType: canvasRedo.type,
   clearHistoryType: canvasClearHistory.type,
   filter: (action, _state, _history) => {
-    // Ignore all actions from other slices
-    if (!action.type.startsWith(slice.name)) {
+    // Ignore both all actions from other slices and canvas management actions
+    if (!action.type.startsWith(canvasSlice.name)) {
       return false;
     }
     // Throttle rapid actions of the same type
@@ -2107,15 +1989,72 @@ const canvasUndoableConfig: UndoableOptions<CanvasesState, UnknownAction> = {
   // debug: import.meta.env.MODE === 'development',
 };
 
-export const canvasSliceConfig: SliceConfig<typeof slice> = {
-  slice,
+const undoableCanvasReducer = undoable(canvasSlice.reducer, canvasUndoableConfig);
+
+export const undoableCanvasesReducer = (
+  state: CanvasesStateWithHistory,
+  action: UnknownAction
+): CanvasesStateWithHistory => {
+  state = canvasesSlice.reducer(state, action);
+
+  if (!isCanvasSliceAction(action)) {
+    return state;
+  }
+
+  return {
+    ...state,
+    canvases: state.canvases.map((c) =>
+      c.present.id === state.selectedCanvasId ? undoableCanvasReducer(c, action) : c
+    ),
+  };
+};
+
+export const canvasSliceConfig: SliceConfig<
+  typeof canvasesSlice,
+  CanvasesStateWithHistory,
+  CanvasesStateWithoutHistory
+> = {
+  slice: canvasesSlice,
   getInitialState: getInitialCanvasesState,
-  schema: zCanvasesState,
+  schema: zCanvasesStateWithHistory,
   persistConfig: {
-    migrate: (state) => zCanvasesState.parse(state),
-  },
-  undoableConfig: {
-    reduxUndoOptions: canvasUndoableConfig,
+    migrate: (state) => {
+      assert(isPlainObject(state));
+      if (state._version === 3) {
+        // Migrate from v3 to v4: slice represented a canvas instance -> slice represents multiple canvas instances
+        const canvasId = getPrefixedId('canvas');
+        const canvasName = 'default';
+
+        const canvas = {
+          id: canvasId,
+          name: canvasName,
+          ...state,
+        } as CanvasState;
+
+        state = {
+          _version: 4,
+          selectedCanvasId: canvas.id,
+          canvases: [canvas],
+        };
+      }
+      return zCanvasesStateWithoutHistory.parse(state);
+    },
+    wrapState: (state) => {
+      const canvasesState = state as CanvasesStateWithoutHistory;
+
+      return {
+        _version: canvasesState._version,
+        selectedCanvasId: canvasesState.selectedCanvasId,
+        canvases: canvasesState.canvases.map((canvas) => newHistory([], canvas, [])),
+      };
+    },
+    unwrapState: (state) => {
+      return {
+        _version: state._version,
+        selectedCanvasId: state.selectedCanvasId,
+        canvases: state.canvases.map((canvas) => canvas.present),
+      };
+    },
   },
 };
 

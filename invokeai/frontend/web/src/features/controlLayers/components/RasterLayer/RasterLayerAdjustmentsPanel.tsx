@@ -13,7 +13,7 @@ import {
   rasterLayerAdjustmentsReset,
   rasterLayerAdjustmentsSet,
 } from 'features/controlLayers/store/canvasSlice';
-import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
+import { selectEntity, selectSelectedCanvas } from 'features/controlLayers/store/selectors';
 import React, { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiCaretDownBold, PiCheckBold, PiTrashBold } from 'react-icons/pi';
@@ -25,14 +25,16 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
   const canvasManager = useCanvasManager();
 
   const selectHasAdjustments = useMemo(() => {
-    return createSelector(selectCanvasSlice, (canvas) => Boolean(selectEntity(canvas, entityIdentifier)?.adjustments));
+    return createSelector(selectSelectedCanvas, (canvas) =>
+      Boolean(selectEntity(canvas, entityIdentifier)?.adjustments)
+    );
   }, [entityIdentifier]);
 
   const hasAdjustments = useAppSelector(selectHasAdjustments);
 
   const selectMode = useMemo(() => {
     return createSelector(
-      selectCanvasSlice,
+      selectSelectedCanvas,
       (canvas) => selectEntity(canvas, entityIdentifier)?.adjustments?.mode ?? 'simple'
     );
   }, [entityIdentifier]);
@@ -40,7 +42,7 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
 
   const selectEnabled = useMemo(() => {
     return createSelector(
-      selectCanvasSlice,
+      selectSelectedCanvas,
       (canvas) => selectEntity(canvas, entityIdentifier)?.adjustments?.enabled ?? false
     );
   }, [entityIdentifier]);
@@ -48,7 +50,7 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
 
   const selectCollapsed = useMemo(() => {
     return createSelector(
-      selectCanvasSlice,
+      selectSelectedCanvas,
       (canvas) => selectEntity(canvas, entityIdentifier)?.adjustments?.collapsed ?? false
     );
   }, [entityIdentifier]);

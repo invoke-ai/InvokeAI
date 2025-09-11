@@ -17,9 +17,12 @@ export const CanvasTabEditableTitle = memo(({ id, name, isSelected }: CanvasTabE
   const isHovering = useBoolean(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const onChange = useCallback(() => {
-    dispatch(canvasNameChanged({ id, name }));
-  }, [dispatch, id, name]);
+  const onChange = useCallback(
+    (value: string) => {
+      dispatch(canvasNameChanged({ id, name: value }));
+    },
+    [dispatch, id]
+  );
 
   const editable = useEditable({
     value: name,
