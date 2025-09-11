@@ -1,11 +1,12 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEntityAdapterContext } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { rasterLayerAdjustmentsCurvesUpdated } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
-import type { ChannelName, ChannelPoints } from 'features/controlLayers/store/types';
+import type { ChannelName, ChannelPoints, CurvesAdjustmentsConfig } from 'features/controlLayers/store/types';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -15,6 +16,13 @@ const DEFAULT_POINTS: ChannelPoints = [
   [0, 0],
   [255, 255],
 ];
+
+const DEFAULT_CURVES: CurvesAdjustmentsConfig = {
+  master: DEFAULT_POINTS,
+  r: DEFAULT_POINTS,
+  g: DEFAULT_POINTS,
+  b: DEFAULT_POINTS,
+};
 
 type ChannelHistograms = Record<ChannelName, number[] | null>;
 
@@ -62,11 +70,14 @@ export const RasterLayerCurvesAdjustmentsEditor = memo(() => {
   const entityIdentifier = useEntityIdentifierContext<'raster_layer'>();
   const adapter = useEntityAdapterContext<'raster_layer'>('raster_layer');
   const { t } = useTranslation();
-  const selectLayer = useMemo(
-    () => createSelector(selectCanvasSlice, (canvas) => selectEntity(canvas, entityIdentifier)),
-    [entityIdentifier]
-  );
-  const layer = useAppSelector(selectLayer);
+  const selectCurves = useMemo(() => {
+    return createSelector(
+      selectCanvasSlice,
+      (canvas) => selectEntity(canvas, entityIdentifier)?.adjustments?.curves ?? DEFAULT_CURVES
+    );
+  }, [entityIdentifier]);
+  const curves = useAppSelector(selectCurves);
+
   const selectIsDisabled = useMemo(() => {
     return createSelector(
       selectCanvasSlice,
@@ -74,16 +85,13 @@ export const RasterLayerCurvesAdjustmentsEditor = memo(() => {
     );
   }, [entityIdentifier]);
   const isDisabled = useAppSelector(selectIsDisabled);
+  // The canvas cache for the layer serves as a proxy for when the layer changes and can be used to trigger histo recalc
+  const canvasCache = useStore(adapter.$canvasCache);
 
   const [histMaster, setHistMaster] = useState<number[] | null>(null);
   const [histR, setHistR] = useState<number[] | null>(null);
   const [histG, setHistG] = useState<number[] | null>(null);
   const [histB, setHistB] = useState<number[] | null>(null);
-
-  const pointsMaster = layer?.adjustments?.curves.master ?? DEFAULT_POINTS;
-  const pointsR = layer?.adjustments?.curves.r ?? DEFAULT_POINTS;
-  const pointsG = layer?.adjustments?.curves.g ?? DEFAULT_POINTS;
-  const pointsB = layer?.adjustments?.curves.b ?? DEFAULT_POINTS;
 
   const recalcHistogram = useCallback(() => {
     try {
@@ -110,7 +118,7 @@ export const RasterLayerCurvesAdjustmentsEditor = memo(() => {
 
   useEffect(() => {
     recalcHistogram();
-  }, [layer?.objects, layer?.adjustments, recalcHistogram]);
+  }, [canvasCache, recalcHistogram]);
 
   const onChangePoints = useCallback(
     (channel: ChannelName, pts: ChannelPoints) => {
@@ -138,28 +146,28 @@ export const RasterLayerCurvesAdjustmentsEditor = memo(() => {
         <RasterLayerCurvesAdjustmentsGraph
           title={t('controlLayers.adjustments.master')}
           channel="master"
-          points={pointsMaster}
+          points={curves.master}
           histogram={histMaster}
           onChange={onChangeMaster}
         />
         <RasterLayerCurvesAdjustmentsGraph
           title={t('common.red')}
           channel="r"
-          points={pointsR}
+          points={curves.r}
           histogram={histR}
           onChange={onChangeR}
         />
         <RasterLayerCurvesAdjustmentsGraph
           title={t('common.green')}
           channel="g"
-          points={pointsG}
+          points={curves.g}
           histogram={histG}
           onChange={onChangeG}
         />
         <RasterLayerCurvesAdjustmentsGraph
           title={t('common.blue')}
           channel="b"
-          points={pointsB}
+          points={curves.b}
           histogram={histB}
           onChange={onChangeB}
         />

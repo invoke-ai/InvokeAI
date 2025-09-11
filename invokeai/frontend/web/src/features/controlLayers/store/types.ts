@@ -404,6 +404,7 @@ const zChannelName = z.enum(['master', 'r', 'g', 'b']);
 const zCurvesAdjustmentsConfig = z.record(zChannelName, zChannelPoints);
 export type ChannelName = z.infer<typeof zChannelName>;
 export type ChannelPoints = z.infer<typeof zChannelPoints>;
+export type CurvesAdjustmentsConfig = z.infer<typeof zCurvesAdjustmentsConfig>;
 
 /**
  * The curves adjustments are stored as LUTs in the Konva node attributes. Konva will use these values when applying
