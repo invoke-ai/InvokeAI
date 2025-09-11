@@ -801,6 +801,16 @@ const zRegionalGuidance = z.object({
   isHidden: z.boolean(),
   entities: z.array(zCanvasRegionalGuidanceState),
 });
+const zStateWithHistory = <T extends z.ZodTypeAny>(stateSchema: T) =>
+  z.object({
+    past: z.array(stateSchema),
+    present: stateSchema,
+    future: z.array(stateSchema),
+    _latestUnfiltered: stateSchema.optional(),
+    group: z.string().optional(),
+    index: z.number().optional(),
+    limit: z.number().optional(),
+  });
 const zCanvasState = z.object({
   id: zId,
   name: z.string().min(1),
@@ -813,12 +823,17 @@ const zCanvasState = z.object({
   bbox: zBboxState,
 });
 export type CanvasState = z.infer<typeof zCanvasState>;
-export const zCanvasesState = z.object({
-  _version: z.literal(3),
-  selectedCanvasId: zId,
-  canvases: z.array(zCanvasState),
-});
-export type CanvasesState = z.infer<typeof zCanvasesState>;
+const zCanvasStateWithHistory = zStateWithHistory(zCanvasState);
+const zCanvasesState = <T extends z.ZodTypeAny>(canvasStateSchema: T) =>
+  z.object({
+    _version: z.literal(4),
+    selectedCanvasId: zId,
+    canvases: z.array(canvasStateSchema),
+  });
+export const zCanvasesStateWithHistory = zCanvasesState(zCanvasStateWithHistory);
+export type CanvasesStateWithHistory = z.infer<typeof zCanvasesStateWithHistory>;
+export const zCanvasesStateWithoutHistory = zCanvasesState(zCanvasState);
+export type CanvasesStateWithoutHistory = z.infer<typeof zCanvasesStateWithoutHistory>;
 export const zRefImagesState = z.object({
   selectedEntityId: z.string().nullable(),
   isPanelOpen: z.boolean(),
