@@ -131,6 +131,17 @@ const slice = createSlice({
       }
       layer.adjustments = merge(layer.adjustments, adjustments);
     },
+    rasterLayerAdjustmentsReset: (state, action: PayloadAction<EntityIdentifierPayload<void, 'raster_layer'>>) => {
+      const { entityIdentifier } = action.payload;
+      const layer = selectEntity(state, entityIdentifier);
+      if (!layer) {
+        return;
+      }
+      if (layer.adjustments) {
+        layer.adjustments.simple = makeDefaultRasterLayerAdjustments('simple').simple;
+        layer.adjustments.curves = makeDefaultRasterLayerAdjustments('curves').curves;
+      }
+    },
     rasterLayerAdjustmentsCancel: (state, action: PayloadAction<EntityIdentifierPayload<void, 'raster_layer'>>) => {
       const { entityIdentifier } = action.payload;
       const layer = selectEntity(state, entityIdentifier);
@@ -1739,6 +1750,7 @@ export const {
   // Raster layer adjustments
   rasterLayerAdjustmentsSet,
   rasterLayerAdjustmentsCancel,
+  rasterLayerAdjustmentsReset,
   rasterLayerAdjustmentsSimpleUpdated,
   rasterLayerAdjustmentsCurvesUpdated,
   entityDeleted,
