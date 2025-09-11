@@ -28,7 +28,7 @@ import type {
   RasterLayerAdjustments,
   RegionalGuidanceRefImageState,
   RgbColor,
-  SimpleConfig,
+  SimpleAdjustmentsConfig,
 } from 'features/controlLayers/store/types';
 import {
   calculateNewSize,
@@ -148,7 +148,7 @@ const slice = createSlice({
     },
     rasterLayerAdjustmentsSimpleUpdated: (
       state,
-      action: PayloadAction<EntityIdentifierPayload<{ simple: Partial<SimpleConfig> }, 'raster_layer'>>
+      action: PayloadAction<EntityIdentifierPayload<{ simple: Partial<SimpleAdjustmentsConfig> }, 'raster_layer'>>
     ) => {
       const { entityIdentifier, simple } = action.payload;
       const layer = selectEntity(state, entityIdentifier);
