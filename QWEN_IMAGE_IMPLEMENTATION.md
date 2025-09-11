@@ -42,8 +42,8 @@ git clone https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct invokeai/models/qwe
 2. **Model Configuration** (`config.py`): Uses MainDiffusersConfig for Qwen-Image models
 3. **Model Loader** (`qwen_image.py`): Loads models and submodels via diffusers
 4. **Model Loader Node** (`qwen_image_model_loader.py`): Loads transformer, text encoder, and VAE
-5. **Text Encoder Node** (`qwen_image_text_encoder.py`): Encodes prompts using Qwen2.5-VL
-6. **Denoising Node** (`qwen_image_denoise.py`): Generates images using QwenImagePipeline
+5. **Text Encoder Node** (`qwen_image_text_encoder.py`): Encodes prompts using Qwen2.5-VL with the Qwen prompt template, returning `prompt_embeds` and `prompt_embeds_mask`
+6. **Denoising Node** (`qwen_image_denoise.py`): Generates images using `QwenImagePipeline` from loaded components (transformer, VAE, Qwen2.5-VL tokenizer/text_encoder), preferring embeddings+mask when available, with negative prompt support
 
 ### Frontend Components
 1. **UI Types**: Added QwenImageMainModel, Qwen2_5VLModel field types
@@ -58,17 +58,18 @@ git clone https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct invokeai/models/qwe
 ## Usage in InvokeAI
 
 ### Node Graph Setup
-1. Add a **"Main Model - Qwen-Image"** loader node
-2. Select your Qwen-Image model from the dropdown
-3. Select the Qwen2.5-VL model for text encoding
-4. VAE field is optional (uses bundled VAE if left empty)
-5. Connect to **Qwen-Image Text Encoder** node
-6. Connect to **Qwen-Image Denoise** node
-7. Add **VAE Decode** node to convert latents to images
+The Qwen-Image graph builder is wired into the Generate flow.
+
+1. Select a Qwen-Image main model in the UI
+2. Select a Qwen2.5-VL model for text encoding
+3. Optionally select a VAE override (uses bundled VAE by default)
+4. InvokeAI builds a graph: `qwen_image_model_loader` → `qwen_image_text_encoder` → `qwen_image_denoise`
+5. The denoise node constructs a `QwenImagePipeline` from the loaded components and runs generation
+6. Negative prompt supported via a second text-encoder path feeding `negative_conditioning`
 
 ### Model Selection
-- **Main Model**: Select from models with base type "qwen-image"
-- **Text Encoder**: Select Qwen2.5-VL-7B-Instruct
+- **Main Model**: Select from models with base type `qwen-image`
+- **Text Encoder**: Select `Qwen2.5-VL-7B-Instruct` (or compatible Qwen2.5-VL)
 - **VAE**: Optional - leave empty to use bundled VAE, or select a custom VAE
 
 ## Troubleshooting
@@ -111,10 +112,13 @@ Qwen-Image is a large model (20B parameters) and Qwen2.5-VL is 7B parameters. To
 
 ## Future Enhancements
 
-1. **Image Editing**: Support for Qwen-Image-Edit variant
-2. **LoRA Support**: Fine-tuning capabilities
-3. **Optimizations**: Quantization and speed improvements (Qwen-Image-Lightning)
-4. **Advanced Features**: Image-to-image, inpainting, controlnet support
+1. Negative prompt/dual conditioning path
+2. Image-to-image/inpainting graph paths
+3. LoRA integration and adapters
+4. Quantization-aware loading and Lightning variants
+5. Nunchaku variant support (Done):
+   - Loader detects Nunchaku transformer via `model_class` metadata or path and loads `NunchakuQwenImageTransformer2DModel` if available.
+   - Denoise/pipeline usage is unchanged; the Nunchaku transformer seamlessly plugs into the pipeline.
 
 ## Files Modified/Created
 
@@ -124,5 +128,7 @@ Qwen-Image is a large model (20B parameters) and Qwen2.5-VL is 7B parameters. To
 - `/invokeai/app/invocations/fields.py` (modified)
 - `/invokeai/app/invocations/primitives.py` (modified)
 - `/invokeai/app/invocations/qwen_image_text_encoder.py` (created)
-- `/invokeai/app/invocations/qwen_image_denoise.py` (created)
+- `/invokeai/app/invocations/qwen_image_denoise.py` (created/updated)
+- `/invokeai/frontend/web/src/features/nodes/util/graph/generation/buildQwenImageGraph.ts` (created)
+- `/invokeai/frontend/web/src/features/queue/hooks/useEnqueueGenerate.ts` (updated)
 - `/pyproject.toml` (modified)

@@ -19,6 +19,7 @@ class QwenImageModelLoaderOutput(BaseInvocationOutput):
     transformer: TransformerField = OutputField(description="Qwen-Image transformer model", title="Transformer")
     qwen2_5_vl: Qwen2_5VLField = OutputField(description="Qwen2.5-VL text encoder for Qwen-Image", title="Text Encoder")
     vae: VAEField = OutputField(description="Qwen-Image VAE", title="VAE")
+    scheduler: ModelIdentifierField = OutputField(description="Qwen-Image scheduler", title="Scheduler")
 
 
 @invocation(
@@ -63,6 +64,7 @@ class QwenImageModelLoaderInvocation(BaseInvocation):
 
         # Create submodel references
         transformer = self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
+        scheduler = self.model.model_copy(update={"submodel_type": SubModelType.Scheduler})
         
         # Use provided VAE or extract from main model
         if self.vae_model:
@@ -79,4 +81,5 @@ class QwenImageModelLoaderInvocation(BaseInvocation):
             transformer=TransformerField(transformer=transformer, loras=[]),
             qwen2_5_vl=Qwen2_5VLField(tokenizer=tokenizer, text_encoder=text_encoder, loras=[]),
             vae=VAEField(vae=vae),
+            scheduler=scheduler,
         )

@@ -13,6 +13,7 @@ import { buildFluxKontextGraph } from 'features/nodes/util/graph/generation/buil
 import { buildGemini2_5Graph } from 'features/nodes/util/graph/generation/buildGemini2_5Graph';
 import { buildImagen3Graph } from 'features/nodes/util/graph/generation/buildImagen3Graph';
 import { buildImagen4Graph } from 'features/nodes/util/graph/generation/buildImagen4Graph';
+import { buildQwenImageGraph } from 'features/nodes/util/graph/generation/buildQwenImageGraph';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSD3Graph } from 'features/nodes/util/graph/generation/buildSD3Graph';
 import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
@@ -57,6 +58,8 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
         return await buildFLUXGraph(graphBuilderArg);
       case 'cogview4':
         return await buildCogView4Graph(graphBuilderArg);
+      case 'qwen-image':
+        return await buildQwenImageGraph(graphBuilderArg);
       case 'imagen3':
         return buildImagen3Graph(graphBuilderArg);
       case 'imagen4':

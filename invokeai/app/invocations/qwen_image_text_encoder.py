@@ -1,5 +1,9 @@
 # Copyright (c) 2024, Brandon W. Rising and the InvokeAI Development Team
-"""Qwen-Image text encoding invocation."""
+"""Qwen-Image text encoding invocation.
+
+Encodes the prompt using Qwen2.5-VL and returns embeddings and attention mask
+following the Qwen-Image pipeline's prompt handling template.
+"""
 
 import torch
 
@@ -34,45 +38,77 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         
         # Load the text encoder info first to get the model
         text_encoder_info = context.models.load(self.qwen2_5_vl.text_encoder)
-        
+
         # Load the Qwen2.5-VL tokenizer and text encoder with proper device management
         with text_encoder_info.model_on_device() as (cached_weights, text_encoder), \
-             context.models.load(self.qwen2_5_vl.tokenizer) as tokenizer:
-            
+            context.models.load(self.qwen2_5_vl.tokenizer) as tokenizer:
+
             try:
-                # Tokenize the prompt
-                # Qwen2.5-VL supports much longer sequences than CLIP
-                text_inputs = tokenizer(
-                    self.prompt,
-                    padding="max_length",
-                    max_length=1024,  # Qwen2.5-VL supports much longer sequences
+                # Build prompt template and tokenize
+                template = (
+                    "<|im_start|>system\n"
+                    "Describe the image by detailing the color, shape, size, texture, quantity, text, spatial relationships of the objects and background:<|im_end|>\n"
+                    "<|im_start|>user\n{}<|im_end|>\n"
+                    "<|im_start|>assistant\n"
+                )
+                drop_idx = 34  # number of special tokens before the user content in template
+                txt = template.format(self.prompt)
+
+                tok = tokenizer(
+                    txt,
+                    max_length=1024 + drop_idx,
+                    padding=True,
                     truncation=True,
                     return_tensors="pt",
                 )
-                
-                # Encode the text (text_encoder is already on the correct device)
-                text_embeddings = text_encoder(text_inputs.input_ids.to(text_encoder.device))[0]
-                
-                # Create a simple conditioning info that stores the embeddings
-                # For now, we'll create a simple class to hold the data
+                tok = {k: v.to(text_encoder.device) for k, v in tok.items()}
+
+                # Encode with hidden states
+                enc = text_encoder(
+                    input_ids=tok["input_ids"], attention_mask=tok["attention_mask"], output_hidden_states=True
+                )
+                hidden_states = enc.hidden_states[-1]  # [B, seq, hidden]
+
+                # Extract masked hidden states per-sample
+                mask = tok["attention_mask"].bool()
+                valid_lengths = mask.sum(dim=1)
+                selected = hidden_states[mask]
+                split = torch.split(selected, valid_lengths.tolist(), dim=0)
+                split = [s[drop_idx:] for s in split]
+
+                # Build attention masks aligned to truncated sequences
+                attn_masks = [torch.ones(s.size(0), dtype=torch.long, device=text_encoder.device) for s in split]
+                max_seq_len = max(s.size(0) for s in split) if split else 0
+                if max_seq_len == 0:
+                    raise ValueError("Empty encoded sequence after applying template and mask")
+
+                # Pad to max sequence length and stack
+                embeds = torch.stack(
+                    [torch.cat([u, u.new_zeros(max_seq_len - u.size(0), u.size(1))]) for u in split]
+                )
+                embeds_mask = torch.stack(
+                    [torch.cat([m, m.new_zeros(max_seq_len - m.size(0))]) for m in attn_masks]
+                )
+
+                embeds = embeds.to(dtype=text_encoder.dtype).contiguous()
+
+                # Save conditioning (move to cpu for storage)
                 class QwenImageConditioningInfo:
-                    def __init__(self, text_embeds: torch.Tensor, prompt: str):
+                    def __init__(self, text_embeds: torch.Tensor, text_embeds_mask: torch.Tensor, prompt: str):
                         self.text_embeds = text_embeds
+                        self.text_embeds_mask = text_embeds_mask
                         self.prompt = prompt
-                
-                conditioning_info = QwenImageConditioningInfo(text_embeddings, self.prompt)
+
+                conditioning_info = QwenImageConditioningInfo(embeds.cpu(), embeds_mask.cpu(), self.prompt)
                 conditioning_data = ConditioningFieldData(conditionings=[conditioning_info])
-                
                 conditioning_name = context.conditioning.save(conditioning_data)
                 return QwenImageConditioningOutput.build(conditioning_name)
-                
+
             except Exception as e:
                 context.logger.error(f"Error encoding Qwen-Image text: {e}")
-                # Fallback to simple text storage
                 class QwenImageConditioningInfo:
                     def __init__(self, prompt: str):
                         self.prompt = prompt
-                
                 conditioning_info = QwenImageConditioningInfo(self.prompt)
                 conditioning_data = ConditioningFieldData(conditionings=[conditioning_info])
                 conditioning_name = context.conditioning.save(conditioning_data)
