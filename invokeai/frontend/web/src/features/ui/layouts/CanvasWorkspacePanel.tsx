@@ -22,6 +22,7 @@ import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagin
 import { memo, useCallback } from 'react';
 import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
 
+import { CanvasTabs } from './CanvasTabs';
 import { StagingArea } from './StagingArea';
 
 const MenuContent = memo(() => {
@@ -74,6 +75,7 @@ export const CanvasWorkspacePanel = memo(() => {
           <CanvasToolbar />
         </CanvasManagerProviderGate>
         <Divider />
+        <CanvasTabs />
         <ContextMenu<HTMLDivElement> renderMenu={renderMenu} withLongPress={false}>
           {(ref) => (
             <Flex ref={ref} sx={canvasBgSx} data-dynamic-grid={dynamicGrid}>
