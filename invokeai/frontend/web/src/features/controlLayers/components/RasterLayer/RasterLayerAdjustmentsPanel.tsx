@@ -7,9 +7,8 @@ import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerP
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import {
   rasterLayerAdjustmentsCancel,
-  rasterLayerAdjustmentsCurvesUpdated,
+  rasterLayerAdjustmentsReset,
   rasterLayerAdjustmentsSet,
-  rasterLayerAdjustmentsSimpleUpdated,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
 import { makeDefaultRasterLayerAdjustments } from 'features/controlLayers/store/util';
@@ -49,27 +48,7 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
 
   const onReset = useCallback(() => {
     // Reset values to defaults but keep adjustments present; preserve enabled/collapsed/mode
-    dispatch(
-      rasterLayerAdjustmentsSimpleUpdated({
-        entityIdentifier,
-        simple: {
-          brightness: 0,
-          contrast: 0,
-          saturation: 0,
-          temperature: 0,
-          tint: 0,
-          sharpness: 0,
-        },
-      })
-    );
-    const defaultPoints: Array<[number, number]> = [
-      [0, 0],
-      [255, 255],
-    ];
-    dispatch(rasterLayerAdjustmentsCurvesUpdated({ entityIdentifier, channel: 'master', points: defaultPoints }));
-    dispatch(rasterLayerAdjustmentsCurvesUpdated({ entityIdentifier, channel: 'r', points: defaultPoints }));
-    dispatch(rasterLayerAdjustmentsCurvesUpdated({ entityIdentifier, channel: 'g', points: defaultPoints }));
-    dispatch(rasterLayerAdjustmentsCurvesUpdated({ entityIdentifier, channel: 'b', points: defaultPoints }));
+    dispatch(rasterLayerAdjustmentsReset({ entityIdentifier }));
   }, [dispatch, entityIdentifier]);
 
   const onCancel = useCallback(() => {
