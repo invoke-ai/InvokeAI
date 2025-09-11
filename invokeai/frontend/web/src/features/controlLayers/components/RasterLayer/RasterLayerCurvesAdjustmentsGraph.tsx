@@ -51,7 +51,7 @@ const CANVAS_STYLE: React.CSSProperties = {
   display: 'block',
 };
 
-export type CurveGraphProps = {
+type CurveGraphProps = {
   title: string;
   channel: ChannelName;
   points: ChannelPoints | undefined;
