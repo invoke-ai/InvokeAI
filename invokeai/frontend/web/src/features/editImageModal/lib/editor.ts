@@ -4,6 +4,9 @@ import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { objectEntries } from 'tsafe';
 
+/**
+ * The position and size of a crop box.
+ */
 export type CropBox = {
   x: number;
   y: number;
@@ -11,6 +14,9 @@ export type CropBox = {
   height: number;
 };
 
+/**
+ * The callbacks supported by the editor.
+ */
 type EditorCallbacks = {
   onCropStart?: () => void;
   onCropBoxChange?: (crop: CropBox) => void;
@@ -21,10 +27,19 @@ type EditorCallbacks = {
   onImageLoad?: () => void;
 };
 
+/**
+ * Crop box resize handle names.
+ */
 type HandleName = 'top-left' | 'top-right' | 'bottom-right' | 'bottom-left' | 'top' | 'right' | 'bottom' | 'left';
 
+/**
+ * Crop box guide line names.
+ */
 type GuideName = 'left' | 'right' | 'top' | 'bottom';
 
+/**
+ * All the Konva objects used by the editor, organized by function and approximating the Konva node structures.
+ */
 type KonvaObjects = {
   stage: Konva.Stage;
   bg: {
@@ -51,8 +66,14 @@ type KonvaObjects = {
   };
 };
 
+/**
+ * Valid editor output formats.
+ */
 type OutputFormat = 'canvas' | 'blob' | 'dataURL';
 
+/**
+ * Type helper mapping output format name to the actual data type.
+ */
 type OutputFormatToOutputMap<T extends OutputFormat> = T extends 'canvas'
   ? HTMLCanvasElement
   : T extends 'blob'
@@ -61,54 +82,96 @@ type OutputFormatToOutputMap<T extends OutputFormat> = T extends 'canvas'
       ? string
       : never;
 
+/**
+ * The editor's configurable parameters.
+ */
 type EditorConfig = {
+  /**
+   * The minimum size for the crop box. Applied to both width and height.
+   */
   MIN_CROP_DIMENSION: number;
 
+  /**
+   * The zoom factor applied when zooming with the mouse wheel. A value of 1.1 means each wheel step zooms in/out by 10%.
+   */
   ZOOM_WHEEL_FACTOR: number;
+
+  /**
+   * The zoom factor applied when zooming with buttons (e.g. the editor's zoomIn/zoomOut methods). A value of 1.2 means
+   * each button press zooms in/out by 20%.
+   */
   ZOOM_BUTTON_FACTOR: number;
 
+  /**
+   * The size of the crop box resize handles. The handles do not scale with zoom; this is the size they will appear on screen.
+   */
   CROP_HANDLE_SIZE: number;
+
+  /**
+   * The stroke width of the crop box resize handles. The stroke does not scale with zoom; this is the width it will appear on screen.
+   */
   CROP_HANDLE_STROKE_WIDTH: number;
+
+  /**
+   * The fill color for the crop box resize handles.
+   */
   CROP_HANDLE_FILL: string;
+
+  /**
+   * The stroke color for the crop box resize handles.
+   */
   CROP_HANDLE_STROKE: string;
 
+  /**
+   * The stroke color for the group box guides.
+   */
   CROP_GUIDE_STROKE: string;
+
+  /**
+   * The stroke width for the crop box guides. The stroke does not scale with zoom; this is the width it will appear on screen.
+   */
   CROP_GUIDE_STROKE_WIDTH: number;
 
-  FIT_TO_CONTAINER_PADDING: number;
+  /**
+   * When fitting the image to the container, this padding factor is applied to ensure some space around the image.
+   */
+  FIT_TO_CONTAINER_PADDING_PCT: number;
 
+  /**
+   * When starting a new crop, the initial crop box will be this fraction of the image size.
+   */
   DEFAULT_CROP_BOX_SCALE: number;
 
-  ZOOM_MIN: number;
-  ZOOM_MAX: number;
+  /**
+   * The minimum zoom (scale) for the stage.
+   */
+  ZOOM_MIN_PCT: number;
+
+  /**
+   * The maximum zoom (scale) for the stage.
+   */
+  ZOOM_MAX_PCT: number;
 };
 
 const DEFAULT_CONFIG: EditorConfig = {
   MIN_CROP_DIMENSION: 64,
-
   ZOOM_WHEEL_FACTOR: 1.1,
   ZOOM_BUTTON_FACTOR: 1.2,
-
   CROP_HANDLE_SIZE: 8,
   CROP_HANDLE_STROKE_WIDTH: 1,
   CROP_HANDLE_FILL: 'white',
   CROP_HANDLE_STROKE: 'black',
-
   CROP_GUIDE_STROKE: 'rgba(255, 255, 255, 0.5)',
   CROP_GUIDE_STROKE_WIDTH: 1,
-
-  FIT_TO_CONTAINER_PADDING: 0.9,
-
+  FIT_TO_CONTAINER_PADDING_PCT: 0.9,
   DEFAULT_CROP_BOX_SCALE: 0.8,
-
-  ZOOM_MIN: 0.1,
-  ZOOM_MAX: 10,
+  ZOOM_MIN_PCT: 0.1,
+  ZOOM_MAX_PCT: 10,
 };
 
 export class Editor {
   private konva: KonvaObjects | null = null;
   private originalImage: HTMLImageElement | null = null;
-  private isCropping = false;
   private config: EditorConfig = DEFAULT_CONFIG;
 
   private aspectRatio: number | null = null;
@@ -117,6 +180,7 @@ export class Editor {
   private cropBox: CropBox | null = null;
 
   // State
+  private isCropping = false;
   private isPanning = false;
   private lastPointerPosition: { x: number; y: number } | null = null;
   private isSpacePressed = false;
@@ -156,7 +220,7 @@ export class Editor {
     const image = new Image();
     image.onload = () => {
       rect.fillPatternImage(image);
-      this.updateBg();
+      this.updateKonvaBg();
     };
     image.src = TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL;
     layer.add(rect);
@@ -211,20 +275,20 @@ export class Editor {
 
     const rect = this.createKonvaCropInteractionRect();
     const handles = {
-      'top-left': this.createKonvaCropHandle('top-left'),
-      'top-right': this.createKonvaCropHandle('top-right'),
-      'bottom-right': this.createKonvaCropHandle('bottom-right'),
-      'bottom-left': this.createKonvaCropHandle('bottom-left'),
-      top: this.createKonvaCropHandle('top'),
-      right: this.createKonvaCropHandle('right'),
-      bottom: this.createKonvaCropHandle('bottom'),
-      left: this.createKonvaCropHandle('left'),
+      'top-left': this.createKonvaCropInteractionHandle('top-left'),
+      'top-right': this.createKonvaCropInteractionHandle('top-right'),
+      'bottom-right': this.createKonvaCropInteractionHandle('bottom-right'),
+      'bottom-left': this.createKonvaCropInteractionHandle('bottom-left'),
+      top: this.createKonvaCropInteractionHandle('top'),
+      right: this.createKonvaCropInteractionHandle('right'),
+      bottom: this.createKonvaCropInteractionHandle('bottom'),
+      left: this.createKonvaCropInteractionHandle('left'),
     };
     const guides = {
-      left: this.createKonvaCropGuide('left'),
-      right: this.createKonvaCropGuide('right'),
-      top: this.createKonvaCropGuide('top'),
-      bottom: this.createKonvaCropGuide('bottom'),
+      left: this.createKonvaCropInteractionGuide('left'),
+      right: this.createKonvaCropInteractionGuide('right'),
+      top: this.createKonvaCropInteractionGuide('top'),
+      bottom: this.createKonvaCropInteractionGuide('bottom'),
     };
 
     group.add(rect);
@@ -277,7 +341,7 @@ export class Editor {
       rect.x(x);
       rect.y(y);
 
-      this.updateCropBox({ x, y, width, height });
+      this.updateKonvaCropBox({ x, y, width, height });
     });
 
     rect.on('mouseenter', () => {
@@ -303,7 +367,7 @@ export class Editor {
     return rect;
   };
 
-  private createKonvaCropGuide = (name: GuideName): Konva.Line => {
+  private createKonvaCropInteractionGuide = (name: GuideName): Konva.Line => {
     const line = new Konva.Line({
       name,
       stroke: this.config.CROP_GUIDE_STROKE,
@@ -315,7 +379,7 @@ export class Editor {
     return line;
   };
 
-  private createKonvaCropHandle = (name: HandleName): Konva.Rect => {
+  private createKonvaCropInteractionHandle = (name: HandleName): Konva.Rect => {
     const rect = new Konva.Rect({
       name,
       x: 0,
@@ -381,14 +445,14 @@ export class Editor {
     return rect;
   };
 
-  private updateCropInteractionRect = () => {
+  private updateKonvaCropInteractionRect = () => {
     if (!this.konva || !this.cropBox) {
       return;
     }
     this.konva.crop.interaction.rect.setAttrs({ ...this.cropBox });
   };
 
-  private updateCropGuides = () => {
+  private updateKonvaCropInteractionGuides = () => {
     if (!this.konva || !this.cropBox) {
       return;
     }
@@ -404,36 +468,7 @@ export class Editor {
     this.konva.crop.interaction.guides.bottom.points([x, y + horizontalThird * 2, x + width, y + horizontalThird * 2]);
   };
 
-  private updateCropBox = (cropBox: CropBox) => {
-    this.cropBox = cropBox;
-    this.updateCropInteractionRect();
-    this.updateCropOverlay();
-    this.updateCropGuides();
-    this.updateHandlePositions();
-    this.callbacks.onCropBoxChange?.(cropBox);
-  };
-
-  private updateBg = () => {
-    if (!this.konva) {
-      return;
-    }
-    const scale = this.konva.stage.scaleX();
-    const patternScale = 1 / scale;
-    const { x, y } = this.konva.stage.getPosition();
-    const { width, height } = this.konva.stage.size();
-
-    this.konva.bg.rect.setAttrs({
-      visible: true,
-      x: Math.floor(-x / scale),
-      y: Math.floor(-y / scale),
-      width: Math.ceil(width / scale),
-      height: Math.ceil(height / scale),
-      fillPatternScaleX: patternScale,
-      fillPatternScaleY: patternScale,
-    });
-  };
-
-  private updateHandlePositions = () => {
+  private updateKonvaCropInteractionHandlePositions = () => {
     if (!this.konva || !this.cropBox) {
       return;
     }
@@ -462,22 +497,7 @@ export class Editor {
     }
   };
 
-  private updateCropOverlay = () => {
-    if (!this.konva?.image.image || !this.cropBox) {
-      return;
-    }
-
-    // Make the overlay cover the entire image
-    this.konva.crop.overlay.full.setAttrs({
-      ...this.konva.image.image.getPosition(),
-      ...this.konva.image.image.getSize(),
-    });
-
-    // Clear the crop area from the overlay
-    this.konva.crop.overlay.clear.setAttrs({ ...this.cropBox });
-  };
-
-  private updateHandleScale = () => {
+  private updateKonvaCropInteractionHandleScales = () => {
     if (!this.konva) {
       return;
     }
@@ -504,6 +524,76 @@ export class Editor {
       handle.x(centerX - handleSize / 2);
       handle.y(centerY - handleSize / 2);
     }
+  };
+
+  private updateKonvaCropBox = (cropBox: CropBox) => {
+    this.cropBox = cropBox;
+    this.updateKonvaCropOverlay();
+    this.updateKonvaCropInteractionRect();
+    this.updateKonvaCropInteractionGuides();
+    this.updateKonvaCropInteractionHandlePositions();
+    this.callbacks.onCropBoxChange?.(cropBox);
+  };
+
+  private updateKonvaBg = () => {
+    if (!this.konva) {
+      return;
+    }
+    const scale = this.konva.stage.scaleX();
+    const patternScale = 1 / scale;
+    const { x, y } = this.konva.stage.getPosition();
+    const { width, height } = this.konva.stage.size();
+
+    this.konva.bg.rect.setAttrs({
+      visible: true,
+      x: Math.floor(-x / scale),
+      y: Math.floor(-y / scale),
+      width: Math.ceil(width / scale),
+      height: Math.ceil(height / scale),
+      fillPatternScaleX: patternScale,
+      fillPatternScaleY: patternScale,
+    });
+  };
+
+  private updateKonvaCropOverlay = () => {
+    if (!this.konva?.image.image || !this.cropBox) {
+      return;
+    }
+
+    // Make the overlay cover the entire image
+    this.konva.crop.overlay.full.setAttrs({
+      ...this.konva.image.image.getPosition(),
+      ...this.konva.image.image.getSize(),
+    });
+
+    // Clear the crop area from the overlay
+    this.konva.crop.overlay.clear.setAttrs({ ...this.cropBox });
+  };
+
+  private updateImage = () => {
+    if (!this.originalImage || !this.konva) {
+      return;
+    }
+
+    // Clear existing image
+    if (this.konva.image.image) {
+      this.konva.image.image.destroy();
+      this.konva.image.image = undefined;
+    }
+
+    const imageNode = new Konva.Image({
+      image: this.originalImage,
+      x: 0,
+      y: 0,
+      width: this.originalImage.width,
+      height: this.originalImage.height,
+    });
+
+    this.konva.image.image = imageNode;
+    this.konva.image.layer.add(imageNode);
+
+    // Center image at 100% zoom
+    this.resetView();
   };
 
   //#region Event Handling
@@ -572,7 +662,7 @@ export class Editor {
     let newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
 
     // Apply zoom limits
-    newScale = Math.max(this.config.ZOOM_MIN, Math.min(this.config.ZOOM_MAX, newScale));
+    newScale = Math.max(this.config.ZOOM_MIN_PCT, Math.min(this.config.ZOOM_MAX_PCT, newScale));
 
     this.konva.stage.scale({ x: newScale, y: newScale });
 
@@ -583,8 +673,8 @@ export class Editor {
     this.konva.stage.position(newPos);
 
     // Update handle scaling to maintain constant screen size
-    this.updateHandleScale();
-    this.updateBg();
+    this.updateKonvaCropInteractionHandleScales();
+    this.updateKonvaBg();
     this.callbacks.onZoomChange?.(newScale);
   };
 
@@ -646,7 +736,7 @@ export class Editor {
     this.konva.stage.x(this.konva.stage.x() + dx);
     this.konva.stage.y(this.konva.stage.y() + dy);
 
-    this.updateBg();
+    this.updateKonvaBg();
 
     this.lastPointerPosition = pointer;
   };
@@ -665,33 +755,7 @@ export class Editor {
     // Prevent context menu on right-click
     e.evt.preventDefault();
   };
-  //#endregion
-
-  private updateImage = () => {
-    if (!this.originalImage || !this.konva) {
-      return;
-    }
-
-    // Clear existing image
-    if (this.konva.image.image) {
-      this.konva.image.image.destroy();
-      this.konva.image.image = undefined;
-    }
-
-    const imageNode = new Konva.Image({
-      image: this.originalImage,
-      x: 0,
-      y: 0,
-      width: this.originalImage.width,
-      height: this.originalImage.height,
-    });
-
-    this.konva.image.image = imageNode;
-    this.konva.image.layer.add(imageNode);
-
-    // Center image at 100% zoom
-    this.resetView();
-  };
+  //#region Event Handling
 
   private resizeCropBox = (handleName: HandleName, handleRect: Konva.Rect) => {
     if (!this.konva) {
@@ -702,7 +766,7 @@ export class Editor {
       ? this._resizeCropBoxWithAspectRatio(handleName, handleRect)
       : this._resizeCropBoxFree(handleName, handleRect);
 
-    this.updateCropBox({
+    this.updateKonvaCropBox({
       x: newX,
       y: newY,
       width: newWidth,
@@ -711,17 +775,17 @@ export class Editor {
   };
 
   private _resizeCropBoxFree = (handleName: HandleName, handleRect: Konva.Rect) => {
-    if (!this.konva?.image.image) {
+    if (!this.konva?.image.image || !this.cropBox) {
       throw new Error('Crop box or image not found');
     }
-    const rect = this.konva.crop.overlay.clear;
+
     const imgWidth = this.konva.image.image.width();
     const imgHeight = this.konva.image.image.height();
 
-    let newX = rect.x();
-    let newY = rect.y();
-    let newWidth = rect.width();
-    let newHeight = rect.height();
+    let newX = this.cropBox.x;
+    let newY = this.cropBox.y;
+    let newWidth = this.cropBox.width;
+    let newHeight = this.cropBox.height;
 
     const handleX = handleRect.x() + handleRect.width() / 2;
     const handleY = handleRect.y() + handleRect.height() / 2;
@@ -902,6 +966,7 @@ export class Editor {
     return { newX, newY, newWidth, newHeight };
   };
 
+  //#region Public API
   loadImage = (src: string): Promise<void> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -956,7 +1021,7 @@ export class Editor {
       cropY = (imgHeight - cropHeight) / 2;
     }
 
-    this.updateCropBox({
+    this.updateKonvaCropBox({
       x: cropX,
       y: cropY,
       width: cropWidth,
@@ -989,7 +1054,7 @@ export class Editor {
 
   resetCrop = () => {
     if (this.konva?.image.image) {
-      this.updateCropBox({
+      this.updateKonvaCropBox({
         x: 0,
         y: 0,
         ...this.konva.image.image.size(),
@@ -1071,7 +1136,7 @@ export class Editor {
       return;
     }
 
-    scale = Math.max(this.config.ZOOM_MIN, Math.min(this.config.ZOOM_MAX, scale));
+    scale = Math.max(this.config.ZOOM_MIN_PCT, Math.min(this.config.ZOOM_MAX_PCT, scale));
 
     // If no point provided, use center of viewport
     if (!point && this.konva.image) {
@@ -1102,9 +1167,9 @@ export class Editor {
     }
 
     // Update handle scaling
-    this.updateHandleScale();
+    this.updateKonvaCropInteractionHandleScales();
 
-    this.updateBg();
+    this.updateKonvaBg();
 
     this.callbacks.onZoomChange?.(scale);
   };
@@ -1142,9 +1207,9 @@ export class Editor {
     });
 
     // Update handle scaling
-    this.updateHandleScale();
+    this.updateKonvaCropInteractionHandleScales();
 
-    this.updateBg();
+    this.updateKonvaBg();
 
     this.callbacks.onZoomChange?.(1);
   };
@@ -1160,7 +1225,7 @@ export class Editor {
     const imageHeight = this.konva.image.image.height();
 
     const scale =
-      Math.min(containerWidth / imageWidth, containerHeight / imageHeight) * this.config.FIT_TO_CONTAINER_PADDING;
+      Math.min(containerWidth / imageWidth, containerHeight / imageHeight) * this.config.FIT_TO_CONTAINER_PADDING_PCT;
 
     this.konva.stage.scale({ x: scale, y: scale });
 
@@ -1174,9 +1239,9 @@ export class Editor {
     });
 
     // Update handle scaling
-    this.updateHandleScale();
+    this.updateKonvaCropInteractionHandleScales();
 
-    this.updateBg();
+    this.updateKonvaBg();
 
     this.callbacks.onZoomChange?.(scale);
   };
@@ -1253,7 +1318,7 @@ export class Editor {
     newX = Math.max(0, Math.min(newX, imgWidth - newWidth));
     newY = Math.max(0, Math.min(newY, imgHeight - newHeight));
 
-    this.updateCropBox({
+    this.updateKonvaCropBox({
       x: newX,
       y: newY,
       width: newWidth,
@@ -1274,7 +1339,7 @@ export class Editor {
     this.konva.stage.width(width);
     this.konva.stage.height(height);
 
-    this.updateBg();
+    this.updateKonvaBg();
   };
 
   destroy = () => {
@@ -1295,4 +1360,5 @@ export class Editor {
     this.cropBox = null;
     this.callbacks = {};
   };
+  //#endregion Public API
 }
