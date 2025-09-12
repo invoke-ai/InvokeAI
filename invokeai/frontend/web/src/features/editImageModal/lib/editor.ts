@@ -1,4 +1,5 @@
 import Konva from 'konva';
+import type { KonvaEventObject } from 'konva/lib/Node';
 
 type CropConstraints = {
   minWidth?: number;
@@ -8,17 +9,17 @@ type CropConstraints = {
   aspectRatio?: number;
 };
 
-type EditorCallbacks = {
-  onCropChange?: (crop: { x: number; y: number; width: number; height: number }) => void;
-  onZoomChange?: (zoom: number) => void;
-  onImageLoad?: () => void;
-};
-
 type CropData = {
   x: number;
   y: number;
   width: number;
   height: number;
+};
+
+type EditorCallbacks = {
+  onCropChange?: (crop: CropData | null) => void;
+  onZoomChange?: (zoom: number) => void;
+  onImageLoad?: () => void;
 };
 
 type KonvaObjects = {
@@ -37,10 +38,11 @@ type KonvaObjects = {
 };
 
 export class Editor {
-  private konva?: KonvaObjects;
-  private originalImage?: HTMLImageElement;
+  private konva: KonvaObjects | null = null;
+  private originalImage: HTMLImageElement | null = null;
   private isCropping = false;
-  private appliedCrop?: CropData;
+  private appliedCrop: CropData | null = null;
+  private currentImageBlobUrl: string | null = null;
 
   // Configuration
   private zoomMin = 0.1;
@@ -53,13 +55,10 @@ export class Editor {
 
   // State
   private isPanning = false;
-  private lastPointerPosition?: { x: number; y: number };
+  private lastPointerPosition: { x: number; y: number } | null = null;
   private isSpacePressed = false;
-  private keydownHandler?: (e: KeyboardEvent) => void;
-  private keyupHandler?: (e: KeyboardEvent) => void;
-  private contextMenuHandler?: (e: Event) => void;
-  private currentImageBlobUrl?: string;
-  private wheelHandler?: (e: WheelEvent) => void;
+
+  subscriptions: Set<() => void> = new Set();
 
   init = (container: HTMLDivElement) => {
     // Create stage
@@ -81,123 +80,163 @@ export class Editor {
     }
     const stage = this.konva.stage;
 
-    // Zoom with mouse wheel
-    this.wheelHandler = (e: WheelEvent) => {
-      e.preventDefault();
-
-      const oldScale = stage.scaleX();
-      const pointer = stage.getPointerPosition();
-
-      if (!pointer) {
-        return;
-      }
-
-      const mousePointTo = {
-        x: (pointer.x - stage.x()) / oldScale,
-        y: (pointer.y - stage.y()) / oldScale,
-      };
-
-      const direction = e.deltaY > 0 ? -1 : 1;
-      const scaleBy = 1.1;
-      let newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
-
-      // Apply zoom limits
-      newScale = Math.max(this.zoomMin, Math.min(this.zoomMax, newScale));
-
-      stage.scale({ x: newScale, y: newScale });
-
-      const newPos = {
-        x: pointer.x - mousePointTo.x * newScale,
-        y: pointer.y - mousePointTo.y * newScale,
-      };
-      stage.position(newPos);
-
-      // Update handle scaling to maintain constant screen size
-      this.updateHandleScale();
-
-      this.callbacks.onZoomChange?.(newScale);
-    };
-
-    stage.container().addEventListener('wheel', this.wheelHandler, { passive: false });
-
-    // Track Space key press
-    this.keydownHandler = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && !this.isSpacePressed) {
-        e.preventDefault();
-        this.isSpacePressed = true;
-        if (stage) {
-          stage.container().style.cursor = 'grab';
-        }
-      }
-    };
-
-    this.keyupHandler = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        e.preventDefault();
-        this.isSpacePressed = false;
-        this.isPanning = false;
-        if (stage) {
-          stage.container().style.cursor = 'default';
-        }
-      }
-    };
-
-    window.addEventListener('keydown', this.keydownHandler);
-    window.addEventListener('keyup', this.keyupHandler);
-
-    // Pan with Space + drag or middle mouse button
-    stage.on('mousedown', (e) => {
-      if (this.isSpacePressed || e.evt.button === 1) {
-        e.evt.preventDefault();
-        e.evt.stopPropagation();
-        this.isPanning = true;
-        this.lastPointerPosition = stage.getPointerPosition() || undefined;
-        stage.container().style.cursor = 'grabbing';
-
-        // Stop any active drags on crop elements
-        if (this.konva?.crop) {
-          if (this.konva.crop.rect.isDragging()) {
-            this.konva.crop.rect.stopDrag();
-          }
-          this.konva.crop.handles.children.forEach((handle) => {
-            if (handle.isDragging()) {
-              handle.stopDrag();
-            }
-          });
-        }
-      }
+    stage.container().addEventListener('wheel', this.onWheel, { passive: false });
+    this.subscriptions.add(() => {
+      stage.container().removeEventListener('wheel', this.onWheel);
+    });
+    stage.container().addEventListener('contextmenu', this.onContextMenu);
+    this.subscriptions.add(() => {
+      stage.container().removeEventListener('contextmenu', this.onContextMenu);
     });
 
-    stage.on('mousemove', () => {
-      if (!this.isPanning || !this.lastPointerPosition) {
-        return;
-      }
-
-      const pointer = stage.getPointerPosition();
-      if (!pointer) {
-        return;
-      }
-
-      const dx = pointer.x - this.lastPointerPosition.x;
-      const dy = pointer.y - this.lastPointerPosition.y;
-
-      stage.x(stage.x() + dx);
-      stage.y(stage.y() + dy);
-
-      this.lastPointerPosition = pointer;
+    stage.on('pointerdown', this.onPointerDown);
+    this.subscriptions.add(() => {
+      stage.off('contextmenu', this.onContextMenu);
+    });
+    stage.on('pointerup', this.onPointerUp);
+    this.subscriptions.add(() => {
+      stage.off('pointerup', this.onPointerUp);
+    });
+    stage.on('pointermove', this.onPointerMove);
+    this.subscriptions.add(() => {
+      stage.off('pointermove', this.onPointerMove);
     });
 
-    stage.on('mouseup', () => {
-      if (this.isPanning) {
-        this.isPanning = false;
-        stage.container().style.cursor = this.isSpacePressed ? 'grab' : 'default';
-      }
+    window.addEventListener('keydown', this.onKeyDown);
+    this.subscriptions.add(() => {
+      window.removeEventListener('keydown', this.onKeyDown);
     });
 
-    // Prevent context menu on right click
-    this.contextMenuHandler = (e: Event) => e.preventDefault();
-    stage.container().addEventListener('contextmenu', this.contextMenuHandler);
+    window.addEventListener('keyup', this.onKeyUp);
+    this.subscriptions.add(() => {
+      window.removeEventListener('keyup', this.onKeyUp);
+    });
   };
+
+  // Track Space key press
+  onKeyDown = (e: KeyboardEvent) => {
+    if (!this.konva?.stage) {
+      return;
+    }
+    if (e.code === 'Space' && !this.isSpacePressed) {
+      e.preventDefault();
+      this.isSpacePressed = true;
+      this.konva.stage.container().style.cursor = 'grab';
+    }
+  };
+
+  // Zoom with mouse wheel
+  onWheel = (e: WheelEvent) => {
+    if (!this.konva?.stage) {
+      return;
+    }
+    e.preventDefault();
+
+    const oldScale = this.konva.stage.scaleX();
+    const pointer = this.konva.stage.getPointerPosition();
+
+    if (!pointer) {
+      return;
+    }
+
+    const mousePointTo = {
+      x: (pointer.x - this.konva.stage.x()) / oldScale,
+      y: (pointer.y - this.konva.stage.y()) / oldScale,
+    };
+
+    const direction = e.deltaY > 0 ? -1 : 1;
+    const scaleBy = 1.1;
+    let newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
+
+    // Apply zoom limits
+    newScale = Math.max(this.zoomMin, Math.min(this.zoomMax, newScale));
+
+    this.konva.stage.scale({ x: newScale, y: newScale });
+
+    const newPos = {
+      x: pointer.x - mousePointTo.x * newScale,
+      y: pointer.y - mousePointTo.y * newScale,
+    };
+    this.konva.stage.position(newPos);
+
+    // Update handle scaling to maintain constant screen size
+    this.updateHandleScale();
+
+    this.callbacks.onZoomChange?.(newScale);
+  };
+
+  onKeyUp = (e: KeyboardEvent) => {
+    if (!this.konva?.stage) {
+      return;
+    }
+    if (e.code === 'Space') {
+      e.preventDefault();
+      this.isSpacePressed = false;
+      this.isPanning = false;
+      this.konva.stage.container().style.cursor = 'grab';
+    }
+  };
+
+  // Pan with Space + drag or middle mouse button
+  onPointerDown = (e: KonvaEventObject<PointerEvent>) => {
+    if (!this.konva?.stage) {
+      return;
+    }
+    if (this.isSpacePressed || e.evt.button === 1) {
+      e.evt.preventDefault();
+      e.evt.stopPropagation();
+      this.isPanning = true;
+      this.lastPointerPosition = this.konva.stage.getPointerPosition();
+      this.konva.stage.container().style.cursor = 'grabbing';
+
+      // Stop any active drags on crop elements
+      if (this.konva.crop) {
+        if (this.konva.crop.rect.isDragging()) {
+          this.konva.crop.rect.stopDrag();
+        }
+        this.konva.crop.handles.children.forEach((handle) => {
+          if (handle.isDragging()) {
+            handle.stopDrag();
+          }
+        });
+      }
+    }
+  };
+
+  onPointerMove = (_: KonvaEventObject<PointerEvent>) => {
+    if (!this.konva?.stage) {
+      return;
+    }
+    if (!this.isPanning || !this.lastPointerPosition) {
+      return;
+    }
+
+    const pointer = this.konva.stage.getPointerPosition();
+    if (!pointer) {
+      return;
+    }
+
+    const dx = pointer.x - this.lastPointerPosition.x;
+    const dy = pointer.y - this.lastPointerPosition.y;
+
+    this.konva.stage.x(this.konva.stage.x() + dx);
+    this.konva.stage.y(this.konva.stage.y() + dy);
+
+    this.lastPointerPosition = pointer;
+  };
+
+  onPointerUp = (_: KonvaEventObject<PointerEvent>) => {
+    if (!this.konva?.stage) {
+      return;
+    }
+    if (this.isPanning) {
+      this.isPanning = false;
+      this.konva.stage.container().style.cursor = this.isSpacePressed ? 'grab' : 'default';
+    }
+  };
+
+  // Prevent context menu on right click
+  onContextMenu = (e: MouseEvent) => e.preventDefault();
 
   // Image Management
   loadImage = (src: string | File | Blob): Promise<void> => {
@@ -205,7 +244,7 @@ export class Editor {
       // Clean up previous blob URL if it exists
       if (this.currentImageBlobUrl) {
         URL.revokeObjectURL(this.currentImageBlobUrl);
-        this.currentImageBlobUrl = undefined;
+        this.currentImageBlobUrl = null;
       }
 
       const img = new Image();
@@ -226,7 +265,7 @@ export class Editor {
         // Clean up blob URL on error
         if (this.currentImageBlobUrl) {
           URL.revokeObjectURL(this.currentImageBlobUrl);
-          this.currentImageBlobUrl = undefined;
+          this.currentImageBlobUrl = null;
         }
         reject(new Error('Failed to load image'));
       };
@@ -1124,7 +1163,7 @@ export class Editor {
   };
 
   resetCrop = () => {
-    this.appliedCrop = undefined;
+    this.appliedCrop = null;
 
     // Redisplay image without crop
     this.displayImage();
@@ -1406,33 +1445,14 @@ export class Editor {
   };
 
   destroy = () => {
-    // Remove window event listeners
-    if (this.keydownHandler) {
-      window.removeEventListener('keydown', this.keydownHandler);
-      this.keydownHandler = undefined;
-    }
-    if (this.keyupHandler) {
-      window.removeEventListener('keyup', this.keyupHandler);
-      this.keyupHandler = undefined;
-    }
-
-    // Remove stage container event listeners
-    if (this.konva) {
-      const container = this.konva.stage.container();
-      if (this.contextMenuHandler) {
-        container.removeEventListener('contextmenu', this.contextMenuHandler);
-        this.contextMenuHandler = undefined;
-      }
-      if (this.wheelHandler) {
-        container.removeEventListener('wheel', this.wheelHandler);
-        this.wheelHandler = undefined;
-      }
+    for (const unsubscribe of this.subscriptions) {
+      unsubscribe();
     }
 
     // Clean up blob URL if it exists
     if (this.currentImageBlobUrl) {
       URL.revokeObjectURL(this.currentImageBlobUrl);
-      this.currentImageBlobUrl = undefined;
+      this.currentImageBlobUrl = null;
     }
 
     // Cancel any ongoing crop operation
@@ -1445,9 +1465,9 @@ export class Editor {
     this.konva?.stage.destroy();
 
     // Clear all references
-    this.konva = undefined;
-    this.originalImage = undefined;
-    this.appliedCrop = undefined;
+    this.konva = null;
+    this.originalImage = null;
+    this.appliedCrop = null;
     this.callbacks = {};
   };
 }
