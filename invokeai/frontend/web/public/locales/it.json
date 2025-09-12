@@ -1350,7 +1350,7 @@
         "generations_many": "Generazioni",
         "generations_other": "Generazioni",
         "origin": "Origine",
-        "destination": "Destinazione",
+        "destination": "Dest",
         "upscaling": "Ampliamento",
         "canvas": "Tela",
         "workflows": "Flussi di lavoro",
@@ -1372,7 +1372,8 @@
         "sortOrderAscending": "Ascendente",
         "sortOrderDescending": "Discendente",
         "createdAt": "Creato",
-        "completedAt": "Completato"
+        "completedAt": "Completato",
+        "batchFieldValues": "Valori del campo Lotto"
     },
     "models": {
         "noMatchingModels": "Nessun modello corrispondente",
@@ -2031,7 +2032,9 @@
             "errorWorkflowHasUnpublishableNodes": "Il flusso di lavoro ha nodi di estrazione lotto, generatore o metadati",
             "showShuffle": "Mostra Mescola",
             "shuffle": "Mescola",
-            "removeFromForm": "Rimuovi dal modulo"
+            "removeFromForm": "Rimuovi dal modulo",
+            "emptyRootPlaceholderViewMode": "Fare clic su Modifica per iniziare a creare un modulo per questo flusso di lavoro.",
+            "workflowBuilderAlphaWarning": "Il generatore di flussi di lavoro è attualmente in versione alpha. Potrebbero esserci modifiche sostanziali prima della versione stabile."
         },
         "loadMore": "Carica altro",
         "searchPlaceholder": "Cerca per nome, descrizione o etichetta",
@@ -2051,7 +2054,14 @@
         "userWorkflows": "Flussi di lavoro dell'utente",
         "projectWorkflows": "Flussi di lavoro del progetto",
         "allLoaded": "Tutti i flussi di lavoro caricati",
-        "filterByTags": "Filtra per etichetta"
+        "filterByTags": "Filtra per etichetta",
+        "noRecentWorkflows": "Nessun flusso di lavoro recente",
+        "openWorkflow": "Apri flusso di lavoro",
+        "problemLoading": "Problema nel caricamento dei flussi di lavoro",
+        "noDescription": "Nessuna descrizione",
+        "searchWorkflows": "Ricerca flussi di lavoro",
+        "clearWorkflowSearchFilter": "Cancella filtro di ricerca del flusso di lavoro",
+        "openLibrary": "Apri libreria"
     },
     "accordions": {
         "compositing": {
@@ -2442,7 +2452,17 @@
             "include": "Includi",
             "neutral": "Neutro",
             "saveAs": "Salva come",
-            "process": "Elabora"
+            "process": "Elabora",
+            "desc": "Seleziona un singolo oggetto di destinazione. Una volta completata la selezione, fai clic su <Bold>Applica</Bold> per eliminare tutto ciò che si trova al di fuori dell'area selezionata, oppure salva la selezione come nuovo livello.",
+            "visualModeDesc": "La modalità visiva utilizza input di tipo riquadro e punto per selezionare un oggetto.",
+            "visualMode1": "Fai clic e trascina per disegnare un riquadro attorno all'oggetto che desideri selezionare. Puoi ottenere risultati migliori disegnando il riquadro un po' più grande o più piccolo dell'oggetto.",
+            "visualMode2": "Fare clic per aggiungere un punto di <Bold>iinclusione</Bold>i verde oppure fare clic tenendo premuto Maiusc per aggiungere un punto di <Bold>iesclusione</Bold>i rosso per indicare al modello cosa includere o escludere.",
+            "visualMode3": "I punti possono essere utilizzati per perfezionare una selezione di caselle oppure in modo indipendente.",
+            "promptModeDesc": "La modalità Prompt utilizza l'input di testo per selezionare un oggetto.",
+            "promptMode1": "Digitare una breve descrizione dell'oggetto che si desidera selezionare.",
+            "promptMode2": "Utilizzare un linguaggio semplice, evitando descrizioni complesse o oggetti multipli.",
+            "model": "Modello",
+            "prompt": "Prompt di selezione"
         },
         "convertControlLayerTo": "Converti $t(controlLayers.controlLayer) in",
         "newRasterLayer": "Nuovo $t(controlLayers.rasterLayer)",
@@ -2514,7 +2534,9 @@
         "hideNonRasterLayers": "Nascondi livelli non raster (Shift+H)",
         "referenceImageEmptyStateWithCanvasOptions": "<UploadButton>Carica un'immagine</UploadButton>, trascina un'immagine dalla galleria su questa immagine di riferimento o <PullBboxButton>trascina il riquadro di delimitazione in questa immagine di riferimento</PullBboxButton> per iniziare.",
         "autoSwitch": {
-            "off": "Spento"
+            "off": "Spento",
+            "switchOnStart": "All'inizio",
+            "switchOnFinish": "Alla fine"
         },
         "invertMask": "Inverti maschera",
         "fitBboxToMasks": "Adatta il riquadro di delimitazione alle maschere",
@@ -2525,7 +2547,52 @@
         "globalReferenceImage_withCount_other": "Immagini di riferimento globali",
         "layer_withCount_one": "Livello ({{count}})",
         "layer_withCount_many": "Livelli ({{count}})",
-        "layer_withCount_other": "Livelli ({{count}})"
+        "layer_withCount_other": "Livelli ({{count}})",
+        "addAdjustments": "Aggiungi regolazioni",
+        "removeAdjustments": "Rimuovi regolazioni",
+        "adjustments": {
+            "simple": "Semplice",
+            "curves": "Curve",
+            "heading": "Regolazioni",
+            "expand": "Espandi regolazioni",
+            "collapse": "Comprimi regolazioni",
+            "brightness": "Luminosità",
+            "contrast": "Contrasto",
+            "saturation": "Saturazione",
+            "temperature": "Temperatura",
+            "tint": "Tinta",
+            "sharpness": "Nitidezza",
+            "reset": "Reimposta"
+        },
+        "deletePrompt": "Elimina prompt",
+        "addGlobalReferenceImage": "Aggiungi $t(controlLayers.globalReferenceImage)",
+        "referenceImageGlobal": "Immagine di riferimento (globale)",
+        "sendingToGallery": "Invia generazioni alla Galleria",
+        "sendToGallery": "Invia alla Galleria",
+        "sendToGalleryDesc": "Premendo Invoke viene generata e salvata un'immagine unica nella tua galleria.",
+        "newImg2ImgCanvasFromImage": "Nuovo immagine-a-immagine da Immagine",
+        "sendToCanvasDesc": "Premendo Invoke il lavoro in corso viene visualizzato sulla tela.",
+        "viewProgressOnCanvas": "Visualizza i progressi e gli output nel <Btn>Visualizzatore immagini</Btn>.",
+        "regionalGuidance_withCount_hidden": "Guida regionale ({{count}} nascosti)",
+        "controlLayers_withCount_hidden": "Livelli di controllo ({{count}} nascosti)",
+        "rasterLayers_withCount_hidden": "Livelli raster ({{count}} nascosti)",
+        "globalReferenceImages_withCount_hidden": "Immagini di riferimento globali ({{count}} nascoste)",
+        "inpaintMasks_withCount_hidden": "Maschere Inpaint ({{count}} nascoste)",
+        "regionalGuidance_withCount_visible": "Guida regionale ({{count}})",
+        "controlLayers_withCount_visible": "Livelli di controllo ({{count}})",
+        "rasterLayers_withCount_visible": "Livelli raster ({{count}})",
+        "globalReferenceImages_withCount_visible": "Immagini di riferimento globali ({{count}})",
+        "inpaintMasks_withCount_visible": "Maschere Inpaint ({{count}})",
+        "pastedTo": "Incollato su {{destination}}",
+        "stagingOnCanvas": "Predisponi le immagini su",
+        "newGallerySession": "Nuova sessione della Galleria",
+        "newGallerySessionDesc": "Questo cancellerà la tela e tutte le impostazioni, ad eccezione della selezione del modello. Le generazioni verranno inviate alla galleria.",
+        "newCanvasSession": "Nuova sessione Tela",
+        "newCanvasSessionDesc": "Questo cancellerà la tela e tutte le impostazioni, ad eccezione della selezione del modello. Le generazioni verranno predisposte sulla tela.",
+        "replaceCurrent": "Sostituisci l'attuale",
+        "uploadOrDragAnImage": "Trascina un'immagine dalla galleria o <UploadButton>carica un'immagine</UploadButton>.",
+        "sendingToCanvas": "Predisponi le generazioni sulla Tela",
+        "viewProgressInViewer": "Visualizza i progressi e gli output nel <Btn>Visualizzatore immagini</Btn>."
     },
     "ui": {
         "tabs": {
@@ -2622,6 +2689,10 @@
             "addStartingFrame": {
                 "title": "Aggiungi un fotogramma iniziale",
                 "description": "Aggiungi un'immagine per controllare il primo fotogramma del tuo video."
+            },
+            "video": {
+                "startingFrameCalloutTitle": "Aggiungi un fotogramma iniziale",
+                "startingFrameCalloutDesc": "Aggiungi un'immagine per controllare il primo fotogramma del tuo video."
             }
         },
         "panels": {
@@ -2719,9 +2790,10 @@
         "readReleaseNotes": "Leggi le note di rilascio",
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "items": [
-            "Tela: separa i colori di primo piano e di sfondo - attiva con 'x', ripristina in bianco e nero con 'd'",
-            "LoRA: imposta i pesi predefiniti per i singoli LoRA nella scheda Gestione modelli"
-        ]
+            "Seleziona oggetto v2: selezione degli oggetti migliorata con input di punti e riquadri o prompt di testo.",
+            "Regolazioni del livello raster: regola facilmente la luminosità, il contrasto, la saturazione, le curve e altro ancora del livello."
+        ],
+        "watchUiUpdatesOverview": "Guarda la panoramica degli aggiornamenti dell'interfaccia utente"
     },
     "system": {
         "logLevel": {
@@ -2772,5 +2844,9 @@
     },
     "lora": {
         "weight": "Peso"
+    },
+    "video": {
+        "noVideoSelected": "Nessun video selezionato",
+        "selectFromGallery": "Seleziona un video dalla galleria per riprodurlo"
     }
 }
