@@ -121,7 +121,7 @@ export class Editor {
   private lastPointerPosition: { x: number; y: number } | null = null;
   private isSpacePressed = false;
 
-  private subscriptions: Set<() => void> = new Set();
+  private cleanupFunctions: Set<() => void> = new Set();
 
   init = (container: HTMLDivElement, config?: Partial<EditorConfig>) => {
     this.config = { ...this.config, ...config };
@@ -147,7 +147,7 @@ export class Editor {
       crop,
     };
 
-    this.setupStageEvents();
+    this.setupListeners();
   };
 
   private createKonvaBgObjects = (): KonvaObjects['bg'] => {
@@ -507,41 +507,31 @@ export class Editor {
   };
 
   //#region Event Handling
-  private setupStageEvents = () => {
+  private setupListeners = () => {
     if (!this.konva) {
       return;
     }
     const stage = this.konva.stage;
 
-    stage.container().addEventListener('wheel', this.onWheel, { passive: false });
-    this.subscriptions.add(() => {
-      stage.container().removeEventListener('wheel', this.onWheel);
-    });
-    stage.container().addEventListener('contextmenu', this.onContextMenu);
-    this.subscriptions.add(() => {
-      stage.container().removeEventListener('contextmenu', this.onContextMenu);
-    });
-
+    stage.on('wheel', this.onWheel);
+    stage.on('contextmenu', this.onContextMenu);
     stage.on('pointerdown', this.onPointerDown);
-    this.subscriptions.add(() => {
-      stage.off('pointerdown', this.onPointerDown);
-    });
     stage.on('pointerup', this.onPointerUp);
-    this.subscriptions.add(() => {
-      stage.off('pointerup', this.onPointerUp);
-    });
     stage.on('pointermove', this.onPointerMove);
-    this.subscriptions.add(() => {
+
+    this.cleanupFunctions.add(() => {
+      stage.off('wheel', this.onWheel);
+      stage.off('contextmenu', this.onContextMenu);
+      stage.off('pointerdown', this.onPointerDown);
+      stage.off('pointerup', this.onPointerUp);
       stage.off('pointermove', this.onPointerMove);
     });
 
     window.addEventListener('keydown', this.onKeyDown);
-    this.subscriptions.add(() => {
-      window.removeEventListener('keydown', this.onKeyDown);
-    });
-
     window.addEventListener('keyup', this.onKeyUp);
-    this.subscriptions.add(() => {
+
+    this.cleanupFunctions.add(() => {
+      window.removeEventListener('keydown', this.onKeyDown);
       window.removeEventListener('keyup', this.onKeyUp);
     });
   };
@@ -559,11 +549,11 @@ export class Editor {
   };
 
   // Zoom with mouse wheel
-  private onWheel = (e: WheelEvent) => {
+  private onWheel = (e: KonvaEventObject<WheelEvent>) => {
     if (!this.konva?.stage) {
       return;
     }
-    e.preventDefault();
+    e.evt.preventDefault();
 
     const oldScale = this.konva.stage.scaleX();
     const pointer = this.konva.stage.getPointerPosition();
@@ -577,7 +567,7 @@ export class Editor {
       y: (pointer.y - this.konva.stage.y()) / oldScale,
     };
 
-    const direction = e.deltaY > 0 ? -1 : 1;
+    const direction = e.evt.deltaY > 0 ? -1 : 1;
     const scaleBy = this.config.ZOOM_WHEEL_FACTOR;
     let newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
 
@@ -671,9 +661,9 @@ export class Editor {
     }
   };
 
-  private onContextMenu = (e: MouseEvent) => {
+  private onContextMenu = (e: KonvaEventObject<MouseEvent>) => {
     // Prevent context menu on right-click
-    e.preventDefault();
+    e.evt.preventDefault();
   };
   //#endregion
 
@@ -1288,8 +1278,8 @@ export class Editor {
   };
 
   destroy = () => {
-    for (const unsubscribe of this.subscriptions) {
-      unsubscribe();
+    for (const cleanup of this.cleanupFunctions) {
+      cleanup();
     }
 
     // Cancel any ongoing crop operation
@@ -1297,8 +1287,6 @@ export class Editor {
       this.cancelCrop();
     }
 
-    // Remove all Konva event listeners by destroying the stage
-    // This automatically removes all Konva event handlers
     this.konva?.stage.destroy();
 
     // Clear all references
