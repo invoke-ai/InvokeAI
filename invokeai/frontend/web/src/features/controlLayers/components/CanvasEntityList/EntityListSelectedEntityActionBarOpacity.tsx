@@ -19,8 +19,8 @@ import { clamp, round } from 'es-toolkit/compat';
 import { snapToNearest } from 'features/controlLayers/konva/util';
 import { entityOpacityChanged } from 'features/controlLayers/store/canvasSlice';
 import {
-  selectCanvasSlice,
   selectEntity,
+  selectSelectedCanvas,
   selectSelectedEntityIdentifier,
 } from 'features/controlLayers/store/selectors';
 import type { KeyboardEvent } from 'react';
@@ -60,7 +60,7 @@ const sliderDefaultValue = mapRawValueToSliderValue(1);
 
 const snapCandidates = marks.slice(1, marks.length - 1);
 
-const selectOpacity = createSelector(selectCanvasSlice, (canvas) => {
+const selectOpacity = createSelector(selectSelectedCanvas, (canvas) => {
   const selectedEntityIdentifier = canvas.selectedEntityIdentifier;
   if (!selectedEntityIdentifier) {
     return 1; // fallback to 100% opacity
