@@ -1,3 +1,5 @@
+import { $authToken } from 'app/store/nanostores/authToken';
+import { TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 
@@ -24,6 +26,10 @@ type EditorCallbacks = {
 
 type KonvaObjects = {
   stage: Konva.Stage;
+  bg: {
+    layer: Konva.Layer;
+    patternRect: Konva.Rect;
+  };
   image?: {
     layer: Konva.Layer;
     node: Konva.Image;
@@ -61,17 +67,54 @@ export class Editor {
   subscriptions: Set<() => void> = new Set();
 
   init = (container: HTMLDivElement) => {
-    // Create stage
-    this.konva = {
-      stage: new Konva.Stage({
-        container: container,
-        width: container.clientWidth,
-        height: container.clientHeight,
-      }),
-    };
+    const stage = new Konva.Stage({
+      container: container,
+      width: container.clientWidth,
+      height: container.clientHeight,
+    });
 
+    const bgLayer = new Konva.Layer();
+    const bgPatternRect = new Konva.Rect();
+    bgLayer.add(bgPatternRect);
+    const bgImage = new Image();
+    bgImage.onload = () => {
+      bgPatternRect.fillPatternImage(bgImage);
+      this.renderBg();
+    };
+    bgImage.src = $authToken.get() ? 'use-credentials' : 'anonymous';
+    bgImage.src = TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL;
+
+    stage.add(bgLayer);
+
+    this.konva = {
+      stage,
+      bg: {
+        layer: bgLayer,
+        patternRect: bgPatternRect,
+      },
+    };
     // Setup mouse event handlers
     this.setupStageEvents();
+  };
+
+  renderBg = () => {
+    if (!this.konva) {
+      return;
+    }
+    const scale = this.konva.stage.scaleX();
+    const patternScale = 1 / scale;
+    const { x, y } = this.konva.stage.getPosition();
+    const { width, height } = this.konva.stage.size();
+
+    this.konva.bg.patternRect.setAttrs({
+      visible: true,
+      x: Math.floor(-x / scale),
+      y: Math.floor(-y / scale),
+      width: Math.ceil(width / scale),
+      height: Math.ceil(height / scale),
+      fillPatternScaleX: patternScale,
+      fillPatternScaleY: patternScale,
+    });
   };
 
   private setupStageEvents = () => {
@@ -161,7 +204,7 @@ export class Editor {
 
     // Update handle scaling to maintain constant screen size
     this.updateHandleScale();
-
+    this.renderBg();
     this.callbacks.onZoomChange?.(newScale);
   };
 
@@ -221,6 +264,8 @@ export class Editor {
 
     this.konva.stage.x(this.konva.stage.x() + dx);
     this.konva.stage.y(this.konva.stage.y() + dy);
+
+    this.renderBg();
 
     this.lastPointerPosition = pointer;
   };
@@ -1275,6 +1320,8 @@ export class Editor {
     // Update handle scaling
     this.updateHandleScale();
 
+    this.renderBg();
+
     this.callbacks.onZoomChange?.(scale);
   };
 
@@ -1312,6 +1359,8 @@ export class Editor {
 
     // Update handle scaling
     this.updateHandleScale();
+
+    this.renderBg();
 
     this.callbacks.onZoomChange?.(1);
   };
@@ -1452,6 +1501,8 @@ export class Editor {
 
     this.konva.stage.width(width);
     this.konva.stage.height(height);
+
+    this.renderBg();
   };
 
   destroy = () => {
