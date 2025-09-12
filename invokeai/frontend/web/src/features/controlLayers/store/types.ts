@@ -612,8 +612,13 @@ const zDimensionsState = z.object({
   aspectRatio: zAspectRatioConfig,
 });
 
+export const MAX_POSITIVE_PROMPT_HISTORY = 100;
+const zPositivePromptHistory = z
+  .array(zParameterPositivePrompt)
+  .transform((arr) => arr.slice(0, MAX_POSITIVE_PROMPT_HISTORY));
+
 export const zParamsState = z.object({
-  _version: z.literal(1),
+  _version: z.literal(2),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -644,6 +649,7 @@ export const zParamsState = z.object({
   clipSkip: z.number(),
   shouldUseCpuNoise: z.boolean(),
   positivePrompt: zParameterPositivePrompt,
+  positivePromptHistory: zPositivePromptHistory,
   negativePrompt: zParameterNegativePrompt,
   refinerModel: zParameterSDXLRefinerModel.nullable(),
   refinerSteps: z.number(),
@@ -661,7 +667,7 @@ export const zParamsState = z.object({
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
-  _version: 1,
+  _version: 2,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -692,6 +698,7 @@ export const getInitialParamsState = (): ParamsState => ({
   clipSkip: 0,
   shouldUseCpuNoise: true,
   positivePrompt: '',
+  positivePromptHistory: [],
   negativePrompt: null,
   refinerModel: null,
   refinerSteps: 20,

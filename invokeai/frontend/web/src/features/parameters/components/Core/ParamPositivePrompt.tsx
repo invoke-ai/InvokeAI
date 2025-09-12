@@ -32,6 +32,8 @@ import type { HotkeyCallback } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 
+import { PositivePromptHistoryIconButton } from './PositivePromptHistory';
+
 const persistOptions: Parameters<typeof usePersistedTextAreaSize>[2] = {
   trackWidth: false,
   trackHeight: true,
@@ -118,6 +120,7 @@ export const ParamPositivePrompt = memo(() => {
             <Flex flexDir="column" gap={2} justifyContent="flex-start" alignItems="center">
               <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
               <ShowDynamicPromptsPreviewButton />
+              <PositivePromptHistoryIconButton />
               {activeTab !== 'video' && modelSupportsNegativePrompt && <NegativePromptToggleButton />}
             </Flex>
             {isPromptExpansionEnabled && <PromptExpansionMenu />}
