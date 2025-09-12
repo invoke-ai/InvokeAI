@@ -103,7 +103,7 @@ export class Editor {
   private lastPointerPosition: { x: number; y: number } | null = null;
   private isSpacePressed = false;
 
-  subscriptions: Set<() => void> = new Set();
+  private subscriptions: Set<() => void> = new Set();
 
   init = (container: HTMLDivElement) => {
     const stage = new Konva.Stage({
@@ -130,13 +130,13 @@ export class Editor {
     this.setupStageEvents();
   };
 
-  createKonvaBgObjects = (): KonvaObjects['bg'] => {
+  private createKonvaBgObjects = (): KonvaObjects['bg'] => {
     const layer = new Konva.Layer();
     const rect = new Konva.Rect();
     const image = new Image();
     image.onload = () => {
       rect.fillPatternImage(image);
-      this.renderBg();
+      this.updateBg();
     };
     image.src = TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL;
     layer.add(rect);
@@ -147,14 +147,14 @@ export class Editor {
     };
   };
 
-  createKonvaImageObjects = (): KonvaObjects['image'] => {
+  private createKonvaImageObjects = (): KonvaObjects['image'] => {
     const layer = new Konva.Layer();
     return {
       layer,
     };
   };
 
-  createKonvaCropObjects = (): KonvaObjects['crop'] => {
+  private createKonvaCropObjects = (): KonvaObjects['crop'] => {
     const layer = new Konva.Layer();
     const overlay = this.createKonvaCropOverlayObjects();
     const interaction = this.createKonvaCropInteractionObjects();
@@ -166,7 +166,8 @@ export class Editor {
       interaction,
     };
   };
-  createKonvaCropOverlayObjects = (): KonvaObjects['crop']['overlay'] => {
+
+  private createKonvaCropOverlayObjects = (): KonvaObjects['crop']['overlay'] => {
     const group = new Konva.Group();
     const full = new Konva.Rect({
       fill: 'black',
@@ -185,25 +186,25 @@ export class Editor {
     };
   };
 
-  createKonvaCropInteractionObjects = (): KonvaObjects['crop']['interaction'] => {
+  private createKonvaCropInteractionObjects = (): KonvaObjects['crop']['interaction'] => {
     const group = new Konva.Group();
 
-    const rect = this.createCropInteractionRect();
+    const rect = this.createKonvaCropInteractionRect();
     const handles = {
-      'top-left': this.createHandle('top-left'),
-      'top-right': this.createHandle('top-right'),
-      'bottom-right': this.createHandle('bottom-right'),
-      'bottom-left': this.createHandle('bottom-left'),
-      top: this.createHandle('top'),
-      right: this.createHandle('right'),
-      bottom: this.createHandle('bottom'),
-      left: this.createHandle('left'),
+      'top-left': this.createKonvaCropHandle('top-left'),
+      'top-right': this.createKonvaCropHandle('top-right'),
+      'bottom-right': this.createKonvaCropHandle('bottom-right'),
+      'bottom-left': this.createKonvaCropHandle('bottom-left'),
+      top: this.createKonvaCropHandle('top'),
+      right: this.createKonvaCropHandle('right'),
+      bottom: this.createKonvaCropHandle('bottom'),
+      left: this.createKonvaCropHandle('left'),
     };
     const guides = {
-      left: this.createGuide('left'),
-      right: this.createGuide('right'),
-      top: this.createGuide('top'),
-      bottom: this.createGuide('bottom'),
+      left: this.createKonvaCropGuide('left'),
+      right: this.createKonvaCropGuide('right'),
+      top: this.createKonvaCropGuide('top'),
+      bottom: this.createKonvaCropGuide('bottom'),
     };
 
     group.add(rect);
@@ -223,7 +224,7 @@ export class Editor {
     };
   };
 
-  createCropInteractionRect = (): Konva.Rect => {
+  private createKonvaCropInteractionRect = (): Konva.Rect => {
     const rect = new Konva.Rect({
       stroke: 'white',
       strokeWidth: 1,
@@ -285,14 +286,7 @@ export class Editor {
     return rect;
   };
 
-  updateCropInteractionRect = () => {
-    if (!this.konva || !this.cropBox) {
-      return;
-    }
-    this.konva.crop.interaction.rect.setAttrs({ ...this.cropBox });
-  };
-
-  createGuide = (name: GuideName): Konva.Line => {
+  private createKonvaCropGuide = (name: GuideName): Konva.Line => {
     const line = new Konva.Line({
       name,
       stroke: this.CROP_GUIDE_STROKE,
@@ -304,23 +298,7 @@ export class Editor {
     return line;
   };
 
-  updateCropGuides = () => {
-    if (!this.konva || !this.cropBox) {
-      return;
-    }
-
-    const { x, y, width, height } = this.cropBox;
-
-    const verticalThird = width / 3;
-    this.konva.crop.interaction.guides.left.points([x + verticalThird, y, x + verticalThird, y + height]);
-    this.konva.crop.interaction.guides.right.points([x + verticalThird * 2, y, x + verticalThird * 2, y + height]);
-
-    const horizontalThird = height / 3;
-    this.konva.crop.interaction.guides.top.points([x, y + horizontalThird, x + width, y + horizontalThird]);
-    this.konva.crop.interaction.guides.bottom.points([x, y + horizontalThird * 2, x + width, y + horizontalThird * 2]);
-  };
-
-  createHandle = (name: HandleName): Konva.Rect => {
+  private createKonvaCropHandle = (name: HandleName): Konva.Rect => {
     const rect = new Konva.Rect({
       name,
       x: 0,
@@ -332,6 +310,7 @@ export class Editor {
       strokeWidth: this.CROP_HANDLE_STROKE_WIDTH,
       strokeScaleEnabled: true,
       draggable: true,
+      hitStrokeWidth: 16,
     });
 
     // Prevent handle dragging when panning
@@ -385,7 +364,30 @@ export class Editor {
     return rect;
   };
 
-  updateCropBox = (cropBox: CropBox) => {
+  private updateCropInteractionRect = () => {
+    if (!this.konva || !this.cropBox) {
+      return;
+    }
+    this.konva.crop.interaction.rect.setAttrs({ ...this.cropBox });
+  };
+
+  private updateCropGuides = () => {
+    if (!this.konva || !this.cropBox) {
+      return;
+    }
+
+    const { x, y, width, height } = this.cropBox;
+
+    const verticalThird = width / 3;
+    this.konva.crop.interaction.guides.left.points([x + verticalThird, y, x + verticalThird, y + height]);
+    this.konva.crop.interaction.guides.right.points([x + verticalThird * 2, y, x + verticalThird * 2, y + height]);
+
+    const horizontalThird = height / 3;
+    this.konva.crop.interaction.guides.top.points([x, y + horizontalThird, x + width, y + horizontalThird]);
+    this.konva.crop.interaction.guides.bottom.points([x, y + horizontalThird * 2, x + width, y + horizontalThird * 2]);
+  };
+
+  private updateCropBox = (cropBox: CropBox) => {
     this.cropBox = cropBox;
     this.updateCropInteractionRect();
     this.updateCropOverlay();
@@ -394,7 +396,7 @@ export class Editor {
     this.callbacks.onCropBoxChange?.(cropBox);
   };
 
-  renderBg = () => {
+  private updateBg = () => {
     if (!this.konva) {
       return;
     }
@@ -414,6 +416,80 @@ export class Editor {
     });
   };
 
+  private updateHandlePositions = () => {
+    if (!this.konva || !this.cropBox) {
+      return;
+    }
+
+    for (const [handleName, handleRect] of objectEntries(this.konva.crop.interaction.handles)) {
+      const { x, y, width, height } = this.cropBox;
+      const handleSize = handleRect.width();
+
+      let handleX = x;
+      let handleY = y;
+
+      if (handleName.includes('right')) {
+        handleX += width;
+      } else if (!handleName.includes('left')) {
+        handleX += width / 2;
+      }
+
+      if (handleName.includes('bottom')) {
+        handleY += height;
+      } else if (!handleName.includes('top')) {
+        handleY += height / 2;
+      }
+
+      handleRect.x(handleX - handleSize / 2);
+      handleRect.y(handleY - handleSize / 2);
+    }
+  };
+
+  private updateCropOverlay = () => {
+    if (!this.konva?.image.image || !this.cropBox) {
+      return;
+    }
+
+    // Make the overlay cover the entire image
+    this.konva.crop.overlay.full.setAttrs({
+      ...this.konva.image.image.getPosition(),
+      ...this.konva.image.image.getSize(),
+    });
+
+    // Clear the crop area from the overlay
+    this.konva.crop.overlay.clear.setAttrs({ ...this.cropBox });
+  };
+
+  private updateHandleScale = () => {
+    if (!this.konva) {
+      return;
+    }
+
+    const scale = this.konva.stage.scaleX();
+    const handleSize = this.CROP_HANDLE_SIZE / scale;
+    const strokeWidth = this.CROP_HANDLE_STROKE_WIDTH / scale;
+
+    for (const handle of Object.values(this.konva.crop.interaction.handles)) {
+      const currentX = handle.x();
+      const currentY = handle.y();
+      const oldSize = handle.width();
+
+      // Calculate center position
+      const centerX = currentX + oldSize / 2;
+      const centerY = currentY + oldSize / 2;
+
+      // Update size and stroke
+      handle.width(handleSize);
+      handle.height(handleSize);
+      handle.strokeWidth(strokeWidth);
+
+      // Reposition to maintain center
+      handle.x(centerX - handleSize / 2);
+      handle.y(centerY - handleSize / 2);
+    }
+  };
+
+  //#region Event Handling
   private setupStageEvents = () => {
     if (!this.konva) {
       return;
@@ -454,7 +530,7 @@ export class Editor {
   };
 
   // Track Space key press
-  onKeyDown = (e: KeyboardEvent) => {
+  private onKeyDown = (e: KeyboardEvent) => {
     if (!this.konva?.stage) {
       return;
     }
@@ -466,7 +542,7 @@ export class Editor {
   };
 
   // Zoom with mouse wheel
-  onWheel = (e: WheelEvent) => {
+  private onWheel = (e: WheelEvent) => {
     if (!this.konva?.stage) {
       return;
     }
@@ -501,11 +577,11 @@ export class Editor {
 
     // Update handle scaling to maintain constant screen size
     this.updateHandleScale();
-    this.renderBg();
+    this.updateBg();
     this.callbacks.onZoomChange?.(newScale);
   };
 
-  onKeyUp = (e: KeyboardEvent) => {
+  private onKeyUp = (e: KeyboardEvent) => {
     if (!this.konva?.stage) {
       return;
     }
@@ -519,7 +595,7 @@ export class Editor {
   };
 
   // Pan with Space + drag or middle mouse button
-  onPointerDown = (e: KonvaEventObject<PointerEvent>) => {
+  private onPointerDown = (e: KonvaEventObject<PointerEvent>) => {
     if (!this.konva?.stage) {
       return;
     }
@@ -544,7 +620,7 @@ export class Editor {
     }
   };
 
-  onPointerMove = (_: KonvaEventObject<PointerEvent>) => {
+  private onPointerMove = (_: KonvaEventObject<PointerEvent>) => {
     if (!this.konva?.stage) {
       return;
     }
@@ -563,12 +639,12 @@ export class Editor {
     this.konva.stage.x(this.konva.stage.x() + dx);
     this.konva.stage.y(this.konva.stage.y() + dy);
 
-    this.renderBg();
+    this.updateBg();
 
     this.lastPointerPosition = pointer;
   };
 
-  onPointerUp = (_: KonvaEventObject<PointerEvent>) => {
+  private onPointerUp = (_: KonvaEventObject<PointerEvent>) => {
     if (!this.konva?.stage) {
       return;
     }
@@ -578,32 +654,13 @@ export class Editor {
     }
   };
 
-  // Prevent context menu on right click
-  onContextMenu = (e: MouseEvent) => e.preventDefault();
-
-  // Image Management
-  loadImage = (src: string): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-
-      img.crossOrigin = $crossOrigin.get();
-
-      img.onload = () => {
-        this.originalImage = img;
-        this.displayImage();
-        this.callbacks.onImageLoad?.();
-        resolve();
-      };
-
-      img.onerror = () => {
-        reject(new Error('Failed to load image'));
-      };
-
-      img.src = src;
-    });
+  private onContextMenu = (e: MouseEvent) => {
+    // Prevent context menu on right-click
+    e.preventDefault();
   };
+  //#endregion
 
-  private displayImage = () => {
+  private updateImage = () => {
     if (!this.originalImage || !this.konva) {
       return;
     }
@@ -846,83 +903,25 @@ export class Editor {
     return { newX, newY, newWidth, newHeight };
   };
 
-  private positionHandle = (handleName: HandleName, handleRect: Konva.Rect) => {
-    if (!this.konva || !this.cropBox) {
-      return;
-    }
+  loadImage = (src: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
 
-    const { x, y, width, height } = this.cropBox;
-    const handleSize = handleRect.width();
+      img.crossOrigin = $crossOrigin.get();
 
-    let handleX = x;
-    let handleY = y;
+      img.onload = () => {
+        this.originalImage = img;
+        this.updateImage();
+        this.callbacks.onImageLoad?.();
+        resolve();
+      };
 
-    if (handleName.includes('right')) {
-      handleX += width;
-    } else if (!handleName.includes('left')) {
-      handleX += width / 2;
-    }
+      img.onerror = () => {
+        reject(new Error('Failed to load image'));
+      };
 
-    if (handleName.includes('bottom')) {
-      handleY += height;
-    } else if (!handleName.includes('top')) {
-      handleY += height / 2;
-    }
-
-    handleRect.x(handleX - handleSize / 2);
-    handleRect.y(handleY - handleSize / 2);
-  };
-
-  private updateHandlePositions = () => {
-    if (!this.konva) {
-      return;
-    }
-
-    for (const [handleName, handleRect] of objectEntries(this.konva.crop.interaction.handles)) {
-      this.positionHandle(handleName, handleRect);
-    }
-  };
-
-  private updateCropOverlay = () => {
-    if (!this.konva?.image.image || !this.cropBox) {
-      return;
-    }
-
-    this.konva.crop.overlay.full.setAttrs({
-      ...this.konva.image.image.getPosition(),
-      ...this.konva.image.image.getSize(),
+      img.src = src;
     });
-
-    this.konva.crop.overlay.clear.setAttrs({ ...this.cropBox });
-  };
-
-  private updateHandleScale = () => {
-    if (!this.konva) {
-      return;
-    }
-
-    const scale = this.konva.stage.scaleX();
-    const handleSize = this.CROP_HANDLE_SIZE / scale;
-    const strokeWidth = this.CROP_HANDLE_STROKE_WIDTH / scale;
-
-    for (const handle of Object.values(this.konva.crop.interaction.handles)) {
-      const currentX = handle.x();
-      const currentY = handle.y();
-      const oldSize = handle.width();
-
-      // Calculate center position
-      const centerX = currentX + oldSize / 2;
-      const centerY = currentY + oldSize / 2;
-
-      // Update size and stroke
-      handle.width(handleSize);
-      handle.height(handleSize);
-      handle.strokeWidth(strokeWidth);
-
-      // Reposition to maintain center
-      handle.x(centerX - handleSize / 2);
-      handle.y(centerY - handleSize / 2);
-    }
   };
 
   // Crop Mode
@@ -1106,7 +1105,7 @@ export class Editor {
     // Update handle scaling
     this.updateHandleScale();
 
-    this.renderBg();
+    this.updateBg();
 
     this.callbacks.onZoomChange?.(scale);
   };
@@ -1146,7 +1145,7 @@ export class Editor {
     // Update handle scaling
     this.updateHandleScale();
 
-    this.renderBg();
+    this.updateBg();
 
     this.callbacks.onZoomChange?.(1);
   };
@@ -1177,7 +1176,7 @@ export class Editor {
     // Update handle scaling
     this.updateHandleScale();
 
-    this.renderBg();
+    this.updateBg();
 
     this.callbacks.onZoomChange?.(scale);
   };
@@ -1275,7 +1274,7 @@ export class Editor {
     this.konva.stage.width(width);
     this.konva.stage.height(height);
 
-    this.renderBg();
+    this.updateBg();
   };
 
   destroy = () => {

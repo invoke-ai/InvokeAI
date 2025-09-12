@@ -71,6 +71,7 @@ export const EditorContainer = ({ editor, imageName }: Props) => {
         width: imageDTO.width,
         height: imageDTO.height,
       });
+      editor.fitToContainer();
     },
     [editor]
   );
@@ -133,22 +134,14 @@ export const EditorContainer = ({ editor, imageName }: Props) => {
 
   const handleApplyCrop = useCallback(() => {
     editor.applyCrop();
-    // setIsCropping(false);
-    // setHasCropBbox(true);
-    // setCropInfo('');
-    setAspectRatio('free');
   }, [editor]);
 
   const handleCancelCrop = useCallback(() => {
     editor.cancelCrop();
-    // setIsCropping(false);
-    // setCropInfo('');
-    setAspectRatio('free');
   }, [editor]);
 
   const handleResetCrop = useCallback(() => {
     editor.resetCrop();
-    // setHasCropBbox(false);
   }, [editor]);
 
   const handleExport = useCallback(async () => {
