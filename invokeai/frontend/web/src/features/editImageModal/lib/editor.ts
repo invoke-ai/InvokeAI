@@ -44,6 +44,10 @@ type KonvaObjects = {
     handles: Konva.Group;
     guides: Konva.Group;
   };
+  frozenCrop?: {
+    layer: Konva.Layer;
+    overlay: Konva.Group;
+  };
 };
 
 type OutputFormat = 'canvas' | 'blob' | 'dataURL';
@@ -362,33 +366,15 @@ export class Editor {
       this.konva.image = undefined;
     }
 
-    // Create image layer and node
+    // Create image layer and node - always show full image
     const imageLayer = new Konva.Layer();
-    let imageNode: Konva.Image;
-
-    if (this.appliedCrop) {
-      imageNode = new Konva.Image({
-        image: this.originalImage,
-        x: 0,
-        y: 0,
-        width: this.appliedCrop.width,
-        height: this.appliedCrop.height,
-        crop: {
-          x: this.appliedCrop.x,
-          y: this.appliedCrop.y,
-          width: this.appliedCrop.width,
-          height: this.appliedCrop.height,
-        },
-      });
-    } else {
-      imageNode = new Konva.Image({
-        image: this.originalImage,
-        x: 0,
-        y: 0,
-        width: this.originalImage.width,
-        height: this.originalImage.height,
-      });
-    }
+    const imageNode = new Konva.Image({
+      image: this.originalImage,
+      x: 0,
+      y: 0,
+      width: this.originalImage.width,
+      height: this.originalImage.height,
+    });
 
     imageLayer.add(imageNode);
     this.konva.stage.add(imageLayer);
@@ -401,6 +387,11 @@ export class Editor {
 
     imageLayer.batchDraw();
 
+    // If there's an applied crop, create frozen overlay
+    if (this.appliedCrop) {
+      this.createFrozenCropOverlay();
+    }
+
     // Center image at 100% zoom
     this.resetView();
   };
@@ -409,6 +400,12 @@ export class Editor {
   startCrop = (crop?: CropBox) => {
     if (!this.konva?.image || this.isCropping) {
       return;
+    }
+
+    // Remove frozen crop overlay if it exists
+    if (this.konva.frozenCrop) {
+      this.konva.frozenCrop.layer.destroy();
+      this.konva.frozenCrop = undefined;
     }
 
     this.isCropping = true;
@@ -425,9 +422,9 @@ export class Editor {
       cropWidth = crop.width;
       cropHeight = crop.height;
     } else if (this.appliedCrop) {
-      // When cropped, start with full visible area
-      cropX = 0;
-      cropY = 0;
+      // Use the applied crop as starting point
+      cropX = this.appliedCrop.x;
+      cropY = this.appliedCrop.y;
       cropWidth = this.appliedCrop.width;
       cropHeight = this.appliedCrop.height;
     } else {
@@ -1122,6 +1119,109 @@ export class Editor {
     this.konva.crop.layer.batchDraw();
   };
 
+  private freezeCropOverlay = () => {
+    if (!this.konva?.crop || !this.konva?.image) {
+      return;
+    }
+
+    const imgWidth = this.konva.image.node.width();
+    const imgHeight = this.konva.image.node.height();
+    const cropX = this.konva.crop.rect.x();
+    const cropY = this.konva.crop.rect.y();
+    const cropWidth = this.konva.crop.rect.width();
+    const cropHeight = this.konva.crop.rect.height();
+
+    // Create a new frozen overlay layer
+    const frozenLayer = new Konva.Layer();
+    const frozenOverlay = new Konva.Group();
+
+    // Create full overlay
+    const fullOverlay = new Konva.Rect({
+      x: 0,
+      y: 0,
+      width: imgWidth,
+      height: imgHeight,
+      fill: 'black',
+      opacity: 0.7,
+    });
+
+    // Create clear rectangle for crop area
+    const clearRect = new Konva.Rect({
+      x: cropX,
+      y: cropY,
+      width: cropWidth,
+      height: cropHeight,
+      fill: 'black',
+      globalCompositeOperation: 'destination-out',
+    });
+
+    frozenOverlay.add(fullOverlay);
+    frozenOverlay.add(clearRect);
+    frozenLayer.add(frozenOverlay);
+
+    // Add frozen layer to stage
+    this.konva.stage.add(frozenLayer);
+
+    // Store reference to frozen overlay
+    this.konva.frozenCrop = {
+      layer: frozenLayer,
+      overlay: frozenOverlay,
+    };
+
+    // Remove the interactive crop layer
+    this.resetEphemeralCropState();
+
+    frozenLayer.batchDraw();
+  };
+
+  private createFrozenCropOverlay = () => {
+    if (!this.appliedCrop || !this.konva?.image) {
+      return;
+    }
+
+    const imgWidth = this.konva.image.node.width();
+    const imgHeight = this.konva.image.node.height();
+
+    // Create a frozen overlay layer
+    const frozenLayer = new Konva.Layer();
+    const frozenOverlay = new Konva.Group();
+
+    // Create full overlay
+    const fullOverlay = new Konva.Rect({
+      x: 0,
+      y: 0,
+      width: imgWidth,
+      height: imgHeight,
+      fill: 'black',
+      opacity: 0.7,
+    });
+
+    // Create clear rectangle for crop area
+    const clearRect = new Konva.Rect({
+      x: this.appliedCrop.x,
+      y: this.appliedCrop.y,
+      width: this.appliedCrop.width,
+      height: this.appliedCrop.height,
+      fill: 'black',
+      globalCompositeOperation: 'destination-out',
+    });
+
+    frozenOverlay.add(fullOverlay);
+    frozenOverlay.add(clearRect);
+    frozenLayer.add(frozenOverlay);
+
+    // Add frozen layer to stage
+    this.konva.stage.add(frozenLayer);
+
+    // Store reference to frozen overlay
+    this.konva.frozenCrop = {
+      layer: frozenLayer,
+      overlay: frozenOverlay,
+    };
+
+    frozenLayer.batchDraw();
+  };
+
   resetEphemeralCropState = () => {
     this.isCropping = false;
     if (this.konva?.crop) {
@@ -1145,36 +1245,29 @@ export class Editor {
 
     const rect = this.konva.crop.rect;
 
-    // If there's already an applied crop, combine them
-    if (this.appliedCrop) {
-      // The new crop is relative to the already cropped image
-      this.appliedCrop = {
-        x: this.appliedCrop.x + rect.x(),
-        y: this.appliedCrop.y + rect.y(),
-        width: rect.width(),
-        height: rect.height(),
-      };
-    } else {
-      this.appliedCrop = {
-        x: rect.x(),
-        y: rect.y(),
-        width: rect.width(),
-        height: rect.height(),
-      };
-    }
+    // Store the crop dimensions
+    this.appliedCrop = {
+      x: rect.x(),
+      y: rect.y(),
+      width: rect.width(),
+      height: rect.height(),
+    };
 
-    // Redisplay image with crop applied
-    this.displayImage();
+    // Freeze the crop overlay instead of redisplaying image
+    this.freezeCropOverlay();
 
-    this.resetEphemeralCropState();
+    this.isCropping = false;
     this.callbacks.onCropApply?.(this.appliedCrop);
   };
 
   resetCrop = () => {
     this.appliedCrop = null;
 
-    // Redisplay image without crop
-    this.displayImage();
+    // Remove frozen crop overlay if it exists
+    if (this.konva?.frozenCrop) {
+      this.konva.frozenCrop.layer.destroy();
+      this.konva.frozenCrop = undefined;
+    }
 
     this.callbacks.onCropReset?.();
   };
