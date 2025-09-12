@@ -1235,6 +1235,12 @@ export class Editor {
       return;
     }
     this.resetEphemeralCropState();
+    
+    // If there's an applied crop, restore the frozen overlay
+    if (this.appliedCrop) {
+      this.createFrozenCropOverlay();
+    }
+    
     this.callbacks.onCropCancel?.();
   };
 
