@@ -1,4 +1,3 @@
-import { $authToken } from 'app/store/nanostores/authToken';
 import { TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -64,12 +63,24 @@ export class Editor {
   private appliedCrop: CropBox | null = null;
   private currentImageBlobUrl: string | null = null;
 
+  // Constants
+  private readonly MIN_CROP_DIMENSION = 64;
+  private readonly ZOOM_WHEEL_FACTOR = 1.1;
+  private readonly ZOOM_BUTTON_FACTOR = 1.2;
+  private readonly CROP_HANDLE_SIZE = 8;
+  private readonly CROP_HANDLE_STROKE_WIDTH = 1;
+  private readonly FIT_TO_CONTAINER_PADDING = 0.9;
+  private readonly DEFAULT_CROP_BOX_SCALE = 0.8;
+  private readonly CORNER_HANDLE_NAMES = ['top-left', 'top-right', 'bottom-right', 'bottom-left'];
+  private readonly EDGE_HANDLE_NAMES = ['top', 'right', 'bottom', 'left'];
+
   // Configuration
-  private zoomMin = 0.1;
-  private zoomMax = 10;
+  private readonly ZOOM_MIN = 0.1;
+  private readonly ZOOM_MAX = 10;
+
   private cropConstraints: CropConstraints = {
-    minWidth: 64,
-    minHeight: 64,
+    minWidth: this.MIN_CROP_DIMENSION,
+    minHeight: this.MIN_CROP_DIMENSION,
   };
   private callbacks: EditorCallbacks = {};
 
@@ -95,7 +106,6 @@ export class Editor {
       bgPatternRect.fillPatternImage(bgImage);
       this.renderBg();
     };
-    bgImage.src = $authToken.get() ? 'use-credentials' : 'anonymous';
     bgImage.src = TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL;
 
     stage.add(bgLayer);
@@ -148,7 +158,7 @@ export class Editor {
 
     stage.on('pointerdown', this.onPointerDown);
     this.subscriptions.add(() => {
-      stage.off('contextmenu', this.onContextMenu);
+      stage.off('pointerdown', this.onPointerDown);
     });
     stage.on('pointerup', this.onPointerUp);
     this.subscriptions.add(() => {
@@ -202,11 +212,11 @@ export class Editor {
     };
 
     const direction = e.deltaY > 0 ? -1 : 1;
-    const scaleBy = 1.1;
+    const scaleBy = this.ZOOM_WHEEL_FACTOR;
     let newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
 
     // Apply zoom limits
-    newScale = Math.max(this.zoomMin, Math.min(this.zoomMax, newScale));
+    newScale = Math.max(this.ZOOM_MIN, Math.min(this.ZOOM_MAX, newScale));
 
     this.konva.stage.scale({ x: newScale, y: newScale });
 
@@ -230,7 +240,8 @@ export class Editor {
       e.preventDefault();
       this.isSpacePressed = false;
       this.isPanning = false;
-      this.konva.stage.container().style.cursor = 'grab';
+      // Revert cursor to default; mouseenter events will set it correctly if over an interactive element.
+      this.konva.stage.container().style.cursor = 'default';
     }
   };
 
@@ -423,8 +434,8 @@ export class Editor {
       // Create default crop box (centered, 80% of image)
       const imgWidth = this.konva.image.node.width();
       const imgHeight = this.konva.image.node.height();
-      cropWidth = imgWidth * 0.8;
-      cropHeight = imgHeight * 0.8;
+      cropWidth = imgWidth * this.DEFAULT_CROP_BOX_SCALE;
+      cropHeight = imgHeight * this.DEFAULT_CROP_BOX_SCALE;
       cropX = (imgWidth - cropWidth) / 2;
       cropY = (imgHeight - cropHeight) / 2;
     }
@@ -490,7 +501,7 @@ export class Editor {
       width: width,
       height: height,
       stroke: 'white',
-      strokeWidth: 1,
+      strokeWidth: this.CROP_HANDLE_STROKE_WIDTH,
       strokeScaleEnabled: false,
       draggable: true,
     });
@@ -547,7 +558,7 @@ export class Editor {
 
     const guideConfig = {
       stroke: 'rgba(255, 255, 255, 0.5)',
-      strokeWidth: 1,
+      strokeWidth: this.CROP_HANDLE_STROKE_WIDTH,
       strokeScaleEnabled: false,
       listening: false,
     };
@@ -591,13 +602,13 @@ export class Editor {
     const rect = this.konva.crop.rect;
     const handles = this.konva.crop.handles;
     const scale = this.konva.stage.scaleX();
-    const handleSize = 8 / scale;
+    const handleSize = this.CROP_HANDLE_SIZE / scale;
     const handleConfig = {
       width: handleSize,
       height: handleSize,
       fill: 'white',
       stroke: 'black',
-      strokeWidth: 1,
+      strokeWidth: this.CROP_HANDLE_STROKE_WIDTH,
       strokeScaleEnabled: true,
     };
 
@@ -751,280 +762,17 @@ export class Editor {
     }
 
     const rect = this.konva.crop.rect;
-    const handleName = handle.name();
-    const imgWidth = this.konva.image.node.width();
-    const imgHeight = this.konva.image.node.height();
 
-    let newX = rect.x();
-    let newY = rect.y();
-    let newWidth = rect.width();
-    let newHeight = rect.height();
+    let { newX, newY, newWidth, newHeight } = this.cropConstraints.aspectRatio
+      ? this._resizeCropBoxWithAspectRatio(handle)
+      : this._resizeCropBoxFree(handle);
 
-    const handleX = handle.x() + handle.width() / 2;
-    const handleY = handle.y() + handle.height() / 2;
-
-    const minWidth = this.cropConstraints.minWidth ?? 64;
-    const minHeight = this.cropConstraints.minHeight ?? 64;
-
-    // Update dimensions based on handle type
-    if (handleName.includes('left')) {
-      const right = newX + newWidth;
-      newX = Math.max(0, Math.min(handleX, right - minWidth));
-      newWidth = right - newX;
-    }
-    if (handleName.includes('right')) {
-      newWidth = Math.max(minWidth, Math.min(handleX - newX, imgWidth - newX));
-    }
-    if (handleName.includes('top')) {
-      const bottom = newY + newHeight;
-      newY = Math.max(0, Math.min(handleY, bottom - minHeight));
-      newHeight = bottom - newY;
-    }
-    if (handleName.includes('bottom')) {
-      newHeight = Math.max(minHeight, Math.min(handleY - newY, imgHeight - newY));
-    }
-
-    // Early boundary check for aspect ratio mode
-    // If we're at a boundary and have aspect ratio, we need special handling
-    if (this.cropConstraints.aspectRatio) {
-      const atLeftEdge = rect.x() <= 0;
-      const atRightEdge = rect.x() + rect.width() >= imgWidth;
-      const atTopEdge = rect.y() <= 0;
-      const atBottomEdge = rect.y() + rect.height() >= imgHeight;
-
-      // For edge handles at boundaries, prevent invalid operations
-      if (handleName === 'left' && atLeftEdge && handleX >= rect.x()) {
-        // Can't move left edge further left, only right (shrinking)
-        return;
-      }
-      if (handleName === 'right' && atRightEdge && handleX <= rect.x() + rect.width()) {
-        // Can't move right edge further right, only left (shrinking)
-        return;
-      }
-      if (handleName === 'top' && atTopEdge && handleY >= rect.y()) {
-        // Can't move top edge further up, only down (shrinking)
-        return;
-      }
-      if (handleName === 'bottom' && atBottomEdge && handleY <= rect.y() + rect.height()) {
-        // Can't move bottom edge further down, only up (shrinking)
-        return;
-      }
-    }
-
-    // Apply constraints
+    // Apply general constraints
     if (this.cropConstraints.maxWidth) {
       newWidth = Math.min(newWidth, this.cropConstraints.maxWidth);
     }
     if (this.cropConstraints.maxHeight) {
       newHeight = Math.min(newHeight, this.cropConstraints.maxHeight);
-    }
-
-    // Apply aspect ratio if set
-    if (this.cropConstraints.aspectRatio) {
-      const ratio = this.cropConstraints.aspectRatio;
-      const oldX = rect.x();
-      const oldY = rect.y();
-      const oldWidth = rect.width();
-      const oldHeight = rect.height();
-
-      // Define anchor points (opposite of the handle being dragged)
-      let anchorX = oldX;
-      let anchorY = oldY;
-
-      if (handleName.includes('right')) {
-        anchorX = oldX; // Left edge is anchor
-      } else if (handleName.includes('left')) {
-        anchorX = oldX + oldWidth; // Right edge is anchor
-      } else {
-        anchorX = oldX + oldWidth / 2; // Center X is anchor for top/bottom
-      }
-
-      if (handleName.includes('bottom')) {
-        anchorY = oldY; // Top edge is anchor
-      } else if (handleName.includes('top')) {
-        anchorY = oldY + oldHeight; // Bottom edge is anchor
-      } else {
-        anchorY = oldY + oldHeight / 2; // Center Y is anchor for left/right
-      }
-
-      // Calculate new dimensions maintaining aspect ratio
-      if (handleName === 'left' || handleName === 'right') {
-        // For left/right handles, adjust height to maintain ratio
-        newHeight = newWidth / ratio;
-
-        // Use center Y as anchor point
-        newY = anchorY - newHeight / 2;
-      } else if (handleName === 'top' || handleName === 'bottom') {
-        // For top/bottom handles, adjust width to maintain ratio
-        newWidth = newHeight * ratio;
-
-        // Use center X as anchor point
-        newX = anchorX - newWidth / 2;
-      } else {
-        // Corner handles - the anchor is the opposite corner
-        // Use mouse position relative to anchor to determine constraint
-        const mouseDistanceFromAnchorX = Math.abs(handleX - anchorX);
-        const mouseDistanceFromAnchorY = Math.abs(handleY - anchorY);
-
-        // Calculate maximum possible dimensions based on anchor position and image bounds
-        let maxPossibleWidth;
-        let maxPossibleHeight;
-
-        if (handleName.includes('left')) {
-          // Anchor is on the right, max width is anchor X position
-          maxPossibleWidth = anchorX;
-        } else {
-          // Anchor is on the left, max width is image width minus anchor X
-          maxPossibleWidth = imgWidth - anchorX;
-        }
-
-        if (handleName.includes('top')) {
-          // Anchor is on the bottom, max height is anchor Y position
-          maxPossibleHeight = anchorY;
-        } else {
-          // Anchor is on the top, max height is image height minus anchor Y
-          maxPossibleHeight = imgHeight - anchorY;
-        }
-
-        // Constrain mouse distances to stay within image bounds
-        const constrainedMouseDistanceX = Math.min(mouseDistanceFromAnchorX, maxPossibleWidth);
-        const constrainedMouseDistanceY = Math.min(mouseDistanceFromAnchorY, maxPossibleHeight);
-
-        // Determine which dimension should be the primary constraint
-        // based on which direction the mouse moved further from the anchor (after constraining)
-        const shouldConstrainByWidth = constrainedMouseDistanceX / ratio > constrainedMouseDistanceY;
-
-        if (shouldConstrainByWidth) {
-          // Width is the primary dimension, calculate height from it
-          newWidth = constrainedMouseDistanceX;
-          newHeight = newWidth / ratio;
-
-          // If calculated height exceeds bounds, switch to height constraint
-          if (newHeight > maxPossibleHeight) {
-            newHeight = maxPossibleHeight;
-            newWidth = newHeight * ratio;
-          }
-        } else {
-          // Height is the primary dimension, calculate width from it
-          newHeight = constrainedMouseDistanceY;
-          newWidth = newHeight * ratio;
-
-          // If calculated width exceeds bounds, switch to width constraint
-          if (newWidth > maxPossibleWidth) {
-            newWidth = maxPossibleWidth;
-            newHeight = newWidth / ratio;
-          }
-        }
-
-        // For corner handles, keep the opposite corner fixed
-        if (handleName.includes('left')) {
-          newX = anchorX - newWidth;
-        } else {
-          newX = anchorX;
-        }
-
-        if (handleName.includes('top')) {
-          newY = anchorY - newHeight;
-        } else {
-          newY = anchorY;
-        }
-      }
-
-      // Boundary checks and adjustments
-      // Check if we exceed image bounds and need to adjust
-      if (newX < 0) {
-        const adjustment = -newX;
-        newX = 0;
-        // If we're anchored on the right, we need to adjust width
-        if (handleName.includes('left')) {
-          newWidth -= adjustment;
-          newHeight = newWidth / ratio;
-          if (handleName !== 'left') {
-            // For corner handles, also adjust Y to maintain anchor
-            newY = anchorY - newHeight;
-          }
-        }
-      }
-
-      if (newY < 0) {
-        const adjustment = -newY;
-        newY = 0;
-        // If we're anchored on the bottom, we need to adjust height
-        if (handleName.includes('top')) {
-          newHeight -= adjustment;
-          newWidth = newHeight * ratio;
-          if (handleName !== 'top') {
-            // For corner handles, also adjust X to maintain anchor
-            newX = anchorX - newWidth;
-          }
-        }
-      }
-
-      if (newX + newWidth > imgWidth) {
-        const adjustment = newX + newWidth - imgWidth;
-        // If we're anchored on the left, we need to adjust width
-        if (handleName.includes('right')) {
-          newWidth -= adjustment;
-          newHeight = newWidth / ratio;
-          if (handleName !== 'right') {
-            // For corner handles, maintain anchor
-            newY = anchorY - newHeight;
-          }
-        } else if (handleName === 'top' || handleName === 'bottom') {
-          // For vertical handles, recenter
-          newX = imgWidth - newWidth;
-          if (newX < 0) {
-            newWidth = imgWidth;
-            newHeight = newWidth / ratio;
-            newX = 0;
-          }
-        }
-      }
-
-      if (newY + newHeight > imgHeight) {
-        const adjustment = newY + newHeight - imgHeight;
-        // If we're anchored on the top, we need to adjust height
-        if (handleName.includes('bottom')) {
-          newHeight -= adjustment;
-          newWidth = newHeight * ratio;
-          if (handleName !== 'bottom') {
-            // For corner handles, maintain anchor
-            newX = anchorX - newWidth;
-          }
-        } else if (handleName === 'left' || handleName === 'right') {
-          // For horizontal handles, recenter
-          newY = imgHeight - newHeight;
-          if (newY < 0) {
-            newHeight = imgHeight;
-            newWidth = newHeight * ratio;
-            newY = 0;
-          }
-        }
-      }
-
-      // Final check for minimum sizes
-      if (newWidth < minWidth) {
-        newWidth = minWidth;
-        newHeight = newWidth / ratio;
-        // Reposition based on anchor
-        if (handleName.includes('left')) {
-          newX = anchorX - newWidth;
-        }
-        if (handleName.includes('top')) {
-          newY = anchorY - newHeight;
-        }
-      }
-      if (newHeight < minHeight) {
-        newHeight = minHeight;
-        newWidth = newHeight * ratio;
-        // Reposition based on anchor
-        if (handleName.includes('left')) {
-          newX = anchorX - newWidth;
-        }
-        if (handleName.includes('top')) {
-          newY = anchorY - newHeight;
-        }
-      }
     }
 
     // Update crop rect
@@ -1049,6 +797,191 @@ export class Editor {
     });
   };
 
+  private _resizeCropBoxFree = (handle: Konva.Rect) => {
+    if (!this.konva?.crop || !this.konva?.image) {
+      throw new Error('Crop box or image not found');
+    }
+    const rect = this.konva.crop.rect;
+    const handleName = handle.name();
+    const imgWidth = this.konva.image.node.width();
+    const imgHeight = this.konva.image.node.height();
+
+    let newX = rect.x();
+    let newY = rect.y();
+    let newWidth = rect.width();
+    let newHeight = rect.height();
+
+    const handleX = handle.x() + handle.width() / 2;
+    const handleY = handle.y() + handle.height() / 2;
+
+    const minWidth = this.cropConstraints.minWidth ?? this.MIN_CROP_DIMENSION;
+    const minHeight = this.cropConstraints.minHeight ?? this.MIN_CROP_DIMENSION;
+
+    // Update dimensions based on handle type
+    if (handleName.includes('left')) {
+      const right = newX + newWidth;
+      newX = Math.max(0, Math.min(handleX, right - minWidth));
+      newWidth = right - newX;
+    }
+    if (handleName.includes('right')) {
+      newWidth = Math.max(minWidth, Math.min(handleX - newX, imgWidth - newX));
+    }
+    if (handleName.includes('top')) {
+      const bottom = newY + newHeight;
+      newY = Math.max(0, Math.min(handleY, bottom - minHeight));
+      newHeight = bottom - newY;
+    }
+    if (handleName.includes('bottom')) {
+      newHeight = Math.max(minHeight, Math.min(handleY - newY, imgHeight - newY));
+    }
+
+    return { newX, newY, newWidth, newHeight };
+  };
+
+  private _resizeCropBoxWithAspectRatio = (handle: Konva.Rect) => {
+    if (!this.konva?.crop || !this.konva?.image || !this.cropConstraints.aspectRatio) {
+      throw new Error('Crop box, image, or aspect ratio not found');
+    }
+    const rect = this.konva.crop.rect;
+    const handleName = handle.name();
+    const imgWidth = this.konva.image.node.width();
+    const imgHeight = this.konva.image.node.height();
+    const ratio = this.cropConstraints.aspectRatio;
+
+    const handleX = handle.x() + handle.width() / 2;
+    const handleY = handle.y() + handle.height() / 2;
+
+    const minWidth = this.cropConstraints.minWidth ?? this.MIN_CROP_DIMENSION;
+    const minHeight = this.cropConstraints.minHeight ?? this.MIN_CROP_DIMENSION;
+
+    // Early boundary check for aspect ratio mode
+    const atLeftEdge = rect.x() <= 0;
+    const atRightEdge = rect.x() + rect.width() >= imgWidth;
+    const atTopEdge = rect.y() <= 0;
+    const atBottomEdge = rect.y() + rect.height() >= imgHeight;
+
+    if (
+      (handleName === 'left' && atLeftEdge && handleX >= rect.x()) ||
+      (handleName === 'right' && atRightEdge && handleX <= rect.x() + rect.width()) ||
+      (handleName === 'top' && atTopEdge && handleY >= rect.y()) ||
+      (handleName === 'bottom' && atBottomEdge && handleY <= rect.y() + rect.height())
+    ) {
+      return { newX: rect.x(), newY: rect.y(), newWidth: rect.width(), newHeight: rect.height() };
+    }
+
+    const { newX: freeX, newY: freeY, newWidth: freeWidth, newHeight: freeHeight } = this._resizeCropBoxFree(handle);
+    let newX = freeX;
+    let newY = freeY;
+    let newWidth = freeWidth;
+    let newHeight = freeHeight;
+
+    const oldX = rect.x();
+    const oldY = rect.y();
+    const oldWidth = rect.width();
+    const oldHeight = rect.height();
+
+    // Define anchor points (opposite of the handle being dragged)
+    let anchorX = oldX;
+    let anchorY = oldY;
+
+    if (handleName.includes('right')) {
+      anchorX = oldX; // Left edge is anchor
+    } else if (handleName.includes('left')) {
+      anchorX = oldX + oldWidth; // Right edge is anchor
+    } else {
+      anchorX = oldX + oldWidth / 2; // Center X is anchor for top/bottom
+    }
+
+    if (handleName.includes('bottom')) {
+      anchorY = oldY; // Top edge is anchor
+    } else if (handleName.includes('top')) {
+      anchorY = oldY + oldHeight; // Bottom edge is anchor
+    } else {
+      anchorY = oldY + oldHeight / 2; // Center Y is anchor for left/right
+    }
+
+    const isCornerHandle = this.CORNER_HANDLE_NAMES.includes(handleName);
+
+    // Calculate new dimensions maintaining aspect ratio
+    if (this.EDGE_HANDLE_NAMES.includes(handleName) && !isCornerHandle) {
+      if (handleName === 'left' || handleName === 'right') {
+        newHeight = newWidth / ratio;
+        newY = anchorY - newHeight / 2;
+      } else {
+        // top or bottom
+        newWidth = newHeight * ratio;
+        newX = anchorX - newWidth / 2;
+      }
+    } else if (isCornerHandle) {
+      const mouseDistanceFromAnchorX = Math.abs(handleX - anchorX);
+      const mouseDistanceFromAnchorY = Math.abs(handleY - anchorY);
+
+      let maxPossibleWidth = handleName.includes('left') ? anchorX : imgWidth - anchorX;
+      let maxPossibleHeight = handleName.includes('top') ? anchorY : imgHeight - anchorY;
+
+      const constrainedMouseDistanceX = Math.min(mouseDistanceFromAnchorX, maxPossibleWidth);
+      const constrainedMouseDistanceY = Math.min(mouseDistanceFromAnchorY, maxPossibleHeight);
+
+      if (constrainedMouseDistanceX / ratio > constrainedMouseDistanceY) {
+        newWidth = constrainedMouseDistanceX;
+        newHeight = newWidth / ratio;
+        if (newHeight > maxPossibleHeight) {
+          newHeight = maxPossibleHeight;
+          newWidth = newHeight * ratio;
+        }
+      } else {
+        newHeight = constrainedMouseDistanceY;
+        newWidth = newHeight * ratio;
+        if (newWidth > maxPossibleWidth) {
+          newWidth = maxPossibleWidth;
+          newHeight = newWidth / ratio;
+        }
+      }
+
+      newX = handleName.includes('left') ? anchorX - newWidth : anchorX;
+      newY = handleName.includes('top') ? anchorY - newHeight : anchorY;
+    }
+
+    // Boundary checks and adjustments
+    if (newX < 0) {
+      newX = 0;
+      newWidth = oldX + oldWidth;
+      newHeight = newWidth / ratio;
+      newY = handleName.includes('top') ? oldY + oldHeight - newHeight : oldY;
+    }
+    if (newY < 0) {
+      newY = 0;
+      newHeight = oldY + oldHeight;
+      newWidth = newHeight * ratio;
+      newX = handleName.includes('left') ? oldX + oldWidth - newWidth : oldX;
+    }
+    if (newX + newWidth > imgWidth) {
+      newWidth = imgWidth - newX;
+      newHeight = newWidth / ratio;
+      newY = handleName.includes('top') ? oldY + oldHeight - newHeight : oldY;
+    }
+    if (newY + newHeight > imgHeight) {
+      newHeight = imgHeight - newY;
+      newWidth = newHeight * ratio;
+      newX = handleName.includes('left') ? oldX + oldWidth - newWidth : oldX;
+    }
+
+    // Final check for minimum sizes
+    if (newWidth < minWidth || newHeight < minHeight) {
+      if (minWidth / ratio > minHeight) {
+        newWidth = minWidth;
+        newHeight = newWidth / ratio;
+      } else {
+        newHeight = minHeight;
+        newWidth = newHeight * ratio;
+      }
+      newX = handleName.includes('left') ? anchorX - newWidth : anchorX;
+      newY = handleName.includes('top') ? anchorY - newHeight : anchorY;
+    }
+
+    return { newX, newY, newWidth, newHeight };
+  };
+
   private positionHandle = (handle: Konva.Rect) => {
     if (!this.konva?.crop) {
       return;
@@ -1063,17 +996,13 @@ export class Editor {
 
     if (handleName.includes('right')) {
       x += rect.width();
-    } else if (handleName.includes('left')) {
-      x += 0;
-    } else {
+    } else if (!handleName.includes('left')) {
       x += rect.width() / 2;
     }
 
     if (handleName.includes('bottom')) {
       y += rect.height();
-    } else if (handleName.includes('top')) {
-      y += 0;
-    } else {
+    } else if (!handleName.includes('top')) {
       y += rect.height() / 2;
     }
 
@@ -1165,8 +1094,8 @@ export class Editor {
     }
 
     const scale = this.konva.stage.scaleX();
-    const handleSize = 8 / scale;
-    const strokeWidth = 1 / scale;
+    const handleSize = this.CROP_HANDLE_SIZE / scale;
+    const strokeWidth = this.CROP_HANDLE_STROKE_WIDTH / scale;
 
     // Update each handle's size and stroke to maintain constant screen size
     this.konva.crop.handles.children.forEach((handle) => {
@@ -1327,7 +1256,7 @@ export class Editor {
       return;
     }
 
-    scale = Math.max(this.zoomMin, Math.min(this.zoomMax, scale));
+    scale = Math.max(this.ZOOM_MIN, Math.min(this.ZOOM_MAX, scale));
 
     // If no point provided, use center of viewport
     if (!point && this.konva.image) {
@@ -1369,14 +1298,14 @@ export class Editor {
     return this.konva?.stage.scaleX() || 1;
   };
 
-  zoomIn = (factor = 1.2, point?: { x: number; y: number }) => {
+  zoomIn = (point?: { x: number; y: number }) => {
     const currentZoom = this.getZoom();
-    this.setZoom(currentZoom * factor, point);
+    this.setZoom(currentZoom * this.ZOOM_BUTTON_FACTOR, point);
   };
 
-  zoomOut = (factor = 1.2, point?: { x: number; y: number }) => {
+  zoomOut = (point?: { x: number; y: number }) => {
     const currentZoom = this.getZoom();
-    this.setZoom(currentZoom / factor, point);
+    this.setZoom(currentZoom / this.ZOOM_BUTTON_FACTOR, point);
   };
 
   resetView = () => {
@@ -1415,7 +1344,7 @@ export class Editor {
     const imageWidth = this.konva.image.node.width();
     const imageHeight = this.konva.image.node.height();
 
-    const scale = Math.min(containerWidth / imageWidth, containerHeight / imageHeight) * 0.9; // 90% to add some padding
+    const scale = Math.min(containerWidth / imageWidth, containerHeight / imageHeight) * this.FIT_TO_CONTAINER_PADDING;
 
     this.konva.stage.scale({ x: scale, y: scale });
 
@@ -1484,8 +1413,8 @@ export class Editor {
       }
 
       // Apply minimum size constraints
-      const minWidth = this.cropConstraints.minWidth ?? 64;
-      const minHeight = this.cropConstraints.minHeight ?? 64;
+      const minWidth = this.cropConstraints.minWidth ?? this.MIN_CROP_DIMENSION;
+      const minHeight = this.cropConstraints.minHeight ?? this.MIN_CROP_DIMENSION;
 
       if (newWidth < minWidth) {
         newWidth = minWidth;
