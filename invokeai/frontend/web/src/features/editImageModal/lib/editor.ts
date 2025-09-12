@@ -43,6 +43,16 @@ type KonvaObjects = {
   };
 };
 
+type OutputFormat = 'canvas' | 'blob' | 'dataURL';
+
+type OutputFormatToOutputMap<T extends OutputFormat> = T extends 'canvas'
+  ? HTMLCanvasElement
+  : T extends 'blob'
+    ? Blob
+    : T extends 'dataURL'
+      ? string
+      : never;
+
 export class Editor {
   private konva: KonvaObjects | null = null;
   private originalImage: HTMLImageElement | null = null;
@@ -1219,7 +1229,11 @@ export class Editor {
   };
 
   // Export
-  exportImage = (format: 'canvas' | 'blob' | 'dataURL' = 'blob'): Promise<HTMLCanvasElement | Blob | string> => {
+  exportImage = <T extends 'canvas' | 'blob' | 'dataURL'>(
+    format: T = 'blob' as T
+  ): Promise<
+    T extends 'canvas' ? HTMLCanvasElement : T extends 'blob' ? Blob : T extends 'dataURL' ? string : never
+  > => {
     return new Promise((resolve, reject) => {
       if (!this.originalImage) {
         throw new Error('No image loaded');
@@ -1255,10 +1269,10 @@ export class Editor {
         }
 
         if (format === 'canvas') {
-          resolve(canvas);
+          resolve(canvas as OutputFormatToOutputMap<T>);
         } else if (format === 'dataURL') {
           try {
-            resolve(canvas.toDataURL('image/png'));
+            resolve(canvas.toDataURL('image/png') as OutputFormatToOutputMap<T>);
           } catch (error) {
             reject(error);
           }
@@ -1266,7 +1280,7 @@ export class Editor {
           try {
             canvas.toBlob((blob) => {
               if (blob) {
-                resolve(blob);
+                resolve(blob as OutputFormatToOutputMap<T>);
               } else {
                 reject(new Error('Failed to create blob'));
               }

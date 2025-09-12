@@ -117,7 +117,7 @@ export const EditorContainer = () => {
 
   const handleExport = useCallback(async () => {
     try {
-      const blob = (await editor.exportImage('blob')) as Blob;
+      const blob = await editor.exportImage('blob');
       const file = new File([blob], 'image.png', { type: 'image/png' });
 
       await uploadImage({
