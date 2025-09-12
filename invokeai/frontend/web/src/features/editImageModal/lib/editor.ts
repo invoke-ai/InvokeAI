@@ -4,14 +4,6 @@ import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { objectEntries } from 'tsafe';
 
-type CropConstraints = {
-  minWidth?: number;
-  minHeight?: number;
-  maxWidth?: number;
-  maxHeight?: number;
-  aspectRatio?: number;
-};
-
 export type CropBox = {
   x: number;
   y: number;
@@ -119,10 +111,8 @@ export class Editor {
   private isCropping = false;
   private config: EditorConfig = DEFAULT_CONFIG;
 
-  private cropConstraints: CropConstraints = {
-    minWidth: this.config.MIN_CROP_DIMENSION,
-    minHeight: this.config.MIN_CROP_DIMENSION,
-  };
+  private aspectRatio: number | null = null;
+
   private callbacks: EditorCallbacks = {};
   private cropBox: CropBox | null = null;
 
@@ -718,17 +708,9 @@ export class Editor {
       return;
     }
 
-    let { newX, newY, newWidth, newHeight } = this.cropConstraints.aspectRatio
+    let { newX, newY, newWidth, newHeight } = this.aspectRatio
       ? this._resizeCropBoxWithAspectRatio(handleName, handleRect)
       : this._resizeCropBoxFree(handleName, handleRect);
-
-    // Apply general constraints
-    if (this.cropConstraints.maxWidth) {
-      newWidth = Math.min(newWidth, this.cropConstraints.maxWidth);
-    }
-    if (this.cropConstraints.maxHeight) {
-      newHeight = Math.min(newHeight, this.cropConstraints.maxHeight);
-    }
 
     this.updateCropBox({
       x: newX,
@@ -754,8 +736,8 @@ export class Editor {
     const handleX = handleRect.x() + handleRect.width() / 2;
     const handleY = handleRect.y() + handleRect.height() / 2;
 
-    const minWidth = this.cropConstraints.minWidth ?? this.config.MIN_CROP_DIMENSION;
-    const minHeight = this.cropConstraints.minHeight ?? this.config.MIN_CROP_DIMENSION;
+    const minWidth = this.config.MIN_CROP_DIMENSION;
+    const minHeight = this.config.MIN_CROP_DIMENSION;
 
     // Update dimensions based on handle type
     if (handleName.includes('left')) {
@@ -779,18 +761,18 @@ export class Editor {
   };
 
   private _resizeCropBoxWithAspectRatio = (handleName: HandleName, handleRect: Konva.Rect) => {
-    if (!this.konva?.image.image || !this.cropConstraints.aspectRatio || !this.cropBox) {
+    if (!this.konva?.image.image || !this.aspectRatio || !this.cropBox) {
       throw new Error('Crop box, image, or aspect ratio not found');
     }
     const imgWidth = this.konva.image.image.width();
     const imgHeight = this.konva.image.image.height();
-    const ratio = this.cropConstraints.aspectRatio;
+    const ratio = this.aspectRatio;
 
     const handleX = handleRect.x() + handleRect.width() / 2;
     const handleY = handleRect.y() + handleRect.height() / 2;
 
-    const minWidth = this.cropConstraints.minWidth ?? this.config.MIN_CROP_DIMENSION;
-    const minHeight = this.cropConstraints.minHeight ?? this.config.MIN_CROP_DIMENSION;
+    const minWidth = this.config.MIN_CROP_DIMENSION;
+    const minHeight = this.config.MIN_CROP_DIMENSION;
 
     // Early boundary check for aspect ratio mode
     const atLeftEdge = this.cropBox.x <= 0;
@@ -1218,9 +1200,9 @@ export class Editor {
     }
   };
 
-  setCropAspectRatio = (ratio: number | undefined) => {
+  setCropAspectRatio = (ratio: number | null) => {
     // Update the constraint
-    this.cropConstraints.aspectRatio = ratio;
+    this.aspectRatio = ratio;
 
     if (!this.konva?.image.image || !this.cropBox) {
       return;
@@ -1230,7 +1212,7 @@ export class Editor {
     const currentHeight = this.cropBox.height;
     const currentArea = currentWidth * currentHeight;
 
-    if (ratio === undefined) {
+    if (ratio === null) {
       // Just removed the aspect ratio constraint, no need to adjust
       return;
     }
@@ -1258,8 +1240,8 @@ export class Editor {
     }
 
     // Apply minimum size constraints
-    const minWidth = this.cropConstraints.minWidth ?? this.config.MIN_CROP_DIMENSION;
-    const minHeight = this.cropConstraints.minHeight ?? this.config.MIN_CROP_DIMENSION;
+    const minWidth = this.config.MIN_CROP_DIMENSION;
+    const minHeight = this.config.MIN_CROP_DIMENSION;
 
     if (newWidth < minWidth) {
       newWidth = minWidth;
@@ -1289,8 +1271,8 @@ export class Editor {
     });
   };
 
-  getCropAspectRatio = (): number | undefined => {
-    return this.cropConstraints.aspectRatio;
+  getCropAspectRatio = (): number | null => {
+    return this.aspectRatio;
   };
 
   // Utility
