@@ -5,6 +5,7 @@ import type { CropBox, Editor } from 'features/editImageModal/lib/editor';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useGetImageDTOQuery, useUploadImageMutation } from 'services/api/endpoints/images';
+import type { ImageDTO } from 'services/api/types';
 
 type Props = {
   editor: Editor;
@@ -23,12 +24,64 @@ export const EditorContainer = ({ editor, imageName }: Props) => {
 
   const [uploadImage] = useUploadImageMutation({ fixedCacheKey: 'editorContainer' });
 
+  const setup = useCallback(
+    async (imageDTO: ImageDTO, container: HTMLDivElement) => {
+      editor.init(container);
+      editor.setCallbacks({
+        onZoomChange: (zoom) => {
+          setZoom(zoom);
+        },
+        onCropStart: () => {
+          setCropInProgress(true);
+          setCropBox(null);
+        },
+        onCropBoxChange: (crop) => {
+          setCropBox(crop);
+        },
+        onCropApply: () => {
+          setCropApplied(true);
+          setCropInProgress(false);
+          setCropBox(null);
+        },
+        onCropReset: () => {
+          setCropApplied(true);
+          setCropInProgress(false);
+          setCropBox(null);
+        },
+        onCropCancel: () => {
+          setCropInProgress(false);
+          setCropBox(null);
+        },
+        onImageLoad: () => {
+          // setCropInfo('');
+          // setIsCropping(false);
+          // setHasCropBbox(false);
+        },
+      });
+      const blob = await convertImageUrlToBlob(imageDTO.image_url);
+      if (!blob) {
+        console.error('Failed to convert image to blob');
+        return;
+      }
+
+      await editor.loadImage(imageDTO.image_url);
+      editor.startCrop({
+        x: 0,
+        y: 0,
+        width: imageDTO.width,
+        height: imageDTO.height,
+      });
+    },
+    [editor]
+  );
+
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) {
+    if (!container || !imageDTO) {
       return;
     }
     editor.init(container);
+    setup(imageDTO, container);
     const handleResize = () => {
       editor.resize(container.clientWidth, container.clientHeight);
     };
@@ -37,58 +90,8 @@ export const EditorContainer = ({ editor, imageName }: Props) => {
     resizeObserver.observe(container);
     return () => {
       resizeObserver.disconnect();
-      editor.destroy();
     };
-  }, [editor]);
-
-  const loadImage = useCallback(async () => {
-    if (!imageDTO) {
-      console.error('Image not found');
-      return;
-    }
-    const blob = await convertImageUrlToBlob(imageDTO.image_url);
-    if (!blob) {
-      console.error('Failed to convert image to blob');
-      return;
-    }
-    await editor.loadImage(blob);
-  }, [editor, imageDTO]);
-
-  // Setup callbacks
-  useEffect(() => {
-    loadImage();
-    editor.setCallbacks({
-      onZoomChange: (zoom) => {
-        setZoom(zoom);
-      },
-      onCropStart: () => {
-        setCropInProgress(true);
-        setCropBox(null);
-      },
-      onCropBoxChange: (crop) => {
-        setCropBox(crop);
-      },
-      onCropApply: () => {
-        setCropApplied(true);
-        setCropInProgress(false);
-        setCropBox(null);
-      },
-      onCropReset: () => {
-        setCropApplied(true);
-        setCropInProgress(false);
-        setCropBox(null);
-      },
-      onCropCancel: () => {
-        setCropInProgress(false);
-        setCropBox(null);
-      },
-      onImageLoad: () => {
-        // setCropInfo('');
-        // setIsCropping(false);
-        // setHasCropBbox(false);
-      },
-    });
-  }, [editor, loadImage]);
+  }, [editor, imageDTO, setup]);
 
   const handleStartCrop = useCallback(() => {
     editor.startCrop();
