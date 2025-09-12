@@ -187,6 +187,11 @@ export class Editor {
 
   private cleanupFunctions: Set<() => void> = new Set();
 
+  /**
+   * Initialize the editor inside the given container element.
+   * @param container The HTML element to contain the editor. It will be used as the Konva stage container.
+   * @param config Optional configuration overrides.
+   */
   init = (container: HTMLDivElement, config?: Partial<EditorConfig>) => {
     this.config = { ...this.config, ...config };
 
@@ -214,6 +219,9 @@ export class Editor {
     this.setupListeners();
   };
 
+  /**
+   * Create the Konva objects used for the background layer (checkerboard pattern).
+   */
   private createKonvaBgObjects = (): KonvaObjects['bg'] => {
     const layer = new Konva.Layer();
     const rect = new Konva.Rect();
@@ -231,6 +239,9 @@ export class Editor {
     };
   };
 
+  /**
+   * Create the Konva objects used for the image layer. Note that the Konva image node is created when an image is loaded.
+   */
   private createKonvaImageObjects = (): KonvaObjects['image'] => {
     const layer = new Konva.Layer();
     return {
@@ -238,6 +249,9 @@ export class Editor {
     };
   };
 
+  /**
+   * Create the Konva objects used for cropping (overlay and interaction).
+   */
   private createKonvaCropObjects = (): KonvaObjects['crop'] => {
     const layer = new Konva.Layer();
     const overlay = this.createKonvaCropOverlayObjects();
@@ -251,6 +265,12 @@ export class Editor {
     };
   };
 
+  /**
+   * Create the Konva objects used for the crop overlay (the darkened area outside the crop box).
+   *
+   * This includes a full rectangle covering the entire image and a rectangle matching the crop box which is used to
+   * "cut out" the crop area from the overlay using the 'destination-out' composite operation.
+   */
   private createKonvaCropOverlayObjects = (): KonvaObjects['crop']['overlay'] => {
     const group = new Konva.Group();
     const full = new Konva.Rect({
@@ -270,6 +290,9 @@ export class Editor {
     };
   };
 
+  /**
+   * Create the Konva objects used for crop interaction (the crop box, resize handles, and guides).
+   */
   private createKonvaCropInteractionObjects = (): KonvaObjects['crop']['interaction'] => {
     const group = new Konva.Group();
 
@@ -308,6 +331,9 @@ export class Editor {
     };
   };
 
+  /**
+   * Create the Konva rectangle used for crop box interaction (dragging the crop box).
+   */
   private createKonvaCropInteractionRect = (): Konva.Rect => {
     const rect = new Konva.Rect({
       stroke: 'white',
@@ -341,7 +367,7 @@ export class Editor {
       rect.x(x);
       rect.y(y);
 
-      this.updateKonvaCropBox({ x, y, width, height });
+      this.updateCropBox({ x, y, width, height });
     });
 
     rect.on('mouseenter', () => {
@@ -367,6 +393,9 @@ export class Editor {
     return rect;
   };
 
+  /**
+   * Create a Konva line used as a crop box guide (one of the "rule of thirds" lines).
+   */
   private createKonvaCropInteractionGuide = (name: GuideName): Konva.Line => {
     const line = new Konva.Line({
       name,
@@ -379,6 +408,9 @@ export class Editor {
     return line;
   };
 
+  /**
+   * Create a Konva rectangle used as a crop box resize handle.
+   */
   private createKonvaCropInteractionHandle = (name: HandleName): Konva.Rect => {
     const rect = new Konva.Rect({
       name,
@@ -439,12 +471,28 @@ export class Editor {
 
     // Handle dragging
     rect.on('dragmove', () => {
-      this.resizeCropBox(name, rect);
+      if (!this.konva) {
+        return;
+      }
+
+      const { newX, newY, newWidth, newHeight } = this.aspectRatio
+        ? this.getNextCropBoxByHandleWithAspectRatio(name, rect)
+        : this.getNextCropBoxByHandleFree(name, rect);
+
+      this.updateCropBox({
+        x: newX,
+        y: newY,
+        width: newWidth,
+        height: newHeight,
+      });
     });
 
     return rect;
   };
 
+  /**
+   * Update (render) the Konva rectangle used for crop box interaction (dragging the crop box).
+   */
   private updateKonvaCropInteractionRect = () => {
     if (!this.konva || !this.cropBox) {
       return;
@@ -452,6 +500,9 @@ export class Editor {
     this.konva.crop.interaction.rect.setAttrs({ ...this.cropBox });
   };
 
+  /**
+   * Update (render) the Konva lines used as crop box guides (the "rule of thirds" lines).
+   */
   private updateKonvaCropInteractionGuides = () => {
     if (!this.konva || !this.cropBox) {
       return;
@@ -468,6 +519,10 @@ export class Editor {
     this.konva.crop.interaction.guides.bottom.points([x, y + horizontalThird * 2, x + width, y + horizontalThird * 2]);
   };
 
+  /**
+   * Update (render) the Konva rectangles used as crop box resize handles. Only the positions are updated in this
+   * method.
+   */
   private updateKonvaCropInteractionHandlePositions = () => {
     if (!this.konva || !this.cropBox) {
       return;
@@ -497,6 +552,10 @@ export class Editor {
     }
   };
 
+  /**
+   * Update (render) the Konva rectangles used as crop box resize handles. Only the sizes and stroke widths are updated
+   * in this method to maintain a constant screen size regardless of zoom level.
+   */
   private updateKonvaCropInteractionHandleScales = () => {
     if (!this.konva) {
       return;
@@ -526,7 +585,10 @@ export class Editor {
     }
   };
 
-  private updateKonvaCropBox = (cropBox: CropBox) => {
+  /**
+   * Update the crop box state and re-render all related Konva objects.
+   */
+  private updateCropBox = (cropBox: CropBox) => {
     this.cropBox = cropBox;
     this.updateKonvaCropOverlay();
     this.updateKonvaCropInteractionRect();
@@ -535,6 +597,9 @@ export class Editor {
     this.callbacks.onCropBoxChange?.(cropBox);
   };
 
+  /**
+   * Update (render) the Konva background objects (the checkerboard pattern).
+   */
   private updateKonvaBg = () => {
     if (!this.konva) {
       return;
@@ -555,6 +620,9 @@ export class Editor {
     });
   };
 
+  /**
+   * Update (render) the Konva crop overlay objects (the darkened area outside the crop box).
+   */
   private updateKonvaCropOverlay = () => {
     if (!this.konva?.image.image || !this.cropBox) {
       return;
@@ -570,6 +638,11 @@ export class Editor {
     this.konva.crop.overlay.clear.setAttrs({ ...this.cropBox });
   };
 
+  /**
+   * Update (render) the Konva image object when a new image is loaded.
+   *
+   * This shouldn't be called during normal renders.
+   */
   private updateImage = () => {
     if (!this.originalImage || !this.konva) {
       return;
@@ -596,185 +669,14 @@ export class Editor {
     this.resetView();
   };
 
-  //#region Event Handling
-  private setupListeners = () => {
-    if (!this.konva) {
-      return;
-    }
-    const stage = this.konva.stage;
-
-    stage.on('wheel', this.onWheel);
-    stage.on('contextmenu', this.onContextMenu);
-    stage.on('pointerdown', this.onPointerDown);
-    stage.on('pointerup', this.onPointerUp);
-    stage.on('pointermove', this.onPointerMove);
-
-    this.cleanupFunctions.add(() => {
-      stage.off('wheel', this.onWheel);
-      stage.off('contextmenu', this.onContextMenu);
-      stage.off('pointerdown', this.onPointerDown);
-      stage.off('pointerup', this.onPointerUp);
-      stage.off('pointermove', this.onPointerMove);
-    });
-
-    window.addEventListener('keydown', this.onKeyDown);
-    window.addEventListener('keyup', this.onKeyUp);
-
-    this.cleanupFunctions.add(() => {
-      window.removeEventListener('keydown', this.onKeyDown);
-      window.removeEventListener('keyup', this.onKeyUp);
-    });
-  };
-
-  // Track Space key press
-  private onKeyDown = (e: KeyboardEvent) => {
-    if (!this.konva?.stage) {
-      return;
-    }
-    if (e.code === 'Space' && !this.isSpacePressed) {
-      e.preventDefault();
-      this.isSpacePressed = true;
-      this.konva.stage.container().style.cursor = 'grab';
-    }
-  };
-
-  // Zoom with mouse wheel
-  private onWheel = (e: KonvaEventObject<WheelEvent>) => {
-    if (!this.konva?.stage) {
-      return;
-    }
-    e.evt.preventDefault();
-
-    const oldScale = this.konva.stage.scaleX();
-    const pointer = this.konva.stage.getPointerPosition();
-
-    if (!pointer) {
-      return;
-    }
-
-    const mousePointTo = {
-      x: (pointer.x - this.konva.stage.x()) / oldScale,
-      y: (pointer.y - this.konva.stage.y()) / oldScale,
-    };
-
-    const direction = e.evt.deltaY > 0 ? -1 : 1;
-    const scaleBy = this.config.ZOOM_WHEEL_FACTOR;
-    let newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
-
-    // Apply zoom limits
-    newScale = Math.max(this.config.ZOOM_MIN_PCT, Math.min(this.config.ZOOM_MAX_PCT, newScale));
-
-    this.konva.stage.scale({ x: newScale, y: newScale });
-
-    const newPos = {
-      x: pointer.x - mousePointTo.x * newScale,
-      y: pointer.y - mousePointTo.y * newScale,
-    };
-    this.konva.stage.position(newPos);
-
-    // Update handle scaling to maintain constant screen size
-    this.updateKonvaCropInteractionHandleScales();
-    this.updateKonvaBg();
-    this.callbacks.onZoomChange?.(newScale);
-  };
-
-  private onKeyUp = (e: KeyboardEvent) => {
-    if (!this.konva?.stage) {
-      return;
-    }
-    if (e.code === 'Space') {
-      e.preventDefault();
-      this.isSpacePressed = false;
-      this.isPanning = false;
-      // Revert cursor to default; mouseenter events will set it correctly if over an interactive element.
-      this.konva.stage.container().style.cursor = 'default';
-    }
-  };
-
-  // Pan with Space + drag or middle mouse button
-  private onPointerDown = (e: KonvaEventObject<PointerEvent>) => {
-    if (!this.konva?.stage) {
-      return;
-    }
-    if (this.isSpacePressed || e.evt.button === 1) {
-      e.evt.preventDefault();
-      e.evt.stopPropagation();
-      this.isPanning = true;
-      this.lastPointerPosition = this.konva.stage.getPointerPosition();
-      this.konva.stage.container().style.cursor = 'grabbing';
-
-      // Stop any active drags on crop elements
-      if (this.konva.crop) {
-        if (this.konva.crop.interaction.rect.isDragging()) {
-          this.konva.crop.interaction.rect.stopDrag();
-        }
-        for (const handle of Object.values(this.konva.crop.interaction.handles)) {
-          if (handle.isDragging()) {
-            handle.stopDrag();
-          }
-        }
-      }
-    }
-  };
-
-  private onPointerMove = (_: KonvaEventObject<PointerEvent>) => {
-    if (!this.konva?.stage) {
-      return;
-    }
-    if (!this.isPanning || !this.lastPointerPosition) {
-      return;
-    }
-
-    const pointer = this.konva.stage.getPointerPosition();
-    if (!pointer) {
-      return;
-    }
-
-    const dx = pointer.x - this.lastPointerPosition.x;
-    const dy = pointer.y - this.lastPointerPosition.y;
-
-    this.konva.stage.x(this.konva.stage.x() + dx);
-    this.konva.stage.y(this.konva.stage.y() + dy);
-
-    this.updateKonvaBg();
-
-    this.lastPointerPosition = pointer;
-  };
-
-  private onPointerUp = (_: KonvaEventObject<PointerEvent>) => {
-    if (!this.konva?.stage) {
-      return;
-    }
-    if (this.isPanning) {
-      this.isPanning = false;
-      this.konva.stage.container().style.cursor = this.isSpacePressed ? 'grab' : 'default';
-    }
-  };
-
-  private onContextMenu = (e: KonvaEventObject<MouseEvent>) => {
-    // Prevent context menu on right-click
-    e.evt.preventDefault();
-  };
-  //#region Event Handling
-
-  private resizeCropBox = (handleName: HandleName, handleRect: Konva.Rect) => {
-    if (!this.konva) {
-      return;
-    }
-
-    let { newX, newY, newWidth, newHeight } = this.aspectRatio
-      ? this._resizeCropBoxWithAspectRatio(handleName, handleRect)
-      : this._resizeCropBoxFree(handleName, handleRect);
-
-    this.updateKonvaCropBox({
-      x: newX,
-      y: newY,
-      width: newWidth,
-      height: newHeight,
-    });
-  };
-
-  private _resizeCropBoxFree = (handleName: HandleName, handleRect: Konva.Rect) => {
+  /**
+   * Calculate the next crop box dimensions when dragging a handle in freeform mode (no aspect ratio).
+   *
+   * The handle that was dragged determines which edges of the crop box are adjusted.
+   *
+   * TODO(psyche): Konva's Transformer class can handle this logic. Explore refactoring to use it.
+   */
+  private getNextCropBoxByHandleFree = (handleName: HandleName, handleRect: Konva.Rect) => {
     if (!this.konva?.image.image || !this.cropBox) {
       throw new Error('Crop box or image not found');
     }
@@ -814,7 +716,14 @@ export class Editor {
     return { newX, newY, newWidth, newHeight };
   };
 
-  private _resizeCropBoxWithAspectRatio = (handleName: HandleName, handleRect: Konva.Rect) => {
+  /**
+   * Calculate the next crop box dimensions when dragging a handle in fixed aspect ratio mode.
+   *
+   * The handle that was dragged determines which edges of the crop box are adjusted.
+   *
+   * TODO(psyche): Konva's Transformer class can handle this logic. Explore refactoring to use it.
+   */
+  private getNextCropBoxByHandleWithAspectRatio = (handleName: HandleName, handleRect: Konva.Rect) => {
     if (!this.konva?.image.image || !this.aspectRatio || !this.cropBox) {
       throw new Error('Crop box, image, or aspect ratio not found');
     }
@@ -853,7 +762,7 @@ export class Editor {
       newY: freeY,
       newWidth: freeWidth,
       newHeight: freeHeight,
-    } = this._resizeCropBoxFree(handleName, handleRect);
+    } = this.getNextCropBoxByHandleFree(handleName, handleRect);
 
     let newX = freeX;
     let newY = freeY;
@@ -966,7 +875,202 @@ export class Editor {
     return { newX, newY, newWidth, newHeight };
   };
 
+  //#region Event Handling
+
+  /**
+   * Set up event listeners for Konva stage (pointer) and window events (keyboard).
+   */
+  private setupListeners = () => {
+    if (!this.konva) {
+      return;
+    }
+
+    const stage = this.konva.stage;
+
+    stage.on('wheel', this.onWheel);
+    stage.on('contextmenu', this.onContextMenu);
+    stage.on('pointerdown', this.onPointerDown);
+    stage.on('pointerup', this.onPointerUp);
+    stage.on('pointermove', this.onPointerMove);
+
+    this.cleanupFunctions.add(() => {
+      stage.off('wheel', this.onWheel);
+      stage.off('contextmenu', this.onContextMenu);
+      stage.off('pointerdown', this.onPointerDown);
+      stage.off('pointerup', this.onPointerUp);
+      stage.off('pointermove', this.onPointerMove);
+    });
+
+    window.addEventListener('keydown', this.onKeyDown);
+    window.addEventListener('keyup', this.onKeyUp);
+
+    this.cleanupFunctions.add(() => {
+      window.removeEventListener('keydown', this.onKeyDown);
+      window.removeEventListener('keyup', this.onKeyUp);
+    });
+  };
+
+  /**
+   * Handle keydown events.
+   * - Space: Enable panning mode.
+   */
+  private onKeyDown = (e: KeyboardEvent) => {
+    if (!this.konva?.stage) {
+      return;
+    }
+    if (e.code === 'Space' && !this.isSpacePressed) {
+      e.preventDefault();
+      this.isSpacePressed = true;
+      this.konva.stage.container().style.cursor = 'grab';
+    }
+  };
+
+  /**
+   * Handle keyup events.
+   * - Space: Disable panning mode.
+   */
+  private onKeyUp = (e: KeyboardEvent) => {
+    if (!this.konva?.stage) {
+      return;
+    }
+    if (e.code === 'Space') {
+      e.preventDefault();
+      this.isSpacePressed = false;
+      this.isPanning = false;
+      // Revert cursor to default; mouseenter events will set it correctly if over an interactive element.
+      this.konva.stage.container().style.cursor = 'default';
+    }
+  };
+
+  /**
+   * Handle mouse wheel events for zooming in/out.
+   * - Zoom is centered on the mouse pointer position and constrained to min/max levels.
+   * - The crop box handles are rescaled to maintain a constant screen size.
+   * - The background pattern is rescalted to maintain a constant screen size.
+   */
+  private onWheel = (e: KonvaEventObject<WheelEvent>) => {
+    if (!this.konva?.stage) {
+      return;
+    }
+    e.evt.preventDefault();
+
+    const oldScale = this.konva.stage.scaleX();
+    const pointer = this.konva.stage.getPointerPosition();
+
+    if (!pointer) {
+      return;
+    }
+
+    const mousePointTo = {
+      x: (pointer.x - this.konva.stage.x()) / oldScale,
+      y: (pointer.y - this.konva.stage.y()) / oldScale,
+    };
+
+    const direction = e.evt.deltaY > 0 ? -1 : 1;
+    const scaleBy = this.config.ZOOM_WHEEL_FACTOR;
+    let newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
+
+    // Apply zoom limits
+    newScale = Math.max(this.config.ZOOM_MIN_PCT, Math.min(this.config.ZOOM_MAX_PCT, newScale));
+
+    this.konva.stage.scale({ x: newScale, y: newScale });
+
+    const newPos = {
+      x: pointer.x - mousePointTo.x * newScale,
+      y: pointer.y - mousePointTo.y * newScale,
+    };
+    this.konva.stage.position(newPos);
+
+    // Update handle scaling to maintain constant screen size
+    this.updateKonvaCropInteractionHandleScales();
+    this.updateKonvaBg();
+    this.callbacks.onZoomChange?.(newScale);
+  };
+
+  /**
+   * Handle pointer down events to initiate panning mode if spacebar is pressed or middle mouse button is used.
+   * - Stops any active drags on crop elements to prevent conflicts.
+   */
+  private onPointerDown = (e: KonvaEventObject<PointerEvent>) => {
+    if (!this.konva?.stage) {
+      return;
+    }
+    if (this.isSpacePressed || e.evt.button === 1) {
+      e.evt.preventDefault();
+      e.evt.stopPropagation();
+      this.isPanning = true;
+      this.lastPointerPosition = this.konva.stage.getPointerPosition();
+      this.konva.stage.container().style.cursor = 'grabbing';
+
+      // Stop any active drags on crop elements
+      if (this.konva.crop) {
+        if (this.konva.crop.interaction.rect.isDragging()) {
+          this.konva.crop.interaction.rect.stopDrag();
+        }
+        for (const handle of Object.values(this.konva.crop.interaction.handles)) {
+          if (handle.isDragging()) {
+            handle.stopDrag();
+          }
+        }
+      }
+    }
+  };
+
+  /**
+   * Handle pointer move events to pan the image when in panning mode.
+   */
+  private onPointerMove = (_: KonvaEventObject<PointerEvent>) => {
+    if (!this.konva?.stage) {
+      return;
+    }
+    if (!this.isPanning || !this.lastPointerPosition) {
+      return;
+    }
+
+    const pointer = this.konva.stage.getPointerPosition();
+    if (!pointer) {
+      return;
+    }
+
+    const dx = pointer.x - this.lastPointerPosition.x;
+    const dy = pointer.y - this.lastPointerPosition.y;
+
+    this.konva.stage.x(this.konva.stage.x() + dx);
+    this.konva.stage.y(this.konva.stage.y() + dy);
+
+    this.updateKonvaBg();
+
+    this.lastPointerPosition = pointer;
+  };
+
+  /**
+   * Handle pointer up events to exit panning mode.
+   */
+  private onPointerUp = (_: KonvaEventObject<PointerEvent>) => {
+    if (!this.konva?.stage) {
+      return;
+    }
+    if (this.isPanning) {
+      this.isPanning = false;
+      this.konva.stage.container().style.cursor = this.isSpacePressed ? 'grab' : 'default';
+    }
+  };
+
+  /**
+   * Handle context menu events to prevent the default browser context menu from appearing on right-click.
+   */
+  private onContextMenu = (e: KonvaEventObject<MouseEvent>) => {
+    e.evt.preventDefault();
+  };
+  //#region Event Handling
+
   //#region Public API
+
+  /**
+   * Load an image from a URL or data URL.
+   * @param src The image source URL or data URL.
+   * @returns A promise that resolves when the image is loaded or rejects on error.
+   */
   loadImage = (src: string): Promise<void> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -988,8 +1092,11 @@ export class Editor {
     });
   };
 
-  // Crop Mode
-  startCrop = (crop?: CropBox) => {
+  /**
+   * Start a cropping session with an optional initial crop box.
+   * @param initialCrop Optional initial crop box to use. If not provided, uses the current crop box or a default centered box.
+   */
+  startCrop = (initialCrop?: CropBox) => {
     if (!this.konva?.image.image || this.isCropping) {
       return;
     }
@@ -1000,11 +1107,12 @@ export class Editor {
     let cropWidth: number;
     let cropHeight: number;
 
-    if (crop) {
-      cropX = crop.x;
-      cropY = crop.y;
-      cropWidth = crop.width;
-      cropHeight = crop.height;
+    if (initialCrop) {
+      // User provided initial crop
+      cropX = initialCrop.x;
+      cropY = initialCrop.y;
+      cropWidth = initialCrop.width;
+      cropHeight = initialCrop.height;
     } else if (this.cropBox) {
       // Use the current crop as starting point
       cropX = this.cropBox.x;
@@ -1021,7 +1129,7 @@ export class Editor {
       cropY = (imgHeight - cropHeight) / 2;
     }
 
-    this.updateKonvaCropBox({
+    this.updateCropBox({
       x: cropX,
       y: cropY,
       width: cropWidth,
@@ -1033,6 +1141,9 @@ export class Editor {
     this.callbacks.onCropStart?.();
   };
 
+  /**
+   * Cancel the current cropping session and hide crop UI.
+   */
   cancelCrop = () => {
     if (!this.isCropping || !this.konva) {
       return;
@@ -1042,6 +1153,9 @@ export class Editor {
     this.callbacks.onCropCancel?.();
   };
 
+  /**
+   * Apply the current crop box and exit cropping mode.
+   */
   applyCrop = () => {
     if (!this.isCropping || !this.cropBox || !this.konva) {
       return;
@@ -1052,9 +1166,12 @@ export class Editor {
     this.callbacks.onCropApply?.(this.cropBox);
   };
 
+  /**
+   * Reset the crop box to encompass the entire image.
+   */
   resetCrop = () => {
     if (this.konva?.image.image) {
-      this.updateKonvaCropBox({
+      this.updateCropBox({
         x: 0,
         y: 0,
         ...this.konva.image.image.size(),
@@ -1063,12 +1180,12 @@ export class Editor {
     this.callbacks.onCropReset?.();
   };
 
-  // Export
-  exportImage = <T extends 'canvas' | 'blob' | 'dataURL'>(
-    format: T = 'blob' as T
-  ): Promise<
-    T extends 'canvas' ? HTMLCanvasElement : T extends 'blob' ? Blob : T extends 'dataURL' ? string : never
-  > => {
+  /**
+   * Export the current image, optionally cropped, in the specified format.
+   * @param format The output format: 'canvas', 'blob', or 'dataURL'. Defaults to 'blob'.
+   * @returns A promise that resolves with the exported image in the requested format.
+   */
+  exportImage = <T extends OutputFormat>(format: T = 'blob' as T): Promise<OutputFormatToOutputMap<T>> => {
     return new Promise((resolve, reject) => {
       if (!this.originalImage) {
         throw new Error('No image loaded');
@@ -1130,7 +1247,11 @@ export class Editor {
     });
   };
 
-  // View Control
+  /**
+   * Set the zoom level, optionally centered on a specific point.
+   * @param scale The target zoom scale (1 = 100%).
+   * @param point Optional point to center the zoom on, in stage coordinates. Defaults to center of viewport.
+   */
   setZoom = (scale: number, point?: { x: number; y: number }) => {
     if (!this.konva) {
       return;
@@ -1174,20 +1295,34 @@ export class Editor {
     this.callbacks.onZoomChange?.(scale);
   };
 
+  /**
+   * Get the current zoom level (1 = 100%).
+   */
   getZoom = (): number => {
     return this.konva?.stage.scaleX() || 1;
   };
 
+  /**
+   * Zoom in/out by a fixed factor, optionally centered on a specific point.
+   * @param point Optional point to center the zoom on, in stage coordinates. Defaults to center of viewport.
+   */
   zoomIn = (point?: { x: number; y: number }) => {
     const currentZoom = this.getZoom();
     this.setZoom(currentZoom * this.config.ZOOM_BUTTON_FACTOR, point);
   };
 
+  /**
+   * Zoom out by a fixed factor, optionally centered on a specific point.
+   * @param point Optional point to center the zoom on, in stage coordinates. Defaults to center of viewport.
+   */
   zoomOut = (point?: { x: number; y: number }) => {
     const currentZoom = this.getZoom();
     this.setZoom(currentZoom / this.config.ZOOM_BUTTON_FACTOR, point);
   };
 
+  /**
+   * Reset the view to 100% zoom and center the image in the container.
+   */
   resetView = () => {
     if (!this.konva?.image.image) {
       return;
@@ -1214,6 +1349,10 @@ export class Editor {
     this.callbacks.onZoomChange?.(1);
   };
 
+  /**
+   * Scale the image to fit within the container while maintaining aspect ratio.
+   * Adds padding to ensure the image isn't flush against container edges.
+   */
   fitToContainer = () => {
     if (!this.konva?.image?.image) {
       return;
@@ -1246,7 +1385,11 @@ export class Editor {
     this.callbacks.onZoomChange?.(scale);
   };
 
-  // Configuration
+  /**
+   * Set or update event callbacks.
+   * @param callbacks The callbacks to set or update.
+   * @param replace If true, replaces all existing callbacks. If false, merges with existing callbacks. Default is false.
+   */
   setCallbacks = (callbacks: EditorCallbacks, replace = false) => {
     if (replace) {
       this.callbacks = callbacks;
@@ -1255,8 +1398,14 @@ export class Editor {
     }
   };
 
+  /**
+   * Set or update the crop aspect ratio constraint.
+   * @param ratio The desired aspect ratio (width / height) or null to remove the constraint.
+   *
+   * If setting a new aspect ratio, the crop box is adjusted to maintain its area while fitting within image bounds.
+   * Minimum size constraints are applied as needed.
+   */
   setCropAspectRatio = (ratio: number | null) => {
-    // Update the constraint
     this.aspectRatio = ratio;
 
     if (!this.konva?.image.image || !this.cropBox) {
@@ -1318,7 +1467,7 @@ export class Editor {
     newX = Math.max(0, Math.min(newX, imgWidth - newWidth));
     newY = Math.max(0, Math.min(newY, imgHeight - newHeight));
 
-    this.updateKonvaCropBox({
+    this.updateCropBox({
       x: newX,
       y: newY,
       width: newWidth,
@@ -1326,11 +1475,22 @@ export class Editor {
     });
   };
 
+  /**
+   * Get the current crop aspect ratio constraint.
+   * @returns The current aspect ratio (width / height) or null if no constraint is set.
+   */
   getCropAspectRatio = (): number | null => {
     return this.aspectRatio;
   };
 
-  // Utility
+  /**
+   * Resize the editor container and adjust the Konva stage accordingly.
+   *
+   * Use this method when the container size changes (e.g., window resize) to ensure the canvas fits properly.
+   *
+   * @param width The new container width in pixels.
+   * @param height The new container height in pixels.
+   */
   resize = (width: number, height: number) => {
     if (!this.konva) {
       return;
@@ -1342,6 +1502,11 @@ export class Editor {
     this.updateKonvaBg();
   };
 
+  /**
+   * Destroy the editor instance, cleaning up all resources and event listeners.
+   *
+   * After calling this method, the instance should not be used again.
+   */
   destroy = () => {
     for (const cleanup of this.cleanupFunctions) {
       cleanup();
