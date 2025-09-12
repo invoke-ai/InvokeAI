@@ -1,29 +1,21 @@
-import { Modal, ModalBody, ModalContent, ModalHeader, ModalOverlay } from "@invoke-ai/ui-library";
-import { useStore } from "@nanostores/react";
-import { $isOpen } from "features/editImageModal/store";
-import { useCallback } from "react";
+import { Modal, ModalBody, ModalContent, ModalHeader, ModalOverlay } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
+import { $editImageModalState, closeEditImageModal } from 'features/editImageModal/store';
 
-import { EditorContainer } from "./EditorContainer";
+import { EditorContainer } from './EditorContainer';
 
 export const EditImageModal = () => {
-  const isOpen = useStore($isOpen);
-  const onClose = useCallback(() => {
-    $isOpen.set(false);
-  }, []);
+  const state = useStore($editImageModalState);
 
-  return <Modal
-    isOpen={isOpen}
-    onClose={onClose}
-    isCentered
-    useInert={false}
-    size="6xl"
-  >
-    <ModalOverlay />
-    <ModalContent h="80vh">
-      <ModalHeader>Edit Image</ModalHeader>
-      <ModalBody >
-        <EditorContainer />
-      </ModalBody>
-    </ModalContent>
-  </Modal>;
+  return (
+    <Modal isOpen={state.isOpen} onClose={closeEditImageModal} isCentered useInert={false} size="full">
+      <ModalOverlay />
+      <ModalContent minH="unset" minW="unset" maxH="90vh" maxW="90vw" w="full" h="full" borderRadius="base">
+        <ModalHeader>Edit Image</ModalHeader>
+        <ModalBody px={4} pb={4} pt={0}>
+          {state.isOpen && <EditorContainer editor={state.editor} imageName={state.imageName} />}
+        </ModalBody>
+      </ModalContent>
+    </Modal>
+  );
 };
