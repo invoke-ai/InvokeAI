@@ -69,31 +69,59 @@ type OutputFormatToOutputMap<T extends OutputFormat> = T extends 'canvas'
       ? string
       : never;
 
+type EditorConfig = {
+  MIN_CROP_DIMENSION: number;
+
+  ZOOM_WHEEL_FACTOR: number;
+  ZOOM_BUTTON_FACTOR: number;
+
+  CROP_HANDLE_SIZE: number;
+  CROP_HANDLE_STROKE_WIDTH: number;
+  CROP_HANDLE_FILL: string;
+  CROP_HANDLE_STROKE: string;
+
+  CROP_GUIDE_STROKE: string;
+  CROP_GUIDE_STROKE_WIDTH: number;
+
+  FIT_TO_CONTAINER_PADDING: number;
+
+  DEFAULT_CROP_BOX_SCALE: number;
+
+  ZOOM_MIN: number;
+  ZOOM_MAX: number;
+};
+
+const DEFAULT_CONFIG: EditorConfig = {
+  MIN_CROP_DIMENSION: 64,
+
+  ZOOM_WHEEL_FACTOR: 1.1,
+  ZOOM_BUTTON_FACTOR: 1.2,
+
+  CROP_HANDLE_SIZE: 8,
+  CROP_HANDLE_STROKE_WIDTH: 1,
+  CROP_HANDLE_FILL: 'white',
+  CROP_HANDLE_STROKE: 'black',
+
+  CROP_GUIDE_STROKE: 'rgba(255, 255, 255, 0.5)',
+  CROP_GUIDE_STROKE_WIDTH: 1,
+
+  FIT_TO_CONTAINER_PADDING: 0.9,
+
+  DEFAULT_CROP_BOX_SCALE: 0.8,
+
+  ZOOM_MIN: 0.1,
+  ZOOM_MAX: 10,
+};
+
 export class Editor {
   private konva: KonvaObjects | null = null;
   private originalImage: HTMLImageElement | null = null;
   private isCropping = false;
-
-  // Constants
-  private readonly MIN_CROP_DIMENSION = 64;
-  private readonly ZOOM_WHEEL_FACTOR = 1.1;
-  private readonly ZOOM_BUTTON_FACTOR = 1.2;
-  private readonly CROP_HANDLE_SIZE = 8;
-  private readonly CROP_HANDLE_STROKE_WIDTH = 1;
-  private readonly CROP_GUIDE_STROKE = 'rgba(255, 255, 255, 0.5)';
-  private readonly CROP_GUIDE_STROKE_WIDTH = 1;
-  private readonly CROP_HANDLE_FILL = 'white';
-  private readonly CROP_HANDLE_STROKE = 'black';
-  private readonly FIT_TO_CONTAINER_PADDING = 0.9;
-  private readonly DEFAULT_CROP_BOX_SCALE = 0.8;
-
-  // Configuration
-  private readonly ZOOM_MIN = 0.1;
-  private readonly ZOOM_MAX = 10;
+  private config: EditorConfig = DEFAULT_CONFIG;
 
   private cropConstraints: CropConstraints = {
-    minWidth: this.MIN_CROP_DIMENSION,
-    minHeight: this.MIN_CROP_DIMENSION,
+    minWidth: this.config.MIN_CROP_DIMENSION,
+    minHeight: this.config.MIN_CROP_DIMENSION,
   };
   private callbacks: EditorCallbacks = {};
   private cropBox: CropBox | null = null;
@@ -105,7 +133,9 @@ export class Editor {
 
   private subscriptions: Set<() => void> = new Set();
 
-  init = (container: HTMLDivElement) => {
+  init = (container: HTMLDivElement, config?: Partial<EditorConfig>) => {
+    this.config = { ...this.config, ...config };
+
     const stage = new Konva.Stage({
       container: container,
       width: container.clientWidth,
@@ -245,24 +275,21 @@ export class Editor {
       if (!this.konva?.image.image || !this.cropBox) {
         return;
       }
+
       const imgWidth = this.konva.image.image.width();
       const imgHeight = this.konva.image.image.height();
 
       // Constrain to image bounds
       const x = Math.max(0, Math.min(rect.x(), imgWidth - rect.width()));
       const y = Math.max(0, Math.min(rect.y(), imgHeight - rect.height()));
+      const { width, height } = this.cropBox;
 
       rect.x(x);
       rect.y(y);
 
-      this.updateCropBox({
-        ...this.cropBox,
-        x,
-        y,
-      });
+      this.updateCropBox({ x, y, width, height });
     });
 
-    // Cursor styles
     rect.on('mouseenter', () => {
       const stage = this.konva?.stage;
       if (!stage) {
@@ -289,8 +316,8 @@ export class Editor {
   private createKonvaCropGuide = (name: GuideName): Konva.Line => {
     const line = new Konva.Line({
       name,
-      stroke: this.CROP_GUIDE_STROKE,
-      strokeWidth: this.CROP_GUIDE_STROKE_WIDTH,
+      stroke: this.config.CROP_GUIDE_STROKE,
+      strokeWidth: this.config.CROP_GUIDE_STROKE_WIDTH,
       strokeScaleEnabled: false,
       listening: false,
     });
@@ -303,11 +330,11 @@ export class Editor {
       name,
       x: 0,
       y: 0,
-      width: this.CROP_HANDLE_SIZE,
-      height: this.CROP_HANDLE_SIZE,
-      fill: this.CROP_HANDLE_FILL,
-      stroke: this.CROP_HANDLE_STROKE,
-      strokeWidth: this.CROP_HANDLE_STROKE_WIDTH,
+      width: this.config.CROP_HANDLE_SIZE,
+      height: this.config.CROP_HANDLE_SIZE,
+      fill: this.config.CROP_HANDLE_FILL,
+      stroke: this.config.CROP_HANDLE_STROKE,
+      strokeWidth: this.config.CROP_HANDLE_STROKE_WIDTH,
       strokeScaleEnabled: true,
       draggable: true,
       hitStrokeWidth: 16,
@@ -466,8 +493,8 @@ export class Editor {
     }
 
     const scale = this.konva.stage.scaleX();
-    const handleSize = this.CROP_HANDLE_SIZE / scale;
-    const strokeWidth = this.CROP_HANDLE_STROKE_WIDTH / scale;
+    const handleSize = this.config.CROP_HANDLE_SIZE / scale;
+    const strokeWidth = this.config.CROP_HANDLE_STROKE_WIDTH / scale;
 
     for (const handle of Object.values(this.konva.crop.interaction.handles)) {
       const currentX = handle.x();
@@ -561,11 +588,11 @@ export class Editor {
     };
 
     const direction = e.deltaY > 0 ? -1 : 1;
-    const scaleBy = this.ZOOM_WHEEL_FACTOR;
+    const scaleBy = this.config.ZOOM_WHEEL_FACTOR;
     let newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
 
     // Apply zoom limits
-    newScale = Math.max(this.ZOOM_MIN, Math.min(this.ZOOM_MAX, newScale));
+    newScale = Math.max(this.config.ZOOM_MIN, Math.min(this.config.ZOOM_MAX, newScale));
 
     this.konva.stage.scale({ x: newScale, y: newScale });
 
@@ -727,8 +754,8 @@ export class Editor {
     const handleX = handleRect.x() + handleRect.width() / 2;
     const handleY = handleRect.y() + handleRect.height() / 2;
 
-    const minWidth = this.cropConstraints.minWidth ?? this.MIN_CROP_DIMENSION;
-    const minHeight = this.cropConstraints.minHeight ?? this.MIN_CROP_DIMENSION;
+    const minWidth = this.cropConstraints.minWidth ?? this.config.MIN_CROP_DIMENSION;
+    const minHeight = this.cropConstraints.minHeight ?? this.config.MIN_CROP_DIMENSION;
 
     // Update dimensions based on handle type
     if (handleName.includes('left')) {
@@ -762,8 +789,8 @@ export class Editor {
     const handleX = handleRect.x() + handleRect.width() / 2;
     const handleY = handleRect.y() + handleRect.height() / 2;
 
-    const minWidth = this.cropConstraints.minWidth ?? this.MIN_CROP_DIMENSION;
-    const minHeight = this.cropConstraints.minHeight ?? this.MIN_CROP_DIMENSION;
+    const minWidth = this.cropConstraints.minWidth ?? this.config.MIN_CROP_DIMENSION;
+    const minHeight = this.cropConstraints.minHeight ?? this.config.MIN_CROP_DIMENSION;
 
     // Early boundary check for aspect ratio mode
     const atLeftEdge = this.cropBox.x <= 0;
@@ -951,8 +978,8 @@ export class Editor {
       // Create default crop box (centered, 80% of image)
       const imgWidth = this.konva.image.image.width();
       const imgHeight = this.konva.image.image.height();
-      cropWidth = imgWidth * this.DEFAULT_CROP_BOX_SCALE;
-      cropHeight = imgHeight * this.DEFAULT_CROP_BOX_SCALE;
+      cropWidth = imgWidth * this.config.DEFAULT_CROP_BOX_SCALE;
+      cropHeight = imgHeight * this.config.DEFAULT_CROP_BOX_SCALE;
       cropX = (imgWidth - cropWidth) / 2;
       cropY = (imgHeight - cropHeight) / 2;
     }
@@ -1072,7 +1099,7 @@ export class Editor {
       return;
     }
 
-    scale = Math.max(this.ZOOM_MIN, Math.min(this.ZOOM_MAX, scale));
+    scale = Math.max(this.config.ZOOM_MIN, Math.min(this.config.ZOOM_MAX, scale));
 
     // If no point provided, use center of viewport
     if (!point && this.konva.image) {
@@ -1116,12 +1143,12 @@ export class Editor {
 
   zoomIn = (point?: { x: number; y: number }) => {
     const currentZoom = this.getZoom();
-    this.setZoom(currentZoom * this.ZOOM_BUTTON_FACTOR, point);
+    this.setZoom(currentZoom * this.config.ZOOM_BUTTON_FACTOR, point);
   };
 
   zoomOut = (point?: { x: number; y: number }) => {
     const currentZoom = this.getZoom();
-    this.setZoom(currentZoom / this.ZOOM_BUTTON_FACTOR, point);
+    this.setZoom(currentZoom / this.config.ZOOM_BUTTON_FACTOR, point);
   };
 
   resetView = () => {
@@ -1160,7 +1187,8 @@ export class Editor {
     const imageWidth = this.konva.image.image.width();
     const imageHeight = this.konva.image.image.height();
 
-    const scale = Math.min(containerWidth / imageWidth, containerHeight / imageHeight) * this.FIT_TO_CONTAINER_PADDING;
+    const scale =
+      Math.min(containerWidth / imageWidth, containerHeight / imageHeight) * this.config.FIT_TO_CONTAINER_PADDING;
 
     this.konva.stage.scale({ x: scale, y: scale });
 
@@ -1230,8 +1258,8 @@ export class Editor {
     }
 
     // Apply minimum size constraints
-    const minWidth = this.cropConstraints.minWidth ?? this.MIN_CROP_DIMENSION;
-    const minHeight = this.cropConstraints.minHeight ?? this.MIN_CROP_DIMENSION;
+    const minWidth = this.cropConstraints.minWidth ?? this.config.MIN_CROP_DIMENSION;
+    const minHeight = this.cropConstraints.minHeight ?? this.config.MIN_CROP_DIMENSION;
 
     if (newWidth < minWidth) {
       newWidth = minWidth;
