@@ -7,7 +7,7 @@ import { videoFrameFromImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
 import { DndImageIcon, imageButtonSx } from 'features/dnd/DndImageIcon';
-import { $imageName, $isOpen } from 'features/editImageModal/store';
+import { openEditImageModal } from 'features/editImageModal/store';
 import {
   selectStartingFrameImage,
   selectVideoAspectRatio,
@@ -41,10 +41,11 @@ export const StartingFrameImage = () => {
   );
 
   const onOpenEditImageModal = useCallback(() => {
-    $isOpen.set(true);
-    $imageName.set(imageDTO?.image_name ?? null);
+    if (!imageDTO) {
+      return;
+    }
+    openEditImageModal(imageDTO.image_name);
   }, [imageDTO]);
-
 
   const fitsCurrentAspectRatio = useMemo(() => {
     if (!imageDTO) {
@@ -56,20 +57,24 @@ export const StartingFrameImage = () => {
 
   return (
     <Flex justifyContent="flex-start" flexDir="column" gap={2}>
-      <FormLabel display="flex" alignItems="center" gap={2}><Text>{t('parameters.startingFrameImage')}</Text>
-        <Tooltip
-          label={t('parameters.startingFrameImageAspectRatioWarning', { videoAspectRatio: videoAspectRatio })}
-        >
-          <Box >
-            <Icon
-              as={PiWarningBold}
-              size={16}
-              color="warning.500"
-            />
+      <FormLabel display="flex" alignItems="center" gap={2}>
+        <Text>{t('parameters.startingFrameImage')}</Text>
+        <Tooltip label={t('parameters.startingFrameImageAspectRatioWarning', { videoAspectRatio: videoAspectRatio })}>
+          <Box>
+            <Icon as={PiWarningBold} size={16} color="warning.500" />
           </Box>
         </Tooltip>
       </FormLabel>
-      <Flex position="relative" w={36} h={36} alignItems="center" justifyContent="center" borderWidth={1} borderStyle="solid" borderColor={fitsCurrentAspectRatio ? 'base.500' : 'warning.500'}>
+      <Flex
+        position="relative"
+        w={36}
+        h={36}
+        alignItems="center"
+        justifyContent="center"
+        borderWidth={1}
+        borderStyle="solid"
+        borderColor={fitsCurrentAspectRatio ? 'base.500' : 'warning.500'}
+      >
         {!imageDTO && (
           <UploadImageIconButton
             w="full"
@@ -100,8 +105,6 @@ export const StartingFrameImage = () => {
                 tooltip={t('common.crop')}
               />
             </Flex>
-
-
 
             <Text
               position="absolute"

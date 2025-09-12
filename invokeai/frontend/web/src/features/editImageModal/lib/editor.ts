@@ -11,7 +11,7 @@ type CropConstraints = {
   aspectRatio?: number;
 };
 
-type CropData = {
+export type CropBox = {
   x: number;
   y: number;
   width: number;
@@ -19,7 +19,11 @@ type CropData = {
 };
 
 type EditorCallbacks = {
-  onCropChange?: (crop: CropData | null) => void;
+  onCropStart?: () => void;
+  onCropBoxChange?: (crop: CropBox) => void;
+  onCropApply?: (crop: CropBox) => void;
+  onCropReset?: () => void;
+  onCropCancel?: () => void;
   onZoomChange?: (zoom: number) => void;
   onImageLoad?: () => void;
 };
@@ -57,7 +61,7 @@ export class Editor {
   private konva: KonvaObjects | null = null;
   private originalImage: HTMLImageElement | null = null;
   private isCropping = false;
-  private appliedCrop: CropData | null = null;
+  private appliedCrop: CropBox | null = null;
   private currentImageBlobUrl: string | null = null;
 
   // Configuration
@@ -391,7 +395,7 @@ export class Editor {
   };
 
   // Crop Mode
-  startCrop = () => {
+  startCrop = (crop?: CropBox) => {
     if (!this.konva?.image || this.isCropping) {
       return;
     }
@@ -404,7 +408,12 @@ export class Editor {
     let cropWidth: number;
     let cropHeight: number;
 
-    if (this.appliedCrop) {
+    if (crop) {
+      cropX = crop.x;
+      cropY = crop.y;
+      cropWidth = crop.width;
+      cropHeight = crop.height;
+    } else if (this.appliedCrop) {
       // When cropped, start with full visible area
       cropX = 0;
       cropY = 0;
@@ -421,6 +430,14 @@ export class Editor {
     }
 
     this.createCropBox(cropX, cropY, cropWidth, cropHeight);
+
+    this.callbacks.onCropStart?.();
+    this.callbacks.onCropBoxChange?.({
+      x: cropX,
+      y: cropY,
+      width: cropWidth,
+      height: cropHeight,
+    });
   };
 
   private createCropBox = (x: number, y: number, width: number, height: number) => {
@@ -662,7 +679,7 @@ export class Editor {
       this.updateHandlePositions();
       this.updateCropGuides();
 
-      this.callbacks.onCropChange?.({
+      this.callbacks.onCropBoxChange?.({
         x,
         y,
         width: rect.width(),
@@ -1024,7 +1041,7 @@ export class Editor {
     // Reset handle position to follow crop box
     this.positionHandle(handle);
 
-    this.callbacks.onCropChange?.({
+    this.callbacks.onCropBoxChange?.({
       x: newX,
       y: newY,
       width: newWidth,
@@ -1176,14 +1193,20 @@ export class Editor {
     this.konva.crop.layer.batchDraw();
   };
 
+  resetEphemeralCropState = () => {
+    this.isCropping = false;
+    if (this.konva?.crop) {
+      this.konva.crop.layer.destroy();
+      this.konva.crop = undefined;
+    }
+  };
+
   cancelCrop = () => {
     if (!this.isCropping || !this.konva?.crop) {
       return;
     }
-
-    this.isCropping = false;
-    this.konva.crop.layer.destroy();
-    this.konva.crop = undefined;
+    this.resetEphemeralCropState();
+    this.callbacks.onCropCancel?.();
   };
 
   applyCrop = () => {
@@ -1211,10 +1234,11 @@ export class Editor {
       };
     }
 
-    this.cancelCrop();
-
     // Redisplay image with crop applied
     this.displayImage();
+
+    this.resetEphemeralCropState();
+    this.callbacks.onCropApply?.(this.appliedCrop);
   };
 
   resetCrop = () => {
@@ -1222,6 +1246,8 @@ export class Editor {
 
     // Redisplay image without crop
     this.displayImage();
+
+    this.callbacks.onCropReset?.();
   };
 
   hasCrop = (): boolean => {
@@ -1405,6 +1431,8 @@ export class Editor {
     // Update handle scaling
     this.updateHandleScale();
 
+    this.renderBg();
+
     this.callbacks.onZoomChange?.(scale);
   };
 
@@ -1491,7 +1519,7 @@ export class Editor {
       this.updateCropGuides();
 
       // Notify callback
-      this.callbacks.onCropChange?.({
+      this.callbacks.onCropBoxChange?.({
         x: newX,
         y: newY,
         width: newWidth,

@@ -1,25 +1,45 @@
-import { Button, Flex, Select } from '@invoke-ai/ui-library';
-import { skipToken } from '@reduxjs/toolkit/query';
+import { Button, Divider, Flex, Select, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { convertImageUrlToBlob } from 'common/util/convertImageUrlToBlob';
-import { useEditor } from 'features/editImageModal/hooks/useEditor';
-import { $imageName } from 'features/editImageModal/store';
+import type { CropBox, Editor } from 'features/editImageModal/lib/editor';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useGetImageDTOQuery, useUploadImageMutation } from 'services/api/endpoints/images';
 
-export const EditorContainer = () => {
+type Props = {
+  editor: Editor;
+  imageName: string;
+};
+
+export const EditorContainer = ({ editor, imageName }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const editor = useEditor({ containerRef });
-  const [zoomLevel, setZoomLevel] = useState(100);
-  const [cropInfo, setCropInfo] = useState<string>('');
-  const [isCropping, setIsCropping] = useState(false);
-  const [hasCropBbox, setHasCropBbox] = useState(false);
+  const [zoom, setZoom] = useState(100);
+  const [cropInProgress, setCropInProgress] = useState(false);
+  const [cropBox, setCropBox] = useState<CropBox | null>(null);
+  const [cropApplied, setCropApplied] = useState(false);
   const [aspectRatio, setAspectRatio] = useState<string>('free');
-  const { data: imageDTO } = useGetImageDTOQuery($imageName.get() ?? skipToken);
+  const { data: imageDTO } = useGetImageDTOQuery(imageName);
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
 
-  const [uploadImage, { isLoading }] = useUploadImageMutation({ fixedCacheKey: 'editorContainer' });
+  const [uploadImage] = useUploadImageMutation({ fixedCacheKey: 'editorContainer' });
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+    editor.init(container);
+    const handleResize = () => {
+      editor.resize(container.clientWidth, container.clientHeight);
+    };
+
+    const resizeObserver = new ResizeObserver(handleResize);
+    resizeObserver.observe(container);
+    return () => {
+      resizeObserver.disconnect();
+      editor.destroy();
+    };
+  }, [editor]);
 
   const loadImage = useCallback(async () => {
     if (!imageDTO) {
@@ -38,27 +58,40 @@ export const EditorContainer = () => {
   useEffect(() => {
     loadImage();
     editor.setCallbacks({
-      onZoomChange: (zoom) => setZoomLevel(Math.round(zoom * 100)),
-      onCropChange: (crop) => {
-        if (!crop) {
-          setCropInfo('');
-          return;
-        }
-        setCropInfo(
-          `Crop: ${Math.round(crop.x)}, ${Math.round(crop.y)} - ${Math.round(crop.width)}x${Math.round(crop.height)}`
-        );
+      onZoomChange: (zoom) => {
+        setZoom(zoom);
+      },
+      onCropStart: () => {
+        setCropInProgress(true);
+        setCropBox(null);
+      },
+      onCropBoxChange: (crop) => {
+        setCropBox(crop);
+      },
+      onCropApply: () => {
+        setCropApplied(true);
+        setCropInProgress(false);
+        setCropBox(null);
+      },
+      onCropReset: () => {
+        setCropApplied(true);
+        setCropInProgress(false);
+        setCropBox(null);
+      },
+      onCropCancel: () => {
+        setCropInProgress(false);
+        setCropBox(null);
       },
       onImageLoad: () => {
-        setCropInfo('');
-        setIsCropping(false);
-        setHasCropBbox(false);
+        // setCropInfo('');
+        // setIsCropping(false);
+        // setHasCropBbox(false);
       },
     });
   }, [editor, loadImage]);
 
   const handleStartCrop = useCallback(() => {
     editor.startCrop();
-    setIsCropping(true);
     // Apply current aspect ratio if not free
     if (aspectRatio !== 'free') {
       const ratios: Record<string, number> = {
@@ -97,22 +130,22 @@ export const EditorContainer = () => {
 
   const handleApplyCrop = useCallback(() => {
     editor.applyCrop();
-    setIsCropping(false);
-    setHasCropBbox(true);
-    setCropInfo('');
+    // setIsCropping(false);
+    // setHasCropBbox(true);
+    // setCropInfo('');
     setAspectRatio('free');
   }, [editor]);
 
   const handleCancelCrop = useCallback(() => {
     editor.cancelCrop();
-    setIsCropping(false);
-    setCropInfo('');
+    // setIsCropping(false);
+    // setCropInfo('');
     setAspectRatio('free');
   }, [editor]);
 
   const handleResetCrop = useCallback(() => {
     editor.resetCrop();
-    setHasCropBbox(false);
+    // setHasCropBbox(false);
   }, [editor]);
 
   const handleExport = useCallback(async () => {
@@ -155,56 +188,59 @@ export const EditorContainer = () => {
   }, [editor]);
 
   return (
-    <Flex w="full" h="full" flexDir="column">
-      <Flex>
-        <Flex>
-          {!isCropping && (
-            <>
-              <Button onClick={handleStartCrop}>Start Crop</Button>
-              {hasCropBbox && <Button onClick={handleResetCrop}>Reset Crop</Button>}
-            </>
-          )}
-          {isCropping && (
-            <>
-              <Select value={aspectRatio} onChange={handleAspectRatioChange}>
-                <option value="free">Free</option>
-                <option value="1:1">1:1 (Square)</option>
-                <option value="4:3">4:3</option>
-                <option value="16:9">16:9</option>
-                <option value="3:2">3:2</option>
-                <option value="2:3">2:3 (Portrait)</option>
-                <option value="9:16">9:16 (Portrait)</option>
-              </Select>
-              <Button onClick={handleApplyCrop}>Apply Crop</Button>
-              <Button onClick={handleCancelCrop}>Cancel Crop</Button>
-            </>
-          )}
-        </Flex>
+    <Flex w="full" h="full" flexDir="column" gap={4}>
+      <Flex gap={2}>
+        {!cropInProgress && <Button onClick={handleStartCrop}>Start Crop</Button>}
+        {cropApplied && <Button onClick={handleResetCrop}>Reset Crop</Button>}
+        {cropInProgress && (
+          <>
+            <Select value={aspectRatio} onChange={handleAspectRatioChange}>
+              <option value="free">Free</option>
+              <option value="1:1">1:1 (Square)</option>
+              <option value="4:3">4:3</option>
+              <option value="16:9">16:9</option>
+              <option value="3:2">3:2</option>
+              <option value="2:3">2:3 (Portrait)</option>
+              <option value="9:16">9:16 (Portrait)</option>
+            </Select>
+            <Button onClick={handleApplyCrop}>Apply Crop</Button>
+            <Button onClick={handleCancelCrop}>Cancel Crop</Button>
+          </>
+        )}
 
-        <Flex>
-          <Button onClick={fitToContainer}>Fit</Button>
-          <Button onClick={resetView}>Reset View</Button>
-          <Button onClick={zoomIn}>Zoom In</Button>
-          <Button onClick={zoomOut}>Zoom Out</Button>
-        </Flex>
+        <Button onClick={fitToContainer}>Fit</Button>
+        <Button onClick={resetView}>Reset View</Button>
+        <Button onClick={zoomIn}>Zoom In</Button>
+        <Button onClick={zoomOut}>Zoom Out</Button>
 
         <Button onClick={handleExport}>Export</Button>
-
-        <Flex>
-          <span>Zoom: {zoomLevel}%</span>
-          {cropInfo && <span>{cropInfo}</span>}
-          {hasCropBbox && <span style={{ color: 'green' }}>✓ Crop Applied</span>}
-        </Flex>
       </Flex>
 
-      <Flex>
-        <Flex>Mouse wheel: Zoom</Flex>
-        <Flex>Space + Drag: Pan</Flex>
-        {isCropping && <Flex>Drag crop box or handles to adjust</Flex>}
-        {isCropping && aspectRatio !== 'free' && <Flex>Aspect ratio: {aspectRatio}</Flex>}
-      </Flex>
       <Flex position="relative" w="full" h="full" bg="base.900">
         <Flex position="absolute" inset={0} ref={containerRef} />
+      </Flex>
+
+      <Flex gap={2} color="base.300">
+        <Text>Mouse wheel: Zoom</Text>
+        <Divider orientation="vertical" />
+        <Text>Space + Drag: Pan</Text>
+        {cropInProgress && (
+          <>
+            <Divider orientation="vertical" />
+            <Text>Drag crop box or handles to adjust</Text>
+          </>
+        )}
+        {cropInProgress && cropBox && (
+          <>
+            <Divider orientation="vertical" />
+            <Text>
+              X: {Math.round(cropBox.x)}, Y: {Math.round(cropBox.y)}, Width: {Math.round(cropBox.width)}, Height:{' '}
+              {Math.round(cropBox.height)}
+            </Text>
+          </>
+        )}
+        <Spacer key="help-spacer" />
+        <Text key="help-zoom">Zoom: {Math.round(zoom * 100)}%</Text>
       </Flex>
     </Flex>
   );
