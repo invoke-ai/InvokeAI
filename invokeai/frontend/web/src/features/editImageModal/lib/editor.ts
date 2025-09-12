@@ -395,7 +395,7 @@ export class Editor {
       width: imgWidth,
       height: imgHeight,
       fill: 'black',
-      opacity: 0.5,
+      opacity: 0.7,
     });
 
     // Create clear rectangle for crop area using composite operation
@@ -525,8 +525,8 @@ export class Editor {
       height: handleSize,
       fill: 'white',
       stroke: 'black',
-      strokeWidth: 1 / scale,
-      strokeScaleEnabled: false,
+      strokeWidth: 1,
+      strokeScaleEnabled: true,
     };
 
     // Corner handles
@@ -1280,6 +1280,16 @@ export class Editor {
 
   getZoom = (): number => {
     return this.konva?.stage.scaleX() || 1;
+  };
+
+  zoomIn = (factor = 1.2, point?: { x: number; y: number }) => {
+    const currentZoom = this.getZoom();
+    this.setZoom(currentZoom * factor, point);
+  };
+
+  zoomOut = (factor = 1.2, point?: { x: number; y: number }) => {
+    const currentZoom = this.getZoom();
+    this.setZoom(currentZoom / factor, point);
   };
 
   resetView = () => {
