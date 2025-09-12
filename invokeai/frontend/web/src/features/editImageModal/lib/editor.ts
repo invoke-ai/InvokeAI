@@ -73,7 +73,6 @@ export class Editor {
   private konva: KonvaObjects | null = null;
   private originalImage: HTMLImageElement | null = null;
   private isCropping = false;
-  private appliedCrop: CropBox | null = null;
 
   // Constants
   private readonly MIN_CROP_DIMENSION = 64;
@@ -630,52 +629,6 @@ export class Editor {
     this.resetView();
   };
 
-  // Crop Mode
-  startCrop = (crop?: CropBox) => {
-    if (!this.konva?.image.image || this.isCropping) {
-      return;
-    }
-
-    this.unfreezeCropOverlay();
-    this.isCropping = true;
-
-    // Calculate initial crop dimensions
-    let cropX: number;
-    let cropY: number;
-    let cropWidth: number;
-    let cropHeight: number;
-
-    if (crop) {
-      cropX = crop.x;
-      cropY = crop.y;
-      cropWidth = crop.width;
-      cropHeight = crop.height;
-    } else if (this.appliedCrop) {
-      // Use the applied crop as starting point
-      cropX = this.appliedCrop.x;
-      cropY = this.appliedCrop.y;
-      cropWidth = this.appliedCrop.width;
-      cropHeight = this.appliedCrop.height;
-    } else {
-      // Create default crop box (centered, 80% of image)
-      const imgWidth = this.konva.image.image.width();
-      const imgHeight = this.konva.image.image.height();
-      cropWidth = imgWidth * this.DEFAULT_CROP_BOX_SCALE;
-      cropHeight = imgHeight * this.DEFAULT_CROP_BOX_SCALE;
-      cropX = (imgWidth - cropWidth) / 2;
-      cropY = (imgHeight - cropHeight) / 2;
-    }
-
-    this.updateCropBox({
-      x: cropX,
-      y: cropY,
-      width: cropWidth,
-      height: cropHeight,
-    });
-
-    this.callbacks.onCropStart?.();
-  };
-
   private resizeCropBox = (handleName: HandleName, handleRect: Konva.Rect) => {
     if (!this.konva) {
       return;
@@ -972,58 +925,79 @@ export class Editor {
     }
   };
 
-  private freezeCropOverlay = () => {
-    if (!this.konva) {
+  // Crop Mode
+  startCrop = (crop?: CropBox) => {
+    if (!this.konva?.image.image || this.isCropping) {
       return;
     }
 
-    this.konva.crop.interaction.group.visible(false);
-  };
+    // Calculate initial crop dimensions
+    let cropX: number;
+    let cropY: number;
+    let cropWidth: number;
+    let cropHeight: number;
 
-  private unfreezeCropOverlay = () => {
-    if (!this.konva) {
-      return;
+    if (crop) {
+      cropX = crop.x;
+      cropY = crop.y;
+      cropWidth = crop.width;
+      cropHeight = crop.height;
+    } else if (this.cropBox) {
+      // Use the current crop as starting point
+      cropX = this.cropBox.x;
+      cropY = this.cropBox.y;
+      cropWidth = this.cropBox.width;
+      cropHeight = this.cropBox.height;
+    } else {
+      // Create default crop box (centered, 80% of image)
+      const imgWidth = this.konva.image.image.width();
+      const imgHeight = this.konva.image.image.height();
+      cropWidth = imgWidth * this.DEFAULT_CROP_BOX_SCALE;
+      cropHeight = imgHeight * this.DEFAULT_CROP_BOX_SCALE;
+      cropX = (imgWidth - cropWidth) / 2;
+      cropY = (imgHeight - cropHeight) / 2;
     }
 
+    this.updateCropBox({
+      x: cropX,
+      y: cropY,
+      width: cropWidth,
+      height: cropHeight,
+    });
+    this.isCropping = true;
     this.konva.crop.interaction.group.visible(true);
-  };
 
-  resetEphemeralCropState = () => {
-    this.isCropping = false;
+    this.callbacks.onCropStart?.();
   };
 
   cancelCrop = () => {
-    if (!this.isCropping || !this.konva?.crop) {
+    if (!this.isCropping || !this.konva) {
       return;
     }
-    this.resetEphemeralCropState();
-
+    this.isCropping = false;
+    this.konva.crop.interaction.group.visible(false);
     this.callbacks.onCropCancel?.();
   };
 
   applyCrop = () => {
-    if (!this.isCropping || !this.cropBox) {
+    if (!this.isCropping || !this.cropBox || !this.konva) {
       return;
     }
 
-    // Store the crop dimensions
-    this.appliedCrop = { ...this.cropBox };
-
-    // Freeze the crop overlay instead of redisplaying image
-    this.freezeCropOverlay();
-
     this.isCropping = false;
-    this.callbacks.onCropApply?.(this.appliedCrop);
+    this.konva.crop.interaction.group.visible(false);
+    this.callbacks.onCropApply?.(this.cropBox);
   };
 
   resetCrop = () => {
-    this.appliedCrop = null;
-
+    if (this.konva?.image.image) {
+      this.updateCropBox({
+        x: 0,
+        y: 0,
+        ...this.konva.image.image.size(),
+      });
+    }
     this.callbacks.onCropReset?.();
-  };
-
-  hasCrop = (): boolean => {
-    return !!this.appliedCrop;
   };
 
   // Export
@@ -1045,20 +1019,20 @@ export class Editor {
       }
 
       try {
-        if (this.appliedCrop) {
-          canvas.width = this.appliedCrop.width;
-          canvas.height = this.appliedCrop.height;
+        if (this.cropBox) {
+          canvas.width = this.cropBox.width;
+          canvas.height = this.cropBox.height;
 
           ctx.drawImage(
             this.originalImage,
-            this.appliedCrop.x,
-            this.appliedCrop.y,
-            this.appliedCrop.width,
-            this.appliedCrop.height,
+            this.cropBox.x,
+            this.cropBox.y,
+            this.cropBox.width,
+            this.cropBox.height,
             0,
             0,
-            this.appliedCrop.width,
-            this.appliedCrop.height
+            this.cropBox.width,
+            this.cropBox.height
           );
         } else {
           canvas.width = this.originalImage.width;
@@ -1321,7 +1295,7 @@ export class Editor {
     // Clear all references
     this.konva = null;
     this.originalImage = null;
-    this.appliedCrop = null;
+    this.cropBox = null;
     this.callbacks = {};
   };
 }
