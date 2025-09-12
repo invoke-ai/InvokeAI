@@ -2,6 +2,7 @@ import { $crossOrigin } from 'app/store/nanostores/authToken';
 import { TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
+import { objectEntries } from 'tsafe';
 
 type CropConstraints = {
   minWidth?: number;
@@ -29,18 +30,8 @@ type EditorCallbacks = {
 };
 
 type HandleName = 'top-left' | 'top-right' | 'bottom-right' | 'bottom-left' | 'top' | 'right' | 'bottom' | 'left';
-type GuideName = 'left' | 'right' | 'top' | 'bottom';
 
-// const HANDLE_INIT_COORDS: Record<HandleName, { x: number; y: number }> = {
-//   'top-left': { x: 0, y: 0 },
-//   'top-right': { x: 1, y: 0 },
-//   'bottom-right': { x: 1, y: 1 },
-//   'bottom-left': { x: 0, y: 1 },
-//   top: { x: 0.5, y: 0 },
-//   right: { x: 1, y: 0.5 },
-//   bottom: { x: 0.5, y: 1 },
-//   left: { x: 0, y: 0.5 },
-// };
+type GuideName = 'left' | 'right' | 'top' | 'bottom';
 
 type KonvaObjects = {
   stage: Konva.Stage;
@@ -96,8 +87,6 @@ export class Editor {
   private readonly CROP_HANDLE_STROKE = 'black';
   private readonly FIT_TO_CONTAINER_PADDING = 0.9;
   private readonly DEFAULT_CROP_BOX_SCALE = 0.8;
-  private readonly CORNER_HANDLE_NAMES = ['top-left', 'top-right', 'bottom-right', 'bottom-left'];
-  private readonly EDGE_HANDLE_NAMES = ['top', 'right', 'bottom', 'left'];
 
   // Configuration
   private readonly ZOOM_MIN = 0.1;
@@ -391,7 +380,7 @@ export class Editor {
 
     // Handle dragging
     rect.on('dragmove', () => {
-      this.resizeCropBox(rect);
+      this.resizeCropBox(name, rect);
     });
 
     return rect;
@@ -687,14 +676,14 @@ export class Editor {
     this.callbacks.onCropStart?.();
   };
 
-  private resizeCropBox = (handle: Konva.Rect) => {
+  private resizeCropBox = (handleName: HandleName, handleRect: Konva.Rect) => {
     if (!this.konva) {
       return;
     }
 
     let { newX, newY, newWidth, newHeight } = this.cropConstraints.aspectRatio
-      ? this._resizeCropBoxWithAspectRatio(handle)
-      : this._resizeCropBoxFree(handle);
+      ? this._resizeCropBoxWithAspectRatio(handleName, handleRect)
+      : this._resizeCropBoxFree(handleName, handleRect);
 
     // Apply general constraints
     if (this.cropConstraints.maxWidth) {
@@ -712,12 +701,11 @@ export class Editor {
     });
   };
 
-  private _resizeCropBoxFree = (handle: Konva.Rect) => {
+  private _resizeCropBoxFree = (handleName: HandleName, handleRect: Konva.Rect) => {
     if (!this.konva?.image.image) {
       throw new Error('Crop box or image not found');
     }
     const rect = this.konva.crop.overlay.clear;
-    const handleName = handle.name();
     const imgWidth = this.konva.image.image.width();
     const imgHeight = this.konva.image.image.height();
 
@@ -726,8 +714,8 @@ export class Editor {
     let newWidth = rect.width();
     let newHeight = rect.height();
 
-    const handleX = handle.x() + handle.width() / 2;
-    const handleY = handle.y() + handle.height() / 2;
+    const handleX = handleRect.x() + handleRect.width() / 2;
+    const handleY = handleRect.y() + handleRect.height() / 2;
 
     const minWidth = this.cropConstraints.minWidth ?? this.MIN_CROP_DIMENSION;
     const minHeight = this.cropConstraints.minHeight ?? this.MIN_CROP_DIMENSION;
@@ -753,47 +741,56 @@ export class Editor {
     return { newX, newY, newWidth, newHeight };
   };
 
-  private _resizeCropBoxWithAspectRatio = (handle: Konva.Rect) => {
-    if (!this.konva?.image.image || !this.cropConstraints.aspectRatio) {
+  private _resizeCropBoxWithAspectRatio = (handleName: HandleName, handleRect: Konva.Rect) => {
+    if (!this.konva?.image.image || !this.cropConstraints.aspectRatio || !this.cropBox) {
       throw new Error('Crop box, image, or aspect ratio not found');
     }
-    const rect = this.konva.crop.overlay.clear;
-    const handleName = handle.name();
     const imgWidth = this.konva.image.image.width();
     const imgHeight = this.konva.image.image.height();
     const ratio = this.cropConstraints.aspectRatio;
 
-    const handleX = handle.x() + handle.width() / 2;
-    const handleY = handle.y() + handle.height() / 2;
+    const handleX = handleRect.x() + handleRect.width() / 2;
+    const handleY = handleRect.y() + handleRect.height() / 2;
 
     const minWidth = this.cropConstraints.minWidth ?? this.MIN_CROP_DIMENSION;
     const minHeight = this.cropConstraints.minHeight ?? this.MIN_CROP_DIMENSION;
 
     // Early boundary check for aspect ratio mode
-    const atLeftEdge = rect.x() <= 0;
-    const atRightEdge = rect.x() + rect.width() >= imgWidth;
-    const atTopEdge = rect.y() <= 0;
-    const atBottomEdge = rect.y() + rect.height() >= imgHeight;
+    const atLeftEdge = this.cropBox.x <= 0;
+    const atRightEdge = this.cropBox.x + this.cropBox.width >= imgWidth;
+    const atTopEdge = this.cropBox.y <= 0;
+    const atBottomEdge = this.cropBox.y + this.cropBox.height >= imgHeight;
 
     if (
-      (handleName === 'left' && atLeftEdge && handleX >= rect.x()) ||
-      (handleName === 'right' && atRightEdge && handleX <= rect.x() + rect.width()) ||
-      (handleName === 'top' && atTopEdge && handleY >= rect.y()) ||
-      (handleName === 'bottom' && atBottomEdge && handleY <= rect.y() + rect.height())
+      (handleName === 'left' && atLeftEdge && handleX < this.cropBox.x) ||
+      (handleName === 'right' && atRightEdge && handleX > this.cropBox.x + this.cropBox.width) ||
+      (handleName === 'top' && atTopEdge && handleY < this.cropBox.y) ||
+      (handleName === 'bottom' && atBottomEdge && handleY > this.cropBox.y + this.cropBox.height)
     ) {
-      return { newX: rect.x(), newY: rect.y(), newWidth: rect.width(), newHeight: rect.height() };
+      return {
+        newX: this.cropBox.x,
+        newY: this.cropBox.y,
+        newWidth: this.cropBox.width,
+        newHeight: this.cropBox.height,
+      };
     }
 
-    const { newX: freeX, newY: freeY, newWidth: freeWidth, newHeight: freeHeight } = this._resizeCropBoxFree(handle);
+    const {
+      newX: freeX,
+      newY: freeY,
+      newWidth: freeWidth,
+      newHeight: freeHeight,
+    } = this._resizeCropBoxFree(handleName, handleRect);
+
     let newX = freeX;
     let newY = freeY;
     let newWidth = freeWidth;
     let newHeight = freeHeight;
 
-    const oldX = rect.x();
-    const oldY = rect.y();
-    const oldWidth = rect.width();
-    const oldHeight = rect.height();
+    const oldX = this.cropBox.x;
+    const oldY = this.cropBox.y;
+    const oldWidth = this.cropBox.width;
+    const oldHeight = this.cropBox.height;
 
     // Define anchor points (opposite of the handle being dragged)
     let anchorX = oldX;
@@ -815,10 +812,8 @@ export class Editor {
       anchorY = oldY + oldHeight / 2; // Center Y is anchor for left/right
     }
 
-    const isCornerHandle = this.CORNER_HANDLE_NAMES.includes(handleName);
-
     // Calculate new dimensions maintaining aspect ratio
-    if (this.EDGE_HANDLE_NAMES.includes(handleName) && !isCornerHandle) {
+    if (handleName === 'left' || handleName === 'right' || handleName === 'top' || handleName === 'bottom') {
       if (handleName === 'left' || handleName === 'right') {
         newHeight = newWidth / ratio;
         newY = anchorY - newHeight / 2;
@@ -827,7 +822,8 @@ export class Editor {
         newWidth = newHeight * ratio;
         newX = anchorX - newWidth / 2;
       }
-    } else if (isCornerHandle) {
+    } else {
+      // Corner handles
       const mouseDistanceFromAnchorX = Math.abs(handleX - anchorX);
       const mouseDistanceFromAnchorY = Math.abs(handleY - anchorY);
 
@@ -897,14 +893,13 @@ export class Editor {
     return { newX, newY, newWidth, newHeight };
   };
 
-  private positionHandle = (handle: Konva.Rect) => {
+  private positionHandle = (handleName: HandleName, handleRect: Konva.Rect) => {
     if (!this.konva || !this.cropBox) {
       return;
     }
 
     const { x, y, width, height } = this.cropBox;
-    const handleName = handle.name();
-    const handleSize = handle.width();
+    const handleSize = handleRect.width();
 
     let handleX = x;
     let handleY = y;
@@ -921,8 +916,8 @@ export class Editor {
       handleY += height / 2;
     }
 
-    handle.x(handleX - handleSize / 2);
-    handle.y(handleY - handleSize / 2);
+    handleRect.x(handleX - handleSize / 2);
+    handleRect.y(handleY - handleSize / 2);
   };
 
   private updateHandlePositions = () => {
@@ -930,8 +925,8 @@ export class Editor {
       return;
     }
 
-    for (const handle of Object.values(this.konva.crop.interaction.handles)) {
-      this.positionHandle(handle);
+    for (const [handleName, handleRect] of objectEntries(this.konva.crop.interaction.handles)) {
+      this.positionHandle(handleName, handleRect);
     }
   };
 
