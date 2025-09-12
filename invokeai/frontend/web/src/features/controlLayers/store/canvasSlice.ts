@@ -2096,14 +2096,21 @@ const syncScaledSize = (canvas: CanvasState) => {
 
 let filter = true;
 
+const nonUndoableActions: string[] = [
+  canvasAdded.type,
+  canvasSelected.type,
+  canvasNameChanged.type,
+  canvasDeleted.type,
+];
+
 const canvasUndoableConfig: UndoableOptions<CanvasesState, UnknownAction> = {
   limit: 64,
   undoType: canvasUndo.type,
   redoType: canvasRedo.type,
   clearHistoryType: canvasClearHistory.type,
   filter: (action, _state, _history) => {
-    // Ignore all actions from other slices
-    if (!action.type.startsWith(slice.name)) {
+    // Ignore both all actions from other slices and canvas management actions
+    if (!action.type.startsWith(slice.name) || (nonUndoableActions.includes(action.type))) {
       return false;
     }
     // Throttle rapid actions of the same type
