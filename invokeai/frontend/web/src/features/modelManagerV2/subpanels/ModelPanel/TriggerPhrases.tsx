@@ -74,6 +74,8 @@ export const TriggerPhrases = memo(({ modelConfig }: Props) => {
     [addTriggerPhrase]
   );
 
+  const hasTriggerPhrases = triggerPhrases.length > 0;
+
   return (
     <Flex flexDir="column" w="full" gap="5">
       <form onSubmit={onTriggerPhraseAddFormSubmit}>
@@ -99,14 +101,16 @@ export const TriggerPhrases = memo(({ modelConfig }: Props) => {
         </FormControl>
       </form>
 
-      <Flex gap="4" flexWrap="wrap">
-        {triggerPhrases.map((phrase, index) => (
-          <Tag size="md" key={index} py={2} px={4} bg="base.700">
-            <TagLabel>{phrase}</TagLabel>
-            <TagCloseButton onClick={removeTriggerPhrase.bind(null, phrase)} isDisabled={isLoading} />
-          </Tag>
-        ))}
-      </Flex>
+      {hasTriggerPhrases && (
+        <Flex gap="4" flexWrap="wrap">
+          {triggerPhrases.map((phrase, index) => (
+            <Tag size="md" key={index} py={2} px={4} bg="base.700">
+              <TagLabel>{phrase}</TagLabel>
+              <TagCloseButton onClick={removeTriggerPhrase.bind(null, phrase)} isDisabled={isLoading} />
+            </Tag>
+          ))}
+        </Flex>
+      )}
     </Flex>
   );
 });

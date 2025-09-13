@@ -13,6 +13,7 @@ import { useStarterBundleInstallStatus } from 'features/modelManagerV2/hooks/use
 import { t } from 'i18next';
 import type { MouseEvent } from 'react';
 import { useCallback } from 'react';
+import { PiDownloadSimpleBold } from 'react-icons/pi';
 import type { S } from 'services/api/types';
 
 export const StarterBundleButton = ({ bundle, ...rest }: { bundle: S['StarterModelBundle'] } & ButtonProps) => {
@@ -33,8 +34,16 @@ export const StarterBundleButton = ({ bundle, ...rest }: { bundle: S['StarterMod
 
   return (
     <>
-      <Button onClick={onClickBundle} isDisabled={install.length === 0} {...rest}>
-        {bundle.name}
+      <Button
+        display="flex"
+        justifyContent="space-between"
+        gap={2}
+        onClick={onClickBundle}
+        isDisabled={install.length === 0}
+        {...rest}
+      >
+        <span>{bundle.name}</span>
+        <PiDownloadSimpleBold size="16px" />
       </Button>
       <ConfirmationAlertDialog
         isOpen={isOpen}
