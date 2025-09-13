@@ -1,17 +1,13 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { ConfirmationAlertDialog, Flex, IconButton, Spacer, Text, useDisclosure } from '@invoke-ai/ui-library';
+import { Flex, Spacer, Text } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectModelManagerV2Slice, setSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import ModelBaseBadge from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
 import ModelFormatBadge from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelFormatBadge';
-import { toast } from 'features/toast/toast';
+import { ModelDeleteButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelDeleteButton';
 import { filesize } from 'filesize';
-import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
-import { PiTrashSimpleBold } from 'react-icons/pi';
-import { useDeleteModelsMutation } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 
 import ModelImage from './ModelImage';
@@ -46,6 +42,7 @@ const sx: SystemStyleObject = {
     bg: 'base.850',
     '& .delete-button': { opacity: 1 },
   },
+  '& .delete-button': { opacity: 0 },
   "&[aria-selected='false']:hover:before": { bg: 'base.750' },
   "&[aria-selected='true']": {
     bg: 'base.800',
@@ -55,7 +52,6 @@ const sx: SystemStyleObject = {
 };
 
 const ModelListItem = ({ model }: ModelListItemProps) => {
-  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const selectIsSelected = useMemo(
     () =>
@@ -66,41 +62,10 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
     [model.key]
   );
   const isSelected = useAppSelector(selectIsSelected);
-  const [deleteModel] = useDeleteModelsMutation();
-  const { isOpen, onOpen, onClose } = useDisclosure();
 
   const handleSelectModel = useCallback(() => {
     dispatch(setSelectedModelKey(model.key));
   }, [model.key, dispatch]);
-
-  const onClickDeleteButton = useCallback(
-    (e: MouseEvent<HTMLButtonElement>) => {
-      e.stopPropagation();
-      onOpen();
-    },
-    [onOpen]
-  );
-  const handleModelDelete = useCallback(() => {
-    deleteModel({ key: model.key })
-      .unwrap()
-      .then((_) => {
-        toast({
-          id: 'MODEL_DELETED',
-          title: `${t('modelManager.modelDeleted')}: ${model.name}`,
-          status: 'success',
-        });
-      })
-      .catch((error) => {
-        if (error) {
-          toast({
-            id: 'MODEL_DELETE_FAILED',
-            title: `${t('modelManager.modelDeleteFailed')}: ${model.name}`,
-            status: 'error',
-          });
-        }
-      });
-    dispatch(setSelectedModelKey(null));
-  }, [deleteModel, model, dispatch, t]);
 
   return (
     <Flex
@@ -108,7 +73,7 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
       aria-selected={isSelected}
       justifyContent="flex-start"
       w="full"
-      alignItems="center"
+      alignItems="flex-start"
       gap={2}
       cursor="pointer"
       onClick={handleSelectModel}
@@ -134,29 +99,9 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
           </Flex>
         </Flex>
       </Flex>
-      <IconButton
-        className="delete-button"
-        onClick={onClickDeleteButton}
-        icon={<PiTrashSimpleBold size={16} />}
-        aria-label={t('modelManager.deleteConfig')}
-        colorScheme="error"
-        opacity={0}
-        mt={1}
-        alignSelf="flex-start"
-      />
-      <ConfirmationAlertDialog
-        isOpen={isOpen}
-        onClose={onClose}
-        title={t('modelManager.deleteModel')}
-        acceptCallback={handleModelDelete}
-        acceptButtonText={t('modelManager.delete')}
-        useInert={false}
-      >
-        <Flex rowGap={4} flexDirection="column">
-          <Text fontWeight="bold">{t('modelManager.deleteMsg1')}</Text>
-          <Text>{t('modelManager.deleteMsg2')}</Text>
-        </Flex>
-      </ConfirmationAlertDialog>
+      <Flex mt={1}>
+        <ModelDeleteButton modelConfig={model} showLabel={false} />
+      </Flex>
     </Flex>
   );
 };

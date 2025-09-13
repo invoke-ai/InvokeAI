@@ -12,6 +12,7 @@ import type { AnyModelConfig } from 'services/api/types';
 
 import { MainModelDefaultSettings } from './MainModelDefaultSettings/MainModelDefaultSettings';
 import { ModelAttrView } from './ModelAttrView';
+import { ModelFooter } from './ModelFooter';
 import { RelatedModels } from './RelatedModels';
 
 type Props = {
@@ -100,6 +101,7 @@ export const ModelView = memo(({ modelConfig }: Props) => {
           <RelatedModels modelConfig={modelConfig} />
         </Box>
       </Flex>
+      <ModelFooter modelConfig={modelConfig} isEditing={false} />
     </Flex>
   );
 });
