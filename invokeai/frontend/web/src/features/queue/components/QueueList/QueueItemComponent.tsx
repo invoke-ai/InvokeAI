@@ -1,5 +1,5 @@
 import type { ChakraProps, CollapseProps, FlexProps } from '@invoke-ai/ui-library';
-import { Badge, ButtonGroup, Collapse, Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
+import { Badge, ButtonGroup, Collapse, Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import QueueStatusBadge from 'features/queue/components/common/QueueStatusBadge';
 import { useDestinationText } from 'features/queue/components/QueueList/useDestinationText';
 import { useOriginText } from 'features/queue/components/QueueList/useOriginText';
@@ -82,25 +82,13 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
         <Flex w={COLUMN_WIDTHS.number} alignItems="center" flexShrink={0}>
           <Text variant="subtext">{index + 1}</Text>
         </Flex>
+        <Flex w={COLUMN_WIDTHS.createdAt} alignItems="center" flexShrink={0} flexGrow={0}>
+          {new Date(item.created_at).toLocaleString()}
+        </Flex>
         <Flex w={COLUMN_WIDTHS.statusBadge} alignItems="center" flexShrink={0}>
           <QueueStatusBadge status={item.status} />
         </Flex>
-        <Flex w={COLUMN_WIDTHS.createdAt} alignItems="center" flexShrink={0}>
-          {item.created_at}
-        </Flex>
-        <Flex w={COLUMN_WIDTHS.completedAt} alignItems="center" flexShrink={0}>
-          {item.completed_at || '-'}
-        </Flex>
-        <Flex w={COLUMN_WIDTHS.origin} flexShrink={0}>
-          <Text overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" alignItems="center">
-            {originText}
-          </Text>
-        </Flex>
-        <Flex w={COLUMN_WIDTHS.destination} flexShrink={0}>
-          <Text overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" alignItems="center">
-            {destinationText}
-          </Text>
-        </Flex>
+
         <Flex w={COLUMN_WIDTHS.time} alignItems="center" flexShrink={0}>
           {executionTime || '-'}
         </Flex>
@@ -109,17 +97,37 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
             {item.credits || '-'}
           </Flex>
         )}
+        <Flex w={COLUMN_WIDTHS.origin_destination} flexShrink={0}>
+          <Text overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" alignItems="center">
+            {originText} / {destinationText}
+          </Text>
+        </Flex>
         <Flex w={COLUMN_WIDTHS.batchId} flexShrink={0}>
           <Text overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" alignItems="center">
             {item.batch_id}
           </Text>
         </Flex>
+        <Flex overflow="hidden" flexGrow={1}>
+          {item.field_values && (
+            <Flex gap={2} w="full" whiteSpace="nowrap" textOverflow="ellipsis" overflow="hidden">
+              {item.field_values
+                .filter((v) => v.node_path !== 'metadata_accumulator')
+                .map(({ node_path, field_name, value }) => (
+                  <Text as="span" key={`${item.item_id}.${node_path}.${field_name}.${value}`}>
+                    <Text as="span" fontWeight="semibold">
+                      {node_path}.{field_name}
+                    </Text>
+                    : {JSON.stringify(value)}
+                  </Text>
+                ))}
+            </Flex>
+          )}
+        </Flex>
+
         <Flex alignItems="center" w={COLUMN_WIDTHS.validationRun} flexShrink={0}>
           {isValidationRun && <Badge>{t('workflows.builder.publishingValidationRun')}</Badge>}
         </Flex>
-        <Flex w="full">
-          <Spacer />
-        </Flex>
+
         <Flex alignItems="center" w={COLUMN_WIDTHS.actions} pe={3}>
           <ButtonGroup size="xs" variant="ghost">
             {(!isFailed || !isRetryEnabled || isValidationRun) && (

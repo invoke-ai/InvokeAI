@@ -202,6 +202,7 @@ const FloatListItemContent = memo(
             fineStep={fineStep}
             className={NO_DRAG_CLASS}
             flexGrow={1}
+            allowMath
           />
         </GridItem>
         <GridItem>

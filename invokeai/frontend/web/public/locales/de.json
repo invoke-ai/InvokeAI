@@ -873,7 +873,6 @@
         "batchQueuedDesc_other": "{{count}} Einträge an {{direction}} der Wartschlange hinzugefügt",
         "openQueue": "Warteschlange öffnen",
         "batchFailedToQueue": "Fehler beim Einreihen in die Stapelverarbeitung",
-        "batchFieldValues": "Stapelverarbeitungswerte",
         "batchQueued": "Stapelverarbeitung eingereiht",
         "graphQueued": "Graph eingereiht",
         "graphFailedToQueue": "Fehler beim Einreihen des Graphen",

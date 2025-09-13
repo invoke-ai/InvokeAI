@@ -150,4 +150,15 @@ class BulkDownloadService(BulkDownloadBase):
     def _is_valid_path(self, path: Union[str, Path]) -> bool:
         """Validates the path given for a bulk download."""
         path = path if isinstance(path, Path) else Path(path)
-        return path.exists()
+
+        # Resolve the path to handle any path traversal attempts (e.g., ../)
+        resolved_path = path.resolve()
+
+        # The path may not traverse out of the bulk downloads folder or its subfolders
+        does_not_traverse = resolved_path.parent == self._bulk_downloads_folder.resolve()
+
+        # The path must exist and be a .zip file
+        does_exist = resolved_path.exists()
+        is_zip_file = resolved_path.suffix == ".zip"
+
+        return does_exist and is_zip_file and does_not_traverse

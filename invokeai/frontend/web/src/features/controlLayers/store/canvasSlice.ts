@@ -19,12 +19,16 @@ import type {
   CanvasEntityType,
   CanvasInpaintMaskState,
   CanvasMetadata,
+  ChannelName,
+  ChannelPoints,
   ControlLoRAConfig,
   EntityMovedByPayload,
   FillStyle,
   FLUXReduxImageInfluence,
+  RasterLayerAdjustments,
   RegionalGuidanceRefImageState,
   RgbColor,
+  SimpleAdjustmentsConfig,
 } from 'features/controlLayers/store/types';
 import {
   calculateNewSize,
@@ -96,6 +100,7 @@ import {
   initialFLUXRedux,
   initialIPAdapter,
   initialT2IAdapter,
+  makeDefaultRasterLayerAdjustments,
 } from './util';
 
 const slice = createSlice({
@@ -104,6 +109,96 @@ const slice = createSlice({
   reducers: {
     // undoable canvas state
     //#region Raster layers
+    rasterLayerAdjustmentsSet: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<{ adjustments: RasterLayerAdjustments | null }, 'raster_layer'>>
+    ) => {
+      const { entityIdentifier, adjustments } = action.payload;
+      const layer = selectEntity(state, entityIdentifier);
+      if (!layer) {
+        return;
+      }
+      if (adjustments === null) {
+        delete layer.adjustments;
+        return;
+      }
+      if (!layer.adjustments) {
+        layer.adjustments = makeDefaultRasterLayerAdjustments(adjustments.mode ?? 'simple');
+      }
+      layer.adjustments = merge(layer.adjustments, adjustments);
+    },
+    rasterLayerAdjustmentsReset: (state, action: PayloadAction<EntityIdentifierPayload<void, 'raster_layer'>>) => {
+      const { entityIdentifier } = action.payload;
+      const layer = selectEntity(state, entityIdentifier);
+      if (!layer?.adjustments) {
+        return;
+      }
+      layer.adjustments.simple = makeDefaultRasterLayerAdjustments('simple').simple;
+      layer.adjustments.curves = makeDefaultRasterLayerAdjustments('curves').curves;
+    },
+    rasterLayerAdjustmentsCancel: (state, action: PayloadAction<EntityIdentifierPayload<void, 'raster_layer'>>) => {
+      const { entityIdentifier } = action.payload;
+      const layer = selectEntity(state, entityIdentifier);
+      if (!layer) {
+        return;
+      }
+      delete layer.adjustments;
+    },
+    rasterLayerAdjustmentsModeChanged: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<{ mode: 'simple' | 'curves' }, 'raster_layer'>>
+    ) => {
+      const { entityIdentifier, mode } = action.payload;
+      const layer = selectEntity(state, entityIdentifier);
+      if (!layer?.adjustments) {
+        return;
+      }
+      layer.adjustments.mode = mode;
+    },
+    rasterLayerAdjustmentsSimpleUpdated: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<{ simple: Partial<SimpleAdjustmentsConfig> }, 'raster_layer'>>
+    ) => {
+      const { entityIdentifier, simple } = action.payload;
+      const layer = selectEntity(state, entityIdentifier);
+      if (!layer?.adjustments) {
+        return;
+      }
+      layer.adjustments.simple = merge(layer.adjustments.simple, simple);
+    },
+    rasterLayerAdjustmentsCurvesUpdated: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<{ channel: ChannelName; points: ChannelPoints }, 'raster_layer'>>
+    ) => {
+      const { entityIdentifier, channel, points } = action.payload;
+      const layer = selectEntity(state, entityIdentifier);
+      if (!layer?.adjustments) {
+        return;
+      }
+      layer.adjustments.curves[channel] = points;
+    },
+    rasterLayerAdjustmentsEnabledToggled: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<void, 'raster_layer'>>
+    ) => {
+      const { entityIdentifier } = action.payload;
+      const layer = selectEntity(state, entityIdentifier);
+      if (!layer?.adjustments) {
+        return;
+      }
+      layer.adjustments.enabled = !layer.adjustments.enabled;
+    },
+    rasterLayerAdjustmentsCollapsedToggled: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<void, 'raster_layer'>>
+    ) => {
+      const { entityIdentifier } = action.payload;
+      const layer = selectEntity(state, entityIdentifier);
+      if (!layer?.adjustments) {
+        return;
+      }
+      layer.adjustments.collapsed = !layer.adjustments.collapsed;
+    },
     rasterLayerAdded: {
       reducer: (
         state,
@@ -1658,6 +1753,15 @@ export const {
   entityBrushLineAdded,
   entityEraserLineAdded,
   entityRectAdded,
+  // Raster layer adjustments
+  rasterLayerAdjustmentsSet,
+  rasterLayerAdjustmentsCancel,
+  rasterLayerAdjustmentsReset,
+  rasterLayerAdjustmentsModeChanged,
+  rasterLayerAdjustmentsEnabledToggled,
+  rasterLayerAdjustmentsCollapsedToggled,
+  rasterLayerAdjustmentsSimpleUpdated,
+  rasterLayerAdjustmentsCurvesUpdated,
   entityDeleted,
   entityArrangedForwardOne,
   entityArrangedToFront,

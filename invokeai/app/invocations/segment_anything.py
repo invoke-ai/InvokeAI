@@ -1,72 +1,75 @@
-from enum import Enum
+from itertools import zip_longest
 from pathlib import Path
 from typing import Literal
 
 import numpy as np
 import torch
 from PIL import Image
-from pydantic import BaseModel, Field
-from transformers import AutoProcessor
+from pydantic import BaseModel, Field, model_validator
 from transformers.models.sam import SamModel
 from transformers.models.sam.processing_sam import SamProcessor
+from transformers.models.sam2 import Sam2Model
+from transformers.models.sam2.processing_sam2 import Sam2Processor
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import BoundingBoxField, ImageField, InputField, TensorField
 from invokeai.app.invocations.primitives import MaskOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.segment_anything.mask_refinement import mask_to_polygon, polygon_to_mask
+from invokeai.backend.image_util.segment_anything.segment_anything_2_pipeline import SegmentAnything2Pipeline
 from invokeai.backend.image_util.segment_anything.segment_anything_pipeline import SegmentAnythingPipeline
+from invokeai.backend.image_util.segment_anything.shared import SAMInput, SAMPoint
 
-SegmentAnythingModelKey = Literal["segment-anything-base", "segment-anything-large", "segment-anything-huge"]
+SegmentAnythingModelKey = Literal[
+    "segment-anything-base",
+    "segment-anything-large",
+    "segment-anything-huge",
+    "segment-anything-2-tiny",
+    "segment-anything-2-small",
+    "segment-anything-2-base",
+    "segment-anything-2-large",
+]
 SEGMENT_ANYTHING_MODEL_IDS: dict[SegmentAnythingModelKey, str] = {
     "segment-anything-base": "facebook/sam-vit-base",
     "segment-anything-large": "facebook/sam-vit-large",
     "segment-anything-huge": "facebook/sam-vit-huge",
+    "segment-anything-2-tiny": "facebook/sam2.1-hiera-tiny",
+    "segment-anything-2-small": "facebook/sam2.1-hiera-small",
+    "segment-anything-2-base": "facebook/sam2.1-hiera-base-plus",
+    "segment-anything-2-large": "facebook/sam2.1-hiera-large",
 }
 
 
-class SAMPointLabel(Enum):
-    negative = -1
-    neutral = 0
-    positive = 1
-
-
-class SAMPoint(BaseModel):
-    x: int = Field(..., description="The x-coordinate of the point")
-    y: int = Field(..., description="The y-coordinate of the point")
-    label: SAMPointLabel = Field(..., description="The label of the point")
-
-
 class SAMPointsField(BaseModel):
-    points: list[SAMPoint] = Field(..., description="The points of the object")
+    points: list[SAMPoint] = Field(..., description="The points of the object", min_length=1)
 
-    def to_list(self) -> list[list[int]]:
+    def to_list(self) -> list[list[float]]:
         return [[point.x, point.y, point.label.value] for point in self.points]
 
 
 @invocation(
     "segment_anything",
     title="Segment Anything",
-    tags=["prompt", "segmentation"],
+    tags=["prompt", "segmentation", "sam", "sam2"],
     category="segmentation",
-    version="1.2.0",
+    version="1.3.0",
 )
 class SegmentAnythingInvocation(BaseInvocation):
-    """Runs a Segment Anything Model."""
+    """Runs a Segment Anything Model (SAM or SAM2)."""
 
     # Reference:
     # - https://arxiv.org/pdf/2304.02643
     # - https://huggingface.co/docs/transformers/v4.43.3/en/model_doc/grounding-dino#grounded-sam
     # - https://github.com/NielsRogge/Transformers-Tutorials/blob/a39f33ac1557b02ebfb191ea7753e332b5ca933f/Grounding%20DINO/GroundingDINO_with_Segment_Anything.ipynb
 
-    model: SegmentAnythingModelKey = InputField(description="The Segment Anything model to use.")
+    model: SegmentAnythingModelKey = InputField(description="The Segment Anything model to use (SAM or SAM2).")
     image: ImageField = InputField(description="The image to segment.")
     bounding_boxes: list[BoundingBoxField] | None = InputField(
-        default=None, description="The bounding boxes to prompt the SAM model with."
+        default=None, description="The bounding boxes to prompt the model with."
     )
     point_lists: list[SAMPointsField] | None = InputField(
         default=None,
-        description="The list of point lists to prompt the SAM model with. Each list of points represents a single object.",
+        description="The list of point lists to prompt the model with. Each list of points represents a single object.",
     )
     apply_polygon_refinement: bool = InputField(
         description="Whether to apply polygon refinement to the masks. This will smooth the edges of the masks slightly and ensure that each mask consists of a single closed polygon (before merging).",
@@ -77,13 +80,17 @@ class SegmentAnythingInvocation(BaseInvocation):
         default="all",
     )
 
+    @model_validator(mode="after")
+    def validate_points_and_boxes_len(self):
+        if self.point_lists is not None and self.bounding_boxes is not None:
+            if len(self.point_lists) != len(self.bounding_boxes):
+                raise ValueError("If both point_lists and bounding_boxes are provided, they must have the same length.")
+        return self
+
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> MaskOutput:
         # The models expect a 3-channel RGB image.
         image_pil = context.images.get_pil(self.image.image_name, mode="RGB")
-
-        if self.point_lists is not None and self.bounding_boxes is not None:
-            raise ValueError("Only one of point_lists or bounding_box can be provided.")
 
         if (not self.bounding_boxes or len(self.bounding_boxes) == 0) and (
             not self.point_lists or len(self.point_lists) == 0
@@ -111,26 +118,38 @@ class SegmentAnythingInvocation(BaseInvocation):
             # model, and figure out how to make it work in the pipeline.
             # torch_dtype=TorchDevice.choose_torch_dtype(),
         )
-
-        sam_processor = AutoProcessor.from_pretrained(model_path, local_files_only=True)
-        assert isinstance(sam_processor, SamProcessor)
+        sam_processor = SamProcessor.from_pretrained(model_path, local_files_only=True)
         return SegmentAnythingPipeline(sam_model=sam_model, sam_processor=sam_processor)
 
-    def _segment(self, context: InvocationContext, image: Image.Image) -> list[torch.Tensor]:
-        """Use Segment Anything (SAM) to generate masks given an image + a set of bounding boxes."""
-        # Convert the bounding boxes to the SAM input format.
-        sam_bounding_boxes = (
-            [[bb.x_min, bb.y_min, bb.x_max, bb.y_max] for bb in self.bounding_boxes] if self.bounding_boxes else None
-        )
-        sam_points = [p.to_list() for p in self.point_lists] if self.point_lists else None
+    @staticmethod
+    def _load_sam_2_model(model_path: Path):
+        sam2_model = Sam2Model.from_pretrained(model_path, local_files_only=True)
+        sam2_processor = Sam2Processor.from_pretrained(model_path, local_files_only=True)
+        return SegmentAnything2Pipeline(sam2_model=sam2_model, sam2_processor=sam2_processor)
 
-        with (
-            context.models.load_remote_model(
-                source=SEGMENT_ANYTHING_MODEL_IDS[self.model], loader=SegmentAnythingInvocation._load_sam_model
-            ) as sam_pipeline,
-        ):
-            assert isinstance(sam_pipeline, SegmentAnythingPipeline)
-            masks = sam_pipeline.segment(image=image, bounding_boxes=sam_bounding_boxes, point_lists=sam_points)
+    def _segment(self, context: InvocationContext, image: Image.Image) -> list[torch.Tensor]:
+        """Use Segment Anything (SAM or SAM2) to generate masks given an image + a set of bounding boxes."""
+
+        source = SEGMENT_ANYTHING_MODEL_IDS[self.model]
+        inputs: list[SAMInput] = []
+        for bbox_field, point_field in zip_longest(self.bounding_boxes or [], self.point_lists or [], fillvalue=None):
+            inputs.append(
+                SAMInput(
+                    bounding_box=bbox_field,
+                    points=point_field.points if point_field else None,
+                )
+            )
+
+        if "sam2" in source:
+            loader = SegmentAnythingInvocation._load_sam_2_model
+            with context.models.load_remote_model(source=source, loader=loader) as pipeline:
+                assert isinstance(pipeline, SegmentAnything2Pipeline)
+                masks = pipeline.segment(image=image, inputs=inputs)
+        else:
+            loader = SegmentAnythingInvocation._load_sam_model
+            with context.models.load_remote_model(source=source, loader=loader) as pipeline:
+                assert isinstance(pipeline, SegmentAnythingPipeline)
+                masks = pipeline.segment(image=image, inputs=inputs)
 
         masks = self._process_masks(masks)
         if self.apply_polygon_refinement:

@@ -4,6 +4,7 @@ import { CanvasEntityHeader } from 'features/controlLayers/components/common/Can
 import { CanvasEntityHeaderCommonActions } from 'features/controlLayers/components/common/CanvasEntityHeaderCommonActions';
 import { CanvasEntityPreviewImage } from 'features/controlLayers/components/common/CanvasEntityPreviewImage';
 import { CanvasEntityEditableTitle } from 'features/controlLayers/components/common/CanvasEntityTitleEdit';
+import { RasterLayerAdjustmentsPanel } from 'features/controlLayers/components/RasterLayer/RasterLayerAdjustmentsPanel';
 import { CanvasEntityStateGate } from 'features/controlLayers/contexts/CanvasEntityStateGate';
 import { RasterLayerAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
@@ -39,6 +40,7 @@ export const RasterLayer = memo(({ id }: Props) => {
               <Spacer />
               <CanvasEntityHeaderCommonActions />
             </CanvasEntityHeader>
+            <RasterLayerAdjustmentsPanel />
             <DndDropTarget
               dndTarget={replaceCanvasEntityObjectsWithImageDndTarget}
               dndTargetData={dndTargetData}

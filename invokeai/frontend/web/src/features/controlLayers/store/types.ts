@@ -116,6 +116,9 @@ export type SAMPointLabel = z.infer<typeof zSAMPointLabel>;
 export const zSAMPointLabelString = z.enum(['background', 'neutral', 'foreground']);
 export type SAMPointLabelString = z.infer<typeof zSAMPointLabelString>;
 
+export const zSAMModel = z.enum(['SAM1', 'SAM2']);
+export type SAMModel = z.infer<typeof zSAMModel>;
+
 /**
  * A mapping of SAM point labels (as numbers) to their string representations.
  */
@@ -375,11 +378,57 @@ const zControlLoRAConfig = z.object({
 });
 export type ControlLoRAConfig = z.infer<typeof zControlLoRAConfig>;
 
+/**
+ * All simple params normalized to `[-1, 1]` except sharpness `[0, 1]`.
+ *
+ * - Brightness: -1 (darken) to 1 (brighten)
+ * - Contrast: -1 (decrease contrast) to 1 (increase contrast)
+ * - Saturation: -1 (desaturate) to 1 (saturate)
+ * - Temperature: -1 (cooler/blue) to 1 (warmer/yellow)
+ * - Tint: -1 (greener) to 1 (more magenta)
+ * - Sharpness: 0 (no sharpening) to 1 (maximum sharpening)
+ */
+export const zSimpleAdjustmentsConfig = z.object({
+  brightness: z.number().gte(-1).lte(1),
+  contrast: z.number().gte(-1).lte(1),
+  saturation: z.number().gte(-1).lte(1),
+  temperature: z.number().gte(-1).lte(1),
+  tint: z.number().gte(-1).lte(1),
+  sharpness: z.number().gte(0).lte(1),
+});
+export type SimpleAdjustmentsConfig = z.infer<typeof zSimpleAdjustmentsConfig>;
+
+const zUint8 = z.number().int().min(0).max(255);
+const zChannelPoints = z.array(z.tuple([zUint8, zUint8])).min(2);
+const zChannelName = z.enum(['master', 'r', 'g', 'b']);
+const zCurvesAdjustmentsConfig = z.record(zChannelName, zChannelPoints);
+export type ChannelName = z.infer<typeof zChannelName>;
+export type ChannelPoints = z.infer<typeof zChannelPoints>;
+export type CurvesAdjustmentsConfig = z.infer<typeof zCurvesAdjustmentsConfig>;
+
+/**
+ * The curves adjustments are stored as LUTs in the Konva node attributes. Konva will use these values when applying
+ * the filter.
+ */
+export const zCurvesAdjustmentsLUTs = z.record(zChannelName, z.array(zUint8));
+
+const zRasterLayerAdjustments = z.object({
+  version: z.literal(1),
+  enabled: z.boolean(),
+  collapsed: z.boolean(),
+  mode: z.enum(['simple', 'curves']),
+  simple: zSimpleAdjustmentsConfig,
+  curves: zCurvesAdjustmentsConfig,
+});
+export type RasterLayerAdjustments = z.infer<typeof zRasterLayerAdjustments>;
+
 const zCanvasRasterLayerState = zCanvasEntityBase.extend({
   type: z.literal('raster_layer'),
   position: zCoordinate,
   opacity: zOpacity,
   objects: z.array(zCanvasObjectState),
+  // Optional per-layer color adjustments (simple + curves). When undefined, no adjustments are applied.
+  adjustments: zRasterLayerAdjustments.optional(),
 });
 export type CanvasRasterLayerState = z.infer<typeof zCanvasRasterLayerState>;
 
@@ -421,7 +470,7 @@ export const zLoRA = z.object({
   id: z.string(),
   isEnabled: z.boolean(),
   model: zModelIdentifierField,
-  weight: z.number().gte(-1).lte(2),
+  weight: z.number().gte(-10).lte(10),
 });
 export type LoRA = z.infer<typeof zLoRA>;
 
@@ -563,8 +612,13 @@ const zDimensionsState = z.object({
   aspectRatio: zAspectRatioConfig,
 });
 
+export const MAX_POSITIVE_PROMPT_HISTORY = 100;
+const zPositivePromptHistory = z
+  .array(zParameterPositivePrompt)
+  .transform((arr) => arr.slice(0, MAX_POSITIVE_PROMPT_HISTORY));
+
 export const zParamsState = z.object({
-  _version: z.literal(1),
+  _version: z.literal(2),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -595,6 +649,7 @@ export const zParamsState = z.object({
   clipSkip: z.number(),
   shouldUseCpuNoise: z.boolean(),
   positivePrompt: zParameterPositivePrompt,
+  positivePromptHistory: zPositivePromptHistory,
   negativePrompt: zParameterNegativePrompt,
   refinerModel: zParameterSDXLRefinerModel.nullable(),
   refinerSteps: z.number(),
@@ -612,7 +667,7 @@ export const zParamsState = z.object({
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
-  _version: 1,
+  _version: 2,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -643,6 +698,7 @@ export const getInitialParamsState = (): ParamsState => ({
   clipSkip: 0,
   shouldUseCpuNoise: true,
   positivePrompt: '',
+  positivePromptHistory: [],
   negativePrompt: null,
   refinerModel: null,
   refinerSteps: 20,

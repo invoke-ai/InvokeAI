@@ -13,15 +13,17 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import {
   buildSelectLoRA,
+  DEFAULT_LORA_WEIGHT_CONFIG,
   loraDeleted,
   loraIsEnabledChanged,
   loraWeightChanged,
 } from 'features/controlLayers/store/lorasSlice';
 import type { LoRA } from 'features/controlLayers/store/types';
-import { DEFAULT_LORA_WEIGHT_CONFIG } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
+
+const MARKS = [-1, 0, 1, 2];
 
 export const LoRACard = memo((props: { id: string }) => {
   const selectLoRA = useMemo(() => buildSelectLoRA(props.id), [props.id]);
@@ -81,7 +83,8 @@ const LoRAContent = memo(({ lora }: { lora: LoRA }) => {
             min={DEFAULT_LORA_WEIGHT_CONFIG.sliderMin}
             max={DEFAULT_LORA_WEIGHT_CONFIG.sliderMax}
             step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
-            marks={DEFAULT_LORA_WEIGHT_CONFIG.marks.slice()}
+            fineStep={DEFAULT_LORA_WEIGHT_CONFIG.fineStep}
+            marks={MARKS}
             defaultValue={DEFAULT_LORA_WEIGHT_CONFIG.initial}
             isDisabled={!lora.isEnabled}
           />
@@ -91,6 +94,7 @@ const LoRAContent = memo(({ lora }: { lora: LoRA }) => {
             min={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMin}
             max={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMax}
             step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
+            fineStep={DEFAULT_LORA_WEIGHT_CONFIG.fineStep}
             w={20}
             flexShrink={0}
             defaultValue={DEFAULT_LORA_WEIGHT_CONFIG.initial}

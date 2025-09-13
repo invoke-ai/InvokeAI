@@ -1,4 +1,4 @@
-import { omit } from 'es-toolkit/compat';
+import { omit, throttle } from 'es-toolkit/compat';
 import { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterBase';
 import { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityBufferObjectRenderer';
 import { CanvasEntityFilterer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityFilterer';
@@ -6,6 +6,7 @@ import { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasE
 import { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityTransformer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasSegmentAnythingModule } from 'features/controlLayers/konva/CanvasSegmentAnythingModule';
+import { AdjustmentsCurvesFilter, AdjustmentsSimpleFilter, buildCurveLUT } from 'features/controlLayers/konva/filters';
 import type { CanvasEntityIdentifier, CanvasRasterLayerState, Rect } from 'features/controlLayers/store/types';
 import type { GroupConfig } from 'konva/lib/Group';
 import type { JsonObject } from 'type-fest';
@@ -59,13 +60,18 @@ export class CanvasEntityAdapterRasterLayer extends CanvasEntityAdapterBase<
     if (!prevState || this.state.opacity !== prevState.opacity) {
       this.syncOpacity();
     }
+
+    // Apply per-layer adjustments as a Konva filter
+    if (!prevState || this.haveAdjustmentsChanged(prevState, this.state)) {
+      this.syncAdjustmentsFilter();
+    }
   };
 
   getCanvas = (rect?: Rect): HTMLCanvasElement => {
     this.log.trace({ rect }, 'Getting canvas');
     // The opacity may have been changed in response to user selecting a different entity category, so we must restore
     // the original opacity before rendering the canvas
-    const attrs: GroupConfig = { opacity: this.state.opacity, filters: [] };
+    const attrs: GroupConfig = { opacity: this.state.opacity };
     const canvas = this.renderer.getCanvas({ rect, attrs });
     return canvas;
   };
@@ -73,5 +79,80 @@ export class CanvasEntityAdapterRasterLayer extends CanvasEntityAdapterBase<
   getHashableState = (): JsonObject => {
     const keysToOmit: (keyof CanvasRasterLayerState)[] = ['name', 'isLocked'];
     return omit(this.state, keysToOmit);
+  };
+
+  private syncAdjustmentsFilter = () => {
+    const a = this.state.adjustments;
+    const apply = !!a && a.enabled;
+    // The filter operates on the renderer's object group; we can set filters at the group level via renderer
+    const group = this.renderer.konva.objectGroup;
+    if (apply) {
+      const filters = group.filters() ?? [];
+      let nextFilters = filters.filter((f) => f !== AdjustmentsSimpleFilter && f !== AdjustmentsCurvesFilter);
+      if (a.mode === 'simple') {
+        group.setAttr('adjustmentsSimple', a.simple);
+        group.setAttr('adjustmentsCurves', null);
+        nextFilters = [...nextFilters, AdjustmentsSimpleFilter];
+      } else {
+        // Build LUTs and set curves attr
+        const master = buildCurveLUT(a.curves.master);
+        const r = buildCurveLUT(a.curves.r);
+        const g = buildCurveLUT(a.curves.g);
+        const b = buildCurveLUT(a.curves.b);
+        group.setAttr('adjustmentsCurves', { master, r, g, b });
+        group.setAttr('adjustmentsSimple', null);
+        nextFilters = [...nextFilters, AdjustmentsCurvesFilter];
+      }
+      group.filters(nextFilters);
+      this._throttledCacheRefresh();
+    } else {
+      // Remove our filter if present
+      const filters = (group.filters() ?? []).filter(
+        (f) => f !== AdjustmentsSimpleFilter && f !== AdjustmentsCurvesFilter
+      );
+      group.filters(filters);
+      group.setAttr('adjustmentsSimple', null);
+      group.setAttr('adjustmentsCurves', null);
+      this._throttledCacheRefresh();
+    }
+  };
+
+  private _throttledCacheRefresh = throttle(() => this.renderer.syncKonvaCache(true), 50);
+
+  private haveAdjustmentsChanged = (prevState: CanvasRasterLayerState, currState: CanvasRasterLayerState): boolean => {
+    const pa = prevState.adjustments;
+    const ca = currState.adjustments;
+    if (pa === ca) {
+      return false;
+    }
+    if (!pa || !ca) {
+      return true;
+    }
+    if (pa.enabled !== ca.enabled) {
+      return true;
+    }
+    if (pa.mode !== ca.mode) {
+      return true;
+    }
+    // simple params
+    const ps = pa.simple;
+    const cs = ca.simple;
+    if (
+      ps.brightness !== cs.brightness ||
+      ps.contrast !== cs.contrast ||
+      ps.saturation !== cs.saturation ||
+      ps.temperature !== cs.temperature ||
+      ps.tint !== cs.tint ||
+      ps.sharpness !== cs.sharpness
+    ) {
+      return true;
+    }
+    // curves reference (UI not implemented yet) - if arrays differ by ref, consider changed
+    const pc = pa.curves;
+    const cc = ca.curves;
+    if (pc !== cc) {
+      return true;
+    }
+    return false;
   };
 }

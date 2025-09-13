@@ -15,6 +15,7 @@ import type {
   Gemini2_5ReferenceImageConfig,
   ImageWithDims,
   IPAdapterConfig,
+  RasterLayerAdjustments,
   RefImageState,
   RgbColor,
   T2IAdapterConfig,
@@ -118,6 +119,32 @@ export const initialControlLoRA: ControlLoRAConfig = {
   weight: 0.75,
 };
 
+export const makeDefaultRasterLayerAdjustments = (mode: 'simple' | 'curves' = 'simple'): RasterLayerAdjustments => ({
+  version: 1,
+  enabled: true,
+  collapsed: false,
+  mode,
+  simple: { brightness: 0, contrast: 0, saturation: 0, temperature: 0, tint: 0, sharpness: 0 },
+  curves: {
+    master: [
+      [0, 0],
+      [255, 255],
+    ],
+    r: [
+      [0, 0],
+      [255, 255],
+    ],
+    g: [
+      [0, 0],
+      [255, 255],
+    ],
+    b: [
+      [0, 0],
+      [255, 255],
+    ],
+  },
+});
+
 export const getReferenceImageState = (id: string, overrides?: PartialDeep<RefImageState>): RefImageState => {
   const entityState: RefImageState = {
     id,
@@ -187,6 +214,7 @@ export const getRasterLayerState = (
     objects: [],
     opacity: 1,
     position: { x: 0, y: 0 },
+    adjustments: undefined,
   };
   merge(entityState, overrides);
   return entityState;

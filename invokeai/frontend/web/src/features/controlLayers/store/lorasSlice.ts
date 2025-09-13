@@ -1,13 +1,23 @@
 import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
+import type { NumericalParameterConfig } from 'app/types/invokeai';
 import { paramsReset } from 'features/controlLayers/store/paramsSlice';
 import { type LoRA, zLoRA } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import { DEFAULT_LORA_WEIGHT_CONFIG } from 'features/system/store/configSlice';
 import type { LoRAModelConfig } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
 import z from 'zod';
+
+export const DEFAULT_LORA_WEIGHT_CONFIG: NumericalParameterConfig = {
+  initial: 0.75,
+  sliderMin: -1,
+  sliderMax: 2,
+  numberInputMin: -10,
+  numberInputMax: 10,
+  fineStep: 0.01,
+  coarseStep: 0.05,
+};
 
 const zLoRAsState = z.object({
   loras: z.array(zLoRA),

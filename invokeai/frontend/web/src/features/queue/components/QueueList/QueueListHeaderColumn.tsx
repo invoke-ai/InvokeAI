@@ -1,102 +1,62 @@
+import type { FlexProps } from '@invoke-ai/ui-library';
 import { Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import type * as CSS from 'csstype';
-import type { SortBy } from 'features/queue/store/queueSlice';
-import {
-  selectQueueSortBy,
-  selectQueueSortOrder,
-  sortByChanged,
-  sortOrderChanged,
-} from 'features/queue/store/queueSlice';
-import { memo, useCallback, useMemo, useState } from 'react';
+import { selectQueueSortOrder, sortOrderChanged } from 'features/queue/store/queueSlice';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiSortAscendingBold, PiSortDescendingBold } from 'react-icons/pi';
 import { useSelector } from 'react-redux';
 
-type QueueListHeaderColumnProps = {
-  field?: SortBy;
+interface QueueListHeaderColumnProps extends FlexProps {
+  field?: string;
   displayName: string;
   alignItems?: CSS.Property.AlignItems;
   ps?: CSS.Property.PaddingInlineStart | number;
   w?: CSS.Property.Width | number;
-};
+}
 
-const QueueListHeaderColumn = ({ field, displayName, alignItems, ps, w }: QueueListHeaderColumnProps) => {
-  const [isMouseHoveringColumn, setIsMouseHoveringColumn] = useState(false);
-
-  const handleMouseEnterColumn = useCallback(() => {
-    setIsMouseHoveringColumn(true);
-  }, [setIsMouseHoveringColumn]);
-  const handleMouseLeaveColumn = useCallback(() => {
-    setIsMouseHoveringColumn(false);
-  }, [setIsMouseHoveringColumn]);
-
+const QueueListHeaderColumn = ({ field, displayName, alignItems, ps, w, ...props }: QueueListHeaderColumnProps) => {
   return (
-    <Flex
-      paddingInlineStart={ps}
-      width={w}
-      alignItems={alignItems}
-      onMouseEnter={handleMouseEnterColumn}
-      onMouseLeave={handleMouseLeaveColumn}
-    >
+    <Flex paddingInlineStart={ps} width={w} alignItems={alignItems} {...props}>
       <Text variant="subtext">{displayName}</Text>
-      {!!field && (
-        <ColumnSortIcon field={field} displayName={displayName} isMouseHoveringColumn={isMouseHoveringColumn} />
-      )}
+      {!!field && <ColumnSortIcon />}
     </Flex>
   );
 };
 
 export default memo(QueueListHeaderColumn);
 
-type ColumnSortIconProps = {
-  field: SortBy;
-  displayName: string;
-  isMouseHoveringColumn: boolean;
-};
-
-const ColumnSortIcon = memo(({ field, displayName, isMouseHoveringColumn }: ColumnSortIconProps) => {
+const ColumnSortIcon = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
-  const sortBy = useSelector(selectQueueSortBy);
   const sortOrder = useSelector(selectQueueSortOrder);
-  const isSortByColumn = useMemo(() => sortBy === field, [sortBy, field]);
-  const isShown = useMemo(() => isSortByColumn || isMouseHoveringColumn, [isSortByColumn, isMouseHoveringColumn]);
   const tooltip = useMemo(() => {
-    if (isSortByColumn) {
-      return sortOrder === 'ASC' ? t('queue.sortOrderAscending') : t('queue.sortOrderDescending');
-    }
-    return t('queue.sortBy', { column: displayName });
-  }, [isSortByColumn, sortOrder, t, displayName]);
+    return sortOrder === 'ASC' ? t('queue.sortOrderAscending') : t('queue.sortOrderDescending');
+  }, [sortOrder, t]);
 
   // PiSortDescendingBold is used for ascending because the arrow points up
   const icon = useMemo(() => (sortOrder === 'ASC' ? <PiSortDescendingBold /> : <PiSortAscendingBold />), [sortOrder]);
 
   const handleClickSortColumn = useCallback(() => {
-    if (isSortByColumn) {
-      if (sortOrder === 'ASC') {
-        dispatch(sortOrderChanged('DESC'));
-      } else {
-        dispatch(sortOrderChanged('ASC'));
-      }
+    if (sortOrder === 'ASC') {
+      dispatch(sortOrderChanged('DESC'));
     } else {
-      dispatch(sortByChanged(field));
+      dispatch(sortOrderChanged('ASC'));
     }
-  }, [isSortByColumn, sortOrder, dispatch, field]);
+  }, [sortOrder, dispatch]);
 
   return (
-    isShown && (
-      <IconButton
-        size="sm"
-        variant="link"
-        alignSelf="stretch"
-        onClick={handleClickSortColumn}
-        tooltip={tooltip}
-        aria-label={t('queue.sortColumn')}
-        icon={icon}
-      />
-    )
+    <IconButton
+      size="sm"
+      variant="link"
+      alignSelf="stretch"
+      onClick={handleClickSortColumn}
+      tooltip={tooltip}
+      aria-label={t('queue.sortColumn')}
+      icon={icon}
+    />
   );
 });
 ColumnSortIcon.displayName = 'ColumnSortIcon';

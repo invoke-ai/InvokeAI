@@ -2,20 +2,10 @@ import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
-import { getDefaultAppConfig, type PartialAppConfig, zAppConfig } from 'app/types/invokeai';
+import type { PartialAppConfig } from 'app/types/invokeai';
+import { getDefaultAppConfig, zAppConfig } from 'app/types/invokeai';
 import { merge } from 'es-toolkit/compat';
 import z from 'zod';
-
-export const DEFAULT_LORA_WEIGHT_CONFIG = {
-  initial: 0.75,
-  sliderMin: -1,
-  sliderMax: 2,
-  marks: [-1, 0, 1, 2],
-  numberInputMin: -1,
-  numberInputMax: 2,
-  fineStep: 0.01,
-  coarseStep: 0.05,
-} as const;
 
 const zConfigState = z.object({
   ...zAppConfig.shape,

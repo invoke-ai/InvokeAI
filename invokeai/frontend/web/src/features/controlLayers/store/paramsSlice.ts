@@ -4,7 +4,7 @@ import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
-import { isPlainObject } from 'es-toolkit';
+import { isPlainObject, uniq } from 'es-toolkit';
 import { clamp } from 'es-toolkit/compat';
 import type { AspectRatioID, ParamsState, RgbaColor } from 'features/controlLayers/store/types';
 import {
@@ -19,6 +19,7 @@ import {
   isFluxKontextAspectRatioID,
   isGemini2_5AspectRatioID,
   isImagenAspectRatioID,
+  MAX_POSITIVE_PROMPT_HISTORY,
   zParamsState,
 } from 'features/controlLayers/store/types';
 import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
@@ -191,6 +192,27 @@ const slice = createSlice({
     },
     positivePromptChanged: (state, action: PayloadAction<ParameterPositivePrompt>) => {
       state.positivePrompt = action.payload;
+    },
+    positivePromptAddedToHistory: (state, action: PayloadAction<ParameterPositivePrompt>) => {
+      const prompt = action.payload.trim();
+      if (prompt.length === 0) {
+        return;
+      }
+      // Remove if already exists
+      state.positivePromptHistory = uniq(state.positivePromptHistory);
+
+      // Add to front
+      state.positivePromptHistory.unshift(prompt);
+
+      if (state.positivePromptHistory.length > MAX_POSITIVE_PROMPT_HISTORY) {
+        state.positivePromptHistory = state.positivePromptHistory.slice(0, MAX_POSITIVE_PROMPT_HISTORY);
+      }
+    },
+    promptRemovedFromHistory: (state, action: PayloadAction<string>) => {
+      state.positivePromptHistory = state.positivePromptHistory.filter((p) => p !== action.payload);
+    },
+    promptHistoryCleared: (state) => {
+      state.positivePromptHistory = [];
     },
     negativePromptChanged: (state, action: PayloadAction<ParameterNegativePrompt>) => {
       state.negativePrompt = action.payload;
@@ -462,6 +484,9 @@ export const {
   setClipSkip,
   shouldUseCpuNoiseChanged,
   positivePromptChanged,
+  positivePromptAddedToHistory,
+  promptRemovedFromHistory,
+  promptHistoryCleared,
   negativePromptChanged,
   refinerModelChanged,
   setRefinerSteps,
@@ -498,6 +523,12 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         state._version = 1;
         state.dimensions.width = state.dimensions.rect.width;
         state.dimensions.height = state.dimensions.rect.height;
+      }
+
+      if (state._version === 1) {
+        // v1 -> v2, add positive prompt history
+        state._version = 2;
+        state.positivePromptHistory = [];
       }
 
       return zParamsState.parse(state);
@@ -600,6 +631,7 @@ export const selectShouldUseCPUNoise = createParamsSelector((params) => params.s
 export const selectUpscaleScheduler = createParamsSelector((params) => params.upscaleScheduler);
 export const selectUpscaleCfgScale = createParamsSelector((params) => params.upscaleCfgScale);
 
+export const selectPositivePromptHistory = createParamsSelector((params) => params.positivePromptHistory);
 export const selectRefinerCFGScale = createParamsSelector((params) => params.refinerCFGScale);
 export const selectRefinerModel = createParamsSelector((params) => params.refinerModel);
 export const selectIsRefinerModelSelected = createParamsSelector((params) => Boolean(params.refinerModel));
