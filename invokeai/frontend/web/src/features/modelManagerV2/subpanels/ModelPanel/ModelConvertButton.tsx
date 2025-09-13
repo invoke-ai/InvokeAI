@@ -52,6 +52,7 @@ export const ModelConvertButton = memo(({ modelConfig }: ModelConvertProps) => {
   return (
     <>
       <Button
+        variant="outline"
         onClick={onOpen}
         size="sm"
         aria-label={t('modelManager.convertToDiffusers')}

@@ -14,15 +14,44 @@ import { PiTrashSimpleBold } from 'react-icons/pi';
 import { useDeleteModelsMutation } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 
-import ModelImage, { MODEL_IMAGE_THUMBNAIL_SIZE } from './ModelImage';
+import ModelImage from './ModelImage';
 
 type ModelListItemProps = {
   model: AnyModelConfig;
 };
 
 const sx: SystemStyleObject = {
-  _hover: { bg: 'base.700' },
-  "&[aria-selected='true']": { bg: 'base.700' },
+  paddingInline: 3,
+  paddingBlock: 2,
+  position: 'relative',
+  rounded: 'base',
+  '&:after,&:before': {
+    content: `''`,
+    position: 'absolute',
+    pointerEvents: 'none',
+  },
+  '&:after': {
+    h: '1px',
+    bottom: '-0.5px',
+    insetInline: 3,
+    bg: 'base.850',
+  },
+  '&:before': {
+    left: 1,
+    w: 1,
+    insetBlock: 2,
+    rounded: 'base',
+  },
+  _hover: {
+    bg: 'base.850',
+    '& .delete-button': { opacity: 1 },
+  },
+  "&[aria-selected='false']:hover:before": { bg: 'base.750' },
+  "&[aria-selected='true']": {
+    bg: 'base.800',
+    '& .delete-button': { opacity: 1 },
+  },
+  "&[aria-selected='true']:before": { bg: 'invokeBlue.300' },
 };
 
 const ModelListItem = ({ model }: ModelListItemProps) => {
@@ -78,8 +107,6 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
       sx={sx}
       aria-selected={isSelected}
       justifyContent="flex-start"
-      p={2}
-      borderRadius="base"
       w="full"
       alignItems="center"
       gap={2}
@@ -88,7 +115,7 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
     >
       <Flex gap={2} w="full" h="full" minW={0}>
         <ModelImage image_url={model.cover_image} />
-        <Flex gap={1} alignItems="flex-start" flexDir="column" w="full" minW={0}>
+        <Flex alignItems="flex-start" flexDir="column" w="full" minW={0}>
           <Flex gap={2} w="full" alignItems="flex-start">
             <Text fontWeight="semibold" noOfLines={1} wordBreak="break-all">
               {model.name}
@@ -101,25 +128,21 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
           <Text variant="subtext" noOfLines={1}>
             {model.description || 'No Description'}
           </Text>
-        </Flex>
-        <Flex
-          h={MODEL_IMAGE_THUMBNAIL_SIZE}
-          flexDir="column"
-          alignItems="flex-end"
-          justifyContent="space-between"
-          gap={2}
-        >
-          <ModelBaseBadge base={model.base} />
-          <ModelFormatBadge format={model.format} />
+          <Flex gap={1} mt={1}>
+            <ModelBaseBadge base={model.base} />
+            <ModelFormatBadge format={model.format} />
+          </Flex>
         </Flex>
       </Flex>
       <IconButton
+        className="delete-button"
         onClick={onClickDeleteButton}
         icon={<PiTrashSimpleBold size={16} />}
         aria-label={t('modelManager.deleteConfig')}
         colorScheme="error"
-        h={MODEL_IMAGE_THUMBNAIL_SIZE}
-        w={MODEL_IMAGE_THUMBNAIL_SIZE}
+        opacity={0}
+        mt={1}
+        alignSelf="flex-start"
       />
       <ConfirmationAlertDialog
         isOpen={isOpen}
