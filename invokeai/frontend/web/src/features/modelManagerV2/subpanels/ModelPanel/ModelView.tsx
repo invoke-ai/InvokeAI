@@ -1,4 +1,4 @@
-import { Box, Flex, SimpleGrid } from '@invoke-ai/ui-library';
+import { Box, Divider, Flex, SimpleGrid } from '@invoke-ai/ui-library';
 import { ControlAdapterModelDefaultSettings } from 'features/modelManagerV2/subpanels/ModelPanel/ControlAdapterModelDefaultSettings/ControlAdapterModelDefaultSettings';
 import { LoRAModelDefaultSettings } from 'features/modelManagerV2/subpanels/ModelPanel/LoRAModelDefaultSettings/LoRAModelDefaultSettings';
 import { ModelConvertButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelConvertButton';
@@ -46,8 +46,9 @@ export const ModelView = memo(({ modelConfig }: Props) => {
         )}
         <ModelEditButton />
       </ModelHeader>
+      <Divider />
       <Flex flexDir="column" h="full" gap={4}>
-        <Box layerStyle="second" borderRadius="base" p={4}>
+        <Box>
           <SimpleGrid columns={2} gap={4}>
             <ModelAttrView label={t('modelManager.baseModel')} value={modelConfig.base} />
             <ModelAttrView label={t('modelManager.modelType')} value={modelConfig.type} />
@@ -73,23 +74,29 @@ export const ModelView = memo(({ modelConfig }: Props) => {
           </SimpleGrid>
         </Box>
         {withSettings && (
-          <Box layerStyle="second" borderRadius="base" p={4}>
-            {modelConfig.type === 'main' && modelConfig.base !== 'sdxl-refiner' && (
-              <MainModelDefaultSettings modelConfig={modelConfig} />
-            )}
-            {(modelConfig.type === 'controlnet' ||
-              modelConfig.type === 't2i_adapter' ||
-              modelConfig.type === 'control_lora') && <ControlAdapterModelDefaultSettings modelConfig={modelConfig} />}
-            {modelConfig.type === 'lora' && (
-              <>
-                <LoRAModelDefaultSettings modelConfig={modelConfig} />
-                <TriggerPhrases modelConfig={modelConfig} />
-              </>
-            )}
-            {modelConfig.type === 'main' && <TriggerPhrases modelConfig={modelConfig} />}
-          </Box>
+          <>
+            <Divider />
+            <Box>
+              {modelConfig.type === 'main' && modelConfig.base !== 'sdxl-refiner' && (
+                <MainModelDefaultSettings modelConfig={modelConfig} />
+              )}
+              {(modelConfig.type === 'controlnet' ||
+                modelConfig.type === 't2i_adapter' ||
+                modelConfig.type === 'control_lora') && (
+                <ControlAdapterModelDefaultSettings modelConfig={modelConfig} />
+              )}
+              {modelConfig.type === 'lora' && (
+                <>
+                  <LoRAModelDefaultSettings modelConfig={modelConfig} />
+                  <TriggerPhrases modelConfig={modelConfig} />
+                </>
+              )}
+              {modelConfig.type === 'main' && <TriggerPhrases modelConfig={modelConfig} />}
+            </Box>
+          </>
         )}
-        <Box overflowY="auto" layerStyle="second" borderRadius="base" p={4}>
+        <Divider />
+        <Box overflowY="auto">
           <RelatedModels modelConfig={modelConfig} />
         </Box>
       </Flex>

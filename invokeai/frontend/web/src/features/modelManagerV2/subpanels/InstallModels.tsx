@@ -1,16 +1,24 @@
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Button, Flex, Heading, Tab, TabList, TabPanel, TabPanels, Tabs, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $installModelsTabIndex } from 'features/modelManagerV2/store/installModelsStore';
 import { StarterModelsForm } from 'features/modelManagerV2/subpanels/AddModelPanel/StarterModels/StarterModelsForm';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiInfoBold } from 'react-icons/pi';
+import { PiCubeBold, PiFolderOpenBold, PiInfoBold, PiLinkSimpleBold, PiShootingStarBold } from 'react-icons/pi';
+import { SiHuggingface } from 'react-icons/si';
 
 import { HuggingFaceForm } from './AddModelPanel/HuggingFaceFolder/HuggingFaceForm';
 import { InstallModelForm } from './AddModelPanel/InstallModelForm';
 import { LaunchpadForm } from './AddModelPanel/LaunchpadForm/LaunchpadForm';
 import { ModelInstallQueue } from './AddModelPanel/ModelInstallQueue/ModelInstallQueue';
 import { ScanModelsForm } from './AddModelPanel/ScanFolder/ScanFolderForm';
+
+const installModelsTabSx: SystemStyleObject = {
+  display: 'flex',
+  gap: 2,
+  px: 2,
+};
 
 export const InstallModels = memo(() => {
   const { t } = useTranslation();
@@ -29,21 +37,36 @@ export const InstallModels = memo(() => {
         </Button>
       </Flex>
       <Tabs
-        variant="collapse"
-        height="50%"
+        variant="line"
+        height="100%"
         display="flex"
         flexDir="column"
         index={tabIndex}
         onChange={$installModelsTabIndex.set}
       >
         <TabList>
-          <Tab>{t('modelManager.launchpadTab')}</Tab>
-          <Tab>{t('modelManager.urlOrLocalPath')}</Tab>
-          <Tab>{t('modelManager.huggingFace')}</Tab>
-          <Tab>{t('modelManager.scanFolder')}</Tab>
-          <Tab>{t('modelManager.starterModels')}</Tab>
+          <Tab sx={installModelsTabSx}>
+            <PiCubeBold />
+            {t('modelManager.launchpadTab')}
+          </Tab>
+          <Tab sx={installModelsTabSx}>
+            <PiLinkSimpleBold />
+            {t('modelManager.urlOrLocalPath')}
+          </Tab>
+          <Tab sx={installModelsTabSx}>
+            <SiHuggingface />
+            {t('modelManager.huggingFace')}
+          </Tab>
+          <Tab sx={installModelsTabSx}>
+            <PiFolderOpenBold />
+            {t('modelManager.scanFolder')}
+          </Tab>
+          <Tab sx={installModelsTabSx}>
+            <PiShootingStarBold />
+            {t('modelManager.starterModels')}
+          </Tab>
         </TabList>
-        <TabPanels p={3} height="100%">
+        <TabPanels height="100%">
           <TabPanel height="100%">
             <LaunchpadForm />
           </TabPanel>
