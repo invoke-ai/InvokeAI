@@ -113,9 +113,9 @@ export const ScanModelsResults = memo(({ results }: ScanModelResultsProps) => {
             </InputGroup>
           </Flex>
         </Flex>
-        <Flex height="100%" layerStyle="third" borderRadius="base" p={3}>
+        <Flex height="100%" layerStyle="second" borderRadius="base" px={2}>
           <ScrollableContent>
-            <Flex flexDir="column" gap={3}>
+            <Flex flexDir="column">
               {filteredResults.map((result) => (
                 <ScanModelResultItem key={result.path} result={result} installModel={handleInstallOne} />
               ))}

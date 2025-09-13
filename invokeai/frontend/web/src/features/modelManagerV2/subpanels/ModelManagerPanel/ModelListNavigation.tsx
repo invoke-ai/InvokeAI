@@ -1,4 +1,4 @@
-import { Flex, IconButton, Input, InputGroup, InputRightElement, Spacer } from '@invoke-ai/ui-library';
+import { Flex, IconButton, Input, InputGroup, InputRightElement } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectSearchTerm, setSearchTerm } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { t } from 'i18next';
@@ -25,9 +25,7 @@ export const ModelListNavigation = memo(() => {
 
   return (
     <Flex gap={2} alignItems="center" justifyContent="space-between">
-      <ModelTypeFilter />
-      <Spacer />
-      <InputGroup maxW="400px">
+      <InputGroup>
         <Input
           placeholder={t('modelManager.search')}
           value={searchTerm || ''}
@@ -47,6 +45,9 @@ export const ModelListNavigation = memo(() => {
           </InputRightElement>
         )}
       </InputGroup>
+      <Flex shrink={0}>
+        <ModelTypeFilter />
+      </Flex>
     </Flex>
   );
 });

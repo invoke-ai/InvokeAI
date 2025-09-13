@@ -35,7 +35,7 @@ export const LaunchpadForm = memo(() => {
   return (
     <Flex flexDir="column" height="100%" gap={3}>
       <ScrollableContent>
-        <Flex flexDir="column" gap={6} p={3}>
+        <Flex flexDir="column" gap={6} py={2}>
           {/* Welcome Section */}
           <Flex flexDir="column" gap={2} alignItems="flex-start">
             <Heading size="md">{t('modelManager.launchpad.welcome')}</Heading>
