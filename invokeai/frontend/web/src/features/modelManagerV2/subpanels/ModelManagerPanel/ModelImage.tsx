@@ -7,7 +7,7 @@ type Props = {
   image_url?: string | null;
 };
 
-export const MODEL_IMAGE_THUMBNAIL_SIZE = '54px';
+const MODEL_IMAGE_THUMBNAIL_SIZE = '54px';
 const FALLBACK_ICON_SIZE = '28px';
 
 const sharedSx: SystemStyleObject = {
