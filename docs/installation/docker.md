@@ -27,7 +27,7 @@ Once the container starts up, open <http://localhost:9090> in your browser, inst
 !!! warning "MISSING RENDER_GROUP_ID VARIABLE"
 
     Because of the way the invoke wrapper command script do work, it can't automatically detect your host devices render group.
-    In order for invoke wrapper command to successfully detect your AMD devices, you need to give him the host render group_id:
+    In order for invoke wrapper command to successfully detect your AMD devices, you need to give it the host render group_id:
     ```bash
     docker run -e "RENDER_GROUP_ID=$(getent group render | cut -d':' -f 3)
     ```
