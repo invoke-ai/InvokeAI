@@ -24,6 +24,7 @@ import type { AnyModelConfig } from 'services/api/types';
 import BaseModelSelect from './Fields/BaseModelSelect';
 import ModelVariantSelect from './Fields/ModelVariantSelect';
 import PredictionTypeSelect from './Fields/PredictionTypeSelect';
+import { ModelFooter } from './ModelFooter';
 
 type Props = {
   modelConfig: AnyModelConfig;
@@ -158,6 +159,7 @@ export const ModelEdit = memo(({ modelConfig }: Props) => {
           </Flex>
         </form>
       </Flex>
+      <ModelFooter modelConfig={modelConfig} isEditing={true} />
     </Flex>
   );
 });
