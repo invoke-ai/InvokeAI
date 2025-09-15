@@ -44,7 +44,7 @@ export const StartingFrameImage = () => {
     [dispatch]
   );
 
-  const edit = useCallback(() => {
+  const edit = useCallback(async () => {
     if (!originalImageDTO) {
       return;
     }
@@ -76,7 +76,8 @@ export const StartingFrameImage = () => {
         )
       );
     });
-    openEditImageModal(originalImageDTO.image_name, editor);
+    await editor.loadImage(originalImageDTO.image_url);
+    openEditImageModal(editor);
   }, [dispatch, originalImageDTO, startingFrameImage?.crop, uploadImage]);
 
   const fitsCurrentAspectRatio = useMemo(() => {

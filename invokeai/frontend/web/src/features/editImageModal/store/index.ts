@@ -4,25 +4,21 @@ import { atom } from 'nanostores';
 type EditImageModalState =
   | {
       isOpen: false;
-      imageName: null;
       editor: null;
     }
   | {
       isOpen: true;
-      imageName: string;
       editor: Editor;
     };
 
 export const $editImageModalState = atom<EditImageModalState>({
   isOpen: false,
-  imageName: null,
   editor: null,
 });
 
-export const openEditImageModal = (imageName: string, editor: Editor) => {
+export const openEditImageModal = (editor: Editor) => {
   $editImageModalState.set({
     isOpen: true,
-    imageName,
     editor,
   });
 };
@@ -32,7 +28,6 @@ export const closeEditImageModal = () => {
   editor?.destroy();
   $editImageModalState.set({
     isOpen: false,
-    imageName: null,
     editor: null,
   });
 };
