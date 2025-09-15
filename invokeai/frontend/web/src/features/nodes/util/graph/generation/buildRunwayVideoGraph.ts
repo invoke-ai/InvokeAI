@@ -38,7 +38,7 @@ export const buildRunwayVideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn 
   const startingFrameImage = selectStartingFrameImage(state);
 
   assert(startingFrameImage, 'Video starting frame is required for runway video generation');
-  const firstFrameImageField = zImageField.parse(startingFrameImage);
+  const firstFrameImageField = zImageField.parse(startingFrameImage.crop?.image ?? startingFrameImage.original);
 
   const { seed, shouldRandomizeSeed } = params;
   const { videoDuration, videoAspectRatio, videoResolution } = videoParams;
