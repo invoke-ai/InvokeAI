@@ -12,6 +12,7 @@ import {
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
+  Portal,
 } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -122,21 +123,23 @@ const DropDownToolWidthPickerComponent = memo(
             </NumberInput>
           </PopoverAnchor>
         </FormControl>
-        <PopoverContent w={200} pt={0} pb={2} px={4}>
-          <PopoverArrow />
-          <PopoverBody>
-            <CompositeSlider
-              min={0}
-              max={100}
-              value={mapRawValueToSliderValue(localValue)}
-              onChange={onChangeSlider}
-              defaultValue={sliderDefaultValue}
-              marks={marks}
-              formatValue={formatSliderValue}
-              alwaysShowMarks
-            />
-          </PopoverBody>
-        </PopoverContent>
+        <Portal>
+          <PopoverContent w={200} pt={0} pb={2} px={4}>
+            <PopoverArrow />
+            <PopoverBody>
+              <CompositeSlider
+                min={0}
+                max={100}
+                value={mapRawValueToSliderValue(localValue)}
+                onChange={onChangeSlider}
+                defaultValue={sliderDefaultValue}
+                marks={marks}
+                formatValue={formatSliderValue}
+                alwaysShowMarks
+              />
+            </PopoverBody>
+          </PopoverContent>
+        </Portal>
       </Popover>
     );
   }

@@ -8,6 +8,7 @@ import {
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
+  Portal,
   Text,
   useShiftModifier,
 } from '@invoke-ai/ui-library';
@@ -45,62 +46,64 @@ export const CanvasSettingsPopover = memo(() => {
           alignSelf="stretch"
         />
       </PopoverTrigger>
-      <PopoverContent maxW="280px">
-        <PopoverArrow />
-        <PopoverBody>
-          <Flex direction="column" gap={2}>
-            {/* Behavior Settings */}
-            <Flex direction="column" gap={1}>
-              <Flex align="center" gap={2}>
-                <Icon as={PiPencilFill} boxSize={4} />
-                <Text fontWeight="bold" fontSize="sm" color="base.100">
-                  {t('hotkeys.canvas.settings.behavior')}
-                </Text>
+      <Portal>
+        <PopoverContent maxW="280px">
+          <PopoverArrow />
+          <PopoverBody>
+            <Flex direction="column" gap={2}>
+              {/* Behavior Settings */}
+              <Flex direction="column" gap={1}>
+                <Flex align="center" gap={2}>
+                  <Icon as={PiPencilFill} boxSize={4} />
+                  <Text fontWeight="bold" fontSize="sm" color="base.100">
+                    {t('hotkeys.canvas.settings.behavior')}
+                  </Text>
+                </Flex>
+                <CanvasSettingsInvertScrollCheckbox />
+                <CanvasSettingsPressureSensitivityCheckbox />
+                <CanvasSettingsPreserveMaskCheckbox />
+                <CanvasSettingsClipToBboxCheckbox />
+                <CanvasSettingsOutputOnlyMaskedRegionsCheckbox />
+                <CanvasSettingsSaveAllImagesToGalleryCheckbox />
               </Flex>
-              <CanvasSettingsInvertScrollCheckbox />
-              <CanvasSettingsPressureSensitivityCheckbox />
-              <CanvasSettingsPreserveMaskCheckbox />
-              <CanvasSettingsClipToBboxCheckbox />
-              <CanvasSettingsOutputOnlyMaskedRegionsCheckbox />
-              <CanvasSettingsSaveAllImagesToGalleryCheckbox />
-            </Flex>
 
-            <Divider />
+              <Divider />
 
-            {/* Display Settings */}
-            <Flex direction="column" gap={1}>
-              <Flex align="center" gap={2} color="base.200">
-                <Icon as={PiEyeFill} boxSize={4} />
-                <Text fontWeight="bold" fontSize="sm">
-                  {t('hotkeys.canvas.settings.display')}
-                </Text>
+              {/* Display Settings */}
+              <Flex direction="column" gap={1}>
+                <Flex align="center" gap={2} color="base.200">
+                  <Icon as={PiEyeFill} boxSize={4} />
+                  <Text fontWeight="bold" fontSize="sm">
+                    {t('hotkeys.canvas.settings.display')}
+                  </Text>
+                </Flex>
+                <CanvasSettingsShowProgressOnCanvas />
+                <CanvasSettingsIsolatedStagingPreviewSwitch />
+                <CanvasSettingsIsolatedLayerPreviewSwitch />
+                <CanvasSettingsBboxOverlaySwitch />
+                <CanvasSettingsShowHUDSwitch />
               </Flex>
-              <CanvasSettingsShowProgressOnCanvas />
-              <CanvasSettingsIsolatedStagingPreviewSwitch />
-              <CanvasSettingsIsolatedLayerPreviewSwitch />
-              <CanvasSettingsBboxOverlaySwitch />
-              <CanvasSettingsShowHUDSwitch />
-            </Flex>
 
-            <Divider />
+              <Divider />
 
-            {/* Grid Settings */}
-            <Flex direction="column" gap={1}>
-              <Flex align="center" gap={2} color="base.200">
-                <Icon as={PiSquaresFourFill} boxSize={4} />
-                <Text fontWeight="bold" fontSize="sm">
-                  {t('hotkeys.canvas.settings.grid')}
-                </Text>
+              {/* Grid Settings */}
+              <Flex direction="column" gap={1}>
+                <Flex align="center" gap={2} color="base.200">
+                  <Icon as={PiSquaresFourFill} boxSize={4} />
+                  <Text fontWeight="bold" fontSize="sm">
+                    {t('hotkeys.canvas.settings.grid')}
+                  </Text>
+                </Flex>
+                <CanvasSettingsSnapToGridCheckbox />
+                <CanvasSettingsDynamicGridSwitch />
+                <CanvasSettingsRuleOfThirdsSwitch />
               </Flex>
-              <CanvasSettingsSnapToGridCheckbox />
-              <CanvasSettingsDynamicGridSwitch />
-              <CanvasSettingsRuleOfThirdsSwitch />
-            </Flex>
 
-            <DebugSettings />
-          </Flex>
-        </PopoverBody>
-      </PopoverContent>
+              <DebugSettings />
+            </Flex>
+          </PopoverBody>
+        </PopoverContent>
+      </Portal>
     </Popover>
   );
 });
