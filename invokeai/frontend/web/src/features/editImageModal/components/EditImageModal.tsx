@@ -7,13 +7,17 @@ import { EditorContainer } from './EditorContainer';
 export const EditImageModal = () => {
   const state = useStore($editImageModalState);
 
+  if (!state) {
+    return null;
+  }
+
   return (
-    <Modal isOpen={state.isOpen} onClose={closeEditImageModal} isCentered useInert={false} size="full">
+    <Modal isOpen={true} onClose={closeEditImageModal} isCentered useInert={false} size="full">
       <ModalOverlay />
       <ModalContent minH="unset" minW="unset" maxH="90vh" maxW="90vw" w="full" h="full" borderRadius="base">
-        <ModalHeader>Edit Image</ModalHeader>
+        <ModalHeader>Crop Image</ModalHeader>
         <ModalBody px={4} pb={4} pt={0}>
-          {state.isOpen && <EditorContainer editor={state.editor} imageName={state.imageName} />}
+          <EditorContainer editor={state.editor} onApplyCrop={state.onApplyCrop} onReady={state.onReady} />
         </ModalBody>
       </ModalContent>
     </Modal>

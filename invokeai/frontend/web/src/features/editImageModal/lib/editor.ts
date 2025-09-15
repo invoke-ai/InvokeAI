@@ -18,11 +18,8 @@ export type CropBox = {
  * The callbacks supported by the editor.
  */
 type EditorCallbacks = {
-  onCropStart: Set<() => void>;
   onCropBoxChange: Set<(crop: CropBox) => void>;
-  onCropApply: Set<(crop: CropBox) => void>;
   onCropReset: Set<() => void>;
-  onCropCancel: Set<() => void>;
   onZoomChange: Set<(zoom: number) => void>;
   onImageLoad: Set<() => void>;
 };
@@ -185,11 +182,8 @@ export class Editor {
   private aspectRatio: number | null = null;
 
   private callbacks: EditorCallbacks = {
-    onCropApply: new Set(),
     onCropBoxChange: new Set(),
-    onCropCancel: new Set(),
     onCropReset: new Set(),
-    onCropStart: new Set(),
     onZoomChange: new Set(),
     onImageLoad: new Set(),
   };
@@ -197,7 +191,6 @@ export class Editor {
   private cropBox: CropBox | null = null;
 
   // State
-  private isCropping = false;
   private isPanning = false;
   private lastPointerPosition: { x: number; y: number } | null = null;
   private isSpacePressed = false;
@@ -234,10 +227,6 @@ export class Editor {
     };
 
     this.setupListeners();
-
-    if (this.originalImage) {
-      this.updateImage();
-    }
   };
 
   /**
@@ -314,7 +303,7 @@ export class Editor {
    * Create the Konva objects used for crop interaction (the crop box, resize handles, and guides).
    */
   private createKonvaCropInteractionObjects = (): KonvaObjects['crop']['interaction'] => {
-    const group = new Konva.Group({ visible: false });
+    const group = new Konva.Group();
 
     const rect = this.createKonvaCropInteractionRect();
     const handles = {
@@ -669,7 +658,7 @@ export class Editor {
    *
    * This shouldn't be called during normal renders.
    */
-  private updateImage = () => {
+  private updateImage = (initial?: { cropBox: CropBox; aspectRatio: number | null }) => {
     if (!this.originalImage || !this.konva) {
       return;
     }
@@ -694,8 +683,18 @@ export class Editor {
     // Center image at 100% zoom
     this.resetView();
 
-    if (this.cropBox) {
-      this.updateKonvaCropOverlay();
+    if (initial) {
+      this.aspectRatio = initial.aspectRatio;
+      this.updateCropBox(initial.cropBox);
+    } else {
+      // Create default crop box (centered, 80% of image)
+      const imgWidth = this.konva.image.image.width();
+      const imgHeight = this.konva.image.image.height();
+      const width = imgWidth * this.config.DEFAULT_CROP_BOX_SCALE;
+      const height = imgHeight * this.config.DEFAULT_CROP_BOX_SCALE;
+      const x = (imgWidth - width) / 2;
+      const y = (imgHeight - height) / 2;
+      this.updateCropBox({ x, y, width, height });
     }
   };
 
@@ -1101,7 +1100,7 @@ export class Editor {
    * @param src The image source URL or data URL.
    * @returns A promise that resolves when the image is loaded or rejects on error.
    */
-  loadImage = (src: string): Promise<void> => {
+  loadImage = (src: string, initial?: { cropBox: CropBox; aspectRatio: number | null }): Promise<void> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
 
@@ -1109,7 +1108,7 @@ export class Editor {
 
       img.onload = () => {
         this.originalImage = img;
-        this.updateImage();
+        this.updateImage(initial);
         this._invokeCallbacks('onImageLoad');
         resolve();
       };
@@ -1120,80 +1119,6 @@ export class Editor {
 
       img.src = src;
     });
-  };
-
-  /**
-   * Start a cropping session with an optional initial crop box.
-   * @param initialCrop Optional initial crop box to use. If not provided, uses the current crop box or a default centered box.
-   */
-  startCrop = (initialCrop?: CropBox) => {
-    if (!this.konva?.image.image || this.isCropping) {
-      return;
-    }
-
-    // Calculate initial crop dimensions
-    let cropX: number;
-    let cropY: number;
-    let cropWidth: number;
-    let cropHeight: number;
-
-    if (initialCrop) {
-      // User provided initial crop
-      cropX = initialCrop.x;
-      cropY = initialCrop.y;
-      cropWidth = initialCrop.width;
-      cropHeight = initialCrop.height;
-    } else if (this.cropBox) {
-      // Use the current crop as starting point
-      cropX = this.cropBox.x;
-      cropY = this.cropBox.y;
-      cropWidth = this.cropBox.width;
-      cropHeight = this.cropBox.height;
-    } else {
-      // Create default crop box (centered, 80% of image)
-      const imgWidth = this.konva.image.image.width();
-      const imgHeight = this.konva.image.image.height();
-      cropWidth = imgWidth * this.config.DEFAULT_CROP_BOX_SCALE;
-      cropHeight = imgHeight * this.config.DEFAULT_CROP_BOX_SCALE;
-      cropX = (imgWidth - cropWidth) / 2;
-      cropY = (imgHeight - cropHeight) / 2;
-    }
-
-    this.updateCropBox({
-      x: cropX,
-      y: cropY,
-      width: cropWidth,
-      height: cropHeight,
-    });
-    this.isCropping = true;
-    this.konva.crop.interaction.group.visible(true);
-
-    this._invokeCallbacks('onCropStart');
-  };
-
-  /**
-   * Cancel the current cropping session and hide crop UI.
-   */
-  cancelCrop = () => {
-    if (!this.isCropping || !this.konva) {
-      return;
-    }
-    this.isCropping = false;
-    this.konva.crop.interaction.group.visible(false);
-    this._invokeCallbacks('onCropCancel');
-  };
-
-  /**
-   * Apply the current crop box and exit cropping mode.
-   */
-  applyCrop = () => {
-    if (!this.isCropping || !this.cropBox || !this.konva) {
-      return;
-    }
-
-    this.isCropping = false;
-    this.konva.crop.interaction.group.visible(false);
-    this._invokeCallbacks('onCropApply', this.cropBox);
   };
 
   /**
@@ -1544,6 +1469,10 @@ export class Editor {
     this.updateCropBox(box);
   };
 
+  getCropBox = (): CropBox | null => {
+    return this.cropBox;
+  };
+
   /**
    * Get the current crop aspect ratio constraint.
    * @returns The current aspect ratio (width / height) or null if no constraint is set.
@@ -1584,29 +1513,20 @@ export class Editor {
   };
 
   /**
-   * Register a callback for when the crop is applied.
-   */
-  onCropApply = this._buildCallbackRegistrar('onCropApply');
-  /**
-   * Register a callback for when the crop is canceled.
-   */
-  onCropCancel = this._buildCallbackRegistrar('onCropCancel');
-  /**
    * Register a callback for when the crop is reset.
    */
   onCropReset = this._buildCallbackRegistrar('onCropReset');
-  /**
-   * Register a callback for when cropping starts.
-   */
-  onCropStart = this._buildCallbackRegistrar('onCropStart');
+
   /**
    * Register a callback for when the crop box changes (moved or resized).
    */
   onCropBoxChange = this._buildCallbackRegistrar('onCropBoxChange');
+
   /**
    * Register a callback for when a new image is loaded.
    */
   onImageLoad = this._buildCallbackRegistrar('onImageLoad');
+
   /**
    * Register a callback for when the zoom level changes.
    */
@@ -1639,11 +1559,6 @@ export class Editor {
   destroy = () => {
     for (const cleanup of this.cleanupFunctions) {
       cleanup();
-    }
-
-    // Cancel any ongoing crop operation
-    if (this.isCropping) {
-      this.cancelCrop();
     }
 
     this.konva?.stage.destroy();

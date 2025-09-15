@@ -1,33 +1,20 @@
 import type { Editor } from 'features/editImageModal/lib/editor';
 import { atom } from 'nanostores';
 
-type EditImageModalState =
-  | {
-      isOpen: false;
-      editor: null;
-    }
-  | {
-      isOpen: true;
-      editor: Editor;
-    };
+export type EditImageModalState = {
+  editor: Editor;
+  onApplyCrop: () => Promise<void> | void;
+  onReady: () => Promise<void> | void;
+};
 
-export const $editImageModalState = atom<EditImageModalState>({
-  isOpen: false,
-  editor: null,
-});
+export const $editImageModalState = atom<EditImageModalState | null>(null);
 
-export const openEditImageModal = (editor: Editor) => {
-  $editImageModalState.set({
-    isOpen: true,
-    editor,
-  });
+export const openEditImageModal = (state: EditImageModalState) => {
+  $editImageModalState.set(state);
 };
 
 export const closeEditImageModal = () => {
-  const { editor } = $editImageModalState.get();
-  editor?.destroy();
-  $editImageModalState.set({
-    isOpen: false,
-    editor: null,
-  });
+  const state = $editImageModalState.get();
+  state?.editor.destroy();
+  $editImageModalState.set(null);
 };

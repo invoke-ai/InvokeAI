@@ -43,7 +43,7 @@ const zCropBox = z.object({
   width: z.number().int().positive(),
   height: z.number().int().positive(),
 });
-export const zCroppableImage = z.object({
+export const zCroppableImageWithDims = z.object({
   original: zImageWithDims,
   crop: z
     .object({
@@ -53,7 +53,7 @@ export const zCroppableImage = z.object({
     })
     .optional(),
 });
-export type CroppableImageWithDims = z.infer<typeof zCroppableImage>;
+export type CroppableImageWithDims = z.infer<typeof zCroppableImageWithDims>;
 
 const zImageWithDimsDataURL = z.object({
   dataURL: z.string(),

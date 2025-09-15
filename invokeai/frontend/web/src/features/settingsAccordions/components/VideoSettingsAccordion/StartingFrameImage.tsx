@@ -44,7 +44,7 @@ export const StartingFrameImage = () => {
     [dispatch]
   );
 
-  const edit = useCallback(async () => {
+  const edit = useCallback(() => {
     if (!originalImageDTO) {
       return;
     }
@@ -52,18 +52,11 @@ export const StartingFrameImage = () => {
     // We will create a new editor instance each time the user wants to edit
     const editor = new Editor();
 
-    // Initialize w/ the existing crop & ratio if there is one
-    if (startingFrameImage?.crop) {
-      editor.setCropBox(startingFrameImage.crop.box);
-      // Due to floating point precision, we need to record the ratio separately - cannot infer from w/hof box
-      // TODO(psyche): figure out how to not need to save ratio separately, maybe use some "close enough" logic?
-      editor.setCropAspectRatio(startingFrameImage.crop.ratio);
-    }
-
     // When the user applies the crop, we will upload the cropped image and store the applied crop box so if the user
     // re-opens the editor they see the same crop
-    editor.onCropApply(async (box) => {
-      if (objectEquals(box, startingFrameImage?.crop?.box)) {
+    const onApplyCrop = async () => {
+      const box = editor.getCropBox();
+      if (!box || objectEquals(box, startingFrameImage?.crop?.box)) {
         // If the box hasn't changed, don't do anything
         return;
       }
@@ -85,11 +78,17 @@ export const StartingFrameImage = () => {
           })
         )
       );
-    });
+    };
 
-    // Load the image into the editor and open the modal once it's ready
-    await editor.loadImage(originalImageDTO.image_url);
-    openEditImageModal(editor);
+    const onReady = async () => {
+      const initial = startingFrameImage?.crop
+        ? { cropBox: startingFrameImage.crop.box, aspectRatio: startingFrameImage.crop.ratio }
+        : undefined;
+      // Load the image into the editor and open the modal once it's ready
+      await editor.loadImage(originalImageDTO.image_url, initial);
+    };
+
+    openEditImageModal({ editor, onApplyCrop, onReady });
   }, [dispatch, originalImageDTO, startingFrameImage?.crop, uploadImage]);
 
   const fitsCurrentAspectRatio = useMemo(() => {

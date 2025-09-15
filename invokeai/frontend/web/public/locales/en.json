@@ -104,6 +104,7 @@
         "copy": "Copy",
         "copyError": "$t(gallery.copy) Error",
         "clipboard": "Clipboard",
+        "crop": "Crop",
         "on": "On",
         "off": "Off",
         "or": "or",
