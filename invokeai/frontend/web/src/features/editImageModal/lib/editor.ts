@@ -18,7 +18,7 @@ export type CropBox = {
  * The callbacks supported by the editor.
  */
 type EditorCallbacks = {
-  onCropBoxChange: Set<(crop: CropBox) => void>;
+  onCropBoxChange: Set<(crop: Readonly<CropBox>) => void>;
   onCropReset: Set<() => void>;
   onZoomChange: Set<(zoom: number) => void>;
   onImageLoad: Set<() => void>;
@@ -598,13 +598,7 @@ export class Editor {
    * Update the crop box state and re-render all related Konva objects.
    */
   private updateCropBox = (cropBox: CropBox) => {
-    const { x, y, width, height } = cropBox;
-    this.cropBox = {
-      x: Math.floor(x),
-      y: Math.floor(y),
-      width: Math.floor(width),
-      height: Math.floor(height),
-    };
+    this.cropBox = cropBox;
     this.updateKonvaCropOverlay();
     this.updateKonvaCropInteractionRect();
     this.updateKonvaCropInteractionGuides();

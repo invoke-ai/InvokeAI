@@ -56,8 +56,13 @@ export const StartingFrameImage = () => {
     // re-opens the editor they see the same crop
     const onApplyCrop = async () => {
       const box = editor.getCropBox();
-      if (!box || objectEquals(box, startingFrameImage?.crop?.box)) {
+      if (objectEquals(box, startingFrameImage?.crop?.box)) {
         // If the box hasn't changed, don't do anything
+        return;
+      }
+      if (!box || objectEquals(box, { x: 0, y: 0, width: originalImageDTO.width, height: originalImageDTO.height })) {
+        // There is a crop applied but it is the whole iamge - revert to original image
+        dispatch(startingFrameImageChanged(imageDTOToCroppableImage(originalImageDTO)));
         return;
       }
       const blob = await editor.exportImage('blob');
