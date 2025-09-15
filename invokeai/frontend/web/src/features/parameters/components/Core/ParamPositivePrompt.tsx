@@ -117,7 +117,9 @@ export const ParamPositivePrompt = memo(() => {
 
   // Compute a starting working history and ensure current prompt is bumped into history
   const startBrowsing = useCallback(() => {
-    if (browsingIndexRef.current !== null) return;
+    if (browsingIndexRef.current !== null) {
+      return;
+    }
     preBrowsePromptRef.current = prompt ?? '';
     const trimmedCurrent = (prompt ?? '').trim();
     if (trimmedCurrent) {
@@ -129,13 +131,17 @@ export const ParamPositivePrompt = memo(() => {
   const applyHistoryAtIndex = useCallback(
     (idx: number, placeCaretAt: 'start' | 'end') => {
       const list = history;
-      if (list.length === 0) return;
+      if (list.length === 0) {
+        return;
+      }
       const clamped = Math.max(0, Math.min(idx, list.length - 1));
       browsingIndexRef.current = clamped;
       dispatch(positivePromptChanged(list[clamped]));
       requestAnimationFrame(() => {
         const el = textareaRef.current;
-        if (!el) return;
+        if (!el) {
+          return;
+        }
         if (placeCaretAt === 'start') {
           el.selectionStart = 0;
           el.selectionEnd = 0;
@@ -150,8 +156,12 @@ export const ParamPositivePrompt = memo(() => {
   );
 
   const browsePrev = useCallback(() => {
-    if (!isPromptFocused()) return;
-    if (history.length === 0) return;
+    if (!isPromptFocused()) {
+      return;
+    }
+    if (history.length === 0) {
+      return;
+    }
     if (browsingIndexRef.current === null) {
       startBrowsing();
       // Move to older entry on first activation
@@ -168,8 +178,12 @@ export const ParamPositivePrompt = memo(() => {
   }, [applyHistoryAtIndex, history.length, isPromptFocused, startBrowsing]);
 
   const browseNext = useCallback(() => {
-    if (!isPromptFocused()) return;
-    if (history.length === 0) return;
+    if (!isPromptFocused()) {
+      return;
+    }
+    if (history.length === 0) {
+      return;
+    }
     if (browsingIndexRef.current === null) {
       // Not browsing; Down does nothing (matches shell semantics)
       return;
