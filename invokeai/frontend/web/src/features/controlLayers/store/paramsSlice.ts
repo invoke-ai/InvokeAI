@@ -199,11 +199,11 @@ const slice = createSlice({
         return;
       }
 
-      if (state.positivePromptHistory.includes(prompt)) {
-        return;
-      }
 
-      state.positivePromptHistory.unshift(prompt);
+      state.positivePromptHistory = [
+        prompt,
+        ...state.positivePromptHistory.filter((p) => p !== prompt),
+      ];
 
       if (state.positivePromptHistory.length > MAX_POSITIVE_PROMPT_HISTORY) {
         state.positivePromptHistory = state.positivePromptHistory.slice(0, MAX_POSITIVE_PROMPT_HISTORY);

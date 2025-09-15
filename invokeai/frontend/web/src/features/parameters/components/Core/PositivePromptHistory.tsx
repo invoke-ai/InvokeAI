@@ -96,25 +96,32 @@ const PromptHistoryContent = memo(() => {
         </Button>
       </Flex>
       <Divider />
-      {positivePromptHistory.length === 0 && (
-        <Flex w="full" h="full" alignItems="center" justifyContent="center">
-          <Text color="base.300">No prompt history recorded.</Text>
-        </Flex>
-      )}
-      {positivePromptHistory.length !== 0 && filteredPrompts.length === 0 && (
-        <Flex w="full" h="full" alignItems="center" justifyContent="center">
-          <Text color="base.300">No matching prompts in history.</Text>{' '}
-        </Flex>
-      )}
-      {filteredPrompts.length > 0 && (
-        <ScrollableContent>
-          <Flex flexDir="column">
-            {filteredPrompts.map((prompt, index) => (
-              <PromptItem key={`${prompt}-${index}`} prompt={prompt} />
-            ))}
+      <Flex flexDir="column" flexGrow={1} minH={0}>
+        {positivePromptHistory.length === 0 && (
+          <Flex w="full" h="full" alignItems="center" justifyContent="center">
+            <Text color="base.300">No prompt history recorded.</Text>
           </Flex>
-        </ScrollableContent>
-      )}
+        )}
+        {positivePromptHistory.length !== 0 && filteredPrompts.length === 0 && (
+          <Flex w="full" h="full" alignItems="center" justifyContent="center">
+            <Text color="base.300">No matching prompts in history.</Text>{' '}
+          </Flex>
+        )}
+        {filteredPrompts.length > 0 && (
+          <ScrollableContent>
+            <Flex flexDir="column">
+              {filteredPrompts.map((prompt, index) => (
+                <PromptItem key={`${prompt}-${index}`} prompt={prompt} />
+              ))}
+            </Flex>
+          </ScrollableContent>
+        )}
+      </Flex>
+      <Flex alignItems="center" justifyContent="center" pt={1}>
+        <Text fontSize="xs" color="base.400" textAlign="center">
+          <Text as="span" fontWeight="semibold">Alt + Up/Down</Text> to switch between prompts.
+        </Text>
+      </Flex>
     </Flex>
   );
 });
