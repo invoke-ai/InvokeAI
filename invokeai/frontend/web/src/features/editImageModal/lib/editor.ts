@@ -18,14 +18,16 @@ export type CropBox = {
  * The callbacks supported by the editor.
  */
 type EditorCallbacks = {
-  onCropStart?: () => void;
-  onCropBoxChange?: (crop: CropBox) => void;
-  onCropApply?: (crop: CropBox) => void;
-  onCropReset?: () => void;
-  onCropCancel?: () => void;
-  onZoomChange?: (zoom: number) => void;
-  onImageLoad?: () => void;
+  onCropStart: Set<() => void>;
+  onCropBoxChange: Set<(crop: CropBox) => void>;
+  onCropApply: Set<(crop: CropBox) => void>;
+  onCropReset: Set<() => void>;
+  onCropCancel: Set<() => void>;
+  onZoomChange: Set<(zoom: number) => void>;
+  onImageLoad: Set<() => void>;
 };
+
+type SetElement<T> = T extends Set<infer U> ? U : never;
 
 /**
  * Crop box resize handle names.
@@ -133,6 +135,11 @@ type EditorConfig = {
   CROP_GUIDE_STROKE_WIDTH: number;
 
   /**
+   * The fill color for the crop overlay (the darkened area outside the crop box).
+   */
+  CROP_OVERLAY_FILL_COLOR: string;
+
+  /**
    * When fitting the image to the container, this padding factor is applied to ensure some space around the image.
    */
   FIT_TO_CONTAINER_PADDING_PCT: number;
@@ -163,6 +170,7 @@ const DEFAULT_CONFIG: EditorConfig = {
   CROP_HANDLE_STROKE: 'black',
   CROP_GUIDE_STROKE: 'rgba(255, 255, 255, 0.5)',
   CROP_GUIDE_STROKE_WIDTH: 1,
+  CROP_OVERLAY_FILL_COLOR: 'rgba(0, 0, 0, 0.8)',
   FIT_TO_CONTAINER_PADDING_PCT: 0.9,
   DEFAULT_CROP_BOX_SCALE: 0.8,
   ZOOM_MIN_PCT: 0.1,
@@ -176,7 +184,16 @@ export class Editor {
 
   private aspectRatio: number | null = null;
 
-  private callbacks: EditorCallbacks = {};
+  private callbacks: EditorCallbacks = {
+    onCropApply: new Set(),
+    onCropBoxChange: new Set(),
+    onCropCancel: new Set(),
+    onCropReset: new Set(),
+    onCropStart: new Set(),
+    onZoomChange: new Set(),
+    onImageLoad: new Set(),
+  };
+
   private cropBox: CropBox | null = null;
 
   // State
@@ -217,6 +234,10 @@ export class Editor {
     };
 
     this.setupListeners();
+
+    if (this.originalImage) {
+      this.updateImage();
+    }
   };
 
   /**
@@ -274,8 +295,7 @@ export class Editor {
   private createKonvaCropOverlayObjects = (): KonvaObjects['crop']['overlay'] => {
     const group = new Konva.Group();
     const full = new Konva.Rect({
-      fill: 'black',
-      opacity: 0.7,
+      fill: this.config.CROP_OVERLAY_FILL_COLOR,
     });
     const clear = new Konva.Rect({
       fill: 'black',
@@ -294,7 +314,7 @@ export class Editor {
    * Create the Konva objects used for crop interaction (the crop box, resize handles, and guides).
    */
   private createKonvaCropInteractionObjects = (): KonvaObjects['crop']['interaction'] => {
-    const group = new Konva.Group();
+    const group = new Konva.Group({ visible: false });
 
     const rect = this.createKonvaCropInteractionRect();
     const handles = {
@@ -589,12 +609,18 @@ export class Editor {
    * Update the crop box state and re-render all related Konva objects.
    */
   private updateCropBox = (cropBox: CropBox) => {
-    this.cropBox = cropBox;
+    const { x, y, width, height } = cropBox;
+    this.cropBox = {
+      x: Math.floor(x),
+      y: Math.floor(y),
+      width: Math.floor(width),
+      height: Math.floor(height),
+    };
     this.updateKonvaCropOverlay();
     this.updateKonvaCropInteractionRect();
     this.updateKonvaCropInteractionGuides();
     this.updateKonvaCropInteractionHandlePositions();
-    this.callbacks.onCropBoxChange?.(cropBox);
+    this._invokeCallbacks('onCropBoxChange', cropBox);
   };
 
   /**
@@ -667,6 +693,10 @@ export class Editor {
 
     // Center image at 100% zoom
     this.resetView();
+
+    if (this.cropBox) {
+      this.updateKonvaCropOverlay();
+    }
   };
 
   /**
@@ -984,7 +1014,7 @@ export class Editor {
     // Update handle scaling to maintain constant screen size
     this.updateKonvaCropInteractionHandleScales();
     this.updateKonvaBg();
-    this.callbacks.onZoomChange?.(newScale);
+    this._invokeCallbacks('onZoomChange', newScale);
   };
 
   /**
@@ -1080,7 +1110,7 @@ export class Editor {
       img.onload = () => {
         this.originalImage = img;
         this.updateImage();
-        this.callbacks.onImageLoad?.();
+        this._invokeCallbacks('onImageLoad');
         resolve();
       };
 
@@ -1138,7 +1168,7 @@ export class Editor {
     this.isCropping = true;
     this.konva.crop.interaction.group.visible(true);
 
-    this.callbacks.onCropStart?.();
+    this._invokeCallbacks('onCropStart');
   };
 
   /**
@@ -1150,7 +1180,7 @@ export class Editor {
     }
     this.isCropping = false;
     this.konva.crop.interaction.group.visible(false);
-    this.callbacks.onCropCancel?.();
+    this._invokeCallbacks('onCropCancel');
   };
 
   /**
@@ -1163,7 +1193,7 @@ export class Editor {
 
     this.isCropping = false;
     this.konva.crop.interaction.group.visible(false);
-    this.callbacks.onCropApply?.(this.cropBox);
+    this._invokeCallbacks('onCropApply', this.cropBox);
   };
 
   /**
@@ -1177,15 +1207,22 @@ export class Editor {
         ...this.konva.image.image.size(),
       });
     }
-    this.callbacks.onCropReset?.();
+    this._invokeCallbacks('onCropReset');
   };
 
   /**
-   * Export the current image, optionally cropped, in the specified format.
+   * Export the current image with the current crop applied, in the specified format.
+   *
+   * If there is no crop box, the full image is exported.
+   *
    * @param format The output format: 'canvas', 'blob', or 'dataURL'. Defaults to 'blob'.
    * @returns A promise that resolves with the exported image in the requested format.
    */
-  exportImage = <T extends OutputFormat>(format: T = 'blob' as T): Promise<OutputFormatToOutputMap<T>> => {
+  exportImage = <T extends OutputFormat>(
+    format: T = 'blob' as T,
+    options?: { withCropOverlay?: boolean }
+  ): Promise<OutputFormatToOutputMap<T>> => {
+    const { withCropOverlay } = { withCropOverlay: false, ...options };
     return new Promise((resolve, reject) => {
       if (!this.originalImage) {
         throw new Error('No image loaded');
@@ -1200,20 +1237,48 @@ export class Editor {
 
       try {
         if (this.cropBox) {
-          canvas.width = this.cropBox.width;
-          canvas.height = this.cropBox.height;
+          if (!withCropOverlay) {
+            // Draw the cropped image
+            canvas.width = this.cropBox.width;
+            canvas.height = this.cropBox.height;
 
-          ctx.drawImage(
-            this.originalImage,
-            this.cropBox.x,
-            this.cropBox.y,
-            this.cropBox.width,
-            this.cropBox.height,
-            0,
-            0,
-            this.cropBox.width,
-            this.cropBox.height
-          );
+            ctx.drawImage(
+              this.originalImage,
+              this.cropBox.x,
+              this.cropBox.y,
+              this.cropBox.width,
+              this.cropBox.height,
+              0,
+              0,
+              this.cropBox.width,
+              this.cropBox.height
+            );
+          } else {
+            // Draw the full image with dark overlay and clear crop area
+            canvas.width = this.originalImage.width;
+            canvas.height = this.originalImage.height;
+
+            ctx.drawImage(this.originalImage, 0, 0);
+
+            // We need a new canvas for the overlay to avoid messing up the original image when clearing the crop area
+            const overlayCanvas = document.createElement('canvas');
+            overlayCanvas.width = this.originalImage.width;
+            overlayCanvas.height = this.originalImage.height;
+
+            const overlayCtx = overlayCanvas.getContext('2d');
+            if (!overlayCtx) {
+              throw new Error('Failed to get canvas context');
+            }
+
+            overlayCtx.fillStyle = this.config.CROP_OVERLAY_FILL_COLOR;
+            overlayCtx.fillRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            overlayCtx.clearRect(this.cropBox.x, this.cropBox.y, this.cropBox.width, this.cropBox.height);
+
+            ctx.globalCompositeOperation = 'multiply';
+            ctx.drawImage(overlayCanvas, 0, 0);
+
+            overlayCanvas.remove();
+          }
         } else {
           canvas.width = this.originalImage.width;
           canvas.height = this.originalImage.height;
@@ -1292,7 +1357,7 @@ export class Editor {
 
     this.updateKonvaBg();
 
-    this.callbacks.onZoomChange?.(scale);
+    this._invokeCallbacks('onZoomChange', scale);
   };
 
   /**
@@ -1346,7 +1411,7 @@ export class Editor {
 
     this.updateKonvaBg();
 
-    this.callbacks.onZoomChange?.(1);
+    this._invokeCallbacks('onZoomChange', 1);
   };
 
   /**
@@ -1382,7 +1447,7 @@ export class Editor {
 
     this.updateKonvaBg();
 
-    this.callbacks.onZoomChange?.(scale);
+    this._invokeCallbacks('onZoomChange', scale);
   };
 
   /**
@@ -1475,6 +1540,10 @@ export class Editor {
     });
   };
 
+  setCropBox = (box: CropBox) => {
+    this.updateCropBox(box);
+  };
+
   /**
    * Get the current crop aspect ratio constraint.
    * @returns The current aspect ratio (width / height) or null if no constraint is set.
@@ -1482,6 +1551,66 @@ export class Editor {
   getCropAspectRatio = (): number | null => {
     return this.aspectRatio;
   };
+
+  /**
+   * Helper to build a callback registrar function for a specific event name.
+   * @param name The callback event name.
+   */
+  _buildCallbackRegistrar = <T extends keyof EditorCallbacks>(name: T) => {
+    return (cb: SetElement<EditorCallbacks[T]>): (() => void) => {
+      (this.callbacks[name] as Set<typeof cb>).add(cb);
+      return () => {
+        (this.callbacks[name] as Set<typeof cb>).delete(cb);
+      };
+    };
+  };
+
+  /**
+   * Invoke all callbacks registered for a specific event.
+   * @param name The callback event name.
+   * @param args The arguments to pass to each callback.
+   */
+  private _invokeCallbacks = <T extends keyof EditorCallbacks>(
+    name: T,
+    ...args: EditorCallbacks[T] extends Set<(...args: infer P) => void> ? P : never
+  ): void => {
+    const callbacks = this.callbacks[name];
+    if (callbacks && callbacks.size > 0) {
+      callbacks.forEach((cb) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (cb as (...args: any[]) => void)(...args);
+      });
+    }
+  };
+
+  /**
+   * Register a callback for when the crop is applied.
+   */
+  onCropApply = this._buildCallbackRegistrar('onCropApply');
+  /**
+   * Register a callback for when the crop is canceled.
+   */
+  onCropCancel = this._buildCallbackRegistrar('onCropCancel');
+  /**
+   * Register a callback for when the crop is reset.
+   */
+  onCropReset = this._buildCallbackRegistrar('onCropReset');
+  /**
+   * Register a callback for when cropping starts.
+   */
+  onCropStart = this._buildCallbackRegistrar('onCropStart');
+  /**
+   * Register a callback for when the crop box changes (moved or resized).
+   */
+  onCropBoxChange = this._buildCallbackRegistrar('onCropBoxChange');
+  /**
+   * Register a callback for when a new image is loaded.
+   */
+  onImageLoad = this._buildCallbackRegistrar('onImageLoad');
+  /**
+   * Register a callback for when the zoom level changes.
+   */
+  onZoomChange = this._buildCallbackRegistrar('onZoomChange');
 
   /**
    * Resize the editor container and adjust the Konva stage accordingly.
@@ -1523,7 +1652,9 @@ export class Editor {
     this.konva = null;
     this.originalImage = null;
     this.cropBox = null;
-    this.callbacks = {};
+    for (const set of Object.values(this.callbacks)) {
+      set.clear();
+    }
   };
   //#endregion Public API
 }

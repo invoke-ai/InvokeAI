@@ -1,4 +1,4 @@
-import { Editor } from 'features/editImageModal/lib/editor';
+import type { Editor } from 'features/editImageModal/lib/editor';
 import { atom } from 'nanostores';
 
 type EditImageModalState =
@@ -19,11 +19,11 @@ export const $editImageModalState = atom<EditImageModalState>({
   editor: null,
 });
 
-export const openEditImageModal = (imageName: string) => {
+export const openEditImageModal = (imageName: string, editor: Editor) => {
   $editImageModalState.set({
     isOpen: true,
     imageName,
-    editor: new Editor(),
+    editor,
   });
 };
 

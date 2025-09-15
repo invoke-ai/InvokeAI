@@ -4,7 +4,7 @@ import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerH
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { refImageAdded } from 'features/controlLayers/store/refImagesSlice';
 import type { CanvasEntityIdentifier, CanvasEntityType } from 'features/controlLayers/store/types';
-import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
+import { imageDTOToCroppableImage, imageDTOToImageWithDims } from 'features/controlLayers/store/util';
 import { selectComparisonImages } from 'features/gallery/components/ImageViewer/common';
 import type { BoardId } from 'features/gallery/store/types';
 import {
@@ -641,7 +641,7 @@ export const videoFrameFromImageDndTarget: DndTarget<VideoFrameFromImageDndTarge
   },
   handler: ({ sourceData, dispatch }) => {
     const { imageDTO } = sourceData.payload;
-    dispatch(startingFrameImageChanged(imageDTOToImageWithDims(imageDTO)));
+    dispatch(startingFrameImageChanged(imageDTOToCroppableImage(imageDTO)));
   },
 };
 //#endregion

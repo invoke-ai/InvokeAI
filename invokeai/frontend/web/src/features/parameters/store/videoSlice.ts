@@ -4,7 +4,7 @@ import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import { isPlainObject } from 'es-toolkit';
 import type {
-  ImageWithDims,
+  CroppableImageWithDims,
   VideoAspectRatio,
   VideoDuration,
   VideoResolution,
@@ -16,7 +16,7 @@ import {
   isVeo3AspectRatioID,
   isVeo3DurationID,
   isVeo3Resolution,
-  zImageWithDims,
+  zCroppableImage,
   zVideoAspectRatio,
   zVideoDuration,
   zVideoResolution,
@@ -31,7 +31,7 @@ import z from 'zod';
 
 const zVideoState = z.object({
   _version: z.literal(1),
-  startingFrameImage: zImageWithDims.nullable(),
+  startingFrameImage: zCroppableImage.nullable(),
   videoModel: zModelIdentifierField.nullable(),
   videoResolution: zVideoResolution,
   videoDuration: zVideoDuration,
@@ -55,7 +55,7 @@ const slice = createSlice({
   name: 'video',
   initialState: getInitialState(),
   reducers: {
-    startingFrameImageChanged: (state, action: PayloadAction<ImageWithDims | null>) => {
+    startingFrameImageChanged: (state, action: PayloadAction<CroppableImageWithDims | null>) => {
       state.startingFrameImage = action.payload;
     },
 

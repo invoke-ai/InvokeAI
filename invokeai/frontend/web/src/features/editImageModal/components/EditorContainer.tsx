@@ -12,6 +12,29 @@ type Props = {
   imageName: string;
 };
 
+const CROP_ASPECT_RATIO_MAP: Record<string, number> = {
+  '16:9': 16 / 9,
+  '3:2': 3 / 2,
+  '4:3': 4 / 3,
+  '1:1': 1,
+  '3:4': 3 / 4,
+  '2:3': 2 / 3,
+  '9:16': 9 / 16,
+};
+
+export const getAspectRatioString = (ratio: number | null) => {
+  if (!ratio) {
+    return 'free';
+  }
+  const entries = Object.entries(CROP_ASPECT_RATIO_MAP);
+  for (const [key, value] of entries) {
+    if (value === ratio) {
+      return key;
+    }
+  }
+  return 'free';
+};
+
 export const EditorContainer = ({ editor, imageName }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(100);
@@ -26,51 +49,44 @@ export const EditorContainer = ({ editor, imageName }: Props) => {
 
   const setup = useCallback(
     async (imageDTO: ImageDTO, container: HTMLDivElement) => {
+      console.log('Setting up editor');
       editor.init(container);
-      editor.setCallbacks({
-        onZoomChange: (zoom) => {
-          setZoom(zoom);
-        },
-        onCropStart: () => {
-          setCropInProgress(true);
-          setCropBox(null);
-        },
-        onCropBoxChange: (crop) => {
-          setCropBox(crop);
-        },
-        onCropApply: () => {
-          setCropApplied(true);
-          setCropInProgress(false);
-          setCropBox(null);
-        },
-        onCropReset: () => {
-          setCropApplied(true);
-          setCropInProgress(false);
-          setCropBox(null);
-        },
-        onCropCancel: () => {
-          setCropInProgress(false);
-          setCropBox(null);
-        },
-        onImageLoad: () => {
-          // setCropInfo('');
-          // setIsCropping(false);
-          // setHasCropBbox(false);
-        },
+      editor.onZoomChange((zoom) => {
+        setZoom(zoom);
+      });
+      editor.onCropStart(() => {
+        setCropInProgress(true);
+        setCropBox(null);
+      });
+      editor.onCropBoxChange((crop) => {
+        setCropBox(crop);
+      });
+      editor.onCropApply(() => {
+        setCropApplied(true);
+        setCropInProgress(false);
+        setCropBox(null);
+      });
+      editor.onCropReset(() => {
+        setCropApplied(true);
+        setCropInProgress(false);
+        setCropBox(null);
+      });
+      editor.onCropCancel(() => {
+        setCropInProgress(false);
+        setCropBox(null);
+      });
+      editor.onImageLoad(() => {
+        // setCropInfo('');
+        // setIsCropping(false);
+        // setHasCropBbox(false);
       });
       const blob = await convertImageUrlToBlob(imageDTO.image_url);
       if (!blob) {
         console.error('Failed to convert image to blob');
         return;
       }
-
+      setAspectRatio(getAspectRatioString(editor.getCropAspectRatio()));
       await editor.loadImage(imageDTO.image_url);
-      editor.startCrop({
-        x: 0,
-        y: 0,
-        width: imageDTO.width,
-        height: imageDTO.height,
-      });
       editor.fitToContainer();
     },
     [editor]
@@ -98,15 +114,7 @@ export const EditorContainer = ({ editor, imageName }: Props) => {
     editor.startCrop();
     // Apply current aspect ratio if not free
     if (aspectRatio !== 'free') {
-      const ratios: Record<string, number> = {
-        '1:1': 1,
-        '4:3': 4 / 3,
-        '16:9': 16 / 9,
-        '3:2': 3 / 2,
-        '2:3': 2 / 3,
-        '9:16': 9 / 16,
-      };
-      editor.setCropAspectRatio(ratios[aspectRatio]);
+      editor.setCropAspectRatio(CROP_ASPECT_RATIO_MAP[aspectRatio] ?? null);
     }
   }, [aspectRatio, editor]);
 
@@ -116,17 +124,9 @@ export const EditorContainer = ({ editor, imageName }: Props) => {
       setAspectRatio(newRatio);
 
       if (newRatio === 'free') {
-        editor.setCropAspectRatio(undefined);
+        editor.setCropAspectRatio(null);
       } else {
-        const ratios: Record<string, number> = {
-          '1:1': 1,
-          '4:3': 4 / 3,
-          '16:9': 16 / 9,
-          '3:2': 3 / 2,
-          '2:3': 2 / 3,
-          '9:16': 9 / 16,
-        };
-        editor.setCropAspectRatio(ratios[newRatio]);
+        editor.setCropAspectRatio(CROP_ASPECT_RATIO_MAP[newRatio] ?? null);
       }
     },
     [editor]
@@ -146,7 +146,7 @@ export const EditorContainer = ({ editor, imageName }: Props) => {
 
   const handleExport = useCallback(async () => {
     try {
-      const blob = await editor.exportImage('blob');
+      const blob = await editor.exportImage('blob', { withCropOverlay: true });
       const file = new File([blob], 'image.png', { type: 'image/png' });
 
       await uploadImage({
