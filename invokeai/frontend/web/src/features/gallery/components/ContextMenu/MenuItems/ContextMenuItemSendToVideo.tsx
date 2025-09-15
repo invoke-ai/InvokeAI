@@ -1,4 +1,5 @@
 import { MenuItem } from '@invoke-ai/ui-library';
+import { imageDTOToCroppableImage } from 'features/controlLayers/store/util';
 import { useItemDTOContextImageOnly } from 'features/gallery/contexts/ItemDTOContext';
 import { startingFrameImageChanged } from 'features/parameters/store/videoSlice';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -13,7 +14,7 @@ export const ContextMenuItemSendToVideo = memo(() => {
   const dispatch = useDispatch();
 
   const onClick = useCallback(() => {
-    dispatch(startingFrameImageChanged(imageDTO));
+    dispatch(startingFrameImageChanged(imageDTOToCroppableImage(imageDTO)));
     navigationApi.switchToTab('video');
   }, [imageDTO, dispatch]);
 

@@ -16,7 +16,7 @@ import {
   isVeo3AspectRatioID,
   isVeo3DurationID,
   isVeo3Resolution,
-  zCroppableImage,
+  zCroppableImageWithDims,
   zVideoAspectRatio,
   zVideoDuration,
   zVideoResolution,
@@ -30,8 +30,8 @@ import { assert } from 'tsafe';
 import z from 'zod';
 
 const zVideoState = z.object({
-  _version: z.literal(1),
-  startingFrameImage: zCroppableImage.nullable(),
+  _version: z.literal(2),
+  startingFrameImage: zCroppableImageWithDims.nullable(),
   videoModel: zModelIdentifierField.nullable(),
   videoResolution: zVideoResolution,
   videoDuration: zVideoDuration,
@@ -42,7 +42,7 @@ export type VideoState = z.infer<typeof zVideoState>;
 
 const getInitialState = (): VideoState => {
   return {
-    _version: 1,
+    _version: 2,
     startingFrameImage: null,
     videoModel: null,
     videoResolution: '1080p',
@@ -118,6 +118,13 @@ export const videoSliceConfig: SliceConfig<typeof slice> = {
       assert(isPlainObject(state));
       if (!('_version' in state)) {
         state._version = 1;
+      }
+      if (state._version === 1) {
+        state._version = 2;
+        if (state.startingFrameImage) {
+          // startingFrameImage changed from ImageWithDims to CroppableImageWithDims
+          state.startingFrameImage = zCroppableImageWithDims.parse({ original: state.startingFrameImage });
+        }
       }
       return zVideoState.parse(state);
     },

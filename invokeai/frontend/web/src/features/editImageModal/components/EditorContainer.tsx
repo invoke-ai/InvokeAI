@@ -1,12 +1,15 @@
 import { Button, Divider, Flex, Select, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import type { CropBox, Editor } from 'features/editImageModal/lib/editor';
+import type { CropBox } from 'features/editImageModal/lib/editor';
+import { closeEditImageModal, type EditImageModalState } from 'features/editImageModal/store';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useUploadImageMutation } from 'services/api/endpoints/images';
 
 type Props = {
-  editor: Editor;
+  editor: EditImageModalState['editor'];
+  onApplyCrop: EditImageModalState['onApplyCrop'];
+  onReady: EditImageModalState['onReady'];
 };
 
 const CROP_ASPECT_RATIO_MAP: Record<string, number> = {
@@ -19,7 +22,7 @@ const CROP_ASPECT_RATIO_MAP: Record<string, number> = {
   '9:16': 9 / 16,
 };
 
-export const getAspectRatioString = (ratio: number | null) => {
+const getAspectRatioString = (ratio: number | null) => {
   if (!ratio) {
     return 'free';
   }
@@ -32,53 +35,32 @@ export const getAspectRatioString = (ratio: number | null) => {
   return 'free';
 };
 
-export const EditorContainer = ({ editor }: Props) => {
+export const EditorContainer = ({ editor, onApplyCrop, onReady }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(100);
-  const [cropInProgress, setCropInProgress] = useState(false);
   const [cropBox, setCropBox] = useState<CropBox | null>(null);
-  const [cropApplied, setCropApplied] = useState(false);
   const [aspectRatio, setAspectRatio] = useState<string>('free');
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
 
   const [uploadImage] = useUploadImageMutation({ fixedCacheKey: 'editorContainer' });
 
   const setup = useCallback(
-    (container: HTMLDivElement) => {
+    async (container: HTMLDivElement) => {
       editor.init(container);
       editor.onZoomChange((zoom) => {
         setZoom(zoom);
       });
-      editor.onCropStart(() => {
-        setCropInProgress(true);
-        setCropBox(null);
-      });
       editor.onCropBoxChange((crop) => {
         setCropBox(crop);
       });
-      editor.onCropApply(() => {
-        setCropApplied(true);
-        setCropInProgress(false);
-        setCropBox(null);
-      });
       editor.onCropReset(() => {
-        setCropApplied(true);
-        setCropInProgress(false);
         setCropBox(null);
-      });
-      editor.onCropCancel(() => {
-        setCropInProgress(false);
-        setCropBox(null);
-      });
-      editor.onImageLoad(() => {
-        // setCropInfo('');
-        // setIsCropping(false);
-        // setHasCropBbox(false);
       });
       setAspectRatio(getAspectRatioString(editor.getCropAspectRatio()));
+      await onReady();
       editor.fitToContainer();
     },
-    [editor]
+    [editor, onReady]
   );
 
   useEffect(() => {
@@ -98,14 +80,6 @@ export const EditorContainer = ({ editor }: Props) => {
     };
   }, [editor, setup]);
 
-  const handleStartCrop = useCallback(() => {
-    editor.startCrop();
-    // Apply current aspect ratio if not free
-    if (aspectRatio !== 'free') {
-      editor.setCropAspectRatio(CROP_ASPECT_RATIO_MAP[aspectRatio] ?? null);
-    }
-  }, [aspectRatio, editor]);
-
   const handleAspectRatioChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       const newRatio = e.target.value;
@@ -120,17 +94,18 @@ export const EditorContainer = ({ editor }: Props) => {
     [editor]
   );
 
-  const handleApplyCrop = useCallback(() => {
-    editor.applyCrop();
-  }, [editor]);
-
-  const handleCancelCrop = useCallback(() => {
-    editor.cancelCrop();
-  }, [editor]);
-
   const handleResetCrop = useCallback(() => {
     editor.resetCrop();
   }, [editor]);
+
+  const handleApplyCrop = useCallback(async () => {
+    await onApplyCrop();
+    closeEditImageModal();
+  }, [onApplyCrop]);
+
+  const handleCancelCrop = useCallback(() => {
+    closeEditImageModal();
+  }, []);
 
   const handleExport = useCallback(async () => {
     try {
@@ -144,7 +119,6 @@ export const EditorContainer = ({ editor }: Props) => {
         board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
       }).unwrap();
     } catch (err) {
-      console.error('Export failed:', err);
       if (err instanceof Error && err.message.includes('tainted')) {
         alert(
           'Cannot export image: The image is from a different domain (CORS issue). To fix this:\n\n1. Load images from the same domain\n2. Use images from CORS-enabled sources\n3. Upload a local image file instead'
@@ -174,23 +148,19 @@ export const EditorContainer = ({ editor }: Props) => {
   return (
     <Flex w="full" h="full" flexDir="column" gap={4}>
       <Flex gap={2}>
-        {!cropInProgress && <Button onClick={handleStartCrop}>Start Crop</Button>}
-        {cropApplied && <Button onClick={handleResetCrop}>Reset Crop</Button>}
-        {cropInProgress && (
-          <>
-            <Select value={aspectRatio} onChange={handleAspectRatioChange}>
-              <option value="free">Free</option>
-              <option value="1:1">1:1 (Square)</option>
-              <option value="4:3">4:3</option>
-              <option value="16:9">16:9</option>
-              <option value="3:2">3:2</option>
-              <option value="2:3">2:3 (Portrait)</option>
-              <option value="9:16">9:16 (Portrait)</option>
-            </Select>
-            <Button onClick={handleApplyCrop}>Apply Crop</Button>
-            <Button onClick={handleCancelCrop}>Cancel Crop</Button>
-          </>
-        )}
+        {cropBox && <Button onClick={handleResetCrop}>Reset Crop</Button>}
+        <Select value={aspectRatio} onChange={handleAspectRatioChange} w={64}>
+          <option value="free">Free</option>
+          <option value="16:9">16:9</option>
+          <option value="3:2">3:2</option>
+          <option value="4:3">4:3</option>
+          <option value="1:1">1:1 (Square)</option>
+          <option value="3:4">3:4</option>
+          <option value="2:3">2:3 (Portrait)</option>
+          <option value="9:16">9:16 (Portrait)</option>
+        </Select>
+        <Button onClick={handleApplyCrop}>Apply Crop</Button>
+        <Button onClick={handleCancelCrop}>Cancel Crop</Button>
 
         <Button onClick={fitToContainer}>Fit</Button>
         <Button onClick={resetView}>Reset View</Button>
@@ -208,13 +178,9 @@ export const EditorContainer = ({ editor }: Props) => {
         <Text>Mouse wheel: Zoom</Text>
         <Divider orientation="vertical" />
         <Text>Space + Drag: Pan</Text>
-        {cropInProgress && (
-          <>
-            <Divider orientation="vertical" />
-            <Text>Drag crop box or handles to adjust</Text>
-          </>
-        )}
-        {cropInProgress && cropBox && (
+        <Divider orientation="vertical" />
+        <Text>Drag crop box or handles to adjust</Text>
+        {cropBox && (
           <>
             <Divider orientation="vertical" />
             <Text>

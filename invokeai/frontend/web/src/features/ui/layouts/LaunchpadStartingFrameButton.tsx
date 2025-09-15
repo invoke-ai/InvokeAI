@@ -1,7 +1,7 @@
 import { Flex, Heading, Icon, Text } from '@invoke-ai/ui-library';
 import { useAppStore } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
-import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
+import { imageDTOToCroppableImage } from 'features/controlLayers/store/util';
 import { videoFrameFromImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { startingFrameImageChanged } from 'features/parameters/store/videoSlice';
@@ -21,7 +21,7 @@ export const LaunchpadStartingFrameButton = memo((props: { extraAction?: () => v
     () =>
       ({
         onUpload: (imageDTO: ImageDTO) => {
-          dispatch(startingFrameImageChanged(imageDTOToImageWithDims(imageDTO)));
+          dispatch(startingFrameImageChanged(imageDTOToCroppableImage(imageDTO)));
           props.extraAction?.();
         },
         allowMultiple: false,
