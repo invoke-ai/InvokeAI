@@ -235,6 +235,7 @@
         "compatibleEmbeddings": "Compatible Embeddings",
         "noMatchingTriggers": "No matching triggers",
         "generateFromImage": "Generate prompt from image",
+        "historyHotkeyHint": "Tip: Use Alt+Up/Down to browse history from the prompt.",
         "expandCurrentPrompt": "Expand Current Prompt",
         "uploadImageForPromptGeneration": "Upload Image for Prompt Generation",
         "expandingPrompt": "Expanding prompt...",
@@ -479,6 +480,14 @@
             "focusPrompt": {
                 "title": "Focus Prompt",
                 "desc": "Move cursor focus to the positive prompt."
+            },
+            "promptHistoryPrev": {
+                "title": "Previous Prompt in History",
+                "desc": "When the prompt is focused, move to the previous (older) prompt in your history."
+            },
+            "promptHistoryNext": {
+                "title": "Next Prompt in History",
+                "desc": "When the prompt is focused, move to the next (newer) prompt in your history."
             },
             "toggleLeftPanel": {
                 "title": "Toggle Left Panel",

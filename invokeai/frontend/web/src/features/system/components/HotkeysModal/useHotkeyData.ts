@@ -81,6 +81,10 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('app', 'selectGenerateTab', ['1']);
     addHotkey('app', 'selectCanvasTab', ['2']);
     addHotkey('app', 'selectUpscalingTab', ['3']);
+    // Prompt/history navigation (when prompt textarea is focused)
+    addHotkey('app', 'promptHistoryPrev', ['alt+up']);
+    addHotkey('app', 'promptHistoryNext', ['alt+down']);
+
     if (isVideoEnabled) {
       addHotkey('app', 'selectVideoTab', ['4']);
       addHotkey('app', 'selectWorkflowsTab', ['5']);
