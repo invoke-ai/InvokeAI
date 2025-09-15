@@ -9,6 +9,7 @@ import {
   PopoverContent,
   PopoverHeader,
   PopoverTrigger,
+  Portal,
   Text,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
@@ -54,25 +55,27 @@ export const Notifications = () => {
           />
         </Flex>
       </PopoverTrigger>
-      <PopoverContent p={2}>
-        <PopoverArrow />
-        <PopoverCloseButton />
-        <PopoverHeader fontSize="md" fontWeight="semibold" pt={5}>
-          <Flex alignItems="center" gap={3}>
-            <Image src={InvokeSymbol} boxSize={6} />
-            {t('whatsNew.whatsNewInInvoke')}
-            {!!data.version.length &&
-              (isLocal ? (
-                <Text variant="subtext">{`v${data.version}`}</Text>
-              ) : (
-                <Text variant="subtext">{data.version}</Text>
-              ))}
-          </Flex>
-        </PopoverHeader>
-        <PopoverBody p={2} maxW={300}>
-          <WhatsNew />
-        </PopoverBody>
-      </PopoverContent>
+      <Portal>
+        <PopoverContent p={2}>
+          <PopoverArrow />
+          <PopoverCloseButton />
+          <PopoverHeader fontSize="md" fontWeight="semibold" pt={5}>
+            <Flex alignItems="center" gap={3}>
+              <Image src={InvokeSymbol} boxSize={6} />
+              {t('whatsNew.whatsNewInInvoke')}
+              {!!data.version.length &&
+                (isLocal ? (
+                  <Text variant="subtext">{`v${data.version}`}</Text>
+                ) : (
+                  <Text variant="subtext">{data.version}</Text>
+                ))}
+            </Flex>
+          </PopoverHeader>
+          <PopoverBody p={2} maxW={300}>
+            <WhatsNew />
+          </PopoverBody>
+        </PopoverContent>
+      </Portal>
     </Popover>
   );
 };

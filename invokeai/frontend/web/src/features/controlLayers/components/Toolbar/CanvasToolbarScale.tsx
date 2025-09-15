@@ -12,6 +12,7 @@ import {
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
+  Portal,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { round } from 'es-toolkit/compat';
@@ -153,21 +154,23 @@ export const CanvasToolbarScale = memo(() => {
             </PopoverTrigger>
           </NumberInput>
         </PopoverAnchor>
-        <PopoverContent w={200} pt={0} pb={2} px={4}>
-          <PopoverArrow />
-          <PopoverBody>
-            <CompositeSlider
-              min={0}
-              max={100}
-              value={mapRawValueToSliderValue(localScale)}
-              onChange={onChangeSlider}
-              defaultValue={sliderDefaultValue}
-              marks={marks}
-              formatValue={formatSliderValue}
-              alwaysShowMarks
-            />
-          </PopoverBody>
-        </PopoverContent>
+        <Portal>
+          <PopoverContent w={200} pt={0} pb={2} px={4}>
+            <PopoverArrow />
+            <PopoverBody>
+              <CompositeSlider
+                min={0}
+                max={100}
+                value={mapRawValueToSliderValue(localScale)}
+                onChange={onChangeSlider}
+                defaultValue={sliderDefaultValue}
+                marks={marks}
+                formatValue={formatSliderValue}
+                alwaysShowMarks
+              />
+            </PopoverBody>
+          </PopoverContent>
+        </Portal>
       </Popover>
       <ZoomInButton />
     </Flex>

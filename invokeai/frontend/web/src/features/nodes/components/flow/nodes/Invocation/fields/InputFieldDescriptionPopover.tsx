@@ -5,6 +5,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  Portal,
   Textarea,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
@@ -36,9 +37,11 @@ export const InputFieldDescriptionPopover = memo(({ nodeId, fieldName }: Props) 
           size="xs"
         />
       </PopoverTrigger>
-      <PopoverContent p={2} w={256}>
-        <Content nodeId={nodeId} fieldName={fieldName} />
-      </PopoverContent>
+      <Portal>
+        <PopoverContent p={2} w={256}>
+          <Content nodeId={nodeId} fieldName={fieldName} />
+        </PopoverContent>
+      </Portal>
     </Popover>
   );
 });
