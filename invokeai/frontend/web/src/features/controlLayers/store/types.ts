@@ -758,7 +758,7 @@ const zCanvasState = z.object({
 });
 export type CanvasState = z.infer<typeof zCanvasState>;
 const zCanvasStateWithHistory = zStateWithHistory(zCanvasState);
-export const zCanvasesState = <T extends z.ZodTypeAny>(canvasStateSchema: T) =>
+const zCanvasesState = <T extends z.ZodTypeAny>(canvasStateSchema: T) =>
   z.object({
     _version: z.literal(4),
     selectedCanvasId: zId,

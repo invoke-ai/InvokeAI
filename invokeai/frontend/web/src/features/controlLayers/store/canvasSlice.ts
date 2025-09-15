@@ -4,8 +4,8 @@ import type { SliceConfig } from 'app/store/types';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
+import { isPlainObject } from 'es-toolkit';
 import { merge } from 'es-toolkit/compat';
-import { isPlainObject, omit } from 'es-toolkit';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasReset } from 'features/controlLayers/store/actions';
 import { modelChanged } from 'features/controlLayers/store/paramsSlice';
@@ -54,6 +54,7 @@ import {
   isIPAdapterModelConfig,
   type T2IAdapterModelConfig,
 } from 'services/api/types';
+import { assert } from 'tsafe';
 
 import type {
   AspectRatioID,
@@ -106,8 +107,6 @@ import {
   initialT2IAdapter,
   makeDefaultRasterLayerAdjustments,
 } from './util';
-import { assert } from 'tsafe';
-import { Canvas } from 'konva/lib/Canvas';
 
 type CanvasDeletedPayloadAction = PayloadAction<{ id: string }>;
 
@@ -145,14 +144,14 @@ const getInitialCanvasesState = (): CanvasesStateWithoutHistory => {
     selectedCanvasId: canvasId,
     canvases: [canvas],
   };
-}
+};
 
 const getInitialCanvasesHistoryState = (): CanvasesStateWithHistory => {
   const state = getInitialCanvasesState();
 
   return {
     ...state,
-    canvases: state.canvases.map((canvas) => newHistory([], canvas, []))
+    canvases: state.canvases.map((canvas) => newHistory([], canvas, [])),
   };
 };
 
@@ -2038,17 +2037,17 @@ export const canvasSliceConfig: SliceConfig<typeof slice, CanvasesStateWithHisto
         const canvas = {
           id: canvasId,
           name: canvasName,
-          ...state
+          ...state,
         } as CanvasState;
 
         state = {
           _version: 4,
           selectedCanvasId: canvas.id,
-          canvases: [ canvas ]
+          canvases: [canvas],
         };
       }
       return zCanvasesStateWithoutHistory.parse(state);
-    }
+    },
   },
 };
 
