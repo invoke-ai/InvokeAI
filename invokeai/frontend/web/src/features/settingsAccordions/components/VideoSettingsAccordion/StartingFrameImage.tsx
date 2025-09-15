@@ -1,12 +1,14 @@
 import { Box, Flex, FormLabel, Icon, IconButton, Text, Tooltip } from '@invoke-ai/ui-library';
+import { objectEquals } from '@observ33r/object-equals';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { UploadImageIconButton } from 'common/hooks/useImageUploadButton';
 import { ASPECT_RATIO_MAP } from 'features/controlLayers/store/types';
-import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
+import { imageDTOToCroppableImage, imageDTOToImageWithDims } from 'features/controlLayers/store/util';
 import { videoFrameFromImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
 import { DndImageIcon, imageButtonSx } from 'features/dnd/DndImageIcon';
+import { Editor } from 'features/editImageModal/lib/editor';
 import { openEditImageModal } from 'features/editImageModal/store';
 import {
   selectStartingFrameImage,
@@ -17,7 +19,7 @@ import {
 import { t } from 'i18next';
 import { useCallback, useMemo } from 'react';
 import { PiArrowCounterClockwiseBold, PiCropBold, PiWarningBold } from 'react-icons/pi';
-import { useImageDTO } from 'services/api/endpoints/images';
+import { useImageDTO, useUploadImageMutation } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
 const dndTargetData = videoFrameFromImageDndTarget.getData({ frame: 'start' });
@@ -26,8 +28,10 @@ export const StartingFrameImage = () => {
   const dispatch = useAppDispatch();
   const requiresStartingFrame = useAppSelector(selectVideoModelRequiresStartingFrame);
   const startingFrameImage = useAppSelector(selectStartingFrameImage);
-  const imageDTO = useImageDTO(startingFrameImage?.image_name);
+  const originalImageDTO = useImageDTO(startingFrameImage?.original.image_name);
+  const croppedImageDTO = useImageDTO(startingFrameImage?.crop?.image.image_name);
   const videoAspectRatio = useAppSelector(selectVideoAspectRatio);
+  const [uploadImage] = useUploadImageMutation({ fixedCacheKey: 'editorContainer' });
 
   const onReset = useCallback(() => {
     dispatch(startingFrameImageChanged(null));
@@ -35,25 +39,53 @@ export const StartingFrameImage = () => {
 
   const onUpload = useCallback(
     (imageDTO: ImageDTO) => {
-      dispatch(startingFrameImageChanged(imageDTOToImageWithDims(imageDTO)));
+      dispatch(startingFrameImageChanged(imageDTOToCroppableImage(imageDTO)));
     },
     [dispatch]
   );
 
-  const onOpenEditImageModal = useCallback(() => {
-    if (!imageDTO) {
+  const edit = useCallback(() => {
+    if (!originalImageDTO) {
       return;
     }
-    openEditImageModal(imageDTO.image_name);
-  }, [imageDTO]);
+    const editor = new Editor();
+    if (startingFrameImage?.crop) {
+      editor.setCropBox(startingFrameImage.crop.box);
+      editor.setCropAspectRatio(startingFrameImage.crop.ratio);
+    }
+    editor.onCropApply(async (box) => {
+      if (objectEquals(box, startingFrameImage?.crop?.box)) {
+        return;
+      }
+      const blob = await editor.exportImage('blob');
+      const file = new File([blob], 'image.png', { type: 'image/png' });
+
+      const newCroppedImageDTO = await uploadImage({
+        file,
+        is_intermediate: true,
+        image_category: 'user',
+      }).unwrap();
+
+      dispatch(
+        startingFrameImageChanged(
+          imageDTOToCroppableImage(originalImageDTO, {
+            image: imageDTOToImageWithDims(newCroppedImageDTO),
+            box,
+            ratio: editor.getCropAspectRatio(),
+          })
+        )
+      );
+    });
+    openEditImageModal(originalImageDTO.image_name, editor);
+  }, [dispatch, originalImageDTO, startingFrameImage?.crop, uploadImage]);
 
   const fitsCurrentAspectRatio = useMemo(() => {
-    if (!imageDTO) {
+    if (!originalImageDTO) {
       return true;
     }
 
-    return imageDTO.width / imageDTO.height === ASPECT_RATIO_MAP[videoAspectRatio]?.ratio;
-  }, [imageDTO, videoAspectRatio]);
+    return originalImageDTO.width / originalImageDTO.height === ASPECT_RATIO_MAP[videoAspectRatio]?.ratio;
+  }, [originalImageDTO, videoAspectRatio]);
 
   return (
     <Flex justifyContent="flex-start" flexDir="column" gap={2}>
@@ -75,18 +107,23 @@ export const StartingFrameImage = () => {
         borderStyle="solid"
         borderColor={fitsCurrentAspectRatio ? 'base.500' : 'warning.500'}
       >
-        {!imageDTO && (
+        {!originalImageDTO && (
           <UploadImageIconButton
             w="full"
             h="full"
-            isError={requiresStartingFrame && !imageDTO}
+            isError={requiresStartingFrame && !originalImageDTO}
             onUpload={onUpload}
             fontSize={36}
           />
         )}
-        {imageDTO && (
+        {originalImageDTO && (
           <>
-            <DndImage imageDTO={imageDTO} borderRadius="base" borderWidth={1} borderStyle="solid" />
+            <DndImage
+              imageDTO={croppedImageDTO ?? originalImageDTO}
+              borderRadius="base"
+              borderWidth={1}
+              borderStyle="solid"
+            />
             <Flex position="absolute" flexDir="column" top={1} insetInlineEnd={1} gap={1}>
               <DndImageIcon
                 onClick={onReset}
@@ -100,7 +137,7 @@ export const StartingFrameImage = () => {
                 variant="link"
                 sx={imageButtonSx}
                 aria-label={t('common.crop')}
-                onClick={onOpenEditImageModal}
+                onClick={edit}
                 icon={<PiCropBold size={16} />}
                 tooltip={t('common.crop')}
               />
@@ -120,7 +157,7 @@ export const StartingFrameImage = () => {
               borderTopEndRadius="base"
               borderBottomStartRadius="base"
               pointerEvents="none"
-            >{`${imageDTO.width}x${imageDTO.height}`}</Text>
+            >{`${croppedImageDTO?.width ?? originalImageDTO.width}x${croppedImageDTO?.height ?? originalImageDTO.height}`}</Text>
           </>
         )}
         <DndDropTarget label="Drop" dndTarget={videoFrameFromImageDndTarget} dndTargetData={dndTargetData} />

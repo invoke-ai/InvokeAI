@@ -10,6 +10,7 @@ import type {
   ChatGPT4oReferenceImageConfig,
   ControlLoRAConfig,
   ControlNetConfig,
+  CroppableImageWithDims,
   FluxKontextReferenceImageConfig,
   FLUXReduxConfig,
   Gemini2_5ReferenceImageConfig,
@@ -44,6 +45,21 @@ export const imageDTOToImageWithDims = ({ image_name, width, height }: ImageDTO)
   width,
   height,
 });
+
+export const imageDTOToCroppableImage = (
+  originalImageDTO: ImageDTO,
+  crop?: CroppableImageWithDims['crop']
+): CroppableImageWithDims => {
+  const { image_name, width, height } = originalImageDTO;
+  const val: CroppableImageWithDims = {
+    original: { image_name, width, height },
+  };
+  if (crop) {
+    val.crop = deepClone(crop);
+  }
+
+  return val;
+};
 
 export const imageDTOToImageField = ({ image_name }: ImageDTO): ImageField => ({ image_name });
 
