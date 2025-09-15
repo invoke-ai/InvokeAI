@@ -19,13 +19,13 @@ import { assert } from 'tsafe';
 /**
  * Selects the canvas slice from the root state
  */
-const selectCanvasSlice = (state: RootState) => state.canvas.present;
+const selectCanvasSlice = (state: RootState) => state.canvas;
 
 /**
  * Selects the canvases
  */
 export const selectCanvases = createSelector(selectCanvasSlice, (state) =>
-  state.canvases.map((canvas) => ({
+  state.canvases.map(({ present: canvas }) => ({
     ...canvas,
     isSelected: canvas.id === state.selectedCanvasId,
     canDelete: state.canvases.length > 1,
@@ -35,10 +35,12 @@ export const selectCanvases = createSelector(selectCanvasSlice, (state) =>
 /**
  * Selects the selected canvas
  */
-export const selectSelectedCanvas = createSelector(
+const selectSelectedCanvasWithHistory = createSelector(
   selectCanvasSlice,
-  (state) => state.canvases.find((canvas) => canvas.id === state.selectedCanvasId)!
+  (state) => state.canvases.find(({ present: canvas }) => canvas.id === state.selectedCanvasId)!
 );
+
+export const selectSelectedCanvas = createSelector(selectSelectedCanvasWithHistory, (canvas) => canvas.present);
 
 /**
  * Selects the total canvas entity count:
@@ -285,8 +287,11 @@ export const selectBookmarkedEntityIdentifier = createSelector(
   (canvas) => canvas.bookmarkedEntityIdentifier
 );
 
-export const selectCanvasMayUndo = (state: RootState) => state.canvas.past.length > 0;
-export const selectCanvasMayRedo = (state: RootState) => state.canvas.future.length > 0;
+export const selectCanvasMayUndo = createSelector(selectSelectedCanvasWithHistory, (canvas) => canvas.past.length > 0);
+export const selectCanvasMayRedo = createSelector(
+  selectSelectedCanvasWithHistory,
+  (canvas) => canvas.future.length > 0
+);
 export const selectSelectedEntityFill = createSelector(
   selectSelectedCanvas,
   selectSelectedEntityIdentifier,
