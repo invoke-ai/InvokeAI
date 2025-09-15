@@ -1,4 +1,14 @@
-import { Button, Divider, Flex, Select, Spacer, Text } from '@invoke-ai/ui-library';
+import {
+  Button,
+  ButtonGroup,
+  Divider,
+  Flex,
+  FormControl,
+  FormLabel,
+  Select,
+  Spacer,
+  Text,
+} from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { CropBox } from 'features/editImageModal/lib/editor';
 import { closeEditImageModal, type EditImageModalState } from 'features/editImageModal/store';
@@ -52,9 +62,6 @@ export const EditorContainer = ({ editor, onApplyCrop, onReady }: Props) => {
       });
       editor.onCropBoxChange((crop) => {
         setCropBox(crop);
-      });
-      editor.onCropReset(() => {
-        setCropBox(null);
       });
       setAspectRatio(getAspectRatioString(editor.getCropAspectRatio()));
       await onReady();
@@ -147,27 +154,38 @@ export const EditorContainer = ({ editor, onApplyCrop, onReady }: Props) => {
 
   return (
     <Flex w="full" h="full" flexDir="column" gap={4}>
-      <Flex gap={2}>
-        {cropBox && <Button onClick={handleResetCrop}>Reset Crop</Button>}
-        <Select value={aspectRatio} onChange={handleAspectRatioChange} w={64}>
-          <option value="free">Free</option>
-          <option value="16:9">16:9</option>
-          <option value="3:2">3:2</option>
-          <option value="4:3">4:3</option>
-          <option value="1:1">1:1 (Square)</option>
-          <option value="3:4">3:4</option>
-          <option value="2:3">2:3 (Portrait)</option>
-          <option value="9:16">9:16 (Portrait)</option>
-        </Select>
-        <Button onClick={handleApplyCrop}>Apply Crop</Button>
-        <Button onClick={handleCancelCrop}>Cancel Crop</Button>
+      <Flex gap={2} alignItems="center">
+        <FormControl flex={1}>
+          <FormLabel>Aspect Ratio:</FormLabel>
+          <Select size="sm" value={aspectRatio} onChange={handleAspectRatioChange} w={64}>
+            <option value="free">Free</option>
+            <option value="16:9">16:9</option>
+            <option value="3:2">3:2</option>
+            <option value="4:3">4:3</option>
+            <option value="1:1">1:1 (Square)</option>
+            <option value="3:4">3:4</option>
+            <option value="2:3">2:3 (Portrait)</option>
+            <option value="9:16">9:16 (Portrait)</option>
+          </Select>
+        </FormControl>
 
-        <Button onClick={fitToContainer}>Fit</Button>
-        <Button onClick={resetView}>Reset View</Button>
-        <Button onClick={zoomIn}>Zoom In</Button>
-        <Button onClick={zoomOut}>Zoom Out</Button>
+        <Spacer />
 
-        <Button onClick={handleExport}>Export</Button>
+        <ButtonGroup size="sm" isAttached={false}>
+          <Button onClick={fitToContainer}>Fit View</Button>
+          <Button onClick={resetView}>Reset View</Button>
+          <Button onClick={zoomIn}>Zoom In</Button>
+          <Button onClick={zoomOut}>Zoom Out</Button>
+        </ButtonGroup>
+
+        <Spacer />
+
+        <ButtonGroup size="sm" isAttached={false}>
+          <Button onClick={handleApplyCrop}>Apply</Button>
+          <Button onClick={handleResetCrop}>Reset</Button>
+          <Button onClick={handleCancelCrop}>Cancel</Button>
+          <Button onClick={handleExport}>Export</Button>
+        </ButtonGroup>
       </Flex>
 
       <Flex position="relative" w="full" h="full" bg="base.900">

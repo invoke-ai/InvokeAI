@@ -19,12 +19,8 @@ export type CropBox = {
  */
 type EditorCallbacks = {
   onCropBoxChange: Set<(crop: Readonly<CropBox>) => void>;
-  onCropReset: Set<() => void>;
   onZoomChange: Set<(zoom: number) => void>;
-  onImageLoad: Set<() => void>;
 };
-
-type SetElement<T> = T extends Set<infer U> ? U : never;
 
 /**
  * Crop box resize handle names.
@@ -183,9 +179,7 @@ export class Editor {
 
   private callbacks: EditorCallbacks = {
     onCropBoxChange: new Set(),
-    onCropReset: new Set(),
     onZoomChange: new Set(),
-    onImageLoad: new Set(),
   };
 
   private cropBox: CropBox | null = null;
@@ -603,7 +597,9 @@ export class Editor {
     this.updateKonvaCropInteractionRect();
     this.updateKonvaCropInteractionGuides();
     this.updateKonvaCropInteractionHandlePositions();
-    this._invokeCallbacks('onCropBoxChange', cropBox);
+    for (const cb of this.callbacks.onCropBoxChange) {
+      cb(cropBox);
+    }
   };
 
   /**
@@ -1007,7 +1003,9 @@ export class Editor {
     // Update handle scaling to maintain constant screen size
     this.updateKonvaCropInteractionHandleScales();
     this.updateKonvaBg();
-    this._invokeCallbacks('onZoomChange', newScale);
+    for (const cb of this.callbacks.onZoomChange) {
+      cb(newScale);
+    }
   };
 
   /**
@@ -1103,7 +1101,6 @@ export class Editor {
       img.onload = () => {
         this.originalImage = img;
         this.updateImage(initial);
-        this._invokeCallbacks('onImageLoad');
         resolve();
       };
 
@@ -1119,14 +1116,14 @@ export class Editor {
    * Reset the crop box to encompass the entire image.
    */
   resetCrop = () => {
-    if (this.konva?.image.image) {
-      this.updateCropBox({
-        x: 0,
-        y: 0,
-        ...this.konva.image.image.size(),
-      });
+    if (!this.konva?.image.image) {
+      return;
     }
-    this._invokeCallbacks('onCropReset');
+    this.updateCropBox({
+      x: 0,
+      y: 0,
+      ...this.konva.image.image.size(),
+    });
   };
 
   /**
@@ -1276,7 +1273,9 @@ export class Editor {
 
     this.updateKonvaBg();
 
-    this._invokeCallbacks('onZoomChange', scale);
+    for (const cb of this.callbacks.onZoomChange) {
+      cb(scale);
+    }
   };
 
   /**
@@ -1330,7 +1329,9 @@ export class Editor {
 
     this.updateKonvaBg();
 
-    this._invokeCallbacks('onZoomChange', 1);
+    for (const cb of this.callbacks.onZoomChange) {
+      cb(1);
+    }
   };
 
   /**
@@ -1366,7 +1367,9 @@ export class Editor {
 
     this.updateKonvaBg();
 
-    this._invokeCallbacks('onZoomChange', scale);
+    for (const cb of this.callbacks.onZoomChange) {
+      cb(scale);
+    }
   };
 
   /**
@@ -1476,56 +1479,24 @@ export class Editor {
   };
 
   /**
-   * Helper to build a callback registrar function for a specific event name.
-   * @param name The callback event name.
+   * Register a callback for when the crop box changes (moved or resized).
    */
-  _buildCallbackRegistrar = <T extends keyof EditorCallbacks>(name: T) => {
-    return (cb: SetElement<EditorCallbacks[T]>): (() => void) => {
-      (this.callbacks[name] as Set<typeof cb>).add(cb);
-      return () => {
-        (this.callbacks[name] as Set<typeof cb>).delete(cb);
-      };
+  onCropBoxChange = (cb: (crop: Readonly<CropBox>) => void): (() => void) => {
+    this.callbacks.onCropBoxChange.add(cb);
+    return () => {
+      this.callbacks.onCropBoxChange.delete(cb);
     };
   };
 
   /**
-   * Invoke all callbacks registered for a specific event.
-   * @param name The callback event name.
-   * @param args The arguments to pass to each callback.
-   */
-  private _invokeCallbacks = <T extends keyof EditorCallbacks>(
-    name: T,
-    ...args: EditorCallbacks[T] extends Set<(...args: infer P) => void> ? P : never
-  ): void => {
-    const callbacks = this.callbacks[name];
-    if (callbacks && callbacks.size > 0) {
-      callbacks.forEach((cb) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (cb as (...args: any[]) => void)(...args);
-      });
-    }
-  };
-
-  /**
-   * Register a callback for when the crop is reset.
-   */
-  onCropReset = this._buildCallbackRegistrar('onCropReset');
-
-  /**
-   * Register a callback for when the crop box changes (moved or resized).
-   */
-  onCropBoxChange = this._buildCallbackRegistrar('onCropBoxChange');
-
-  /**
-   * Register a callback for when a new image is loaded.
-   */
-  onImageLoad = this._buildCallbackRegistrar('onImageLoad');
-
-  /**
    * Register a callback for when the zoom level changes.
    */
-  onZoomChange = this._buildCallbackRegistrar('onZoomChange');
-
+  onZoomChange = (cb: (zoom: number) => void): (() => void) => {
+    this.callbacks.onZoomChange.add(cb);
+    return () => {
+      this.callbacks.onZoomChange.delete(cb);
+    };
+  };
   /**
    * Resize the editor container and adjust the Konva stage accordingly.
    *
