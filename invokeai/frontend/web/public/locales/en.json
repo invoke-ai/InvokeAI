@@ -2782,7 +2782,8 @@
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
             "Select Object v2: Improved object selection with point and box inputs or text prompts.",
-            "Raster Layer Adjustments: Easily adjust layer brightness, contrast, saturation, curves and more."
+            "Raster Layer Adjustments: Easily adjust layer brightness, contrast, saturation, curves and more.",
+            "Prompt History: Review and quickly recall your last 100 prompts."
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
