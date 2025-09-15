@@ -1,15 +1,12 @@
 import { Button, Divider, Flex, Select, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { convertImageUrlToBlob } from 'common/util/convertImageUrlToBlob';
 import type { CropBox, Editor } from 'features/editImageModal/lib/editor';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useGetImageDTOQuery, useUploadImageMutation } from 'services/api/endpoints/images';
-import type { ImageDTO } from 'services/api/types';
+import { useUploadImageMutation } from 'services/api/endpoints/images';
 
 type Props = {
   editor: Editor;
-  imageName: string;
 };
 
 const CROP_ASPECT_RATIO_MAP: Record<string, number> = {
@@ -35,21 +32,19 @@ export const getAspectRatioString = (ratio: number | null) => {
   return 'free';
 };
 
-export const EditorContainer = ({ editor, imageName }: Props) => {
+export const EditorContainer = ({ editor }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(100);
   const [cropInProgress, setCropInProgress] = useState(false);
   const [cropBox, setCropBox] = useState<CropBox | null>(null);
   const [cropApplied, setCropApplied] = useState(false);
   const [aspectRatio, setAspectRatio] = useState<string>('free');
-  const { data: imageDTO } = useGetImageDTOQuery(imageName);
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
 
   const [uploadImage] = useUploadImageMutation({ fixedCacheKey: 'editorContainer' });
 
   const setup = useCallback(
-    async (imageDTO: ImageDTO, container: HTMLDivElement) => {
-      console.log('Setting up editor');
+    (container: HTMLDivElement) => {
       editor.init(container);
       editor.onZoomChange((zoom) => {
         setZoom(zoom);
@@ -80,13 +75,7 @@ export const EditorContainer = ({ editor, imageName }: Props) => {
         // setIsCropping(false);
         // setHasCropBbox(false);
       });
-      const blob = await convertImageUrlToBlob(imageDTO.image_url);
-      if (!blob) {
-        console.error('Failed to convert image to blob');
-        return;
-      }
       setAspectRatio(getAspectRatioString(editor.getCropAspectRatio()));
-      await editor.loadImage(imageDTO.image_url);
       editor.fitToContainer();
     },
     [editor]
@@ -94,11 +83,10 @@ export const EditorContainer = ({ editor, imageName }: Props) => {
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || !imageDTO) {
+    if (!container) {
       return;
     }
-    editor.init(container);
-    setup(imageDTO, container);
+    setup(container);
     const handleResize = () => {
       editor.resize(container.clientWidth, container.clientHeight);
     };
@@ -108,7 +96,7 @@ export const EditorContainer = ({ editor, imageName }: Props) => {
     return () => {
       resizeObserver.disconnect();
     };
-  }, [editor, imageDTO, setup]);
+  }, [editor, setup]);
 
   const handleStartCrop = useCallback(() => {
     editor.startCrop();
@@ -146,7 +134,7 @@ export const EditorContainer = ({ editor, imageName }: Props) => {
 
   const handleExport = useCallback(async () => {
     try {
-      const blob = await editor.exportImage('blob', { withCropOverlay: true });
+      const blob = await editor.exportImage('blob');
       const file = new File([blob], 'image.png', { type: 'image/png' });
 
       await uploadImage({
