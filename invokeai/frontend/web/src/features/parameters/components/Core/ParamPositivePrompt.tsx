@@ -136,7 +136,10 @@ export const ParamPositivePrompt = memo(() => {
       }
       const clamped = Math.max(0, Math.min(idx, list.length - 1));
       browsingIndexRef.current = clamped;
-      dispatch(positivePromptChanged(list[clamped]));
+      const historyItem = list[clamped];
+      if (historyItem !== undefined) {
+        dispatch(positivePromptChanged(historyItem));
+      }
       requestAnimationFrame(() => {
         const el = textareaRef.current;
         if (!el) {
