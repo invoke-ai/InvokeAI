@@ -243,7 +243,10 @@
         "resultSubtitle": "Choose how to handle the expanded prompt:",
         "replace": "Replace",
         "insert": "Insert",
-        "discard": "Discard"
+        "discard": "Discard",
+        "noPromptHistory": "No prompt history recorded.",
+        "noMatchingPrompts": "No matching prompts in history.",
+        "toSwitchBetweenPrompts": "to switch between prompts."
     },
     "queue": {
         "queue": "Queue",

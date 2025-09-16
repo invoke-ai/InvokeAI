@@ -23,6 +23,7 @@ import {
 } from 'features/controlLayers/store/paramsSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiArrowArcLeftBold, PiClockCounterClockwise, PiTrashBold, PiTrashSimpleBold } from 'react-icons/pi';
 
 export const PositivePromptHistoryIconButton = memo(() => {
@@ -51,6 +52,7 @@ export const PositivePromptHistoryIconButton = memo(() => {
 PositivePromptHistoryIconButton.displayName = 'PositivePromptHistoryIconButton';
 
 const PromptHistoryContent = memo(() => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const positivePromptHistory = useAppSelector(selectPositivePromptHistory);
   const [searchTerm, setSearchTerm] = useState('');
@@ -100,12 +102,12 @@ const PromptHistoryContent = memo(() => {
       <Flex flexDir="column" flexGrow={1} minH={0}>
         {positivePromptHistory.length === 0 && (
           <Flex w="full" h="full" alignItems="center" justifyContent="center">
-            <Text color="base.300">No prompt history recorded.</Text>
+            <Text color="base.300">{t('prompt.noPromptHistory')}</Text>
           </Flex>
         )}
         {positivePromptHistory.length !== 0 && filteredPrompts.length === 0 && (
           <Flex w="full" h="full" alignItems="center" justifyContent="center">
-            <Text color="base.300">No matching prompts in history.</Text>{' '}
+            <Text color="base.300">{t('prompt.noMatchingPrompts')}</Text>{' '}
           </Flex>
         )}
         {filteredPrompts.length > 0 && (
@@ -120,7 +122,7 @@ const PromptHistoryContent = memo(() => {
       </Flex>
       <Flex alignItems="center" justifyContent="center" pt={1}>
         <Text color="base.300" textAlign="center">
-          <Kbd textTransform="lowercase">alt+up/down</Kbd> to switch between prompts.
+          <Kbd textTransform="lowercase">alt+up/down</Kbd> {t('prompt.toSwitchBetweenPrompts')}
         </Text>
       </Flex>
     </Flex>
