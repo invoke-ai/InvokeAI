@@ -22,7 +22,7 @@ import { merge } from 'es-toolkit';
 import { omit, pick } from 'es-toolkit/compat';
 import { changeBoardModalSliceConfig } from 'features/changeBoardModal/store/slice';
 import { canvasSettingsSliceConfig } from 'features/controlLayers/store/canvasSettingsSlice';
-import { canvasSliceConfig } from 'features/controlLayers/store/canvasSlice';
+import { canvasSliceConfig, undoableCanvasesReducer } from 'features/controlLayers/store/canvasSlice';
 import { canvasSessionSliceConfig } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { lorasSliceConfig } from 'features/controlLayers/store/lorasSlice';
 import { paramsSliceConfig } from 'features/controlLayers/store/paramsSlice';
@@ -30,7 +30,7 @@ import { refImagesSliceConfig } from 'features/controlLayers/store/refImagesSlic
 import { dynamicPromptsSliceConfig } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { gallerySliceConfig } from 'features/gallery/store/gallerySlice';
 import { modelManagerSliceConfig } from 'features/modelManagerV2/store/modelManagerV2Slice';
-import { nodesSliceConfig } from 'features/nodes/store/nodesSlice';
+import { nodesSliceConfig, undoableNodesSliceReducer } from 'features/nodes/store/nodesSlice';
 import { workflowLibrarySliceConfig } from 'features/nodes/store/workflowLibrarySlice';
 import { workflowSettingsSliceConfig } from 'features/nodes/store/workflowSettingsSlice';
 import { upscaleSliceConfig } from 'features/parameters/store/upscaleSlice';
@@ -44,7 +44,6 @@ import { diff } from 'jsondiffpatch';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
 import type { SerializeFunction, UnserializeFunction } from 'redux-remember';
 import { REMEMBER_REHYDRATED, rememberEnhancer, rememberReducer } from 'redux-remember';
-import undoable, { newHistory } from 'redux-undo';
 import { serializeError } from 'serialize-error';
 import { api } from 'services/api';
 import { authToastMiddleware } from 'services/api/authToastMiddleware';
@@ -91,22 +90,14 @@ const ALL_REDUCERS = {
   [api.reducerPath]: api.reducer,
   [canvasSessionSliceConfig.slice.reducerPath]: canvasSessionSliceConfig.slice.reducer,
   [canvasSettingsSliceConfig.slice.reducerPath]: canvasSettingsSliceConfig.slice.reducer,
-  // Undoable!
-  [canvasSliceConfig.slice.reducerPath]: undoable(
-    canvasSliceConfig.slice.reducer,
-    canvasSliceConfig.undoableConfig?.reduxUndoOptions
-  ),
+  [canvasSliceConfig.slice.reducerPath]: undoableCanvasesReducer,
   [changeBoardModalSliceConfig.slice.reducerPath]: changeBoardModalSliceConfig.slice.reducer,
   [configSliceConfig.slice.reducerPath]: configSliceConfig.slice.reducer,
   [dynamicPromptsSliceConfig.slice.reducerPath]: dynamicPromptsSliceConfig.slice.reducer,
   [gallerySliceConfig.slice.reducerPath]: gallerySliceConfig.slice.reducer,
   [lorasSliceConfig.slice.reducerPath]: lorasSliceConfig.slice.reducer,
   [modelManagerSliceConfig.slice.reducerPath]: modelManagerSliceConfig.slice.reducer,
-  // Undoable!
-  [nodesSliceConfig.slice.reducerPath]: undoable(
-    nodesSliceConfig.slice.reducer,
-    nodesSliceConfig.undoableConfig?.reduxUndoOptions
-  ),
+  [nodesSliceConfig.slice.reducerPath]: undoableNodesSliceReducer,
   [paramsSliceConfig.slice.reducerPath]: paramsSliceConfig.slice.reducer,
   [queueSliceConfig.slice.reducerPath]: queueSliceConfig.slice.reducer,
   [refImagesSliceConfig.slice.reducerPath]: refImagesSliceConfig.slice.reducer,
@@ -128,7 +119,7 @@ const unserialize: UnserializeFunction = (data, key) => {
   if (!sliceConfig?.persistConfig) {
     throw new Error(`No persist config for slice "${key}"`);
   }
-  const { getInitialState, persistConfig, undoableConfig } = sliceConfig;
+  const { getInitialState, persistConfig } = sliceConfig;
   let state;
   try {
     const initialState = getInitialState();
@@ -160,12 +151,7 @@ const unserialize: UnserializeFunction = (data, key) => {
     state = getInitialState();
   }
 
-  // Undoable slices must be wrapped in a history!
-  if (undoableConfig) {
-    return newHistory([], state, []);
-  } else {
-    return state;
-  }
+  return persistConfig.wrapState ? persistConfig.wrapState(state) : state;
 };
 
 const serialize: SerializeFunction = (data, key) => {
@@ -175,7 +161,7 @@ const serialize: SerializeFunction = (data, key) => {
   }
 
   const result = omit(
-    sliceConfig.undoableConfig ? data.present : data,
+    sliceConfig.persistConfig.unwrapState ? sliceConfig.persistConfig.unwrapState(data) : data,
     sliceConfig.persistConfig.persistDenylist ?? []
   );
 
