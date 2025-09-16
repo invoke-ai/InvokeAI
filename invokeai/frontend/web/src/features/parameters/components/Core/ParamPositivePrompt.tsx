@@ -1,9 +1,8 @@
 import { Box, Flex, Textarea } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { usePersistedTextAreaSize } from 'common/hooks/usePersistedTextareaSize';
 import {
-  positivePromptAddedToHistory,
   positivePromptChanged,
   selectModelSupportsNegativePrompt,
   selectPositivePrompt,
@@ -29,9 +28,10 @@ import {
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { selectAllowPromptExpansion } from 'features/system/store/configSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { memo, useCallback, useMemo, useRef } from 'react';
 import type { HotkeyCallback } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
+import { useClickAway } from 'react-use';
 import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 
 import { PositivePromptHistoryIconButton } from './PositivePromptHistory';
@@ -42,16 +42,89 @@ const persistOptions: Parameters<typeof usePersistedTextAreaSize>[2] = {
   initialHeight: 120,
 };
 
+const usePromptHistory = () => {
+  const store = useAppStore();
+  const history = useAppSelector(selectPositivePromptHistory);
+
+  /**
+   * This ref is populated only when the user navigates back in history. In other words, its presence is a proxy
+   * for "are we currently browsing history?"
+   *
+   * When we are moving thru history, we will always have a stashedPrompt (the prompt before we started browsing)
+   * and a historyIdx which is an index into the history array (0 = most recent, 1 = previous, etc).
+   */
+  const stateRef = useRef<{ stashedPrompt: string; historyIdx: number } | null>(null);
+
+  const prev = useCallback(() => {
+    if (history.length === 0) {
+      // No history, nothing to do
+      return;
+    }
+    let state = stateRef.current;
+    if (!state) {
+      // First time going "back" in history, init state
+      state = { stashedPrompt: selectPositivePrompt(store.getState()), historyIdx: 0 };
+      stateRef.current = state;
+    } else {
+      // Subsequent "back" in history, increment index
+      if (state.historyIdx === history.length - 1) {
+        // Already at the end of history, nothing to do
+        return;
+      }
+      state.historyIdx = state.historyIdx + 1;
+    }
+    // We should go "back" in history
+    const newPrompt = history[state.historyIdx];
+    if (newPrompt === undefined) {
+      // Shouldn't happen
+      return;
+    }
+    store.dispatch(positivePromptChanged(newPrompt));
+  }, [history, store]);
+  const next = useCallback(() => {
+    if (history.length === 0) {
+      // No history, nothing to do
+      return;
+    }
+    let state = stateRef.current;
+    if (!state) {
+      // If the user hasn't gone "back" in history, "forward" does nothing
+      return;
+    }
+    state.historyIdx = state.historyIdx - 1;
+    if (state.historyIdx < 0) {
+      // Overshot to the "current" stashed prompt
+      store.dispatch(positivePromptChanged(state.stashedPrompt));
+      // Clear state bc we're back to current prompt
+      stateRef.current = null;
+      return;
+    }
+    // We should go "forward" in history
+    const newPrompt = history[state.historyIdx];
+    if (newPrompt === undefined) {
+      // Shouldn't happen
+      return;
+    }
+    store.dispatch(positivePromptChanged(newPrompt));
+  }, [history, store]);
+  const reset = useCallback(() => {
+    // Clear stashed state - used when user clicks away or types in the prompt box
+    stateRef.current = null;
+  }, []);
+  return { prev, next, reset };
+};
+
 export const ParamPositivePrompt = memo(() => {
   const dispatch = useAppDispatch();
   const prompt = useAppSelector(selectPositivePrompt);
-  const history = useAppSelector(selectPositivePromptHistory);
   const viewMode = useAppSelector(selectStylePresetViewMode);
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
   const modelSupportsNegativePrompt = useAppSelector(selectModelSupportsNegativePrompt);
   const { isPending: isPromptExpansionPending } = useStore(promptExpansionApi.$state);
   const isPromptExpansionEnabled = useAppSelector(selectAllowPromptExpansion);
   const activeTab = useAppSelector(selectActiveTab);
+
+  const promptHistoryApi = usePromptHistory();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   usePersistedTextAreaSize('positive_prompt', textareaRef, persistOptions);
@@ -70,8 +143,11 @@ export const ParamPositivePrompt = memo(() => {
   const handleChange = useCallback(
     (v: string) => {
       dispatch(positivePromptChanged(v));
+      // When the user changes the prompt, reset the prompt history state. This event is not fired when the prompt is
+      // changed via the prompt history navigation.
+      promptHistoryApi.reset();
     },
-    [dispatch]
+    [dispatch, promptHistoryApi]
   );
   const { onChange, isOpen, onClose, onOpen, onSelect, onKeyDown, onFocus } = usePrompt({
     prompt,
@@ -80,21 +156,8 @@ export const ParamPositivePrompt = memo(() => {
     isDisabled: isPromptExpansionPending,
   });
 
-  // Browsing state for boundary Up/Down traversal
-  const browsingIndexRef = useRef<number | null>(null); // null => not browsing; 0..n => index in history
-  const preBrowsePromptRef = useRef<string>(''); // original prompt when browsing started
-  const lastHistoryFirstRef = useRef<string | undefined>(undefined);
-
-  // Reset browsing when history updates due to a new generation (first item changes or history mutates)
-  useEffect(() => {
-    if (lastHistoryFirstRef.current !== history[0]) {
-      browsingIndexRef.current = null;
-      preBrowsePromptRef.current = '';
-      lastHistoryFirstRef.current = history[0];
-    }
-  }, [history]);
-
-  // Boundary navigation via Up/Down keys was replaced by explicit hotkeys below.
+  // When the user clicks away from the textarea, reset the prompt history state.
+  useClickAway(textareaRef, promptHistoryApi.reset);
 
   const focus: HotkeyCallback = useCallback(
     (e) => {
@@ -115,100 +178,6 @@ export const ParamPositivePrompt = memo(() => {
   // Helper: check if prompt textarea is focused
   const isPromptFocused = useCallback(() => document.activeElement === textareaRef.current, []);
 
-  // Compute a starting working history and ensure current prompt is bumped into history
-  const startBrowsing = useCallback(() => {
-    if (browsingIndexRef.current !== null) {
-      return;
-    }
-    preBrowsePromptRef.current = prompt ?? '';
-    const trimmedCurrent = (prompt ?? '').trim();
-    if (trimmedCurrent) {
-      dispatch(positivePromptAddedToHistory(trimmedCurrent));
-    }
-    browsingIndexRef.current = 0;
-  }, [dispatch, prompt]);
-
-  const applyHistoryAtIndex = useCallback(
-    (idx: number, placeCaretAt: 'start' | 'end') => {
-      const list = history;
-      if (list.length === 0) {
-        return;
-      }
-      const clamped = Math.max(0, Math.min(idx, list.length - 1));
-      browsingIndexRef.current = clamped;
-      const historyItem = list[clamped];
-      if (historyItem !== undefined) {
-        dispatch(positivePromptChanged(historyItem));
-      }
-      requestAnimationFrame(() => {
-        const el = textareaRef.current;
-        if (!el) {
-          return;
-        }
-        if (placeCaretAt === 'start') {
-          el.selectionStart = 0;
-          el.selectionEnd = 0;
-        } else {
-          const end = el.value.length;
-          el.selectionStart = end;
-          el.selectionEnd = end;
-        }
-      });
-    },
-    [dispatch, history]
-  );
-
-  const browsePrev = useCallback(() => {
-    if (!isPromptFocused()) {
-      return;
-    }
-    if (history.length === 0) {
-      return;
-    }
-    if (browsingIndexRef.current === null) {
-      startBrowsing();
-      // Move to older entry on first activation
-      if (history.length > 1) {
-        applyHistoryAtIndex(1, 'start');
-      } else {
-        applyHistoryAtIndex(0, 'start');
-      }
-      return;
-    }
-    // Already browsing, go older if possible
-    const next = Math.min((browsingIndexRef.current ?? 0) + 1, history.length - 1);
-    applyHistoryAtIndex(next, 'start');
-  }, [applyHistoryAtIndex, history.length, isPromptFocused, startBrowsing]);
-
-  const browseNext = useCallback(() => {
-    if (!isPromptFocused()) {
-      return;
-    }
-    if (history.length === 0) {
-      return;
-    }
-    if (browsingIndexRef.current === null) {
-      // Not browsing; Down does nothing (matches shell semantics)
-      return;
-    }
-    if ((browsingIndexRef.current ?? 0) > 0) {
-      const next = (browsingIndexRef.current ?? 0) - 1;
-      applyHistoryAtIndex(next, 'end');
-    } else {
-      // Exit browsing and restore pre-browse prompt
-      browsingIndexRef.current = null;
-      dispatch(positivePromptChanged(preBrowsePromptRef.current));
-      requestAnimationFrame(() => {
-        const el = textareaRef.current;
-        if (el) {
-          const end = el.value.length;
-          el.selectionStart = end;
-          el.selectionEnd = end;
-        }
-      });
-    }
-  }, [applyHistoryAtIndex, dispatch, history.length, isPromptFocused]);
-
   // Register hotkeys for browsing
   useRegisteredHotkeys({
     id: 'promptHistoryPrev',
@@ -216,11 +185,11 @@ export const ParamPositivePrompt = memo(() => {
     callback: (e) => {
       if (isPromptFocused()) {
         e.preventDefault();
-        browsePrev();
+        promptHistoryApi.prev();
       }
     },
     options: { preventDefault: true, enableOnFormTags: ['INPUT', 'SELECT', 'TEXTAREA'] },
-    dependencies: [browsePrev, isPromptFocused],
+    dependencies: [promptHistoryApi.prev, isPromptFocused],
   });
   useRegisteredHotkeys({
     id: 'promptHistoryNext',
@@ -228,11 +197,11 @@ export const ParamPositivePrompt = memo(() => {
     callback: (e) => {
       if (isPromptFocused()) {
         e.preventDefault();
-        browseNext();
+        promptHistoryApi.next();
       }
     },
     options: { preventDefault: true, enableOnFormTags: ['INPUT', 'SELECT', 'TEXTAREA'] },
-    dependencies: [browseNext, isPromptFocused],
+    dependencies: [promptHistoryApi.next, isPromptFocused],
   });
 
   const dndTargetData = useMemo(() => promptGenerationFromImageDndTarget.getData(), []);
