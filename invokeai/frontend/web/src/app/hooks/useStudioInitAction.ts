@@ -4,7 +4,6 @@ import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { withResultAsync } from 'common/util/result';
 import { canvasReset } from 'features/controlLayers/store/actions';
 import { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
-import { paramsReset } from 'features/controlLayers/store/paramsSlice';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { sentImageToCanvas } from 'features/gallery/store/actions';
@@ -164,7 +163,6 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
         case 'generation':
           // Go to the generate tab, open the launchpad
           await navigationApi.focusPanel('generate', LAUNCHPAD_PANEL_ID);
-          store.dispatch(paramsReset());
           break;
         case 'canvas':
           // Go to the canvas tab, open the launchpad
