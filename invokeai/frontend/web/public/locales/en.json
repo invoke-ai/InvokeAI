@@ -235,7 +235,6 @@
         "compatibleEmbeddings": "Compatible Embeddings",
         "noMatchingTriggers": "No matching triggers",
         "generateFromImage": "Generate prompt from image",
-        "historyHotkeyHint": "Tip: Use Alt+Up/Down to browse history from the prompt.",
         "expandCurrentPrompt": "Expand Current Prompt",
         "uploadImageForPromptGeneration": "Upload Image for Prompt Generation",
         "expandingPrompt": "Expanding prompt...",
