@@ -10,42 +10,35 @@ import {
   Text,
 } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import type { CropBox } from 'features/editImageModal/lib/editor';
-import { closeEditImageModal, type EditImageModalState } from 'features/editImageModal/store';
+import type { AspectRatioID } from 'features/controlLayers/store/types';
+import { ASPECT_RATIO_MAP, isAspectRatioID } from 'features/controlLayers/store/types';
+import type { CropBox } from 'features/cropper/lib/editor';
+import { cropImageModalApi, type CropImageModalState } from 'features/cropper/store';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useUploadImageMutation } from 'services/api/endpoints/images';
+import { objectEntries } from 'tsafe';
 
 type Props = {
-  editor: EditImageModalState['editor'];
-  onApplyCrop: EditImageModalState['onApplyCrop'];
-  onReady: EditImageModalState['onReady'];
+  editor: CropImageModalState['editor'];
+  onApplyCrop: CropImageModalState['onApplyCrop'];
+  onReady: CropImageModalState['onReady'];
 };
 
-const CROP_ASPECT_RATIO_MAP: Record<string, number> = {
-  '16:9': 16 / 9,
-  '3:2': 3 / 2,
-  '4:3': 4 / 3,
-  '1:1': 1,
-  '3:4': 3 / 4,
-  '2:3': 2 / 3,
-  '9:16': 9 / 16,
-};
-
-const getAspectRatioString = (ratio: number | null) => {
+const getAspectRatioString = (ratio: number | null): AspectRatioID => {
   if (!ratio) {
-    return 'free';
+    return 'Free';
   }
-  const entries = Object.entries(CROP_ASPECT_RATIO_MAP);
+  const entries = objectEntries(ASPECT_RATIO_MAP);
   for (const [key, value] of entries) {
-    if (value === ratio) {
+    if (value.ratio === ratio) {
       return key;
     }
   }
-  return 'free';
+  return 'Free';
 };
 
-export const EditorContainer = ({ editor, onApplyCrop, onReady }: Props) => {
+export const CropImageEditor = memo(({ editor, onApplyCrop, onReady }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(100);
   const [cropBox, setCropBox] = useState<CropBox | null>(null);
@@ -90,12 +83,15 @@ export const EditorContainer = ({ editor, onApplyCrop, onReady }: Props) => {
   const handleAspectRatioChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       const newRatio = e.target.value;
+      if (!isAspectRatioID(newRatio)) {
+        return;
+      }
       setAspectRatio(newRatio);
 
-      if (newRatio === 'free') {
+      if (newRatio === 'Free') {
         editor.setCropAspectRatio(null);
       } else {
-        editor.setCropAspectRatio(CROP_ASPECT_RATIO_MAP[newRatio] ?? null);
+        editor.setCropAspectRatio(ASPECT_RATIO_MAP[newRatio]?.ratio ?? null);
       }
     },
     [editor]
@@ -107,11 +103,11 @@ export const EditorContainer = ({ editor, onApplyCrop, onReady }: Props) => {
 
   const handleApplyCrop = useCallback(async () => {
     await onApplyCrop();
-    closeEditImageModal();
+    cropImageModalApi.close();
   }, [onApplyCrop]);
 
   const handleCancelCrop = useCallback(() => {
-    closeEditImageModal();
+    cropImageModalApi.close();
   }, []);
 
   const handleExport = useCallback(async () => {
@@ -157,15 +153,15 @@ export const EditorContainer = ({ editor, onApplyCrop, onReady }: Props) => {
       <Flex gap={2} alignItems="center">
         <FormControl flex={1}>
           <FormLabel>Aspect Ratio:</FormLabel>
-          <Select size="sm" value={aspectRatio} onChange={handleAspectRatioChange} w={64}>
-            <option value="free">Free</option>
+          <Select size="sm" value={aspectRatio} onChange={handleAspectRatioChange} w={32}>
+            <option value="Free">Free</option>
             <option value="16:9">16:9</option>
             <option value="3:2">3:2</option>
             <option value="4:3">4:3</option>
-            <option value="1:1">1:1 (Square)</option>
+            <option value="1:1">1:1</option>
             <option value="3:4">3:4</option>
-            <option value="2:3">2:3 (Portrait)</option>
-            <option value="9:16">9:16 (Portrait)</option>
+            <option value="2:3">2:3</option>
+            <option value="9:16">9:16</option>
           </Select>
         </FormControl>
 
@@ -184,7 +180,7 @@ export const EditorContainer = ({ editor, onApplyCrop, onReady }: Props) => {
           <Button onClick={handleApplyCrop}>Apply</Button>
           <Button onClick={handleResetCrop}>Reset</Button>
           <Button onClick={handleCancelCrop}>Cancel</Button>
-          <Button onClick={handleExport}>Export</Button>
+          <Button onClick={handleExport}>Save to Assets</Button>
         </ButtonGroup>
       </Flex>
 
@@ -212,4 +208,6 @@ export const EditorContainer = ({ editor, onApplyCrop, onReady }: Props) => {
       </Flex>
     </Flex>
   );
-};
+});
+
+CropImageEditor.displayName = 'CropImageEditor';
