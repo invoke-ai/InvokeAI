@@ -4,6 +4,7 @@ import {
   Flex,
   IconButton,
   Input,
+  Kbd,
   Popover,
   PopoverBody,
   PopoverContent,
@@ -118,11 +119,8 @@ const PromptHistoryContent = memo(() => {
         )}
       </Flex>
       <Flex alignItems="center" justifyContent="center" pt={1}>
-        <Text fontSize="xs" color="base.400" textAlign="center">
-          <Text as="span" fontWeight="semibold">
-            Alt + Up/Down
-          </Text>{' '}
-          to switch between prompts.
+        <Text color="base.300" textAlign="center">
+          <Kbd textTransform="lowercase">alt+up/down</Kbd> to switch between prompts.
         </Text>
       </Flex>
     </Flex>
