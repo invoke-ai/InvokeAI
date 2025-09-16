@@ -960,14 +960,12 @@ export const nodesSliceConfig: SliceConfig<typeof slice, StateWithHistory<NodesS
       }
       return zNodesState.parse(state);
     },
-  },
-  undoableConfig: {
-    unwrapState: (state) => state.present,
     wrapState: (state) => {
       const nodesState = state as NodesState;
 
       return newHistory([], nodesState, []);
     },
+    unwrapState: (state) => state.present,
   },
 };
 

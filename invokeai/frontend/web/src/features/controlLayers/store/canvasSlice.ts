@@ -108,8 +108,6 @@ import {
   makeDefaultRasterLayerAdjustments,
 } from './util';
 
-type CanvasDeletedPayloadAction = PayloadAction<{ id: string }>;
-
 const getInitialCanvasState = (id: string, name: string): CanvasState => ({
   id,
   name,
@@ -155,7 +153,7 @@ const getInitialCanvasesHistoryState = (): CanvasesStateWithHistory => {
   };
 };
 
-const slice = createSlice({
+const canvasesSlice = createSlice({
   name: 'canvas',
   initialState: getInitialCanvasesHistoryState(),
   reducers: {
@@ -197,7 +195,7 @@ const slice = createSlice({
 
       canvas.name = name;
     },
-    canvasDeleted: (state, action: CanvasDeletedPayloadAction) => {
+    canvasDeleted: (state, action: PayloadAction<{ id: string }>) => {
       const { id } = action.payload;
 
       if (state.canvases.length === 1) {
@@ -1868,7 +1866,7 @@ export const {
   canvasSelected,
   canvasNameChanged,
   canvasDeleted,
-} = slice.actions;
+} = canvasesSlice.actions;
 
 export const {
   canvasMetadataRecalled,
@@ -1968,6 +1966,8 @@ export const {
   // inpaintMaskRecalled,
 } = canvasSlice.actions;
 
+const isCanvasSliceAction = isAnyOf(...Object.values(canvasSlice.actions));
+
 let filter = true;
 
 const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
@@ -1977,7 +1977,7 @@ const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
   clearHistoryType: canvasClearHistory.type,
   filter: (action, _state, _history) => {
     // Ignore both all actions from other slices and canvas management actions
-    if (!action.type.startsWith(slice.name)) {
+    if (!action.type.startsWith(canvasSlice.name)) {
       return false;
     }
     // Throttle rapid actions of the same type
@@ -1990,11 +1990,15 @@ const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
 
 const undoableCanvasReducer = undoable(canvasSlice.reducer, canvasUndoableConfig);
 
-export const undoableCanvasSliceReducer = (
+export const undoableCanvasesReducer = (
   state: CanvasesStateWithHistory,
   action: UnknownAction
 ): CanvasesStateWithHistory => {
-  state = slice.reducer(state, action);
+  state = canvasesSlice.reducer(state, action);
+
+  if (!isCanvasSliceAction(action)) {
+    return state;
+  }
 
   return {
     ...state,
@@ -2004,28 +2008,14 @@ export const undoableCanvasSliceReducer = (
   };
 };
 
-export const canvasSliceConfig: SliceConfig<typeof slice, CanvasesStateWithHistory, CanvasesStateWithoutHistory> = {
-  slice,
+export const canvasSliceConfig: SliceConfig<
+  typeof canvasesSlice,
+  CanvasesStateWithHistory,
+  CanvasesStateWithoutHistory
+> = {
+  slice: canvasesSlice,
   getInitialState: getInitialCanvasesState,
   schema: zCanvasesStateWithHistory,
-  undoableConfig: {
-    unwrapState: (state) => {
-      return {
-        _version: state._version,
-        selectedCanvasId: state.selectedCanvasId,
-        canvases: state.canvases.map((canvas) => canvas.present),
-      };
-    },
-    wrapState: (state) => {
-      const canvasesState = state as CanvasesStateWithoutHistory;
-
-      return {
-        _version: canvasesState._version,
-        selectedCanvasId: canvasesState.selectedCanvasId,
-        canvases: canvasesState.canvases.map((canvas) => newHistory([], canvas, [])),
-      };
-    },
-  },
   persistConfig: {
     migrate: (state) => {
       assert(isPlainObject(state));
@@ -2047,6 +2037,22 @@ export const canvasSliceConfig: SliceConfig<typeof slice, CanvasesStateWithHisto
         };
       }
       return zCanvasesStateWithoutHistory.parse(state);
+    },
+    wrapState: (state) => {
+      const canvasesState = state as CanvasesStateWithoutHistory;
+
+      return {
+        _version: canvasesState._version,
+        selectedCanvasId: canvasesState.selectedCanvasId,
+        canvases: canvasesState.canvases.map((canvas) => newHistory([], canvas, [])),
+      };
+    },
+    unwrapState: (state) => {
+      return {
+        _version: state._version,
+        selectedCanvasId: state.selectedCanvasId,
+        canvases: state.canvases.map((canvas) => canvas.present),
+      };
     },
   },
 };

@@ -32,24 +32,19 @@ export type SliceConfig<T extends Slice, TInternalState = StateFromSlice<T>, TSe
      * Keys to omit from the persisted state.
      */
     persistDenylist?: (keyof StateFromSlice<T>)[];
-  };
-  /**
-   * The optional undoable configuration for this slice. If omitted, the slice will not be undoable.
-   */
-  undoableConfig?: {
     /**
      * Wraps state into state with history
      *
      * @param state The state without history
      * @returns The state with history
      */
-    wrapState: (state: unknown) => TInternalState;
+    wrapState?: (state: unknown) => TInternalState;
     /**
      * Unwraps state with history
      *
      * @param state The state with history
      * @returns The state without history
      */
-    unwrapState: (state: TInternalState) => TSerializedState;
+    unwrapState?: (state: TInternalState) => TSerializedState;
   };
 };
