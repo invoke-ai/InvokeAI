@@ -56,7 +56,9 @@ export const CropImageEditor = memo(({ editor, onApplyCrop, onReady }: Props) =>
       editor.onCropBoxChange((crop) => {
         setCropBox(crop);
       });
-      setAspectRatio(getAspectRatioString(editor.getCropAspectRatio()));
+      editor.onAspectRatioChange((ratio) => {
+        setAspectRatio(getAspectRatioString(ratio));
+      });
       await onReady();
       editor.fitToContainer();
     },

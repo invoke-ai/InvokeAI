@@ -1,4 +1,4 @@
-import { Box, Flex, FormLabel, Icon, IconButton, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Flex, FormLabel, Icon, IconButton, Text, Tooltip } from '@invoke-ai/ui-library';
 import { objectEquals } from '@observ33r/object-equals';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { UploadImageIconButton } from 'common/hooks/useImageUploadButton';
@@ -97,33 +97,31 @@ export const StartingFrameImage = () => {
   }, [dispatch, originalImageDTO, startingFrameImage?.crop, uploadImage]);
 
   const fitsCurrentAspectRatio = useMemo(() => {
-    if (!originalImageDTO) {
+    const imageDTO = croppedImageDTO ?? originalImageDTO;
+    if (!imageDTO) {
       return true;
     }
 
-    return originalImageDTO.width / originalImageDTO.height === ASPECT_RATIO_MAP[videoAspectRatio]?.ratio;
-  }, [originalImageDTO, videoAspectRatio]);
+    const imageRatio = imageDTO.width / imageDTO.height;
+    const targetRatio = ASPECT_RATIO_MAP[videoAspectRatio].ratio;
+
+    // Call it a fit if the image is within 10% of the target aspect ratio
+    return Math.abs((imageRatio - targetRatio) / targetRatio) < 0.1;
+  }, [croppedImageDTO, originalImageDTO, videoAspectRatio]);
 
   return (
     <Flex justifyContent="flex-start" flexDir="column" gap={2}>
       <FormLabel display="flex" alignItems="center" gap={2}>
         <Text>{t('parameters.startingFrameImage')}</Text>
-        <Tooltip label={t('parameters.startingFrameImageAspectRatioWarning', { videoAspectRatio: videoAspectRatio })}>
-          <Box>
-            <Icon as={PiWarningBold} size={16} color="warning.500" />
-          </Box>
-        </Tooltip>
+        {!fitsCurrentAspectRatio && (
+          <Tooltip label={t('parameters.startingFrameImageAspectRatioWarning', { videoAspectRatio: videoAspectRatio })}>
+            <Flex alignItems="center">
+              <Icon as={PiWarningBold} size={16} color="warning.300" />
+            </Flex>
+          </Tooltip>
+        )}
       </FormLabel>
-      <Flex
-        position="relative"
-        w={36}
-        h={36}
-        alignItems="center"
-        justifyContent="center"
-        borderWidth={1}
-        borderStyle="solid"
-        borderColor={fitsCurrentAspectRatio ? 'base.500' : 'warning.500'}
-      >
+      <Flex position="relative" w={36} h={36} alignItems="center" justifyContent="center">
         {!originalImageDTO && (
           <UploadImageIconButton
             w="full"

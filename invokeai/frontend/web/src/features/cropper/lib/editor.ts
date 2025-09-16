@@ -19,6 +19,7 @@ export type CropBox = {
  */
 type EditorCallbacks = {
   onCropBoxChange: Set<(crop: Readonly<CropBox>) => void>;
+  onAspectRatioChange: Set<(ratio: number | null) => void>;
   onZoomChange: Set<(zoom: number) => void>;
 };
 
@@ -180,6 +181,7 @@ export class Editor {
   private callbacks: EditorCallbacks = {
     onCropBoxChange: new Set(),
     onZoomChange: new Set(),
+    onAspectRatioChange: new Set(),
   };
 
   private cropBox: CropBox | null = null;
@@ -674,7 +676,7 @@ export class Editor {
     this.resetView();
 
     if (initial) {
-      this.aspectRatio = initial.aspectRatio;
+      this.setCropAspectRatio(initial.aspectRatio);
       this.updateCropBox(initial.cropBox);
     } else {
       // Create default crop box (centered, 80% of image)
@@ -1460,6 +1462,10 @@ export class Editor {
       width: newWidth,
       height: newHeight,
     });
+
+    for (const cb of this.callbacks.onAspectRatioChange) {
+      cb(ratio);
+    }
   };
 
   setCropBox = (box: CropBox) => {
@@ -1497,6 +1503,17 @@ export class Editor {
       this.callbacks.onZoomChange.delete(cb);
     };
   };
+
+  /**
+   * Register a callback for when the aspect ratio changes.
+   */
+  onAspectRatioChange = (cb: (ratio: number | null) => void): (() => void) => {
+    this.callbacks.onAspectRatioChange.add(cb);
+    return () => {
+      this.callbacks.onAspectRatioChange.delete(cb);
+    };
+  };
+
   /**
    * Resize the editor container and adjust the Konva stage accordingly.
    *
