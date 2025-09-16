@@ -4,12 +4,12 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { UploadImageIconButton } from 'common/hooks/useImageUploadButton';
 import { ASPECT_RATIO_MAP } from 'features/controlLayers/store/types';
 import { imageDTOToCroppableImage, imageDTOToImageWithDims } from 'features/controlLayers/store/util';
+import { Editor } from 'features/cropper/lib/editor';
+import { cropImageModalApi } from 'features/cropper/store';
 import { videoFrameFromImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
 import { DndImageIcon, imageButtonSx } from 'features/dnd/DndImageIcon';
-import { Editor } from 'features/editImageModal/lib/editor';
-import { openEditImageModal } from 'features/editImageModal/store';
 import {
   selectStartingFrameImage,
   selectVideoAspectRatio,
@@ -93,7 +93,7 @@ export const StartingFrameImage = () => {
       await editor.loadImage(originalImageDTO.image_url, initial);
     };
 
-    openEditImageModal({ editor, onApplyCrop, onReady });
+    cropImageModalApi.open({ editor, onApplyCrop, onReady });
   }, [dispatch, originalImageDTO, startingFrameImage?.crop, uploadImage]);
 
   const fitsCurrentAspectRatio = useMemo(() => {
