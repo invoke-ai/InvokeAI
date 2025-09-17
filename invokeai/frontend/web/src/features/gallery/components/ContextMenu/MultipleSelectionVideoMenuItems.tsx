@@ -1,8 +1,8 @@
 import { MenuDivider, MenuItem } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { isModalOpenChanged, videosToChangeSelected } from 'features/changeBoardModal/store/slice';
+import { useAppSelector } from 'app/store/storeHooks';
+import { useChangeBoardModalApi } from 'features/changeBoardModal/store/state';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFoldersBold, PiStarBold, PiStarFill, PiTrashSimpleBold } from 'react-icons/pi';
@@ -10,18 +10,17 @@ import { useDeleteVideosMutation, useStarVideosMutation, useUnstarVideosMutation
 
 const MultipleSelectionMenuItems = () => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
   const selection = useAppSelector((s) => s.gallery.selection);
   const customStarUi = useStore($customStarUI);
+  const changeBoardModal = useChangeBoardModalApi();
 
   const [starVideos] = useStarVideosMutation();
   const [unstarVideos] = useUnstarVideosMutation();
   const [deleteVideos] = useDeleteVideosMutation();
 
   const handleChangeBoard = useCallback(() => {
-    dispatch(videosToChangeSelected(selection.map((s) => s.id)));
-    dispatch(isModalOpenChanged(true));
-  }, [dispatch, selection]);
+    changeBoardModal.openWithVideos(selection.map((s) => s.id));
+  }, [changeBoardModal, selection]);
 
   const handleDeleteSelection = useCallback(() => {
     // TODO: Add confirm on delete and video usage functionality

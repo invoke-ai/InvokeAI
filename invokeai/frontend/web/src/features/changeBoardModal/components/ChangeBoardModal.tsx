@@ -1,13 +1,8 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, ConfirmationAlertDialog, Flex, FormControl, Text } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import {
-  changeBoardReset,
-  isModalOpenChanged,
-  selectChangeBoardModalSlice,
-} from 'features/changeBoardModal/store/slice';
+import { useChangeBoardModalApi, useChangeBoardModalState } from 'features/changeBoardModal/store/state';
 import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,30 +10,16 @@ import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import { useAddImagesToBoardMutation, useRemoveImagesFromBoardMutation } from 'services/api/endpoints/images';
 import { useAddVideosToBoardMutation, useRemoveVideosFromBoardMutation } from 'services/api/endpoints/videos';
 
-const selectImagesToChange = createSelector(
-  selectChangeBoardModalSlice,
-  (changeBoardModal) => changeBoardModal.image_names
-);
-
-const selectVideosToChange = createSelector(
-  selectChangeBoardModalSlice,
-  (changeBoardModal) => changeBoardModal.video_ids
-);
-
-const selectIsModalOpen = createSelector(
-  selectChangeBoardModalSlice,
-  (changeBoardModal) => changeBoardModal.isModalOpen
-);
-
 const ChangeBoardModal = () => {
   useAssertSingleton('ChangeBoardModal');
-  const dispatch = useAppDispatch();
   const currentBoardId = useAppSelector(selectSelectedBoardId);
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>();
   const { data: boards, isFetching } = useListAllBoardsQuery({ include_archived: true });
-  const isModalOpen = useAppSelector(selectIsModalOpen);
-  const imagesToChange = useAppSelector(selectImagesToChange);
-  const videosToChange = useAppSelector(selectVideosToChange);
+  const changeBoardModalState = useChangeBoardModalState();
+  const changeBoardModal = useChangeBoardModalApi();
+  const imagesToChange = changeBoardModalState.imageNames;
+  const videosToChange = changeBoardModalState.videoIds;
+  const isModalOpen = changeBoardModalState.isOpen;
   const [addImagesToBoard] = useAddImagesToBoardMutation();
   const [removeImagesFromBoard] = useRemoveImagesFromBoardMutation();
   const [addVideosToBoard] = useAddVideosToBoardMutation();
@@ -61,9 +42,8 @@ const ChangeBoardModal = () => {
   const value = useMemo(() => options.find((o) => o.value === selectedBoardId), [options, selectedBoardId]);
 
   const handleClose = useCallback(() => {
-    dispatch(changeBoardReset());
-    dispatch(isModalOpenChanged(false));
-  }, [dispatch]);
+    changeBoardModal.close();
+  }, [changeBoardModal]);
 
   const handleChangeBoard = useCallback(() => {
     if (!selectedBoardId || (imagesToChange.length === 0 && videosToChange.length === 0)) {
@@ -90,10 +70,10 @@ const ChangeBoardModal = () => {
         });
       }
     }
-    dispatch(changeBoardReset());
+    changeBoardModal.close();
   }, [
     addImagesToBoard,
-    dispatch,
+    changeBoardModal,
     imagesToChange,
     videosToChange,
     removeImagesFromBoard,

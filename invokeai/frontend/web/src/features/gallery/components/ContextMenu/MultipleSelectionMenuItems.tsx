@@ -1,8 +1,8 @@
 import { MenuDivider, MenuItem } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { imagesToChangeSelected, isModalOpenChanged } from 'features/changeBoardModal/store/slice';
+import { useAppSelector } from 'app/store/storeHooks';
+import { useChangeBoardModalApi } from 'features/changeBoardModal/store/state';
 import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo, useCallback } from 'react';
@@ -16,10 +16,10 @@ import {
 
 const MultipleSelectionMenuItems = () => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
   const selection = useAppSelector((s) => s.gallery.selection);
   const customStarUi = useStore($customStarUI);
   const deleteImageModal = useDeleteImageModalApi();
+  const changeBoardModal = useChangeBoardModalApi();
 
   const isBulkDownloadEnabled = useFeatureStatus('bulkDownload');
 
@@ -28,9 +28,8 @@ const MultipleSelectionMenuItems = () => {
   const [bulkDownload] = useBulkDownloadImagesMutation();
 
   const handleChangeBoard = useCallback(() => {
-    dispatch(imagesToChangeSelected(selection.map((s) => s.id)));
-    dispatch(isModalOpenChanged(true));
-  }, [dispatch, selection]);
+    changeBoardModal.openWithImages(selection.map((s) => s.id));
+  }, [changeBoardModal, selection]);
 
   const handleDeleteSelection = useCallback(() => {
     deleteImageModal.delete(selection.map((s) => s.id));
