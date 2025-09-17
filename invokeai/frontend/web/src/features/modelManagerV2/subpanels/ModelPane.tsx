@@ -18,6 +18,7 @@ const modelPaneSx: SystemStyleObject = {
   },
   h: 'full',
   minWidth: '300px',
+  overflow: 'auto',
 };
 
 export const ModelPane = memo(() => {
