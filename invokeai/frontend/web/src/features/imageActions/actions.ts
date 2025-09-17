@@ -26,7 +26,12 @@ import type {
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
 } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject, imageDTOToImageWithDims, initialControlNet } from 'features/controlLayers/store/util';
+import {
+  imageDTOToCroppableImage,
+  imageDTOToImageObject,
+  imageDTOToImageWithDims,
+  initialControlNet,
+} from 'features/controlLayers/store/util';
 import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import type { BoardId } from 'features/gallery/store/types';
@@ -44,7 +49,7 @@ import { assert } from 'tsafe';
 
 export const setGlobalReferenceImage = (arg: { imageDTO: ImageDTO; id: string; dispatch: AppDispatch }) => {
   const { imageDTO, id, dispatch } = arg;
-  dispatch(refImageImageChanged({ id, imageDTO }));
+  dispatch(refImageImageChanged({ id, croppableImage: imageDTOToCroppableImage(imageDTO) }));
 };
 
 export const setRegionalGuidanceReferenceImage = (arg: {

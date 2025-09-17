@@ -61,7 +61,7 @@ export const buildFluxKontextGraph = (arg: GraphBuilderArg): GraphBuilderReturn 
         aspect_ratio: aspectRatio.id,
         prompt_upsampling: true,
         input_image: {
-          image_name: firstImage.image_name,
+          image_name: firstImage.crop?.image.image_name ?? firstImage.original.image.image_name,
         },
         ...selectCanvasOutputFields(state),
       });

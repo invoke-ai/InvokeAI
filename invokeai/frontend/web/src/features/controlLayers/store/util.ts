@@ -18,6 +18,7 @@ import type {
   IPAdapterConfig,
   RasterLayerAdjustments,
   RefImageState,
+  RegionalGuidanceIPAdapterConfig,
   RgbColor,
   T2IAdapterConfig,
 } from 'features/controlLayers/store/types';
@@ -52,7 +53,7 @@ export const imageDTOToCroppableImage = (
 ): CroppableImageWithDims => {
   const { image_name, width, height } = originalImageDTO;
   const val: CroppableImageWithDims = {
-    original: { image_name, width, height },
+    original: { image: { image_name, width, height } },
   };
   if (crop) {
     val.crop = deepClone(crop);
@@ -87,6 +88,15 @@ const getInpaintMaskFillColor = buildMaskFillCycler(3);
 const getRegionalGuidanceMaskFillColor = buildMaskFillCycler(0);
 
 export const initialIPAdapter: IPAdapterConfig = {
+  type: 'ip_adapter',
+  image: null,
+  model: null,
+  beginEndStepPct: [0, 1],
+  method: 'full',
+  clipVisionModel: 'ViT-H',
+  weight: 1,
+};
+export const initialRegionalGuidanceIPAdapter: RegionalGuidanceIPAdapterConfig = {
   type: 'ip_adapter',
   image: null,
   model: null,

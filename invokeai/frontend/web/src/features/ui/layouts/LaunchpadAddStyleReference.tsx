@@ -3,7 +3,7 @@ import { useAppStore } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { refImageAdded } from 'features/controlLayers/store/refImagesSlice';
-import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
+import { imageDTOToCroppableImage } from 'features/controlLayers/store/util';
 import { addGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { LaunchpadButton } from 'features/ui/layouts/LaunchpadButton';
@@ -23,7 +23,7 @@ export const LaunchpadAddStyleReference = memo((props: { extraAction?: () => voi
       ({
         onUpload: (imageDTO: ImageDTO) => {
           const config = getDefaultRefImageConfig(getState);
-          config.image = imageDTOToImageWithDims(imageDTO);
+          config.image = imageDTOToCroppableImage(imageDTO);
           dispatch(refImageAdded({ overrides: { config } }));
           props.extraAction?.();
         },

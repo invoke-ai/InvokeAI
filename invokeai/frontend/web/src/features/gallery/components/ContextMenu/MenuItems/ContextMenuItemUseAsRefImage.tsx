@@ -2,7 +2,7 @@ import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppStore } from 'app/store/storeHooks';
 import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { refImageAdded } from 'features/controlLayers/store/refImagesSlice';
-import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
+import { imageDTOToCroppableImage } from 'features/controlLayers/store/util';
 import { useItemDTOContextImageOnly } from 'features/gallery/contexts/ItemDTOContext';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
@@ -17,7 +17,7 @@ export const ContextMenuItemUseAsRefImage = memo(() => {
   const onClickNewGlobalReferenceImageFromImage = useCallback(() => {
     const { dispatch, getState } = store;
     const config = getDefaultRefImageConfig(getState);
-    config.image = imageDTOToImageWithDims(imageDTO);
+    config.image = imageDTOToCroppableImage(imageDTO);
     dispatch(refImageAdded({ overrides: { config } }));
     toast({
       id: 'SENT_TO_CANVAS',

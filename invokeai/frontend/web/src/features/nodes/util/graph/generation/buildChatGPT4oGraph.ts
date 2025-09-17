@@ -50,7 +50,7 @@ export const buildChatGPT4oGraph = async (arg: GraphBuilderArg): Promise<GraphBu
     for (const entity of validRefImages) {
       assert(entity.config.image, 'Image is required for reference image');
       reference_images.push({
-        image_name: entity.config.image.image_name,
+        image_name: entity.config.image.crop?.image.image_name ?? entity.config.image.original.image.image_name,
       });
     }
   }
