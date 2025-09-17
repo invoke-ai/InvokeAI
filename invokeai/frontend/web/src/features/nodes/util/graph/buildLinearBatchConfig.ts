@@ -2,7 +2,7 @@ import type { RootState } from 'app/store/store';
 import { generateSeeds } from 'common/util/generateSeeds';
 import { range } from 'es-toolkit/compat';
 import type { SeedBehaviour } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
-import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import type { Graph, GraphUIContract, GraphUIInput } from 'features/nodes/util/graph/generation/Graph';
 import { API_BASE_MODELS, VIDEO_BASE_MODELS } from 'features/parameters/types/constants';
 import type { components } from 'services/api/schema';
 import type { BaseModelType, Batch, EnqueueBatchArg, Invocation } from 'services/api/types';
@@ -37,23 +37,54 @@ export const prepareLinearUIBatch = (arg: {
   const { iterations, shouldRandomizeSeed, seed } = state.params;
   const { prompts, seedBehaviour } = state.dynamicPrompts;
 
+  const graphWithContract = g.getGraph();
+  const uiContract = graphWithContract.ui;
+
   const data: Batch['data'] = [];
   const firstBatchDatumList: components['schemas']['BatchDatum'][] = [];
   const secondBatchDatumList: components['schemas']['BatchDatum'][] = [];
 
+  const resolvePromptInput = (contract?: GraphUIContract): { nodePath: string; fieldName: string } => {
+    if (!contract) {
+      return { nodePath: positivePromptNode.id, fieldName: 'value' };
+    }
+    const preferredId = contract.primary_input;
+    const promptInput = preferredId
+      ? contract.inputs.find((i) => i.id === preferredId)
+      : contract.inputs.find((i) => i.kind === 'string');
+    if (promptInput) {
+      return { nodePath: promptInput.node_id, fieldName: promptInput.field };
+    }
+    return { nodePath: positivePromptNode.id, fieldName: 'value' };
+  };
+
+  const resolveSeedInput = (contract?: GraphUIContract): GraphUIInput | undefined => {
+    if (!contract) {
+      return undefined;
+    }
+    const preferredId = contract.inputs.find((i) => i.kind === 'seed');
+    return preferredId;
+  };
+
+  const promptTarget = resolvePromptInput(uiContract);
+  const seedTarget = resolveSeedInput(uiContract);
+
+  const seedNodePath = seedTarget?.node_id ?? seedNode?.id;
+  const seedFieldName = seedTarget?.field ?? 'value';
+
   // add seeds first to ensure the output order groups the prompts
-  if (seedNode && seedBehaviour === 'PER_PROMPT') {
+  if (seedNodePath && seedBehaviour === 'PER_PROMPT') {
     const seeds = generateSeeds({
       count: prompts.length * iterations,
       start: shouldRandomizeSeed ? undefined : seed,
     });
 
     firstBatchDatumList.push({
-      node_path: seedNode.id,
-      field_name: 'value',
+      node_path: seedNodePath,
+      field_name: seedFieldName,
       items: seeds,
     });
-  } else if (seedNode && seedBehaviour === 'PER_ITERATION') {
+  } else if (seedNodePath && seedBehaviour === 'PER_ITERATION') {
     // seedBehaviour = SeedBehaviour.PerRun
     const seeds = generateSeeds({
       count: iterations,
@@ -61,8 +92,8 @@ export const prepareLinearUIBatch = (arg: {
     });
 
     secondBatchDatumList.push({
-      node_path: seedNode.id,
-      field_name: 'value',
+      node_path: seedNodePath,
+      field_name: seedFieldName,
       items: seeds,
     });
     data.push(secondBatchDatumList);
@@ -72,8 +103,8 @@ export const prepareLinearUIBatch = (arg: {
 
   // zipped batch of prompts
   firstBatchDatumList.push({
-    node_path: positivePromptNode.id,
-    field_name: 'value',
+    node_path: promptTarget.nodePath,
+    field_name: promptTarget.fieldName,
     items: extendedPrompts,
   });
 
@@ -82,7 +113,7 @@ export const prepareLinearUIBatch = (arg: {
   const enqueueBatchArg: EnqueueBatchArg = {
     prepend,
     batch: {
-      graph: g.getGraph(),
+      graph: graphWithContract,
       runs: 1,
       data,
       origin,

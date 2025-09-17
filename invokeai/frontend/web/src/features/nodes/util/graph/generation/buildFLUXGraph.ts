@@ -16,7 +16,7 @@ import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
 import { addRegions } from 'features/nodes/util/graph/generation/addRegions';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
-import { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { Graph, type GraphUIContract } from 'features/nodes/util/graph/generation/Graph';
 import { selectCanvasOutputFields } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
@@ -356,6 +356,40 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   }
 
   g.setMetadataReceivingNode(canvasOutput);
+
+  const uiContract: GraphUIContract = {
+    version: '0.1',
+    primary_input: 'prompt',
+    primary_output: 'image',
+    inputs: [
+      {
+        id: 'prompt',
+        node_id: positivePrompt.id,
+        field: 'value',
+        kind: 'string',
+        batchable: true,
+        ui: { component: 'textarea' },
+      },
+      {
+        id: 'seed',
+        node_id: seed.id,
+        field: 'value',
+        kind: 'seed',
+        batchable: true,
+        ui: { component: 'seed' },
+      },
+    ],
+    outputs: [
+      {
+        id: 'image',
+        node_id: canvasOutput.id,
+        field: 'image',
+        kind: 'image',
+      },
+    ],
+  };
+
+  g.setUIContract(uiContract);
 
   return {
     g,

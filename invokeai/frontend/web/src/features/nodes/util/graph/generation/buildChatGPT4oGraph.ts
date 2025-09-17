@@ -6,7 +6,7 @@ import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import { isChatGPT4oAspectRatioID, isChatGPT4oReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { type ImageField, zModelIdentifierField } from 'features/nodes/types/common';
-import { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { Graph, type GraphUIContract } from 'features/nodes/util/graph/generation/Graph';
 import {
   getOriginalAndScaledSizesForOtherModes,
   getOriginalAndScaledSizesForTextToImage,
@@ -86,6 +86,32 @@ export const buildChatGPT4oGraph = async (arg: GraphBuilderArg): Promise<GraphBu
       width: originalSize.width,
       height: originalSize.height,
     });
+
+    const uiContract: GraphUIContract = {
+      version: '0.1',
+      primary_input: 'prompt',
+      primary_output: 'image',
+      inputs: [
+        {
+          id: 'prompt',
+          node_id: positivePrompt.id,
+          field: 'value',
+          kind: 'string',
+          batchable: true,
+          ui: { component: 'textarea' },
+        },
+      ],
+      outputs: [
+        {
+          id: 'image',
+          node_id: gptImage.id,
+          field: 'image',
+          kind: 'image',
+        },
+      ],
+    };
+
+    g.setUIContract(uiContract);
     return {
       g,
       positivePrompt,
@@ -134,6 +160,32 @@ export const buildChatGPT4oGraph = async (arg: GraphBuilderArg): Promise<GraphBu
     }
 
     g.setMetadataReceivingNode(gptImage);
+
+    const uiContract: GraphUIContract = {
+      version: '0.1',
+      primary_input: 'prompt',
+      primary_output: 'image',
+      inputs: [
+        {
+          id: 'prompt',
+          node_id: positivePrompt.id,
+          field: 'value',
+          kind: 'string',
+          batchable: false,
+          ui: { component: 'textarea' },
+        },
+      ],
+      outputs: [
+        {
+          id: 'image',
+          node_id: gptImage.id,
+          field: 'image',
+          kind: 'image',
+        },
+      ],
+    };
+
+    g.setUIContract(uiContract);
 
     return {
       g,

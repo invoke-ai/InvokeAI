@@ -30,7 +30,40 @@ type Edge = {
   };
 };
 
-export type GraphType = { id: string; nodes: Record<string, AnyInvocation>; edges: Edge[] };
+export type GraphUIInputKind = 'string' | 'seed' | 'image' | 'number';
+
+export type GraphUIInput = {
+  id: string;
+  node_id: string;
+  field: string;
+  kind: GraphUIInputKind;
+  batchable?: boolean;
+  ui?: Record<string, unknown>;
+};
+
+export type GraphUIOutputKind = 'image' | 'latents';
+
+export type GraphUIOutput = {
+  id: string;
+  node_id: string;
+  field: string;
+  kind: GraphUIOutputKind;
+};
+
+export type GraphUIContract = {
+  version: '0.1';
+  inputs: GraphUIInput[];
+  outputs: GraphUIOutput[];
+  primary_input?: string;
+  primary_output?: string;
+};
+
+export type GraphType = {
+  id: string;
+  nodes: Record<string, AnyInvocation>;
+  edges: Edge[];
+  ui?: GraphUIContract;
+};
 
 export class Graph {
   _graph: GraphType;
@@ -364,6 +397,10 @@ export class Graph {
    */
   getGraphSafe(): GraphType {
     return this._graph;
+  }
+
+  setUIContract(contract: GraphUIContract): void {
+    this._graph.ui = contract;
   }
   //#endregion
 
