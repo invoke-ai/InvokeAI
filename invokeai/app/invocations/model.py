@@ -9,7 +9,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input, InputField, OutputField, UIType
+from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input, InputField, OutputField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.shared.models import FreeUConfig
 from invokeai.backend.model_manager.config import (
@@ -153,7 +153,7 @@ class ModelIdentifierInvocation(BaseInvocation):
 class MainModelLoaderInvocation(BaseInvocation):
     """Loads a main model, outputting its submodels."""
 
-    model: ModelIdentifierField = InputField(description=FieldDescriptions.main_model, ui_type=UIType.MainModel)
+    model: ModelIdentifierField = InputField(description=FieldDescriptions.main_model, ui_model_type=ModelType.Main)
     # TODO: precision?
 
     def invoke(self, context: InvocationContext) -> ModelLoaderOutput:
@@ -187,7 +187,10 @@ class LoRALoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
 
     lora: ModelIdentifierField = InputField(
-        description=FieldDescriptions.lora_model, title="LoRA", ui_type=UIType.LoRAModel
+        description=FieldDescriptions.lora_model,
+        title="LoRA",
+        ui_model_base=BaseModelType.StableDiffusion1,
+        ui_model_type=ModelType.LoRA,
     )
     weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
     unet: Optional[UNetField] = InputField(
@@ -250,7 +253,9 @@ class LoRASelectorInvocation(BaseInvocation):
     """Selects a LoRA model and weight."""
 
     lora: ModelIdentifierField = InputField(
-        description=FieldDescriptions.lora_model, title="LoRA", ui_type=UIType.LoRAModel
+        description=FieldDescriptions.lora_model,
+        title="LoRA",
+        ui_model_type=ModelType.LoRA,
     )
     weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
 
@@ -332,7 +337,10 @@ class SDXLLoRALoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
 
     lora: ModelIdentifierField = InputField(
-        description=FieldDescriptions.lora_model, title="LoRA", ui_type=UIType.LoRAModel
+        description=FieldDescriptions.lora_model,
+        title="LoRA",
+        ui_model_base=BaseModelType.StableDiffusionXL,
+        ui_model_type=ModelType.LoRA,
     )
     weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
     unet: Optional[UNetField] = InputField(
@@ -479,7 +487,15 @@ class VAELoaderInvocation(BaseInvocation):
     """Loads a VAE model, outputting a VaeLoaderOutput"""
 
     vae_model: ModelIdentifierField = InputField(
-        description=FieldDescriptions.vae_model, title="VAE", ui_type=UIType.VAEModel
+        description=FieldDescriptions.vae_model,
+        title="VAE",
+        ui_model_base=[
+            BaseModelType.StableDiffusion1,
+            BaseModelType.StableDiffusionXL,
+            BaseModelType.StableDiffusion3,
+            BaseModelType.Flux,
+        ],
+        ui_model_type=ModelType.VAE,
     )
 
     def invoke(self, context: InvocationContext) -> VAEOutput:

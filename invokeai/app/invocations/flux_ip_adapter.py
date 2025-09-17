@@ -5,7 +5,7 @@ from pydantic import field_validator, model_validator
 from typing_extensions import Self
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
-from invokeai.app.invocations.fields import InputField, UIType
+from invokeai.app.invocations.fields import InputField
 from invokeai.app.invocations.ip_adapter import (
     CLIP_VISION_MODEL_MAP,
     IPAdapterField,
@@ -20,6 +20,7 @@ from invokeai.backend.model_manager.config import (
     IPAdapterCheckpointConfig,
     IPAdapterInvokeAIConfig,
 )
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
 
 @invocation(
@@ -36,7 +37,10 @@ class FluxIPAdapterInvocation(BaseInvocation):
 
     image: ImageField = InputField(description="The IP-Adapter image prompt(s).")
     ip_adapter_model: ModelIdentifierField = InputField(
-        description="The IP-Adapter model.", title="IP-Adapter Model", ui_type=UIType.IPAdapterModel
+        description="The IP-Adapter model.",
+        title="IP-Adapter Model",
+        ui_model_base=BaseModelType.Flux,
+        ui_model_type=ModelType.IPAdapter,
     )
     # Currently, the only known ViT model used by FLUX IP-Adapters is ViT-L.
     clip_vision_model: Literal["ViT-L"] = InputField(description="CLIP Vision model to use.", default="ViT-L")

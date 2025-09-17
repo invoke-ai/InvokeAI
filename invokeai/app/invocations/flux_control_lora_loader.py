@@ -4,9 +4,10 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import FieldDescriptions, ImageField, InputField, OutputField, UIType
+from invokeai.app.invocations.fields import FieldDescriptions, ImageField, InputField, OutputField
 from invokeai.app.invocations.model import ControlLoRAField, ModelIdentifierField
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
 
 @invocation_output("flux_control_lora_loader_output")
@@ -29,7 +30,10 @@ class FluxControlLoRALoaderInvocation(BaseInvocation):
     """LoRA model and Image to use with FLUX transformer generation."""
 
     lora: ModelIdentifierField = InputField(
-        description=FieldDescriptions.control_lora_model, title="Control LoRA", ui_type=UIType.ControlLoRAModel
+        description=FieldDescriptions.control_lora_model,
+        title="Control LoRA",
+        ui_model_base=BaseModelType.Flux,
+        ui_model_type=ModelType.ControlLoRa,
     )
     image: ImageField = InputField(description="The image to encode.")
     weight: float = InputField(description="The weight of the LoRA.", default=1.0)

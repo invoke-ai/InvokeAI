@@ -18,7 +18,6 @@ from invokeai.app.invocations.fields import (
     InputField,
     OutputField,
     TensorField,
-    UIType,
 )
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageField
@@ -64,7 +63,8 @@ class FluxReduxInvocation(BaseInvocation):
     redux_model: ModelIdentifierField = InputField(
         description="The FLUX Redux model to use.",
         title="FLUX Redux Model",
-        ui_type=UIType.FluxReduxModel,
+        ui_model_base=BaseModelType.Flux,
+        ui_model_type=ModelType.FluxRedux,
     )
     downsampling_factor: int = InputField(
         ge=1,

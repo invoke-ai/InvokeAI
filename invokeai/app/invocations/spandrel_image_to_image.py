@@ -11,7 +11,6 @@ from invokeai.app.invocations.fields import (
     FieldDescriptions,
     ImageField,
     InputField,
-    UIType,
     WithBoard,
     WithMetadata,
 )
@@ -19,6 +18,7 @@ from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.model_manager.taxonomy import ModelType
 from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 from invokeai.backend.tiles.tiles import calc_tiles_min_overlap
 from invokeai.backend.tiles.utils import TBLR, Tile
@@ -33,7 +33,7 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     image_to_image_model: ModelIdentifierField = InputField(
         title="Image-to-Image Model",
         description=FieldDescriptions.spandrel_image_to_image_model,
-        ui_type=UIType.SpandrelImageToImageModel,
+        ui_model_type=ModelType.SpandrelImageToImage,
     )
     tile_size: int = InputField(
         default=512, description="The tile size for tiled image-to-image. Set to 0 to disable tiling."

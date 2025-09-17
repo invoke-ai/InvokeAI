@@ -6,7 +6,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
+from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField
 from invokeai.app.invocations.model import CLIPField, ModelIdentifierField, T5EncoderField, TransformerField, VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.t5_model_identifier import (
@@ -17,7 +17,7 @@ from invokeai.backend.flux.util import max_seq_lengths
 from invokeai.backend.model_manager.config import (
     CheckpointConfigBase,
 )
-from invokeai.backend.model_manager.taxonomy import SubModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
 
 
 @invocation_output("flux_model_loader_output")
@@ -46,23 +46,30 @@ class FluxModelLoaderInvocation(BaseInvocation):
 
     model: ModelIdentifierField = InputField(
         description=FieldDescriptions.flux_model,
-        ui_type=UIType.FluxMainModel,
         input=Input.Direct,
+        ui_model_base=BaseModelType.Flux,
+        ui_model_type=ModelType.Main,
     )
 
     t5_encoder_model: ModelIdentifierField = InputField(
-        description=FieldDescriptions.t5_encoder, ui_type=UIType.T5EncoderModel, input=Input.Direct, title="T5 Encoder"
+        description=FieldDescriptions.t5_encoder,
+        input=Input.Direct,
+        title="T5 Encoder",
+        ui_model_type=ModelType.T5Encoder,
     )
 
     clip_embed_model: ModelIdentifierField = InputField(
         description=FieldDescriptions.clip_embed_model,
-        ui_type=UIType.CLIPEmbedModel,
         input=Input.Direct,
         title="CLIP Embed",
+        ui_model_type=ModelType.CLIPEmbed,
     )
 
     vae_model: ModelIdentifierField = InputField(
-        description=FieldDescriptions.vae_model, ui_type=UIType.FluxVAEModel, title="VAE"
+        description=FieldDescriptions.vae_model,
+        title="VAE",
+        ui_model_base=BaseModelType.Flux,
+        ui_model_type=ModelType.VAE,
     )
 
     def invoke(self, context: InvocationContext) -> FluxModelLoaderOutput:

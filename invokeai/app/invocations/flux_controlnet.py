@@ -6,11 +6,12 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import FieldDescriptions, ImageField, InputField, OutputField, UIType
+from invokeai.app.invocations.fields import FieldDescriptions, ImageField, InputField, OutputField
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import CONTROLNET_RESIZE_VALUES
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
 
 class FluxControlNetField(BaseModel):
@@ -57,7 +58,9 @@ class FluxControlNetInvocation(BaseInvocation):
 
     image: ImageField = InputField(description="The control image")
     control_model: ModelIdentifierField = InputField(
-        description=FieldDescriptions.controlnet_model, ui_type=UIType.ControlNetModel
+        description=FieldDescriptions.controlnet_model,
+        ui_model_base=BaseModelType.Flux,
+        ui_model_type=ModelType.ControlNet,
     )
     control_weight: float | list[float] = InputField(
         default=1.0, ge=-1, le=2, description="The weight given to the ControlNet"
