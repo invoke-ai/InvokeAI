@@ -27,6 +27,7 @@ export const zLogNamespace = z.enum([
   'queue',
   'workflows',
   'video',
+  'enqueue',
 ]);
 export type LogNamespace = z.infer<typeof zLogNamespace>;
 
