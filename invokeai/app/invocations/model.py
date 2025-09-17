@@ -153,7 +153,11 @@ class ModelIdentifierInvocation(BaseInvocation):
 class MainModelLoaderInvocation(BaseInvocation):
     """Loads a main model, outputting its submodels."""
 
-    model: ModelIdentifierField = InputField(description=FieldDescriptions.main_model, ui_model_type=ModelType.Main)
+    model: ModelIdentifierField = InputField(
+        description=FieldDescriptions.main_model,
+        ui_model_base=BaseModelType.StableDiffusion1,
+        ui_model_type=ModelType.Main,
+    )
     # TODO: precision?
 
     def invoke(self, context: InvocationContext) -> ModelLoaderOutput:
