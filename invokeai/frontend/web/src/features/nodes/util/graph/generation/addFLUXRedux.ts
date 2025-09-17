@@ -87,7 +87,7 @@ const addFLUXRedux = (id: string, ipAdapter: FLUXReduxConfig, g: Graph, collecto
     type: 'flux_redux',
     redux_model: fluxReduxModel,
     image: {
-      image_name: image.image_name,
+      image_name: image.crop?.image.image_name ?? image.original.image.image_name,
     },
     ...IMAGE_INFLUENCE_TO_SETTINGS[ipAdapter.imageInfluence ?? 'highest'],
   });

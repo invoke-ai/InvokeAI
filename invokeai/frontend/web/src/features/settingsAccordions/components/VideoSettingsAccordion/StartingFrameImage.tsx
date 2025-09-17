@@ -28,10 +28,10 @@ export const StartingFrameImage = () => {
   const dispatch = useAppDispatch();
   const requiresStartingFrame = useAppSelector(selectVideoModelRequiresStartingFrame);
   const startingFrameImage = useAppSelector(selectStartingFrameImage);
-  const originalImageDTO = useImageDTO(startingFrameImage?.original.image_name);
+  const originalImageDTO = useImageDTO(startingFrameImage?.original.image.image_name);
   const croppedImageDTO = useImageDTO(startingFrameImage?.crop?.image.image_name);
   const videoAspectRatio = useAppSelector(selectVideoAspectRatio);
-  const [uploadImage] = useUploadImageMutation({ fixedCacheKey: 'editorContainer' });
+  const [uploadImage] = useUploadImageMutation();
 
   const onReset = useCallback(() => {
     dispatch(startingFrameImageChanged(null));

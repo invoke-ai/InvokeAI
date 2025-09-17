@@ -6,13 +6,16 @@ import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import { clamp } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type { FLUXReduxImageInfluence, RefImagesState } from 'features/controlLayers/store/types';
+import type {
+  CroppableImageWithDims,
+  FLUXReduxImageInfluence,
+  RefImagesState,
+} from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type {
   ChatGPT4oModelConfig,
   FLUXKontextModelConfig,
   FLUXReduxModelConfig,
-  ImageDTO,
   IPAdapterModelConfig,
 } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -22,7 +25,6 @@ import type { CLIPVisionModelV2, IPMethodV2, RefImageState } from './types';
 import { getInitialRefImagesState, isFLUXReduxConfig, isIPAdapterConfig, zRefImagesState } from './types';
 import {
   getReferenceImageState,
-  imageDTOToImageWithDims,
   initialChatGPT4oReferenceImage,
   initialFluxKontextReferenceImage,
   initialFLUXRedux,
@@ -65,13 +67,13 @@ const slice = createSlice({
         state.entities.push(...entities);
       }
     },
-    refImageImageChanged: (state, action: PayloadActionWithId<{ imageDTO: ImageDTO | null }>) => {
-      const { id, imageDTO } = action.payload;
+    refImageImageChanged: (state, action: PayloadActionWithId<{ croppableImage: CroppableImageWithDims | null }>) => {
+      const { id, croppableImage } = action.payload;
       const entity = selectRefImageEntity(state, id);
       if (!entity) {
         return;
       }
-      entity.config.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
+      entity.config.image = croppableImage;
     },
     refImageIPAdapterMethodChanged: (state, action: PayloadActionWithId<{ method: IPMethodV2 }>) => {
       const { id, method } = action.payload;
