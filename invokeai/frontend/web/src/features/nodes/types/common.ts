@@ -73,7 +73,7 @@ export type SchedulerField = z.infer<typeof zSchedulerField>;
 // #endregion
 
 // #region Model-related schemas
-const zBaseModel = z.enum([
+export const zBaseModelType = z.enum([
   'any',
   'sd-1',
   'sd-2',
@@ -90,7 +90,7 @@ const zBaseModel = z.enum([
   'veo3',
   'runway',
 ]);
-export type BaseModelType = z.infer<typeof zBaseModel>;
+export type BaseModelType = z.infer<typeof zBaseModelType>;
 export const zMainModelBase = z.enum([
   'sd-1',
   'sd-2',
@@ -143,11 +143,15 @@ const zSubModelType = z.enum([
   'safety_checker',
 ]);
 export type SubModelType = z.infer<typeof zSubModelType>;
+
+export const zClipVariantType = z.enum(['large', 'gigantic']);
+export const zModelVariantType = z.enum(['normal', 'inpaint', 'depth']);
+
 export const zModelIdentifierField = z.object({
   key: z.string().min(1),
   hash: z.string().min(1),
   name: z.string().min(1),
-  base: zBaseModel,
+  base: zBaseModelType,
   type: zModelType,
   submodel_type: zSubModelType.nullish(),
 });
