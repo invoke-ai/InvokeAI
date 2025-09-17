@@ -11805,6 +11805,21 @@ export type components = {
             ui_choice_labels: {
                 [key: string]: string;
             } | null;
+            /**
+             * Ui Model Base
+             * @default null
+             */
+            ui_model_base: components["schemas"]["BaseModelType"][] | null;
+            /**
+             * Ui Model Type
+             * @default null
+             */
+            ui_model_type: components["schemas"]["ModelType"][] | null;
+            /**
+             * Ui Model Variant
+             * @default null
+             */
+            ui_model_variant: (components["schemas"]["ClipVariantType"] | components["schemas"]["ModelVariantType"])[] | null;
         };
         /**
          * InstallStatus
