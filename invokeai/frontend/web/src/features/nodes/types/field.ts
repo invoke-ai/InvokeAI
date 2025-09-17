@@ -9,7 +9,17 @@ import { assert } from 'tsafe';
 import { z } from 'zod';
 
 import type { ImageField } from './common';
-import { zBoardField, zColorField, zImageField, zModelIdentifierField, zSchedulerField } from './common';
+import {
+  zBaseModelType,
+  zBoardField,
+  zClipVariantType,
+  zColorField,
+  zImageField,
+  zModelIdentifierField,
+  zModelType,
+  zModelVariantType,
+  zSchedulerField,
+} from './common';
 
 /**
  * zod schemas & inferred types for fields.
@@ -60,6 +70,9 @@ const zFieldInputTemplateBase = zFieldTemplateBase.extend({
   default: z.undefined(),
   ui_component: zFieldUIComponent.nullish(),
   ui_choice_labels: z.record(z.string(), z.string()).nullish(),
+  ui_model_base: z.array(zBaseModelType).nullish(),
+  ui_model_type: z.array(zModelType).nullish(),
+  ui_model_variant: z.array(zModelVariantType.or(zClipVariantType)).nullish(),
 });
 const zFieldOutputTemplateBase = zFieldTemplateBase.extend({
   fieldKind: z.literal('output'),

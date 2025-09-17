@@ -12,11 +12,14 @@ import type {
   SchedulerField,
   SubModelType,
   T2IAdapterField,
+  zClipVariantType,
+  zModelVariantType,
 } from 'features/nodes/types/common';
-import type { Invocation, ModelType, S } from 'services/api/types';
+import type { Invocation, S } from 'services/api/types';
 import type { Equals, Extends } from 'tsafe';
 import { assert } from 'tsafe';
 import { describe, test } from 'vitest';
+import type z from 'zod';
 
 /**
  * These types originate from the server and are recreated as zod schemas manually, for use at runtime.
@@ -38,7 +41,8 @@ describe('Common types', () => {
   test('ModelIdentifier', () => assert<Equals<ModelIdentifierField, S['ModelIdentifierField']>>());
   test('ModelIdentifier', () => assert<Equals<BaseModelType, S['BaseModelType']>>());
   test('ModelIdentifier', () => assert<Equals<SubModelType, S['SubModelType']>>());
-  test('ModelIdentifier', () => assert<Equals<ModelType, S['ModelType']>>());
+  test('ClipVariantType', () => assert<Equals<z.infer<typeof zClipVariantType>, S['ClipVariantType']>>());
+  test('ModelVariantType', () => assert<Equals<z.infer<typeof zModelVariantType>, S['ModelVariantType']>>());
 
   // Misc types
   test('ProgressImage', () => assert<Equals<ProgressImage, S['ProgressImage']>>());

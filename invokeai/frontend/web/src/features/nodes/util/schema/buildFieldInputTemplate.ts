@@ -892,7 +892,18 @@ export const buildFieldInputTemplate = (
   fieldName: string,
   fieldType: FieldType
 ): FieldInputTemplate => {
-  const { input, ui_hidden, ui_component, ui_type, ui_order, ui_choice_labels, orig_required: required } = fieldSchema;
+  const {
+    input,
+    ui_hidden,
+    ui_component,
+    ui_type,
+    ui_order,
+    ui_choice_labels,
+    orig_required: required,
+    ui_model_base,
+    ui_model_type,
+    ui_model_variant,
+  } = fieldSchema;
 
   // This is the base field template that is common to all fields. The builder function will add all other
   // properties to this template.
@@ -908,6 +919,9 @@ export const buildFieldInputTemplate = (
     ui_type,
     ui_order,
     ui_choice_labels,
+    ui_model_base,
+    ui_model_type,
+    ui_model_variant,
   };
 
   if (isStatefulFieldType(fieldType)) {
