@@ -1983,7 +1983,7 @@
         "loadWorkflow": "$t(common.load) Workflow",
         "autoLayout": "Auto Layout",
         "edit": "Edit",
-        "view": "View",
+        "view": "Load",
         "download": "Download",
         "copyShareLink": "Copy Share Link",
         "copyShareLinkForWorkflow": "Copy Share Link for Workflow",

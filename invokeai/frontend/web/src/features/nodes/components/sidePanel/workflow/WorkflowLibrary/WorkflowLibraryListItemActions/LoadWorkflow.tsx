@@ -5,9 +5,9 @@ import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/L
 import type { MouseEvent } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiEyeBold } from 'react-icons/pi';
+import { PiCheckBold } from 'react-icons/pi';
 
-export const ViewWorkflow = ({ workflowId }: { workflowId: string }) => {
+export const LoadWorkflow = ({ workflowId }: { workflowId: string }) => {
   const dispatch = useAppDispatch();
   const loadWorkflowWithDialog = useLoadWorkflowWithDialog();
   const { t } = useTranslation();
@@ -30,11 +30,11 @@ export const ViewWorkflow = ({ workflowId }: { workflowId: string }) => {
     <Tooltip label={t('workflows.view')} closeOnScroll>
       <IconButton
         size="sm"
-        variant="link"
+        variant="ghost"
         alignSelf="stretch"
         aria-label={t('workflows.view')}
         onClick={handleClickLoad}
-        icon={<PiEyeBold />}
+        icon={<PiCheckBold />}
       />
     </Tooltip>
   );
