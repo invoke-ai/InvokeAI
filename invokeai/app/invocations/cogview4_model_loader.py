@@ -5,7 +5,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
+from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField
 from invokeai.app.invocations.model import (
     GlmEncoderField,
     ModelIdentifierField,
@@ -14,6 +14,7 @@ from invokeai.app.invocations.model import (
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.config import SubModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
 
 @invocation_output("cogview4_model_loader_output")
@@ -38,8 +39,9 @@ class CogView4ModelLoaderInvocation(BaseInvocation):
 
     model: ModelIdentifierField = InputField(
         description=FieldDescriptions.cogview4_model,
-        ui_type=UIType.CogView4MainModel,
         input=Input.Direct,
+        ui_model_base=BaseModelType.CogView4,
+        ui_model_type=ModelType.Main,
     )
 
     def invoke(self, context: InvocationContext) -> CogView4ModelLoaderOutput:

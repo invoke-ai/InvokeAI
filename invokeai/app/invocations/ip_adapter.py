@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from typing_extensions import Self
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
-from invokeai.app.invocations.fields import FieldDescriptions, InputField, OutputField, TensorField, UIType
+from invokeai.app.invocations.fields import FieldDescriptions, InputField, OutputField, TensorField
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
@@ -85,7 +85,8 @@ class IPAdapterInvocation(BaseInvocation):
         description="The IP-Adapter model.",
         title="IP-Adapter Model",
         ui_order=-1,
-        ui_type=UIType.IPAdapterModel,
+        ui_model_base=[BaseModelType.StableDiffusion1, BaseModelType.StableDiffusionXL],
+        ui_model_type=ModelType.IPAdapter,
     )
     clip_vision_model: Literal["ViT-H", "ViT-G", "ViT-L"] = InputField(
         description="CLIP Vision model to use. Overrides model settings. Mandatory for checkpoint models.",
