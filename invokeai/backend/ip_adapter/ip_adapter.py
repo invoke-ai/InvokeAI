@@ -210,8 +210,8 @@ def load_ip_adapter_tensors(ip_adapter_ckpt_path: pathlib.Path, device: str) -> 
     state_dict: IPAdapterStateDict = {
         "ip_adapter": {},
         "image_proj": {},
-        "adapter_modules": {}, # added for NOOB-IPA-MARK1
-        "image_proj_model": {}, # added for NOOB-IPA-MARK1
+        "adapter_modules": {},  # added for noobai-mark-ipa
+        "image_proj_model": {},  # added for noobai-mark-ipa
     }
 
     if ip_adapter_ckpt_path.suffix == ".safetensors":
