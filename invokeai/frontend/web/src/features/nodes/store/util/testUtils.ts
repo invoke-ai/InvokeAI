@@ -247,9 +247,10 @@ export const main_model_loader: InvocationTemplate = {
       fieldKind: 'input',
       input: 'direct',
       ui_hidden: false,
-      ui_type: 'MainModelField',
+      ui_model_base: ['sd-1', 'sdxl'],
+      ui_model_type: ['main'],
       type: {
-        name: 'MainModelField',
+        name: 'ModelIdentifierField',
         cardinality: 'SINGLE',
         batch: false,
 

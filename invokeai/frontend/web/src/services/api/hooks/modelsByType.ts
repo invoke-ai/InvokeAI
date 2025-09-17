@@ -12,34 +12,25 @@ import {
   isChatGPT4oModelConfig,
   isCLIPEmbedModelConfig,
   isCLIPVisionModelConfig,
-  isCogView4MainModelModelConfig,
   isControlLayerModelConfig,
   isControlLoRAModelConfig,
   isControlNetModelConfig,
   isFluxKontextApiModelConfig,
   isFluxKontextModelConfig,
-  isFluxMainModelModelConfig,
   isFluxReduxModelConfig,
   isFluxVAEModelConfig,
   isGemini2_5ModelConfig,
-  isImagen3ModelConfig,
-  isImagen4ModelConfig,
   isIPAdapterModelConfig,
   isLLaVAModelConfig,
   isLoRAModelConfig,
   isNonRefinerMainModelConfig,
-  isNonSDXLMainModelConfig,
   isRefinerMainModelModelConfig,
-  isRunwayModelConfig,
-  isSD3MainModelModelConfig,
-  isSDXLMainModelModelConfig,
   isSigLipModelConfig,
   isSpandrelImageToImageModelConfig,
   isT2IAdapterModelConfig,
   isT5EncoderModelConfig,
   isTIModelConfig,
   isVAEModelConfig,
-  isVeo3ModelConfig,
   isVideoModelConfig,
 } from 'services/api/types';
 
@@ -66,12 +57,7 @@ const buildModelsHook =
     return [modelConfigs, result] as const;
   };
 export const useMainModels = buildModelsHook(isNonRefinerMainModelConfig);
-export const useNonSDXLMainModels = buildModelsHook(isNonSDXLMainModelConfig);
 export const useRefinerModels = buildModelsHook(isRefinerMainModelModelConfig);
-export const useFluxModels = buildModelsHook(isFluxMainModelModelConfig);
-export const useSD3Models = buildModelsHook(isSD3MainModelModelConfig);
-export const useCogView4Models = buildModelsHook(isCogView4MainModelModelConfig);
-export const useSDXLModels = buildModelsHook(isSDXLMainModelModelConfig);
 export const useLoRAModels = buildModelsHook(isLoRAModelConfig);
 export const useControlLoRAModel = buildModelsHook(isControlLoRAModelConfig);
 export const useControlLayerModels = buildModelsHook(isControlLayerModelConfig);
@@ -103,12 +89,6 @@ export const useRegionalReferenceImageModels = buildModelsHook(
   (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config)
 );
 export const useLLaVAModels = buildModelsHook(isLLaVAModelConfig);
-export const useImagen3Models = buildModelsHook(isImagen3ModelConfig);
-export const useImagen4Models = buildModelsHook(isImagen4ModelConfig);
-export const useChatGPT4oModels = buildModelsHook(isChatGPT4oModelConfig);
-export const useFluxKontextModels = buildModelsHook(isFluxKontextApiModelConfig);
-export const useVeo3Models = buildModelsHook(isVeo3ModelConfig);
-export const useRunwayModels = buildModelsHook(isRunwayModelConfig);
 export const useVideoModels = buildModelsHook(isVideoModelConfig);
 
 const buildModelsSelector =

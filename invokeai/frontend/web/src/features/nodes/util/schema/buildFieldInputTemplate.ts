@@ -3,53 +3,26 @@ import { FieldParseError } from 'features/nodes/types/error';
 import type {
   BoardFieldInputTemplate,
   BooleanFieldInputTemplate,
-  ChatGPT4oModelFieldInputTemplate,
-  CLIPEmbedModelFieldInputTemplate,
-  CLIPGEmbedModelFieldInputTemplate,
-  CLIPLEmbedModelFieldInputTemplate,
-  CogView4MainModelFieldInputTemplate,
   ColorFieldInputTemplate,
-  ControlLoRAModelFieldInputTemplate,
-  ControlNetModelFieldInputTemplate,
   EnumFieldInputTemplate,
   FieldInputTemplate,
   FieldType,
   FloatFieldCollectionInputTemplate,
   FloatFieldInputTemplate,
   FloatGeneratorFieldInputTemplate,
-  FluxKontextModelFieldInputTemplate,
-  FluxMainModelFieldInputTemplate,
-  FluxReduxModelFieldInputTemplate,
-  FluxVAEModelFieldInputTemplate,
   ImageFieldCollectionInputTemplate,
   ImageFieldInputTemplate,
   ImageGeneratorFieldInputTemplate,
-  Imagen3ModelFieldInputTemplate,
-  Imagen4ModelFieldInputTemplate,
   IntegerFieldCollectionInputTemplate,
   IntegerFieldInputTemplate,
   IntegerGeneratorFieldInputTemplate,
-  IPAdapterModelFieldInputTemplate,
-  LLaVAModelFieldInputTemplate,
-  LoRAModelFieldInputTemplate,
-  MainModelFieldInputTemplate,
   ModelIdentifierFieldInputTemplate,
-  RunwayModelFieldInputTemplate,
   SchedulerFieldInputTemplate,
-  SD3MainModelFieldInputTemplate,
-  SDXLMainModelFieldInputTemplate,
-  SDXLRefinerModelFieldInputTemplate,
-  SigLipModelFieldInputTemplate,
-  SpandrelImageToImageModelFieldInputTemplate,
   StatefulFieldType,
   StatelessFieldInputTemplate,
   StringFieldCollectionInputTemplate,
   StringFieldInputTemplate,
   StringGeneratorFieldInputTemplate,
-  T2IAdapterModelFieldInputTemplate,
-  T5EncoderModelFieldInputTemplate,
-  VAEModelFieldInputTemplate,
-  Veo3ModelFieldInputTemplate,
 } from 'features/nodes/types/field';
 import {
   getFloatGeneratorArithmeticSequenceDefaults,
@@ -302,373 +275,6 @@ const buildModelIdentifierFieldInputTemplate: FieldInputTemplateBuilder<ModelIde
   return template;
 };
 
-const buildMainModelFieldInputTemplate: FieldInputTemplateBuilder<MainModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: MainModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-
-  return template;
-};
-
-const buildSDXLMainModelFieldInputTemplate: FieldInputTemplateBuilder<SDXLMainModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: SDXLMainModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-
-  return template;
-};
-
-const buildFluxMainModelFieldInputTemplate: FieldInputTemplateBuilder<FluxMainModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: FluxMainModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-
-  return template;
-};
-
-const buildSD3MainModelFieldInputTemplate: FieldInputTemplateBuilder<SD3MainModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: SD3MainModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-
-  return template;
-};
-
-const buildCogView4MainModelFieldInputTemplate: FieldInputTemplateBuilder<CogView4MainModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: CogView4MainModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-
-  return template;
-};
-
-const buildRefinerModelFieldInputTemplate: FieldInputTemplateBuilder<SDXLRefinerModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: SDXLRefinerModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-
-  return template;
-};
-
-const buildVAEModelFieldInputTemplate: FieldInputTemplateBuilder<VAEModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: VAEModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-
-  return template;
-};
-
-const buildT5EncoderModelFieldInputTemplate: FieldInputTemplateBuilder<T5EncoderModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: T5EncoderModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-
-  return template;
-};
-
-const buildCLIPEmbedModelFieldInputTemplate: FieldInputTemplateBuilder<CLIPEmbedModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: CLIPEmbedModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-
-  return template;
-};
-
-const buildCLIPLEmbedModelFieldInputTemplate: FieldInputTemplateBuilder<CLIPLEmbedModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: CLIPLEmbedModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-
-  return template;
-};
-
-const buildCLIPGEmbedModelFieldInputTemplate: FieldInputTemplateBuilder<CLIPGEmbedModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: CLIPGEmbedModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-
-  return template;
-};
-
-const buildControlLoRAModelFieldInputTemplate: FieldInputTemplateBuilder<ControlLoRAModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: ControlLoRAModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-
-  return template;
-};
-
-const buildLLaVAModelFieldInputTemplate: FieldInputTemplateBuilder<LLaVAModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: LLaVAModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-  return template;
-};
-
-const buildFluxVAEModelFieldInputTemplate: FieldInputTemplateBuilder<FluxVAEModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: FluxVAEModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-
-  return template;
-};
-
-const buildLoRAModelFieldInputTemplate: FieldInputTemplateBuilder<LoRAModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: LoRAModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-
-  return template;
-};
-
-const buildControlNetModelFieldInputTemplate: FieldInputTemplateBuilder<ControlNetModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: ControlNetModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-
-  return template;
-};
-
-const buildIPAdapterModelFieldInputTemplate: FieldInputTemplateBuilder<IPAdapterModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: IPAdapterModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-
-  return template;
-};
-
-const buildT2IAdapterModelFieldInputTemplate: FieldInputTemplateBuilder<T2IAdapterModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: T2IAdapterModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-
-  return template;
-};
-
-const buildSpandrelImageToImageModelFieldInputTemplate: FieldInputTemplateBuilder<
-  SpandrelImageToImageModelFieldInputTemplate
-> = ({ schemaObject, baseField, fieldType }) => {
-  const template: SpandrelImageToImageModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-
-  return template;
-};
-
-const buildSigLipModelFieldInputTemplate: FieldInputTemplateBuilder<SigLipModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: SigLipModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-  return template;
-};
-
-const buildFluxReduxModelFieldInputTemplate: FieldInputTemplateBuilder<FluxReduxModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: FluxReduxModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-  return template;
-};
-
-const buildImagen3ModelFieldInputTemplate: FieldInputTemplateBuilder<Imagen3ModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: Imagen3ModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-  return template;
-};
-
-const buildImagen4ModelFieldInputTemplate: FieldInputTemplateBuilder<Imagen4ModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: Imagen4ModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-  return template;
-};
-
-const buildFluxKontextModelFieldInputTemplate: FieldInputTemplateBuilder<FluxKontextModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: FluxKontextModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-  return template;
-};
-
-const buildVeo3ModelFieldInputTemplate: FieldInputTemplateBuilder<Veo3ModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: Veo3ModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-  return template;
-};
-
-const buildRunwayModelFieldInputTemplate: FieldInputTemplateBuilder<RunwayModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: RunwayModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-  return template;
-};
-
-const buildChatGPT4oModelFieldInputTemplate: FieldInputTemplateBuilder<ChatGPT4oModelFieldInputTemplate> = ({
-  schemaObject,
-  baseField,
-  fieldType,
-}) => {
-  const template: ChatGPT4oModelFieldInputTemplate = {
-    ...baseField,
-    type: fieldType,
-    default: schemaObject.default ?? undefined,
-  };
-  return template;
-};
-
 const buildBoardFieldInputTemplate: FieldInputTemplateBuilder<BoardFieldInputTemplate> = ({
   schemaObject,
   baseField,
@@ -847,40 +453,13 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   BoardField: buildBoardFieldInputTemplate,
   BooleanField: buildBooleanFieldInputTemplate,
   ColorField: buildColorFieldInputTemplate,
-  ControlNetModelField: buildControlNetModelFieldInputTemplate,
   EnumField: buildEnumFieldInputTemplate,
   FloatField: buildFloatFieldInputTemplate,
   ImageField: buildImageFieldInputTemplate,
   IntegerField: buildIntegerFieldInputTemplate,
-  IPAdapterModelField: buildIPAdapterModelFieldInputTemplate,
-  LoRAModelField: buildLoRAModelFieldInputTemplate,
-  LLaVAModelField: buildLLaVAModelFieldInputTemplate,
   ModelIdentifierField: buildModelIdentifierFieldInputTemplate,
-  MainModelField: buildMainModelFieldInputTemplate,
   SchedulerField: buildSchedulerFieldInputTemplate,
-  SDXLMainModelField: buildSDXLMainModelFieldInputTemplate,
-  SD3MainModelField: buildSD3MainModelFieldInputTemplate,
-  CogView4MainModelField: buildCogView4MainModelFieldInputTemplate,
-  FluxMainModelField: buildFluxMainModelFieldInputTemplate,
-  SDXLRefinerModelField: buildRefinerModelFieldInputTemplate,
   StringField: buildStringFieldInputTemplate,
-  T2IAdapterModelField: buildT2IAdapterModelFieldInputTemplate,
-  SpandrelImageToImageModelField: buildSpandrelImageToImageModelFieldInputTemplate,
-  VAEModelField: buildVAEModelFieldInputTemplate,
-  T5EncoderModelField: buildT5EncoderModelFieldInputTemplate,
-  CLIPEmbedModelField: buildCLIPEmbedModelFieldInputTemplate,
-  CLIPLEmbedModelField: buildCLIPLEmbedModelFieldInputTemplate,
-  CLIPGEmbedModelField: buildCLIPGEmbedModelFieldInputTemplate,
-  FluxVAEModelField: buildFluxVAEModelFieldInputTemplate,
-  ControlLoRAModelField: buildControlLoRAModelFieldInputTemplate,
-  SigLipModelField: buildSigLipModelFieldInputTemplate,
-  FluxReduxModelField: buildFluxReduxModelFieldInputTemplate,
-  Imagen3ModelField: buildImagen3ModelFieldInputTemplate,
-  Imagen4ModelField: buildImagen4ModelFieldInputTemplate,
-  ChatGPT4oModelField: buildChatGPT4oModelFieldInputTemplate,
-  FluxKontextModelField: buildFluxKontextModelFieldInputTemplate,
-  Veo3ModelField: buildVeo3ModelFieldInputTemplate,
-  RunwayModelField: buildRunwayModelFieldInputTemplate,
   FloatGeneratorField: buildFloatGeneratorFieldInputTemplate,
   IntegerGeneratorField: buildIntegerGeneratorFieldInputTemplate,
   StringGeneratorField: buildStringGeneratorFieldInputTemplate,
