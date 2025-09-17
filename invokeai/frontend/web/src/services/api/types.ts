@@ -122,7 +122,7 @@ export type T2IAdapterModelConfig = S['T2IAdapterConfig'];
 export type CLIPLEmbedModelConfig = S['CLIPLEmbedDiffusersConfig'];
 export type CLIPGEmbedModelConfig = S['CLIPGEmbedDiffusersConfig'];
 export type CLIPEmbedModelConfig = CLIPLEmbedModelConfig | CLIPGEmbedModelConfig;
-export type LlavaOnevisionConfig = S['LlavaOnevisionConfig'];
+type LlavaOnevisionConfig = S['LlavaOnevisionConfig'];
 export type T5EncoderModelConfig = S['T5EncoderConfig'];
 export type T5EncoderBnbQuantizedLlmInt8bModelConfig = S['T5EncoderBnbQuantizedLlmInt8bConfig'];
 export type SpandrelImageToImageModelConfig = S['SpandrelImageToImageConfig'];
@@ -130,16 +130,14 @@ type TextualInversionModelConfig = S['TextualInversionFileConfig'] | S['TextualI
 type DiffusersModelConfig = S['MainDiffusersConfig'];
 export type CheckpointModelConfig = S['MainCheckpointConfig'];
 type CLIPVisionDiffusersConfig = S['CLIPVisionDiffusersConfig'];
-export type SigLipModelConfig = S['SigLIPConfig'];
+type SigLipModelConfig = S['SigLIPConfig'];
 export type FLUXReduxModelConfig = S['FluxReduxConfig'];
-export type ApiModelConfig = S['ApiModelConfig'];
+type ApiModelConfig = S['ApiModelConfig'];
 export type VideoApiModelConfig = S['VideoApiModelConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig | ApiModelConfig;
 export type FLUXKontextModelConfig = MainModelConfig;
 export type ChatGPT4oModelConfig = ApiModelConfig;
 export type Gemini2_5ModelConfig = ApiModelConfig;
-type Veo3ModelConfig = VideoApiModelConfig;
-type RunwayModelConfig = VideoApiModelConfig;
 export type AnyModelConfig =
   | ControlLoRAModelConfig
   | LoRAModelConfig
@@ -310,22 +308,6 @@ export const isVideoModelConfig = (config: AnyModelConfig): config is VideoApiMo
   return config.type === 'video';
 };
 
-export const isVeo3ModelConfig = (config: AnyModelConfig): config is Veo3ModelConfig => {
-  return config.base === 'veo3' && config.type === 'video';
-};
-
-export const isRunwayModelConfig = (config: AnyModelConfig): config is RunwayModelConfig => {
-  return config.base === 'runway' && config.type === 'video';
-};
-
-export const isImagen3ModelConfig = (config: AnyModelConfig): config is ApiModelConfig => {
-  return config.type === 'main' && config.base === 'imagen3';
-};
-
-export const isImagen4ModelConfig = (config: AnyModelConfig): config is ApiModelConfig => {
-  return config.type === 'main' && config.base === 'imagen4';
-};
-
 export const isFluxKontextApiModelConfig = (config: AnyModelConfig): config is ApiModelConfig => {
   return config.type === 'main' && config.base === 'flux-kontext';
 };
@@ -350,28 +332,8 @@ export const isRefinerMainModelModelConfig = (config: AnyModelConfig): config is
   return config.type === 'main' && config.base === 'sdxl-refiner';
 };
 
-export const isSDXLMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
-  return config.type === 'main' && config.base === 'sdxl';
-};
-
-export const isSD3MainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
-  return config.type === 'main' && config.base === 'sd-3';
-};
-
-export const isCogView4MainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
-  return config.type === 'main' && config.base === 'cogview4';
-};
-
-export const isFluxMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
-  return config.type === 'main' && config.base === 'flux';
-};
-
 export const isFluxFillMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base === 'flux' && config.variant === 'inpaint';
-};
-
-export const isNonSDXLMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
-  return config.type === 'main' && (config.base === 'sd-1' || config.base === 'sd-2');
 };
 
 export const isTIModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
