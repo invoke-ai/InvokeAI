@@ -1,4 +1,4 @@
-import type { ThunkDispatch, TypedStartListening, UnknownAction } from '@reduxjs/toolkit';
+import type { ReducersMapObject, Slice, ThunkDispatch, TypedStartListening, UnknownAction } from '@reduxjs/toolkit';
 import { addListener, combineReducers, configureStore, createAction, createListenerMiddleware } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { errorHandler } from 'app/store/enhancers/reduxRemember/errors';
@@ -20,7 +20,6 @@ import { addSocketConnectedEventListener } from 'app/store/middleware/listenerMi
 import { deepClone } from 'common/util/deepClone';
 import { merge } from 'es-toolkit';
 import { omit, pick } from 'es-toolkit/compat';
-import { changeBoardModalSliceConfig } from 'features/changeBoardModal/store/slice';
 import { canvasSettingsSliceConfig } from 'features/controlLayers/store/canvasSettingsSlice';
 import { canvasSliceConfig } from 'features/controlLayers/store/canvasSlice';
 import { canvasSessionSliceConfig } from 'features/controlLayers/store/canvasStagingAreaSlice';
@@ -50,6 +49,7 @@ import { api } from 'services/api';
 import { authToastMiddleware } from 'services/api/authToastMiddleware';
 import type { JsonObject } from 'type-fest';
 
+import type { SliceConfig } from './types';
 import { reduxRememberDriver } from './enhancers/reduxRemember/driver';
 import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
@@ -61,63 +61,58 @@ export const listenerMiddleware = createListenerMiddleware();
 
 const log = logger('system');
 
-// When adding a slice, add the config to the SLICE_CONFIGS object below, then add the reducer to ALL_REDUCERS.
-const SLICE_CONFIGS = {
-  [canvasSessionSliceConfig.slice.reducerPath]: canvasSessionSliceConfig,
-  [canvasSettingsSliceConfig.slice.reducerPath]: canvasSettingsSliceConfig,
-  [canvasSliceConfig.slice.reducerPath]: canvasSliceConfig,
-  [changeBoardModalSliceConfig.slice.reducerPath]: changeBoardModalSliceConfig,
-  [configSliceConfig.slice.reducerPath]: configSliceConfig,
-  [dynamicPromptsSliceConfig.slice.reducerPath]: dynamicPromptsSliceConfig,
-  [gallerySliceConfig.slice.reducerPath]: gallerySliceConfig,
-  [lorasSliceConfig.slice.reducerPath]: lorasSliceConfig,
-  [modelManagerSliceConfig.slice.reducerPath]: modelManagerSliceConfig,
-  [nodesSliceConfig.slice.reducerPath]: nodesSliceConfig,
-  [paramsSliceConfig.slice.reducerPath]: paramsSliceConfig,
-  [queueSliceConfig.slice.reducerPath]: queueSliceConfig,
-  [refImagesSliceConfig.slice.reducerPath]: refImagesSliceConfig,
-  [stylePresetSliceConfig.slice.reducerPath]: stylePresetSliceConfig,
-  [systemSliceConfig.slice.reducerPath]: systemSliceConfig,
-  [uiSliceConfig.slice.reducerPath]: uiSliceConfig,
-  [upscaleSliceConfig.slice.reducerPath]: upscaleSliceConfig,
-  [videoSliceConfig.slice.reducerPath]: videoSliceConfig,
-  [workflowLibrarySliceConfig.slice.reducerPath]: workflowLibrarySliceConfig,
-  [workflowSettingsSliceConfig.slice.reducerPath]: workflowSettingsSliceConfig,
+type GenericSlice = Slice<any, any, string>;
+type RegisteredSliceConfig = SliceConfig<GenericSlice>;
+
+const registeredSliceConfigs: RegisteredSliceConfig[] = [];
+
+// Register each slice config once—reducers and persistence metadata are derived from this list.
+const registerSlice = (config: RegisteredSliceConfig) => {
+  registeredSliceConfigs.push(config);
 };
 
-// TS makes it really hard to dynamically create this object :/ so it's just hardcoded here.
-// Remember to wrap undoable reducers in `undoable()`!
-const ALL_REDUCERS = {
-  [api.reducerPath]: api.reducer,
-  [canvasSessionSliceConfig.slice.reducerPath]: canvasSessionSliceConfig.slice.reducer,
-  [canvasSettingsSliceConfig.slice.reducerPath]: canvasSettingsSliceConfig.slice.reducer,
-  // Undoable!
-  [canvasSliceConfig.slice.reducerPath]: undoable(
-    canvasSliceConfig.slice.reducer,
-    canvasSliceConfig.undoableConfig?.reduxUndoOptions
-  ),
-  [changeBoardModalSliceConfig.slice.reducerPath]: changeBoardModalSliceConfig.slice.reducer,
-  [configSliceConfig.slice.reducerPath]: configSliceConfig.slice.reducer,
-  [dynamicPromptsSliceConfig.slice.reducerPath]: dynamicPromptsSliceConfig.slice.reducer,
-  [gallerySliceConfig.slice.reducerPath]: gallerySliceConfig.slice.reducer,
-  [lorasSliceConfig.slice.reducerPath]: lorasSliceConfig.slice.reducer,
-  [modelManagerSliceConfig.slice.reducerPath]: modelManagerSliceConfig.slice.reducer,
-  // Undoable!
-  [nodesSliceConfig.slice.reducerPath]: undoable(
-    nodesSliceConfig.slice.reducer,
-    nodesSliceConfig.undoableConfig?.reduxUndoOptions
-  ),
-  [paramsSliceConfig.slice.reducerPath]: paramsSliceConfig.slice.reducer,
-  [queueSliceConfig.slice.reducerPath]: queueSliceConfig.slice.reducer,
-  [refImagesSliceConfig.slice.reducerPath]: refImagesSliceConfig.slice.reducer,
-  [stylePresetSliceConfig.slice.reducerPath]: stylePresetSliceConfig.slice.reducer,
-  [systemSliceConfig.slice.reducerPath]: systemSliceConfig.slice.reducer,
-  [uiSliceConfig.slice.reducerPath]: uiSliceConfig.slice.reducer,
-  [upscaleSliceConfig.slice.reducerPath]: upscaleSliceConfig.slice.reducer,
-  [videoSliceConfig.slice.reducerPath]: videoSliceConfig.slice.reducer,
-  [workflowLibrarySliceConfig.slice.reducerPath]: workflowLibrarySliceConfig.slice.reducer,
-  [workflowSettingsSliceConfig.slice.reducerPath]: workflowSettingsSliceConfig.slice.reducer,
+registerSlice(canvasSessionSliceConfig);
+registerSlice(canvasSettingsSliceConfig);
+registerSlice(canvasSliceConfig);
+registerSlice(configSliceConfig);
+registerSlice(dynamicPromptsSliceConfig);
+registerSlice(gallerySliceConfig);
+registerSlice(lorasSliceConfig);
+registerSlice(modelManagerSliceConfig);
+registerSlice(nodesSliceConfig);
+registerSlice(paramsSliceConfig);
+registerSlice(queueSliceConfig);
+registerSlice(refImagesSliceConfig);
+registerSlice(stylePresetSliceConfig);
+registerSlice(systemSliceConfig);
+registerSlice(uiSliceConfig);
+registerSlice(upscaleSliceConfig);
+registerSlice(videoSliceConfig);
+registerSlice(workflowLibrarySliceConfig);
+registerSlice(workflowSettingsSliceConfig);
+
+const sliceConfigList = registeredSliceConfigs as readonly RegisteredSliceConfig[];
+
+const SLICE_CONFIGS = sliceConfigList.reduce<Record<string, RegisteredSliceConfig>>((acc, config) => {
+  acc[config.slice.reducerPath] = config;
+  return acc;
+}, {});
+
+const buildReducers = (): ReducersMapObject => {
+  const reducers: ReducersMapObject = {
+    [api.reducerPath]: api.reducer,
+  };
+
+  sliceConfigList.forEach((config) => {
+    reducers[config.slice.reducerPath] = config.undoableConfig
+      ? undoable(config.slice.reducer, config.undoableConfig.reduxUndoOptions)
+      : config.slice.reducer;
+  });
+
+  return reducers;
 };
+
+const ALL_REDUCERS = buildReducers();
 
 const rootReducer = combineReducers(ALL_REDUCERS);
 
