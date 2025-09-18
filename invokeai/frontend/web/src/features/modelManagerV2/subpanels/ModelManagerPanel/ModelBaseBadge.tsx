@@ -1,7 +1,7 @@
 import { Badge } from '@invoke-ai/ui-library';
 import { MODEL_BASE_TO_COLOR, MODEL_BASE_TO_SHORT_NAME } from 'features/modelManagerV2/models';
+import type { BaseModelType } from 'features/nodes/types/common';
 import { memo } from 'react';
-import type { BaseModelType } from 'services/api/types';
 
 type Props = {
   base: BaseModelType;
