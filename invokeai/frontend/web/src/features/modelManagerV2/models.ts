@@ -1,4 +1,4 @@
-import type { BaseModelType, ModelType, ModelVariantType } from 'features/nodes/types/common';
+import type { BaseModelType, ModelFormat, ModelType, ModelVariantType } from 'features/nodes/types/common';
 import type { AnyModelConfig } from 'services/api/types';
 import {
   isCLIPEmbedModelConfig,
@@ -223,6 +223,24 @@ export const MODEL_VARIANT_TO_LONG_NAME: Record<ModelVariantType, string> = {
   normal: 'Normal',
   inpaint: 'Inpaint',
   depth: 'Depth',
+};
+
+export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {
+  omi: 'OMI',
+  diffusers: 'Diffusers',
+  checkpoint: 'Checkpoint',
+  lycoris: 'LyCORIS',
+  onnx: 'ONNX',
+  olive: 'Olive',
+  embedding_file: 'Embedding (file)',
+  embedding_folder: 'Embedding (folder)',
+  invokeai: 'InvokeAI',
+  t5_encoder: 'T5 Encoder',
+  bnb_quantized_int8b: 'BNB Quantized (int8b)',
+  bnb_quantized_nf4b: 'BNB Quantized (nf4b)',
+  gguf_quantized: 'GGUF Quantized',
+  api: 'API',
+  unknown: 'Unknown',
 };
 
 /**

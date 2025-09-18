@@ -942,6 +942,7 @@
         "modelConverted": "Model Converted",
         "modelDeleted": "Model Deleted",
         "modelDeleteFailed": "Failed to delete model",
+        "modelFormat": "Model Format",
         "modelImageDeleted": "Model Image Deleted",
         "modelImageDeleteFailed": "Model Image Delete Failed",
         "modelImageUpdated": "Model Image Updated",
