@@ -37,7 +37,7 @@ import type { Logger } from 'roarr';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 import {
-  isCLIPEmbedModelConfig,
+  isCLIPEmbedModelConfigOrSubmodel,
   isControlLayerModelConfig,
   isControlNetModelConfig,
   isFluxReduxModelConfig,
@@ -48,7 +48,7 @@ import {
   isNonRefinerMainModelConfig,
   isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
-  isT5EncoderModelConfig,
+  isT5EncoderModelConfigOrSubmodel,
   isVideoModelConfig,
 } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
@@ -418,7 +418,7 @@ const handleTileControlNetModel: ModelHandler = (models, state, dispatch, log) =
 
 const handleT5EncoderModels: ModelHandler = (models, state, dispatch, log) => {
   const selectedT5EncoderModel = state.params.t5EncoderModel;
-  const t5EncoderModels = models.filter((m) => isT5EncoderModelConfig(m));
+  const t5EncoderModels = models.filter((m) => isT5EncoderModelConfigOrSubmodel(m));
 
   // If the currently selected model is available, we don't need to do anything
   if (selectedT5EncoderModel && t5EncoderModels.some((m) => m.key === selectedT5EncoderModel.key)) {
@@ -446,7 +446,7 @@ const handleT5EncoderModels: ModelHandler = (models, state, dispatch, log) => {
 
 const handleCLIPEmbedModels: ModelHandler = (models, state, dispatch, log) => {
   const selectedCLIPEmbedModel = state.params.clipEmbedModel;
-  const CLIPEmbedModels = models.filter((m) => isCLIPEmbedModelConfig(m));
+  const CLIPEmbedModels = models.filter((m) => isCLIPEmbedModelConfigOrSubmodel(m));
 
   // If the currently selected model is available, we don't need to do anything
   if (selectedCLIPEmbedModel && CLIPEmbedModels.some((m) => m.key === selectedCLIPEmbedModel.key)) {

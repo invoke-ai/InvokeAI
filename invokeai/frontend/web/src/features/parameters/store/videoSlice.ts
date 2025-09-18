@@ -21,9 +21,9 @@ import {
   zVideoDuration,
   zVideoResolution,
 } from 'features/controlLayers/store/types';
+import { REQUIRES_STARTING_FRAME_BASE_MODELS } from 'features/modelManagerV2/models';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import { REQUIRES_STARTING_FRAME_BASE_MODELS } from 'features/parameters/types/constants';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import { isVideoModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';

@@ -29,6 +29,7 @@ export const ModelTypeFilter = memo(() => {
       flux_redux: t('modelManager.fluxRedux'),
       llava_onevision: t('modelManager.llavaOnevision'),
       video: t('modelManager.video'),
+      unknown: t('modelManager.unknown'),
     }),
     [t]
   );
