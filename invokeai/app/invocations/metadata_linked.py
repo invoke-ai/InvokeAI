@@ -473,7 +473,6 @@ class MetadataToModelOutput(BaseInvocationOutput):
     model: ModelIdentifierField = OutputField(
         description=FieldDescriptions.main_model,
         title="Model",
-        ui_type=UIType.MainModel,
     )
     name: str = OutputField(description="Model Name", title="Name")
     unet: UNetField = OutputField(description=FieldDescriptions.unet, title="UNet")
@@ -488,7 +487,6 @@ class MetadataToSDXLModelOutput(BaseInvocationOutput):
     model: ModelIdentifierField = OutputField(
         description=FieldDescriptions.main_model,
         title="Model",
-        ui_type=UIType.SDXLMainModel,
     )
     name: str = OutputField(description="Model Name", title="Name")
     unet: UNetField = OutputField(description=FieldDescriptions.unet, title="UNet")
