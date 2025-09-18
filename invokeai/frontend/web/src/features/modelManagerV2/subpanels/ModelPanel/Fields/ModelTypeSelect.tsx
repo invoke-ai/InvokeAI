@@ -1,21 +1,24 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox } from '@invoke-ai/ui-library';
 import { typedMemo } from 'common/util/typedMemo';
-import { MODEL_VARIANT_TO_LONG_NAME } from 'features/modelManagerV2/models';
+import { MODEL_TYPE_TO_LONG_NAME } from 'features/modelManagerV2/models';
 import { useCallback, useMemo } from 'react';
 import type { Control } from 'react-hook-form';
 import { useController } from 'react-hook-form';
 import type { UpdateModelArg } from 'services/api/endpoints/models';
 import { objectEntries } from 'tsafe';
 
-const options: ComboboxOption[] = objectEntries(MODEL_VARIANT_TO_LONG_NAME).map(([value, label]) => ({ label, value }));
+const options: ComboboxOption[] = objectEntries(MODEL_TYPE_TO_LONG_NAME).map(([value, label]) => ({
+  label,
+  value,
+}));
 
 type Props = {
   control: Control<UpdateModelArg['body']>;
 };
 
-const ModelVariantSelect = ({ control }: Props) => {
-  const { field } = useController({ control, name: 'variant' });
+const ModelTypeSelect = ({ control }: Props) => {
+  const { field } = useController({ control, name: 'type' });
   const value = useMemo(() => options.find((o) => o.value === field.value), [field.value]);
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {
@@ -26,4 +29,4 @@ const ModelVariantSelect = ({ control }: Props) => {
   return <Combobox value={value} options={options} onChange={onChange} />;
 };
 
-export default typedMemo(ModelVariantSelect);
+export default typedMemo(ModelTypeSelect);
