@@ -145,7 +145,6 @@ export const zSubModelType = z.enum([
   'scheduler',
   'safety_checker',
 ]);
-export type SubModelType = z.infer<typeof zSubModelType>;
 
 export const zClipVariantType = z.enum(['large', 'gigantic']);
 export const zModelVariantType = z.enum(['normal', 'inpaint', 'depth']);
