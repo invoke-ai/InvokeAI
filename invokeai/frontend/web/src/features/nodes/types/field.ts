@@ -15,6 +15,7 @@ import {
   zClipVariantType,
   zColorField,
   zImageField,
+  zModelFormat,
   zModelIdentifierField,
   zModelType,
   zModelVariantType,
@@ -73,6 +74,7 @@ const zFieldInputTemplateBase = zFieldTemplateBase.extend({
   ui_model_base: z.array(zBaseModelType).nullish(),
   ui_model_type: z.array(zModelType).nullish(),
   ui_model_variant: z.array(zModelVariantType.or(zClipVariantType)).nullish(),
+  ui_model_format: z.array(zModelFormat).nullish(),
 });
 const zFieldOutputTemplateBase = zFieldTemplateBase.extend({
   fieldKind: z.literal('output'),
