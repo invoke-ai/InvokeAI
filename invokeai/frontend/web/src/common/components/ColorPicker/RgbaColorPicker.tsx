@@ -45,8 +45,6 @@ const RgbaColorPicker = (props: Props) => {
   useEffect(() => {
     setHex(rgbaToHex(color, true));
   }, [color]);
-  const _setModeRgb = useCallback(() => setMode('rgb'), []);
-  const _setModeHex = useCallback(() => setMode('hex'), []);
   const onToggleMode = useCallback(() => setMode((m) => (m === 'rgb' ? 'hex' : 'rgb')), []);
   const onChangeHex = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
