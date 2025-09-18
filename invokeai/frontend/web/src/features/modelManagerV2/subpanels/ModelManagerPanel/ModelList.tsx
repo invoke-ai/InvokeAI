@@ -2,7 +2,7 @@ import { Flex, Text } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { MODEL_CATEGORIES } from 'features/modelManagerV2/models';
+import { MODEL_CATEGORIES_AS_LIST } from 'features/modelManagerV2/models';
 import {
   type FilterableModelType,
   selectFilteredModelType,
@@ -31,7 +31,7 @@ const ModelList = () => {
     const byCategory: { i18nKey: string; configs: AnyModelConfig[] }[] = [];
     const total = baseFilteredModelConfigs.length;
     let renderedTotal = 0;
-    for (const { i18nKey, filter } of Object.values(MODEL_CATEGORIES)) {
+    for (const { i18nKey, filter } of MODEL_CATEGORIES_AS_LIST) {
       const configs = baseFilteredModelConfigs.filter(filter);
       renderedTotal += configs.length;
       byCategory.push({ i18nKey, configs });
