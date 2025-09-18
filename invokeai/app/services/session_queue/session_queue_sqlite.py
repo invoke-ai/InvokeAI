@@ -3,7 +3,6 @@ import json
 import sqlite3
 from typing import Optional, Union, cast
 
-from invokeai.app.services.shared.pagination import CursorPaginatedResults
 from pydantic_core import to_jsonable_python
 
 from invokeai.app.services.invoker import Invoker
@@ -35,6 +34,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     prepare_values_to_insert,
 )
 from invokeai.app.services.shared.graph import GraphExecutionState
+from invokeai.app.services.shared.pagination import CursorPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
