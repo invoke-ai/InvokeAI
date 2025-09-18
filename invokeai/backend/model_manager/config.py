@@ -175,7 +175,7 @@ class ModelConfigBase(ABC, BaseModel):
         if issubclass(cls, LegacyProbeMixin):
             ModelConfigBase.USING_LEGACY_PROBE.add(cls)
         # Cannot use `elif isinstance(cls, UnknownModelConfig)` because UnknownModelConfig is not defined yet
-        elif cls.__name__ != "UnknownModelConfig":
+        else:
             ModelConfigBase.USING_CLASSIFY_API.add(cls)
 
     @staticmethod
