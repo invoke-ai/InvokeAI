@@ -1,6 +1,6 @@
 import { useAppStore } from 'app/store/storeHooks';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { useCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { useCanvasIsStaging } from 'features/controlLayers/hooks/useCanvasIsStaging';
 import { newCanvasFromImage } from 'features/imageActions/actions';
 import { toast } from 'features/toast/toast';
 import { navigationApi } from 'features/ui/layouts/navigation-api';

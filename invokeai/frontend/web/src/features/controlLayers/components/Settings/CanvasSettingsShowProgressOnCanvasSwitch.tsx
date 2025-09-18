@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 export const CanvasSettingsShowProgressOnCanvas = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const showProgressOnCanvas = useAppSelector(selectShowProgressOnCanvas);
+  const showProgressOnCanvas = useAppSelector((state) => selectShowProgressOnCanvas(state));
   const onChange = useCallback(() => {
     dispatch(settingsShowProgressOnCanvasToggled());
   }, [dispatch]);

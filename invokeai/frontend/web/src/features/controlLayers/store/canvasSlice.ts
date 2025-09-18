@@ -1,5 +1,6 @@
-import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
+import type { CaseReducer, PayloadAction, UnknownAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
+import type { AppDispatch, RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { deepClone } from 'common/util/deepClone';
@@ -22,6 +23,7 @@ import type {
   CanvasesStateWithoutHistory,
   CanvasInpaintMaskState,
   CanvasMetadata,
+  CanvasStateWithHistory,
   ChannelName,
   ChannelPoints,
   ControlLoRAConfig,
@@ -135,7 +137,7 @@ const getInitialCanvasHistoryState = (id: string, name: string): StateWithHistor
 
 const getInitialCanvasesState = (): CanvasesStateWithoutHistory => {
   const canvasId = getPrefixedId('canvas');
-  const canvasName = 'default';
+  const canvasName = getNextCanvasName([]);
   const canvas = getInitialCanvasState(canvasId, canvasName);
 
   return {
@@ -154,6 +156,15 @@ const getInitialCanvasesHistoryState = (): CanvasesStateWithHistory => {
   };
 };
 
+const getNextCanvasName = (canvases: CanvasStateWithHistory[]): string => {
+  for (let i = 1; ; i++) {
+    const name = `Canvas-${i}`;
+    if (!canvases.some((c) => c.present.name === name)) {
+      return name;
+    }
+  }
+};
+
 const canvasesSlice = createSlice({
   name: 'canvas',
   initialState: getInitialCanvasesHistoryState(),
@@ -162,7 +173,7 @@ const canvasesSlice = createSlice({
       reducer: (state, action: PayloadAction<{ id: string; isSelected?: boolean }>) => {
         const { id, isSelected } = action.payload;
 
-        const name = 'default';
+        const name = getNextCanvasName(state.canvases);
         const canvas = getInitialCanvasHistoryState(id, name);
         state.canvases.push(canvas);
 
@@ -176,25 +187,20 @@ const canvasesSlice = createSlice({
         };
       },
     },
+    canvasCreated: (_state, _action: PayloadAction<{ id: string }>) => {},
+    canvasMigrated: (state) => {
+      delete state.migration;
+    },
+    canvasMultiCanvasMigrated: (_state, _action: PayloadAction<{ id: string }>) => {},
     canvasSelected: (state, action: PayloadAction<{ id: string }>) => {
       const { id } = action.payload;
 
-      const canvas = getCanvasById(state, id);
+      const canvas = state.canvases.find((canvas) => canvas.present.id === id)?.present;
       if (!canvas) {
         return;
       }
 
       state.selectedCanvasId = canvas.id;
-    },
-    canvasNameChanged: (state, action: PayloadAction<{ id: string; name: string }>) => {
-      const { id, name } = action.payload;
-
-      const canvas = getCanvasById(state, id);
-      if (!canvas) {
-        return;
-      }
-
-      canvas.name = name;
     },
     canvasDeleted: (state, action: PayloadAction<{ id: string }>) => {
       const { id } = action.payload;
@@ -209,13 +215,22 @@ const canvasesSlice = createSlice({
       state.selectedCanvasId = state.canvases[nextIndex]!.present.id;
       state.canvases = state.canvases.filter((canvas) => canvas.present.id !== id);
     },
+    canvasRemoved: (_state, _action: PayloadAction<{ id: string }>) => {},
   },
 });
+
+type WithId<P> = P & { id: string };
+type IdCaseReducer<S, P> = CaseReducer<S, PayloadAction<WithId<P>>>;
 
 const canvasSlice = createSlice({
   name: 'canvas',
   initialState: {} as CanvasState,
   reducers: {
+    canvasNameChanged: ((state, action: PayloadAction<{ name: string }>) => {
+      const { name } = action.payload;
+
+      state.name = name;
+    }) as IdCaseReducer<CanvasState, { name: string }>,
     //#region Raster layers
     rasterLayerAdjustmentsSet: (
       state,
@@ -1858,18 +1873,41 @@ const syncScaledSize = (state: CanvasState) => {
   }
 };
 
-const getCanvasById = (state: CanvasesStateWithHistory, id: string) =>
-  state.canvases.find((canvas) => canvas.present.id === id)?.present;
+export const addCanvas = (payload: { isSelected?: boolean }) => (dispatch: AppDispatch) => {
+  const action = canvasesSlice.actions.canvasAdded(payload);
+  dispatch(action);
+
+  const { id } = action.payload;
+  dispatch(canvasesSlice.actions.canvasCreated({ id }));
+};
+
+export const MIGRATION_MULTI_CANVAS_ID_PLACEHOLDER = 'multi-canvas-id-placeholder';
+
+export const migrateCanvas = () => (dispatch: AppDispatch, getState: () => RootState) => {
+  const state = getState();
+
+  if (state.canvas.migration?.isMultiCanvasMigrationPending) {
+    dispatch(canvasesSlice.actions.canvasMultiCanvasMigrated({ id: state.canvas.canvases[0]!.present.id }));
+  }
+
+  dispatch(canvasesSlice.actions.canvasMigrated());
+};
+
+export const deleteCanvas = (payload: { id: string }) => (dispatch: AppDispatch) => {
+  dispatch(canvasesSlice.actions.canvasDeleted(payload));
+  dispatch(canvasesSlice.actions.canvasRemoved(payload));
+};
 
 export const {
   // Canvas
-  canvasAdded,
+  canvasCreated,
+  canvasMultiCanvasMigrated,
+  canvasRemoved,
   canvasSelected,
-  canvasNameChanged,
-  canvasDeleted,
 } = canvasesSlice.actions;
 
 export const {
+  canvasNameChanged,
   canvasMetadataRecalled,
   canvasUndo,
   canvasRedo,
@@ -1970,6 +2008,7 @@ export const {
 const isCanvasSliceAction = isAnyOf(...Object.values(canvasSlice.actions));
 
 let filter = true;
+const isActionFileterd = isAnyOf(canvasNameChanged, entitySelected);
 
 const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
   limit: 64,
@@ -1978,7 +2017,7 @@ const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
   clearHistoryType: canvasClearHistory.type,
   filter: (action, _state, _history) => {
     // Ignore both all actions from other slices and canvas management actions
-    if (!action.type.startsWith(canvasSlice.name)) {
+    if (!action.type.startsWith(canvasSlice.name) || isActionFileterd(action)) {
       return false;
     }
     // Throttle rapid actions of the same type
@@ -2023,7 +2062,7 @@ export const canvasSliceConfig: SliceConfig<
       if (state._version === 3) {
         // Migrate from v3 to v4: slice represented a canvas instance -> slice represents multiple canvas instances
         const canvasId = getPrefixedId('canvas');
-        const canvasName = 'default';
+        const canvasName = getNextCanvasName([]);
 
         const canvas = {
           id: canvasId,
@@ -2035,6 +2074,9 @@ export const canvasSliceConfig: SliceConfig<
           _version: 4,
           selectedCanvasId: canvas.id,
           canvases: [canvas],
+          migration: {
+            isMultiCanvasMigrationPending: true,
+          },
         };
       }
       return zCanvasesStateWithoutHistory.parse(state);
@@ -2046,6 +2088,7 @@ export const canvasSliceConfig: SliceConfig<
         _version: canvasesState._version,
         selectedCanvasId: canvasesState.selectedCanvasId,
         canvases: canvasesState.canvases.map((canvas) => newHistory([], canvas, [])),
+        migration: canvasesState.migration,
       };
     },
     unwrapState: (state) => {
@@ -2053,6 +2096,7 @@ export const canvasSliceConfig: SliceConfig<
         _version: state._version,
         selectedCanvasId: state.selectedCanvasId,
         canvases: state.canvases.map((canvas) => canvas.present),
+        migration: state.migration,
       };
     },
   },

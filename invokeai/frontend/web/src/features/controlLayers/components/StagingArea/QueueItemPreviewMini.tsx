@@ -47,7 +47,7 @@ export const QueueItemPreviewMini = memo(({ item, index }: Props) => {
   const $isSelected = useMemo(() => ctx.buildIsSelectedComputed(item.item_id), [ctx, item.item_id]);
   const isSelected = useStore($isSelected);
   const imageDTO = useOutputImageDTO(item.item_id);
-  const autoSwitch = useAppSelector(selectStagingAreaAutoSwitch);
+  const autoSwitch = useAppSelector((state) => selectStagingAreaAutoSwitch(state));
 
   const onClick = useCallback(() => {
     ctx.select(item.item_id);
@@ -55,7 +55,7 @@ export const QueueItemPreviewMini = memo(({ item, index }: Props) => {
 
   const onDoubleClick = useCallback(() => {
     if (autoSwitch !== 'off') {
-      dispatch(settingsStagingAreaAutoSwitchChanged('off'));
+      dispatch(settingsStagingAreaAutoSwitchChanged({ stagingAreaAutoSwitch: 'off' }));
       toast({
         title: 'Auto-Switch Disabled',
       });

@@ -1,8 +1,8 @@
 import { FormControl, FormLabel, Select } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { useCanvasIsStaging } from 'features/controlLayers/hooks/useCanvasIsStaging';
 import { bboxAspectRatioIdChanged } from 'features/controlLayers/store/canvasSlice';
-import { useCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   selectIsChatGPT4o,
   selectIsFluxKontext,

@@ -2,7 +2,7 @@ import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { selectCanvasMetadata, selectSelectedCanvas } from 'features/controlLayers/store/selectors';
+import { selectCanvasById, selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import { addControlNets, addT2IAdapters } from 'features/nodes/util/graph/generation/addControlAdapters';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
@@ -36,7 +36,7 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   assert(model.base === 'sd-1' || model.base === 'sd-2', 'Selected model is not a SDXL model');
 
   const params = selectParamsSlice(state);
-  const canvas = selectSelectedCanvas(state);
+  const canvas = manager ? selectCanvasById(state, manager.canvasId) : null;
   const refImages = selectRefImagesSlice(state);
 
   const {
@@ -231,7 +231,7 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     assert<Equals<typeof generationMode, never>>(false);
   }
 
-  if (manager !== null) {
+  if (manager !== null && canvas !== null) {
     const controlNetCollector = g.addNode({
       type: 'collect',
       id: getPrefixedId('control_net_collector'),
@@ -281,7 +281,7 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   });
   let totalIPAdaptersAdded = ipAdapterResult.addedIPAdapters;
 
-  if (manager !== null) {
+  if (manager !== null && canvas !== null) {
     const regionsResult = await addRegions({
       manager,
       regions: canvas.regionalGuidance.entities,

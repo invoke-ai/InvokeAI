@@ -22,7 +22,7 @@ import { merge } from 'es-toolkit';
 import { omit, pick } from 'es-toolkit/compat';
 import { changeBoardModalSliceConfig } from 'features/changeBoardModal/store/slice';
 import { canvasSettingsSliceConfig } from 'features/controlLayers/store/canvasSettingsSlice';
-import { canvasSliceConfig, undoableCanvasesReducer } from 'features/controlLayers/store/canvasSlice';
+import { canvasSliceConfig, migrateCanvas, undoableCanvasesReducer } from 'features/controlLayers/store/canvasSlice';
 import { canvasSessionSliceConfig } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { lorasSliceConfig } from 'features/controlLayers/store/lorasSlice';
 import { paramsSliceConfig } from 'features/controlLayers/store/paramsSlice';
@@ -219,8 +219,9 @@ export const createStore = (options?: { persist?: boolean; persistDebounce?: num
   // Once-off listener to support waiting for rehydration before rendering the app
   startAppListening({
     actionCreator: createAction(REMEMBER_REHYDRATED),
-    effect: (action, { unsubscribe }) => {
+    effect: (action, { dispatch, unsubscribe }) => {
       unsubscribe();
+      dispatch(migrateCanvas());
       options?.onRehydrated?.();
     },
   });

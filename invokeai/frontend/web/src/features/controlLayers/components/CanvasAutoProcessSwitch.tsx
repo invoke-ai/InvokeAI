@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 export const CanvasAutoProcessSwitch = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const autoProcess = useAppSelector(selectAutoProcess);
+  const autoProcess = useAppSelector((state) => selectAutoProcess(state));
 
   const onChange = useCallback(() => {
     dispatch(settingsAutoProcessToggled());

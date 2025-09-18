@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 export const CanvasSettingsSnapToGridCheckbox = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const snapToGrid = useAppSelector(selectSnapToGrid);
+  const snapToGrid = useAppSelector((state) => selectSnapToGrid(state));
   const onChange = useCallback<ChangeEventHandler<HTMLInputElement>>(() => {
     dispatch(settingsSnapToGridToggled());
   }, [dispatch]);

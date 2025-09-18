@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 export const CanvasSettingsPreserveMaskCheckbox = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const preserveMask = useAppSelector(selectPreserveMask);
+  const preserveMask = useAppSelector((state) => selectPreserveMask(state));
   const onChange = useCallback(() => dispatch(settingsPreserveMaskToggled()), [dispatch]);
   return (
     <FormControl w="full">
