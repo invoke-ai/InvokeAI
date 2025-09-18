@@ -6,15 +6,12 @@ import { useCallback, useMemo } from 'react';
 import type { Control } from 'react-hook-form';
 import { useController } from 'react-hook-form';
 import type { UpdateModelArg } from 'services/api/endpoints/models';
+import { objectEntries } from 'tsafe';
 
-const options: ComboboxOption[] = [
-  { value: 'sd-1', label: MODEL_BASE_TO_LONG_NAME['sd-1'] },
-  { value: 'sd-2', label: MODEL_BASE_TO_LONG_NAME['sd-2'] },
-  { value: 'sd-3', label: MODEL_BASE_TO_LONG_NAME['sd-3'] },
-  { value: 'flux', label: MODEL_BASE_TO_LONG_NAME['flux'] },
-  { value: 'sdxl', label: MODEL_BASE_TO_LONG_NAME['sdxl'] },
-  { value: 'sdxl-refiner', label: MODEL_BASE_TO_LONG_NAME['sdxl-refiner'] },
-];
+const options: ComboboxOption[] = objectEntries(MODEL_BASE_TO_LONG_NAME).map(([value, label]) => ({
+  label,
+  value,
+}));
 
 type Props = {
   control: Control<UpdateModelArg['body']>;
