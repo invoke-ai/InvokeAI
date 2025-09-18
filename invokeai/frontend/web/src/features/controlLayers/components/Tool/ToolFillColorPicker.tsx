@@ -1,6 +1,7 @@
 import {
   Box,
   Flex,
+  IconButton,
   Popover,
   PopoverArrow,
   PopoverBody,
@@ -8,6 +9,7 @@ import {
   PopoverTrigger,
   Portal,
   Tooltip,
+  useDisclosure,
 } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -15,15 +17,18 @@ import RgbaColorPicker from 'common/components/ColorPicker/RgbaColorPicker';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import {
   selectCanvasSettingsSlice,
+  selectFillColorPickerPinned,
   settingsActiveColorToggled,
   settingsBgColorChanged,
   settingsColorsSetToDefault,
   settingsFgColorChanged,
+  settingsFillColorPickerPinnedSet,
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { RgbaColor } from 'features/controlLayers/store/types';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiPushPinBold } from 'react-icons/pi';
 
 const selectActiveColor = createSelector(selectCanvasSettingsSlice, (settings) => settings.activeColor);
 const selectBgColor = createSelector(selectCanvasSettingsSlice, (settings) => settings.bgColor);
@@ -31,6 +36,8 @@ const selectFgColor = createSelector(selectCanvasSettingsSlice, (settings) => se
 
 export const ToolFillColorPicker = memo(() => {
   const { t } = useTranslation();
+  const disclosure = useDisclosure();
+  const isPinned = useAppSelector(selectFillColorPickerPinned);
   const activeColorType = useAppSelector(selectActiveColor);
   const bgColor = useAppSelector(selectBgColor);
   const fgColor = useAppSelector(selectFgColor);
@@ -53,6 +60,8 @@ export const ToolFillColorPicker = memo(() => {
     [activeColorType, dispatch]
   );
 
+  // Note: when pinned, the persistent color picker renders in the canvas overlay instead.
+
   useRegisteredHotkeys({
     id: 'setFillColorsToDefault',
     category: 'canvas',
@@ -70,7 +79,17 @@ export const ToolFillColorPicker = memo(() => {
   });
 
   return (
-    <Popover isLazy>
+    <Popover
+      isLazy
+      isOpen={!isPinned && disclosure.isOpen}
+      onOpen={disclosure.onOpen}
+      onClose={() => {
+        disclosure.onClose();
+      }}
+      closeOnBlur={true}
+      closeOnEsc={true}
+      returnFocusOnClose={true}
+    >
       <PopoverTrigger>
         <Flex role="button" aria-label={t('controlLayers.fill.fillColor')} tabIndex={-1} minW={8} w={8} h={8}>
           <Tooltip label={tooltip}>
@@ -107,7 +126,27 @@ export const ToolFillColorPicker = memo(() => {
         <PopoverContent>
           <PopoverArrow />
           <PopoverBody minH={64}>
-            <RgbaColorPicker color={activeColor} onChange={onColorChange} withNumberInput withSwatches />
+            <Flex direction="column" gap={2}>
+              <Flex justifyContent="flex-end">
+                <IconButton
+                  aria-label={isPinned ? 'Unpin color picker' : 'Pin color picker'}
+                  tooltip={isPinned ? 'Unpin' : 'Pin'}
+                  size="sm"
+                  variant={isPinned ? 'solid' : 'ghost'}
+                  onClick={() => {
+                    if (!isPinned) {
+                      // Pin and close the popover; the pinned picker renders in the canvas overlay
+                      dispatch(settingsFillColorPickerPinnedSet(true));
+                      disclosure.onClose();
+                    } else {
+                      dispatch(settingsFillColorPickerPinnedSet(false));
+                    }
+                  }}
+                  icon={<PiPushPinBold />}
+                />
+              </Flex>
+              <RgbaColorPicker color={activeColor} onChange={onColorChange} withNumberInput withSwatches />
+            </Flex>
           </PopoverBody>
         </PopoverContent>
       </Portal>
