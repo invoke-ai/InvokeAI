@@ -55,6 +55,7 @@ class ModelType(str, Enum):
     FluxRedux = "flux_redux"
     LlavaOnevision = "llava_onevision"
     Video = "video"
+    Unknown = "unknown"
 
 
 class SubModelType(str, Enum):
@@ -107,6 +108,7 @@ class ModelFormat(str, Enum):
     BnbQuantizednf4b = "bnb_quantized_nf4b"
     GGUFQuantized = "gguf_quantized"
     Api = "api"
+    Unknown = "unknown"
 
 
 class SchedulerPredictionType(str, Enum):
