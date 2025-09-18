@@ -4,7 +4,7 @@ import { forEach } from 'es-toolkit/compat';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { NODE_WIDTH } from 'features/nodes/types/constants';
 import type { FieldInputInstance } from 'features/nodes/types/field';
-import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import type { WorkflowV4 } from 'features/nodes/types/workflow';
 import { getDefaultForm } from 'features/nodes/types/workflow';
 import { buildFieldInputInstance } from 'features/nodes/util/schema/buildFieldInputInstance';
 import type { NonNullableGraph } from 'services/api/types';
@@ -19,23 +19,24 @@ const log = logger('workflows');
  * @param autoLayout Whether to auto-layout the nodes using `dagre`. If false, nodes will be simply stacked on top of one another with an offset.
  * @returns The workflow.
  */
-export const graphToWorkflow = (graph: NonNullableGraph, autoLayout = true): WorkflowV3 => {
+export const graphToWorkflow = (graph: NonNullableGraph, autoLayout = true): WorkflowV4 => {
   const templates = $templates.get();
 
   // Initialize the workflow
-  const workflow: WorkflowV3 = {
+  const workflow: WorkflowV4 = {
     name: '',
     author: '',
     contact: '',
     description: '',
     meta: {
       category: 'user',
-      version: '3.0.0',
+      version: '4.0.0',
     },
     notes: '',
     tags: '',
     version: '',
     exposedFields: [],
+    output_fields: [],
     edges: [],
     nodes: [],
     form: getDefaultForm(),

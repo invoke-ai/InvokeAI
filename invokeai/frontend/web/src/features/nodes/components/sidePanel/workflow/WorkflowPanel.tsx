@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import WorkflowGeneralTab from './WorkflowGeneralTab';
 import WorkflowJSONTab from './WorkflowJSONTab';
+import WorkflowOutputFieldsTab from './WorkflowOutputFieldsTab';
 
 const WorkflowFieldsLinearViewPanel = () => {
   const { t } = useTranslation();
@@ -17,6 +18,7 @@ const WorkflowFieldsLinearViewPanel = () => {
       <TabList>
         <Tab>{t('workflows.builder.builder')}</Tab>
         <Tab>{t('common.details')}</Tab>
+        <Tab>{t('workflows.builder.outputFieldsTab', 'Output Fields')}</Tab>
         <Tab>JSON</Tab>
         <Spacer />
         {allowPublishWorkflows && <StartPublishFlowButton />}
@@ -28,6 +30,9 @@ const WorkflowFieldsLinearViewPanel = () => {
         </TabPanel>
         <TabPanel h="full" p={0}>
           <WorkflowGeneralTab />
+        </TabPanel>
+        <TabPanel h="full" p={0}>
+          <WorkflowOutputFieldsTab />
         </TabPanel>
         <TabPanel h="full" p={0}>
           <WorkflowJSONTab />

@@ -1,5 +1,5 @@
 import { useAppDispatch } from 'app/store/storeHooks';
-import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import type { WorkflowV4 } from 'features/nodes/types/workflow';
 import { useValidateAndLoadWorkflow } from 'features/workflowLibrary/hooks/useValidateAndLoadWorkflow';
 import { workflowLoadedFromFile } from 'features/workflowLibrary/store/actions';
 import { useCallback } from 'react';
@@ -17,12 +17,12 @@ export const useLoadWorkflowFromFile = () => {
     (
       file: File,
       options: {
-        onSuccess?: (workflow: WorkflowV3) => void;
+        onSuccess?: (workflow: WorkflowV4) => void;
         onError?: () => void;
         onCompleted?: () => void;
       } = {}
     ) => {
-      return new Promise<WorkflowV3 | void>((resolve, reject) => {
+      return new Promise<WorkflowV4 | void>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = async () => {
           const rawJSON = reader.result;

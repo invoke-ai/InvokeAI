@@ -3,7 +3,7 @@ import { useStore } from '@nanostores/react';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useDoesWorkflowHaveUnsavedChanges } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
 import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
-import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import type { WorkflowV4 } from 'features/nodes/types/workflow';
 import { useLoadWorkflowFromFile } from 'features/workflowLibrary/hooks/useLoadWorkflowFromFile';
 import { useLoadWorkflowFromImage } from 'features/workflowLibrary/hooks/useLoadWorkflowFromImage';
 import { useLoadWorkflowFromLibrary } from 'features/workflowLibrary/hooks/useLoadWorkflowFromLibrary';
@@ -13,7 +13,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type LoadWorkflowOptions = {
-  onSuccess?: (workflow: WorkflowV3) => void;
+  onSuccess?: (workflow: WorkflowV4) => void;
   onError?: () => void;
   onCompleted?: () => void;
 };

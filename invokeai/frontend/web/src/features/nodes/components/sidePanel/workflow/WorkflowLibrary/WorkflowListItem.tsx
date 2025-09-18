@@ -106,6 +106,18 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
                   {t('workflows.builder.published')}
                 </Badge>
               )}
+              {workflow.has_valid_image_output_field && (
+                <Badge
+                  color="invokeGreen.400"
+                  borderColor="invokeGreen.700"
+                  borderWidth={1}
+                  bg="transparent"
+                  flexShrink={0}
+                  variant="subtle"
+                >
+                  {t('workflows.validImageOutput')}
+                </Badge>
+              )}
               {workflow.category === 'project' && <Icon as={PiUsersBold} color="base.200" />}
               {workflow.category === 'default' && (
                 <Image

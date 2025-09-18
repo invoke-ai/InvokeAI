@@ -12,7 +12,6 @@ from invokeai.app.services.workflow_records.workflow_records_common import (
     WorkflowNotFoundError,
     WorkflowRecordDTO,
     WorkflowRecordListItemDTO,
-    WorkflowRecordListItemDTOValidator,
     WorkflowRecordOrderBy,
     WorkflowValidator,
     WorkflowWithoutID,
@@ -123,7 +122,8 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                         created_at,
                         updated_at,
                         opened_at,
-                        tags
+                        tags,
+                        workflow
                     FROM workflow_library
                     """
             count_query = "SELECT COUNT(*) FROM workflow_library"
@@ -204,7 +204,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
 
             cursor.execute(main_query, main_params)
             rows = cursor.fetchall()
-            workflows = [WorkflowRecordListItemDTOValidator.validate_python(dict(row)) for row in rows]
+            workflows = [WorkflowRecordListItemDTO.from_dict(dict(row)) for row in rows]
 
             cursor.execute(count_query, count_params)
             total = cursor.fetchone()[0]

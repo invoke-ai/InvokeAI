@@ -1,4 +1,4 @@
-import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import type { WorkflowV4 } from 'features/nodes/types/workflow';
 import { graphToWorkflow } from 'features/nodes/util/workflow/graphToWorkflow';
 import { toast } from 'features/toast/toast';
 import { useValidateAndLoadWorkflow } from 'features/workflowLibrary/hooks/useValidateAndLoadWorkflow';
@@ -21,7 +21,7 @@ export const useLoadWorkflowFromImage = () => {
     async (
       imageName: string,
       options: {
-        onSuccess?: (workflow: WorkflowV3) => void;
+        onSuccess?: (workflow: WorkflowV4) => void;
         onError?: () => void;
         onCompleted?: () => void;
       } = {}

@@ -1,13 +1,13 @@
 import { get } from 'es-toolkit/compat';
 import { img_resize, main_model_loader } from 'features/nodes/store/util/testUtils';
-import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import type { WorkflowV4 } from 'features/nodes/types/workflow';
 import { getDefaultForm } from 'features/nodes/types/workflow';
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
 import { describe, expect, it } from 'vitest';
 
 //TODO(psyche): Test workflow validation for form builder fields
 describe('validateWorkflow', () => {
-  const getWorkflow = (): WorkflowV3 => ({
+  const getWorkflow = (): WorkflowV4 => ({
     name: '',
     author: '',
     description: '',
@@ -16,8 +16,9 @@ describe('validateWorkflow', () => {
     tags: '',
     notes: '',
     exposedFields: [],
+    output_fields: [],
     form: getDefaultForm(),
-    meta: { version: '3.0.0', category: 'user' },
+    meta: { version: '4.0.0', category: 'user' },
     nodes: [
       {
         id: '94b1d596-f2f2-4c1c-bd5b-a79c62d947ad',

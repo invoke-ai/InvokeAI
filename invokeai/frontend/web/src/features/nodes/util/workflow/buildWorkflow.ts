@@ -6,8 +6,8 @@ import { pick } from 'es-toolkit/compat';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState } from 'features/nodes/store/types';
 import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
-import type { WorkflowV3 } from 'features/nodes/types/workflow';
-import { zWorkflowV3 } from 'features/nodes/types/workflow';
+import type { WorkflowV4 } from 'features/nodes/types/workflow';
+import { zWorkflowV4 } from 'features/nodes/types/workflow';
 import i18n from 'i18n';
 import { useCallback } from 'react';
 import { fromZodError } from 'zod-validation-error/v4';
@@ -23,19 +23,25 @@ const workflowKeys = [
   'tags',
   'notes',
   'exposedFields',
+  'output_fields',
   'meta',
   'id',
   'form',
-] satisfies (keyof WorkflowV3)[];
+] satisfies (keyof WorkflowV4)[];
 
-export const buildWorkflowFast = (nodesState: NodesState): WorkflowV3 => {
+export const buildWorkflowFast = (nodesState: NodesState): WorkflowV4 => {
   const { nodes, edges, ...rest } = nodesState;
   const clonedWorkflow = pick(rest, workflowKeys);
 
-  const newWorkflow: WorkflowV3 = {
+  const newWorkflow: WorkflowV4 = {
     ...clonedWorkflow,
     nodes: [],
     edges: [],
+  };
+
+  newWorkflow.meta = {
+    ...newWorkflow.meta,
+    version: '4.0.0',
   };
 
   for (const node of nodes) {
@@ -61,12 +67,12 @@ export const buildWorkflowFast = (nodesState: NodesState): WorkflowV3 => {
   return deepClone(newWorkflow);
 };
 
-export const buildWorkflowWithValidation = (nodesState: NodesState): WorkflowV3 | null => {
+export const buildWorkflowWithValidation = (nodesState: NodesState): WorkflowV4 | null => {
   // builds what really, really should be a valid workflow
   const workflowToValidate = buildWorkflowFast(nodesState);
 
   // but bc we are storing this in the DB, let's be extra sure
-  const result = zWorkflowV3.safeParse(workflowToValidate);
+  const result = zWorkflowV4.safeParse(workflowToValidate);
 
   if (!result.success) {
     const { message } = fromZodError(result.error, {
@@ -80,7 +86,7 @@ export const buildWorkflowWithValidation = (nodesState: NodesState): WorkflowV3 
   return result.data;
 };
 
-export const useBuildWorkflowFast = (): (() => WorkflowV3) => {
+export const useBuildWorkflowFast = (): (() => WorkflowV4) => {
   const store = useAppStore();
   const buildWorkflow = useCallback(() => {
     const nodesState = selectNodesSlice(store.getState());

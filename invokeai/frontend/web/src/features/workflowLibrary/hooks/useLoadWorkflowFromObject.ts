@@ -1,4 +1,4 @@
-import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import type { WorkflowV4 } from 'features/nodes/types/workflow';
 import { useValidateAndLoadWorkflow } from 'features/workflowLibrary/hooks/useValidateAndLoadWorkflow';
 import { useCallback } from 'react';
 
@@ -14,7 +14,7 @@ export const useLoadWorkflowFromObject = () => {
     async (
       unvalidatedWorkflow: unknown,
       options: {
-        onSuccess?: (workflow: WorkflowV3) => void;
+        onSuccess?: (workflow: WorkflowV4) => void;
         onError?: () => void;
         onCompleted?: () => void;
       } = {}

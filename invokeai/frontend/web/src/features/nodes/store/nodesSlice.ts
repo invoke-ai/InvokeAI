@@ -74,7 +74,8 @@ import type {
   NodeFieldElement,
   TextElement,
   WorkflowCategory,
-  WorkflowV3,
+  WorkflowOutputField,
+  WorkflowV4,
 } from 'features/nodes/types/workflow';
 import {
   getDefaultForm,
@@ -101,7 +102,8 @@ export const getInitialWorkflow = (): Omit<NodesState, 'mode' | 'formFieldInitia
     tags: '',
     notes: '',
     exposedFields: [],
-    meta: { version: '3.0.0', category: 'user' },
+    output_fields: [] as WorkflowOutputField[],
+    meta: { version: '4.0.0', category: 'user' },
     form: getDefaultForm(),
     nodes: [],
     edges: [],
@@ -193,6 +195,9 @@ const slice = createSlice({
       );
 
       if (didNodesChange) {
+        const remainingNodeIds = new Set(state.nodes.map((node) => node.id));
+        state.output_fields = state.output_fields.filter((field) => remainingNodeIds.has(field.nodeId));
+
         const edgeChanges: EdgeChange<AnyEdge>[] = [];
         for (const e of state.edges) {
           const sourceExists = state.nodes.some((n) => n.id === e.source);
@@ -512,6 +517,43 @@ const slice = createSlice({
     workflowContactChanged: (state, action: PayloadAction<string>) => {
       state.contact = action.payload;
     },
+    workflowOutputFieldsChanged: (
+      state,
+      action: PayloadAction<Array<{ nodeId: string; fieldName: string; userLabel?: string | null }>>
+    ) => {
+      const validOutputs: WorkflowOutputField[] = [];
+
+      for (const identifier of action.payload) {
+        if (validOutputs.length >= 1) {
+          break; // only allow one output field
+        }
+
+        const nodeId = identifier.nodeId;
+        const fieldName = identifier.fieldName;
+        if (!nodeId || !fieldName) {
+          continue;
+        }
+
+        const node = state.nodes.find((n) => n.id === nodeId);
+        if (!isInvocationNode(node)) {
+          continue;
+        }
+
+        const label = identifier.userLabel ?? null;
+
+        validOutputs.push({
+          nodeId,
+          fieldName,
+          kind: 'output',
+          userLabel: label,
+          node_id: nodeId,
+          field_name: fieldName,
+          user_label: label,
+        });
+      }
+
+      state.output_fields = validOutputs;
+    },
     workflowIDChanged: (state, action: PayloadAction<string>) => {
       state.id = action.payload;
     },
@@ -564,7 +606,7 @@ const slice = createSlice({
       const { formFieldInitialValues } = action.payload;
       state.formFieldInitialValues = formFieldInitialValues;
     },
-    workflowLoaded: (state, action: PayloadAction<WorkflowV3>) => {
+    workflowLoaded: (state, action: PayloadAction<WorkflowV4>) => {
       const { nodes, edges, is_published: _is_published, ...workflowExtra } = action.payload;
 
       const formFieldInitialValues = getFormFieldInitialValues(workflowExtra.form, nodes);
@@ -621,6 +663,7 @@ export const {
   workflowNotesChanged,
   workflowVersionChanged,
   workflowContactChanged,
+  workflowOutputFieldsChanged,
   workflowIDChanged,
   formReset,
   formElementAdded,

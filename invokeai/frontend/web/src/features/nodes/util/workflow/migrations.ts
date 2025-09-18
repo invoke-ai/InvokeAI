@@ -10,8 +10,8 @@ import { zWorkflowV1 } from 'features/nodes/types/v1/workflowV1';
 import type { StatelessFieldType } from 'features/nodes/types/v2/field';
 import type { WorkflowV2 } from 'features/nodes/types/v2/workflow';
 import { zWorkflowV2 } from 'features/nodes/types/v2/workflow';
-import type { WorkflowV3 } from 'features/nodes/types/workflow';
-import { zWorkflowV3 } from 'features/nodes/types/workflow';
+import type { WorkflowOutputField, WorkflowV3, WorkflowV4 } from 'features/nodes/types/workflow';
+import { zWorkflowV3, zWorkflowV4 } from 'features/nodes/types/workflow';
 import { t } from 'i18next';
 import { z } from 'zod';
 
@@ -76,12 +76,72 @@ const migrateV2toV3 = (workflowToMigrate: WorkflowV2): WorkflowV3 => {
   return zWorkflowV3.parse(workflowToMigrate);
 };
 
+const normalizeOutputField = (field: unknown): WorkflowOutputField | null => {
+  if (!field || typeof field !== 'object') {
+    return null;
+  }
+  const maybeField = field as Record<string, unknown>;
+  const nodeId =
+    typeof maybeField.nodeId === 'string'
+      ? maybeField.nodeId
+      : typeof maybeField.node_id === 'string'
+        ? maybeField.node_id
+        : null;
+  const fieldName =
+    typeof maybeField.fieldName === 'string'
+      ? maybeField.fieldName
+      : typeof maybeField.field_name === 'string'
+        ? maybeField.field_name
+        : null;
+  if (!nodeId || !fieldName) {
+    return null;
+  }
+  const userLabel =
+    typeof maybeField.userLabel === 'string'
+      ? maybeField.userLabel
+      : typeof maybeField.userLabel === 'object'
+        ? null
+        : typeof maybeField.user_label === 'string'
+          ? maybeField.user_label
+          : null;
+
+  return {
+    kind: 'output',
+    nodeId,
+    fieldName,
+    userLabel,
+    node_id: nodeId,
+    field_name: fieldName,
+    user_label: userLabel,
+  } satisfies WorkflowOutputField;
+};
+
+const migrateV3toV4 = (workflowToMigrate: WorkflowV3 | Record<string, unknown>): WorkflowV4 => {
+  const rawOutputs = Array.isArray((workflowToMigrate as Record<string, unknown>).output_fields)
+    ? ((workflowToMigrate as Record<string, unknown>).output_fields as unknown[])
+    : [];
+
+  const normalizedOutputs = rawOutputs
+    .map(normalizeOutputField)
+    .filter((field): field is WorkflowOutputField => field !== null)
+    .slice(0, 1);
+
+  const migrated = {
+    ...(workflowToMigrate as Record<string, unknown>),
+    output_fields: normalizedOutputs,
+  } as WorkflowV4;
+
+  migrated.meta.version = '4.0.0';
+
+  return zWorkflowV4.parse(migrated);
+};
+
 /**
  * Parses a workflow and migrates it to the latest version if necessary.
  *
  * This function will return a new workflow object, so the original workflow is not modified.
  */
-export const parseAndMigrateWorkflow = (data: unknown): WorkflowV3 => {
+export const parseAndMigrateWorkflow = (data: unknown): WorkflowV4 => {
   const workflowVersionResult = zWorkflowMetaVersion.safeParse(data);
 
   if (!workflowVersionResult.success) {
@@ -100,8 +160,13 @@ export const parseAndMigrateWorkflow = (data: unknown): WorkflowV3 => {
     workflow = migrateV2toV3(v2);
   }
 
-  // We should now have a V3 workflow
-  const migratedWorkflow = zWorkflowV3.parse(workflow);
+  if (get(workflow, 'meta.version') === '3.0.0') {
+    const v3 = zWorkflowV3.parse(workflow);
+    workflow = migrateV3toV4(v3);
+  }
+
+  // We should now have a V4 workflow
+  const migratedWorkflow = zWorkflowV4.parse(workflow);
 
   return migratedWorkflow;
 };

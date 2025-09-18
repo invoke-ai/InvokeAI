@@ -2,7 +2,7 @@ import type { ToastId } from '@invoke-ai/ui-library';
 import { useToast } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { formFieldInitialValuesChanged } from 'features/nodes/store/nodesSlice';
-import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import type { WorkflowV4 } from 'features/nodes/types/workflow';
 import { useGetFormFieldInitialValues } from 'features/workflowLibrary/hooks/useGetFormInitialValues';
 import { workflowUpdated } from 'features/workflowLibrary/store/actions';
 import { useCallback, useRef } from 'react';
@@ -14,12 +14,12 @@ import type { SetFieldType, SetRequired } from 'type-fest';
  * A library workflow is a workflow that is already saved in the library. It has an id and is not in the default category.
  */
 type LibraryWorkflow = SetFieldType<
-  SetRequired<WorkflowV3, 'id'>,
+  SetRequired<WorkflowV4, 'id'>,
   'meta',
-  SetFieldType<WorkflowV3['meta'], 'category', Exclude<WorkflowV3['meta']['category'], 'default'>>
+  SetFieldType<WorkflowV4['meta'], 'category', Exclude<WorkflowV4['meta']['category'], 'default'>>
 >;
 
-export const isLibraryWorkflow = (workflow: WorkflowV3): workflow is LibraryWorkflow =>
+export const isLibraryWorkflow = (workflow: WorkflowV4): workflow is LibraryWorkflow =>
   !!workflow.id && workflow.meta.category !== 'default';
 
 type UseSaveLibraryWorkflowReturn = {

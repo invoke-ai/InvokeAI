@@ -1,5 +1,5 @@
 import { useToast } from '@invoke-ai/ui-library';
-import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import type { WorkflowV4 } from 'features/nodes/types/workflow';
 import { useValidateAndLoadWorkflow } from 'features/workflowLibrary/hooks/useValidateAndLoadWorkflow';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,7 +21,7 @@ export const useLoadWorkflowFromLibrary = () => {
     async (
       workflowId: string,
       options: {
-        onSuccess?: (workflow: WorkflowV3) => void;
+        onSuccess?: (workflow: WorkflowV4) => void;
         onError?: () => void;
         onCompleted?: () => void;
       } = {}

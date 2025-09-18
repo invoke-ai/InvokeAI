@@ -126,6 +126,29 @@ class WorkflowRecordListItemDTO(WorkflowRecordDTOBase):
     description: str = Field(description="The description of the workflow.")
     category: WorkflowCategory = Field(description="The description of the workflow.")
     tags: str = Field(description="The tags of the workflow.")
+    has_valid_image_output_field: bool = Field(
+        default=False,
+        description="True when the workflow exposes exactly one output field and it is an image output.",
+    )
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "WorkflowRecordListItemDTO":
+        workflow_data = data.pop("workflow", None)
+        has_valid_output = False
+
+        if workflow_data:
+            if isinstance(workflow_data, (str, bytes, bytearray)):
+                workflow = WorkflowValidator.validate_json(workflow_data)
+            else:
+                workflow = WorkflowValidator.validate_python(workflow_data)
+            output_fields = workflow.output_fields or []
+            image_outputs = [f for f in output_fields if f.kind == "output" and f.field_name.startswith("image")]
+            if len(image_outputs) == 1:
+                has_valid_output = True
+
+        data = dict(data)
+        data["has_valid_image_output_field"] = has_valid_output
+        return WorkflowRecordListItemDTOValidator.validate_python(data)
 
 
 WorkflowRecordListItemDTOValidator = TypeAdapter(WorkflowRecordListItemDTO)

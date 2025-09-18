@@ -76,6 +76,7 @@ export const selectWorkflowContact = createNodesSelector((workflow) => workflow.
 export const selectWorkflowTags = createNodesSelector((workflow) => workflow.tags);
 export const selectWorkflowVersion = createNodesSelector((workflow) => workflow.version);
 export const selectWorkflowForm = createNodesSelector((workflow) => workflow.form);
+export const selectWorkflowOutputFields = createNodesSelector((workflow) => workflow.output_fields);
 
 export const selectFormRootElementId = createNodesSelector((workflow) => {
   return workflow.form.rootElementId;

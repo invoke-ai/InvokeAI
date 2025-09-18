@@ -8,7 +8,7 @@ import {
   isModelFieldType,
   isModelIdentifierFieldInputInstance,
 } from 'features/nodes/types/field';
-import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import type { WorkflowV4 } from 'features/nodes/types/workflow';
 import {
   buildNodeFieldElement,
   getDefaultForm,
@@ -36,7 +36,7 @@ type ValidateWorkflowArgs = {
 };
 
 type ValidateWorkflowResult = {
-  workflow: WorkflowV3;
+  workflow: WorkflowV4;
   warnings: WorkflowWarning[];
 };
 
@@ -232,6 +232,65 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
 
   // Remove invalid edges
   _workflow.edges = edges.filter(({ id }) => !edgesToDelete.has(id));
+
+  if (_workflow.output_fields.length > 0) {
+    const validOutputs: typeof _workflow.output_fields = [];
+    for (const output of _workflow.output_fields) {
+      const node = nodes.find(({ id }) => id === output.nodeId);
+      if (!node) {
+        warnings.push({
+          message: t('workflows.builder.outputFieldMissingNode', {
+            defaultValue: 'Removed workflow output referencing a missing node.',
+          }),
+          data: parseify(output),
+        });
+        continue;
+      }
+      if (!isWorkflowInvocationNode(node)) {
+        warnings.push({
+          message: t('workflows.builder.outputFieldInvalidNode', {
+            defaultValue: 'Removed workflow output because the selected node is not an invocation node.',
+          }),
+          data: parseify({ output, node }),
+        });
+        continue;
+      }
+      const template = templates[node.data.type];
+      if (!template) {
+        warnings.push({
+          message: t('workflows.builder.outputFieldMissingTemplate', {
+            defaultValue: 'Removed workflow output because the node template is missing.',
+          }),
+          data: parseify({ output, node }),
+        });
+        continue;
+      }
+      const field = template.outputs[output.fieldName];
+      if (!field) {
+        warnings.push({
+          message: t('workflows.builder.outputFieldMissingHandle', {
+            defaultValue: 'Removed workflow output because the node no longer exposes that field.',
+          }),
+          data: parseify({ output, node, template }),
+        });
+        continue;
+      }
+      if (!(field.type.name === 'ImageField' && field.type.cardinality !== 'COLLECTION')) {
+        warnings.push({
+          message: t('workflows.builder.outputFieldMustBeImage', {
+            defaultValue: 'Removed workflow output because it is not an image field.',
+          }),
+          data: parseify({ output, node, field }),
+        });
+        continue;
+      }
+      validOutputs.push(output);
+      if (validOutputs.length >= 1) {
+        break;
+      }
+    }
+    _workflow.output_fields = validOutputs.slice(0, 1);
+  }
 
   // Migrated exposed fields to form elements if they exist and the form does not
   // Note: If the form is invalid per its zod schema, it will be reset to a default, empty form!

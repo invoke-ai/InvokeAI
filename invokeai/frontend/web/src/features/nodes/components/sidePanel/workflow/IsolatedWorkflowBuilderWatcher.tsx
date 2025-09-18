@@ -7,14 +7,14 @@ import { debounce } from 'es-toolkit/compat';
 import { getInitialWorkflow } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice, selectWorkflowId } from 'features/nodes/store/selectors';
 import type { NodesState } from 'features/nodes/store/types';
-import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import type { WorkflowV4 } from 'features/nodes/types/workflow';
 import { buildWorkflowFast } from 'features/nodes/util/workflow/buildWorkflow';
 import { atom, computed } from 'nanostores';
 import { useEffect, useMemo } from 'react';
 import { useGetWorkflowQuery } from 'services/api/endpoints/workflows';
 import stableHash from 'stable-hash';
 
-const $maybePreviewWorkflow = atom<WorkflowV3 | null>(null);
+const $maybePreviewWorkflow = atom<WorkflowV4 | null>(null);
 export const $previewWorkflow = computed(
   $maybePreviewWorkflow,
   (maybePreviewWorkflow) => maybePreviewWorkflow ?? EMPTY_OBJECT

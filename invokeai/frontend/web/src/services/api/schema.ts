@@ -22719,6 +22719,12 @@ export type components = {
              */
             tags: string;
             /**
+             * Has Valid Image Output Field
+             * @description True when the workflow exposes exactly one output field and it is an image output.
+             * @default false
+             */
+            has_valid_image_output_field?: boolean;
+            /**
              * Thumbnail Url
              * @description The URL of the workflow thumbnail.
              */

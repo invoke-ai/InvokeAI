@@ -57,6 +57,41 @@ const zWorkflowEdgeCollapsed = zWorkflowEdgeBase.extend({
 const zWorkflowEdge = z.union([zWorkflowEdgeDefault, zWorkflowEdgeCollapsed]);
 // #endregion
 
+export type WorkflowOutputField = {
+  kind: 'output';
+  nodeId: string;
+  fieldName: string;
+  userLabel: string | null;
+  node_id: string;
+  field_name: string;
+  user_label: string | null;
+};
+
+const zWorkflowOutputField = z
+  .object({
+    kind: z.literal('output').default('output'),
+    nodeId: z.string().trim().min(1).optional(),
+    node_id: z.string().trim().min(1),
+    fieldName: z.string().trim().min(1).optional(),
+    field_name: z.string().trim().min(1),
+    userLabel: z.string().nullable().optional(),
+    user_label: z.string().nullable().optional(),
+  })
+  .transform((field) => {
+    const nodeId = field.nodeId ?? field.node_id;
+    const fieldName = field.fieldName ?? field.field_name;
+    const userLabel = field.userLabel ?? field.user_label ?? null;
+    return {
+      kind: 'output',
+      nodeId,
+      fieldName,
+      userLabel,
+      node_id: nodeId,
+      field_name: fieldName,
+      user_label: userLabel,
+    } as WorkflowOutputField;
+  });
+
 // #region Workflow Builder
 const zElementId = z.string().trim().min(1);
 export type ElementId = z.infer<typeof zElementId>;
@@ -363,7 +398,7 @@ const zValidatedBuilderForm = zBuilderForm
 //# endregion
 
 // #region Workflow
-export const zWorkflowV3 = z.object({
+const workflowBaseShape = {
   id: z.string().min(1).optional(),
   name: z.string(),
   author: z.string(),
@@ -375,13 +410,27 @@ export const zWorkflowV3 = z.object({
   nodes: z.array(zWorkflowNode),
   edges: z.array(zWorkflowEdge),
   exposedFields: z.array(zFieldIdentifier),
+  // Use the validated form schema!
+  form: zValidatedBuilderForm,
+  is_published: z.boolean().nullish(),
+} as const;
+
+export const zWorkflowV3 = z.object({
+  ...workflowBaseShape,
   meta: z.object({
     category: zWorkflowCategory.default('user'),
     version: z.literal('3.0.0'),
   }),
-  // Use the validated form schema!
-  form: zValidatedBuilderForm,
-  is_published: z.boolean().nullish(),
 });
 export type WorkflowV3 = z.infer<typeof zWorkflowV3>;
+
+export const zWorkflowV4 = z.object({
+  ...workflowBaseShape,
+  meta: z.object({
+    category: zWorkflowCategory.default('user'),
+    version: z.literal('4.0.0'),
+  }),
+  output_fields: z.array(zWorkflowOutputField).max(1).default([]),
+});
+export type WorkflowV4 = z.infer<typeof zWorkflowV4>;
 // #endregion

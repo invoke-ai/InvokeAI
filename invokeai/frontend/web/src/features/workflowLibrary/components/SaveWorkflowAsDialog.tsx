@@ -15,7 +15,7 @@ import { useStore } from '@nanostores/react';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { deepClone } from 'common/util/deepClone';
 import { $workflowLibraryCategoriesOptions } from 'features/nodes/store/workflowLibrarySlice';
-import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import type { WorkflowV4 } from 'features/nodes/types/workflow';
 import { isDraftWorkflow, useCreateLibraryWorkflow } from 'features/workflowLibrary/hooks/useCreateNewWorkflow';
 import { t } from 'i18next';
 import { atom, computed } from 'nanostores';
@@ -28,7 +28,7 @@ import { assert } from 'tsafe';
  *
  * This state is used to determine whether or not the modal is open.
  */
-const $workflowToSave = atom<WorkflowV3 | null>(null);
+const $workflowToSave = atom<WorkflowV4 | null>(null);
 
 /**
  * Whether or not the modal is open. It is open if there is a workflow to save.
@@ -40,7 +40,7 @@ const $workflowToSave = atom<WorkflowV3 | null>(null);
  */
 const $isOpen = computed($workflowToSave, (val) => val !== null);
 
-const getInitialName = (workflow: WorkflowV3): string => {
+const getInitialName = (workflow: WorkflowV4): string => {
   if (!workflow.id) {
     // If the workflow has no ID, that means it's a new workflow that has never been saved to the server. In this case,
     // we should use whatever the user has entered in the workflow name field.
@@ -60,7 +60,7 @@ const getInitialName = (workflow: WorkflowV3): string => {
  * The workflow object is deep cloned to prevent any changes to the original workflow object.
  * @param workflow The workflow to save as a new workflow.
  */
-export const saveWorkflowAs = (workflow: WorkflowV3) => {
+export const saveWorkflowAs = (workflow: WorkflowV4) => {
   $workflowToSave.set(deepClone(workflow));
 };
 
@@ -82,7 +82,7 @@ export const SaveWorkflowAsDialog = () => {
   );
 };
 
-const Content = memo(({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef: RefObject<HTMLButtonElement> }) => {
+const Content = memo(({ workflow, cancelRef }: { workflow: WorkflowV4; cancelRef: RefObject<HTMLButtonElement> }) => {
   const workflowCategories = useStore($workflowLibraryCategoriesOptions);
   const [name, setName] = useState(() => {
     if (workflow) {

@@ -1,5 +1,5 @@
 import type { XYPosition as ReactFlowXYPosition } from '@xyflow/react';
-import type { WorkflowCategory, WorkflowV3, XYPosition } from 'features/nodes/types/workflow';
+import type { WorkflowCategory, WorkflowV4, XYPosition } from 'features/nodes/types/workflow';
 import type { S } from 'services/api/types';
 import type { Equals, Extends } from 'tsafe';
 import { assert } from 'tsafe';
@@ -14,5 +14,5 @@ import { describe, test } from 'vitest';
 describe('Workflow types', () => {
   test('XYPosition', () => assert<Equals<XYPosition, ReactFlowXYPosition>>());
   test('WorkflowCategory', () => assert<Equals<WorkflowCategory, S['WorkflowCategory']>>());
-  test('WorkflowV3', () => assert<Extends<SetRequired<WorkflowV3, 'id'>, S['Workflow']>>());
+  test('WorkflowV4', () => assert<Extends<SetRequired<WorkflowV4, 'id'>, S['Workflow']>>());
 });

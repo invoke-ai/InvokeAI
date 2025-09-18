@@ -7,7 +7,7 @@ import {
   workflowIDChanged,
   workflowNameChanged,
 } from 'features/nodes/store/nodesSlice';
-import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import type { WorkflowV4 } from 'features/nodes/types/workflow';
 import { useGetFormFieldInitialValues } from 'features/workflowLibrary/hooks/useGetFormInitialValues';
 import { newWorkflowSaved } from 'features/workflowLibrary/store/actions';
 import { useCallback, useRef } from 'react';
@@ -19,12 +19,12 @@ import type { SetFieldType } from 'type-fest';
  * A draft workflow is a workflow that is has not been saved yet. It does not have an id and is not in the default category.
  */
 type DraftWorkflow = SetFieldType<
-  SetFieldType<WorkflowV3, 'id', undefined>,
+  SetFieldType<WorkflowV4, 'id', undefined>,
   'meta',
-  SetFieldType<WorkflowV3['meta'], 'category', Exclude<WorkflowV3['meta']['category'], 'default'>>
+  SetFieldType<WorkflowV4['meta'], 'category', Exclude<WorkflowV4['meta']['category'], 'default'>>
 >;
 
-export const isDraftWorkflow = (workflow: WorkflowV3): workflow is DraftWorkflow =>
+export const isDraftWorkflow = (workflow: WorkflowV4): workflow is DraftWorkflow =>
   !workflow.id && workflow.meta.category !== 'default';
 
 type CreateLibraryWorkflowArg = {

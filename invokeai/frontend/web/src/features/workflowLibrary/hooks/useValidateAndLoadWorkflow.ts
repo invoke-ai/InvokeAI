@@ -6,7 +6,7 @@ import { $templates, workflowLoaded } from 'features/nodes/store/nodesSlice';
 import { $needsFit } from 'features/nodes/store/reactFlowInstance';
 import { workflowModeChanged } from 'features/nodes/store/workflowLibrarySlice';
 import { WorkflowMigrationError, WorkflowVersionError } from 'features/nodes/types/error';
-import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import type { WorkflowV4 } from 'features/nodes/types/workflow';
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
 import { toast } from 'features/toast/toast';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -48,7 +48,7 @@ export const useValidateAndLoadWorkflow = () => {
     async (
       unvalidatedWorkflow: unknown,
       origin: 'file' | 'image' | 'object' | 'library'
-    ): Promise<WorkflowV3 | null> => {
+    ): Promise<WorkflowV4 | null> => {
       try {
         const templates = $templates.get();
         const { workflow, warnings } = await validateWorkflow({

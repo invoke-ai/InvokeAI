@@ -1952,6 +1952,7 @@
         "private": "Private",
         "shared": "Shared",
         "published": "Published",
+        "validImageOutput": "Valid Image Output",
         "browseWorkflows": "Browse Workflows",
         "deselectAll": "Deselect All",
         "recommended": "Recommended For You",
