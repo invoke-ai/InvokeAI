@@ -146,6 +146,22 @@ export type SubModelType = z.infer<typeof zSubModelType>;
 
 export const zClipVariantType = z.enum(['large', 'gigantic']);
 export const zModelVariantType = z.enum(['normal', 'inpaint', 'depth']);
+export const zModelFormat = z.enum([
+  'omi',
+  'diffusers',
+  'checkpoint',
+  'lycoris',
+  'onnx',
+  'olive',
+  'embedding_file',
+  'embedding_folder',
+  'invokeai',
+  't5_encoder',
+  'bnb_quantized_int8b',
+  'bnb_quantized_nf4b',
+  'gguf_quantized',
+  'api',
+]);
 
 export const zModelIdentifierField = z.object({
   key: z.string().min(1),

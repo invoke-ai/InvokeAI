@@ -55,9 +55,12 @@ const ModelIdentifierFieldInputComponent = (props: Props) => {
       ) {
         return false;
       }
+      if (fieldTemplate.ui_model_format && !fieldTemplate.ui_model_format.includes(config.format)) {
+        return false;
+      }
       return true;
     });
-  }, [data, fieldTemplate.ui_model_base, fieldTemplate.ui_model_type, fieldTemplate.ui_model_variant]);
+  }, [data, fieldTemplate]);
 
   return (
     <ModelFieldCombobox

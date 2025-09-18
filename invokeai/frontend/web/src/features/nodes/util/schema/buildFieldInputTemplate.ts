@@ -449,7 +449,7 @@ const buildImageGeneratorFieldInputTemplate: FieldInputTemplateBuilder<ImageGene
   return template;
 };
 
-export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputTemplateBuilder> = {
+const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputTemplateBuilder> = {
   BoardField: buildBoardFieldInputTemplate,
   BooleanField: buildBooleanFieldInputTemplate,
   ColorField: buildColorFieldInputTemplate,
@@ -464,7 +464,7 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   IntegerGeneratorField: buildIntegerGeneratorFieldInputTemplate,
   StringGeneratorField: buildStringGeneratorFieldInputTemplate,
   ImageGeneratorField: buildImageGeneratorFieldInputTemplate,
-} as const;
+};
 
 export const buildFieldInputTemplate = (
   fieldSchema: InvocationFieldSchema,
@@ -482,6 +482,7 @@ export const buildFieldInputTemplate = (
     ui_model_base,
     ui_model_type,
     ui_model_variant,
+    ui_model_format,
   } = fieldSchema;
 
   // This is the base field template that is common to all fields. The builder function will add all other
@@ -501,6 +502,7 @@ export const buildFieldInputTemplate = (
     ui_model_base,
     ui_model_type,
     ui_model_variant,
+    ui_model_format,
   };
 
   if (isStatefulFieldType(fieldType)) {

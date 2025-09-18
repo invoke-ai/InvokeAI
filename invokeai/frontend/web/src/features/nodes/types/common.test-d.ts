@@ -13,6 +13,7 @@ import type {
   SubModelType,
   T2IAdapterField,
   zClipVariantType,
+  zModelFormat,
   zModelVariantType,
 } from 'features/nodes/types/common';
 import type { Invocation, S } from 'services/api/types';
@@ -43,6 +44,7 @@ describe('Common types', () => {
   test('ModelIdentifier', () => assert<Equals<SubModelType, S['SubModelType']>>());
   test('ClipVariantType', () => assert<Equals<z.infer<typeof zClipVariantType>, S['ClipVariantType']>>());
   test('ModelVariantType', () => assert<Equals<z.infer<typeof zModelVariantType>, S['ModelVariantType']>>());
+  test('ModelFormat', () => assert<Equals<z.infer<typeof zModelFormat>, S['ModelFormat']>>());
 
   // Misc types
   test('ProgressImage', () => assert<Equals<ProgressImage, S['ProgressImage']>>());
