@@ -258,16 +258,13 @@ class ModelConfigBase(ABC, BaseModel):
         cls.cast_overrides(overrides)
         fields.update(overrides)
 
-        type = fields.get("type") or cls.model_fields["type"].default
-        base = fields.get("base") or cls.model_fields["base"].default
-
         fields["path"] = mod.path.as_posix()
         fields["source"] = fields.get("source") or fields["path"]
         fields["source_type"] = fields.get("source_type") or ModelSourceType.Path
-        fields["name"] = name = fields.get("name") or mod.name
+        fields["name"] = fields.get("name") or mod.name
         fields["hash"] = fields.get("hash") or mod.hash()
         fields["key"] = fields.get("key") or uuid_string()
-        fields["description"] = fields.get("description") or f"{base.value} {type.value} model {name}"
+        fields["description"] = fields.get("description")
         fields["repo_variant"] = fields.get("repo_variant") or mod.repo_variant()
         fields["file_size"] = fields.get("file_size") or mod.size()
 
