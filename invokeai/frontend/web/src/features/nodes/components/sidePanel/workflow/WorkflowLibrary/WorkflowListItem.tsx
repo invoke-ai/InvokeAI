@@ -1,11 +1,17 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Badge, Flex, Icon, Image, Spacer, Text } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { LockedWorkflowIcon } from 'features/nodes/components/sidePanel/workflow/WorkflowLibrary/WorkflowLibraryListItemActions/LockedWorkflowIcon';
 import { ShareWorkflowButton } from 'features/nodes/components/sidePanel/workflow/WorkflowLibrary/WorkflowLibraryListItemActions/ShareWorkflow';
 import { selectWorkflowId } from 'features/nodes/store/selectors';
+import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
 import { workflowModeChanged } from 'features/nodes/store/workflowLibrarySlice';
 import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
+import {
+  $workflowLibraryIntent,
+  setWorkflowLibraryBrowseIntent,
+} from 'features/workflowLibrary/store/workflowLibraryIntent';
 import InvokeLogo from 'public/assets/images/invoke-symbol-wht-lrg.svg';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -36,12 +42,27 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
   const dispatch = useAppDispatch();
   const workflowId = useAppSelector(selectWorkflowId);
   const loadWorkflowWithDialog = useLoadWorkflowWithDialog();
+  const workflowLibraryModal = useWorkflowLibraryModal();
+  const workflowLibraryIntent = useStore($workflowLibraryIntent);
 
   const isActive = useMemo(() => {
     return workflowId === workflow.workflow_id;
   }, [workflowId, workflow.workflow_id]);
 
+  const isTriggerMode = workflowLibraryIntent.mode === 'trigger-workflow';
+  const isDisabled = isTriggerMode && !workflow.has_valid_image_output_field;
+
   const handleClickLoad = useCallback(() => {
+    if (isTriggerMode) {
+      if (isDisabled) {
+        return;
+      }
+      workflowLibraryIntent.onSelect(workflow);
+      setWorkflowLibraryBrowseIntent();
+      workflowLibraryModal.close();
+      return;
+    }
+
     loadWorkflowWithDialog({
       type: 'library',
       data: workflow.workflow_id,
@@ -49,18 +70,32 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
         dispatch(workflowModeChanged('view'));
       },
     });
-  }, [dispatch, loadWorkflowWithDialog, workflow.workflow_id]);
+  }, [
+    dispatch,
+    isDisabled,
+    isTriggerMode,
+    loadWorkflowWithDialog,
+    workflow,
+    workflowLibraryIntent,
+    workflowLibraryModal,
+  ]);
 
   return (
     <Flex
       position="relative"
       role="button"
       onClick={handleClickLoad}
+      aria-disabled={isDisabled}
       bg="base.750"
       borderRadius="base"
       w="full"
       alignItems="stretch"
-      sx={sx}
+      sx={{
+        ...sx,
+        cursor: isDisabled ? 'not-allowed' : 'pointer',
+        opacity: isDisabled ? 0.5 : 1,
+        pointerEvents: isDisabled ? 'none' : 'auto',
+      }}
       gap={2}
     >
       <Flex p={2} pr={0}>

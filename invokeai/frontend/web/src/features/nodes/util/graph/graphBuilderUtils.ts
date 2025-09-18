@@ -205,7 +205,7 @@ export const getInfill = (
   assert(false, 'Unknown infill method');
 };
 
-const CANVAS_OUTPUT_PREFIX = 'canvas_output';
+export const CANVAS_OUTPUT_PREFIX = 'canvas_output';
 
 export const isMainModelWithoutUnet = (modelLoader: Invocation<MainModelLoaderNodes>) => {
   return (

@@ -7,11 +7,14 @@ import type { Templates } from 'features/nodes/store/types';
 import type { BoardField } from 'features/nodes/types/common';
 import type { BoardFieldInputInstance } from 'features/nodes/types/field';
 import { isBoardFieldInputInstance, isBoardFieldInputTemplate } from 'features/nodes/types/field';
-import { isExecutableNode, isInvocationNode } from 'features/nodes/types/invocation';
+import type { InvocationNodeData } from 'features/nodes/types/invocation';
+import { isBatchNodeType, isGeneratorNodeType } from 'features/nodes/types/invocation';
 import type { AnyInvocation, Graph } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
 
 const log = logger('workflows');
+
+type BoardFieldResolver = (field: BoardFieldInputInstance) => BoardField | undefined;
 
 const getBoardField = (field: BoardFieldInputInstance, state: RootState): BoardField | undefined => {
   // Translate the UI value to the graph value. See note in BoardFieldInputComponent for more info.
@@ -34,19 +37,70 @@ const getBoardField = (field: BoardFieldInputInstance, state: RootState): BoardF
   return value;
 };
 
-/**
- * Builds a graph from the node editor state.
- */
-export const buildNodesGraph = (state: RootState, templates: Templates): Required<Graph> => {
-  const { nodes, edges } = selectNodesSlice(state);
+const defaultBoardFieldResolver: BoardFieldResolver = (field) => {
+  const { value } = field;
+  if (!value || value === 'none' || value === 'auto') {
+    return undefined;
+  }
+  return value;
+};
 
-  // Exclude all batch nodes - we will handle these in the batch setup in a diff function
-  const filteredNodes = nodes.filter(isInvocationNode).filter(isExecutableNode);
+type NodeLike = {
+  id: string;
+  type?: string;
+  data?: unknown;
+};
 
-  // Reduce the node editor nodes into invocation graph nodes
-  const parsedNodes = filteredNodes.reduce<NonNullable<Graph['nodes']>>((nodesAccumulator, node) => {
+type InvocationNodeLike = NodeLike & {
+  data: InvocationNodeData;
+};
+
+const isInvocationNodeLike = (node: NodeLike): node is InvocationNodeLike => {
+  if (node.type !== 'invocation') {
+    return false;
+  }
+
+  if (!node.data || typeof node.data !== 'object') {
+    return false;
+  }
+
+  const data = node.data as Partial<InvocationNodeData>;
+  return Boolean(data.inputs && data.type && data.useCache !== undefined && data.isIntermediate !== undefined);
+};
+
+type EdgeLike = {
+  type?: string;
+  source: string;
+  target: string;
+  sourceHandle?: string | null;
+  targetHandle?: string | null;
+};
+
+type BuildInvocationGraphArgs = {
+  nodes: NodeLike[];
+  edges: EdgeLike[];
+  templates: Templates;
+  resolveBoardField?: BoardFieldResolver;
+  graphId?: string;
+};
+
+export const buildInvocationGraph = ({
+  nodes,
+  edges,
+  templates,
+  resolveBoardField = defaultBoardFieldResolver,
+  graphId,
+}: BuildInvocationGraphArgs): Required<Graph> => {
+  const invocationNodes = nodes.filter(isInvocationNodeLike);
+
+  const executableNodes = invocationNodes.filter((node) => {
+    const nodeType = node.data.type;
+    return !isBatchNodeType(nodeType) && !isGeneratorNodeType(nodeType);
+  });
+
+  const parsedNodes = executableNodes.reduce<NonNullable<Graph['nodes']>>((nodesAccumulator, node) => {
     const { id, data } = node;
-    const { type, inputs, isIntermediate } = data;
+    const { type } = data;
 
     const nodeTemplate = templates[type];
     if (!nodeTemplate) {
@@ -54,9 +108,8 @@ export const buildNodesGraph = (state: RootState, templates: Templates): Require
       return nodesAccumulator;
     }
 
-    // Transform each node's inputs to simple key-value pairs
     const transformedInputs = reduce(
-      inputs,
+      data.inputs,
       (inputsAccumulator, input, name) => {
         const fieldTemplate = nodeTemplate.inputs[name];
         if (!fieldTemplate) {
@@ -64,7 +117,7 @@ export const buildNodesGraph = (state: RootState, templates: Templates): Require
           return inputsAccumulator;
         }
         if (isBoardFieldInputTemplate(fieldTemplate) && isBoardFieldInputInstance(input)) {
-          inputsAccumulator[name] = getBoardField(input, state);
+          inputsAccumulator[name] = resolveBoardField(input);
         } else {
           inputsAccumulator[name] = input.value;
         }
@@ -74,18 +127,15 @@ export const buildNodesGraph = (state: RootState, templates: Templates): Require
       {} as Record<Exclude<string, 'id' | 'type'>, unknown>
     );
 
-    // add reserved use_cache
-    transformedInputs['use_cache'] = node.data.useCache;
+    transformedInputs['use_cache'] = data.useCache;
 
-    // Build this specific node
     const graphNode = {
       type,
       id,
       ...transformedInputs,
-      is_intermediate: isIntermediate,
-    };
+      is_intermediate: data.isIntermediate,
+    } as AnyInvocation;
 
-    // Add it to the nodes object
     Object.assign(nodesAccumulator, {
       [id]: graphNode,
     });
@@ -93,58 +143,59 @@ export const buildNodesGraph = (state: RootState, templates: Templates): Require
     return nodesAccumulator;
   }, {});
 
-  const filteredNodeIds = filteredNodes.map(({ id }) => id);
+  const executableNodeIds = executableNodes.map(({ id }) => id);
 
-  // skip out the "dummy" edges between collapsed nodes
-  const filteredEdges = edges
+  const parsedEdges = edges
     .filter((edge) => edge.type !== 'collapsed')
-    .filter((edge) => filteredNodeIds.includes(edge.source) && filteredNodeIds.includes(edge.target));
+    .filter((edge) => executableNodeIds.includes(edge.source) && executableNodeIds.includes(edge.target))
+    .reduce<NonNullable<Graph['edges']>>((edgesAccumulator, edge) => {
+      const { source, target, sourceHandle, targetHandle } = edge;
 
-  // Reduce the node editor edges into invocation graph edges
-  const parsedEdges = filteredEdges.reduce<NonNullable<Graph['edges']>>((edgesAccumulator, edge) => {
-    const { source, target, sourceHandle, targetHandle } = edge;
+      if (!sourceHandle || !targetHandle) {
+        log.warn({ source, target, sourceHandle, targetHandle }, 'Missing source or taget handle for edge');
+        return edgesAccumulator;
+      }
 
-    if (!sourceHandle || !targetHandle) {
-      log.warn({ source, target, sourceHandle, targetHandle }, 'Missing source or taget handle for edge');
+      edgesAccumulator.push({
+        source: {
+          node_id: source,
+          field: sourceHandle,
+        },
+        destination: {
+          node_id: target,
+          field: targetHandle,
+        },
+      });
+
       return edgesAccumulator;
-    }
+    }, []);
 
-    // Format the edges and add to the edges array
-    edgesAccumulator.push({
-      source: {
-        node_id: source,
-        field: sourceHandle,
-      },
-      destination: {
-        node_id: target,
-        field: targetHandle,
-      },
-    });
-
-    return edgesAccumulator;
-  }, []);
-
-  /**
-   * Omit all inputs that have edges connected.
-   *
-   * Fixes edge case where the user has connected an input, but also provided an invalid explicit,
-   * value.
-   *
-   * In this edge case, pydantic will invalidate the node based on the invalid explicit value,
-   * even though the actual value that will be used comes from the connection.
-   */
   parsedEdges.forEach((edge) => {
-    const destination_node = parsedNodes[edge.destination.node_id];
+    const destinationNode = parsedNodes[edge.destination.node_id];
+    if (!destinationNode) {
+      return;
+    }
     const field = edge.destination.field;
-    parsedNodes[edge.destination.node_id] = omit(destination_node, field) as AnyInvocation;
+    parsedNodes[edge.destination.node_id] = omit(destinationNode, field) as AnyInvocation;
   });
 
-  // Assemble!
-  const graph = {
-    id: uuidv4(),
+  return {
+    id: graphId ?? uuidv4(),
     nodes: parsedNodes,
     edges: parsedEdges,
   };
+};
 
-  return graph;
+/**
+ * Builds a graph from the node editor state.
+ */
+export const buildNodesGraph = (state: RootState, templates: Templates): Required<Graph> => {
+  const { nodes, edges } = selectNodesSlice(state);
+
+  return buildInvocationGraph({
+    nodes,
+    edges,
+    templates,
+    resolveBoardField: (field) => getBoardField(field, state),
+  });
 };

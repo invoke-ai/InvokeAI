@@ -50,6 +50,7 @@ import type {
 } from 'features/controlLayers/store/types';
 import { RGBA_BLACK } from 'features/controlLayers/store/types';
 import { zImageOutput } from 'features/nodes/types/common';
+import type { WorkflowV4 } from 'features/nodes/types/workflow';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
@@ -60,6 +61,17 @@ import type { ImageDTO, S } from 'services/api/types';
 import type { Param0 } from 'tsafe';
 
 import type { CanvasEntityAdapter } from './CanvasEntity/types';
+
+export type WorkflowTriggerSelection = {
+  workflow: WorkflowV4;
+  workflowId: string;
+  workflowName: string;
+};
+
+type WorkflowTriggerState = {
+  adapter: CanvasEntityAdapterRasterLayer;
+  selection: WorkflowTriggerSelection | null;
+};
 
 export class CanvasStateApiModule extends CanvasModuleBase {
   readonly type = 'state_api';
@@ -457,6 +469,26 @@ export class CanvasStateApiModule extends CanvasModuleBase {
     }
   };
 
+  startWorkflowTrigger = (adapter: CanvasEntityAdapterRasterLayer) => {
+    const current = this.$workflowTrigger.get();
+    if (current && current.adapter !== adapter) {
+      this.$workflowTrigger.set(null);
+    }
+    this.$workflowTrigger.set({ adapter, selection: null });
+  };
+
+  cancelWorkflowTrigger = () => {
+    this.$workflowTrigger.set(null);
+  };
+
+  setWorkflowTriggerSelection = (selection: WorkflowTriggerSelection) => {
+    const current = this.$workflowTrigger.get();
+    if (!current) {
+      return;
+    }
+    this.$workflowTrigger.set({ adapter: current.adapter, selection });
+  };
+
   /**
    * The entity adapter being filtered, if any.
    */
@@ -496,6 +528,16 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * Whether an entity is currently being segmented. Derived from `$segmentingAdapter`.
    */
   $isSegmenting = computed(this.$segmentingAdapter, (segmentingAdapter) => Boolean(segmentingAdapter));
+
+  /**
+   * The entity adapter currently triggering a workflow, if any.
+   */
+  $workflowTrigger = atom<WorkflowTriggerState | null>(null);
+
+  /**
+   * Whether a workflow trigger is active.
+   */
+  $isWorkflowTriggering = computed(this.$workflowTrigger, (trigger) => Boolean(trigger));
 
   /**
    * Whether the space key is currently pressed.

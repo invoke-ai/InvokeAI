@@ -9,6 +9,7 @@ import { CanvasEntityMenuItemsMergeDown } from 'features/controlLayers/component
 import { CanvasEntityMenuItemsSave } from 'features/controlLayers/components/common/CanvasEntityMenuItemsSave';
 import { CanvasEntityMenuItemsSelectObject } from 'features/controlLayers/components/common/CanvasEntityMenuItemsSelectObject';
 import { CanvasEntityMenuItemsTransform } from 'features/controlLayers/components/common/CanvasEntityMenuItemsTransform';
+import { CanvasEntityMenuItemsTriggerWorkflow } from 'features/controlLayers/components/common/CanvasEntityMenuItemsTriggerWorkflow';
 import { RasterLayerMenuItemsAdjustments } from 'features/controlLayers/components/RasterLayer/RasterLayerMenuItemsAdjustments';
 import { RasterLayerMenuItemsConvertToSubMenu } from 'features/controlLayers/components/RasterLayer/RasterLayerMenuItemsConvertToSubMenu';
 import { RasterLayerMenuItemsCopyToSubMenu } from 'features/controlLayers/components/RasterLayer/RasterLayerMenuItemsCopyToSubMenu';
@@ -24,6 +25,7 @@ export const RasterLayerMenuItems = memo(() => {
       </IconMenuItemGroup>
       <CanvasEntityMenuItemsTransform />
       <CanvasEntityMenuItemsFilter />
+      <CanvasEntityMenuItemsTriggerWorkflow />
       <CanvasEntityMenuItemsSelectObject />
       <RasterLayerMenuItemsAdjustments />
       <MenuDivider />

@@ -2463,6 +2463,18 @@
                 "cr": "Cr (YCbCr)"
             }
         },
+        "triggerWorkflow": {
+            "menuItem": "Trigger Workflow",
+            "heading": "Trigger Workflow",
+            "openLibrary": "Select Workflow",
+            "noWorkflowSelected": "No workflow selected",
+            "loading": "Loading workflow...",
+            "apply": "Apply",
+            "applying": "Applying",
+            "cancel": "Cancel",
+            "enqueued": "Workflow enqueued",
+            "enqueueFailed": "Unable to enqueue workflow"
+        },
         "transform": {
             "transform": "Transform",
             "fitToBbox": "Fit to Bbox",

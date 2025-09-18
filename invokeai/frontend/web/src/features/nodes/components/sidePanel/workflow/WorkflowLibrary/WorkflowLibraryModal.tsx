@@ -17,7 +17,8 @@ import {
   selectWorkflowLibraryView,
   workflowLibraryViewChanged,
 } from 'features/nodes/store/workflowLibrarySlice';
-import { memo, useEffect, useMemo, useState } from 'react';
+import { setWorkflowLibraryBrowseIntent } from 'features/workflowLibrary/store/workflowLibraryIntent';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetCountsByCategoryQuery } from 'services/api/endpoints/workflows';
 
@@ -29,8 +30,12 @@ export const WorkflowLibraryModal = memo(() => {
   const { t } = useTranslation();
   const workflowLibraryModal = useWorkflowLibraryModal();
   const didSync = useSyncInitialWorkflowLibraryCategories();
+  const handleClose = useCallback(() => {
+    setWorkflowLibraryBrowseIntent();
+    workflowLibraryModal.close();
+  }, [workflowLibraryModal]);
   return (
-    <Modal isOpen={workflowLibraryModal.isOpen} onClose={workflowLibraryModal.close} isCentered>
+    <Modal isOpen={workflowLibraryModal.isOpen} onClose={handleClose} isCentered>
       <ModalOverlay />
       <ModalContent
         w="calc(100% - var(--invoke-sizes-40))"
@@ -39,7 +44,7 @@ export const WorkflowLibraryModal = memo(() => {
         maxH="calc(100% - var(--invoke-sizes-40))"
       >
         <ModalHeader>{t('workflows.workflowLibrary')}</ModalHeader>
-        <ModalCloseButton />
+        <ModalCloseButton onClick={handleClose} />
         <ModalBody pb={6}>
           {didSync && (
             <Flex gap={4} h="100%">

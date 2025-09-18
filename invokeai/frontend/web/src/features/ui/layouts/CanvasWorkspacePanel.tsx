@@ -16,6 +16,7 @@ import { SelectObject } from 'features/controlLayers/components/SelectObject/Sel
 import { StagingAreaContextProvider } from 'features/controlLayers/components/StagingArea/context';
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
+import { TriggerWorkflow } from 'features/controlLayers/components/TriggerWorkflow/TriggerWorkflow';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
@@ -112,6 +113,7 @@ export const CanvasWorkspacePanel = memo(() => {
         <Flex position="absolute" bottom={4}>
           <CanvasManagerProviderGate>
             <Filter />
+            <TriggerWorkflow />
             <Transform />
             <SelectObject />
           </CanvasManagerProviderGate>
