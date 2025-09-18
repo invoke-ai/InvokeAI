@@ -38,7 +38,8 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
 
   const state = getState();
 
-  const destination = selectCanvasDestination(state);
+  const destination = selectCanvasDestination(state, canvasManager.canvasId);
+  assert(destination, 'Destination must exist when CanvasManager has already been created');
 
   const model = state.params.model;
   if (!model) {

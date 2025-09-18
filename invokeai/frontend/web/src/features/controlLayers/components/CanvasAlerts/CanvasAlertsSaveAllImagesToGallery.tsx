@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 export const CanvasAlertsSaveAllImagesToGallery = memo(() => {
   const { t } = useTranslation();
-  const saveAllImagesToGallery = useAppSelector(selectSaveAllImagesToGallery);
+  const saveAllImagesToGallery = useAppSelector((state) => selectSaveAllImagesToGallery(state));
 
   if (!saveAllImagesToGallery) {
     return null;

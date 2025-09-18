@@ -2,7 +2,7 @@ import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { selectCanvasMetadata, selectSelectedCanvas } from 'features/controlLayers/store/selectors';
+import { selectCanvasById, selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import { isFluxKontextReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { zImageField } from 'features/nodes/types/common';
@@ -40,7 +40,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   assert(model.base === 'flux', 'Selected model is not a FLUX model');
 
   const params = selectParamsSlice(state);
-  const canvas = selectSelectedCanvas(state);
+  const canvas = manager ? selectCanvasById(state, manager.canvasId) : null;
   const refImages = selectRefImagesSlice(state);
 
   const { guidance: baseGuidance, steps, fluxVAE, t5EncoderModel, clipEmbedModel } = params;
@@ -254,7 +254,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     assert<Equals<typeof generationMode, never>>(false);
   }
 
-  if (manager !== null) {
+  if (manager !== null && canvas !== null) {
     const controlNetCollector = g.addNode({
       type: 'collect',
       id: getPrefixedId('control_net_collector'),
@@ -308,7 +308,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   });
   let totalReduxesAdded = fluxReduxResult.addedFLUXReduxes;
 
-  if (manager !== null) {
+  if (manager !== null && canvas !== null) {
     const regionsResult = await addRegions({
       manager,
       regions: canvas.regionalGuidance.entities,

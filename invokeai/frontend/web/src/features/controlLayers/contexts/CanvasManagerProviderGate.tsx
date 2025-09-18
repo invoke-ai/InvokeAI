@@ -1,31 +1,35 @@
 import { useStore } from '@nanostores/react';
+import { useAppSelector } from 'app/store/storeHooks';
+import { useCanvasId } from 'features/controlLayers/hooks/useCanvasId';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { $canvasManager } from 'features/controlLayers/store/ephemeral';
+import { $canvasManagers } from 'features/controlLayers/store/ephemeral';
+import { selectSelectedCanvasId } from 'features/controlLayers/store/selectors';
 import type { PropsWithChildren } from 'react';
-import { createContext, memo, useContext } from 'react';
+import { createContext, memo } from 'react';
 import { assert } from 'tsafe';
 
-const CanvasManagerContext = createContext<CanvasManager | null>(null);
+const CanvasManagerContext = createContext<{ [canvasId: string]: CanvasManager } | null>(null);
 
 export const CanvasManagerProviderGate = memo(({ children }: PropsWithChildren) => {
-  const canvasManager = useStore($canvasManager);
+  const canvasManagers = useStore($canvasManagers);
+  const selectedCanvasId = useAppSelector(selectSelectedCanvasId);
 
-  if (!canvasManager) {
+  if (Object.keys(canvasManagers).length === 0 || !canvasManagers[selectedCanvasId]) {
     return null;
   }
 
-  return <CanvasManagerContext.Provider value={canvasManager}>{children}</CanvasManagerContext.Provider>;
+  return <CanvasManagerContext.Provider value={canvasManagers}>{children}</CanvasManagerContext.Provider>;
 });
 
 CanvasManagerProviderGate.displayName = 'CanvasManagerProviderGate';
 
 /**
- * Consumes the CanvasManager from the context. This hook must be used within the CanvasManagerProviderGate, otherwise
- * it will throw an error.
+ * Consumes the CanvasManager from the context. If the CanvasManager is not available, it will throw an error.
  */
 export const useCanvasManager = (): CanvasManager => {
-  const canvasManager = useContext(CanvasManagerContext);
-  assert(canvasManager, 'useCanvasManagerContext must be used within a CanvasManagerProviderGate');
+  const canvasManager = useCanvasManagerSafe();
+  assert(canvasManager, 'Canvas manager does not exist');
+
   return canvasManager;
 };
 
@@ -33,6 +37,8 @@ export const useCanvasManager = (): CanvasManager => {
  * Consumes the CanvasManager from the context. If the CanvasManager is not available, it will return null.
  */
 export const useCanvasManagerSafe = (): CanvasManager | null => {
-  const canvasManager = useStore($canvasManager);
-  return canvasManager;
+  const canvasManagers = useStore($canvasManagers);
+  const canvasId = useCanvasId();
+
+  return canvasManagers[canvasId] ?? null;
 };

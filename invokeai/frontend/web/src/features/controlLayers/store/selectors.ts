@@ -41,6 +41,13 @@ const selectSelectedCanvasWithHistory = createSelector(
 );
 
 export const selectSelectedCanvas = createSelector(selectSelectedCanvasWithHistory, (canvas) => canvas.present);
+export const selectSelectedCanvasId = createSelector(selectSelectedCanvas, (canvas) => canvas.id);
+
+export const selectCanvasById = (state: RootState, canvasId: string) => {
+  const canvas = state.canvas.canvases.find((canvas) => canvas.present.id === canvasId);
+  assert(canvas, 'Canvas does not exist');
+  return canvas.present;
+};
 
 /**
  * Selects the total canvas entity count:

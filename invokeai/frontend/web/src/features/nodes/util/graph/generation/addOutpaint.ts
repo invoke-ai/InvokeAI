@@ -2,7 +2,7 @@ import { objectEquals } from '@observ33r/object-equals';
 import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
+import { buildSelectCanvasSettingsByCanvasId } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
@@ -51,7 +51,7 @@ export const addOutpaint = async ({
   denoise.denoising_end = denoising_end;
 
   const params = selectParamsSlice(state);
-  const canvasSettings = selectCanvasSettingsSlice(state);
+  const canvasSettings = buildSelectCanvasSettingsByCanvasId(manager.canvasId)(state);
 
   const { originalSize, scaledSize, rect } = getOriginalAndScaledSizesForOtherModes(state);
 

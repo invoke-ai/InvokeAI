@@ -824,11 +824,16 @@ const zCanvasState = z.object({
 });
 export type CanvasState = z.infer<typeof zCanvasState>;
 const zCanvasStateWithHistory = zStateWithHistory(zCanvasState);
+export type CanvasStateWithHistory = z.infer<typeof zCanvasStateWithHistory>;
+const zCanvasesStateMigration = z.object({
+  isMultiCanvasMigrationPending: z.boolean().optional(),
+});
 const zCanvasesState = <T extends z.ZodTypeAny>(canvasStateSchema: T) =>
   z.object({
     _version: z.literal(4),
     selectedCanvasId: zId,
     canvases: z.array(canvasStateSchema),
+    migration: zCanvasesStateMigration.optional(),
   });
 export const zCanvasesStateWithHistory = zCanvasesState(zCanvasStateWithHistory);
 export type CanvasesStateWithHistory = z.infer<typeof zCanvasesStateWithHistory>;
