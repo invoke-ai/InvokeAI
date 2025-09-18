@@ -81,7 +81,6 @@ class UIType(str, Enum, metaclass=MetaEnum):
     # region Misc Field Types
     Scheduler = "SchedulerField"
     Any = "AnyField"
-    Video = "VideoField"
     # endregion
 
     # region Internal Field Types
