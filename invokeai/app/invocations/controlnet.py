@@ -63,14 +63,16 @@ class ControlOutput(BaseInvocationOutput):
     control: ControlField = OutputField(description=FieldDescriptions.control)
 
 
-@invocation("controlnet", title="ControlNet - SD1.5, SDXL", tags=["controlnet"], category="controlnet", version="1.1.3")
+@invocation(
+    "controlnet", title="ControlNet - SD1.5, SD2, SDXL", tags=["controlnet"], category="controlnet", version="1.1.3"
+)
 class ControlNetInvocation(BaseInvocation):
     """Collects ControlNet info to pass to other nodes"""
 
     image: ImageField = InputField(description="The control image")
     control_model: ModelIdentifierField = InputField(
         description=FieldDescriptions.controlnet_model,
-        ui_model_base=[BaseModelType.StableDiffusion1, BaseModelType.StableDiffusionXL],
+        ui_model_base=[BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2, BaseModelType.StableDiffusionXL],
         ui_model_type=ModelType.ControlNet,
     )
     control_weight: Union[float, List[float]] = InputField(
