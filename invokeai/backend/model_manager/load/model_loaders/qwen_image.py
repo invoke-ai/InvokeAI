@@ -29,7 +29,7 @@ class QwenImageLoader(ModelLoader):
         """Calculate the size of the Qwen-Image model on disk."""
         if not isinstance(config, MainDiffusersConfig):
             raise ValueError("Only MainDiffusersConfig models are currently supported here.")
-        
+
         # For Qwen-Image, we need to calculate the size of the entire model or specific submodels
         return calc_model_size_by_fs(
             model_path=model_path,
@@ -44,21 +44,21 @@ class QwenImageLoader(ModelLoader):
     ) -> AnyModel:
         if not isinstance(config, MainDiffusersConfig):
             raise ValueError("Only MainDiffusersConfig models are currently supported here.")
-        
+
         if config.base != BaseModelType.QwenImage:
             raise ValueError("This loader only supports Qwen-Image models.")
-        
+
         model_path = Path(config.path)
-        
+
         if submodel_type is not None:
             # Load individual submodel components with memory optimizations
             import torch
             from diffusers import QwenImageTransformer2DModel
             from diffusers.models import AutoencoderKLQwenImage
-            
+
             # Force bfloat16 for memory efficiency if not already set
             torch_dtype = self._torch_dtype if self._torch_dtype is not None else torch.bfloat16
-            
+
             # Load only the specific submodel, not the entire pipeline
             if submodel_type == SubModelType.VAE:
                 # Load VAE directly from subfolder
@@ -78,7 +78,7 @@ class QwenImageLoader(ModelLoader):
                         torch_dtype=torch_dtype,
                         low_cpu_mem_usage=True,
                     )
-            
+
             # Fallback to loading full pipeline if direct loading fails
             pipeline = DiffusionPipeline.from_pretrained(
                 model_path,
@@ -86,7 +86,7 @@ class QwenImageLoader(ModelLoader):
                 variant=config.repo_variant.value if config.repo_variant else None,
                 low_cpu_mem_usage=True,
             )
-            
+
             # Return the specific submodel
             if hasattr(pipeline, submodel_type.value):
                 return getattr(pipeline, submodel_type.value)
@@ -95,10 +95,10 @@ class QwenImageLoader(ModelLoader):
         else:
             # Load the full pipeline with memory optimizations
             import torch
-            
+
             # Force bfloat16 for memory efficiency if not already set
             torch_dtype = self._torch_dtype if self._torch_dtype is not None else torch.bfloat16
-            
+
             pipeline = DiffusionPipeline.from_pretrained(
                 model_path,
                 torch_dtype=torch_dtype,

@@ -4,7 +4,7 @@
 import torch
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, UIComponent
+from invokeai.app.invocations.fields import Input, InputField, UIComponent
 from invokeai.app.invocations.model import Qwen2_5VLField
 from invokeai.app.invocations.primitives import QwenImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -31,14 +31,14 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> QwenImageConditioningOutput:
         """Encode the prompt using Qwen-Image's text encoder."""
-        
+
         # Load the text encoder info first to get the model
         text_encoder_info = context.models.load(self.qwen2_5_vl.text_encoder)
-        
+
         # Load the Qwen2.5-VL tokenizer and text encoder with proper device management
         with text_encoder_info.model_on_device() as (cached_weights, text_encoder), \
              context.models.load(self.qwen2_5_vl.tokenizer) as tokenizer:
-            
+
             try:
                 # Tokenize the prompt
                 # Qwen2.5-VL supports much longer sequences than CLIP
@@ -49,30 +49,30 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
                     truncation=True,
                     return_tensors="pt",
                 )
-                
+
                 # Encode the text (text_encoder is already on the correct device)
                 text_embeddings = text_encoder(text_inputs.input_ids.to(text_encoder.device))[0]
-                
+
                 # Create a simple conditioning info that stores the embeddings
                 # For now, we'll create a simple class to hold the data
                 class QwenImageConditioningInfo:
                     def __init__(self, text_embeds: torch.Tensor, prompt: str):
                         self.text_embeds = text_embeds
                         self.prompt = prompt
-                
+
                 conditioning_info = QwenImageConditioningInfo(text_embeddings, self.prompt)
                 conditioning_data = ConditioningFieldData(conditionings=[conditioning_info])
-                
+
                 conditioning_name = context.conditioning.save(conditioning_data)
                 return QwenImageConditioningOutput.build(conditioning_name)
-                
+
             except Exception as e:
                 context.logger.error(f"Error encoding Qwen-Image text: {e}")
                 # Fallback to simple text storage
                 class QwenImageConditioningInfo:
                     def __init__(self, prompt: str):
                         self.prompt = prompt
-                
+
                 conditioning_info = QwenImageConditioningInfo(self.prompt)
                 conditioning_data = ConditioningFieldData(conditionings=[conditioning_info])
                 conditioning_name = context.conditioning.save(conditioning_data)
