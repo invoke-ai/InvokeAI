@@ -11820,6 +11820,11 @@ export type components = {
              * @default null
              */
             ui_model_variant: (components["schemas"]["ClipVariantType"] | components["schemas"]["ModelVariantType"])[] | null;
+            /**
+             * Ui Model Format
+             * @default null
+             */
+            ui_model_format: components["schemas"]["ModelFormat"][] | null;
         };
         /**
          * InstallStatus
@@ -17736,7 +17741,6 @@ export type components = {
             field_kind: components["schemas"]["FieldKind"];
             /** Ui Hidden */
             ui_hidden: boolean;
-            ui_type: components["schemas"]["UIType"] | null;
             /** Ui Order */
             ui_order: number | null;
         };
