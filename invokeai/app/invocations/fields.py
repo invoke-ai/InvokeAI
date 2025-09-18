@@ -46,38 +46,6 @@ class UIType(str, Enum, metaclass=MetaEnum):
     used, and the type will be ignored. They are included here for backwards compatibility.
     """
 
-    # region Quasi-deprecated Model Field Types - use ui_model_[base|type|variant] instead
-    MainModel = "MainModelField"
-    CogView4MainModel = "CogView4MainModelField"
-    FluxMainModel = "FluxMainModelField"
-    SD3MainModel = "SD3MainModelField"
-    SDXLMainModel = "SDXLMainModelField"
-    SDXLRefinerModel = "SDXLRefinerModelField"
-    ONNXModel = "ONNXModelField"
-    VAEModel = "VAEModelField"
-    FluxVAEModel = "FluxVAEModelField"
-    LoRAModel = "LoRAModelField"
-    ControlNetModel = "ControlNetModelField"
-    IPAdapterModel = "IPAdapterModelField"
-    T2IAdapterModel = "T2IAdapterModelField"
-    T5EncoderModel = "T5EncoderModelField"
-    CLIPEmbedModel = "CLIPEmbedModelField"
-    CLIPLEmbedModel = "CLIPLEmbedModelField"
-    CLIPGEmbedModel = "CLIPGEmbedModelField"
-    SpandrelImageToImageModel = "SpandrelImageToImageModelField"
-    ControlLoRAModel = "ControlLoRAModelField"
-    SigLipModel = "SigLipModelField"
-    FluxReduxModel = "FluxReduxModelField"
-    LlavaOnevisionModel = "LLaVAModelField"
-    Imagen3Model = "Imagen3ModelField"
-    Imagen4Model = "Imagen4ModelField"
-    ChatGPT4oModel = "ChatGPT4oModelField"
-    Gemini2_5Model = "Gemini2_5ModelField"
-    FluxKontextModel = "FluxKontextModelField"
-    Veo3Model = "Veo3ModelField"
-    RunwayModel = "RunwayModelField"
-    # endregion
-
     # region Misc Field Types
     Scheduler = "SchedulerField"
     Any = "AnyField"
@@ -129,6 +97,38 @@ class UIType(str, Enum, metaclass=MetaEnum):
     MetadataItemCollection = "DEPRECATED_MetadataItemCollection"
     MetadataItemPolymorphic = "DEPRECATED_MetadataItemPolymorphic"
     MetadataDict = "DEPRECATED_MetadataDict"
+
+    # Deprecated Model Field Types - use ui_model_[base|type|variant|format] instead
+    MainModel = "DEPRECATED_MainModelField"
+    CogView4MainModel = "DEPRECATED_CogView4MainModelField"
+    FluxMainModel = "DEPRECATED_FluxMainModelField"
+    SD3MainModel = "DEPRECATED_SD3MainModelField"
+    SDXLMainModel = "DEPRECATED_SDXLMainModelField"
+    SDXLRefinerModel = "DEPRECATED_SDXLRefinerModelField"
+    ONNXModel = "DEPRECATED_ONNXModelField"
+    VAEModel = "DEPRECATED_VAEModelField"
+    FluxVAEModel = "DEPRECATED_FluxVAEModelField"
+    LoRAModel = "DEPRECATED_LoRAModelField"
+    ControlNetModel = "DEPRECATED_ControlNetModelField"
+    IPAdapterModel = "DEPRECATED_IPAdapterModelField"
+    T2IAdapterModel = "DEPRECATED_T2IAdapterModelField"
+    T5EncoderModel = "DEPRECATED_T5EncoderModelField"
+    CLIPEmbedModel = "DEPRECATED_CLIPEmbedModelField"
+    CLIPLEmbedModel = "DEPRECATED_CLIPLEmbedModelField"
+    CLIPGEmbedModel = "DEPRECATED_CLIPGEmbedModelField"
+    SpandrelImageToImageModel = "DEPRECATED_SpandrelImageToImageModelField"
+    ControlLoRAModel = "DEPRECATED_ControlLoRAModelField"
+    SigLipModel = "DEPRECATED_SigLipModelField"
+    FluxReduxModel = "DEPRECATED_FluxReduxModelField"
+    LlavaOnevisionModel = "DEPRECATED_LLaVAModelField"
+    Imagen3Model = "DEPRECATED_Imagen3ModelField"
+    Imagen4Model = "DEPRECATED_Imagen4ModelField"
+    ChatGPT4oModel = "DEPRECATED_ChatGPT4oModelField"
+    Gemini2_5Model = "DEPRECATED_Gemini2_5ModelField"
+    FluxKontextModel = "DEPRECATED_FluxKontextModelField"
+    Veo3Model = "DEPRECATED_Veo3ModelField"
+    RunwayModel = "DEPRECATED_RunwayModelField"
+    # endregion
 
 
 class UIComponent(str, Enum, metaclass=MetaEnum):
@@ -581,8 +581,8 @@ def InputField(
             or ui_model_variant is not None
             or ui_model_format is not None
         ):
-            logger.warning("InputField: Use either ui_type or ui_model_[base|type|variant]. Ignoring ui_type.")
-        # Map old-style UIType to new-style ui_model_[base|type|variant]
+            logger.warning("InputField: Use either ui_type or ui_model_[base|type|variant|format]. Ignoring ui_type.")
+        # Map old-style UIType to new-style ui_model_[base|type|variant|format]
         elif ui_type is UIType.MainModel:
             json_schema_extra_.ui_model_type = [ModelType.Main]
         elif ui_type is UIType.CogView4MainModel:
@@ -790,25 +790,20 @@ def OutputField(
     """
     Creates an output field for an invocation output.
 
-    This is a wrapper for Pydantic's [Field](https://docs.pydantic.dev/1.10/usage/schema/#field-customization) \
+    This is a wrapper for Pydantic's [Field](https://docs.pydantic.dev/1.10/usage/schema/#field-customization)
     that adds a few extra parameters to support graph execution and the node editor UI.
 
-    :param UIType ui_type: [None] DEPRECATED Optionally provides an extra type hint for the UI. \
-      In some situations, the field's type is not enough to infer the correct UI type. \
-      For example, model selection fields should render a dropdown UI component to select a model. \
-      Internally, there is no difference between SD-1, SD-2 and SDXL model fields, they all use \
-      `MainModelField`. So to ensure the base-model-specific UI is rendered, you can use \
-      `UIType.SDXLMainModelField` to indicate that the field is an SDXL main model field.
+    Args:
+        ui_type: **DEPRECATED** Optionally provides an extra type hint for the UI. This parameter is no longer used.
 
-    :param bool ui_hidden: [False] Specifies whether or not this field should be hidden in the UI. \
+        ui_hidden: Specifies whether or not this field should be hidden in the UI.
 
-    :param int ui_order: [None] Specifies the order in which this field should be rendered in the UI. \
+        ui_order: Specifies the order in which this field should be rendered in the UI. If omitted, the field will be
+        rendered after all fields with an explicit order, in the order they are defined in the Invocation class.
     """
 
     if ui_type is not None:
-        logger.warning(
-            "OutputField: 'ui_type' is deprecated. Use 'ui_model_[base|type|variant]' in InputField instead."
-        )
+        logger.warning("OutputField: 'ui_type' is deprecated.")
 
     return Field(
         default=default,
