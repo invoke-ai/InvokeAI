@@ -89,6 +89,7 @@ export const zBaseModelType = z.enum([
   'gemini-2.5',
   'veo3',
   'runway',
+  'unknown',
 ]);
 export type BaseModelType = z.infer<typeof zBaseModelType>;
 export const zMainModelBase = z.enum([

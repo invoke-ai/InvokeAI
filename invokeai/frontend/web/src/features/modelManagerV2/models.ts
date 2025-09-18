@@ -148,6 +148,7 @@ export const MODEL_BASE_TO_COLOR: Record<BaseModelType, string> = {
   'gemini-2.5': 'pink',
   veo3: 'purple',
   runway: 'green',
+  unknown: 'red',
 };
 
 /**
@@ -169,6 +170,7 @@ export const MODEL_BASE_TO_LONG_NAME: Record<BaseModelType, string> = {
   'gemini-2.5': 'Gemini 2.5',
   veo3: 'Veo3',
   runway: 'Runway',
+  unknown: 'Unknown',
 };
 
 /**
@@ -190,6 +192,7 @@ export const MODEL_BASE_TO_SHORT_NAME: Record<BaseModelType, string> = {
   'gemini-2.5': 'Gemini 2.5',
   veo3: 'Veo3',
   runway: 'Runway',
+  unknown: 'Unknown',
 };
 
 /**
