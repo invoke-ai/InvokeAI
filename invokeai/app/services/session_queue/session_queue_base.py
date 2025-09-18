@@ -20,7 +20,9 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueCountsByDestination,
     SessionQueueItem,
     SessionQueueStatus,
+    QUEUE_ITEM_STATUS,
 )
+from invokeai.app.services.shared.pagination import CursorPaginatedResults
 from invokeai.app.services.shared.graph import GraphExecutionState
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
@@ -133,6 +135,19 @@ class SessionQueueBase(ABC):
     @abstractmethod
     def delete_all_except_current(self, queue_id: str) -> DeleteAllExceptCurrentResult:
         """Deletes all queue items except in-progress items"""
+        pass
+
+    @abstractmethod
+    def list_queue_items(
+        self,
+        queue_id: str,
+        limit: int,
+        priority: int,
+        cursor: Optional[int] = None,
+        status: Optional[QUEUE_ITEM_STATUS] = None,
+        destination: Optional[str] = None,
+    ) -> CursorPaginatedResults[SessionQueueItem]:
+        """Gets a page of session queue items. Do not remove."""
         pass
 
     @abstractmethod
