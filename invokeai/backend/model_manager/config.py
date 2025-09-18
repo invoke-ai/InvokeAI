@@ -137,7 +137,7 @@ class ModelConfigBase(ABC, BaseModel):
 
     @staticmethod
     def json_schema_extra(schema: dict[str, Any]) -> None:
-        schema["required"].extend(["key", "type", "format"])
+        schema["required"].extend(["key", "base", "type", "format"])
 
     model_config = ConfigDict(validate_assignment=True, json_schema_extra=json_schema_extra)
 
@@ -172,7 +172,8 @@ class ModelConfigBase(ABC, BaseModel):
         super().__init_subclass__(**kwargs)
         if issubclass(cls, LegacyProbeMixin):
             ModelConfigBase.USING_LEGACY_PROBE.add(cls)
-        elif cls is not UnknownModelConfig:
+        # Cannot use `elif isinstance(cls, UnknownModelConfig)` because UnknownModelConfig is not defined yet
+        elif cls.__name__ != "UnknownModelConfig":
             ModelConfigBase.USING_CLASSIFY_API.add(cls)
 
     @staticmethod
@@ -274,16 +275,17 @@ class ModelConfigBase(ABC, BaseModel):
 
 
 class UnknownModelConfig(ModelConfigBase):
+    base: Literal[BaseModelType.Any] = BaseModelType.Any
     type: Literal[ModelType.Unknown] = ModelType.Unknown
     format: Literal[ModelFormat.Unknown] = ModelFormat.Unknown
 
     @classmethod
-    def matches(cls, *args, **kwargs) -> bool:
-        raise NotImplementedError("UnknownModelConfig cannot match anything")
+    def matches(cls, mod: ModelOnDisk) -> bool:
+        return False
 
     @classmethod
-    def parse(cls, *args, **kwargs) -> dict[str, Any]:
-        raise NotImplementedError("UnknownModelConfig cannot parse anything")
+    def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
+        return {}
 
 
 class CheckpointConfigBase(ABC, BaseModel):

@@ -25,14 +25,14 @@ import {
 import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import {
   API_BASE_MODELS,
-  CLIP_SKIP_MAP,
   SUPPORTS_ASPECT_RATIO_BASE_MODELS,
   SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS,
   SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS,
   SUPPORTS_PIXEL_DIMENSIONS_BASE_MODELS,
   SUPPORTS_REF_IMAGES_BASE_MODELS,
   SUPPORTS_SEED_BASE_MODELS,
-} from 'features/parameters/types/constants';
+} from 'features/modelManagerV2/models';
+import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import type {
   ParameterCanvasCoherenceMode,
   ParameterCFGRescaleMultiplier,

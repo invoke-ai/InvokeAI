@@ -19,6 +19,7 @@ const FORMAT_NAME_MAP: Record<AnyModelConfig['format'], string> = {
   gguf_quantized: 'gguf',
   api: 'api',
   omi: 'omi',
+  unknown: 'unknown',
 };
 
 const FORMAT_COLOR_MAP: Record<AnyModelConfig['format'], string> = {
@@ -34,6 +35,7 @@ const FORMAT_COLOR_MAP: Record<AnyModelConfig['format'], string> = {
   bnb_quantized_nf4b: 'base',
   gguf_quantized: 'base',
   api: 'base',
+  unknown: 'red',
 };
 
 const ModelFormatBadge = ({ format }: Props) => {

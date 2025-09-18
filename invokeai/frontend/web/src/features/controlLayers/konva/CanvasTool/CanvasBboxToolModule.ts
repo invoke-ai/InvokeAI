@@ -13,8 +13,8 @@ import { selectBboxOverlay } from 'features/controlLayers/store/canvasSettingsSl
 import { selectModel } from 'features/controlLayers/store/paramsSlice';
 import { selectBbox } from 'features/controlLayers/store/selectors';
 import type { Coordinate, Rect, Tool } from 'features/controlLayers/store/types';
+import { API_BASE_MODELS } from 'features/modelManagerV2/models';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
-import { API_BASE_MODELS } from 'features/parameters/types/constants';
 import Konva from 'konva';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
