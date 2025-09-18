@@ -18,83 +18,116 @@ import {
   isTIModelConfig,
   isUnknownModelConfig,
   isVAEModelConfig,
+  isVideoModelConfig,
 } from 'services/api/types';
+import { objectEntries } from 'tsafe';
 
-type ModelCategoryData = {
+import type { FilterableModelType } from './store/modelManagerV2Slice';
+
+export type ModelCategoryData = {
+  category: FilterableModelType;
   i18nKey: string;
   filter: (config: AnyModelConfig) => boolean;
 };
 
-export const MODEL_CATEGORIES: Record<string, ModelCategoryData> = {
+export const MODEL_CATEGORIES: Record<FilterableModelType, ModelCategoryData> = {
+  unknown: {
+    category: 'unknown',
+    i18nKey: 'common.unknown',
+    filter: isUnknownModelConfig,
+  },
   main: {
-    i18nKey: 'model_manager.category.main_models',
+    category: 'main',
+    i18nKey: 'modelManager.main',
     filter: isNonRefinerMainModelConfig,
   },
   refiner: {
-    i18nKey: 'model_manager.category.refiner_models',
+    category: 'refiner',
+    i18nKey: 'sdxl.refiner',
     filter: isRefinerMainModelModelConfig,
   },
   lora: {
-    i18nKey: 'model_manager.category.lora_models',
+    category: 'lora',
+    i18nKey: 'modelManager.loraModels',
     filter: isLoRAModelConfig,
   },
   embedding: {
-    i18nKey: 'model_manager.category.embedding_models',
+    category: 'embedding',
+    i18nKey: 'modelManager.textualInversions',
     filter: isTIModelConfig,
   },
   controlnet: {
-    i18nKey: 'model_manager.category.controlnet_models',
+    category: 'controlnet',
+    i18nKey: 'ControlNet',
     filter: isControlNetModelConfig,
   },
   t2i_adapter: {
-    i18nKey: 'model_manager.category.t2i_adapter_models',
+    category: 't2i_adapter',
+    i18nKey: 'common.t2iAdapter',
     filter: isT2IAdapterModelConfig,
   },
   t5_encoder: {
-    i18nKey: 'model_manager.category.t5_encoder_models',
+    category: 't5_encoder',
+    i18nKey: 'modelManager.t5Encoder',
     filter: isT5EncoderModelConfig,
   },
   control_lora: {
-    i18nKey: 'model_manager.category.control_lora_models',
+    category: 'control_lora',
+    i18nKey: 'modelManager.controlLora',
     filter: isControlLoRAModelConfig,
   },
   clip_embed: {
-    i18nKey: 'model_manager.category.clip_embed_models',
+    category: 'clip_embed',
+    i18nKey: 'modelManager.clipEmbed',
     filter: isCLIPEmbedModelConfig,
   },
-  spandrel: {
-    i18nKey: 'model_manager.category.spandrel_image_to_image_models',
+  spandrel_image_to_image: {
+    category: 'spandrel_image_to_image',
+    i18nKey: 'modelManager.spandrelImageToImage',
     filter: isSpandrelImageToImageModelConfig,
   },
   ip_adapter: {
-    i18nKey: 'model_manager.category.ip_adapter_models',
+    category: 'ip_adapter',
+    i18nKey: 'common.ipAdapter',
     filter: isIPAdapterModelConfig,
   },
   vae: {
-    i18nKey: 'model_manager.category.vae_models',
+    category: 'vae',
+    i18nKey: 'VAE',
     filter: isVAEModelConfig,
   },
   clip_vision: {
-    i18nKey: 'model_manager.category.clip_vision_models',
+    category: 'clip_vision',
+    i18nKey: 'CLIP Vision',
     filter: isCLIPVisionModelConfig,
   },
   siglip: {
-    i18nKey: 'model_manager.category.siglip_models',
+    category: 'siglip',
+    i18nKey: 'modelManager.sigLip',
     filter: isSigLipModelConfig,
   },
   flux_redux: {
-    i18nKey: 'model_manager.category.flux_redux_models',
+    category: 'flux_redux',
+    i18nKey: 'modelManager.fluxRedux',
     filter: isFluxReduxModelConfig,
   },
-  llava_one_vision: {
-    i18nKey: 'model_manager.category.llava_one_vision_models',
+  llava_onevision: {
+    category: 'llava_onevision',
+    i18nKey: 'modelManager.llavaOnevision',
     filter: isLLaVAModelConfig,
   },
-  unknown: {
-    i18nKey: 'model_manager.category.unknown_models',
-    filter: isUnknownModelConfig,
+  video: {
+    category: 'video',
+    i18nKey: 'Video',
+    filter: isVideoModelConfig,
   },
 };
+
+export const MODEL_CATEGORIES_AS_LIST = objectEntries(MODEL_CATEGORIES).map(([category, { i18nKey, filter }]) => ({
+  category,
+  i18nKey,
+  filter,
+}));
 
 /**
  * Mapping of model base to its color
