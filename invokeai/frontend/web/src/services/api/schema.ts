@@ -5580,7 +5580,7 @@ export type components = {
             repo_variant?: components["schemas"]["ModelRepoVariant"] | null;
         };
         /**
-         * ControlNet - SD1.5, SDXL
+         * ControlNet - SD1.5, SD2, SDXL
          * @description Collects ControlNet info to pass to other nodes
          */
         ControlNetInvocation: {
@@ -15183,7 +15183,7 @@ export type components = {
             guidance?: number | null;
         };
         /**
-         * Main Model - SD1.5
+         * Main Model - SD1.5, SD2
          * @description Loads a main model, outputting its submodels.
          */
         MainModelLoaderInvocation: {
@@ -22203,7 +22203,7 @@ export type components = {
             seamless_axes?: string[];
         };
         /**
-         * VAE Model - SD1.5, SDXL, SD3, FLUX
+         * VAE Model - SD1.5, SD2, SDXL, SD3, FLUX
          * @description Loads a VAE model, outputting a VaeLoaderOutput
          */
         VAELoaderInvocation: {
