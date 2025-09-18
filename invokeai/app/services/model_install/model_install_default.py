@@ -180,28 +180,27 @@ class ModelInstallService(ModelInstallServiceBase):
         self,
         model_path: Union[Path, str],
         config: Optional[ModelRecordChanges] = None,
-    ) -> str:  # noqa D102
+    ) -> str:
         model_path = Path(model_path)
         config = config or ModelRecordChanges()
         info: AnyModelConfig = self._probe(Path(model_path), config)  # type: ignore
 
-        if preferred_name := config.name:
-            if Path(model_path).is_file():
-                # Careful! Don't use pathlib.Path(...).with_suffix - it can will strip everything after the first dot.
-                preferred_name = f"{preferred_name}{model_path.suffix}"
-
-        dest_path = (
-            self.app_config.models_path / info.base.value / info.type.value / (preferred_name or model_path.name)
-        )
+        dest_dir = self.app_config.models_path / info.key
         try:
-            new_path = self._move_model(model_path, dest_path)
+            dest_dir.mkdir(parents=True)
+            dest_path = dest_dir / model_path.name if model_path.is_file() else dest_dir
+            if dest_path.exists():
+                raise FileExistsError(
+                    f"Cannot install model {model_path.name} to {dest_path}: destination already exists"
+                )
+            move(model_path, dest_path)
         except FileExistsError as excp:
             raise DuplicateModelException(
-                f"A model named {model_path.name} is already installed at {dest_path.as_posix()}"
+                f"A model named {model_path.name} is already installed at {dest_dir.as_posix()}"
             ) from excp
 
         return self._register(
-            new_path,
+            dest_path,
             config,
             info,
         )
@@ -588,49 +587,6 @@ class ModelInstallService(ModelInstallServiceBase):
         search = ModelSearch(on_model_found=on_model_found)
         found_models = search.search(self._app_config.models_path)
         self._logger.info(f"{len(found_models)} new models registered")
-
-    def sync_model_path(self, key: str) -> AnyModelConfig:
-        """
-        Move model into the location indicated by its basetype, type and name.
-
-        Call this after updating a model's attributes in order to move
-        the model's path into the location indicated by its basetype, type and
-        name. Applies only to models whose paths are within the root `models_dir`
-        directory.
-
-        May raise an UnknownModelException.
-        """
-        model = self.record_store.get_model(key)
-        models_dir = self.app_config.models_path
-        old_path = self.app_config.models_path / model.path
-
-        if not old_path.is_relative_to(models_dir):
-            # The model is not in the models directory - we don't need to move it.
-            return model
-
-        new_path = models_dir / model.base.value / model.type.value / old_path.name
-
-        if old_path == new_path or new_path.exists() and old_path == new_path.resolve():
-            return model
-
-        self._logger.info(f"Moving {model.name} to {new_path}.")
-        new_path = self._move_model(old_path, new_path)
-        model.path = new_path.relative_to(models_dir).as_posix()
-        self.record_store.update_model(key, ModelRecordChanges(path=model.path))
-        return model
-
-    def _move_model(self, old_path: Path, new_path: Path) -> Path:
-        if old_path == new_path:
-            return old_path
-
-        if new_path.exists():
-            raise FileExistsError(f"Cannot move {old_path} to {new_path}: destination already exists")
-
-        new_path.parent.mkdir(parents=True, exist_ok=True)
-
-        move(old_path, new_path)
-
-        return new_path
 
     def _probe(self, model_path: Path, config: Optional[ModelRecordChanges] = None):
         config = config or ModelRecordChanges()

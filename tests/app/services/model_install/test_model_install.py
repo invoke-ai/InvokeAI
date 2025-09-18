@@ -107,8 +107,7 @@ def test_rename(
     key = mm2_installer.install_path(embedding_file)
     model_record = store.get_model(key)
     assert model_record.path.endswith("sd-1/embedding/test_embedding.safetensors")
-    store.update_model(key, ModelRecordChanges(name="new model name", base=BaseModelType("sd-2")))
-    new_model_record = mm2_installer.sync_model_path(key)
+    new_model_record = store.update_model(key, ModelRecordChanges(name="new model name", base=BaseModelType("sd-2")))
     # Renaming the model record shouldn't rename the file
     assert new_model_record.name == "new model name"
     assert new_model_record.path.endswith("sd-2/embedding/test_embedding.safetensors")

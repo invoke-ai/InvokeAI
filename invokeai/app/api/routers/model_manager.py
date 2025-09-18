@@ -297,10 +297,8 @@ async def update_model_record(
     """Update a model's config."""
     logger = ApiDependencies.invoker.services.logger
     record_store = ApiDependencies.invoker.services.model_manager.store
-    installer = ApiDependencies.invoker.services.model_manager.install
     try:
-        record_store.update_model(key, changes=changes)
-        config = installer.sync_model_path(key)
+        config = record_store.update_model(key, changes=changes)
         config = add_cover_image_to_model_config(config, ApiDependencies)
         logger.info(f"Updated model: {key}")
     except UnknownModelException as e:
