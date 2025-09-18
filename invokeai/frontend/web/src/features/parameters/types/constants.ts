@@ -1,5 +1,5 @@
 import type { ComboboxOption } from '@invoke-ai/ui-library';
-import type { BaseModelType } from 'services/api/types';
+import type { BaseModelType } from 'features/nodes/types/common';
 
 /**
  * Mapping of base model to CLIP skip parameter constraints

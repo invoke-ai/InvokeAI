@@ -130,7 +130,7 @@ export const zModelType = z.enum([
   'unknown',
 ]);
 export type ModelType = z.infer<typeof zModelType>;
-const zSubModelType = z.enum([
+export const zSubModelType = z.enum([
   'unet',
   'transformer',
   'text_encoder',

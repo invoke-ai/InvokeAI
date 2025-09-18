@@ -105,16 +105,9 @@ export const isVideoDTO = (dto: ImageDTO | VideoDTO): dto is VideoDTO => {
   return 'video_id' in dto;
 };
 
-// Models
-export type ModelType = S['ModelType'];
-export type BaseModelType = S['BaseModelType'];
-
 // Model Configs
-
 export type ControlLoRAModelConfig = S['ControlLoRALyCORISConfig'] | S['ControlLoRADiffusersConfig'];
-// TODO(MM2): Can we make key required in the pydantic model?
 export type LoRAModelConfig = S['LoRADiffusersConfig'] | S['LoRALyCORISConfig'] | S['LoRAOmiConfig'];
-// TODO(MM2): Can we rename this from Vae -> VAE
 export type VAEModelConfig = S['VAECheckpointConfig'] | S['VAEDiffusersConfig'];
 export type ControlNetModelConfig = S['ControlNetDiffusersConfig'] | S['ControlNetCheckpointConfig'];
 export type IPAdapterModelConfig = S['IPAdapterInvokeAIConfig'] | S['IPAdapterCheckpointConfig'];
