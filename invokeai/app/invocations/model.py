@@ -145,7 +145,7 @@ class ModelIdentifierInvocation(BaseInvocation):
 
 @invocation(
     "main_model_loader",
-    title="Main Model - SD1.5",
+    title="Main Model - SD1.5, SD2",
     tags=["model"],
     category="model",
     version="1.0.4",
@@ -155,7 +155,7 @@ class MainModelLoaderInvocation(BaseInvocation):
 
     model: ModelIdentifierField = InputField(
         description=FieldDescriptions.main_model,
-        ui_model_base=BaseModelType.StableDiffusion1,
+        ui_model_base=[BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2],
         ui_model_type=ModelType.Main,
     )
     # TODO: precision?
@@ -485,7 +485,11 @@ class SDXLLoRACollectionLoader(BaseInvocation):
 
 
 @invocation(
-    "vae_loader", title="VAE Model - SD1.5, SDXL, SD3, FLUX", tags=["vae", "model"], category="model", version="1.0.4"
+    "vae_loader",
+    title="VAE Model - SD1.5, SD2, SDXL, SD3, FLUX",
+    tags=["vae", "model"],
+    category="model",
+    version="1.0.4",
 )
 class VAELoaderInvocation(BaseInvocation):
     """Loads a VAE model, outputting a VaeLoaderOutput"""
@@ -495,6 +499,7 @@ class VAELoaderInvocation(BaseInvocation):
         title="VAE",
         ui_model_base=[
             BaseModelType.StableDiffusion1,
+            BaseModelType.StableDiffusion2,
             BaseModelType.StableDiffusionXL,
             BaseModelType.StableDiffusion3,
             BaseModelType.Flux,
