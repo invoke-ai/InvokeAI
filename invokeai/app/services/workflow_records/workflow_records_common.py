@@ -5,6 +5,7 @@ from typing import Any, Optional, Union
 import semver
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, TypeAdapter, field_validator
 
+from invokeai.app.services.shared.field_identifier import FieldIdentifier
 from invokeai.app.util.metaenum import MetaEnum
 
 __workflow_meta_version__ = semver.Version.parse("1.0.0")
@@ -59,6 +60,10 @@ class WorkflowWithoutID(BaseModel):
     tags: str = Field(description="The tags of the workflow.")
     notes: str = Field(description="The notes of the workflow.")
     exposedFields: list[ExposedField] = Field(description="The exposed fields of the workflow.")
+    output_fields: list[FieldIdentifier] | None = Field(
+        default=None,
+        description="The fields designated as output fields for the workflow.",
+    )
     meta: WorkflowMeta = Field(description="The meta of the workflow.")
     # TODO(psyche): nodes, edges and form are very loosely typed - they are strictly modeled and checked on the frontend.
     nodes: list[dict[str, JsonValue]] = Field(description="The nodes of the workflow.")

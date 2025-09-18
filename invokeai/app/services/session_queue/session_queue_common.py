@@ -17,6 +17,7 @@ from pydantic_core import to_jsonable_python
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation
 from invokeai.app.invocations.fields import ImageField
+from invokeai.app.services.shared.field_identifier import FieldIdentifier
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState, NodeNotFoundError
 from invokeai.app.services.workflow_records.workflow_records_common import (
     WorkflowWithoutID,
@@ -207,13 +208,6 @@ def get_workflow(queue_item_dict: dict) -> Optional[WorkflowWithoutID]:
         workflow = WorkflowWithoutIDValidator.validate_json(workflow_raw, strict=False)
         return workflow
     return None
-
-
-class FieldIdentifier(BaseModel):
-    kind: Literal["input", "output"] = Field(description="The kind of field")
-    node_id: str = Field(description="The ID of the node")
-    field_name: str = Field(description="The name of the field")
-    user_label: str | None = Field(description="The user label of the field, if any")
 
 
 class SessionQueueItem(BaseModel):

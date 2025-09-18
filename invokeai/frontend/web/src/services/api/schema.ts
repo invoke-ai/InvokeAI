@@ -22572,6 +22572,11 @@ export type components = {
              * @description The exposed fields of the workflow.
              */
             exposedFields: components["schemas"]["ExposedField"][];
+            /**
+             * Output Fields
+             * @description The fields designated as output fields for the workflow.
+             */
+            output_fields?: components["schemas"]["FieldIdentifier"][] | null;
             /** @description The meta of the workflow. */
             meta: components["schemas"]["WorkflowMeta"];
             /**
@@ -22807,6 +22812,11 @@ export type components = {
              * @description The exposed fields of the workflow.
              */
             exposedFields: components["schemas"]["ExposedField"][];
+            /**
+             * Output Fields
+             * @description The fields designated as output fields for the workflow.
+             */
+            output_fields?: components["schemas"]["FieldIdentifier"][] | null;
             /** @description The meta of the workflow. */
             meta: components["schemas"]["WorkflowMeta"];
             /**
