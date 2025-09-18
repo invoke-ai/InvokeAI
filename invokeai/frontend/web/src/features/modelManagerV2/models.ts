@@ -1,4 +1,4 @@
-import type { BaseModelType } from 'features/nodes/types/common';
+import type { BaseModelType, ModelType, ModelVariantType } from 'features/nodes/types/common';
 import type { AnyModelConfig } from 'services/api/types';
 import {
   isCLIPEmbedModelConfig,
@@ -152,6 +152,30 @@ export const MODEL_BASE_TO_COLOR: Record<BaseModelType, string> = {
 };
 
 /**
+ * Mapping of model type to human readable name
+ */
+export const MODEL_TYPE_TO_LONG_NAME: Record<ModelType, string> = {
+  main: 'Main',
+  vae: 'VAE',
+  lora: 'LoRA',
+  llava_onevision: 'LLaVA OneVision',
+  control_lora: 'ControlLoRA',
+  controlnet: 'ControlNet',
+  t2i_adapter: 'T2I Adapter',
+  ip_adapter: 'IP Adapter',
+  embedding: 'Embedding',
+  onnx: 'ONNX',
+  clip_vision: 'CLIP Vision',
+  spandrel_image_to_image: 'Spandrel (Image to Image)',
+  t5_encoder: 'T5 Encoder',
+  clip_embed: 'CLIP Embed',
+  siglip: 'SigLIP',
+  flux_redux: 'FLUX Redux',
+  video: 'Video',
+  unknown: 'Unknown',
+};
+
+/**
  * Mapping of model base to human readable name
  */
 export const MODEL_BASE_TO_LONG_NAME: Record<BaseModelType, string> = {
@@ -193,6 +217,12 @@ export const MODEL_BASE_TO_SHORT_NAME: Record<BaseModelType, string> = {
   veo3: 'Veo3',
   runway: 'Runway',
   unknown: 'Unknown',
+};
+
+export const MODEL_VARIANT_TO_LONG_NAME: Record<ModelVariantType, string> = {
+  normal: 'Normal',
+  inpaint: 'Inpaint',
+  depth: 'Depth',
 };
 
 /**

@@ -129,6 +129,7 @@ export const zModelType = z.enum([
   'video',
   'unknown',
 ]);
+export type ModelType = z.infer<typeof zModelType>;
 const zSubModelType = z.enum([
   'unet',
   'transformer',
@@ -148,6 +149,7 @@ export type SubModelType = z.infer<typeof zSubModelType>;
 
 export const zClipVariantType = z.enum(['large', 'gigantic']);
 export const zModelVariantType = z.enum(['normal', 'inpaint', 'depth']);
+export type ModelVariantType = z.infer<typeof zModelVariantType>;
 export const zModelFormat = z.enum([
   'omi',
   'diffusers',
