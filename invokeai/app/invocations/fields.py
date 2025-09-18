@@ -7,7 +7,13 @@ from pydantic_core import PydanticUndefined
 
 from invokeai.app.util.metaenum import MetaEnum
 from invokeai.backend.image_util.segment_anything.shared import BoundingBox
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ClipVariantType, ModelType, ModelVariantType
+from invokeai.backend.model_manager.taxonomy import (
+    BaseModelType,
+    ClipVariantType,
+    ModelFormat,
+    ModelType,
+    ModelVariantType,
+)
 from invokeai.backend.util.logging import InvokeAILogger
 
 logger = InvokeAILogger.get_logger()
@@ -413,6 +419,7 @@ class InputFieldJSONSchemaExtra(BaseModel):
     ui_model_base: Optional[list[BaseModelType]] = None
     ui_model_type: Optional[list[ModelType]] = None
     ui_model_variant: Optional[list[ClipVariantType | ModelVariantType]] = None
+    ui_model_format: Optional[list[ModelFormat]] = None
 
     model_config = ConfigDict(
         validate_assignment=True,
@@ -508,6 +515,7 @@ def InputField(
     ui_model_base: Optional[BaseModelType | list[BaseModelType]] = None,
     ui_model_type: Optional[ModelType | list[ModelType]] = None,
     ui_model_variant: Optional[ClipVariantType | ModelVariantType | list[ClipVariantType | ModelVariantType]] = None,
+    ui_model_format: Optional[ModelFormat | list[ModelFormat]] = None,
 ) -> Any:
     """
     Creates an input field for an invocation.
@@ -545,8 +553,13 @@ def InputField(
     )
 
     if ui_type is not None:
-        if ui_model_base is not None or ui_model_type is not None or ui_model_variant is not None:
-            logger.warning("Use either ui_type or ui_model_[base|type|variant]. Ignoring ui_type.")
+        if (
+            ui_model_base is not None
+            or ui_model_type is not None
+            or ui_model_variant is not None
+            or ui_model_format is not None
+        ):
+            logger.warning("InputField: Use either ui_type or ui_model_[base|type|variant]. Ignoring ui_type.")
         # Map old-style UIType to new-style ui_model_[base|type|variant]
         elif ui_type is UIType.MainModel:
             json_schema_extra_.ui_model_type = [ModelType.Main]
@@ -649,6 +662,11 @@ def InputField(
             json_schema_extra_.ui_model_variant = ui_model_variant
         else:
             json_schema_extra_.ui_model_variant = [ui_model_variant]
+    if ui_model_format is not None:
+        if isinstance(ui_model_format, list):
+            json_schema_extra_.ui_model_format = ui_model_format
+        else:
+            json_schema_extra_.ui_model_format = [ui_model_format]
 
     """
     There is a conflict between the typing of invocation definitions and the typing of an invocation's
