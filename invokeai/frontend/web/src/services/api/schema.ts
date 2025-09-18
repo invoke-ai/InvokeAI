@@ -2467,7 +2467,7 @@ export type components = {
          * @description Base model type.
          * @enum {string}
          */
-        BaseModelType: "any" | "sd-1" | "sd-2" | "sd-3" | "sdxl" | "sdxl-refiner" | "flux" | "cogview4" | "imagen3" | "imagen4" | "gemini-2.5" | "chatgpt-4o" | "flux-kontext" | "veo3" | "runway";
+        BaseModelType: "any" | "sd-1" | "sd-2" | "sd-3" | "sdxl" | "sdxl-refiner" | "flux" | "cogview4" | "imagen3" | "imagen4" | "gemini-2.5" | "chatgpt-4o" | "flux-kontext" | "veo3" | "runway" | "unknown";
         /** Batch */
         Batch: {
             /**
@@ -21970,10 +21970,10 @@ export type components = {
             format: "unknown";
             /**
              * Base
-             * @default any
+             * @default unknown
              * @constant
              */
-            base: "any";
+            base: "unknown";
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
