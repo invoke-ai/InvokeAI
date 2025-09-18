@@ -60,6 +60,18 @@ export const ToolFillColorPicker = memo(() => {
     [activeColorType, dispatch]
   );
 
+  const handlePopoverClose = useCallback(() => {
+    disclosure.onClose();
+  }, [disclosure]);
+  const handlePinClick = useCallback(() => {
+    if (!isPinned) {
+      dispatch(settingsFillColorPickerPinnedSet(true));
+      disclosure.onClose();
+    } else {
+      dispatch(settingsFillColorPickerPinnedSet(false));
+    }
+  }, [dispatch, disclosure, isPinned]);
+
   // Note: when pinned, the persistent color picker renders in the canvas overlay instead.
 
   useRegisteredHotkeys({
@@ -83,9 +95,7 @@ export const ToolFillColorPicker = memo(() => {
       isLazy
       isOpen={!isPinned && disclosure.isOpen}
       onOpen={disclosure.onOpen}
-      onClose={() => {
-        disclosure.onClose();
-      }}
+      onClose={handlePopoverClose}
       closeOnBlur={true}
       closeOnEsc={true}
       returnFocusOnClose={true}
@@ -123,25 +133,17 @@ export const ToolFillColorPicker = memo(() => {
         </Flex>
       </PopoverTrigger>
       <Portal>
-        <PopoverContent>
+        <PopoverContent minW={96}>
           <PopoverArrow />
           <PopoverBody minH={64}>
             <Flex direction="column" gap={2}>
-              <Flex justifyContent="flex-end">
+              <Flex justifyContent="flex-end" alignItems="center">
                 <IconButton
                   aria-label={isPinned ? 'Unpin color picker' : 'Pin color picker'}
                   tooltip={isPinned ? 'Unpin' : 'Pin'}
                   size="sm"
                   variant={isPinned ? 'solid' : 'ghost'}
-                  onClick={() => {
-                    if (!isPinned) {
-                      // Pin and close the popover; the pinned picker renders in the canvas overlay
-                      dispatch(settingsFillColorPickerPinnedSet(true));
-                      disclosure.onClose();
-                    } else {
-                      dispatch(settingsFillColorPickerPinnedSet(false));
-                    }
-                  }}
+                  onClick={handlePinClick}
                   icon={<PiPushPinBold />}
                 />
               </Flex>

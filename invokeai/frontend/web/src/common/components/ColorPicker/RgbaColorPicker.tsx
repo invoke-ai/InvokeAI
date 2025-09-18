@@ -1,9 +1,9 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
-import { Box, CompositeNumberInput, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { Box, Button, CompositeNumberInput, Flex, FormControl, FormLabel, Input } from '@invoke-ai/ui-library';
 import { RGBA_COLOR_SWATCHES } from 'common/components/ColorPicker/swatches';
-import { rgbaColorToString } from 'common/util/colorCodeTransformers';
-import type { CSSProperties } from 'react';
-import { memo, useCallback } from 'react';
+import { hexToRGBA, rgbaColorToString, rgbaToHex } from 'common/util/colorCodeTransformers';
+import type { ChangeEvent, CSSProperties } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { RgbaColorPicker as ColorfulRgbaColorPicker } from 'react-colorful';
 import type { RgbaColor } from 'react-colorful/dist/types';
 import { useTranslation } from 'react-i18next';
@@ -40,61 +40,133 @@ const RgbaColorPicker = (props: Props) => {
   const handleChangeG = useCallback((g: number) => onChange({ ...color, g }), [color, onChange]);
   const handleChangeB = useCallback((b: number) => onChange({ ...color, b }), [color, onChange]);
   const handleChangeA = useCallback((a: number) => onChange({ ...color, a }), [color, onChange]);
+  const [mode, setMode] = useState<'rgb' | 'hex'>('rgb');
+  const [hex, setHex] = useState<string>(rgbaToHex(color, true));
+  useEffect(() => {
+    setHex(rgbaToHex(color, true));
+  }, [color]);
+  const _setModeRgb = useCallback(() => setMode('rgb'), []);
+  const _setModeHex = useCallback(() => setMode('hex'), []);
+  const onToggleMode = useCallback(() => setMode((m) => (m === 'rgb' ? 'hex' : 'rgb')), []);
+  const onChangeHex = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      let value = e.target.value.trim();
+      if (!value.startsWith('#')) {
+        value = `#${value}`;
+      }
+      const cleaned = value.replace(/[^#0-9a-fA-F]/g, '').slice(0, 9);
+      setHex(cleaned);
+      const hexBody = cleaned.replace('#', '');
+      if (hexBody.length === 6 || hexBody.length === 8) {
+        const a = hexBody.length === 8 ? parseInt(hexBody.slice(6, 8), 16) / 255 : color.a;
+        const next = hexToRGBA(hexBody.slice(0, 6).padEnd(6, '0'), a);
+        onChange(next);
+      }
+    },
+    [color.a, onChange]
+  );
+  const onChangeAlpha = useCallback(
+    (a: number) => {
+      const next = { ...color, a: Math.max(0, Math.min(1, a)) };
+      onChange(next);
+      setHex(rgbaToHex(next, true));
+    },
+    [color, onChange]
+  );
   return (
     <Flex sx={sx}>
       <ColorfulRgbaColorPicker color={color} onChange={onChange} style={colorPickerStyles} />
-      {withNumberInput && (
-        <Flex gap={2}>
-          <FormControl gap={0}>
-            <FormLabel>{t('common.red')[0]}</FormLabel>
-            <CompositeNumberInput
-              value={color.r}
-              onChange={handleChangeR}
-              min={0}
-              max={255}
-              step={1}
-              w={numberInputWidth}
-              defaultValue={90}
-            />
-          </FormControl>
-          <FormControl gap={0}>
-            <FormLabel>{t('common.green')[0]}</FormLabel>
-            <CompositeNumberInput
-              value={color.g}
-              onChange={handleChangeG}
-              min={0}
-              max={255}
-              step={1}
-              w={numberInputWidth}
-              defaultValue={90}
-            />
-          </FormControl>
-          <FormControl gap={0}>
-            <FormLabel>{t('common.blue')[0]}</FormLabel>
-            <CompositeNumberInput
-              value={color.b}
-              onChange={handleChangeB}
-              min={0}
-              max={255}
-              step={1}
-              w={numberInputWidth}
-              defaultValue={255}
-            />
-          </FormControl>
-          <FormControl gap={0}>
-            <FormLabel>{t('common.alpha')[0]}</FormLabel>
-            <CompositeNumberInput
-              value={color.a}
-              onChange={handleChangeA}
-              step={0.1}
-              min={0}
-              max={1}
-              w={numberInputWidth}
-              defaultValue={1}
-            />
-          </FormControl>
-        </Flex>
-      )}
+      {withNumberInput &&
+        (mode === 'rgb' ? (
+          <Flex gap={2} alignItems="end">
+            <Button
+              size="xs"
+              variant="ghost"
+              px={3}
+              minW="unset"
+              h={10}
+              whiteSpace="nowrap"
+              onClick={onToggleMode}
+              aria-label="Toggle RGB/HEX"
+            >
+              RGB
+            </Button>
+            <FormControl gap={0}>
+              <FormLabel>{t('common.red')[0]}</FormLabel>
+              <CompositeNumberInput
+                value={color.r}
+                onChange={handleChangeR}
+                min={0}
+                max={255}
+                step={1}
+                w={numberInputWidth}
+              />
+            </FormControl>
+            <FormControl gap={0}>
+              <FormLabel>{t('common.green')[0]}</FormLabel>
+              <CompositeNumberInput
+                value={color.g}
+                onChange={handleChangeG}
+                min={0}
+                max={255}
+                step={1}
+                w={numberInputWidth}
+              />
+            </FormControl>
+            <FormControl gap={0}>
+              <FormLabel>{t('common.blue')[0]}</FormLabel>
+              <CompositeNumberInput
+                value={color.b}
+                onChange={handleChangeB}
+                min={0}
+                max={255}
+                step={1}
+                w={numberInputWidth}
+              />
+            </FormControl>
+            <FormControl gap={0}>
+              <FormLabel>{t('common.alpha')[0]}</FormLabel>
+              <CompositeNumberInput
+                value={color.a}
+                onChange={handleChangeA}
+                step={0.1}
+                min={0}
+                max={1}
+                w={numberInputWidth}
+              />
+            </FormControl>
+          </Flex>
+        ) : (
+          <Flex gap={2} alignItems="end">
+            <Button
+              size="xs"
+              variant="ghost"
+              px={3}
+              minW="unset"
+              h={10}
+              whiteSpace="nowrap"
+              onClick={onToggleMode}
+              aria-label="Toggle RGB/HEX"
+            >
+              HEX
+            </Button>
+            <FormControl gap={0}>
+              <FormLabel>{t('common.hex', { defaultValue: 'Hex' })}</FormLabel>
+              <Input value={hex} onChange={onChangeHex} placeholder="#RRGGBB or #RRGGBBAA" w="10rem" />
+            </FormControl>
+            <FormControl gap={0}>
+              <FormLabel>{t('common.alpha')[0]}</FormLabel>
+              <CompositeNumberInput
+                value={color.a}
+                onChange={onChangeAlpha}
+                step={0.01}
+                min={0}
+                max={1}
+                w={numberInputWidth}
+              />
+            </FormControl>
+          </Flex>
+        ))}
       {withSwatches && (
         <Flex gap={2} justifyContent="space-between">
           {RGBA_COLOR_SWATCHES.map((color, i) => (

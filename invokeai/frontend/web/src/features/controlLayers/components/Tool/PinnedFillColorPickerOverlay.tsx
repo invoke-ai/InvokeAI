@@ -12,7 +12,7 @@ import {
 import type { RgbaColor } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowsLeftRightBold,PiPushPinSlashBold } from 'react-icons/pi';
+import { PiArrowsLeftRightBold, PiPushPinSlashBold } from 'react-icons/pi';
 
 const selectActiveColor = createSelector(selectCanvasSettingsSlice, (settings) => settings.activeColor);
 const selectBgColor = createSelector(selectCanvasSettingsSlice, (settings) => settings.bgColor);
@@ -27,7 +27,10 @@ export const PinnedFillColorPickerOverlay = memo(() => {
   const fgColor = useAppSelector(selectFgColor);
   const dispatch = useAppDispatch();
 
-  const activeColor = useMemo(() => (activeColorType === 'bgColor' ? bgColor : fgColor), [activeColorType, bgColor, fgColor]);
+  const activeColor = useMemo(
+    () => (activeColorType === 'bgColor' ? bgColor : fgColor),
+    [activeColorType, bgColor, fgColor]
+  );
 
   const onColorChange = useCallback(
     (color: RgbaColor) => {
@@ -58,7 +61,7 @@ export const PinnedFillColorPickerOverlay = memo(() => {
         borderStyle="solid"
         shadow="dark-lg"
         borderRadius="base"
-        minW={64}
+        minW={88}
       >
         <Flex justifyContent="space-between" alignItems="center" mb={2} gap={2}>
           <Text fontWeight="semibold" color="base.300">
