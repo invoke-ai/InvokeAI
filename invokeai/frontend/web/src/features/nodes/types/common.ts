@@ -126,6 +126,7 @@ export const zModelType = z.enum([
   'siglip',
   'flux_redux',
   'video',
+  'unknown',
 ]);
 const zSubModelType = z.enum([
   'unet',
@@ -161,6 +162,7 @@ export const zModelFormat = z.enum([
   'bnb_quantized_nf4b',
   'gguf_quantized',
   'api',
+  'unknown',
 ]);
 
 export const zModelIdentifierField = z.object({
