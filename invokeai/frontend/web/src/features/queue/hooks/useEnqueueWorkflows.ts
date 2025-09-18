@@ -1,5 +1,5 @@
 import { createAction } from '@reduxjs/toolkit';
-import type { AppDispatch, AppStore, RootState } from 'app/store/store';
+import type { AppDispatch, RootState } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
 import { groupBy } from 'es-toolkit/compat';
 import {
@@ -15,9 +15,10 @@ import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
 import { resolveBatchValue } from 'features/nodes/util/node/resolveBatchValue';
 import { buildWorkflowWithValidation } from 'features/nodes/util/workflow/buildWorkflow';
 import { useCallback } from 'react';
-import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
 import type { Batch, EnqueueBatchArg, S } from 'services/api/types';
 import { assert } from 'tsafe';
+
+import { executeEnqueue } from './utils/executeEnqueue';
 
 export const enqueueRequestedWorkflows = createAction('app/enqueueRequestedWorkflows');
 
@@ -119,60 +120,50 @@ const getValidationRunData = (state: RootState, templates: Templates): S['Valida
   };
 };
 
-const enqueueWorkflows = async (
-  store: AppStore,
-  templates: Templates,
-  prepend: boolean,
-  isApiValidationRun: boolean
-) => {
-  const { dispatch, getState } = store;
-
-  dispatch(enqueueRequestedWorkflows());
-  const state = getState();
-  const nodesState = selectNodesSlice(state);
-  const graph = buildNodesGraph(state, templates);
-  const workflow = buildWorkflowWithValidation(nodesState);
-
-  if (workflow) {
-    // embedded workflows don't have an id
-    delete workflow.id;
-  }
-
-  const runs = state.params.iterations;
-  const data = await getBatchDataForWorkflowGeneration(state, dispatch);
-
-  const batchConfig: EnqueueBatchArg = {
-    batch: {
-      graph,
-      workflow,
-      runs,
-      origin: 'workflows',
-      destination: 'gallery',
-      data,
-    },
-    prepend,
-  };
-
-  if (isApiValidationRun) {
-    batchConfig.validation_run_data = getValidationRunData(state, templates);
-
-    // If the batch is an API validation run, we only want to run it once
-    batchConfig.batch.runs = 1;
-  }
-
-  const req = dispatch(
-    queueApi.endpoints.enqueueBatch.initiate(batchConfig, { ...enqueueMutationFixedCacheKeyOptions, track: false })
-  );
-
-  const enqueueResult = await req.unwrap();
-  return { batchConfig, enqueueResult };
-};
-
 export const useEnqueueWorkflows = () => {
   const store = useAppStore();
   const enqueue = useCallback(
     (prepend: boolean, isApiValidationRun: boolean) => {
-      return enqueueWorkflows(store, $templates.get(), prepend, isApiValidationRun);
+      return executeEnqueue({
+        store,
+        options: { prepend, isApiValidationRun },
+        requestedAction: enqueueRequestedWorkflows,
+        build: async ({ store: innerStore, options }) => {
+          const { dispatch, getState } = innerStore;
+          const state = getState();
+          const nodesState = selectNodesSlice(state);
+          const templates = $templates.get();
+          const graph = buildNodesGraph(state, templates);
+          const workflow = buildWorkflowWithValidation(nodesState);
+
+          if (workflow) {
+            // embedded workflows don't have an id
+            delete workflow.id;
+          }
+
+          const data = await getBatchDataForWorkflowGeneration(state, dispatch);
+
+          const batchConfig: EnqueueBatchArg = {
+            batch: {
+              graph,
+              workflow,
+              runs: state.params.iterations,
+              origin: 'workflows',
+              destination: 'gallery',
+              data,
+            },
+            prepend: options.prepend,
+          };
+
+          if (options.isApiValidationRun) {
+            batchConfig.validation_run_data = getValidationRunData(state, templates);
+            batchConfig.batch.runs = 1;
+          }
+
+          return { batchConfig } satisfies { batchConfig: EnqueueBatchArg };
+        },
+        prepareBatch: ({ buildResult }) => buildResult.batchConfig,
+      });
     },
     [store]
   );
