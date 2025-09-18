@@ -275,7 +275,7 @@ class ModelConfigBase(ABC, BaseModel):
 
 
 class UnknownModelConfig(ModelConfigBase):
-    base: Literal[BaseModelType.Any] = BaseModelType.Any
+    base: Literal[BaseModelType.Unknown] = BaseModelType.Unknown
     type: Literal[ModelType.Unknown] = ModelType.Unknown
     format: Literal[ModelFormat.Unknown] = ModelFormat.Unknown
 
