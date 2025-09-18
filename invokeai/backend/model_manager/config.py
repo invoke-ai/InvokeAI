@@ -33,6 +33,7 @@ from typing import ClassVar, Literal, Optional, Type, TypeAlias, Union
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, TypeAdapter
 from typing_extensions import Annotated, Any, Dict
 
+from invokeai.app.services.config.config_default import get_config
 from invokeai.app.util.misc import uuid_string
 from invokeai.backend.model_hash.hash_validator import validate_hash
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS
@@ -55,6 +56,7 @@ from invokeai.backend.model_manager.util.model_util import lora_token_vector_len
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 
 logger = logging.getLogger(__name__)
+app_config = get_config()
 
 
 class InvalidModelConfigException(Exception):
@@ -207,10 +209,14 @@ class ModelConfigBase(ABC, BaseModel):
             else:
                 return config_cls.from_model_on_disk(mod, **overrides)
 
-        try:
-            return UnknownModelConfig.from_model_on_disk(mod, **overrides)
-        except Exception:
-            raise InvalidModelConfigException("Unable to determine model type")
+        if app_config.allow_unknown_models:
+            try:
+                return UnknownModelConfig.from_model_on_disk(mod, **overrides)
+            except Exception:
+                # Fall through to raising the exception below
+                pass
+
+        raise InvalidModelConfigException("Unable to determine model type")
 
     @classmethod
     def get_tag(cls) -> Tag:
