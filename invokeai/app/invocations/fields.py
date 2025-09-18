@@ -477,7 +477,6 @@ class OutputFieldJSONSchemaExtra(BaseModel):
 
     field_kind: FieldKind
     ui_hidden: bool
-    ui_type: Optional[UIType]
     ui_order: Optional[int]
 
     model_config = ConfigDict(
@@ -520,31 +519,55 @@ def InputField(
     """
     Creates an input field for an invocation.
 
-    This is a wrapper for Pydantic's [Field](https://docs.pydantic.dev/latest/api/fields/#pydantic.fields.Field) \
+    This is a wrapper for Pydantic's [Field](https://docs.pydantic.dev/latest/api/fields/#pydantic.fields.Field)
     that adds a few extra parameters to support graph execution and the node editor UI.
 
-    :param Input input: [Input.Any] The kind of input this field requires. \
-      `Input.Direct` means a value must be provided on instantiation. \
-      `Input.Connection` means the value must be provided by a connection. \
-      `Input.Any` means either will do.
+    If the field is a `ModelIdentifierField`, use the `ui_model_[base|type|variant|format]` args to filter the model list
+    in the Workflow Editor. Otherwise, use `ui_type` to provide extra type hints for the UI.
 
-    :param UIType ui_type: [None] Optionally provides an extra type hint for the UI. \
-      In some situations, the field's type is not enough to infer the correct UI type. \
-      For example, model selection fields should render a dropdown UI component to select a model. \
-      Internally, there is no difference between SD-1, SD-2 and SDXL model fields, they all use \
-      `MainModelField`. So to ensure the base-model-specific UI is rendered, you can use \
-      `UIType.SDXLMainModelField` to indicate that the field is an SDXL main model field.
+    Don't use both `ui_type` and `ui_model_[base|type|variant|format]` - if both are provided, a warning will be
+    logged and `ui_type` will be ignored.
 
-    :param UIComponent ui_component: [None] Optionally specifies a specific component to use in the UI. \
-      The UI will always render a suitable component, but sometimes you want something different than the default. \
-      For example, a `string` field will default to a single-line input, but you may want a multi-line textarea instead. \
-      For this case, you could provide `UIComponent.Textarea`.
+    Args:
+        input: The kind of input this field requires.
+        - `Input.Direct` means a value must be provided on instantiation.
+        - `Input.Connection` means the value must be provided by a connection.
+        - `Input.Any` means either will do.
 
-    :param bool ui_hidden: [False] Specifies whether or not this field should be hidden in the UI.
+        ui_type: Optionally provides an extra type hint for the UI. In some situations, the field's type is not enough
+        to infer the correct UI type. For example, Scheduler fields are enums, but we want to render a special scheduler
+        dropdown in the UI. Use `UIType.Scheduler` to indicate this.
 
-    :param int ui_order: [None] Specifies the order in which this field should be rendered in the UI.
+        ui_component: Optionally specifies a specific component to use in the UI. The UI will always render a suitable
+        component, but sometimes you want something different than the default. For example, a `string` field will
+        default to a single-line input, but you may want a multi-line textarea instead. In this case, you could use
+        `UIComponent.Textarea`.
 
-    :param dict[str, str] ui_choice_labels: [None] Specifies the labels to use for the choices in an enum field.
+        ui_hidden: Specifies whether or not this field should be hidden in the UI.
+
+        ui_order: Specifies the order in which this field should be rendered in the UI. If omitted, the field will be
+        rendered after all fields with an explicit order, in the order they are defined in the Invocation class.
+
+        ui_model_base: Specifies the base model architectures to filter the model list by in the Workflow Editor. For
+        example, `ui_model_base=BaseModelType.StableDiffusionXL` will show only SDXL architecture models. This arg is
+        only valid if this Input field is annotated as a `ModelIdentifierField`.
+
+        ui_model_type: Specifies the model type(s) to filter the model list by in the Workflow Editor. For example,
+        `ui_model_type=ModelType.VAE` will show only VAE models. This arg is only valid if this Input field is
+        annotated as a `ModelIdentifierField`.
+
+        ui_model_variant: Specifies the model variant(s) to filter the model list by in the Workflow Editor. For example,
+        `ui_model_variant=ModelVariantType.Inpainting` will show only inpainting models. This arg is only valid if this
+        Input field is annotated as a `ModelIdentifierField`.
+
+        ui_model_format: Specifies the model format(s) to filter the model list by in the Workflow Editor. For example,
+        `ui_model_format=ModelFormat.Diffusers` will show only models in the diffusers format. This arg is only valid
+        if this Input field is annotated as a `ModelIdentifierField`.
+
+        ui_choice_labels: Specifies the labels to use for the choices in an enum field. If omitted, the enum values
+        will be used. This arg is only valid if the field is annotated with as a `Literal`. For example,
+        `Literal["choice1", "choice2", "choice3"]` with `ui_choice_labels={"choice1": "Choice 1", "choice2": "Choice 2",
+        "choice3": "Choice 3"}` will render a dropdown with the labels "Choice 1", "Choice 2" and "Choice 3".
     """
 
     json_schema_extra_ = InputFieldJSONSchemaExtra(
@@ -771,7 +794,7 @@ def OutputField(
     This is a wrapper for Pydantic's [Field](https://docs.pydantic.dev/1.10/usage/schema/#field-customization) \
     that adds a few extra parameters to support graph execution and the node editor UI.
 
-    :param UIType ui_type: [None] Optionally provides an extra type hint for the UI. \
+    :param UIType ui_type: [None] DEPRECATED Optionally provides an extra type hint for the UI. \
       In some situations, the field's type is not enough to infer the correct UI type. \
       For example, model selection fields should render a dropdown UI component to select a model. \
       Internally, there is no difference between SD-1, SD-2 and SDXL model fields, they all use \
@@ -782,6 +805,12 @@ def OutputField(
 
     :param int ui_order: [None] Specifies the order in which this field should be rendered in the UI. \
     """
+
+    if ui_type is not None:
+        logger.warning(
+            "OutputField: 'ui_type' is deprecated. Use 'ui_model_[base|type|variant]' in InputField instead."
+        )
+
     return Field(
         default=default,
         title=title,
@@ -799,7 +828,6 @@ def OutputField(
         min_length=min_length,
         max_length=max_length,
         json_schema_extra=OutputFieldJSONSchemaExtra(
-            ui_type=ui_type,
             ui_hidden=ui_hidden,
             ui_order=ui_order,
             field_kind=FieldKind.Output,
