@@ -22,6 +22,7 @@ import { type UpdateModelArg, useUpdateModelMutation } from 'services/api/endpoi
 import type { AnyModelConfig } from 'services/api/types';
 
 import BaseModelSelect from './Fields/BaseModelSelect';
+import ModelFormatSelect from './Fields/ModelFormatSelect';
 import ModelTypeSelect from './Fields/ModelTypeSelect';
 import ModelVariantSelect from './Fields/ModelVariantSelect';
 import PredictionTypeSelect from './Fields/PredictionTypeSelect';
@@ -131,6 +132,10 @@ export const ModelEdit = memo(({ modelConfig }: Props) => {
               <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                 <FormLabel>{t('modelManager.modelType')}</FormLabel>
                 <ModelTypeSelect control={form.control} />
+              </FormControl>
+              <FormControl flexDir="column" alignItems="flex-start" gap={1}>
+                <FormLabel>{t('modelManager.modelFormat')}</FormLabel>
+                <ModelFormatSelect control={form.control} />
               </FormControl>
               {modelConfig.type !== 'clip_vision' && (
                 <FormControl flexDir="column" alignItems="flex-start" gap={1}>

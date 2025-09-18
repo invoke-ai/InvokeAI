@@ -167,6 +167,7 @@ export const zModelFormat = z.enum([
   'api',
   'unknown',
 ]);
+export type ModelFormat = z.infer<typeof zModelFormat>;
 
 export const zModelIdentifierField = z.object({
   key: z.string().min(1),
