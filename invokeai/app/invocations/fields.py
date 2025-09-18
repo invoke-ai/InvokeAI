@@ -475,8 +475,9 @@ class OutputFieldJSONSchemaExtra(BaseModel):
     """
 
     field_kind: FieldKind
-    ui_hidden: bool
-    ui_order: Optional[int]
+    ui_hidden: bool = False
+    ui_order: Optional[int] = None
+    ui_type: Optional[UIType] = None
 
     model_config = ConfigDict(
         validate_assignment=True,
@@ -794,16 +795,15 @@ def OutputField(
     that adds a few extra parameters to support graph execution and the node editor UI.
 
     Args:
-        ui_type: **DEPRECATED** Optionally provides an extra type hint for the UI. This parameter is no longer used.
+        ui_type: Optionally provides an extra type hint for the UI. In some situations, the field's type is not enough
+        to infer the correct UI type. For example, Scheduler fields are enums, but we want to render a special scheduler
+        dropdown in the UI. Use `UIType.Scheduler` to indicate this.
 
         ui_hidden: Specifies whether or not this field should be hidden in the UI.
 
         ui_order: Specifies the order in which this field should be rendered in the UI. If omitted, the field will be
         rendered after all fields with an explicit order, in the order they are defined in the Invocation class.
     """
-
-    if ui_type is not None:
-        logger.warning("OutputField: 'ui_type' is deprecated.")
 
     return Field(
         default=default,
@@ -824,6 +824,7 @@ def OutputField(
         json_schema_extra=OutputFieldJSONSchemaExtra(
             ui_hidden=ui_hidden,
             ui_order=ui_order,
+            ui_type=ui_type,
             field_kind=FieldKind.Output,
         ).model_dump(exclude_none=True),
     )
