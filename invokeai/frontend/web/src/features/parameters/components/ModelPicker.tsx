@@ -32,6 +32,7 @@ import {
 } from 'features/modelManagerV2/models';
 import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
 import ModelImage from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelImage';
+import type { BaseModelType } from 'features/nodes/types/common';
 import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectIsModelsTabDisabled } from 'features/system/store/configSlice';
@@ -41,7 +42,7 @@ import { memo, useCallback, useMemo, useRef } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiCaretDownBold, PiLinkSimple } from 'react-icons/pi';
 import { useGetRelatedModelIdsBatchQuery } from 'services/api/endpoints/modelRelationships';
-import type { AnyModelConfig, BaseModelType } from 'services/api/types';
+import type { AnyModelConfig } from 'services/api/types';
 
 const selectSelectedModelKeys = createMemoizedSelector(selectParamsSlice, selectLoRAsSlice, (params, loras) => {
   const keys: string[] = [];

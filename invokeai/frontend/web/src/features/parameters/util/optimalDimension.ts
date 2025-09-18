@@ -1,4 +1,4 @@
-import type { BaseModelType } from 'services/api/types';
+import type { BaseModelType } from 'features/nodes/types/common';
 
 /**
  * Gets the optimal dimension for a given base model:
