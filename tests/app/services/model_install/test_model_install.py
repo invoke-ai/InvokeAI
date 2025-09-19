@@ -95,7 +95,7 @@ def test_install(
     store = mm2_installer.record_store
     key = mm2_installer.install_path(embedding_file)
     model_record = store.get_model(key)
-    assert model_record.path.endswith("sd-1/embedding/test_embedding.safetensors")
+    assert model_record.path.endswith(f"{key}/test_embedding.safetensors")
     assert (mm2_app_config.models_path / model_record.path).exists()
     assert model_record.source == embedding_file.as_posix()
 
@@ -106,23 +106,24 @@ def test_rename(
     store = mm2_installer.record_store
     key = mm2_installer.install_path(embedding_file)
     model_record = store.get_model(key)
-    assert model_record.path.endswith("sd-1/embedding/test_embedding.safetensors")
+    assert model_record.path.endswith(f"{key}/test_embedding.safetensors")
     new_model_record = store.update_model(key, ModelRecordChanges(name="new model name", base=BaseModelType("sd-2")))
     # Renaming the model record shouldn't rename the file
     assert new_model_record.name == "new model name"
-    assert new_model_record.path.endswith("sd-2/embedding/test_embedding.safetensors")
+    assert model_record.path.endswith(f"{key}/test_embedding.safetensors")
 
 
 @pytest.mark.parametrize(
-    "fixture_name,size,destination",
+    "fixture_name,size,key,destination",
     [
-        ("embedding_file", 15440, "sd-1/embedding/test_embedding.safetensors"),
-        ("diffusers_dir", 8241 if OS == "Windows" else 7907, "sdxl/main/test-diffusers-main"),  # EOL chars
+        ("embedding_file", 15440, "foo", "foo/test_embedding.safetensors"),
+        ("diffusers_dir", 8241 if OS == "Windows" else 7907, "bar", "bar"),  # EOL chars
     ],
 )
 def test_background_install(
     mm2_installer: ModelInstallServiceBase,
     fixture_name: str,
+    key: str,
     size: int,
     destination: str,
     mm2_app_config: InvokeAIAppConfig,
@@ -132,7 +133,7 @@ def test_background_install(
     path: Path = request.getfixturevalue(fixture_name)
     description = "Test of metadata assignment"
     source = LocalModelSource(path=path, inplace=False)
-    job = mm2_installer.import_model(source, config=ModelRecordChanges(description=description))
+    job = mm2_installer.import_model(source, config=ModelRecordChanges(key=key, description=description))
     assert job is not None
     assert isinstance(job, ModelInstallJob)
 
