@@ -60,9 +60,7 @@ export const buildFluxKontextGraph = (arg: GraphBuilderArg): GraphBuilderReturn 
         model: zModelIdentifierField.parse(model),
         aspect_ratio: aspectRatio.id,
         prompt_upsampling: true,
-        input_image: {
-          image_name: firstImage.crop?.image.image_name ?? firstImage.original.image.image_name,
-        },
+        input_image: zImageField.parse(firstImage.crop?.image ?? firstImage.original.image),
         ...selectCanvasOutputFields(state),
       });
     } else {
@@ -70,7 +68,9 @@ export const buildFluxKontextGraph = (arg: GraphBuilderArg): GraphBuilderReturn 
       const kontextConcatenator = g.addNode({
         id: getPrefixedId('flux_kontext_image_prep'),
         type: 'flux_kontext_image_prep',
-        images: validRefImages.map(({ config }) => zImageField.parse(config.image)),
+        images: validRefImages.map(({ config }) =>
+          zImageField.parse(config.image?.crop?.image ?? config.image?.original.image)
+        ),
       });
 
       fluxKontextImage = g.addNode({
