@@ -37,6 +37,7 @@ export const WorkflowLibraryModal = memo(() => {
         maxW="calc(100% - var(--invoke-sizes-40))"
         h="calc(100% - var(--invoke-sizes-40))"
         maxH="calc(100% - var(--invoke-sizes-40))"
+        bg="base.850"
       >
         <ModalHeader>{t('workflows.workflowLibrary')}</ModalHeader>
         <ModalCloseButton />

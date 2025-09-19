@@ -1,4 +1,4 @@
-import type { ButtonProps, CheckboxProps } from '@invoke-ai/ui-library';
+import type { ButtonProps, CheckboxProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import {
   Box,
   Button,
@@ -43,13 +43,13 @@ export const WorkflowLibrarySideNav = () => {
   const allowPublishWorkflows = useAppSelector(selectAllowPublishWorkflows);
 
   return (
-    <Flex h="full" minH={0} overflow="hidden" flexDir="column" w={64} gap={0}>
-      <Flex flexDir="column" w="full" pb={2} gap={2}>
+    <Flex h="full" minH={0} overflow="hidden" flexDir="column" w={64}>
+      <Flex flexDir="column" w="full">
         <WorkflowLibraryViewButton view="recent">{t('workflows.recentlyOpened')}</WorkflowLibraryViewButton>
         <WorkflowLibraryViewButton view="yours">{t('workflows.yourWorkflows')}</WorkflowLibraryViewButton>
         {categoryOptions.includes('project') && (
           <Collapse in={view === 'yours' || view === 'shared' || view === 'private'}>
-            <Flex flexDir="column" gap={2} pl={4} pt={2}>
+            <Flex flexDir="column" pl={4}>
               <WorkflowLibraryViewButton size="sm" view="private">
                 {t('workflows.private')}
               </WorkflowLibraryViewButton>
@@ -64,7 +64,7 @@ export const WorkflowLibrarySideNav = () => {
           <WorkflowLibraryViewButton view="published">{t('workflows.published')}</WorkflowLibraryViewButton>
         )}
       </Flex>
-      <Flex h="full" minH={0} overflow="hidden" flexDir="column">
+      <Flex w="full" h="full" minH={0} flexDir="column">
         <BrowseWorkflowsButton />
         <DefaultsViewCheckboxesCollapsible />
       </Flex>
@@ -87,9 +87,7 @@ const BrowseWorkflowsButton = memo(() => {
   if (view === 'defaults' && selectedTags.length > 0) {
     return (
       <ButtonGroup>
-        <WorkflowLibraryViewButton view="defaults" w="auto">
-          {t('workflows.browseWorkflows')}
-        </WorkflowLibraryViewButton>
+        <WorkflowLibraryViewButton view="defaults">{t('workflows.browseWorkflows')}</WorkflowLibraryViewButton>
         <Tooltip label={t('workflows.deselectAll')}>
           <IconButton
             onClick={resetTags}
@@ -97,8 +95,9 @@ const BrowseWorkflowsButton = memo(() => {
             aria-label={t('workflows.deselectAll')}
             icon={<PiArrowCounterClockwiseBold size={12} />}
             variant="ghost"
-            bg="base.700"
+            bg="base.750"
             color="base.50"
+            flexShrink={0}
           />
         </Tooltip>
       </ButtonGroup>
@@ -193,17 +192,34 @@ const WorkflowLibraryViewButton = memo(({ view, ...rest }: ButtonProps & { view:
     dispatch(workflowLibraryViewChanged(view));
   }, [dispatch, view]);
 
+  const workflowLibraryButtonSx: SystemStyleObject = {
+    position: 'relative',
+    _after: {
+      content: '""',
+      position: 'absolute',
+      insetY: 2,
+      left: 1,
+      w: 0.5,
+      rounded: 'sm',
+      bg: selectedView === view ? 'invokeBlue.300' : 'transparent',
+    },
+    ...(selectedView === view
+      ? {
+          bg: 'base.750',
+          color: 'base.50',
+        }
+      : {}),
+  };
+
   return (
     <Button
       variant="ghost"
       justifyContent="flex-start"
       size="md"
-      flexShrink={0}
       w="full"
       onClick={onClick}
+      sx={workflowLibraryButtonSx}
       {...rest}
-      bg={selectedView === view ? 'base.700' : undefined}
-      color={selectedView === view ? 'base.50' : undefined}
     />
   );
 });
@@ -222,7 +238,7 @@ const TagCategory = memo(({ tagCategory }: { tagCategory: WorkflowTagCategory })
       <Text fontWeight="semibold" color="base.300" flexShrink={0}>
         {t(tagCategory.categoryTKey)}
       </Text>
-      <Flex flexDir="column" gap={2} pl={4}>
+      <Flex flexDir="column">
         {tagCategory.tags.map((tag) => (
           <TagCheckbox key={tag.label} tag={tag} />
         ))}
@@ -247,10 +263,23 @@ const TagCheckbox = memo(({ tag, ...rest }: CheckboxProps & { tag: { label: stri
     return null;
   }
 
+  const tagCheckbox: SystemStyleObject = {
+    py: 1,
+    px: 2,
+    transition: 'background-color 0.1s',
+    rounded: 'base',
+    _hover: {
+      bg: 'base.750',
+    },
+    _active: {
+      bg: 'transparent',
+    },
+    flexShrink: 0,
+  };
+
   return (
-    <Flex alignItems="center" gap={2}>
-      <Checkbox isChecked={isChecked} onChange={onChange} {...rest} flexShrink={0} />
-      <Text>{`${tag.label} (${count})`}</Text>
+    <Checkbox isChecked={isChecked} onChange={onChange} sx={tagCheckbox} {...rest}>
+      <Text>{`${t(tag.label)} (${count})`}</Text>
       {tag.recommended && (
         <Tooltip label={t('workflows.recommended')}>
           <Box as="span" lineHeight={0}>
@@ -258,7 +287,7 @@ const TagCheckbox = memo(({ tag, ...rest }: CheckboxProps & { tag: { label: stri
           </Box>
         </Tooltip>
       )}
-    </Flex>
+    </Checkbox>
   );
 });
 TagCheckbox.displayName = 'TagCheckbox';
