@@ -4,7 +4,7 @@ import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice'
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { isGemini2_5ReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
-import type { ImageField } from 'features/nodes/types/common';
+import { type ImageField, zImageField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { selectCanvasOutputFields } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn } from 'features/nodes/util/graph/types';
@@ -44,9 +44,7 @@ export const buildGemini2_5Graph = (arg: GraphBuilderArg): GraphBuilderReturn =>
     reference_images = [];
     for (const entity of validRefImages) {
       assert(entity.config.image, 'Image is required for reference image');
-      reference_images.push({
-        image_name: entity.config.image.crop?.image.image_name ?? entity.config.image.original.image.image_name,
-      });
+      reference_images.push(zImageField.parse(entity.config.image.crop?.image ?? entity.config.image.original.image));
     }
   }
 
