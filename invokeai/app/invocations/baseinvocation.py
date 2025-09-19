@@ -36,6 +36,9 @@ from pydantic_core import PydanticUndefined
 from invokeai.app.invocations.fields import (
     FieldKind,
     Input,
+    InputFieldJSONSchemaExtra,
+    UIType,
+    migrate_model_ui_type,
 )
 from invokeai.app.services.config.config_default import get_config
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -256,7 +259,9 @@ class BaseInvocation(ABC, BaseModel):
     is_intermediate: bool = Field(
         default=False,
         description="Whether or not this is an intermediate invocation.",
-        json_schema_extra={"ui_type": "IsIntermediate", "field_kind": FieldKind.NodeAttribute},
+        json_schema_extra=InputFieldJSONSchemaExtra(
+            input=Input.Direct, field_kind=FieldKind.NodeAttribute, ui_type=UIType._IsIntermediate
+        ).model_dump(exclude_none=True),
     )
     use_cache: bool = Field(
         default=True,
@@ -445,6 +450,15 @@ with warnings.catch_warnings():
     RESERVED_PYDANTIC_FIELD_NAMES = {m[0] for m in inspect.getmembers(_Model())}
 
 
+def is_enum_member(value: Any, enum_class: type[Enum]) -> bool:
+    """Checks if a value is a member of an enum class."""
+    try:
+        enum_class(value)
+        return True
+    except ValueError:
+        return False
+
+
 def validate_fields(model_fields: dict[str, FieldInfo], model_type: str) -> None:
     """
     Validates the fields of an invocation or invocation output:
@@ -456,51 +470,99 @@ def validate_fields(model_fields: dict[str, FieldInfo], model_type: str) -> None
     """
     for name, field in model_fields.items():
         if name in RESERVED_PYDANTIC_FIELD_NAMES:
-            raise InvalidFieldError(f'Invalid field name "{name}" on "{model_type}" (reserved by pydantic)')
+            raise InvalidFieldError(f"{model_type}.{name}: Invalid field name (reserved by pydantic)")
 
         if not field.annotation:
-            raise InvalidFieldError(f'Invalid field type "{name}" on "{model_type}" (missing annotation)')
+            raise InvalidFieldError(f"{model_type}.{name}: Invalid field type (missing annotation)")
 
         if not isinstance(field.json_schema_extra, dict):
-            raise InvalidFieldError(
-                f'Invalid field definition for "{name}" on "{model_type}" (missing json_schema_extra dict)'
-            )
+            raise InvalidFieldError(f"{model_type}.{name}: Invalid field definition (missing json_schema_extra dict)")
 
         field_kind = field.json_schema_extra.get("field_kind", None)
 
         # must have a field_kind
-        if not isinstance(field_kind, FieldKind):
+        if not is_enum_member(field_kind, FieldKind):
             raise InvalidFieldError(
-                f'Invalid field definition for "{name}" on "{model_type}" (maybe it\'s not an InputField or OutputField?)'
+                f"{model_type}.{name}: Invalid field definition for (maybe it's not an InputField or OutputField?)"
             )
 
-        if field_kind is FieldKind.Input and (
+        if field_kind == FieldKind.Input.value and (
             name in RESERVED_NODE_ATTRIBUTE_FIELD_NAMES or name in RESERVED_INPUT_FIELD_NAMES
         ):
-            raise InvalidFieldError(f'Invalid field name "{name}" on "{model_type}" (reserved input field name)')
+            raise InvalidFieldError(f"{model_type}.{name}: Invalid field name (reserved input field name)")
 
-        if field_kind is FieldKind.Output and name in RESERVED_OUTPUT_FIELD_NAMES:
-            raise InvalidFieldError(f'Invalid field name "{name}" on "{model_type}" (reserved output field name)')
+        if field_kind == FieldKind.Output.value and name in RESERVED_OUTPUT_FIELD_NAMES:
+            raise InvalidFieldError(f"{model_type}.{name}: Invalid field name (reserved output field name)")
 
-        if (field_kind is FieldKind.Internal) and name not in RESERVED_INPUT_FIELD_NAMES:
-            raise InvalidFieldError(
-                f'Invalid field name "{name}" on "{model_type}" (internal field without reserved name)'
-            )
+        if field_kind == FieldKind.Internal.value and name not in RESERVED_INPUT_FIELD_NAMES:
+            raise InvalidFieldError(f"{model_type}.{name}: Invalid field name (internal field without reserved name)")
 
         # node attribute fields *must* be in the reserved list
         if (
-            field_kind is FieldKind.NodeAttribute
+            field_kind == FieldKind.NodeAttribute.value
             and name not in RESERVED_NODE_ATTRIBUTE_FIELD_NAMES
             and name not in RESERVED_OUTPUT_FIELD_NAMES
         ):
             raise InvalidFieldError(
-                f'Invalid field name "{name}" on "{model_type}" (node attribute field without reserved name)'
+                f"{model_type}.{name}: Invalid field name (node attribute field without reserved name)"
             )
 
         ui_type = field.json_schema_extra.get("ui_type", None)
-        if isinstance(ui_type, str) and ui_type.startswith("DEPRECATED_"):
-            logger.warning(f'"UIType.{ui_type.split("_")[-1]}" is deprecated, ignoring')
-            field.json_schema_extra.pop("ui_type")
+        ui_model_base = field.json_schema_extra.get("ui_model_base", None)
+        ui_model_type = field.json_schema_extra.get("ui_model_type", None)
+        ui_model_variant = field.json_schema_extra.get("ui_model_variant", None)
+        ui_model_format = field.json_schema_extra.get("ui_model_format", None)
+
+        if ui_type is not None:
+            # There are 3 cases where we may need to take action:
+            #
+            # 1. The ui_type is a migratable, deprecated value. For example, ui_type=UIType.MainModel value is
+            #    deprecated and should be migrated to:
+            #       - ui_model_base=[BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2]
+            #       - ui_model_type=[ModelType.Main]
+            #
+            # 2. ui_type was set in conjunction with any of the new ui_model_[base|type|variant|format] fields, which
+            #    is not allowed (they are mutually exclusive). In this case, we ignore ui_type and log a warning.
+            #
+            # 3. ui_type is a deprecated value that is not migratable. For example, ui_type=UIType.Image is deprecated;
+            #    Image fields are now automatically detected based on the field's type annotation. In this case, we
+            #    ignore ui_type and log a warning.
+            #
+            # The cases must be checked in this order to ensure proper handling.
+
+            # Easier to work with as an enum
+            ui_type = UIType(ui_type)
+
+            # The enum member values are not always the same as their names - we want to log the name so the user can
+            # easily review their code and see where the deprecated enum member is used.
+            human_readable_name = f"UIType.{ui_type.name}"
+
+            # Case 1: migratable deprecated value
+            did_migrate = migrate_model_ui_type(ui_type, field.json_schema_extra)
+
+            if did_migrate:
+                logger.warning(
+                    f'{model_type}.{name}: Migrated deprecated "ui_type" "{human_readable_name}" to new ui_model_[base|type|variant|format] fields'
+                )
+                field.json_schema_extra.pop("ui_type")
+
+            # Case 2: mutually exclusive with new fields
+            elif (
+                ui_model_base is not None
+                or ui_model_type is not None
+                or ui_model_variant is not None
+                or ui_model_format is not None
+            ):
+                logger.warning(
+                    f'{model_type}.{name}: "ui_type" is mutually exclusive with "ui_model_[base|type|format|variant]", ignoring "ui_type"'
+                )
+                field.json_schema_extra.pop("ui_type")
+
+            # Case 3: deprecated value that is not migratable
+            elif ui_type.startswith("DEPRECATED_"):
+                logger.warning(f'{model_type}.{name}: Deprecated "ui_type" "{human_readable_name}", ignoring')
+                field.json_schema_extra.pop("ui_type")
+
     return None
 
 
