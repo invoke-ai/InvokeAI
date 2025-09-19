@@ -33,6 +33,7 @@ class BaseModelType(str, Enum):
     FluxKontext = "flux-kontext"
     Veo3 = "veo3"
     Runway = "runway"
+    Unknown = "unknown"
 
 
 class ModelType(str, Enum):
@@ -55,6 +56,7 @@ class ModelType(str, Enum):
     FluxRedux = "flux_redux"
     LlavaOnevision = "llava_onevision"
     Video = "video"
+    Unknown = "unknown"
 
 
 class SubModelType(str, Enum):
@@ -107,6 +109,7 @@ class ModelFormat(str, Enum):
     BnbQuantizednf4b = "bnb_quantized_nf4b"
     GGUFQuantized = "gguf_quantized"
     Api = "api"
+    Unknown = "unknown"
 
 
 class SchedulerPredictionType(str, Enum):

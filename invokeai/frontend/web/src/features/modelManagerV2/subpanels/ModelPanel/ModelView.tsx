@@ -53,7 +53,7 @@ export const ModelView = memo(({ modelConfig }: Props) => {
           <SimpleGrid columns={2} gap={4}>
             <ModelAttrView label={t('modelManager.baseModel')} value={modelConfig.base} />
             <ModelAttrView label={t('modelManager.modelType')} value={modelConfig.type} />
-            <ModelAttrView label={t('common.format')} value={modelConfig.format} />
+            <ModelAttrView label={t('modelManager.modelFormat')} value={modelConfig.format} />
             <ModelAttrView label={t('modelManager.path')} value={modelConfig.path} />
             <ModelAttrView label={t('modelManager.fileSize')} value={filesize(modelConfig.file_size)} />
             {modelConfig.type === 'main' && (

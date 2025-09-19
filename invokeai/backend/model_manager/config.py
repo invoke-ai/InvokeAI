@@ -28,11 +28,12 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from inspect import isabstract
 from pathlib import Path
-from typing import ClassVar, Literal, Optional, TypeAlias, Union
+from typing import ClassVar, Literal, Optional, Type, TypeAlias, Union
 
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, TypeAdapter
 from typing_extensions import Annotated, Any, Dict
 
+from invokeai.app.services.config.config_default import get_config
 from invokeai.app.util.misc import uuid_string
 from invokeai.backend.model_hash.hash_validator import validate_hash
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS
@@ -55,6 +56,7 @@ from invokeai.backend.model_manager.util.model_util import lora_token_vector_len
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 
 logger = logging.getLogger(__name__)
+app_config = get_config()
 
 
 class InvalidModelConfigException(Exception):
@@ -109,6 +111,18 @@ class MatchSpeed(int, Enum):
     SLOW = 2
 
 
+class LegacyProbeMixin:
+    """Mixin for classes using the legacy probe for model classification."""
+
+    @classmethod
+    def matches(cls, *args, **kwargs):
+        raise NotImplementedError(f"Method 'matches' not implemented for {cls.__name__}")
+
+    @classmethod
+    def parse(cls, *args, **kwargs):
+        raise NotImplementedError(f"Method 'parse' not implemented for {cls.__name__}")
+
+
 class ModelConfigBase(ABC, BaseModel):
     """
     Abstract Base class for model configurations.
@@ -125,7 +139,7 @@ class ModelConfigBase(ABC, BaseModel):
 
     @staticmethod
     def json_schema_extra(schema: dict[str, Any]) -> None:
-        schema["required"].extend(["key", "type", "format"])
+        schema["required"].extend(["key", "base", "type", "format"])
 
     model_config = ConfigDict(validate_assignment=True, json_schema_extra=json_schema_extra)
 
@@ -152,14 +166,15 @@ class ModelConfigBase(ABC, BaseModel):
     )
     usage_info: Optional[str] = Field(default=None, description="Usage information for this model")
 
-    USING_LEGACY_PROBE: ClassVar[set] = set()
-    USING_CLASSIFY_API: ClassVar[set] = set()
+    USING_LEGACY_PROBE: ClassVar[set[Type["ModelConfigBase"]]] = set()
+    USING_CLASSIFY_API: ClassVar[set[Type["ModelConfigBase"]]] = set()
     _MATCH_SPEED: ClassVar[MatchSpeed] = MatchSpeed.MED
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if issubclass(cls, LegacyProbeMixin):
             ModelConfigBase.USING_LEGACY_PROBE.add(cls)
+        # Cannot use `elif isinstance(cls, UnknownModelConfig)` because UnknownModelConfig is not defined yet
         else:
             ModelConfigBase.USING_CLASSIFY_API.add(cls)
 
@@ -170,7 +185,9 @@ class ModelConfigBase(ABC, BaseModel):
         return concrete
 
     @staticmethod
-    def classify(mod: str | Path | ModelOnDisk, hash_algo: HASHING_ALGORITHMS = "blake3_single", **overrides):
+    def classify(
+        mod: str | Path | ModelOnDisk, hash_algo: HASHING_ALGORITHMS = "blake3_single", **overrides
+    ) -> "AnyModelConfig":
         """
         Returns the best matching ModelConfig instance from a model's file/folder path.
         Raises InvalidModelConfigException if no valid configuration is found.
@@ -191,6 +208,13 @@ class ModelConfigBase(ABC, BaseModel):
                 continue
             else:
                 return config_cls.from_model_on_disk(mod, **overrides)
+
+        if app_config.allow_unknown_models:
+            try:
+                return UnknownModelConfig.from_model_on_disk(mod, **overrides)
+            except Exception:
+                # Fall through to raising the exception below
+                pass
 
         raise InvalidModelConfigException("Unable to determine model type")
 
@@ -240,32 +264,31 @@ class ModelConfigBase(ABC, BaseModel):
         cls.cast_overrides(overrides)
         fields.update(overrides)
 
-        type = fields.get("type") or cls.model_fields["type"].default
-        base = fields.get("base") or cls.model_fields["base"].default
-
         fields["path"] = mod.path.as_posix()
         fields["source"] = fields.get("source") or fields["path"]
         fields["source_type"] = fields.get("source_type") or ModelSourceType.Path
-        fields["name"] = name = fields.get("name") or mod.name
+        fields["name"] = fields.get("name") or mod.name
         fields["hash"] = fields.get("hash") or mod.hash()
         fields["key"] = fields.get("key") or uuid_string()
-        fields["description"] = fields.get("description") or f"{base.value} {type.value} model {name}"
+        fields["description"] = fields.get("description")
         fields["repo_variant"] = fields.get("repo_variant") or mod.repo_variant()
         fields["file_size"] = fields.get("file_size") or mod.size()
 
         return cls(**fields)
 
 
-class LegacyProbeMixin:
-    """Mixin for classes using the legacy probe for model classification."""
+class UnknownModelConfig(ModelConfigBase):
+    base: Literal[BaseModelType.Unknown] = BaseModelType.Unknown
+    type: Literal[ModelType.Unknown] = ModelType.Unknown
+    format: Literal[ModelFormat.Unknown] = ModelFormat.Unknown
 
     @classmethod
-    def matches(cls, *args, **kwargs):
-        raise NotImplementedError(f"Method 'matches' not implemented for {cls.__name__}")
+    def matches(cls, mod: ModelOnDisk) -> bool:
+        return False
 
     @classmethod
-    def parse(cls, *args, **kwargs):
-        raise NotImplementedError(f"Method 'parse' not implemented for {cls.__name__}")
+    def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
+        return {}
 
 
 class CheckpointConfigBase(ABC, BaseModel):
@@ -353,7 +376,7 @@ class LoRAOmiConfig(LoRAConfigBase, ModelConfigBase):
 
         metadata = mod.metadata()
         return (
-            metadata.get("modelspec.sai_model_spec")
+            bool(metadata.get("modelspec.sai_model_spec"))
             and metadata.get("ot_branch") == "omi_format"
             and metadata["modelspec.architecture"].split("/")[1].lower() == "lora"
         )
@@ -751,6 +774,7 @@ AnyModelConfig = Annotated[
         Annotated[LlavaOnevisionConfig, LlavaOnevisionConfig.get_tag()],
         Annotated[ApiModelConfig, ApiModelConfig.get_tag()],
         Annotated[VideoApiModelConfig, VideoApiModelConfig.get_tag()],
+        Annotated[UnknownModelConfig, UnknownModelConfig.get_tag()],
     ],
     Discriminator(get_model_discriminator_value),
 ]

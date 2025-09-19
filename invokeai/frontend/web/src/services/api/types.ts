@@ -105,16 +105,9 @@ export const isVideoDTO = (dto: ImageDTO | VideoDTO): dto is VideoDTO => {
   return 'video_id' in dto;
 };
 
-// Models
-export type ModelType = S['ModelType'];
-export type BaseModelType = S['BaseModelType'];
-
 // Model Configs
-
 export type ControlLoRAModelConfig = S['ControlLoRALyCORISConfig'] | S['ControlLoRADiffusersConfig'];
-// TODO(MM2): Can we make key required in the pydantic model?
 export type LoRAModelConfig = S['LoRADiffusersConfig'] | S['LoRALyCORISConfig'] | S['LoRAOmiConfig'];
-// TODO(MM2): Can we rename this from Vae -> VAE
 export type VAEModelConfig = S['VAECheckpointConfig'] | S['VAEDiffusersConfig'];
 export type ControlNetModelConfig = S['ControlNetDiffusersConfig'] | S['ControlNetCheckpointConfig'];
 export type IPAdapterModelConfig = S['IPAdapterInvokeAIConfig'] | S['IPAdapterCheckpointConfig'];
@@ -134,6 +127,7 @@ type SigLipModelConfig = S['SigLIPConfig'];
 export type FLUXReduxModelConfig = S['FluxReduxConfig'];
 type ApiModelConfig = S['ApiModelConfig'];
 export type VideoApiModelConfig = S['VideoApiModelConfig'];
+type UnknownModelConfig = S['UnknownModelConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig | ApiModelConfig;
 export type FLUXKontextModelConfig = MainModelConfig;
 export type ChatGPT4oModelConfig = ApiModelConfig;
@@ -155,7 +149,8 @@ export type AnyModelConfig =
   | CLIPVisionDiffusersConfig
   | SigLipModelConfig
   | FLUXReduxModelConfig
-  | LlavaOnevisionConfig;
+  | LlavaOnevisionConfig
+  | UnknownModelConfig;
 
 /**
  * Checks if a list of submodels contains any that match a given variant or type
@@ -199,8 +194,15 @@ export const isControlLoRAModelConfig = (config: AnyModelConfig): config is Cont
   return config.type === 'control_lora';
 };
 
-export const isVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: boolean): config is VAEModelConfig => {
+export const isVAEModelConfigOrSubmodel = (
+  config: AnyModelConfig,
+  excludeSubmodels?: boolean
+): config is VAEModelConfig => {
   return config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config));
+};
+
+export const isVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
+  return config.type === 'vae';
 };
 
 export const isNonFluxVAEModelConfig = (
@@ -246,7 +248,7 @@ export const isT2IAdapterModelConfig = (config: AnyModelConfig): config is T2IAd
   return config.type === 't2i_adapter';
 };
 
-export const isT5EncoderModelConfig = (
+export const isT5EncoderModelConfigOrSubmodel = (
   config: AnyModelConfig,
   excludeSubmodels?: boolean
 ): config is T5EncoderModelConfig | T5EncoderBnbQuantizedLlmInt8bModelConfig => {
@@ -256,7 +258,13 @@ export const isT5EncoderModelConfig = (
   );
 };
 
-export const isCLIPEmbedModelConfig = (
+export const isT5EncoderModelConfig = (
+  config: AnyModelConfig
+): config is T5EncoderModelConfig | T5EncoderBnbQuantizedLlmInt8bModelConfig => {
+  return config.type === 't5_encoder';
+};
+
+export const isCLIPEmbedModelConfigOrSubmodel = (
   config: AnyModelConfig,
   excludeSubmodels?: boolean
 ): config is CLIPEmbedModelConfig => {
@@ -266,7 +274,11 @@ export const isCLIPEmbedModelConfig = (
   );
 };
 
-export const isCLIPLEmbedModelConfig = (
+export const isCLIPEmbedModelConfig = (config: AnyModelConfig): config is CLIPEmbedModelConfig => {
+  return config.type === 'clip_embed';
+};
+
+export const isCLIPLEmbedModelConfigOrSubmodel = (
   config: AnyModelConfig,
   excludeSubmodels?: boolean
 ): config is CLIPLEmbedModelConfig => {
@@ -276,7 +288,7 @@ export const isCLIPLEmbedModelConfig = (
   );
 };
 
-export const isCLIPGEmbedModelConfig = (
+export const isCLIPGEmbedModelConfigOrSubmodel = (
   config: AnyModelConfig,
   excludeSubmodels?: boolean
 ): config is CLIPGEmbedModelConfig => {
@@ -306,6 +318,10 @@ export const isChatGPT4oModelConfig = (config: AnyModelConfig): config is ChatGP
 
 export const isVideoModelConfig = (config: AnyModelConfig): config is VideoApiModelConfig => {
   return config.type === 'video';
+};
+
+export const isUnknownModelConfig = (config: AnyModelConfig): config is UnknownModelConfig => {
+  return config.type === 'unknown';
 };
 
 export const isFluxKontextApiModelConfig = (config: AnyModelConfig): config is ApiModelConfig => {
