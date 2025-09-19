@@ -164,7 +164,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
         const kontextImagePrep = g.addNode({
           id: getPrefixedId('flux_kontext_image_prep'),
           type: 'flux_kontext_image_prep',
-          images: [zImageField.parse(config.image)],
+          images: [zImageField.parse(config.image?.crop?.image ?? config.image?.original.image)],
         });
         const kontextConditioning = g.addNode({
           type: 'flux_kontext',
