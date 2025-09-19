@@ -30,6 +30,7 @@ class BaseModelType(str, Enum):
     Imagen4 = "imagen4"
     Gemini2_5 = "gemini-2.5"
     ChatGPT4o = "chatgpt-4o"
+    # This is actually the FLUX Kontext API model. Local FLUX Kontext is just BaseModelType.Flux.
     FluxKontext = "flux-kontext"
     Veo3 = "veo3"
     Runway = "runway"
@@ -90,6 +91,9 @@ class ModelVariantType(str, Enum):
     Normal = "normal"
     Inpaint = "inpaint"
     Depth = "depth"
+    FluxDev = "flux_dev"
+    FluxDevFill = "flux_dev_fill"
+    FluxSchnell = "flux_schnell"
 
 
 class ModelFormat(str, Enum):

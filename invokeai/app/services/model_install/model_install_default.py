@@ -5,6 +5,7 @@ import os
 import re
 import threading
 import time
+from copy import deepcopy
 from pathlib import Path
 from queue import Empty, Queue
 from shutil import move, rmtree
@@ -607,9 +608,11 @@ class ModelInstallService(ModelInstallServiceBase):
         #   any given model - eliminating ambiguity and removing reliance on order.
         # After implementing either of these fixes, remove @pytest.mark.xfail from `test_regression_against_model_probe`
         try:
-            return ModelProbe.probe(model_path=model_path, fields=fields, hash_algo=hash_algo)  # type: ignore
+            fields_copy = deepcopy(fields)
+            return ModelProbe.probe(model_path=model_path, fields=fields_copy, hash_algo=hash_algo)  # type: ignore
         except InvalidModelConfigException:
-            return ModelConfigBase.classify(model_path, hash_algo, **fields)
+            fields_copy = deepcopy(fields)
+            return ModelConfigBase.classify(model_path, hash_algo, **fields_copy)
 
     def _register(
         self, model_path: Path, config: Optional[ModelRecordChanges] = None, info: Optional[AnyModelConfig] = None

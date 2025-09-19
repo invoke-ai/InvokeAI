@@ -141,10 +141,25 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         with self._db.transaction() as cursor:
             record = self.get_model(key)
 
-            # Model configs use pydantic's `validate_assignment`, so each change is validated by pydantic.
-            for field_name in changes.model_fields_set:
-                setattr(record, field_name, getattr(changes, field_name))
+            # The changes may mean the model config class changes. So we need to:
+            #
+            # 1. convert the existing record to a dict
+            # 2. apply the changes to the dict
+            # 3. create a new model config from the updated dict
+            #
+            # This way we ensure that the update does not inadvertently create an invalid model config.
 
+            # 1. convert the existing record to a dict
+            record_as_dict = record.model_dump()
+
+            # 2. apply the changes to the dict
+            for field_name in changes.model_fields_set:
+                record_as_dict[field_name] = getattr(changes, field_name)
+
+            # 3. create a new model config from the updated dict
+            record = ModelConfigFactory.make_config(record_as_dict)
+
+            # If we get this far, the updated model config is valid, so we can save it to the database.
             json_serialized = record.model_dump_json()
 
             cursor.execute(
