@@ -187,17 +187,22 @@ class ModelInstallService(ModelInstallServiceBase):
 
         dest_dir = self.app_config.models_path / info.key
         try:
+            if dest_dir.exists():
+                raise FileExistsError(
+                    f"Cannot install model {model_path.name} to {dest_dir}: destination already exists"
+                )
             dest_dir.mkdir(parents=True)
             dest_path = dest_dir / model_path.name if model_path.is_file() else dest_dir
-            if dest_path.exists():
-                raise FileExistsError(
-                    f"Cannot install model {model_path.name} to {dest_path}: destination already exists"
-                )
-            move(model_path, dest_path)
-        except FileExistsError as excp:
+            if model_path.is_file():
+                move(model_path, dest_path)
+            elif model_path.is_dir():
+                # Move the contents of the directory, not the directory itself
+                for item in model_path.iterdir():
+                    move(item, dest_dir / item.name)
+        except FileExistsError as e:
             raise DuplicateModelException(
                 f"A model named {model_path.name} is already installed at {dest_dir.as_posix()}"
-            ) from excp
+            ) from e
 
         return self._register(
             dest_path,
