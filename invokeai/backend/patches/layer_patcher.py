@@ -11,6 +11,10 @@ from invokeai.backend.patches.pad_with_zeros import pad_with_zeros
 from invokeai.backend.util import InvokeAILogger
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
+from invokeai.backend.flux.modules.layers import MLPEmbedder
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_flux_mlp_embedder import (
+    CustomFluxMLPEmbedder,
+)
 
 
 class LayerPatcher:
@@ -28,8 +32,7 @@ class LayerPatcher:
         suppress_warning_layers: Optional[re.Pattern] = None,
     ):
         """Apply 'smart' model patching that chooses whether to use direct patching or a sidecar wrapper for each
-        module.
-        """
+        module."""
 
         # original_weights are stored for unpatching layers that are directly patched.
         original_weights = OriginalWeightsStorage(cached_weights)
@@ -77,8 +80,7 @@ class LayerPatcher:
         suppress_warning_layers: Optional[re.Pattern] = None,
     ):
         """Apply a single LoRA patch to a model using the 'smart' patching strategy that chooses whether to use direct
-        patching or a sidecar wrapper for each module.
-        """
+        patching or a sidecar wrapper for each module."""
         if patch_weight == 0:
             return
 
@@ -124,9 +126,15 @@ class LayerPatcher:
                 use_sidecar_patching = False
             elif force_sidecar_patching:
                 use_sidecar_patching = True
+            # elif not hasattr(module, "get_num_patches"):
+            #    continue
             elif module.get_num_patches() > 0:
                 use_sidecar_patching = True
             elif LayerPatcher._is_any_part_of_layer_on_cpu(module):
+                use_sidecar_patching = True
+
+            # Force sidecar patching for MLPEmbedder and CustomFluxMLPEmbedder
+            if isinstance(module, (MLPEmbedder, CustomFluxMLPEmbedder)):
                 use_sidecar_patching = True
 
             if use_sidecar_patching:
@@ -174,9 +182,12 @@ class LayerPatcher:
 
         # TODO(ryand): Using torch.autocast(...) over explicit casting may offer a speed benefit on CUDA
         # devices here. Experimentally, it was found to be very slow on CPU. More investigation needed.
-        for param_name, param_weight in patch.get_parameters(
-            dict(module_to_patch.named_parameters(recurse=False)), weight=patch_weight
-        ).items():
+        # Manually create orig_parameters to bypass named_parameters() issue.
+        orig_parameters = {"weight": module_to_patch.weight}
+        if module_to_patch.bias is not None:
+            orig_parameters["bias"] = module_to_patch.bias
+
+        for param_name, param_weight in patch.get_parameters(orig_parameters, weight=patch_weight).items():
             param_key = module_to_patch_key + "." + param_name
             module_param = module_to_patch.get_parameter(param_name)
 
@@ -250,7 +261,9 @@ class LayerPatcher:
 
     @staticmethod
     def _get_submodule(
-        model: torch.nn.Module, layer_key: str, layer_key_is_flattened: bool
+        model: torch.nn.Module,
+        layer_key: str,
+        layer_key_is_flattened: bool,
     ) -> tuple[str, torch.nn.Module]:
         """Get the submodule corresponding to the given layer key.
 
