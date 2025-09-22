@@ -24,6 +24,7 @@ import { changeBoardModalSliceConfig } from 'features/changeBoardModal/store/sli
 import { canvasSettingsSliceConfig } from 'features/controlLayers/store/canvasSettingsSlice';
 import { canvasSliceConfig } from 'features/controlLayers/store/canvasSlice';
 import { canvasSessionSliceConfig } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { canvasWorkflowSliceConfig } from 'features/controlLayers/store/canvasWorkflowSlice';
 import { lorasSliceConfig } from 'features/controlLayers/store/lorasSlice';
 import { paramsSliceConfig } from 'features/controlLayers/store/paramsSlice';
 import { refImagesSliceConfig } from 'features/controlLayers/store/refImagesSlice';
@@ -65,6 +66,7 @@ const log = logger('system');
 const SLICE_CONFIGS = {
   [canvasSessionSliceConfig.slice.reducerPath]: canvasSessionSliceConfig,
   [canvasSettingsSliceConfig.slice.reducerPath]: canvasSettingsSliceConfig,
+  [canvasWorkflowSliceConfig.slice.reducerPath]: canvasWorkflowSliceConfig,
   [canvasSliceConfig.slice.reducerPath]: canvasSliceConfig,
   [changeBoardModalSliceConfig.slice.reducerPath]: changeBoardModalSliceConfig,
   [configSliceConfig.slice.reducerPath]: configSliceConfig,
@@ -91,6 +93,7 @@ const ALL_REDUCERS = {
   [api.reducerPath]: api.reducer,
   [canvasSessionSliceConfig.slice.reducerPath]: canvasSessionSliceConfig.slice.reducer,
   [canvasSettingsSliceConfig.slice.reducerPath]: canvasSettingsSliceConfig.slice.reducer,
+  [canvasWorkflowSliceConfig.slice.reducerPath]: canvasWorkflowSliceConfig.slice.reducer,
   // Undoable!
   [canvasSliceConfig.slice.reducerPath]: undoable(
     canvasSliceConfig.slice.reducer,

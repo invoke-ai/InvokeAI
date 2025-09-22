@@ -9,6 +9,7 @@ import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasMana
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { positivePromptAddedToHistory, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
+import { buildCanvasWorkflowGraph } from 'features/nodes/util/graph/generation/buildCanvasWorkflowGraph';
 import { buildChatGPT4oGraph } from 'features/nodes/util/graph/generation/buildChatGPT4oGraph';
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
@@ -47,6 +48,63 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
   }
 
   const base = model.base;
+
+  const canvasWorkflowState = state.canvasWorkflow;
+  const hasWorkflowData = Boolean(
+    canvasWorkflowState.workflow && canvasWorkflowState.inputNodeId && canvasWorkflowState.outputNodeId
+  );
+  const isCustomCanvasWorkflowActive =
+    hasWorkflowData && (canvasWorkflowState.status === 'succeeded' || canvasWorkflowState.status === 'idle');
+
+  if (isCustomCanvasWorkflowActive) {
+    const buildGraphResult = await withResultAsync(() =>
+      buildCanvasWorkflowGraph({ state, manager: canvasManager, workflowState: canvasWorkflowState })
+    );
+
+    if (buildGraphResult.isErr()) {
+      const error = serializeError(buildGraphResult.error);
+      log.error({ error }, 'Failed to build custom canvas workflow graph');
+      toast({
+        status: 'error',
+        title: 'Failed to build canvas workflow graph',
+        description: buildGraphResult.error.message,
+      });
+      return;
+    }
+
+    const { g, seed, positivePrompt } = buildGraphResult.value;
+
+    const prepareBatchResult = withResult(() =>
+      prepareLinearUIBatch({
+        state,
+        g,
+        base,
+        prepend,
+        seedNode: seed,
+        positivePromptNode: positivePrompt,
+        origin: 'canvas',
+        destination,
+      })
+    );
+
+    if (prepareBatchResult.isErr()) {
+      log.error({ error: serializeError(prepareBatchResult.error) }, 'Failed to prepare batch');
+      return;
+    }
+
+    const batchConfig = prepareBatchResult.value;
+
+    const req = dispatch(
+      queueApi.endpoints.enqueueBatch.initiate(batchConfig, {
+        ...enqueueMutationFixedCacheKeyOptions,
+        track: false,
+      })
+    );
+
+    const enqueueResult = await req.unwrap();
+    dispatch(positivePromptAddedToHistory(selectPositivePrompt(state)));
+    return { batchConfig, enqueueResult };
+  }
 
   const buildGraphResult = await withResultAsync(async () => {
     const generationMode = await canvasManager.compositor.getGenerationMode();

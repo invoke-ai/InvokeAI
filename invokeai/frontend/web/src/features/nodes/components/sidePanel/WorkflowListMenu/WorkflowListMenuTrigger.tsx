@@ -2,6 +2,7 @@ import { Button, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectWorkflowName } from 'features/nodes/store/selectors';
 import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFolderOpenFill } from 'react-icons/pi';
 
@@ -10,8 +11,12 @@ export const WorkflowListMenuTrigger = () => {
   const { t } = useTranslation();
   const workflowName = useAppSelector(selectWorkflowName);
 
+  const onClick = useCallback(() => {
+    workflowLibraryModal.open();
+  }, [workflowLibraryModal]);
+
   return (
-    <Button variant="ghost" rightIcon={<PiFolderOpenFill />} size="sm" onClick={workflowLibraryModal.open}>
+    <Button variant="ghost" rightIcon={<PiFolderOpenFill />} size="sm" onClick={onClick}>
       <Text
         display="auto"
         noOfLines={1}
