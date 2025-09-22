@@ -975,7 +975,7 @@ const RefImages: CollectionMetadataHandler<RefImageState[]> = {
 
     for (const refImage of parsed) {
       if (refImage.config.image) {
-        await throwIfImageDoesNotExist(refImage.config.image.image_name, store);
+        await throwIfImageDoesNotExist(refImage.config.image.original.image.image_name, store);
       }
       if (refImage.config.model) {
         await throwIfModelDoesNotExist(refImage.config.model.key, store);

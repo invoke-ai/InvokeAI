@@ -6,11 +6,12 @@ from pydantic import field_validator
 from transformers import AutoProcessor, LlavaOnevisionForConditionalGeneration, LlavaOnevisionProcessor
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
-from invokeai.app.invocations.fields import FieldDescriptions, ImageField, InputField, UIComponent, UIType
+from invokeai.app.invocations.fields import FieldDescriptions, ImageField, InputField, UIComponent
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import StringOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.llava_onevision_pipeline import LlavaOnevisionPipeline
+from invokeai.backend.model_manager.taxonomy import ModelType
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -34,7 +35,7 @@ class LlavaOnevisionVllmInvocation(BaseInvocation):
     vllm_model: ModelIdentifierField = InputField(
         title="LLaVA Model Type",
         description=FieldDescriptions.vllm_model,
-        ui_type=UIType.LlavaOnevisionModel,
+        ui_model_type=ModelType.LlavaOnevision,
     )
 
     @field_validator("images", mode="before")

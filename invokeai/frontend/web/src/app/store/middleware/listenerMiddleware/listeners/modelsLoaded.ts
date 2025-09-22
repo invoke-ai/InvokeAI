@@ -12,7 +12,13 @@ import {
 } from 'features/controlLayers/store/paramsSlice';
 import { refImageModelChanged, selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import { getEntityIdentifier, isFLUXReduxConfig, isIPAdapterConfig } from 'features/controlLayers/store/types';
+import {
+  getEntityIdentifier,
+  isFLUXReduxConfig,
+  isIPAdapterConfig,
+  isRegionalGuidanceFLUXReduxConfig,
+  isRegionalGuidanceIPAdapterConfig,
+} from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { modelSelected } from 'features/parameters/store/actions';
 import {
@@ -252,7 +258,7 @@ const handleIPAdapterModels: ModelHandler = (models, state, dispatch, log) => {
 
   selectCanvasSlice(state).regionalGuidance.entities.forEach((entity) => {
     entity.referenceImages.forEach(({ id: referenceImageId, config }) => {
-      if (!isIPAdapterConfig(config)) {
+      if (!isRegionalGuidanceIPAdapterConfig(config)) {
         return;
       }
 
@@ -295,7 +301,7 @@ const handleFLUXReduxModels: ModelHandler = (models, state, dispatch, log) => {
 
   selectCanvasSlice(state).regionalGuidance.entities.forEach((entity) => {
     entity.referenceImages.forEach(({ id: referenceImageId, config }) => {
-      if (!isFLUXReduxConfig(config)) {
+      if (!isRegionalGuidanceFLUXReduxConfig(config)) {
         return;
       }
 

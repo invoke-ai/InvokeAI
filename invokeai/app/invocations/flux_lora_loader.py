@@ -6,10 +6,10 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
+from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField
 from invokeai.app.invocations.model import CLIPField, LoRAField, ModelIdentifierField, T5EncoderField, TransformerField
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.taxonomy import BaseModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
 
 @invocation_output("flux_lora_loader_output")
@@ -36,7 +36,10 @@ class FluxLoRALoaderInvocation(BaseInvocation):
     """Apply a LoRA model to a FLUX transformer and/or text encoder."""
 
     lora: ModelIdentifierField = InputField(
-        description=FieldDescriptions.lora_model, title="LoRA", ui_type=UIType.LoRAModel
+        description=FieldDescriptions.lora_model,
+        title="LoRA",
+        ui_model_base=BaseModelType.Flux,
+        ui_model_type=ModelType.LoRA,
     )
     weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
     transformer: TransformerField | None = InputField(

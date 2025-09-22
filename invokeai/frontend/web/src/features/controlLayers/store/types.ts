@@ -37,6 +37,45 @@ export const zImageWithDims = z.object({
 });
 export type ImageWithDims = z.infer<typeof zImageWithDims>;
 
+const zCropBox = z.object({
+  x: z.number().min(0),
+  y: z.number().min(0),
+  width: z.number().positive(),
+  height: z.number().positive(),
+});
+// This new schema is an extension of zImageWithDims, with an optional crop field.
+//
+// When we added cropping support to certain entities (e.g. Ref Images, video Starting Frame Image), we changed
+// their schemas from using zImageWithDims to this new schema. To support loading pre-existing entities that
+// were created before cropping was supported, we can use zod's preprocess to transform old data into the new format.
+// Its essentially a data migration step.
+//
+// This parsing happens currently in two places:
+// - Recalling metadata.
+// - Loading/rehydrating persisted client state from storage.
+export const zCroppableImageWithDims = z.preprocess(
+  (val) => {
+    try {
+      const imageWithDims = zImageWithDims.parse(val);
+      const migrated = { original: { image: deepClone(imageWithDims) } };
+      return migrated;
+    } catch {
+      return val;
+    }
+  },
+  z.object({
+    original: z.object({ image: zImageWithDims }),
+    crop: z
+      .object({
+        box: zCropBox,
+        ratio: z.number().gt(0).nullable(),
+        image: zImageWithDims,
+      })
+      .optional(),
+  })
+);
+export type CroppableImageWithDims = z.infer<typeof zCroppableImageWithDims>;
+
 const zImageWithDimsDataURL = z.object({
   dataURL: z.string(),
   width: z.number().int().positive(),
@@ -235,7 +274,7 @@ export type CanvasObjectState = z.infer<typeof zCanvasObjectState>;
 
 const zIPAdapterConfig = z.object({
   type: z.literal('ip_adapter'),
-  image: zImageWithDims.nullable(),
+  image: zCroppableImageWithDims.nullable(),
   model: zModelIdentifierField.nullable(),
   weight: z.number().gte(-1).lte(2),
   beginEndStepPct: zBeginEndStepPct,
@@ -244,21 +283,39 @@ const zIPAdapterConfig = z.object({
 });
 export type IPAdapterConfig = z.infer<typeof zIPAdapterConfig>;
 
+const zRegionalGuidanceIPAdapterConfig = z.object({
+  type: z.literal('ip_adapter'),
+  image: zImageWithDims.nullable(),
+  model: zModelIdentifierField.nullable(),
+  weight: z.number().gte(-1).lte(2),
+  beginEndStepPct: zBeginEndStepPct,
+  method: zIPMethodV2,
+  clipVisionModel: zCLIPVisionModelV2,
+});
+export type RegionalGuidanceIPAdapterConfig = z.infer<typeof zRegionalGuidanceIPAdapterConfig>;
+
 const zFLUXReduxImageInfluence = z.enum(['lowest', 'low', 'medium', 'high', 'highest']);
 export const isFLUXReduxImageInfluence = (v: unknown): v is FLUXReduxImageInfluence =>
   zFLUXReduxImageInfluence.safeParse(v).success;
 export type FLUXReduxImageInfluence = z.infer<typeof zFLUXReduxImageInfluence>;
 const zFLUXReduxConfig = z.object({
   type: z.literal('flux_redux'),
-  image: zImageWithDims.nullable(),
+  image: zCroppableImageWithDims.nullable(),
   model: zModelIdentifierField.nullable(),
   imageInfluence: zFLUXReduxImageInfluence.default('highest'),
 });
 export type FLUXReduxConfig = z.infer<typeof zFLUXReduxConfig>;
+const zRegionalGuidanceFLUXReduxConfig = z.object({
+  type: z.literal('flux_redux'),
+  image: zImageWithDims.nullable(),
+  model: zModelIdentifierField.nullable(),
+  imageInfluence: zFLUXReduxImageInfluence.default('highest'),
+});
+type RegionalGuidanceFLUXReduxConfig = z.infer<typeof zRegionalGuidanceFLUXReduxConfig>;
 
 const zChatGPT4oReferenceImageConfig = z.object({
   type: z.literal('chatgpt_4o_reference_image'),
-  image: zImageWithDims.nullable(),
+  image: zCroppableImageWithDims.nullable(),
   /**
    * TODO(psyche): Technically there is no model for ChatGPT 4o reference images - it's just a field in the API call.
    * But we use a model drop down to switch between different ref image types, so there needs to be a model here else
@@ -270,14 +327,14 @@ export type ChatGPT4oReferenceImageConfig = z.infer<typeof zChatGPT4oReferenceIm
 
 const zGemini2_5ReferenceImageConfig = z.object({
   type: z.literal('gemini_2_5_reference_image'),
-  image: zImageWithDims.nullable(),
+  image: zCroppableImageWithDims.nullable(),
   model: zModelIdentifierField.nullable(),
 });
 export type Gemini2_5ReferenceImageConfig = z.infer<typeof zGemini2_5ReferenceImageConfig>;
 
 const zFluxKontextReferenceImageConfig = z.object({
   type: z.literal('flux_kontext_reference_image'),
-  image: zImageWithDims.nullable(),
+  image: zCroppableImageWithDims.nullable(),
   model: zModelIdentifierField.nullable(),
 });
 export type FluxKontextReferenceImageConfig = z.infer<typeof zFluxKontextReferenceImageConfig>;
@@ -307,6 +364,7 @@ export const isIPAdapterConfig = (config: RefImageState['config']): config is IP
 
 export const isFLUXReduxConfig = (config: RefImageState['config']): config is FLUXReduxConfig =>
   config.type === 'flux_redux';
+
 export const isChatGPT4oReferenceImageConfig = (
   config: RefImageState['config']
 ): config is ChatGPT4oReferenceImageConfig => config.type === 'chatgpt_4o_reference_image';
@@ -326,9 +384,17 @@ const zFill = z.object({ style: zFillStyle, color: zRgbColor });
 
 const zRegionalGuidanceRefImageState = z.object({
   id: zId,
-  config: z.discriminatedUnion('type', [zIPAdapterConfig, zFLUXReduxConfig]),
+  config: z.discriminatedUnion('type', [zRegionalGuidanceIPAdapterConfig, zRegionalGuidanceFLUXReduxConfig]),
 });
 export type RegionalGuidanceRefImageState = z.infer<typeof zRegionalGuidanceRefImageState>;
+
+export const isRegionalGuidanceIPAdapterConfig = (
+  config: RegionalGuidanceRefImageState['config']
+): config is RegionalGuidanceIPAdapterConfig => config.type === 'ip_adapter';
+
+export const isRegionalGuidanceFLUXReduxConfig = (
+  config: RegionalGuidanceRefImageState['config']
+): config is RegionalGuidanceFLUXReduxConfig => config.type === 'flux_redux';
 
 const zCanvasRegionalGuidanceState = zCanvasEntityBase.extend({
   type: z.literal('regional_guidance'),

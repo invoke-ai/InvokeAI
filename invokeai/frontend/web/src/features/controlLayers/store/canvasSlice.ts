@@ -82,10 +82,10 @@ import {
   IMAGEN_ASPECT_RATIOS,
   isChatGPT4oAspectRatioID,
   isFluxKontextAspectRatioID,
-  isFLUXReduxConfig,
   isGemini2_5AspectRatioID,
   isImagenAspectRatioID,
-  isIPAdapterConfig,
+  isRegionalGuidanceFLUXReduxConfig,
+  isRegionalGuidanceIPAdapterConfig,
   zCanvasState,
 } from './types';
 import {
@@ -99,6 +99,7 @@ import {
   initialControlNet,
   initialFLUXRedux,
   initialIPAdapter,
+  initialRegionalGuidanceIPAdapter,
   initialT2IAdapter,
   makeDefaultRasterLayerAdjustments,
 } from './util';
@@ -804,7 +805,7 @@ const slice = createSlice({
         if (!entity) {
           return;
         }
-        const config = { id: referenceImageId, config: deepClone(initialIPAdapter) };
+        const config = { id: referenceImageId, config: deepClone(initialRegionalGuidanceIPAdapter) };
         merge(config, overrides);
         entity.referenceImages.push(config);
       },
@@ -847,7 +848,7 @@ const slice = createSlice({
       if (!referenceImage) {
         return;
       }
-      if (!isIPAdapterConfig(referenceImage.config)) {
+      if (!isRegionalGuidanceIPAdapterConfig(referenceImage.config)) {
         return;
       }
 
@@ -864,7 +865,7 @@ const slice = createSlice({
       if (!referenceImage) {
         return;
       }
-      if (!isIPAdapterConfig(referenceImage.config)) {
+      if (!isRegionalGuidanceIPAdapterConfig(referenceImage.config)) {
         return;
       }
       referenceImage.config.beginEndStepPct = beginEndStepPct;
@@ -880,7 +881,7 @@ const slice = createSlice({
       if (!referenceImage) {
         return;
       }
-      if (!isIPAdapterConfig(referenceImage.config)) {
+      if (!isRegionalGuidanceIPAdapterConfig(referenceImage.config)) {
         return;
       }
       referenceImage.config.method = method;
@@ -899,7 +900,7 @@ const slice = createSlice({
       if (!referenceImage) {
         return;
       }
-      if (!isFLUXReduxConfig(referenceImage.config)) {
+      if (!isRegionalGuidanceFLUXReduxConfig(referenceImage.config)) {
         return;
       }
 
@@ -928,7 +929,7 @@ const slice = createSlice({
         return;
       }
 
-      if (isIPAdapterConfig(referenceImage.config) && isFluxReduxModelConfig(modelConfig)) {
+      if (isRegionalGuidanceIPAdapterConfig(referenceImage.config) && isFluxReduxModelConfig(modelConfig)) {
         // Switching from ip_adapter to flux_redux
         referenceImage.config = {
           ...initialFLUXRedux,
@@ -938,7 +939,7 @@ const slice = createSlice({
         return;
       }
 
-      if (isFLUXReduxConfig(referenceImage.config) && isIPAdapterModelConfig(modelConfig)) {
+      if (isRegionalGuidanceFLUXReduxConfig(referenceImage.config) && isIPAdapterModelConfig(modelConfig)) {
         // Switching from flux_redux to ip_adapter
         referenceImage.config = {
           ...initialIPAdapter,
@@ -948,7 +949,7 @@ const slice = createSlice({
         return;
       }
 
-      if (isIPAdapterConfig(referenceImage.config)) {
+      if (isRegionalGuidanceIPAdapterConfig(referenceImage.config)) {
         referenceImage.config.model = zModelIdentifierField.parse(modelConfig);
 
         // Ensure that the IP Adapter model is compatible with the CLIP Vision model
@@ -971,7 +972,7 @@ const slice = createSlice({
       if (!referenceImage) {
         return;
       }
-      if (!isIPAdapterConfig(referenceImage.config)) {
+      if (!isRegionalGuidanceIPAdapterConfig(referenceImage.config)) {
         return;
       }
       referenceImage.config.clipVisionModel = clipVisionModel;

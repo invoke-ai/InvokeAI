@@ -131,7 +131,8 @@
         "notInstalled": "Non $t(common.installed)",
         "prevPage": "Pagina precedente",
         "nextPage": "Pagina successiva",
-        "resetToDefaults": "Ripristina impostazioni predefinite"
+        "resetToDefaults": "Ripristina impostazioni predefinite",
+        "crop": "Ritaglia"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -278,6 +279,14 @@
             "selectVideoTab": {
                 "title": "Seleziona la scheda Video",
                 "desc": "Seleziona la scheda Video."
+            },
+            "promptHistoryPrev": {
+                "title": "Prompt precedente nella cronologia",
+                "desc": "Quando il prompt è attivo, passa al prompt precedente (più vecchio) nella cronologia."
+            },
+            "promptHistoryNext": {
+                "title": "Prossimo prompt nella cronologia",
+                "desc": "Quando il prompt è attivo, passa al prompt successivo (più recente) nella cronologia."
             }
         },
         "hotkeys": "Tasti di scelta rapida",
@@ -875,7 +884,8 @@
         "video": "Video",
         "resolution": "Risoluzione",
         "downloadImage": "Scarica l'immagine",
-        "showOptionsPanel": "Mostra pannello laterale (O o T)"
+        "showOptionsPanel": "Mostra pannello laterale (O o T)",
+        "startingFrameImageAspectRatioWarning": "Le proporzioni dell'immagine non corrispondono alle proporzioni del video ({{videoAspectRatio}}). Ciò potrebbe causare ritagli imprevisti durante la generazione del video."
     },
     "settings": {
         "models": "Modelli",
@@ -2095,7 +2105,10 @@
         "generateFromImage": "Genera prompt dall'immagine",
         "resultTitle": "Espansione del prompt completata",
         "resultSubtitle": "Scegli come gestire il prompt espanso:",
-        "insert": "Inserisci"
+        "insert": "Inserisci",
+        "noPromptHistory": "Nessuna cronologia di prompt registrata.",
+        "noMatchingPrompts": "Nessun prompt corrispondente nella cronologia.",
+        "toSwitchBetweenPrompts": "per passare da un prompt all'altro."
     },
     "controlLayers": {
         "addLayer": "Aggiungi Livello",
@@ -2791,7 +2804,8 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "items": [
             "Seleziona oggetto v2: selezione degli oggetti migliorata con input di punti e riquadri o prompt di testo.",
-            "Regolazioni del livello raster: regola facilmente la luminosità, il contrasto, la saturazione, le curve e altro ancora del livello."
+            "Regolazioni del livello raster: regola facilmente la luminosità, il contrasto, la saturazione, le curve e altro ancora del livello.",
+            "Cronologia prompt: rivedi e richiama rapidamente i tuoi ultimi 100 prompt."
         ],
         "watchUiUpdatesOverview": "Guarda la panoramica degli aggiornamenti dell'interfaccia utente"
     },

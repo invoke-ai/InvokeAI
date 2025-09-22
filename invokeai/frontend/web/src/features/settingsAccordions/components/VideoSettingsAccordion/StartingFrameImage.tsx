@@ -1,20 +1,25 @@
-import { Flex, FormLabel, Text } from '@invoke-ai/ui-library';
+import { Flex, FormLabel, Icon, IconButton, Text, Tooltip } from '@invoke-ai/ui-library';
+import { objectEquals } from '@observ33r/object-equals';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { UploadImageIconButton } from 'common/hooks/useImageUploadButton';
-import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
+import { ASPECT_RATIO_MAP } from 'features/controlLayers/store/types';
+import { imageDTOToCroppableImage, imageDTOToImageWithDims } from 'features/controlLayers/store/util';
+import { Editor } from 'features/cropper/lib/editor';
+import { cropImageModalApi } from 'features/cropper/store';
 import { videoFrameFromImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
-import { DndImageIcon } from 'features/dnd/DndImageIcon';
+import { DndImageIcon, imageButtonSx } from 'features/dnd/DndImageIcon';
 import {
   selectStartingFrameImage,
+  selectVideoAspectRatio,
   selectVideoModelRequiresStartingFrame,
   startingFrameImageChanged,
 } from 'features/parameters/store/videoSlice';
 import { t } from 'i18next';
-import { useCallback } from 'react';
-import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
-import { useImageDTO } from 'services/api/endpoints/images';
+import { useCallback, useMemo } from 'react';
+import { PiArrowCounterClockwiseBold, PiCropBold, PiWarningBold } from 'react-icons/pi';
+import { useImageDTO, useUploadImageMutation } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
 const dndTargetData = videoFrameFromImageDndTarget.getData({ frame: 'start' });
@@ -23,7 +28,10 @@ export const StartingFrameImage = () => {
   const dispatch = useAppDispatch();
   const requiresStartingFrame = useAppSelector(selectVideoModelRequiresStartingFrame);
   const startingFrameImage = useAppSelector(selectStartingFrameImage);
-  const imageDTO = useImageDTO(startingFrameImage?.image_name);
+  const originalImageDTO = useImageDTO(startingFrameImage?.original.image.image_name);
+  const croppedImageDTO = useImageDTO(startingFrameImage?.crop?.image.image_name);
+  const videoAspectRatio = useAppSelector(selectVideoAspectRatio);
+  const [uploadImage] = useUploadImageMutation();
 
   const onReset = useCallback(() => {
     dispatch(startingFrameImageChanged(null));
@@ -31,27 +39,106 @@ export const StartingFrameImage = () => {
 
   const onUpload = useCallback(
     (imageDTO: ImageDTO) => {
-      dispatch(startingFrameImageChanged(imageDTOToImageWithDims(imageDTO)));
+      dispatch(startingFrameImageChanged(imageDTOToCroppableImage(imageDTO)));
     },
     [dispatch]
   );
 
+  const edit = useCallback(() => {
+    if (!originalImageDTO) {
+      return;
+    }
+
+    // We will create a new editor instance each time the user wants to edit
+    const editor = new Editor();
+
+    // When the user applies the crop, we will upload the cropped image and store the applied crop box so if the user
+    // re-opens the editor they see the same crop
+    const onApplyCrop = async () => {
+      const box = editor.getCropBox();
+      if (objectEquals(box, startingFrameImage?.crop?.box)) {
+        // If the box hasn't changed, don't do anything
+        return;
+      }
+      if (!box || objectEquals(box, { x: 0, y: 0, width: originalImageDTO.width, height: originalImageDTO.height })) {
+        // There is a crop applied but it is the whole iamge - revert to original image
+        dispatch(startingFrameImageChanged(imageDTOToCroppableImage(originalImageDTO)));
+        return;
+      }
+      const blob = await editor.exportImage('blob');
+      const file = new File([blob], 'image.png', { type: 'image/png' });
+
+      const newCroppedImageDTO = await uploadImage({
+        file,
+        is_intermediate: true,
+        image_category: 'user',
+      }).unwrap();
+
+      dispatch(
+        startingFrameImageChanged(
+          imageDTOToCroppableImage(originalImageDTO, {
+            image: imageDTOToImageWithDims(newCroppedImageDTO),
+            box,
+            ratio: editor.getCropAspectRatio(),
+          })
+        )
+      );
+    };
+
+    const onReady = async () => {
+      const initial = startingFrameImage?.crop
+        ? { cropBox: startingFrameImage.crop.box, aspectRatio: startingFrameImage.crop.ratio }
+        : undefined;
+      // Load the image into the editor and open the modal once it's ready
+      await editor.loadImage(originalImageDTO.image_url, initial);
+    };
+
+    cropImageModalApi.open({ editor, onApplyCrop, onReady });
+  }, [dispatch, originalImageDTO, startingFrameImage?.crop, uploadImage]);
+
+  const fitsCurrentAspectRatio = useMemo(() => {
+    const imageDTO = croppedImageDTO ?? originalImageDTO;
+    if (!imageDTO) {
+      return true;
+    }
+
+    const imageRatio = imageDTO.width / imageDTO.height;
+    const targetRatio = ASPECT_RATIO_MAP[videoAspectRatio].ratio;
+
+    // Call it a fit if the image is within 10% of the target aspect ratio
+    return Math.abs((imageRatio - targetRatio) / targetRatio) < 0.1;
+  }, [croppedImageDTO, originalImageDTO, videoAspectRatio]);
+
   return (
     <Flex justifyContent="flex-start" flexDir="column" gap={2}>
-      <FormLabel>{t('parameters.startingFrameImage')}</FormLabel>
+      <FormLabel display="flex" alignItems="center" gap={2}>
+        <Text>{t('parameters.startingFrameImage')}</Text>
+        {!fitsCurrentAspectRatio && (
+          <Tooltip label={t('parameters.startingFrameImageAspectRatioWarning', { videoAspectRatio: videoAspectRatio })}>
+            <Flex alignItems="center">
+              <Icon as={PiWarningBold} size={16} color="warning.300" />
+            </Flex>
+          </Tooltip>
+        )}
+      </FormLabel>
       <Flex position="relative" w={36} h={36} alignItems="center" justifyContent="center">
-        {!imageDTO && (
+        {!originalImageDTO && (
           <UploadImageIconButton
             w="full"
             h="full"
-            isError={requiresStartingFrame && !imageDTO}
+            isError={requiresStartingFrame && !originalImageDTO}
             onUpload={onUpload}
             fontSize={36}
           />
         )}
-        {imageDTO && (
+        {originalImageDTO && (
           <>
-            <DndImage imageDTO={imageDTO} borderRadius="base" borderWidth={1} borderStyle="solid" />
+            <DndImage
+              imageDTO={croppedImageDTO ?? originalImageDTO}
+              borderRadius="base"
+              borderWidth={1}
+              borderStyle="solid"
+            />
             <Flex position="absolute" flexDir="column" top={1} insetInlineEnd={1} gap={1}>
               <DndImageIcon
                 onClick={onReset}
@@ -59,6 +146,18 @@ export const StartingFrameImage = () => {
                 tooltip={t('common.reset')}
               />
             </Flex>
+
+            <Flex position="absolute" flexDir="column" top={1} insetInlineStart={1} gap={1}>
+              <IconButton
+                variant="link"
+                sx={imageButtonSx}
+                aria-label={t('common.crop')}
+                onClick={edit}
+                icon={<PiCropBold size={16} />}
+                tooltip={t('common.crop')}
+              />
+            </Flex>
+
             <Text
               position="absolute"
               background="base.900"
@@ -73,7 +172,7 @@ export const StartingFrameImage = () => {
               borderTopEndRadius="base"
               borderBottomStartRadius="base"
               pointerEvents="none"
-            >{`${imageDTO.width}x${imageDTO.height}`}</Text>
+            >{`${croppedImageDTO?.width ?? originalImageDTO.width}x${croppedImageDTO?.height ?? originalImageDTO.height}`}</Text>
           </>
         )}
         <DndDropTarget label="Drop" dndTarget={videoFrameFromImageDndTarget} dndTargetData={dndTargetData} />

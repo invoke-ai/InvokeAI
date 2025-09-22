@@ -1,6 +1,7 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { getStore } from 'app/store/nanostores/store';
+import type { CroppableImageWithDims } from 'features/controlLayers/store/types';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import type { components, paths } from 'services/api/schema';
 import type {
@@ -591,5 +592,12 @@ export const imageDTOToFile = async (imageDTO: ImageDTO): Promise<File> => {
 
 export const useImageDTO = (imageName: string | null | undefined) => {
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName ?? skipToken);
+  return imageDTO ?? null;
+};
+
+export const useImageDTOFromCroppableImage = (croppableImage: CroppableImageWithDims | null) => {
+  const { currentData: imageDTO } = useGetImageDTOQuery(
+    croppableImage?.crop?.image.image_name ?? croppableImage?.original.image.image_name ?? skipToken
+  );
   return imageDTO ?? null;
 };

@@ -30,6 +30,7 @@ import type {
   FluxKontextReferenceImageConfig,
   Gemini2_5ReferenceImageConfig,
   IPAdapterConfig,
+  RegionalGuidanceIPAdapterConfig,
   T2IAdapterConfig,
 } from 'features/controlLayers/store/types';
 import {
@@ -38,6 +39,7 @@ import {
   initialFluxKontextReferenceImage,
   initialGemini2_5ReferenceImage,
   initialIPAdapter,
+  initialRegionalGuidanceIPAdapter,
   initialT2IAdapter,
 } from 'features/controlLayers/store/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
@@ -125,7 +127,7 @@ export const getDefaultRefImageConfig = (
   return config;
 };
 
-export const getDefaultRegionalGuidanceRefImageConfig = (getState: AppGetState): IPAdapterConfig => {
+export const getDefaultRegionalGuidanceRefImageConfig = (getState: AppGetState): RegionalGuidanceIPAdapterConfig => {
   // Regional guidance ref images do not support ChatGPT-4o, so we always return the IP Adapter config.
   const state = getState();
 
@@ -138,7 +140,7 @@ export const getDefaultRegionalGuidanceRefImageConfig = (getState: AppGetState):
   const modelConfig = ipAdapterModelConfigs.find((m) => m.base === base);
 
   // Clone the initial IP Adapter config and set the model if available.
-  const config = deepClone(initialIPAdapter);
+  const config = deepClone(initialRegionalGuidanceIPAdapter);
 
   if (modelConfig) {
     config.model = zModelIdentifierField.parse(modelConfig);

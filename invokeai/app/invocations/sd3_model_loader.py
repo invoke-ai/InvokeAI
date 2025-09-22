@@ -6,14 +6,14 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
+from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField
 from invokeai.app.invocations.model import CLIPField, ModelIdentifierField, T5EncoderField, TransformerField, VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.t5_model_identifier import (
     preprocess_t5_encoder_model_identifier,
     preprocess_t5_tokenizer_model_identifier,
 )
-from invokeai.backend.model_manager.taxonomy import SubModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ClipVariantType, ModelType, SubModelType
 
 
 @invocation_output("sd3_model_loader_output")
@@ -39,36 +39,43 @@ class Sd3ModelLoaderInvocation(BaseInvocation):
 
     model: ModelIdentifierField = InputField(
         description=FieldDescriptions.sd3_model,
-        ui_type=UIType.SD3MainModel,
         input=Input.Direct,
+        ui_model_base=BaseModelType.StableDiffusion3,
+        ui_model_type=ModelType.Main,
     )
 
     t5_encoder_model: Optional[ModelIdentifierField] = InputField(
         description=FieldDescriptions.t5_encoder,
-        ui_type=UIType.T5EncoderModel,
         input=Input.Direct,
         title="T5 Encoder",
         default=None,
+        ui_model_type=ModelType.T5Encoder,
     )
 
     clip_l_model: Optional[ModelIdentifierField] = InputField(
         description=FieldDescriptions.clip_embed_model,
-        ui_type=UIType.CLIPLEmbedModel,
         input=Input.Direct,
         title="CLIP L Encoder",
         default=None,
+        ui_model_type=ModelType.CLIPEmbed,
+        ui_model_variant=ClipVariantType.L,
     )
 
     clip_g_model: Optional[ModelIdentifierField] = InputField(
         description=FieldDescriptions.clip_g_model,
-        ui_type=UIType.CLIPGEmbedModel,
         input=Input.Direct,
         title="CLIP G Encoder",
         default=None,
+        ui_model_type=ModelType.CLIPEmbed,
+        ui_model_variant=ClipVariantType.G,
     )
 
     vae_model: Optional[ModelIdentifierField] = InputField(
-        description=FieldDescriptions.vae_model, ui_type=UIType.VAEModel, title="VAE", default=None
+        description=FieldDescriptions.vae_model,
+        title="VAE",
+        default=None,
+        ui_model_base=BaseModelType.StableDiffusion3,
+        ui_model_type=ModelType.VAE,
     )
 
     def invoke(self, context: InvocationContext) -> Sd3ModelLoaderOutput:

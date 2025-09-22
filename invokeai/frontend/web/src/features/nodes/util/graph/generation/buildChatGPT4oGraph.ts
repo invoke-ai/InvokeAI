@@ -5,7 +5,7 @@ import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlic
 import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import { isChatGPT4oAspectRatioID, isChatGPT4oReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
-import { type ImageField, zModelIdentifierField } from 'features/nodes/types/common';
+import { type ImageField, zImageField, zModelIdentifierField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   getOriginalAndScaledSizesForOtherModes,
@@ -49,9 +49,7 @@ export const buildChatGPT4oGraph = async (arg: GraphBuilderArg): Promise<GraphBu
     reference_images = [];
     for (const entity of validRefImages) {
       assert(entity.config.image, 'Image is required for reference image');
-      reference_images.push({
-        image_name: entity.config.image.image_name,
-      });
+      reference_images.push(zImageField.parse(entity.config.image.crop?.image ?? entity.config.image.original.image));
     }
   }
 

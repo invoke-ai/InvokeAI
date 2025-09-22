@@ -40,7 +40,7 @@ export const ModelView = memo(({ modelConfig }: Props) => {
   }, [modelConfig.base, modelConfig.type]);
 
   return (
-    <Flex flexDir="column" gap={4}>
+    <Flex flexDir="column" gap={4} h="full">
       <ModelHeader modelConfig={modelConfig}>
         {modelConfig.format === 'checkpoint' && modelConfig.type === 'main' && (
           <ModelConvertButton modelConfig={modelConfig} />
@@ -48,7 +48,7 @@ export const ModelView = memo(({ modelConfig }: Props) => {
         <ModelEditButton />
       </ModelHeader>
       <Divider />
-      <Flex flexDir="column" h="full" gap={4}>
+      <Flex flexDir="column" gap={4}>
         <Box>
           <SimpleGrid columns={2} gap={4}>
             <ModelAttrView label={t('modelManager.baseModel')} value={modelConfig.base} />

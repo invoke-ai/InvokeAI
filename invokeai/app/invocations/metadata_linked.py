@@ -53,7 +53,7 @@ from invokeai.app.invocations.primitives import (
 from invokeai.app.invocations.scheduler import SchedulerOutput
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField, T2IAdapterInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.taxonomy import ModelType, SubModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 from invokeai.version import __version__
 
@@ -473,7 +473,6 @@ class MetadataToModelOutput(BaseInvocationOutput):
     model: ModelIdentifierField = OutputField(
         description=FieldDescriptions.main_model,
         title="Model",
-        ui_type=UIType.MainModel,
     )
     name: str = OutputField(description="Model Name", title="Name")
     unet: UNetField = OutputField(description=FieldDescriptions.unet, title="UNet")
@@ -488,7 +487,6 @@ class MetadataToSDXLModelOutput(BaseInvocationOutput):
     model: ModelIdentifierField = OutputField(
         description=FieldDescriptions.main_model,
         title="Model",
-        ui_type=UIType.SDXLMainModel,
     )
     name: str = OutputField(description="Model Name", title="Name")
     unet: UNetField = OutputField(description=FieldDescriptions.unet, title="UNet")
@@ -519,8 +517,7 @@ class MetadataToModelInvocation(BaseInvocation, WithMetadata):
         input=Input.Direct,
     )
     default_value: ModelIdentifierField = InputField(
-        description="The default model to use if not found in the metadata",
-        ui_type=UIType.MainModel,
+        description="The default model to use if not found in the metadata", ui_model_type=ModelType.Main
     )
 
     _validate_custom_label = model_validator(mode="after")(validate_custom_label)
@@ -575,7 +572,8 @@ class MetadataToSDXLModelInvocation(BaseInvocation, WithMetadata):
     )
     default_value: ModelIdentifierField = InputField(
         description="The default SDXL Model to use if not found in the metadata",
-        ui_type=UIType.SDXLMainModel,
+        ui_model_type=ModelType.Main,
+        ui_model_base=BaseModelType.StableDiffusionXL,
     )
 
     _validate_custom_label = model_validator(mode="after")(validate_custom_label)

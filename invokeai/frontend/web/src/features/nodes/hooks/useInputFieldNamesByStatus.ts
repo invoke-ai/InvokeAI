@@ -2,20 +2,16 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import type { FieldInputTemplate } from 'features/nodes/types/field';
-import { isSingleOrCollection } from 'features/nodes/types/field';
-import { TEMPLATE_BUILDER_MAP } from 'features/nodes/util/schema/buildFieldInputTemplate';
+import { isSingleOrCollection, isStatefulFieldType } from 'features/nodes/types/field';
 import { useMemo } from 'react';
 
 const isConnectionInputField = (field: FieldInputTemplate) => {
-  return (
-    (field.input === 'connection' && !isSingleOrCollection(field.type)) || !(field.type.name in TEMPLATE_BUILDER_MAP)
-  );
+  return (field.input === 'connection' && !isSingleOrCollection(field.type)) || !isStatefulFieldType(field.type);
 };
 
 const isAnyOrDirectInputField = (field: FieldInputTemplate) => {
   return (
-    (['any', 'direct'].includes(field.input) || isSingleOrCollection(field.type)) &&
-    field.type.name in TEMPLATE_BUILDER_MAP
+    (['any', 'direct'].includes(field.input) || isSingleOrCollection(field.type)) && isStatefulFieldType(field.type)
   );
 };
 

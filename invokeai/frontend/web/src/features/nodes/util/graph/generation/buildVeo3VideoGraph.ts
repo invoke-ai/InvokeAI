@@ -61,7 +61,7 @@ export const buildVeo3VideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn =>
   const startingFrameImage = selectStartingFrameImage(state);
 
   if (startingFrameImage) {
-    const startingFrameImageField = zImageField.parse(startingFrameImage);
+    const startingFrameImageField = zImageField.parse(startingFrameImage.crop?.image ?? startingFrameImage.original);
     // @ts-expect-error: This node is not available in the OSS application
     veo3VideoNode.starting_image = startingFrameImageField;
   }

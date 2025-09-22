@@ -236,8 +236,11 @@ const deleteControlLayerImages = (state: RootState, dispatch: AppDispatch, image
 
 const deleteReferenceImages = (state: RootState, dispatch: AppDispatch, image_name: string) => {
   selectReferenceImageEntities(state).forEach((entity) => {
-    if (entity.config.image?.image_name === image_name) {
-      dispatch(refImageImageChanged({ id: entity.id, imageDTO: null }));
+    if (
+      entity.config.image?.original.image.image_name === image_name ||
+      entity.config.image?.crop?.image.image_name === image_name
+    ) {
+      dispatch(refImageImageChanged({ id: entity.id, croppableImage: null }));
     }
   });
 };
@@ -284,7 +287,10 @@ export const getImageUsage = (
 
   const isUpscaleImage = upscale.upscaleInitialImage?.image_name === image_name;
 
-  const isReferenceImage = refImages.entities.some(({ config }) => config.image?.image_name === image_name);
+  const isReferenceImage = refImages.entities.some(
+    ({ config }) =>
+      config.image?.original.image.image_name === image_name || config.image?.crop?.image.image_name === image_name
+  );
 
   const isRasterLayerImage = canvas.rasterLayers.entities.some(({ objects }) =>
     objects.some((obj) => obj.type === 'image' && 'image_name' in obj.image && obj.image.image_name === image_name)

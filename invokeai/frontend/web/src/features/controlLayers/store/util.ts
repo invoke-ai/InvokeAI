@@ -10,6 +10,7 @@ import type {
   ChatGPT4oReferenceImageConfig,
   ControlLoRAConfig,
   ControlNetConfig,
+  CroppableImageWithDims,
   FluxKontextReferenceImageConfig,
   FLUXReduxConfig,
   Gemini2_5ReferenceImageConfig,
@@ -17,6 +18,7 @@ import type {
   IPAdapterConfig,
   RasterLayerAdjustments,
   RefImageState,
+  RegionalGuidanceIPAdapterConfig,
   RgbColor,
   T2IAdapterConfig,
 } from 'features/controlLayers/store/types';
@@ -45,6 +47,21 @@ export const imageDTOToImageWithDims = ({ image_name, width, height }: ImageDTO)
   height,
 });
 
+export const imageDTOToCroppableImage = (
+  originalImageDTO: ImageDTO,
+  crop?: CroppableImageWithDims['crop']
+): CroppableImageWithDims => {
+  const { image_name, width, height } = originalImageDTO;
+  const val: CroppableImageWithDims = {
+    original: { image: { image_name, width, height } },
+  };
+  if (crop) {
+    val.crop = deepClone(crop);
+  }
+
+  return val;
+};
+
 export const imageDTOToImageField = ({ image_name }: ImageDTO): ImageField => ({ image_name });
 
 const DEFAULT_RG_MASK_FILL_COLORS: RgbColor[] = [
@@ -71,6 +88,15 @@ const getInpaintMaskFillColor = buildMaskFillCycler(3);
 const getRegionalGuidanceMaskFillColor = buildMaskFillCycler(0);
 
 export const initialIPAdapter: IPAdapterConfig = {
+  type: 'ip_adapter',
+  image: null,
+  model: null,
+  beginEndStepPct: [0, 1],
+  method: 'full',
+  clipVisionModel: 'ViT-H',
+  weight: 1,
+};
+export const initialRegionalGuidanceIPAdapter: RegionalGuidanceIPAdapterConfig = {
   type: 'ip_adapter',
   image: null,
   model: null,
