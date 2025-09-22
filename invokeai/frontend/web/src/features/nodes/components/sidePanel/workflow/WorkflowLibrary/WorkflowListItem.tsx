@@ -15,16 +15,26 @@ import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types'
 import { DeleteWorkflow } from './WorkflowLibraryListItemActions/DeleteWorkflow';
 import { DownloadWorkflow } from './WorkflowLibraryListItemActions/DownloadWorkflow';
 import { EditWorkflow } from './WorkflowLibraryListItemActions/EditWorkflow';
-import { ViewWorkflow } from './WorkflowLibraryListItemActions/ViewWorkflow';
+import { LoadWorkflow } from './WorkflowLibraryListItemActions/LoadWorkflow';
 
-const IMAGE_THUMBNAIL_SIZE = '108px';
+const IMAGE_THUMBNAIL_SIZE = '92px';
 const FALLBACK_ICON_SIZE = '32px';
 
 const WORKFLOW_ACTION_BUTTONS_CN = 'workflow-action-buttons';
 
-const sx: SystemStyleObject = {
+const workflowListItemSx: SystemStyleObject = {
+  position: 'relative',
+  cursor: 'pointer',
+  role: 'button',
+  bg: 'base.850',
+  rounded: 'base',
+  w: 'full',
+  alignItems: 'stretch',
+  gap: 2,
+  borderWidth: 1,
+  borderColor: 'base.750',
   _hover: {
-    bg: 'base.700',
+    bg: 'base.800',
     [`& .${WORKFLOW_ACTION_BUTTONS_CN}`]: {
       display: 'flex',
     },
@@ -52,17 +62,7 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
   }, [dispatch, loadWorkflowWithDialog, workflow.workflow_id]);
 
   return (
-    <Flex
-      position="relative"
-      role="button"
-      onClick={handleClickLoad}
-      bg="base.750"
-      borderRadius="base"
-      w="full"
-      alignItems="stretch"
-      sx={sx}
-      gap={2}
-    >
+    <Flex onClick={handleClickLoad} sx={workflowListItemSx}>
       <Flex p={2} pr={0}>
         <Image
           src={workflow.thumbnail_url ?? undefined}
@@ -74,7 +74,7 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
           width={IMAGE_THUMBNAIL_SIZE}
           minHeight={IMAGE_THUMBNAIL_SIZE}
           minWidth={IMAGE_THUMBNAIL_SIZE}
-          borderRadius="base"
+          borderRadius="sm"
         />
       </Flex>
       <Flex flexDir="column" gap={1} justifyContent="space-between" w="full">
@@ -121,11 +121,11 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
               )}
             </Flex>
           </Flex>
-          <Text variant="subtext" fontSize="xs" noOfLines={3}>
+          <Text variant="subtext" fontSize="sm" noOfLines={3}>
             {workflow.description}
           </Text>
         </Flex>
-        <Flex className={WORKFLOW_ACTION_BUTTONS_CN} alignItems="center" display="none" h={8}>
+        <Flex className={WORKFLOW_ACTION_BUTTONS_CN} alignItems="center" display="none" pr={1} py={1}>
           {workflow.opened_at && (
             <Text variant="subtext" fontSize="xs" noOfLines={1} justifySelf="flex-end" pb={0.5}>
               {t('workflows.opened')} {new Date(workflow.opened_at).toLocaleString()}
@@ -133,7 +133,7 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
           )}
           <Spacer />
           {workflow.category === 'default' && !workflow.is_published && (
-            <ViewWorkflow workflowId={workflow.workflow_id} />
+            <LoadWorkflow workflowId={workflow.workflow_id} />
           )}
           {workflow.category !== 'default' && !workflow.is_published && (
             <>
@@ -157,7 +157,7 @@ const UserThumbnailFallback = memo(() => {
       height={IMAGE_THUMBNAIL_SIZE}
       minWidth={IMAGE_THUMBNAIL_SIZE}
       bg="base.600"
-      borderRadius="base"
+      borderRadius="sm"
       alignItems="center"
       justifyContent="center"
       opacity={0.3}
@@ -174,7 +174,7 @@ const DefaultThumbnailFallback = memo(() => {
       height={IMAGE_THUMBNAIL_SIZE}
       minWidth={IMAGE_THUMBNAIL_SIZE}
       bg="base.600"
-      borderRadius="base"
+      borderRadius="sm"
       alignItems="center"
       justifyContent="center"
       opacity={0.3}
