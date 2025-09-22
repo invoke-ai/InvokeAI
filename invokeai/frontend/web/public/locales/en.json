@@ -922,7 +922,7 @@
         "nAlreadyInstalled": "{{count}} already installed",
         "installQueue": "Install Queue",
         "inplaceInstall": "In-place install",
-        "inplaceInstallDesc": "Install models without copying the files. When using the model, it will be loaded from its this location. If disabled, the model file(s) will be copied into the Invoke-managed models directory during installation.",
+        "inplaceInstallDesc": "Install models without moving the files. When using the model, it will be loaded from its original location. If disabled, the model file(s) will be moved into the Invoke-managed models directory during installation.",
         "install": "Install",
         "installAll": "Install All",
         "installRepo": "Install Repo",
