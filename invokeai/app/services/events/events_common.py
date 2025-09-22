@@ -546,11 +546,18 @@ class ModelInstallCompleteEvent(ModelEventBase):
     source: ModelSource = Field(description="Source of the model; local path, repo_id or url")
     key: str = Field(description="Model config record key")
     total_bytes: Optional[int] = Field(description="Size of the model (may be None for installation of a local path)")
+    config: AnyModelConfig = Field(description="The installed model's config")
 
     @classmethod
     def build(cls, job: "ModelInstallJob") -> "ModelInstallCompleteEvent":
         assert job.config_out is not None
-        return cls(id=job.id, source=job.source, key=(job.config_out.key), total_bytes=job.total_bytes)
+        return cls(
+            id=job.id,
+            source=job.source,
+            key=(job.config_out.key),
+            total_bytes=job.total_bytes,
+            config=job.config_out,
+        )
 
 
 @payload_schema.register

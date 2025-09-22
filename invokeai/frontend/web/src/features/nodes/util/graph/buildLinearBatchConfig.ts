@@ -2,10 +2,11 @@ import type { RootState } from 'app/store/store';
 import { generateSeeds } from 'common/util/generateSeeds';
 import { range } from 'es-toolkit/compat';
 import type { SeedBehaviour } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
+import { API_BASE_MODELS, VIDEO_BASE_MODELS } from 'features/modelManagerV2/models';
+import type { BaseModelType } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { API_BASE_MODELS, VIDEO_BASE_MODELS } from 'features/parameters/types/constants';
 import type { components } from 'services/api/schema';
-import type { BaseModelType, Batch, EnqueueBatchArg, Invocation } from 'services/api/types';
+import type { Batch, EnqueueBatchArg, Invocation } from 'services/api/types';
 
 const getExtendedPrompts = (arg: {
   seedBehaviour: SeedBehaviour;

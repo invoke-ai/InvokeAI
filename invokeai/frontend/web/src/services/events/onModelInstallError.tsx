@@ -4,6 +4,7 @@ import { logger } from 'app/logging/logger';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { discordLink, githubIssuesLink } from 'features/system/store/constants';
 import { toast, toastApi } from 'features/toast/toast';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { t } from 'i18next';
@@ -190,4 +191,11 @@ const HFUnauthorizedToastDescription = () => {
       </Button>
     </Text>
   );
+};
+
+export const DiscordLink = () => {
+  return <ExternalLink fontWeight="semibold" href={discordLink} display="inline-flex" label="Discord" />;
+};
+export const GitHubIssuesLink = () => {
+  return <ExternalLink fontWeight="semibold" href={githubIssuesLink} display="inline-flex" label="GitHub" />;
 };
