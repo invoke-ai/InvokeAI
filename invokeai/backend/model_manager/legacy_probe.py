@@ -5,7 +5,6 @@ from typing import Any, Callable, Dict, Literal, Optional, Union
 
 import picklescan.scanner as pscan
 import safetensors.torch
-import spandrel
 import torch
 
 import invokeai.backend.util.logging as logger
@@ -59,7 +58,6 @@ from invokeai.backend.patches.lora_conversions.flux_onetrainer_lora_conversion_u
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
-from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 CkptType = Dict[str | int, Any]
@@ -339,26 +337,6 @@ class ModelProbe(object):
         # diffusers-ti
         if len(ckpt) < 10 and all(isinstance(v, torch.Tensor) for v in ckpt.values()):
             return ModelType.TextualInversion
-
-        # Check if the model can be loaded as a SpandrelImageToImageModel.
-        # This check is intentionally performed last, as it can be expensive (it requires loading the model from disk).
-        try:
-            # It would be nice to avoid having to load the Spandrel model from disk here. A couple of options were
-            # explored to avoid this:
-            # 1. Call `SpandrelImageToImageModel.load_from_state_dict(ckpt)`, where `ckpt` is a state_dict on the meta
-            #    device. Unfortunately, some Spandrel models perform operations during initialization that are not
-            #    supported on meta tensors.
-            # 2. Spandrel has internal logic to determine a model's type from its state_dict before loading the model.
-            #    This logic is not exposed in spandrel's public API. We could copy the logic here, but then we have to
-            #    maintain it, and the risk of false positive detections is higher.
-            SpandrelImageToImageModel.load_from_file(model_path)
-            return ModelType.SpandrelImageToImage
-        except spandrel.UnsupportedModelError:
-            pass
-        except Exception as e:
-            logger.warning(
-                f"Encountered error while probing to determine if {model_path} is a Spandrel model. Ignoring. Error: {e}"
-            )
 
         raise InvalidModelConfigException(f"Unable to determine model type for {model_path}")
 
@@ -1110,7 +1088,6 @@ ModelProbe.register_probe("diffusers", ModelType.ControlNet, ControlNetFolderPro
 ModelProbe.register_probe("diffusers", ModelType.IPAdapter, IPAdapterFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.CLIPVision, CLIPVisionFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.T2IAdapter, T2IAdapterFolderProbe)
-ModelProbe.register_probe("diffusers", ModelType.SpandrelImageToImage, SpandrelImageToImageFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.SigLIP, SigLIPFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.FluxRedux, FluxReduxFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.LlavaOnevision, LlaveOnevisionFolderProbe)
@@ -1123,7 +1100,6 @@ ModelProbe.register_probe("checkpoint", ModelType.ControlNet, ControlNetCheckpoi
 ModelProbe.register_probe("checkpoint", ModelType.IPAdapter, IPAdapterCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.CLIPVision, CLIPVisionCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.T2IAdapter, T2IAdapterCheckpointProbe)
-ModelProbe.register_probe("checkpoint", ModelType.SpandrelImageToImage, SpandrelImageToImageCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.SigLIP, SigLIPCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.FluxRedux, FluxReduxCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.LlavaOnevision, LlavaOnevisionCheckpointProbe)
