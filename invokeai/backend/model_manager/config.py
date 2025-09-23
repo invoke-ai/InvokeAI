@@ -198,7 +198,6 @@ class ModelConfigBase(ABC, BaseModel):
         super().__init_subclass__(**kwargs)
         if issubclass(cls, LegacyProbeMixin):
             ModelConfigBase.USING_LEGACY_PROBE.add(cls)
-        # Cannot use `elif isinstance(cls, UnknownModelConfig)` because UnknownModelConfig is not defined yet
         else:
             ModelConfigBase.USING_CLASSIFY_API.add(cls)
 
@@ -346,11 +345,16 @@ class CheckpointConfigBase(ABC, BaseModel):
     """Base class for checkpoint-style models."""
 
     format: Literal[ModelFormat.Checkpoint, ModelFormat.BnbQuantizednf4b, ModelFormat.GGUFQuantized] = Field(
-        description="Format of the provided checkpoint model", default=ModelFormat.Checkpoint
+        description="Format of the provided checkpoint model",
+        default=ModelFormat.Checkpoint,
     )
-    config_path: str = Field(description="path to the checkpoint model config file")
-    converted_at: Optional[float] = Field(
-        description="When this model was last converted to diffusers", default_factory=time.time
+    config_path: str | None = Field(
+        description="path to the checkpoint model config file",
+        default=None,
+    )
+    converted_at: float | None = Field(
+        description="When this model was last converted to diffusers",
+        default_factory=time.time,
     )
 
 
