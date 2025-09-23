@@ -725,32 +725,6 @@ class LoRACheckpointProbe(CheckpointProbeBase):
             raise InvalidModelConfigException(f"Unknown LoRA type: {self.model_path}")
 
 
-class TextualInversionCheckpointProbe(CheckpointProbeBase):
-    """Class for probing embeddings."""
-
-    def get_format(self) -> ModelFormat:
-        return ModelFormat.EmbeddingFile
-
-    def get_base_type(self) -> BaseModelType:
-        checkpoint = self.checkpoint
-        if "string_to_token" in checkpoint:
-            token_dim = list(checkpoint["string_to_param"].values())[0].shape[-1]
-        elif "emb_params" in checkpoint:
-            token_dim = checkpoint["emb_params"].shape[-1]
-        elif "clip_g" in checkpoint:
-            token_dim = checkpoint["clip_g"].shape[-1]
-        else:
-            token_dim = list(checkpoint.values())[0].shape[0]
-        if token_dim == 768:
-            return BaseModelType.StableDiffusion1
-        elif token_dim == 1024:
-            return BaseModelType.StableDiffusion2
-        elif token_dim == 1280:
-            return BaseModelType.StableDiffusionXL
-        else:
-            raise InvalidModelConfigException(f"{self.model_path}: Could not determine base type")
-
-
 class ControlNetCheckpointProbe(CheckpointProbeBase):
     """Class for probing controlnets."""
 
@@ -973,19 +947,6 @@ class VaeFolderProbe(FolderProbeBase):
         return name
 
 
-class TextualInversionFolderProbe(FolderProbeBase):
-    def get_format(self) -> ModelFormat:
-        return ModelFormat.EmbeddingFolder
-
-    def get_base_type(self) -> BaseModelType:
-        path = self.model_path / "learned_embeds.bin"
-        if not path.exists():
-            raise InvalidModelConfigException(
-                f"{self.model_path.as_posix()} does not contain expected 'learned_embeds.bin' file"
-            )
-        return TextualInversionCheckpointProbe(path).get_base_type()
-
-
 class T5EncoderFolderProbe(FolderProbeBase):
     def get_base_type(self) -> BaseModelType:
         return BaseModelType.Any
@@ -1099,11 +1060,6 @@ class CLIPVisionFolderProbe(FolderProbeBase):
         return BaseModelType.Any
 
 
-class CLIPEmbedFolderProbe(FolderProbeBase):
-    def get_base_type(self) -> BaseModelType:
-        return BaseModelType.Any
-
-
 class SpandrelImageToImageFolderProbe(FolderProbeBase):
     def get_base_type(self) -> BaseModelType:
         raise NotImplementedError()
@@ -1149,11 +1105,9 @@ ModelProbe.register_probe("diffusers", ModelType.Main, PipelineFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.VAE, VaeFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.LoRA, LoRAFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.ControlLoRa, LoRAFolderProbe)
-ModelProbe.register_probe("diffusers", ModelType.TextualInversion, TextualInversionFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.T5Encoder, T5EncoderFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.ControlNet, ControlNetFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.IPAdapter, IPAdapterFolderProbe)
-ModelProbe.register_probe("diffusers", ModelType.CLIPEmbed, CLIPEmbedFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.CLIPVision, CLIPVisionFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.T2IAdapter, T2IAdapterFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.SpandrelImageToImage, SpandrelImageToImageFolderProbe)
@@ -1165,7 +1119,6 @@ ModelProbe.register_probe("checkpoint", ModelType.Main, PipelineCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.VAE, VaeCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.LoRA, LoRACheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.ControlLoRa, LoRACheckpointProbe)
-ModelProbe.register_probe("checkpoint", ModelType.TextualInversion, TextualInversionCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.ControlNet, ControlNetCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.IPAdapter, IPAdapterCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.CLIPVision, CLIPVisionCheckpointProbe)
