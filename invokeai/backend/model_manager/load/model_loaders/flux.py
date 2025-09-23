@@ -37,7 +37,6 @@ from invokeai.backend.flux.util import get_flux_ae_params, get_flux_transformers
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     CheckpointConfigBase,
-    CLIPEmbedCheckpointConfig,
     CLIPEmbedDiffusersConfig,
     ControlNetCheckpointConfig,
     ControlNetDiffusersConfig,
@@ -129,27 +128,6 @@ class CLIPDiffusersLoader(ModelLoader):
         raise ValueError(
             f"Only Tokenizer and TextEncoder submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
         )
-
-
-@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.CLIPEmbed, format=ModelFormat.Checkpoint)
-class CLIPCheckpointLoader(ModelLoader):
-    """Class to load main models."""
-
-    def _load_model(
-        self,
-        config: AnyModelConfig,
-        submodel_type: Optional[SubModelType] = None,
-    ) -> AnyModel:
-        if not isinstance(config, CLIPEmbedCheckpointConfig):
-            raise ValueError("Only CLIPEmbedCheckpointConfig models are currently supported here.")
-
-        match submodel_type:
-            case SubModelType.TextEncoder:
-                return CLIPTextModel.from_pretrained(Path(config.path), use_safetensors=True)
-            case _:
-                raise ValueError(
-                    f"Only TextEncoder submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
-                )
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T5Encoder, format=ModelFormat.BnbQuantizedLlmInt8b)
