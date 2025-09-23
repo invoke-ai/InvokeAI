@@ -5,6 +5,7 @@ import os
 import re
 import threading
 import time
+from copy import deepcopy
 from pathlib import Path
 from queue import Empty, Queue
 from shutil import move, rmtree
@@ -370,6 +371,8 @@ class ModelInstallService(ModelInstallServiceBase):
         model_path = self.app_config.models_path / model.path
         if model_path.is_file() or model_path.is_symlink():
             model_path.unlink()
+            assert model_path.parent != self.app_config.models_path
+            os.rmdir(model_path.parent)
         elif model_path.is_dir():
             rmtree(model_path)
         self.unregister(key)
@@ -607,9 +610,9 @@ class ModelInstallService(ModelInstallServiceBase):
         #   any given model - eliminating ambiguity and removing reliance on order.
         # After implementing either of these fixes, remove @pytest.mark.xfail from `test_regression_against_model_probe`
         try:
-            return ModelProbe.probe(model_path=model_path, fields=fields, hash_algo=hash_algo)  # type: ignore
+            return ModelProbe.probe(model_path=model_path, fields=deepcopy(fields), hash_algo=hash_algo)  # type: ignore
         except InvalidModelConfigException:
-            return ModelConfigBase.classify(model_path, hash_algo, **fields)
+            return ModelConfigBase.classify(mod=model_path, hash_algo=hash_algo, **fields)
 
     def _register(
         self, model_path: Path, config: Optional[ModelRecordChanges] = None, info: Optional[AnyModelConfig] = None
