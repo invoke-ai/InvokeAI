@@ -26,7 +26,7 @@ export const InitialStateMainModelPicker = memo(() => {
     () =>
       selectedModelConfig &&
       isCheckpointMainModelConfig(selectedModelConfig) &&
-      selectedModelConfig.config_path === 'flux-dev',
+      selectedModelConfig.variant === 'flux_dev',
     [selectedModelConfig]
   );
 
