@@ -115,7 +115,7 @@ class MinimalConfigExample(ModelConfigBase):
     fun_quote: str
 
     @classmethod
-    def matches(cls, mod: ModelOnDisk) -> bool:
+    def matches(cls, mod: ModelOnDisk, **overrides) -> bool:
         return mod.path.suffix == ".json"
 
     @classmethod

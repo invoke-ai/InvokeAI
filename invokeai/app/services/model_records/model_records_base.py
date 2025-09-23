@@ -21,6 +21,7 @@ from invokeai.backend.model_manager.config import (
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ClipVariantType,
+    FluxVariantType,
     ModelFormat,
     ModelSourceType,
     ModelType,
@@ -90,7 +91,9 @@ class ModelRecordChanges(BaseModelExcludeNull):
 
     # Checkpoint-specific changes
     # TODO(MM2): Should we expose these? Feels footgun-y...
-    variant: Optional[ModelVariantType | ClipVariantType] = Field(description="The variant of the model.", default=None)
+    variant: Optional[ModelVariantType | ClipVariantType | FluxVariantType] = Field(
+        description="The variant of the model.", default=None
+    )
     prediction_type: Optional[SchedulerPredictionType] = Field(
         description="The prediction type of the model.", default=None
     )

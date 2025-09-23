@@ -44,6 +44,7 @@ from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ClipVariantType,
     FluxLoRAFormat,
+    FluxVariantType,
     ModelFormat,
     ModelRepoVariant,
     ModelSourceType,
@@ -51,6 +52,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelVariantType,
     SchedulerPredictionType,
     SubModelType,
+    variant_type_adapter,
 )
 from invokeai.backend.model_manager.util.model_util import lora_token_vector_length
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
@@ -71,7 +73,7 @@ DEFAULTS_PRECISION = Literal["fp16", "fp32"]
 class SubmodelDefinition(BaseModel):
     path_or_prefix: str
     model_type: ModelType
-    variant: AnyVariant = None
+    variant: AnyVariant | None = None
 
     model_config = ConfigDict(protected_namespaces=())
 
@@ -109,6 +111,15 @@ class MatchSpeed(int, Enum):
     FAST = 0
     MED = 1
     SLOW = 2
+
+
+class MatchCertainty(int, Enum):
+    """Represents the certainty of a config's 'matches' method."""
+
+    NEVER = 0
+    MAYBE = 1
+    EXACT = 2
+    OVERRIDE = 3
 
 
 class LegacyProbeMixin:
@@ -194,20 +205,47 @@ class ModelConfigBase(ABC, BaseModel):
         Created to deprecate ModelProbe.probe
         """
         if isinstance(mod, Path | str):
-            mod = ModelOnDisk(mod, hash_algo)
+            mod = ModelOnDisk(Path(mod), hash_algo)
 
         candidates = ModelConfigBase.USING_CLASSIFY_API
         sorted_by_match_speed = sorted(candidates, key=lambda cls: (cls._MATCH_SPEED, cls.__name__))
 
+        overrides = overrides or {}
+        ModelConfigBase.cast_overrides(**overrides)
+
+        matches: dict[Type[ModelConfigBase], MatchCertainty] = {}
+
         for config_cls in sorted_by_match_speed:
             try:
-                if not config_cls.matches(mod):
+                score = config_cls.matches(mod, **overrides)
+
+                # A score of 0 means "no match"
+                if score is MatchCertainty.NEVER:
                     continue
+
+                matches[config_cls] = score
+
+                if score is MatchCertainty.EXACT or score is MatchCertainty.OVERRIDE:
+                    # Perfect match - skip further checks
+                    break
             except Exception as e:
                 logger.warning(f"Unexpected exception while matching {mod.name} to '{config_cls.__name__}': {e}")
                 continue
-            else:
-                return config_cls.from_model_on_disk(mod, **overrides)
+
+        if matches:
+            # Select the config class with the highest score
+            sorted_by_score = sorted(matches.items(), key=lambda item: item[1].value)
+            # Check if there are multiple classes with the same top score
+            top_score = sorted_by_score[-1][1]
+            top_classes = [cls for cls, score in sorted_by_score if score is top_score]
+            if len(top_classes) > 1:
+                logger.warning(
+                    f"Multiple model config classes matched with the same top score ({top_score}) for model {mod.name}: {[cls.__name__ for cls in top_classes]}. Using {top_classes[0].__name__}."
+                )
+            config_cls = top_classes[0]
+            # Finally, create the config instance
+            logger.info(f"Model {mod.name} classified as {config_cls.__name__} with score {top_score.name}")
+            return config_cls.from_model_on_disk(mod, **overrides)
 
         if app_config.allow_unknown_models:
             try:
@@ -234,13 +272,13 @@ class ModelConfigBase(ABC, BaseModel):
 
     @classmethod
     @abstractmethod
-    def matches(cls, mod: ModelOnDisk) -> bool:
+    def matches(cls, mod: ModelOnDisk, **overrides) -> MatchCertainty:
         """Performs a quick check to determine if the config matches the model.
-        This doesn't need to be a perfect test - the aim is to eliminate unlikely matches quickly before parsing."""
+        Returns a MatchCertainty score."""
         pass
 
     @staticmethod
-    def cast_overrides(overrides: dict[str, Any]):
+    def cast_overrides(**overrides):
         """Casts user overrides from str to Enum"""
         if "type" in overrides:
             overrides["type"] = ModelType(overrides["type"])
@@ -255,13 +293,13 @@ class ModelConfigBase(ABC, BaseModel):
             overrides["source_type"] = ModelSourceType(overrides["source_type"])
 
         if "variant" in overrides:
-            overrides["variant"] = ModelVariantType(overrides["variant"])
+            overrides["variant"] = variant_type_adapter.validate_strings(overrides["variant"])
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, **overrides):
         """Creates an instance of this config or raises InvalidModelConfigException."""
         fields = cls.parse(mod)
-        cls.cast_overrides(overrides)
+        cls.cast_overrides(**overrides)
         fields.update(overrides)
 
         fields["path"] = mod.path.as_posix()
@@ -283,8 +321,8 @@ class UnknownModelConfig(ModelConfigBase):
     format: Literal[ModelFormat.Unknown] = ModelFormat.Unknown
 
     @classmethod
-    def matches(cls, mod: ModelOnDisk) -> bool:
-        return False
+    def matches(cls, mod: ModelOnDisk, **overrides) -> MatchCertainty:
+        return MatchCertainty.NEVER
 
     @classmethod
     def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
@@ -370,16 +408,33 @@ class LoRAOmiConfig(LoRAConfigBase, ModelConfigBase):
     format: Literal[ModelFormat.OMI] = ModelFormat.OMI
 
     @classmethod
-    def matches(cls, mod: ModelOnDisk) -> bool:
+    def matches(cls, mod: ModelOnDisk, **overrides) -> MatchCertainty:
+        is_lora_override = overrides.get("type") is ModelType.LoRA
+        is_omi_override = overrides.get("format") is ModelFormat.OMI
+
+        # If both type and format are overridden, skip the heuristic checks
+        if is_lora_override and is_omi_override:
+            return MatchCertainty.OVERRIDE
+
+        # OMI LoRAs are always files, never directories
         if mod.path.is_dir():
-            return False
+            return MatchCertainty.NEVER
+
+        # Avoid false positive match against ControlLoRA and Diffusers
+        if cls.flux_lora_format(mod) in [FluxLoRAFormat.Control, FluxLoRAFormat.Diffusers]:
+            return MatchCertainty.NEVER
 
         metadata = mod.metadata()
-        return (
+        is_omi_lora_heuristic = (
             bool(metadata.get("modelspec.sai_model_spec"))
             and metadata.get("ot_branch") == "omi_format"
-            and metadata["modelspec.architecture"].split("/")[1].lower() == "lora"
+            and metadata.get("modelspec.architecture", "").split("/")[1].lower() == "lora"
         )
+
+        if is_omi_lora_heuristic:
+            return MatchCertainty.EXACT
+
+        return MatchCertainty.NEVER
 
     @classmethod
     def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
@@ -402,27 +457,55 @@ class LoRALyCORISConfig(LoRAConfigBase, ModelConfigBase):
     format: Literal[ModelFormat.LyCORIS] = ModelFormat.LyCORIS
 
     @classmethod
-    def matches(cls, mod: ModelOnDisk) -> bool:
+    def matches(cls, mod: ModelOnDisk, **overrides) -> MatchCertainty:
+        is_lora_override = overrides.get("type") is ModelType.LoRA
+        is_omi_override = overrides.get("format") is ModelFormat.LyCORIS
+
+        # If both type and format are overridden, skip the heuristic checks and return a perfect score
+        if is_lora_override and is_omi_override:
+            return MatchCertainty.OVERRIDE
+
+        # LyCORIS LoRAs are always files, never directories
         if mod.path.is_dir():
-            return False
+            return MatchCertainty.NEVER
 
         # Avoid false positive match against ControlLoRA and Diffusers
         if cls.flux_lora_format(mod) in [FluxLoRAFormat.Control, FluxLoRAFormat.Diffusers]:
-            return False
+            return MatchCertainty.NEVER
 
         state_dict = mod.load_state_dict()
         for key in state_dict.keys():
             if isinstance(key, int):
                 continue
 
-            if key.startswith(("lora_te_", "lora_unet_", "lora_te1_", "lora_te2_", "lora_transformer_")):
-                return True
+            # Existence of these key prefixes/suffixes does not guarantee that this is a LoRA.
+            # Some main models have these keys, likely due to the creator merging in a LoRA.
+
+            has_key_with_lora_prefix = key.startswith(
+                (
+                    "lora_te_",
+                    "lora_unet_",
+                    "lora_te1_",
+                    "lora_te2_",
+                    "lora_transformer_",
+                )
+            )
+
             # "lora_A.weight" and "lora_B.weight" are associated with models in PEFT format. We don't support all PEFT
             # LoRA models, but as of the time of writing, we support Diffusers FLUX PEFT LoRA models.
-            if key.endswith(("to_k_lora.up.weight", "to_q_lora.down.weight", "lora_A.weight", "lora_B.weight")):
-                return True
+            has_key_with_lora_suffix = key.endswith(
+                (
+                    "to_k_lora.up.weight",
+                    "to_q_lora.down.weight",
+                    "lora_A.weight",
+                    "lora_B.weight",
+                )
+            )
 
-        return False
+            if has_key_with_lora_prefix or has_key_with_lora_suffix:
+                return MatchCertainty.MAYBE
+
+        return MatchCertainty.NEVER
 
     @classmethod
     def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
@@ -459,13 +542,31 @@ class LoRADiffusersConfig(LoRAConfigBase, ModelConfigBase):
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
     @classmethod
-    def matches(cls, mod: ModelOnDisk) -> bool:
+    def matches(cls, mod: ModelOnDisk, **overrides) -> MatchCertainty:
+        is_lora_override = overrides.get("type") is ModelType.LoRA
+        is_diffusers_override = overrides.get("format") is ModelFormat.Diffusers
+
+        # If both type and format are overridden, skip the heuristic checks and return a perfect score
+        if is_lora_override and is_diffusers_override:
+            return MatchCertainty.OVERRIDE
+
+        # Diffusers LoRAs are always directories, never files
         if mod.path.is_file():
-            return cls.flux_lora_format(mod) == FluxLoRAFormat.Diffusers
+            return MatchCertainty.NEVER
+
+        is_flux_lora_diffusers = cls.flux_lora_format(mod) == FluxLoRAFormat.Diffusers
 
         suffixes = ["bin", "safetensors"]
         weight_files = [mod.path / f"pytorch_lora_weights.{sfx}" for sfx in suffixes]
-        return any(wf.exists() for wf in weight_files)
+        has_lora_weight_file = any(wf.exists() for wf in weight_files)
+
+        if is_flux_lora_diffusers and has_lora_weight_file:
+            return MatchCertainty.EXACT
+
+        if is_flux_lora_diffusers or has_lora_weight_file:
+            return MatchCertainty.MAYBE
+
+        return MatchCertainty.NEVER
 
     @classmethod
     def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
@@ -520,7 +621,7 @@ class MainConfigBase(ABC, BaseModel):
     default_settings: Optional[MainModelDefaultSettings] = Field(
         description="Default settings for this model", default=None
     )
-    variant: AnyVariant = ModelVariantType.Normal
+    variant: ModelVariantType | FluxVariantType = ModelVariantType.Normal
 
 
 class VideoConfigBase(ABC, BaseModel):
@@ -529,7 +630,7 @@ class VideoConfigBase(ABC, BaseModel):
     default_settings: Optional[MainModelDefaultSettings] = Field(
         description="Default settings for this model", default=None
     )
-    variant: AnyVariant = ModelVariantType.Normal
+    variant: ModelVariantType = ModelVariantType.Normal
 
 
 class MainCheckpointConfig(CheckpointConfigBase, MainConfigBase, LegacyProbeMixin, ModelConfigBase):
@@ -537,6 +638,14 @@ class MainCheckpointConfig(CheckpointConfigBase, MainConfigBase, LegacyProbeMixi
 
     prediction_type: SchedulerPredictionType = SchedulerPredictionType.Epsilon
     upcast_attention: bool = False
+
+    # @classmethod
+    # def matches(cls, mod: ModelOnDisk) -> bool:
+    #     pass
+
+    # @classmethod
+    # def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
+    #     pass
 
 
 class MainBnbQuantized4bCheckpointConfig(CheckpointConfigBase, MainConfigBase, LegacyProbeMixin, ModelConfigBase):
@@ -583,12 +692,51 @@ class IPAdapterCheckpointConfig(IPAdapterConfigBase, LegacyProbeMixin, ModelConf
 class CLIPEmbedDiffusersConfig(DiffusersConfigBase):
     """Model config for Clip Embeddings."""
 
-    variant: ClipVariantType = Field(description="Clip variant for this model")
+    variant: ClipVariantType = Field(...)
     type: Literal[ModelType.CLIPEmbed] = ModelType.CLIPEmbed
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+    base: Literal[BaseModelType.Any] = BaseModelType.Any
+
+    @classmethod
+    def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
+        clip_variant = cls.get_clip_variant_type(mod)
+        if clip_variant is None:
+            raise InvalidModelConfigException("Unable to determine CLIP variant type")
+
+        return {"variant": clip_variant}
+
+    @classmethod
+    def get_clip_variant_type(cls, mod: ModelOnDisk) -> ClipVariantType | None:
+        try:
+            with open(mod.path / "config.json") as file:
+                config = json.load(file)
+                hidden_size = config.get("hidden_size")
+                match hidden_size:
+                    case 1280:
+                        return ClipVariantType.G
+                    case 768:
+                        return ClipVariantType.L
+                    case _:
+                        return None
+        except Exception:
+            return None
+
+    @classmethod
+    def is_clip_text_encoder(cls, mod: ModelOnDisk) -> bool:
+        try:
+            with open(mod.path / "config.json", "r") as file:
+                config = json.load(file)
+                architectures = config.get("architectures")
+                return architectures[0] in (
+                    "CLIPModel",
+                    "CLIPTextModel",
+                    "CLIPTextModelWithProjection",
+                )
+        except Exception:
+            return False
 
 
-class CLIPGEmbedDiffusersConfig(CLIPEmbedDiffusersConfig, LegacyProbeMixin, ModelConfigBase):
+class CLIPGEmbedDiffusersConfig(CLIPEmbedDiffusersConfig, ModelConfigBase):
     """Model config for CLIP-G Embeddings."""
 
     variant: Literal[ClipVariantType.G] = ClipVariantType.G
@@ -597,8 +745,28 @@ class CLIPGEmbedDiffusersConfig(CLIPEmbedDiffusersConfig, LegacyProbeMixin, Mode
     def get_tag(cls) -> Tag:
         return Tag(f"{ModelType.CLIPEmbed.value}.{ModelFormat.Diffusers.value}.{ClipVariantType.G.value}")
 
+    @classmethod
+    def matches(cls, mod: ModelOnDisk, **overrides) -> MatchCertainty:
+        is_clip_embed_override = overrides.get("type") is ModelType.CLIPEmbed
+        is_diffusers_override = overrides.get("format") is ModelFormat.Diffusers
+        has_clip_variant_override = overrides.get("variant") is ClipVariantType.G
 
-class CLIPLEmbedDiffusersConfig(CLIPEmbedDiffusersConfig, LegacyProbeMixin, ModelConfigBase):
+        if is_clip_embed_override and is_diffusers_override and has_clip_variant_override:
+            return MatchCertainty.OVERRIDE
+
+        if mod.path.is_file():
+            return MatchCertainty.NEVER
+
+        is_clip_embed = cls.is_clip_text_encoder(mod)
+        clip_variant = cls.get_clip_variant_type(mod)
+
+        if is_clip_embed and clip_variant is ClipVariantType.G:
+            return MatchCertainty.EXACT
+
+        return MatchCertainty.NEVER
+
+
+class CLIPLEmbedDiffusersConfig(CLIPEmbedDiffusersConfig, ModelConfigBase):
     """Model config for CLIP-L Embeddings."""
 
     variant: Literal[ClipVariantType.L] = ClipVariantType.L
@@ -606,6 +774,26 @@ class CLIPLEmbedDiffusersConfig(CLIPEmbedDiffusersConfig, LegacyProbeMixin, Mode
     @classmethod
     def get_tag(cls) -> Tag:
         return Tag(f"{ModelType.CLIPEmbed.value}.{ModelFormat.Diffusers.value}.{ClipVariantType.L.value}")
+
+    @classmethod
+    def matches(cls, mod: ModelOnDisk, **overrides) -> MatchCertainty:
+        is_clip_embed_override = overrides.get("type") is ModelType.CLIPEmbed
+        is_diffusers_override = overrides.get("format") is ModelFormat.Diffusers
+        has_clip_variant_override = overrides.get("variant") is ClipVariantType.L
+
+        if is_clip_embed_override and is_diffusers_override and has_clip_variant_override:
+            return MatchCertainty.OVERRIDE
+
+        if mod.path.is_file():
+            return MatchCertainty.NEVER
+
+        is_clip_embed = cls.is_clip_text_encoder(mod)
+        clip_variant = cls.get_clip_variant_type(mod)
+
+        if is_clip_embed and clip_variant is ClipVariantType.L:
+            return MatchCertainty.EXACT
+
+        return MatchCertainty.NEVER
 
 
 class CLIPVisionDiffusersConfig(DiffusersConfigBase, LegacyProbeMixin, ModelConfigBase):
@@ -649,22 +837,30 @@ class LlavaOnevisionConfig(DiffusersConfigBase, ModelConfigBase):
     """Model config for Llava Onevision models."""
 
     type: Literal[ModelType.LlavaOnevision] = ModelType.LlavaOnevision
-    format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
     @classmethod
-    def matches(cls, mod: ModelOnDisk) -> bool:
+    def matches(cls, mod: ModelOnDisk, **overrides) -> MatchCertainty:
+        is_llava_override = overrides.get("type") is ModelType.LlavaOnevision
+        is_diffusers_override = overrides.get("format") is ModelFormat.Diffusers
+
+        if is_llava_override and is_diffusers_override:
+            return MatchCertainty.OVERRIDE
+
         if mod.path.is_file():
-            return False
+            return MatchCertainty.NEVER
 
         config_path = mod.path / "config.json"
         try:
             with open(config_path, "r") as file:
                 config = json.load(file)
         except FileNotFoundError:
-            return False
+            return MatchCertainty.NEVER
 
         architectures = config.get("architectures")
-        return architectures and architectures[0] == "LlavaOnevisionForConditionalGeneration"
+        if architectures and architectures[0] == "LlavaOnevisionForConditionalGeneration":
+            return MatchCertainty.EXACT
+
+        return MatchCertainty.NEVER
 
     @classmethod
     def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
@@ -680,9 +876,9 @@ class ApiModelConfig(MainConfigBase, ModelConfigBase):
     format: Literal[ModelFormat.Api] = ModelFormat.Api
 
     @classmethod
-    def matches(cls, mod: ModelOnDisk) -> bool:
+    def matches(cls, mod: ModelOnDisk, **overrides) -> MatchCertainty:
         # API models are not stored on disk, so we can't match them.
-        return False
+        return MatchCertainty.NEVER
 
     @classmethod
     def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
@@ -695,9 +891,9 @@ class VideoApiModelConfig(VideoConfigBase, ModelConfigBase):
     format: Literal[ModelFormat.Api] = ModelFormat.Api
 
     @classmethod
-    def matches(cls, mod: ModelOnDisk) -> bool:
+    def matches(cls, mod: ModelOnDisk, **overrides) -> MatchCertainty:
         # API models are not stored on disk, so we can't match them.
-        return False
+        return MatchCertainty.NEVER
 
     @classmethod
     def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
@@ -735,8 +931,7 @@ def get_model_discriminator_value(v: Any) -> str:
 
     # Previously, CLIPEmbed did not have any variants, meaning older database entries lack a variant field.
     # To maintain compatibility, we default to ClipVariantType.L in this case.
-    if type_ == ModelType.CLIPEmbed.value and format_ == ModelFormat.Diffusers.value:
-        variant_ = variant_ or ClipVariantType.L.value
+    if type_ == ModelType.CLIPEmbed.value:
         return f"{type_}.{format_}.{variant_}"
     return f"{type_}.{format_}"
 
@@ -779,7 +974,7 @@ AnyModelConfig = Annotated[
     Discriminator(get_model_discriminator_value),
 ]
 
-AnyModelConfigValidator = TypeAdapter(AnyModelConfig)
+AnyModelConfigValidator = TypeAdapter[AnyModelConfig](AnyModelConfig)
 AnyDefaultSettings: TypeAlias = Union[MainModelDefaultSettings, LoraModelDefaultSettings, ControlAdapterDefaultSettings]
 
 
@@ -787,8 +982,8 @@ class ModelConfigFactory:
     @staticmethod
     def make_config(model_data: Dict[str, Any], timestamp: Optional[float] = None) -> AnyModelConfig:
         """Return the appropriate config object from raw dict values."""
-        model = AnyModelConfigValidator.validate_python(model_data)  # type: ignore
+        model = AnyModelConfigValidator.validate_python(model_data)
         if isinstance(model, CheckpointConfigBase) and timestamp:
             model.converted_at = timestamp
         validate_hash(model.hash)
-        return model  # type: ignore
+        return model
