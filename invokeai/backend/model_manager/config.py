@@ -942,6 +942,7 @@ class SpandrelImageToImageConfig(ModelConfigBase):
 
     _MATCH_SPEED: ClassVar[MatchSpeed] = MatchSpeed.SLOW  # requires loading the model from disk
 
+    base: Literal[BaseModelType.Any] = BaseModelType.Any
     type: Literal[ModelType.SpandrelImageToImage] = ModelType.SpandrelImageToImage
     format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
 
@@ -969,6 +970,10 @@ class SpandrelImageToImageConfig(ModelConfigBase):
             )
 
         return MatchCertainty.NEVER
+
+    @classmethod
+    def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
+        return {}
 
 
 class SigLIPConfig(DiffusersConfigBase, LegacyProbeMixin, ModelConfigBase):
