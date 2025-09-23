@@ -128,3 +128,19 @@ class ModelOnDisk:
                         f"Please specify the intended file using the 'path' argument"
                     )
         return path
+
+    def has_keys_exact(self, keys: set[str], path: Optional[Path] = None) -> bool:
+        state_dict = self.load_state_dict(path)
+        return keys.issubset({key for key in state_dict.keys() if isinstance(key, str)})
+
+    def has_keys_starting_with(self, prefixes: set[str], path: Optional[Path] = None) -> bool:
+        state_dict = self.load_state_dict(path)
+        return any(
+            any(key.startswith(prefix) for prefix in prefixes) for key in state_dict.keys() if isinstance(key, str)
+        )
+
+    def has_keys_ending_with(self, prefixes: set[str], path: Optional[Path] = None) -> bool:
+        state_dict = self.load_state_dict(path)
+        return any(
+            any(key.endswith(suffix) for suffix in prefixes) for key in state_dict.keys() if isinstance(key, str)
+        )
