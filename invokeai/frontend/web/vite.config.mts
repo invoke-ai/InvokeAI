@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react-swc';
 import path from 'path';
 import { visualizer } from 'rollup-plugin-visualizer';
 import type { PluginOption } from 'vite';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
 import dts from 'vite-plugin-dts';
 import eslint from 'vite-plugin-eslint';
@@ -11,6 +11,15 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 import { loggerContextPlugin } from './vite-plugin-logger-context';
 
 export default defineConfig(({ mode }) => {
+  // Load env file based on mode in the current working directory.
+  // Set the third parameter to '' to load all env regardless of the VITE_ prefix.
+  const env = loadEnv(mode, process.cwd(), '');
+
+  // Get InvokeAI API base URL from environment variable, default to localhost
+  const apiBaseUrl = env.INVOKEAI_API_BASE_URL || 'http://127.0.0.1:9090';
+  const apiHost = new URL(apiBaseUrl).host;
+  const wsProtocol = apiBaseUrl.startsWith('https') ? 'wss' : 'ws';
+
   if (mode === 'package') {
     return {
       base: './',
@@ -81,16 +90,16 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy: {
         '/ws/socket.io': {
-          target: 'ws://127.0.0.1:9090',
+          target: `${wsProtocol}://${apiHost}`,
           ws: true,
         },
         '/openapi.json': {
-          target: 'http://127.0.0.1:9090/openapi.json',
+          target: `${apiBaseUrl}/openapi.json`,
           rewrite: (path) => path.replace(/^\/openapi.json/, ''),
           changeOrigin: true,
         },
         '/api/': {
-          target: 'http://127.0.0.1:9090/api/',
+          target: `${apiBaseUrl}/api/`,
           rewrite: (path) => path.replace(/^\/api/, ''),
           changeOrigin: true,
         },
