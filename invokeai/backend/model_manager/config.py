@@ -607,7 +607,6 @@ class ControlNetCheckpointConfig(CheckpointConfigBase, ControlAdapterConfigBase,
 class TextualInversionConfigBase(ABC, BaseModel):
     type: Literal[ModelType.TextualInversion] = ModelType.TextualInversion
 
-    KNOWN_SUFFIXES: ClassVar = {"bin", "safetensors", "pt", "ckpt"}
     KNOWN_KEYS: ClassVar = {"string_to_param", "emb_params", "clip_g"}
 
     @classmethod
@@ -621,7 +620,7 @@ class TextualInversionConfigBase(ABC, BaseModel):
             if p.is_dir():
                 return False
 
-            if p.name in [f"learned_embeds.{s}" for s in cls.KNOWN_SUFFIXES]:
+            if p.name in [f"learned_embeds.{s}" for s in mod.weight_files()]:
                 return True
 
             state_dict = mod.load_state_dict(p)
