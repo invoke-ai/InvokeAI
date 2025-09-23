@@ -1,4 +1,3 @@
-import { logZodError } from 'common/util/zodErrorLogger';
 import { deepClone } from 'common/util/deepClone';
 import { forEach, get } from 'es-toolkit/compat';
 import { $templates } from 'features/nodes/store/nodesSlice';
@@ -103,5 +102,6 @@ export const parseAndMigrateWorkflow = (data: unknown): WorkflowV3 => {
 
   // We should now have a V3 workflow
   const migratedWorkflow = zWorkflowV3.parse(workflow);
+
   return migratedWorkflow;
 };
