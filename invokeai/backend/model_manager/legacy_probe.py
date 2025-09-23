@@ -1,5 +1,4 @@
 import json
-import re
 from pathlib import Path
 from typing import Any, Callable, Dict, Literal, Optional, Union
 
@@ -654,21 +653,6 @@ class PipelineCheckpointProbe(CheckpointProbeBase):
             return SchedulerPredictionType.Epsilon
 
 
-class VaeCheckpointProbe(CheckpointProbeBase):
-    def get_base_type(self) -> BaseModelType:
-        # VAEs of all base types have the same structure, so we wimp out and
-        # guess using the name.
-        for regexp, basetype in [
-            (r"xl", BaseModelType.StableDiffusionXL),
-            (r"sd2", BaseModelType.StableDiffusion2),
-            (r"vae", BaseModelType.StableDiffusion1),
-            (r"FLUX.1-schnell_ae", BaseModelType.Flux),
-        ]:
-            if re.search(regexp, self.model_path.name, re.IGNORECASE):
-                return basetype
-        raise InvalidModelConfigException("Cannot determine base type")
-
-
 class LoRACheckpointProbe(CheckpointProbeBase):
     """Class for LoRA checkpoints."""
 
@@ -895,36 +879,6 @@ class PipelineFolderProbe(FolderProbeBase):
         return ModelVariantType.Normal
 
 
-class VaeFolderProbe(FolderProbeBase):
-    def get_base_type(self) -> BaseModelType:
-        if self._config_looks_like_sdxl():
-            return BaseModelType.StableDiffusionXL
-        elif self._name_looks_like_sdxl():
-            # but SD and SDXL VAE are the same shape (3-channel RGB to 4-channel float scaled down
-            # by a factor of 8), we can't necessarily tell them apart by config hyperparameters.
-            return BaseModelType.StableDiffusionXL
-        else:
-            return BaseModelType.StableDiffusion1
-
-    def _config_looks_like_sdxl(self) -> bool:
-        # config values that distinguish Stability's SD 1.x VAE from their SDXL VAE.
-        config_file = self.model_path / "config.json"
-        if not config_file.exists():
-            raise InvalidModelConfigException(f"Cannot determine base type for {self.model_path}")
-        with open(config_file, "r") as file:
-            config = json.load(file)
-        return config.get("scaling_factor", 0) == 0.13025 and config.get("sample_size") in [512, 1024]
-
-    def _name_looks_like_sdxl(self) -> bool:
-        return bool(re.search(r"xl\b", self._guess_name(), re.IGNORECASE))
-
-    def _guess_name(self) -> str:
-        name = self.model_path.name
-        if name == "vae":
-            name = self.model_path.parent.name
-        return name
-
-
 class T5EncoderFolderProbe(FolderProbeBase):
     def get_base_type(self) -> BaseModelType:
         return BaseModelType.Any
@@ -1080,7 +1034,6 @@ class T2IAdapterFolderProbe(FolderProbeBase):
 
 # Register probe classes
 ModelProbe.register_probe("diffusers", ModelType.Main, PipelineFolderProbe)
-ModelProbe.register_probe("diffusers", ModelType.VAE, VaeFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.LoRA, LoRAFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.ControlLoRa, LoRAFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.T5Encoder, T5EncoderFolderProbe)
@@ -1093,7 +1046,6 @@ ModelProbe.register_probe("diffusers", ModelType.FluxRedux, FluxReduxFolderProbe
 ModelProbe.register_probe("diffusers", ModelType.LlavaOnevision, LlaveOnevisionFolderProbe)
 
 ModelProbe.register_probe("checkpoint", ModelType.Main, PipelineCheckpointProbe)
-ModelProbe.register_probe("checkpoint", ModelType.VAE, VaeCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.LoRA, LoRACheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.ControlLoRa, LoRACheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.ControlNet, ControlNetCheckpointProbe)
