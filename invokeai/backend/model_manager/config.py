@@ -23,6 +23,7 @@ Validation errors will raise an InvalidModelConfigException error.
 # pyright: reportIncompatibleVariableOverride=false
 import json
 import logging
+import re
 import time
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -71,6 +72,15 @@ class InvalidModelConfigException(Exception):
 
 
 DEFAULTS_PRECISION = Literal["fp16", "fp32"]
+
+
+def get_class_name_from_config(config: dict[str, Any]) -> Optional[str]:
+    if "_class_name" in config:
+        return config["_class_name"]
+    elif "architectures" in config:
+        return config["architectures"][0]
+    else:
+        return None
 
 
 class SubmodelDefinition(BaseModel):
@@ -578,17 +588,121 @@ class LoRADiffusersConfig(LoRAConfigBase, ModelConfigBase):
         }
 
 
-class VAECheckpointConfig(CheckpointConfigBase, LegacyProbeMixin, ModelConfigBase):
+class VAEConfigBase(CheckpointConfigBase):
+    type: Literal[ModelType.VAE] = ModelType.VAE
+
+
+class VAECheckpointConfig(VAEConfigBase, ModelConfigBase):
     """Model config for standalone VAE models."""
 
-    type: Literal[ModelType.VAE] = ModelType.VAE
+    format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
+
+    KEY_PREFIXES: ClassVar = {"encoder.conv_in", "decoder.conv_in"}
+
+    @classmethod
+    def matches(cls, mod: ModelOnDisk, **overrides) -> MatchCertainty:
+        is_vae_override = overrides.get("type") is ModelType.VAE
+        is_checkpoint_override = overrides.get("format") is ModelFormat.Checkpoint
+
+        if is_vae_override and is_checkpoint_override:
+            return MatchCertainty.OVERRIDE
+
+        if mod.path.is_dir():
+            return MatchCertainty.NEVER
+
+        if mod.has_keys_starting_with(cls.KEY_PREFIXES):
+            return MatchCertainty.MAYBE
+
+        return MatchCertainty.NEVER
+
+    @classmethod
+    def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
+        base = cls.get_base_type(mod)
+        return {"base": base}
+
+    @classmethod
+    def get_base_type(cls, mod: ModelOnDisk) -> BaseModelType:
+        # Heuristic: VAEs of all architectures have a similar structure; the best we can do is guess based on name
+        for regexp, basetype in [
+            (r"xl", BaseModelType.StableDiffusionXL),
+            (r"sd2", BaseModelType.StableDiffusion2),
+            (r"vae", BaseModelType.StableDiffusion1),
+            (r"FLUX.1-schnell_ae", BaseModelType.Flux),
+        ]:
+            if re.search(regexp, mod.path.name, re.IGNORECASE):
+                return basetype
+
+        raise InvalidModelConfigException("Cannot determine base type")
 
 
-class VAEDiffusersConfig(LegacyProbeMixin, ModelConfigBase):
+class VAEDiffusersConfig(VAEConfigBase, ModelConfigBase):
     """Model config for standalone VAE models (diffusers version)."""
 
-    type: Literal[ModelType.VAE] = ModelType.VAE
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+
+    CLASS_NAMES: ClassVar = {"AutoencoderKL", "AutoencoderTiny"}
+
+    @classmethod
+    def matches(cls, mod: ModelOnDisk, **overrides) -> MatchCertainty:
+        is_vae_override = overrides.get("type") is ModelType.VAE
+        is_diffusers_override = overrides.get("format") is ModelFormat.Diffusers
+
+        if is_vae_override and is_diffusers_override:
+            return MatchCertainty.OVERRIDE
+
+        if mod.path.is_file():
+            return MatchCertainty.NEVER
+
+        try:
+            config = cls.get_config(mod)
+            class_name = get_class_name_from_config(config)
+            if class_name in cls.CLASS_NAMES:
+                return MatchCertainty.EXACT
+        except Exception:
+            pass
+
+        return MatchCertainty.NEVER
+
+    @classmethod
+    def get_config(cls, mod: ModelOnDisk) -> dict[str, Any]:
+        config_path = mod.path / "config.json"
+        with open(config_path, "r") as file:
+            return json.load(file)
+
+    @classmethod
+    def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
+        base = cls.get_base_type(mod)
+        return {"base": base}
+
+    @classmethod
+    def get_base_type(cls, mod: ModelOnDisk) -> BaseModelType:
+        if cls._config_looks_like_sdxl(mod):
+            return BaseModelType.StableDiffusionXL
+        elif cls._name_looks_like_sdxl(mod):
+            return BaseModelType.StableDiffusionXL
+        else:
+            # We do not support diffusers VAEs for any other base model at this time... YOLO
+            return BaseModelType.StableDiffusion1
+
+    @classmethod
+    def _config_looks_like_sdxl(cls, mod: ModelOnDisk) -> bool:
+        config = cls.get_config(mod)
+        # Heuristic: These config values that distinguish Stability's SD 1.x VAE from their SDXL VAE.
+        return config.get("scaling_factor", 0) == 0.13025 and config.get("sample_size") in [512, 1024]
+
+    @classmethod
+    def _name_looks_like_sdxl(cls, mod: ModelOnDisk) -> bool:
+        # Heuristic: SD and SDXL VAE are the same shape (3-channel RGB to 4-channel float scaled down
+        # by a factor of 8), so we can't necessarily tell them apart by config hyperparameters. Best
+        # we can do is guess based on name.
+        return bool(re.search(r"xl\b", cls._guess_name(mod), re.IGNORECASE))
+
+    @classmethod
+    def _guess_name(cls, mod: ModelOnDisk) -> str:
+        name = mod.path.name
+        if name == "vae":
+            name = mod.path.parent.name
+        return name
 
 
 class ControlNetDiffusersConfig(DiffusersConfigBase, ControlAdapterConfigBase, LegacyProbeMixin, ModelConfigBase):
