@@ -33,10 +33,11 @@ from invokeai.backend.flux.ip_adapter.xlabs_ip_adapter_flux import (
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.flux.redux.flux_redux_model import FluxReduxModel
-from invokeai.backend.flux.util import ae_params, params
+from invokeai.backend.flux.util import get_flux_ae_params, get_flux_transformers_params
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     CheckpointConfigBase,
+    CLIPEmbedCheckpointConfig,
     CLIPEmbedDiffusersConfig,
     ControlNetCheckpointConfig,
     ControlNetDiffusersConfig,
@@ -56,6 +57,7 @@ from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
     ModelType,
+    ModelVariantType,
     SubModelType,
 )
 from invokeai.backend.model_manager.util.model_util import (
@@ -90,7 +92,7 @@ class FluxVAELoader(ModelLoader):
         model_path = Path(config.path)
 
         with accelerate.init_empty_weights():
-            model = AutoEncoder(ae_params[config.config_path])
+            model = AutoEncoder(get_flux_ae_params())
         sd = load_file(model_path)
         model.load_state_dict(sd, assign=True)
         # VAE is broken in float16, which mps defaults to
@@ -107,7 +109,7 @@ class FluxVAELoader(ModelLoader):
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.CLIPEmbed, format=ModelFormat.Diffusers)
-class ClipCheckpointModel(ModelLoader):
+class CLIPDiffusersLoader(ModelLoader):
     """Class to load main models."""
 
     def _load_model(
@@ -127,6 +129,27 @@ class ClipCheckpointModel(ModelLoader):
         raise ValueError(
             f"Only Tokenizer and TextEncoder submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
         )
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.CLIPEmbed, format=ModelFormat.Checkpoint)
+class CLIPCheckpointLoader(ModelLoader):
+    """Class to load main models."""
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, CLIPEmbedCheckpointConfig):
+            raise ValueError("Only CLIPEmbedCheckpointConfig models are currently supported here.")
+
+        match submodel_type:
+            case SubModelType.TextEncoder:
+                return CLIPTextModel.from_pretrained(Path(config.path), use_safetensors=True)
+            case _:
+                raise ValueError(
+                    f"Only TextEncoder submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
+                )
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T5Encoder, format=ModelFormat.BnbQuantizedLlmInt8b)
@@ -229,7 +252,7 @@ class FluxCheckpointModel(ModelLoader):
         model_path = Path(config.path)
 
         with accelerate.init_empty_weights():
-            model = Flux(params[config.config_path])
+            model = Flux(get_flux_transformers_params(config.variant))
 
         sd = load_file(model_path)
         if "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in sd:
@@ -271,7 +294,7 @@ class FluxGGUFCheckpointModel(ModelLoader):
         model_path = Path(config.path)
 
         with accelerate.init_empty_weights():
-            model = Flux(params[config.config_path])
+            model = Flux(get_flux_transformers_params(config.variant))
 
         # HACK(ryand): We shouldn't be hard-coding the compute_dtype here.
         sd = gguf_sd_loader(model_path, compute_dtype=torch.bfloat16)
@@ -322,7 +345,7 @@ class FluxBnbQuantizednf4bCheckpointModel(ModelLoader):
 
         with SilenceWarnings():
             with accelerate.init_empty_weights():
-                model = Flux(params[config.config_path])
+                model = Flux(get_flux_transformers_params(config.variant))
                 model = quantize_model_nf4(model, modules_to_not_convert=set(), compute_dtype=torch.bfloat16)
             sd = load_file(model_path)
             if "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in sd:
@@ -362,7 +385,7 @@ class FluxControlnetModel(ModelLoader):
     def _load_xlabs_controlnet(self, sd: dict[str, torch.Tensor]) -> AnyModel:
         with accelerate.init_empty_weights():
             # HACK(ryand): Is it safe to assume dev here?
-            model = XLabsControlNetFlux(params["flux-dev"])
+            model = XLabsControlNetFlux(get_flux_transformers_params(ModelVariantType.FluxDev))
 
         model.load_state_dict(sd, assign=True)
         return model

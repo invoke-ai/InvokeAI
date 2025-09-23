@@ -12,7 +12,10 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.util import InvokeAILogger
 
 
-def is_state_dict_likely_in_flux_aitoolkit_format(state_dict: dict[str, Any], metadata: dict[str, Any] = None) -> bool:
+def is_state_dict_likely_in_flux_aitoolkit_format(
+    state_dict: dict[str, Any],
+    metadata: dict[str, Any] | None = None,
+) -> bool:
     if metadata:
         try:
             software = json.loads(metadata.get("software", "{}"))
