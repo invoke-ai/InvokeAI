@@ -33,6 +33,7 @@ from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import (
     AnyVariant,
     BaseModelType,
+    FluxVariantType,
     ModelFormat,
     ModelRepoVariant,
     ModelSourceType,
@@ -62,6 +63,7 @@ from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageM
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 CkptType = Dict[str | int, Any]
+
 
 LEGACY_CONFIGS: Dict[BaseModelType, Dict[ModelVariantType, Union[str, Dict[SchedulerPredictionType, str]]]] = {
     BaseModelType.StableDiffusion1: {
@@ -106,7 +108,7 @@ class ProbeBase(object):
         """Get model file format."""
         raise NotImplementedError
 
-    def get_variant_type(self) -> Optional[ModelVariantType]:
+    def get_variant_type(self) -> AnyVariant | None:
         """Get model variant type."""
         return None
 
@@ -256,7 +258,7 @@ class ModelProbe(object):
         if fields["base"] == BaseModelType.StableDiffusion3 and callable(get_submodels):
             fields["submodels"] = get_submodels()
 
-        model_info = ModelConfigFactory.make_config(fields)  # , key=fields.get("key", None))
+        model_info = ModelConfigFactory.make_config(fields)
         return model_info
 
     @classmethod
@@ -580,7 +582,7 @@ class CheckpointProbeBase(ProbeBase):
             return ModelFormat.GGUFQuantized
         return ModelFormat("checkpoint")
 
-    def get_variant_type(self) -> ModelVariantType:
+    def get_variant_type(self) -> AnyVariant:
         model_type = ModelProbe.get_model_type_from_checkpoint(self.model_path, self.checkpoint)
         base_type = self.get_base_type()
         if model_type != ModelType.Main:
@@ -597,19 +599,26 @@ class CheckpointProbeBase(ProbeBase):
                 )
                 return ModelVariantType.Normal
 
+            is_flux_dev = (
+                "guidance_in.out_layer.weight" in state_dict
+                or "model.diffusion_model.guidance_in.out_layer.weight" in state_dict
+            )
+
             # FLUX Model variant types are distinguished by input channels:
             # - Unquantized Dev and Schnell have in_channels=64
             # - BNB-NF4 Dev and Schnell have in_channels=1
             # - FLUX Fill has in_channels=384
             # - Unsure of quantized FLUX Fill models
             # - Unsure of GGUF-quantized models
-            if in_channels == 384:
+            if is_flux_dev and in_channels == 384:
                 # This is a FLUX Fill model. FLUX Fill needs special handling throughout the application. The variant
                 # type is used to determine whether to use the fill model or the base model.
-                return ModelVariantType.Inpaint
-            else:
+                return FluxVariantType.DevFill
+            elif is_flux_dev:
                 # Fall back on "normal" variant type for all other FLUX models.
-                return ModelVariantType.Normal
+                return FluxVariantType.Dev
+            else:
+                return FluxVariantType.Schnell
 
         in_channels = state_dict["model.diffusion_model.input_blocks.0.0.weight"].shape[1]
         if in_channels == 9:

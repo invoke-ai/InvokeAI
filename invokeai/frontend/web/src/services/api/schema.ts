@@ -5490,7 +5490,7 @@ export type components = {
              * Config Path
              * @description path to the checkpoint model config file
              */
-            config_path: string;
+            config_path?: string | null;
             /**
              * Converted At
              * @description When this model was last converted to diffusers
@@ -14818,7 +14818,7 @@ export type components = {
              * Config Path
              * @description path to the checkpoint model config file
              */
-            config_path: string;
+            config_path?: string | null;
             /**
              * Converted At
              * @description When this model was last converted to diffusers
@@ -14927,7 +14927,7 @@ export type components = {
              * Config Path
              * @description path to the checkpoint model config file
              */
-            config_path: string;
+            config_path?: string | null;
             /**
              * Converted At
              * @description When this model was last converted to diffusers
@@ -15128,7 +15128,7 @@ export type components = {
              * Config Path
              * @description path to the checkpoint model config file
              */
-            config_path: string;
+            config_path?: string | null;
             /**
              * Converted At
              * @description When this model was last converted to diffusers
@@ -17487,7 +17487,7 @@ export type components = {
          * @description Variant type.
          * @enum {string}
          */
-        ModelVariantType: "normal" | "inpaint" | "depth";
+        ModelVariantType: "normal" | "inpaint" | "depth" | "flux_dev" | "flux_dev_fill" | "flux_schnell";
         /**
          * ModelsList
          * @description Return list of configs.
@@ -22199,7 +22199,7 @@ export type components = {
              * Config Path
              * @description path to the checkpoint model config file
              */
-            config_path: string;
+            config_path?: string | null;
             /**
              * Converted At
              * @description When this model was last converted to diffusers

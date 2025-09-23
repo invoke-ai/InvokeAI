@@ -223,6 +223,9 @@ export const MODEL_VARIANT_TO_LONG_NAME: Record<ModelVariantType, string> = {
   normal: 'Normal',
   inpaint: 'Inpaint',
   depth: 'Depth',
+  dev: 'FLUX Dev',
+  dev_fill: 'FLUX Dev Fill',
+  schnell: 'FLUX Schnell',
 };
 
 export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {

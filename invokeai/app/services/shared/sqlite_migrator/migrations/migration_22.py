@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
-from invokeai.backend.model_manager.config import AnyModelConfig, AnyModelConfigValidator
+from invokeai.backend.model_manager.config import AnyModelConfigValidator
 
 
 class NormalizeResult(NamedTuple):
@@ -30,7 +30,7 @@ class Migration22Callback:
         for model_id, config_json in rows:
             try:
                 # Get the model config as a pydantic object
-                config = self._load_model_config(config_json)
+                config = AnyModelConfigValidator.validate_json(config_json)
             except ValidationError:
                 # This could happen if the config schema changed in a way that makes old configs invalid. Unlikely
                 # for users, more likely for devs testing out migration paths.
@@ -215,11 +215,6 @@ class Migration22Callback:
                 continue
 
         self._logger.info("Pruned %d empty directories under %s", len(removed_dirs), self._models_dir)
-
-    def _load_model_config(self, config_json: str) -> AnyModelConfig:
-        # The typing of the validator says it returns Unknown, but it's really a AnyModelConfig. This utility function
-        # just makes that clear.
-        return AnyModelConfigValidator.validate_json(config_json)
 
 
 def build_migration_22(app_config: InvokeAIAppConfig, logger: Logger) -> Migration:

@@ -7,7 +7,8 @@ import torch
 from safetensors.torch import load_file, save_file
 
 from invokeai.backend.flux.model import Flux
-from invokeai.backend.flux.util import params
+from invokeai.backend.flux.util import get_flux_transformers_params
+from invokeai.backend.model_manager.taxonomy import ModelVariantType
 from invokeai.backend.quantization.bnb_nf4 import quantize_model_nf4
 
 
@@ -35,7 +36,7 @@ def main():
     # inference_dtype = torch.bfloat16
     with log_time("Initialize FLUX transformer on meta device"):
         # TODO(ryand): Determine if this is a schnell model or a dev model and load the appropriate config.
-        p = params["flux-schnell"]
+        p = get_flux_transformers_params(ModelVariantType.FluxSchnell)
 
         # Initialize the model on the "meta" device.
         with accelerate.init_empty_weights():

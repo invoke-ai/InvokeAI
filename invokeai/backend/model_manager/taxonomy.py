@@ -5,6 +5,7 @@ import diffusers
 import onnxruntime as ort
 import torch
 from diffusers import ModelMixin
+from pydantic import TypeAdapter
 
 from invokeai.backend.raw_model import RawModel
 
@@ -30,6 +31,7 @@ class BaseModelType(str, Enum):
     Imagen4 = "imagen4"
     Gemini2_5 = "gemini-2.5"
     ChatGPT4o = "chatgpt-4o"
+    # This is actually the FLUX Kontext API model. Local FLUX Kontext is just BaseModelType.Flux.
     FluxKontext = "flux-kontext"
     Veo3 = "veo3"
     Runway = "runway"
@@ -92,6 +94,12 @@ class ModelVariantType(str, Enum):
     Depth = "depth"
 
 
+class FluxVariantType(str, Enum):
+    Schnell = "schnell"
+    Dev = "dev"
+    DevFill = "dev_fill"
+
+
 class ModelFormat(str, Enum):
     """Storage format of model."""
 
@@ -149,4 +157,7 @@ class FluxLoRAFormat(str, Enum):
     AIToolkit = "flux.aitoolkit"
 
 
-AnyVariant: TypeAlias = Union[ModelVariantType, ClipVariantType, None]
+AnyVariant: TypeAlias = Union[ModelVariantType, ClipVariantType, FluxVariantType]
+variant_type_adapter = TypeAdapter[ModelVariantType | ClipVariantType | FluxVariantType](
+    ModelVariantType | ClipVariantType | FluxVariantType
+)
