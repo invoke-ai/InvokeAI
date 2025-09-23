@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from requests.sessions import Session
-from requests_testadapter import TestAdapter, TestSession
+import requests_mock
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadQueueService, DownloadQueueServiceBase
@@ -213,81 +213,83 @@ def mm2_model_manager(
 @pytest.fixture
 def mm2_session(embedding_file: Path, diffusers_dir: Path) -> Session:
     """This fixtures defines a series of mock URLs for testing download and installation."""
-    sess: Session = TestSession()
-    sess.mount(
+    sess = Session()
+    adapter = requests_mock.Adapter()
+    sess.mount("http://", adapter)
+    sess.mount("https://", adapter)
+    adapter.register_uri(
+        "GET",
         "https://test.com/missing_model.safetensors",
-        TestAdapter(
-            b"missing",
-            status=404,
-        ),
+        text="missing",
+        status_code=404,
+        reason="NOT FOUND",
     )
-    sess.mount(
+    adapter.register_uri(
+        "GET",
         "https://huggingface.co/api/models/stabilityai/sdxl-turbo",
-        TestAdapter(
-            RepoHFMetadata1,
-            headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": len(RepoHFMetadata1)},
+        content=RepoHFMetadata1,
+        headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": str(len(RepoHFMetadata1))},
+    )
+    (
+        adapter.register_uri(
+            "GET",
+            "https://huggingface.co/api/models/stabilityai/sdxl-turbo-nofp16",
+            content=RepoHFMetadata1_nofp16,
+            headers={
+                "Content-Type": "application/json; charset=utf-8",
+                "Content-Length": str(len(RepoHFMetadata1_nofp16)),
+            },
         ),
     )
-    sess.mount(
-        "https://huggingface.co/api/models/stabilityai/sdxl-turbo-nofp16",
-        TestAdapter(
-            RepoHFMetadata1_nofp16,
-            headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": len(RepoHFMetadata1_nofp16)},
-        ),
-    )
-    sess.mount(
+    adapter.register_uri(
+        "GET",
         "https://civitai.com/api/v1/model-versions/242807",
-        TestAdapter(
-            RepoCivitaiVersionMetadata1,
-            headers={
-                "Content-Length": len(RepoCivitaiVersionMetadata1),
-            },
-        ),
+        content=RepoCivitaiVersionMetadata1,
+        headers={"Content-Length": str(len(RepoCivitaiVersionMetadata1))},
     )
-    sess.mount(
+    adapter.register_uri(
+        "GET",
         "https://civitai.com/api/v1/models/215485",
-        TestAdapter(
-            RepoCivitaiModelMetadata1,
-            headers={
-                "Content-Length": len(RepoCivitaiModelMetadata1),
-            },
-        ),
+        content=RepoCivitaiModelMetadata1,
+        headers={"Content-Length": str(len(RepoCivitaiModelMetadata1))},
     )
-    sess.mount(
+    adapter.register_uri(
+        "GET",
         "https://huggingface.co/stabilityai/sdxl-turbo/resolve/main/model_index.json",
-        TestAdapter(
-            RepoHFModelJson1,
-            headers={
-                "Content-Length": len(RepoHFModelJson1),
-            },
-        ),
+        content=RepoHFModelJson1,
+        headers={"Content-Length": str(len(RepoHFModelJson1))},
     )
     with open(embedding_file, "rb") as f:
         data = f.read()  # file is small - just 15K
-    sess.mount(
+    adapter.register_uri(
+        "GET",
         "https://www.test.foo/download/test_embedding.safetensors",
-        TestAdapter(data, headers={"Content-Type": "application/octet-stream", "Content-Length": len(data)}),
+        content=data,
+        headers={"Content-Type": "application/octet-stream", "Content-Length": str(len(data))},
     )
-    sess.mount(
+    adapter.register_uri(
+        "GET",
         "https://huggingface.co/api/models/stabilityai/sdxl-turbo",
-        TestAdapter(
-            RepoHFMetadata1,
-            headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": len(RepoHFMetadata1)},
-        ),
+        content=RepoHFMetadata1,
+        headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": str(len(RepoHFMetadata1))},
     )
-    sess.mount(
+    adapter.register_uri(
+        "GET",
+        "https://huggingface.co/api/models/stabilityai/sdxl-turbo/revision/ModelRepoVariant.Default?blobs=True",
+        content=RepoHFMetadata1,
+        headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": str(len(RepoHFMetadata1))},
+    )
+    adapter.register_uri(
+        "GET",
         "https://huggingface.co/api/models/InvokeAI-test/textual_inversion_tests?blobs=True",
-        TestAdapter(
-            HFTestLoraMetadata,
-            headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": len(HFTestLoraMetadata)},
-        ),
+        content=HFTestLoraMetadata,
+        headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": str(len(HFTestLoraMetadata))},
     )
-    sess.mount(
+    adapter.register_uri(
+        "GET",
         "https://huggingface.co/InvokeAI-test/textual_inversion_tests/resolve/main/learned_embeds-steps-1000.safetensors",
-        TestAdapter(
-            data,
-            headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": len(data)},
-        ),
+        content=data,
+        headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": str(len(data))},
     )
     for root, _, files in os.walk(diffusers_dir):
         for name in files:
@@ -296,55 +298,57 @@ def mm2_session(embedding_file: Path, diffusers_dir: Path) -> Session:
             url = f"https://huggingface.co/stabilityai/sdxl-turbo/resolve/main/{url_base}"
             with open(path, "rb") as f:
                 data = f.read()
-            sess.mount(
+            adapter.register_uri(
+                "GET",
                 url,
-                TestAdapter(
-                    data,
-                    headers={
-                        "Content-Type": "application/json; charset=utf-8",
-                        "Content-Length": len(data),
-                    },
-                ),
+                content=data,
+                headers={
+                    "Content-Type": "application/json; charset=utf-8",
+                    "Content-Length": str(len(data)),
+                },
             )
 
     for i in ["12345", "9999", "54321"]:
         content = (
             b"I am a safetensors file " + bytearray(i, "utf-8") + bytearray(32_000)
         )  # for pause tests, must make content large
-        sess.mount(
+        adapter.register_uri(
+            "GET",
             f"http://www.civitai.com/models/{i}",
-            TestAdapter(
-                content,
-                headers={
-                    "Content-Length": len(content),
-                    "Content-Disposition": f'filename="mock{i}.safetensors"',
-                },
-            ),
+            content=content,
+            headers={
+                "Content-Length": str(len(content)),
+                "Content-Disposition": f'filename="mock{i}.safetensors"',
+            },
         )
 
-    sess.mount(
+    adapter.register_uri(
+        "GET",
         "http://www.huggingface.co/foo.txt",
-        TestAdapter(
-            content,
-            headers={
-                "Content-Length": len(content),
-                "Content-Disposition": 'filename="foo.safetensors"',
-            },
-        ),
+        content=content,
+        headers={
+            "Content-Length": str(len(content)),
+            "Content-Disposition": 'filename="foo.safetensors"',
+        },
     )
 
     # here are some malformed URLs to test
     # missing the content length
-    sess.mount(
+    adapter.register_uri(
+        "GET",
         "http://www.civitai.com/models/missing",
-        TestAdapter(
-            b"Missing content length",
-            headers={
-                "Content-Disposition": 'filename="missing.txt"',
-            },
-        ),
+        text="Missing content length",
+        headers={
+            "Content-Disposition": 'filename="missing.txt"',
+        },
     )
     # not found test
-    sess.mount("http://www.civitai.com/models/broken", TestAdapter(b"Not found", status=404))
+    adapter.register_uri(
+        "GET",
+        "http://www.civitai.com/models/broken",
+        text="Not found",
+        status_code=404,
+        reason="NOT FOUND",
+    )
 
     return sess

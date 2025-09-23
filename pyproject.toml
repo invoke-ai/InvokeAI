@@ -111,7 +111,7 @@ dependencies = [
   "pytest-cov",
   "pytest-timeout",
   "pytest-datadir",
-  "requests_testadapter",
+  "requests_mock",
   "httpx",
   "polyfactory==2.19.0",
   "humanize==4.12.1",
