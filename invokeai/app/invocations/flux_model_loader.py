@@ -13,7 +13,7 @@ from invokeai.app.util.t5_model_identifier import (
     preprocess_t5_encoder_model_identifier,
     preprocess_t5_tokenizer_model_identifier,
 )
-from invokeai.backend.flux.util import max_seq_lengths
+from invokeai.backend.flux.util import get_flux_max_seq_length
 from invokeai.backend.model_manager.config import (
     CheckpointConfigBase,
 )
@@ -94,5 +94,5 @@ class FluxModelLoaderInvocation(BaseInvocation):
             clip=CLIPField(tokenizer=tokenizer, text_encoder=clip_encoder, loras=[], skipped_layers=0),
             t5_encoder=T5EncoderField(tokenizer=tokenizer2, text_encoder=t5_encoder, loras=[]),
             vae=VAEField(vae=vae),
-            max_seq_len=max_seq_lengths[transformer_config.config_path],
+            max_seq_len=get_flux_max_seq_length(transformer_config.variant),
         )
