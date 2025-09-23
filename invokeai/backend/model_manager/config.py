@@ -30,6 +30,7 @@ from inspect import isabstract
 from pathlib import Path
 from typing import ClassVar, Literal, Optional, Type, TypeAlias, Union
 
+import spandrel
 import torch
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, TypeAdapter
 from typing_extensions import Annotated, Any, Dict
@@ -56,6 +57,7 @@ from invokeai.backend.model_manager.taxonomy import (
     variant_type_adapter,
 )
 from invokeai.backend.model_manager.util.model_util import lora_token_vector_length
+from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 
 logger = logging.getLogger(__name__)
@@ -605,30 +607,36 @@ class ControlNetCheckpointConfig(CheckpointConfigBase, ControlAdapterConfigBase,
 class TextualInversionConfigBase(ABC, BaseModel):
     type: Literal[ModelType.TextualInversion] = ModelType.TextualInversion
 
+    KNOWN_SUFFIXES: ClassVar = {"bin", "safetensors", "pt", "ckpt"}
+    KNOWN_KEYS: ClassVar = {"string_to_param", "emb_params", "clip_g"}
+
     @classmethod
     def file_looks_like_embedding(cls, mod: ModelOnDisk, path: Path | None = None) -> bool:
-        p = path or mod.path
+        try:
+            p = path or mod.path
 
-        if not p.exists():
+            if not p.exists():
+                return False
+
+            if p.is_dir():
+                return False
+
+            if p.name in [f"learned_embeds.{s}" for s in cls.KNOWN_SUFFIXES]:
+                return True
+
+            state_dict = mod.load_state_dict(p)
+
+            # Heuristic: textual inversion embeddings have these keys
+            if any(key in cls.KNOWN_KEYS for key in state_dict.keys()):
+                return True
+
+            # Heuristic: small state dict with all tensor values
+            if (len(state_dict)) < 10 and all(isinstance(v, torch.Tensor) for v in state_dict.values()):
+                return True
+
             return False
-
-        if p.is_dir():
+        except Exception:
             return False
-
-        if p.name in {"learned_embeds.bin", "learned_embeds.safetensors"}:
-            return True
-
-        state_dict = mod.load_state_dict(p)
-
-        # Heuristic: textual inversion embeddings have these keys
-        if any(key in {"string_to_param", "emb_params"} for key in state_dict.keys()):
-            return True
-
-        # Heuristic: small state dict with all tensor values
-        if (len(state_dict)) < 10 and all(isinstance(v, torch.Tensor) for v in state_dict.values()):
-            return True
-
-        return False
 
     @classmethod
     def get_base(cls, mod: ModelOnDisk, path: Path | None = None) -> BaseModelType:
@@ -716,8 +724,8 @@ class TextualInversionFolderConfig(TextualInversionConfigBase, ModelConfigBase):
         if mod.path.is_file():
             return MatchCertainty.NEVER
 
-        for filename in {"learned_embeds.bin", "learned_embeds.safetensors"}:
-            if cls.file_looks_like_embedding(mod, mod.path / filename):
+        for p in mod.path.iterdir():
+            if cls.file_looks_like_embedding(mod, p):
                 return MatchCertainty.MAYBE
 
         return MatchCertainty.NEVER
@@ -929,13 +937,38 @@ class T2IAdapterConfig(DiffusersConfigBase, ControlAdapterConfigBase, LegacyProb
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
 
-class SpandrelImageToImageConfig(LegacyProbeMixin, ModelConfigBase):
+class SpandrelImageToImageConfig(ModelConfigBase):
     """Model config for Spandrel Image to Image models."""
 
     _MATCH_SPEED: ClassVar[MatchSpeed] = MatchSpeed.SLOW  # requires loading the model from disk
 
     type: Literal[ModelType.SpandrelImageToImage] = ModelType.SpandrelImageToImage
     format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
+
+    @classmethod
+    def matches(cls, mod: ModelOnDisk, **overrides) -> MatchCertainty:
+        if not mod.path.is_file():
+            return MatchCertainty.NEVER
+
+        try:
+            # It would be nice to avoid having to load the Spandrel model from disk here. A couple of options were
+            # explored to avoid this:
+            # 1. Call `SpandrelImageToImageModel.load_from_state_dict(ckpt)`, where `ckpt` is a state_dict on the meta
+            #    device. Unfortunately, some Spandrel models perform operations during initialization that are not
+            #    supported on meta tensors.
+            # 2. Spandrel has internal logic to determine a model's type from its state_dict before loading the model.
+            #    This logic is not exposed in spandrel's public API. We could copy the logic here, but then we have to
+            #    maintain it, and the risk of false positive detections is higher.
+            SpandrelImageToImageModel.load_from_file(mod.path)
+            return MatchCertainty.EXACT
+        except spandrel.UnsupportedModelError:
+            pass
+        except Exception as e:
+            logger.warning(
+                f"Encountered error while probing to determine if {mod.path} is a Spandrel model. Ignoring. Error: {e}"
+            )
+
+        return MatchCertainty.NEVER
 
 
 class SigLIPConfig(DiffusersConfigBase, LegacyProbeMixin, ModelConfigBase):
