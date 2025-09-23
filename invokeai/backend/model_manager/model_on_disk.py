@@ -129,18 +129,21 @@ class ModelOnDisk:
                     )
         return path
 
-    def has_keys_exact(self, keys: set[str], path: Optional[Path] = None) -> bool:
+    def has_keys_exact(self, keys: str | set[str], path: Optional[Path] = None) -> bool:
+        _keys = {keys} if isinstance(keys, str) else keys
         state_dict = self.load_state_dict(path)
-        return keys.issubset({key for key in state_dict.keys() if isinstance(key, str)})
+        return _keys.issubset({key for key in state_dict.keys() if isinstance(key, str)})
 
-    def has_keys_starting_with(self, prefixes: set[str], path: Optional[Path] = None) -> bool:
+    def has_keys_starting_with(self, prefixes: str | set[str], path: Optional[Path] = None) -> bool:
+        _prefixes = {prefixes} if isinstance(prefixes, str) else prefixes
         state_dict = self.load_state_dict(path)
         return any(
-            any(key.startswith(prefix) for prefix in prefixes) for key in state_dict.keys() if isinstance(key, str)
+            any(key.startswith(prefix) for prefix in _prefixes) for key in state_dict.keys() if isinstance(key, str)
         )
 
-    def has_keys_ending_with(self, prefixes: set[str], path: Optional[Path] = None) -> bool:
+    def has_keys_ending_with(self, suffixes: str | set[str], path: Optional[Path] = None) -> bool:
+        _suffixes = {suffixes} if isinstance(suffixes, str) else suffixes
         state_dict = self.load_state_dict(path)
         return any(
-            any(key.endswith(suffix) for suffix in prefixes) for key in state_dict.keys() if isinstance(key, str)
+            any(key.endswith(suffix) for suffix in _suffixes) for key in state_dict.keys() if isinstance(key, str)
         )

@@ -406,15 +406,93 @@ class LoRAConfigBase(ABC, BaseModel):
 class T5EncoderConfigBase(ABC, BaseModel):
     """Base class for diffusers-style models."""
 
+    base: Literal[BaseModelType.Any] = BaseModelType.Any
     type: Literal[ModelType.T5Encoder] = ModelType.T5Encoder
 
+    @classmethod
+    def get_config(cls, mod: ModelOnDisk) -> dict[str, Any]:
+        path = mod.path / "text_encoder_2" / "config.json"
+        with open(path, "r") as file:
+            return json.load(file)
 
-class T5EncoderConfig(T5EncoderConfigBase, LegacyProbeMixin, ModelConfigBase):
+    @classmethod
+    def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
+        return {}
+
+
+class T5EncoderConfig(T5EncoderConfigBase, ModelConfigBase):
     format: Literal[ModelFormat.T5Encoder] = ModelFormat.T5Encoder
 
+    @classmethod
+    def matches(cls, mod: ModelOnDisk, **overrides) -> MatchCertainty:
+        is_t5_type_override = overrides.get("type") is ModelType.T5Encoder
+        is_t5_format_override = overrides.get("format") is ModelFormat.T5Encoder
 
-class T5EncoderBnbQuantizedLlmInt8bConfig(T5EncoderConfigBase, LegacyProbeMixin, ModelConfigBase):
+        if is_t5_type_override and is_t5_format_override:
+            return MatchCertainty.OVERRIDE
+
+        if mod.path.is_file():
+            return MatchCertainty.NEVER
+
+        model_dir = mod.path / "text_encoder_2"
+
+        if not model_dir.exists():
+            return MatchCertainty.NEVER
+
+        try:
+            config = cls.get_config(mod)
+
+            is_t5_encoder_model = get_class_name_from_config(config) == "T5EncoderModel"
+            is_t5_format = (model_dir / "model.safetensors.index.json").exists()
+
+            if is_t5_encoder_model and is_t5_format:
+                return MatchCertainty.EXACT
+        except Exception:
+            pass
+
+        return MatchCertainty.NEVER
+
+
+class T5EncoderBnbQuantizedLlmInt8bConfig(T5EncoderConfigBase, ModelConfigBase):
     format: Literal[ModelFormat.BnbQuantizedLlmInt8b] = ModelFormat.BnbQuantizedLlmInt8b
+
+    @classmethod
+    def matches(cls, mod: ModelOnDisk, **overrides) -> MatchCertainty:
+        is_t5_type_override = overrides.get("type") is ModelType.T5Encoder
+        is_bnb_format_override = overrides.get("format") is ModelFormat.BnbQuantizedLlmInt8b
+
+        if is_t5_type_override and is_bnb_format_override:
+            return MatchCertainty.OVERRIDE
+
+        if mod.path.is_file():
+            return MatchCertainty.NEVER
+
+        model_dir = mod.path / "text_encoder_2"
+
+        if not model_dir.exists():
+            return MatchCertainty.NEVER
+
+        try:
+            config = cls.get_config(mod)
+
+            is_t5_encoder_model = get_class_name_from_config(config) == "T5EncoderModel"
+
+            # Heuristic: look for the quantization in the name
+            files = model_dir.glob("*.safetensors")
+            filename_looks_like_bnb = any(x for x in files if "llm_int8" in x.as_posix())
+
+            if is_t5_encoder_model and filename_looks_like_bnb:
+                return MatchCertainty.EXACT
+
+            # Heuristic: Look for the presence of "SCB" in state dict keys (typically a suffix)
+            has_scb_key = mod.has_keys_ending_with("SCB")
+
+            if is_t5_encoder_model and has_scb_key:
+                return MatchCertainty.EXACT
+        except Exception:
+            pass
+
+        return MatchCertainty.NEVER
 
 
 class LoRAOmiConfig(LoRAConfigBase, ModelConfigBase):
