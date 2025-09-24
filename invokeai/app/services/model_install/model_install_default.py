@@ -39,7 +39,7 @@ from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     CheckpointConfigBase,
     InvalidModelConfigException,
-    ModelConfigBase,
+    ModelConfigFactory,
 )
 from invokeai.backend.model_manager.legacy_probe import ModelProbe
 from invokeai.backend.model_manager.metadata import (
@@ -612,7 +612,11 @@ class ModelInstallService(ModelInstallServiceBase):
         try:
             return ModelProbe.probe(model_path=model_path, fields=deepcopy(fields), hash_algo=hash_algo)  # type: ignore
         except InvalidModelConfigException:
-            return ModelConfigBase.classify(mod=model_path, fields=deepcopy(fields), hash_algo=hash_algo)
+            return ModelConfigFactory.from_model_on_disk(
+                mod=model_path,
+                overrides=deepcopy(fields),
+                hash_algo=hash_algo,
+            )
 
     def _register(
         self, model_path: Path, config: Optional[ModelRecordChanges] = None, info: Optional[AnyModelConfig] = None
@@ -633,7 +637,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
         info.path = model_path.as_posix()
 
-        if isinstance(info, CheckpointConfigBase):
+        if isinstance(info, CheckpointConfigBase) and info.config_path is not None:
             # Checkpoints have a config file needed for conversion. Same handling as the model weights - if it's in the
             # invoke-managed legacy config dir, we use a relative path.
             legacy_config_path = self.app_config.legacy_conf_path / info.config_path
