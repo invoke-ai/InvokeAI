@@ -1149,11 +1149,42 @@ class SpandrelImageToImageConfig(ModelConfigBase):
             raise NotAMatch(cls, "model does not match SpandrelImageToImage heuristics") from e
 
 
-class SigLIPConfig(DiffusersConfigBase, LegacyProbeMixin, ModelConfigBase):
+class SigLIPConfig(DiffusersConfigBase, ModelConfigBase):
     """Model config for SigLIP."""
 
     type: Literal[ModelType.SigLIP] = ModelType.SigLIP
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+
+    VALID_OVERRIDES: ClassVar = {
+        "type": ModelType.SigLIP,
+        "format": ModelFormat.Diffusers,
+    }
+
+    VALID_CLASS_NAMES: ClassVar = {
+        "SiglipModel",
+    }
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, fields: dict[str, Any]) -> Self:
+        if _validate_overrides(
+            config_class=cls,
+            provided_overrides=fields,
+            valid_overrides=cls.VALID_OVERRIDES,
+        ):
+            return cls(**fields)
+
+        if mod.path.is_file():
+            raise NotAMatch(cls, "model path is a file, not a directory")
+
+        config_path = mod.path / "config.json"
+
+        _validate_class_names(
+            config_class=cls,
+            config_path=config_path,
+            valid_class_names=cls.VALID_CLASS_NAMES,
+        )
+
+        return cls(**fields)
 
 
 class FluxReduxConfig(LegacyProbeMixin, ModelConfigBase):
