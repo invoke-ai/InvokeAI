@@ -612,7 +612,7 @@ class ModelInstallService(ModelInstallServiceBase):
         try:
             return ModelProbe.probe(model_path=model_path, fields=deepcopy(fields), hash_algo=hash_algo)  # type: ignore
         except InvalidModelConfigException:
-            return ModelConfigBase.classify(mod=model_path, hash_algo=hash_algo, **fields)
+            return ModelConfigBase.classify(mod=model_path, fields=deepcopy(fields), hash_algo=hash_algo)
 
     def _register(
         self, model_path: Path, config: Optional[ModelRecordChanges] = None, info: Optional[AnyModelConfig] = None
