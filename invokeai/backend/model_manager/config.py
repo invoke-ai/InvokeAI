@@ -25,7 +25,7 @@ import json
 import logging
 import re
 import time
-from abc import ABC, abstractmethod
+from abc import ABC
 from enum import Enum
 from inspect import isabstract
 from pathlib import Path
@@ -280,12 +280,11 @@ class ModelConfigBase(ABC, BaseModel):
         return Tag(f"{type}.{format}")
 
     @classmethod
-    @abstractmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, fields: dict[str, Any]) -> Self:
         """Given the model on disk and any overrides, return an instance of this config class.
 
         Implementations should raise NotAMatch if the model does not match this config class."""
-        pass
+        raise NotImplementedError(f"from_model_on_disk not implemented for {cls.__name__}")
 
 
 class UnknownModelConfig(ModelConfigBase):
