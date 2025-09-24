@@ -132,7 +132,10 @@ class MinimalConfigExample(ModelConfigBase):
 def test_minimal_working_example(datadir: Path):
     model_path = datadir / "minimal_config_model.json"
     overrides = {"base": BaseModelType.StableDiffusion1}
-    config = ModelConfigBase.classify(model_path, **overrides)
+    config = ModelConfigFactory.from_model_on_disk(
+        mod=model_path,
+        overrides=overrides,
+    )
 
     assert isinstance(config, MinimalConfigExample)
     assert config.base == BaseModelType.StableDiffusion1
@@ -160,7 +163,10 @@ def test_regression_against_model_probe(datadir: Path, override_model_loading):
 
         try:
             stripped_mod = StrippedModelOnDisk(path)
-            new_config = ModelConfigBase.classify(stripped_mod, hash=fake_hash, key=fake_key)
+            new_config = ModelConfigFactory.from_model_on_disk(
+                mod=stripped_mod,
+                overrides={"hash": fake_hash, "key": fake_key},
+            )
         except InvalidModelConfigException:
             pass
 
