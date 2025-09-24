@@ -91,7 +91,7 @@ class NotAMatch(Exception):
         config_class: type,
         reason: str,
     ):
-        super().__init__(f"{config_class.__name__} does not match: {reason}")
+        super().__init__(f"{config_class.__name__}: {reason}")
 
 
 DEFAULTS_PRECISION = Literal["fp16", "fp32"]
@@ -1344,32 +1344,34 @@ class ModelConfigFactory:
 
         # Store results as a mapping of config class to either an instance of that class or an exception
         # that was raised when trying to build it.
-        results: dict[type[AnyModelConfig], AnyModelConfig | Exception] = {}
+        results: dict[str, AnyModelConfig | Exception] = {}
 
         # Try to build an instance of each model config class that uses the classify API.
         # Each class will either return an instance of itself or raise NotAMatch if it doesn't match.
         # Other exceptions may be raised if something unexpected happens during matching or building.
         for config_class in ModelConfigBase.USING_CLASSIFY_API:
+            class_name = config_class.__name__
             try:
                 instance = config_class.from_model_on_disk(mod, fields)
-                results[config_class] = instance
+                results[class_name] = instance
             except NotAMatch as e:
-                results[config_class] = e
+                results[class_name] = e
                 logger.debug(f"No match for {config_class.__name__} on model {mod.name}")
             except ValidationError as e:
                 # This means the model matched, but we couldn't create the pydantic model instance for the config.
                 # Maybe invalid overrides were provided?
-                results[config_class] = e
+                results[class_name] = e
                 logger.warning(f"Schema validation error for {config_class.__name__} on model {mod.name}: {e}")
             except Exception as e:
-                results[config_class] = e
+                results[class_name] = e
                 logger.warning(f"Unexpected exception while matching {mod.name} to {config_class.__name__}: {e}")
 
         matches = [r for r in results.values() if isinstance(r, ModelConfigBase)]
 
         if not matches and app_config.allow_unknown_models:
             logger.warning(f"Unable to identify model {mod.name}, classifying as UnknownModelConfig")
-            return UnknownModelConfig.from_model_on_disk(mod, fields)
+            logger.debug(f"Model matching results: {results}")
+            return UnknownModelConfig(**fields)
 
         instance = next(iter(matches))
         if len(matches) > 1:
