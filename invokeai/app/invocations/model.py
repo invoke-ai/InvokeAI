@@ -24,8 +24,9 @@ class ModelIdentifierField(BaseModel):
     name: str = Field(description="The model's name")
     base: BaseModelType = Field(description="The model's base model type")
     type: ModelType = Field(description="The model's type")
-    submodel_type: Optional[SubModelType] = Field(
-        description="The submodel to load, if this is a main model", default=None
+    submodel_type: SubModelType | None = Field(
+        description="The submodel to load, if this is a main model",
+        default=None,
     )
 
     @classmethod
