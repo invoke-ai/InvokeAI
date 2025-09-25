@@ -31,7 +31,10 @@ def classify_with_fallback(path: Path, hash_algo: HASHING_ALGORITHMS):
     try:
         return ModelProbe.probe(path, hash_algo=hash_algo)
     except InvalidModelConfigException:
-        return ModelConfigFactory.from_model_on_disk(mod=path, hash_algo=hash_algo,)
+        return ModelConfigFactory.from_model_on_disk(
+            mod=path,
+            hash_algo=hash_algo,
+        )
 
 
 for path in args.model_path:
