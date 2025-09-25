@@ -106,31 +106,34 @@ export const isVideoDTO = (dto: ImageDTO | VideoDTO): dto is VideoDTO => {
 };
 
 // Model Configs
-export type ControlLoRAModelConfig = S['ControlLoRALyCORISConfig'] | S['ControlLoRADiffusersConfig'];
-export type LoRAModelConfig = S['LoRADiffusersConfig'] | S['LoRALyCORISConfig'] | S['LoRAOmiConfig'];
-export type VAEModelConfig = S['VAECheckpointConfig'] | S['VAEDiffusersConfig'];
-export type ControlNetModelConfig = S['ControlNetDiffusersConfig'] | S['ControlNetCheckpointConfig'];
-export type IPAdapterModelConfig = S['IPAdapterInvokeAIConfig'] | S['IPAdapterCheckpointConfig'];
-export type T2IAdapterModelConfig = S['T2IAdapterConfig'];
-export type CLIPLEmbedModelConfig = S['CLIPLEmbedDiffusersConfig'];
-export type CLIPGEmbedModelConfig = S['CLIPGEmbedDiffusersConfig'];
-export type CLIPEmbedModelConfig = CLIPLEmbedModelConfig | CLIPGEmbedModelConfig;
-type LlavaOnevisionConfig = S['LlavaOnevisionConfig'];
-export type T5EncoderModelConfig = S['T5EncoderConfig'];
-export type T5EncoderBnbQuantizedLlmInt8bModelConfig = S['T5EncoderBnbQuantizedLlmInt8bConfig'];
-export type SpandrelImageToImageModelConfig = S['SpandrelImageToImageConfig'];
-export type CheckpointModelConfig = S['MainCheckpointConfig'];
-type CLIPVisionDiffusersConfig = S['CLIPVisionDiffusersConfig'];
-type SigLipModelConfig = S['SigLIPConfig'];
-export type FLUXReduxModelConfig = S['FluxReduxConfig'];
-type ApiModelConfig = S['ApiModelConfig'];
-export type VideoApiModelConfig = S['VideoApiModelConfig'];
-type UnknownModelConfig = S['UnknownModelConfig'];
+export type AnyModelConfig = S['AnyModelConfig'];
 export type MainModelConfig = Extract<S['AnyModelConfig'], { type: 'main' }>;
+export type ControlLoRAModelConfig = Extract<S['AnyModelConfig'], { type: 'control_lora' }>;
+export type LoRAModelConfig = Extract<S['AnyModelConfig'], { type: 'lora' }>;
+export type VAEModelConfig = Extract<S['AnyModelConfig'], { type: 'vae' }>;
+export type ControlNetModelConfig = Extract<S['AnyModelConfig'], { type: 'controlnet' }>;
+export type IPAdapterModelConfig = Extract<S['AnyModelConfig'], { type: 'ip_adapter' }>;
+export type T2IAdapterModelConfig = Extract<S['AnyModelConfig'], { type: 't2i_adapter' }>;
+export type CLIPLEmbedModelConfig = Extract<S['AnyModelConfig'], { type: 'clip_embed'; variant: 'large' }>;
+export type CLIPGEmbedModelConfig = Extract<S['AnyModelConfig'], { type: 'clip_embed'; variant: 'gigantic' }>;
+export type CLIPEmbedModelConfig = Extract<S['AnyModelConfig'], { type: 'clip_embed' }>;
+type LlavaOnevisionConfig = Extract<S['AnyModelConfig'], { type: 'llava_onevision' }>;
+export type T5EncoderModelConfig = Extract<S['AnyModelConfig'], { type: 't5_encoder' }>;
+export type T5EncoderBnbQuantizedLlmInt8bModelConfig = Extract<
+  S['AnyModelConfig'],
+  { type: 't5_encoder'; format: 'bnb_quantized_int8b' }
+>;
+export type SpandrelImageToImageModelConfig = Extract<S['AnyModelConfig'], { type: 'spandrel_image_to_image' }>;
+export type CheckpointModelConfig = Extract<S['AnyModelConfig'], { type: 'main'; format: 'checkpoint' }>;
+type CLIPVisionDiffusersConfig = Extract<S['AnyModelConfig'], { type: 'clip_vision' }>;
+type SigLipModelConfig = Extract<S['AnyModelConfig'], { type: 'siglip' }>;
+export type FLUXReduxModelConfig = Extract<S['AnyModelConfig'], { type: 'flux_redux' }>;
+type ApiModelConfig = Extract<S['AnyModelConfig'], { format: 'api' }>;
+export type VideoApiModelConfig = Extract<S['AnyModelConfig'], { type: 'video'; format: 'api' }>;
+type UnknownModelConfig = Extract<S['AnyModelConfig'], { type: 'unknown' }>;
 export type FLUXKontextModelConfig = MainModelConfig;
 export type ChatGPT4oModelConfig = ApiModelConfig;
 export type Gemini2_5ModelConfig = ApiModelConfig;
-export type AnyModelConfig = S['AnyModelConfig'];
 
 /**
  * Checks if a list of submodels contains any that match a given variant or type
