@@ -1,4 +1,4 @@
-import type { BaseModelType, ModelFormat, ModelType, ModelVariantType } from 'features/nodes/types/common';
+import type { AnyModelVariant, BaseModelType, ModelFormat, ModelType } from 'features/nodes/types/common';
 import type { AnyModelConfig } from 'services/api/types';
 import {
   isCLIPEmbedModelConfig,
@@ -219,13 +219,15 @@ export const MODEL_BASE_TO_SHORT_NAME: Record<BaseModelType, string> = {
   unknown: 'Unknown',
 };
 
-export const MODEL_VARIANT_TO_LONG_NAME: Record<ModelVariantType, string> = {
+export const MODEL_VARIANT_TO_LONG_NAME: Record<AnyModelVariant, string> = {
   normal: 'Normal',
   inpaint: 'Inpaint',
   depth: 'Depth',
   dev: 'FLUX Dev',
-  dev_fill: 'FLUX Dev Fill',
+  dev_fill: 'FLUX Dev - Fill',
   schnell: 'FLUX Schnell',
+  large: 'CLIP L',
+  gigantic: 'CLIP G',
 };
 
 export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {

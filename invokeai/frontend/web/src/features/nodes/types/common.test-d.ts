@@ -12,6 +12,7 @@ import type {
   T2IAdapterField,
   zBaseModelType,
   zClipVariantType,
+  zFluxVariantType,
   zModelFormat,
   zModelVariantType,
   zSubModelType,
@@ -45,6 +46,7 @@ describe('Common types', () => {
   test('ModelIdentifier', () => assert<Equals<z.infer<typeof zSubModelType>, S['SubModelType']>>());
   test('ClipVariantType', () => assert<Equals<z.infer<typeof zClipVariantType>, S['ClipVariantType']>>());
   test('ModelVariantType', () => assert<Equals<z.infer<typeof zModelVariantType>, S['ModelVariantType']>>());
+  test('FluxVariantType', () => assert<Equals<z.infer<typeof zFluxVariantType>, S['FluxVariantType']>>());
   test('ModelFormat', () => assert<Equals<z.infer<typeof zModelFormat>, S['ModelFormat']>>());
 
   // Misc types
