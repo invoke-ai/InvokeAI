@@ -44,6 +44,10 @@ from typing_extensions import Annotated, Any, Dict
 
 from invokeai.app.services.config.config_default import get_config
 from invokeai.app.util.misc import uuid_string
+from invokeai.backend.flux.controlnet.state_dict_utils import (
+    is_state_dict_instantx_controlnet,
+    is_state_dict_xlabs_controlnet,
+)
 from invokeai.backend.flux.ip_adapter.state_dict_utils import is_state_dict_xlabs_ip_adapter
 from invokeai.backend.flux.redux.flux_redux_state_dict_utils import is_state_dict_likely_flux_redux
 from invokeai.backend.model_hash.hash_validator import validate_hash
@@ -759,12 +763,55 @@ ControlNetDiffusers_SupportedBases: TypeAlias = Literal[
 ]
 
 
-class ControlNetDiffusersConfig(DiffusersConfigBase, ControlAdapterConfigBase, LegacyProbeMixin, ModelConfigBase):
+class ControlNetDiffusersConfig(DiffusersConfigBase, ControlAdapterConfigBase, ModelConfigBase):
     """Model config for ControlNet models (diffusers version)."""
 
     base: ControlNetDiffusers_SupportedBases = Field()
     type: Literal[ModelType.ControlNet] = Field(default=ModelType.ControlNet)
     format: Literal[ModelFormat.Diffusers] = Field(default=ModelFormat.Diffusers)
+
+    VALID_OVERRIDES: ClassVar = {
+        "type": ModelType.ControlNet,
+        "format": ModelFormat.Diffusers,
+    }
+
+    VALID_CLASS_NAMES: ClassVar = {
+        "ControlNetModel",
+        "FluxControlNetModel",
+    }
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, fields: dict[str, Any]) -> Self:
+        _raise_if_not_dir(cls, mod)
+
+        _validate_overrides(cls, fields, cls.VALID_OVERRIDES)
+
+        _validate_class_names(cls, mod.path / "config.json", cls.VALID_CLASS_NAMES)
+
+        base = fields.get("base") or cls._get_base_or_raise(mod)
+
+        return cls(**fields, base=base)
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> ControlNetDiffusers_SupportedBases:
+        config = _get_config_or_raise(cls, mod.path / "config.json")
+
+        if config.get("_class_name") == "FluxControlNetModel":
+            return BaseModelType.Flux
+
+        dimension = config.get("cross_attention_dim")
+
+        match dimension:
+            case 768:
+                return BaseModelType.StableDiffusion1
+            case 1024:
+                # No obvious way to distinguish between sd2-base and sd2-768, but we don't really differentiate them
+                # anyway.
+                return BaseModelType.StableDiffusion2
+            case 2048:
+                return BaseModelType.StableDiffusionXL
+            case _:
+                raise NotAMatch(cls, f"unrecognized cross_attention_dim {dimension}")
 
 
 ControlNetCheckpoint_SupportedBases: TypeAlias = Literal[
@@ -775,12 +822,74 @@ ControlNetCheckpoint_SupportedBases: TypeAlias = Literal[
 ]
 
 
-class ControlNetCheckpointConfig(CheckpointConfigBase, ControlAdapterConfigBase, LegacyProbeMixin, ModelConfigBase):
+class ControlNetCheckpointConfig(CheckpointConfigBase, ControlAdapterConfigBase, ModelConfigBase):
     """Model config for ControlNet models (diffusers version)."""
 
     base: ControlNetDiffusers_SupportedBases = Field()
     type: Literal[ModelType.ControlNet] = Field(default=ModelType.ControlNet)
     format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+
+    VALID_OVERRIDES: ClassVar = {
+        "type": ModelType.ControlNet,
+        "format": ModelFormat.Checkpoint,
+    }
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, fields: dict[str, Any]) -> Self:
+        _raise_if_not_file(cls, mod)
+
+        _validate_overrides(cls, fields, cls.VALID_OVERRIDES)
+
+        if not mod.has_keys_starting_with(
+            {
+                "controlnet",
+                "control_model",
+                "input_blocks",
+                # XLabs FLUX ControlNet models have keys starting with "controlnet_blocks."
+                # For example: https://huggingface.co/XLabs-AI/flux-controlnet-collections/blob/86ab1e915a389d5857135c00e0d350e9e38a9048/flux-canny-controlnet_v2.safetensors
+                # TODO(ryand): This is very fragile. XLabs FLUX ControlNet models also contain keys starting with
+                # "double_blocks.", which we check for above. But, I'm afraid to modify this logic because it is so
+                # delicate.
+                "controlnet_blocks",
+            }
+        ):
+            raise NotAMatch(cls, "state dict does not look like a ControlNet checkpoint")
+
+        base = fields.get("base") or cls._get_base_or_raise(mod)
+
+        return cls(**fields, base=base)
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> ControlNetCheckpoint_SupportedBases:
+        state_dict = mod.load_state_dict()
+
+        if is_state_dict_xlabs_controlnet(state_dict) or is_state_dict_instantx_controlnet(state_dict):
+            # TODO(ryand): Should I distinguish between XLabs, InstantX and other ControlNet models by implementing
+            # get_format()?
+            return BaseModelType.Flux
+
+        for key in (
+            "control_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight",
+            "controlnet_mid_block.bias",
+            "input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight",
+            "down_blocks.1.attentions.0.transformer_blocks.0.attn2.to_k.weight",
+        ):
+            if key not in state_dict:
+                continue
+            width = state_dict[key].shape[-1]
+            match width:
+                case 768:
+                    return BaseModelType.StableDiffusion1
+                case 1024:
+                    return BaseModelType.StableDiffusion2
+                case 2048:
+                    return BaseModelType.StableDiffusionXL
+                case 1280:
+                    return BaseModelType.StableDiffusionXL
+                case _:
+                    pass
+
+        raise NotAMatch(cls, "unable to determine base type from state dict")
 
 
 TextualInversion_SupportedBases: TypeAlias = Literal[
@@ -1247,7 +1356,6 @@ class T2IAdapterConfig(DiffusersConfigBase, ControlAdapterConfigBase, ModelConfi
         "T2IAdapter",
     }
 
-
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, fields: dict[str, Any]) -> Self:
         _raise_if_not_dir(cls, mod)
@@ -1275,6 +1383,7 @@ class T2IAdapterConfig(DiffusersConfigBase, ControlAdapterConfigBase, ModelConfi
                 return BaseModelType.StableDiffusion1
             case _:
                 raise NotAMatch(cls, f"unrecognized adapter_type '{adapter_type}'")
+
 
 class SpandrelImageToImageConfig(ModelConfigBase):
     """Model config for Spandrel Image to Image models."""
