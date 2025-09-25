@@ -119,8 +119,6 @@ type LlavaOnevisionConfig = S['LlavaOnevisionConfig'];
 export type T5EncoderModelConfig = S['T5EncoderConfig'];
 export type T5EncoderBnbQuantizedLlmInt8bModelConfig = S['T5EncoderBnbQuantizedLlmInt8bConfig'];
 export type SpandrelImageToImageModelConfig = S['SpandrelImageToImageConfig'];
-type TextualInversionModelConfig = S['TextualInversionFileConfig'] | S['TextualInversionFolderConfig'];
-type DiffusersModelConfig = S['MainDiffusersConfig'];
 export type CheckpointModelConfig = S['MainCheckpointConfig'];
 type CLIPVisionDiffusersConfig = S['CLIPVisionDiffusersConfig'];
 type SigLipModelConfig = S['SigLIPConfig'];
@@ -128,29 +126,11 @@ export type FLUXReduxModelConfig = S['FluxReduxConfig'];
 type ApiModelConfig = S['ApiModelConfig'];
 export type VideoApiModelConfig = S['VideoApiModelConfig'];
 type UnknownModelConfig = S['UnknownModelConfig'];
-export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig | ApiModelConfig;
+export type MainModelConfig = Extract<S['AnyModelConfig'], { type: 'main' }>;
 export type FLUXKontextModelConfig = MainModelConfig;
 export type ChatGPT4oModelConfig = ApiModelConfig;
 export type Gemini2_5ModelConfig = ApiModelConfig;
-export type AnyModelConfig =
-  | ControlLoRAModelConfig
-  | LoRAModelConfig
-  | VAEModelConfig
-  | ControlNetModelConfig
-  | IPAdapterModelConfig
-  | T5EncoderModelConfig
-  | T5EncoderBnbQuantizedLlmInt8bModelConfig
-  | CLIPEmbedModelConfig
-  | T2IAdapterModelConfig
-  | SpandrelImageToImageModelConfig
-  | TextualInversionModelConfig
-  | MainModelConfig
-  | VideoApiModelConfig
-  | CLIPVisionDiffusersConfig
-  | SigLipModelConfig
-  | FLUXReduxModelConfig
-  | LlavaOnevisionConfig
-  | UnknownModelConfig;
+export type AnyModelConfig = S['AnyModelConfig'];
 
 /**
  * Checks if a list of submodels contains any that match a given variant or type

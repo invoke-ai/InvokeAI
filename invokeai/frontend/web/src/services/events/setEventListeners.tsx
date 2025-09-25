@@ -295,18 +295,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
     const { id, config } = data;
 
-    if (
-      config.type === 'unknown' ||
-      config.base === 'unknown' ||
-      /**
-       * Checking if type/base are 'unknown' technically narrows the config such that it's not possible for a config
-       * that passes to the `config.[type|base] === 'unknown'`  checks. In the future, if we have more model config
-       * classes, this may change, so we will continue to check all three. Any one being 'unknown' is concerning
-       * enough to warrant a toast.
-       */
-      /* @ts-expect-error See note above */
-      config.format === 'unknown'
-    ) {
+    if (config.type === 'unknown') {
       toast({
         id: 'UNKNOWN_MODEL',
         title: t('modelManager.unidentifiedModelTitle'),
