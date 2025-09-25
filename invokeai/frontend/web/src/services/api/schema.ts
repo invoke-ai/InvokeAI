@@ -2200,6 +2200,7 @@ export type components = {
              */
             type: "alpha_mask_to_tensor";
         };
+        AnyModelConfig: components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRAOmiConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["LlavaOnevisionConfig"] | components["schemas"]["ApiModelConfig"] | components["schemas"]["VideoApiModelConfig"] | components["schemas"]["UnknownModelConfig"];
         /**
          * ApiModelConfig
          * @description Model config for API-based models.
@@ -2231,19 +2232,10 @@ export type components = {
              */
             name: string;
             /**
-             * Type
-             * @default main
-             * @constant
+             * Description
+             * @description Model description
              */
-            type: "main";
-            /**
-             * Format
-             * @default api
-             * @constant
-             */
-            format: "api";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
+            description: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -2252,44 +2244,53 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
              */
-            source_api_response?: string | null;
+            source_api_response: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
              */
-            cover_image?: string | null;
+            cover_image: string | null;
             /**
              * Submodels
              * @description Loadable submodels in this model
              */
-            submodels?: {
+            submodels: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
              * Usage Info
              * @description Usage information for this model
              */
-            usage_info?: string | null;
+            usage_info: string | null;
+            /**
+             * Type
+             * @default main
+             * @constant
+             */
+            type: "main";
             /**
              * Trigger Phrases
              * @description Set of trigger phrases for this model
              */
-            trigger_phrases?: string[] | null;
+            trigger_phrases: string[] | null;
             /** @description Default settings for this model */
-            default_settings?: components["schemas"]["MainModelDefaultSettings"] | null;
+            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
+            /** Variant */
+            variant: components["schemas"]["ModelVariantType"] | components["schemas"]["FluxVariantType"];
             /**
-             * Variant
-             * @default normal
+             * Format
+             * @default api
+             * @constant
              */
-            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | null;
+            format: "api";
+            /**
+             * Base
+             * @enum {string}
+             */
+            base: "chatgpt-4o" | "gemini-2.5" | "imagen3" | "imagen4" | "flux-kontext";
         };
         /**
          * AppConfig
@@ -2464,7 +2465,13 @@ export type components = {
         };
         /**
          * BaseModelType
-         * @description Base model type.
+         * @description An enumeration of base model architectures. For example, Stable Diffusion 1.x, Stable Diffusion 2.x, FLUX, etc.
+         *
+         *     Every model config must have a base architecture type.
+         *
+         *     Not all models are associated with a base architecture. For example, CLIP models are their own thing, not related
+         *     to any particular model architecture. To simplify internal APIs and make it easier to work with models, we use a
+         *     fallback/null value `BaseModelType.Any` for these models, instead of making the model base optional.
          * @enum {string}
          */
         BaseModelType: "any" | "sd-1" | "sd-2" | "sd-3" | "sdxl" | "sdxl-refiner" | "flux" | "cogview4" | "imagen3" | "imagen4" | "gemini-2.5" | "chatgpt-4o" | "flux-kontext" | "veo3" | "runway" | "unknown";
@@ -3505,19 +3512,10 @@ export type components = {
              */
             name: string;
             /**
-             * Type
-             * @default clip_embed
-             * @constant
+             * Description
+             * @description Model description
              */
-            type: "clip_embed";
-            /**
-             * Format
-             * @default diffusers
-             * @constant
-             */
-            format: "diffusers";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
+            description: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -3526,40 +3524,53 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
              */
-            source_api_response?: string | null;
+            source_api_response: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
              */
-            cover_image?: string | null;
+            cover_image: string | null;
             /**
              * Submodels
              * @description Loadable submodels in this model
              */
-            submodels?: {
+            submodels: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
              * Usage Info
              * @description Usage information for this model
              */
-            usage_info?: string | null;
+            usage_info: string | null;
+            /**
+             * Format
+             * @default diffusers
+             * @constant
+             */
+            format: "diffusers";
             /** @default  */
-            repo_variant?: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            /**
+             * Base
+             * @default any
+             * @constant
+             */
+            base: "any";
+            /**
+             * Type
+             * @default clip_embed
+             * @constant
+             */
+            type: "clip_embed";
             /**
              * Variant
              * @default gigantic
              * @constant
              */
-            variant?: "gigantic";
+            variant: "gigantic";
         };
         /**
          * CLIPLEmbedDiffusersConfig
@@ -3592,19 +3603,10 @@ export type components = {
              */
             name: string;
             /**
-             * Type
-             * @default clip_embed
-             * @constant
+             * Description
+             * @description Model description
              */
-            type: "clip_embed";
-            /**
-             * Format
-             * @default diffusers
-             * @constant
-             */
-            format: "diffusers";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
+            description: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -3613,40 +3615,53 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
              */
-            source_api_response?: string | null;
+            source_api_response: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
              */
-            cover_image?: string | null;
+            cover_image: string | null;
             /**
              * Submodels
              * @description Loadable submodels in this model
              */
-            submodels?: {
+            submodels: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
              * Usage Info
              * @description Usage information for this model
              */
-            usage_info?: string | null;
+            usage_info: string | null;
+            /**
+             * Format
+             * @default diffusers
+             * @constant
+             */
+            format: "diffusers";
             /** @default  */
-            repo_variant?: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            /**
+             * Base
+             * @default any
+             * @constant
+             */
+            base: "any";
+            /**
+             * Type
+             * @default clip_embed
+             * @constant
+             */
+            type: "clip_embed";
             /**
              * Variant
              * @default large
              * @constant
              */
-            variant?: "large";
+            variant: "large";
         };
         /**
          * CLIPOutput
@@ -3755,19 +3770,10 @@ export type components = {
              */
             name: string;
             /**
-             * Type
-             * @default clip_vision
-             * @constant
+             * Description
+             * @description Model description
              */
-            type: "clip_vision";
-            /**
-             * Format
-             * @default diffusers
-             * @constant
-             */
-            format: "diffusers";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
+            description: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -3776,34 +3782,47 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
              */
-            source_api_response?: string | null;
+            source_api_response: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
              */
-            cover_image?: string | null;
+            cover_image: string | null;
             /**
              * Submodels
              * @description Loadable submodels in this model
              */
-            submodels?: {
+            submodels: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
              * Usage Info
              * @description Usage information for this model
              */
-            usage_info?: string | null;
+            usage_info: string | null;
+            /**
+             * Format
+             * @default diffusers
+             * @constant
+             */
+            format: "diffusers";
             /** @default  */
-            repo_variant?: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            /**
+             * Base
+             * @default any
+             * @constant
+             */
+            base: "any";
+            /**
+             * Type
+             * @default clip_vision
+             * @constant
+             */
+            type: "clip_vision";
         };
         /**
          * CV2 Infill
@@ -5252,6 +5271,46 @@ export type components = {
              */
             name: string;
             /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Submodels
+             * @description Loadable submodels in this model
+             */
+            submodels: {
+                [key: string]: components["schemas"]["SubmodelDefinition"];
+            } | null;
+            /**
+             * Usage Info
+             * @description Usage information for this model
+             */
+            usage_info: string | null;
+            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
+            /**
+             * Base
+             * @constant
+             */
+            base: "flux";
+            /**
              * Type
              * @default control_lora
              * @constant
@@ -5263,49 +5322,8 @@ export type components = {
              * @constant
              */
             format: "diffusers";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
-            /**
-             * Source
-             * @description The original source of the model (path, URL or repo_id).
-             */
-            source: string;
-            /** @description The type of source */
-            source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
-             * Source Api Response
-             * @description The original API response from the source, as stringified JSON.
-             */
-            source_api_response?: string | null;
-            /**
-             * Cover Image
-             * @description Url for image to preview model
-             */
-            cover_image?: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels?: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
-             * Usage Info
-             * @description Usage information for this model
-             */
-            usage_info?: string | null;
-            /** @description Default settings for this model */
-            default_settings?: components["schemas"]["ControlAdapterDefaultSettings"] | null;
-            /**
-             * Trigger Phrases
-             * @description Set of trigger phrases for this model
-             */
-            trigger_phrases?: string[] | null;
+            /** Trigger Phrases */
+            trigger_phrases: string[] | null;
         };
         /** ControlLoRAField */
         ControlLoRAField: {
@@ -5350,6 +5368,46 @@ export type components = {
              */
             name: string;
             /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Submodels
+             * @description Loadable submodels in this model
+             */
+            submodels: {
+                [key: string]: components["schemas"]["SubmodelDefinition"];
+            } | null;
+            /**
+             * Usage Info
+             * @description Usage information for this model
+             */
+            usage_info: string | null;
+            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
+            /**
+             * Base
+             * @constant
+             */
+            base: "flux";
+            /**
              * Type
              * @default control_lora
              * @constant
@@ -5361,49 +5419,8 @@ export type components = {
              * @constant
              */
             format: "lycoris";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
-            /**
-             * Source
-             * @description The original source of the model (path, URL or repo_id).
-             */
-            source: string;
-            /** @description The type of source */
-            source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
-             * Source Api Response
-             * @description The original API response from the source, as stringified JSON.
-             */
-            source_api_response?: string | null;
-            /**
-             * Cover Image
-             * @description Url for image to preview model
-             */
-            cover_image?: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels?: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
-             * Usage Info
-             * @description Usage information for this model
-             */
-            usage_info?: string | null;
-            /** @description Default settings for this model */
-            default_settings?: components["schemas"]["ControlAdapterDefaultSettings"] | null;
-            /**
-             * Trigger Phrases
-             * @description Set of trigger phrases for this model
-             */
-            trigger_phrases?: string[] | null;
+            /** Trigger Phrases */
+            trigger_phrases: string[] | null;
         };
         /**
          * ControlNetCheckpointConfig
@@ -5436,20 +5453,10 @@ export type components = {
              */
             name: string;
             /**
-             * Type
-             * @default controlnet
-             * @constant
+             * Description
+             * @description Model description
              */
-            type: "controlnet";
-            /**
-             * Format
-             * @description Format of the provided checkpoint model
-             * @default checkpoint
-             * @enum {string}
-             */
-            format: "checkpoint" | "bnb_quantized_nf4b" | "gguf_quantized";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
+            description: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -5458,44 +5465,55 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
              */
-            source_api_response?: string | null;
+            source_api_response: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
              */
-            cover_image?: string | null;
+            cover_image: string | null;
             /**
              * Submodels
              * @description Loadable submodels in this model
              */
-            submodels?: {
+            submodels: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
              * Usage Info
              * @description Usage information for this model
              */
-            usage_info?: string | null;
-            /** @description Default settings for this model */
-            default_settings?: components["schemas"]["ControlAdapterDefaultSettings"] | null;
+            usage_info: string | null;
+            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Config Path
-             * @description path to the checkpoint model config file
+             * @description Path to the config for this model, if any.
              */
-            config_path?: string | null;
+            config_path: string | null;
             /**
              * Converted At
              * @description When this model was last converted to diffusers
              */
-            converted_at?: number | null;
+            converted_at: number | null;
+            /**
+             * Base
+             * @enum {string}
+             */
+            base: "sd-1" | "sd-2" | "sdxl" | "flux";
+            /**
+             * Type
+             * @default controlnet
+             * @constant
+             */
+            type: "controlnet";
+            /**
+             * Format
+             * @default checkpoint
+             * @constant
+             */
+            format: "checkpoint";
         };
         /**
          * ControlNetDiffusersConfig
@@ -5528,19 +5546,10 @@ export type components = {
              */
             name: string;
             /**
-             * Type
-             * @default controlnet
-             * @constant
+             * Description
+             * @description Model description
              */
-            type: "controlnet";
-            /**
-             * Format
-             * @default diffusers
-             * @constant
-             */
-            format: "diffusers";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
+            description: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -5549,36 +5558,47 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
              */
-            source_api_response?: string | null;
+            source_api_response: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
              */
-            cover_image?: string | null;
+            cover_image: string | null;
             /**
              * Submodels
              * @description Loadable submodels in this model
              */
-            submodels?: {
+            submodels: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
              * Usage Info
              * @description Usage information for this model
              */
-            usage_info?: string | null;
-            /** @description Default settings for this model */
-            default_settings?: components["schemas"]["ControlAdapterDefaultSettings"] | null;
+            usage_info: string | null;
+            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
+            /**
+             * Format
+             * @default diffusers
+             * @constant
+             */
+            format: "diffusers";
             /** @default  */
-            repo_variant?: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            /**
+             * Base
+             * @enum {string}
+             */
+            base: "sd-1" | "sd-2" | "sdxl" | "flux";
+            /**
+             * Type
+             * @default controlnet
+             * @constant
+             */
+            type: "controlnet";
         };
         /**
          * ControlNet - SD1.5, SD2, SDXL
@@ -8888,6 +8908,40 @@ export type components = {
              */
             name: string;
             /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Submodels
+             * @description Loadable submodels in this model
+             */
+            submodels: {
+                [key: string]: components["schemas"]["SubmodelDefinition"];
+            } | null;
+            /**
+             * Usage Info
+             * @description Usage information for this model
+             */
+            usage_info: string | null;
+            /**
              * Type
              * @default flux_redux
              * @constant
@@ -8899,42 +8953,12 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
             /**
-             * Source
-             * @description The original source of the model (path, URL or repo_id).
+             * Base
+             * @default flux
+             * @constant
              */
-            source: string;
-            /** @description The type of source */
-            source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
-             * Source Api Response
-             * @description The original API response from the source, as stringified JSON.
-             */
-            source_api_response?: string | null;
-            /**
-             * Cover Image
-             * @description Url for image to preview model
-             */
-            cover_image?: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels?: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
-             * Usage Info
-             * @description Usage information for this model
-             */
-            usage_info?: string | null;
+            base: "flux";
         };
         /**
          * FLUX Redux
@@ -9163,6 +9187,11 @@ export type components = {
              */
             type: "flux_vae_encode";
         };
+        /**
+         * FluxVariantType
+         * @enum {string}
+         */
+        FluxVariantType: "schnell" | "dev" | "dev_fill";
         /** FoundModel */
         FoundModel: {
             /**
@@ -9678,19 +9707,10 @@ export type components = {
              */
             name: string;
             /**
-             * Type
-             * @default ip_adapter
-             * @constant
+             * Description
+             * @description Model description
              */
-            type: "ip_adapter";
-            /**
-             * Format
-             * @default checkpoint
-             * @constant
-             */
-            format: "checkpoint";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
+            description: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -9699,32 +9719,44 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
              */
-            source_api_response?: string | null;
+            source_api_response: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
              */
-            cover_image?: string | null;
+            cover_image: string | null;
             /**
              * Submodels
              * @description Loadable submodels in this model
              */
-            submodels?: {
+            submodels: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
              * Usage Info
              * @description Usage information for this model
              */
-            usage_info?: string | null;
+            usage_info: string | null;
+            /**
+             * Type
+             * @default ip_adapter
+             * @constant
+             */
+            type: "ip_adapter";
+            /**
+             * Base
+             * @enum {string}
+             */
+            base: "sd-1" | "sd-2" | "sdxl" | "flux";
+            /**
+             * Format
+             * @default checkpoint
+             * @constant
+             */
+            format: "checkpoint";
         };
         /** IPAdapterField */
         IPAdapterField: {
@@ -9882,19 +9914,10 @@ export type components = {
              */
             name: string;
             /**
-             * Type
-             * @default ip_adapter
-             * @constant
+             * Description
+             * @description Model description
              */
-            type: "ip_adapter";
-            /**
-             * Format
-             * @default invokeai
-             * @constant
-             */
-            format: "invokeai";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
+            description: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -9903,32 +9926,44 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
              */
-            source_api_response?: string | null;
+            source_api_response: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
              */
-            cover_image?: string | null;
+            cover_image: string | null;
             /**
              * Submodels
              * @description Loadable submodels in this model
              */
-            submodels?: {
+            submodels: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
              * Usage Info
              * @description Usage information for this model
              */
-            usage_info?: string | null;
+            usage_info: string | null;
+            /**
+             * Type
+             * @default ip_adapter
+             * @constant
+             */
+            type: "ip_adapter";
+            /**
+             * Base
+             * @enum {string}
+             */
+            base: "sd-1" | "sd-2" | "sdxl";
+            /**
+             * Format
+             * @default invokeai
+             * @constant
+             */
+            format: "invokeai";
             /** Image Encoder Model Id */
             image_encoder_model_id: string;
         };
@@ -14038,19 +14073,10 @@ export type components = {
              */
             name: string;
             /**
-             * Type
-             * @default llava_onevision
-             * @constant
+             * Description
+             * @description Model description
              */
-            type: "llava_onevision";
-            /**
-             * Format
-             * @default diffusers
-             * @constant
-             */
-            format: "diffusers";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
+            description: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -14059,34 +14085,53 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
              */
-            source_api_response?: string | null;
+            source_api_response: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
              */
-            cover_image?: string | null;
+            cover_image: string | null;
             /**
              * Submodels
              * @description Loadable submodels in this model
              */
-            submodels?: {
+            submodels: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
              * Usage Info
              * @description Usage information for this model
              */
-            usage_info?: string | null;
+            usage_info: string | null;
+            /**
+             * Format
+             * @default diffusers
+             * @constant
+             */
+            format: "diffusers";
             /** @default  */
-            repo_variant?: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            /**
+             * Type
+             * @default llava_onevision
+             * @constant
+             */
+            type: "llava_onevision";
+            /**
+             * Base
+             * @default any
+             * @constant
+             */
+            base: "any";
+            /**
+             * Variant
+             * @default normal
+             * @constant
+             */
+            variant: "normal";
         };
         /**
          * LLaVA OneVision VLLM
@@ -14213,19 +14258,10 @@ export type components = {
              */
             name: string;
             /**
-             * Type
-             * @default lora
-             * @constant
+             * Description
+             * @description Model description
              */
-            type: "lora";
-            /**
-             * Format
-             * @default diffusers
-             * @constant
-             */
-            format: "diffusers";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
+            description: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -14234,39 +14270,51 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
              */
-            source_api_response?: string | null;
+            source_api_response: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
              */
-            cover_image?: string | null;
+            cover_image: string | null;
             /**
              * Submodels
              * @description Loadable submodels in this model
              */
-            submodels?: {
+            submodels: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
              * Usage Info
              * @description Usage information for this model
              */
-            usage_info?: string | null;
+            usage_info: string | null;
+            /**
+             * Type
+             * @default lora
+             * @constant
+             */
+            type: "lora";
             /**
              * Trigger Phrases
              * @description Set of trigger phrases for this model
              */
-            trigger_phrases?: string[] | null;
+            trigger_phrases: string[] | null;
             /** @description Default settings for this model */
-            default_settings?: components["schemas"]["LoraModelDefaultSettings"] | null;
+            default_settings: components["schemas"]["LoraModelDefaultSettings"] | null;
+            /**
+             * Base
+             * @enum {string}
+             */
+            base: "sd-1" | "sd-2" | "sdxl" | "flux";
+            /**
+             * Format
+             * @default diffusers
+             * @constant
+             */
+            format: "diffusers";
         };
         /** LoRAField */
         LoRAField: {
@@ -14386,19 +14434,10 @@ export type components = {
              */
             name: string;
             /**
-             * Type
-             * @default lora
-             * @constant
+             * Description
+             * @description Model description
              */
-            type: "lora";
-            /**
-             * Format
-             * @default lycoris
-             * @constant
-             */
-            format: "lycoris";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
+            description: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -14407,39 +14446,51 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
              */
-            source_api_response?: string | null;
+            source_api_response: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
              */
-            cover_image?: string | null;
+            cover_image: string | null;
             /**
              * Submodels
              * @description Loadable submodels in this model
              */
-            submodels?: {
+            submodels: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
              * Usage Info
              * @description Usage information for this model
              */
-            usage_info?: string | null;
+            usage_info: string | null;
+            /**
+             * Type
+             * @default lora
+             * @constant
+             */
+            type: "lora";
             /**
              * Trigger Phrases
              * @description Set of trigger phrases for this model
              */
-            trigger_phrases?: string[] | null;
+            trigger_phrases: string[] | null;
             /** @description Default settings for this model */
-            default_settings?: components["schemas"]["LoraModelDefaultSettings"] | null;
+            default_settings: components["schemas"]["LoraModelDefaultSettings"] | null;
+            /**
+             * Base
+             * @enum {string}
+             */
+            base: "sd-1" | "sd-2" | "sdxl" | "flux";
+            /**
+             * Format
+             * @default lycoris
+             * @constant
+             */
+            format: "lycoris";
         };
         /**
          * LoRAMetadataField
@@ -14482,19 +14533,10 @@ export type components = {
              */
             name: string;
             /**
-             * Type
-             * @default lora
-             * @constant
+             * Description
+             * @description Model description
              */
-            type: "lora";
-            /**
-             * Format
-             * @default omi
-             * @constant
-             */
-            format: "omi";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
+            description: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -14503,39 +14545,51 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
              */
-            source_api_response?: string | null;
+            source_api_response: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
              */
-            cover_image?: string | null;
+            cover_image: string | null;
             /**
              * Submodels
              * @description Loadable submodels in this model
              */
-            submodels?: {
+            submodels: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
              * Usage Info
              * @description Usage information for this model
              */
-            usage_info?: string | null;
+            usage_info: string | null;
+            /**
+             * Type
+             * @default lora
+             * @constant
+             */
+            type: "lora";
             /**
              * Trigger Phrases
              * @description Set of trigger phrases for this model
              */
-            trigger_phrases?: string[] | null;
+            trigger_phrases: string[] | null;
             /** @description Default settings for this model */
-            default_settings?: components["schemas"]["LoraModelDefaultSettings"] | null;
+            default_settings: components["schemas"]["LoraModelDefaultSettings"] | null;
+            /**
+             * Base
+             * @enum {string}
+             */
+            base: "flux" | "sdxl";
+            /**
+             * Format
+             * @default omi
+             * @constant
+             */
+            format: "omi";
         };
         /**
          * Select LoRA
@@ -14755,19 +14809,10 @@ export type components = {
              */
             name: string;
             /**
-             * Type
-             * @default main
-             * @constant
+             * Description
+             * @description Model description
              */
-            type: "main";
-            /**
-             * Format
-             * @default bnb_quantized_nf4b
-             * @constant
-             */
-            format: "bnb_quantized_nf4b";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
+            description: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -14776,61 +14821,71 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
              */
-            source_api_response?: string | null;
+            source_api_response: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
              */
-            cover_image?: string | null;
+            cover_image: string | null;
             /**
              * Submodels
              * @description Loadable submodels in this model
              */
-            submodels?: {
+            submodels: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
              * Usage Info
              * @description Usage information for this model
              */
-            usage_info?: string | null;
+            usage_info: string | null;
+            /**
+             * Type
+             * @default main
+             * @constant
+             */
+            type: "main";
             /**
              * Trigger Phrases
              * @description Set of trigger phrases for this model
              */
-            trigger_phrases?: string[] | null;
+            trigger_phrases: string[] | null;
             /** @description Default settings for this model */
-            default_settings?: components["schemas"]["MainModelDefaultSettings"] | null;
-            /**
-             * Variant
-             * @default normal
-             */
-            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | null;
+            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
+            /** Variant */
+            variant: components["schemas"]["ModelVariantType"] | components["schemas"]["FluxVariantType"];
             /**
              * Config Path
-             * @description path to the checkpoint model config file
+             * @description Path to the config for this model, if any.
              */
-            config_path?: string | null;
+            config_path: string | null;
             /**
              * Converted At
              * @description When this model was last converted to diffusers
              */
-            converted_at?: number | null;
+            converted_at: number | null;
+            /**
+             * Base
+             * @default flux
+             * @constant
+             */
+            base: "flux";
+            /**
+             * Format
+             * @default bnb_quantized_nf4b
+             * @constant
+             */
+            format: "bnb_quantized_nf4b";
             /** @default epsilon */
-            prediction_type?: components["schemas"]["SchedulerPredictionType"];
+            prediction_type: components["schemas"]["SchedulerPredictionType"];
             /**
              * Upcast Attention
              * @default false
              */
-            upcast_attention?: boolean;
+            upcast_attention: boolean;
         };
         /**
          * MainCheckpointConfig
@@ -14863,20 +14918,10 @@ export type components = {
              */
             name: string;
             /**
-             * Type
-             * @default main
-             * @constant
+             * Description
+             * @description Model description
              */
-            type: "main";
-            /**
-             * Format
-             * @description Format of the provided checkpoint model
-             * @default checkpoint
-             * @enum {string}
-             */
-            format: "checkpoint" | "bnb_quantized_nf4b" | "gguf_quantized";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
+            description: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -14885,61 +14930,70 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
              */
-            source_api_response?: string | null;
+            source_api_response: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
              */
-            cover_image?: string | null;
+            cover_image: string | null;
             /**
              * Submodels
              * @description Loadable submodels in this model
              */
-            submodels?: {
+            submodels: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
              * Usage Info
              * @description Usage information for this model
              */
-            usage_info?: string | null;
+            usage_info: string | null;
+            /**
+             * Type
+             * @default main
+             * @constant
+             */
+            type: "main";
             /**
              * Trigger Phrases
              * @description Set of trigger phrases for this model
              */
-            trigger_phrases?: string[] | null;
+            trigger_phrases: string[] | null;
             /** @description Default settings for this model */
-            default_settings?: components["schemas"]["MainModelDefaultSettings"] | null;
-            /**
-             * Variant
-             * @default normal
-             */
-            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | null;
+            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
+            /** Variant */
+            variant: components["schemas"]["ModelVariantType"] | components["schemas"]["FluxVariantType"];
             /**
              * Config Path
-             * @description path to the checkpoint model config file
+             * @description Path to the config for this model, if any.
              */
-            config_path?: string | null;
+            config_path: string | null;
             /**
              * Converted At
              * @description When this model was last converted to diffusers
              */
-            converted_at?: number | null;
+            converted_at: number | null;
+            /**
+             * Base
+             * @enum {string}
+             */
+            base: "sd-1" | "sd-2" | "sd-3" | "sdxl" | "sdxl-refiner" | "flux" | "cogview4";
+            /**
+             * Format
+             * @default checkpoint
+             * @constant
+             */
+            format: "checkpoint";
             /** @default epsilon */
-            prediction_type?: components["schemas"]["SchedulerPredictionType"];
+            prediction_type: components["schemas"]["SchedulerPredictionType"];
             /**
              * Upcast Attention
              * @default false
              */
-            upcast_attention?: boolean;
+            upcast_attention: boolean;
         };
         /**
          * MainDiffusersConfig
@@ -14972,19 +15026,10 @@ export type components = {
              */
             name: string;
             /**
-             * Type
-             * @default main
-             * @constant
+             * Description
+             * @description Model description
              */
-            type: "main";
-            /**
-             * Format
-             * @default diffusers
-             * @constant
-             */
-            format: "diffusers";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
+            description: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -14993,46 +15038,55 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
              */
-            source_api_response?: string | null;
+            source_api_response: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
              */
-            cover_image?: string | null;
+            cover_image: string | null;
             /**
              * Submodels
              * @description Loadable submodels in this model
              */
-            submodels?: {
+            submodels: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
              * Usage Info
              * @description Usage information for this model
              */
-            usage_info?: string | null;
+            usage_info: string | null;
+            /**
+             * Type
+             * @default main
+             * @constant
+             */
+            type: "main";
             /**
              * Trigger Phrases
              * @description Set of trigger phrases for this model
              */
-            trigger_phrases?: string[] | null;
+            trigger_phrases: string[] | null;
             /** @description Default settings for this model */
-            default_settings?: components["schemas"]["MainModelDefaultSettings"] | null;
+            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
+            /** Variant */
+            variant: components["schemas"]["ModelVariantType"] | components["schemas"]["FluxVariantType"];
             /**
-             * Variant
-             * @default normal
+             * Format
+             * @default diffusers
+             * @constant
              */
-            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | null;
+            format: "diffusers";
             /** @default  */
-            repo_variant?: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            /**
+             * Base
+             * @enum {string}
+             */
+            base: "sd-1" | "sd-2" | "sd-3" | "sdxl" | "sdxl-refiner" | "flux" | "cogview4";
         };
         /**
          * MainGGUFCheckpointConfig
@@ -15065,19 +15119,10 @@ export type components = {
              */
             name: string;
             /**
-             * Type
-             * @default main
-             * @constant
+             * Description
+             * @description Model description
              */
-            type: "main";
-            /**
-             * Format
-             * @default gguf_quantized
-             * @constant
-             */
-            format: "gguf_quantized";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
+            description: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -15086,61 +15131,71 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
              */
-            source_api_response?: string | null;
+            source_api_response: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
              */
-            cover_image?: string | null;
+            cover_image: string | null;
             /**
              * Submodels
              * @description Loadable submodels in this model
              */
-            submodels?: {
+            submodels: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
              * Usage Info
              * @description Usage information for this model
              */
-            usage_info?: string | null;
+            usage_info: string | null;
+            /**
+             * Type
+             * @default main
+             * @constant
+             */
+            type: "main";
             /**
              * Trigger Phrases
              * @description Set of trigger phrases for this model
              */
-            trigger_phrases?: string[] | null;
+            trigger_phrases: string[] | null;
             /** @description Default settings for this model */
-            default_settings?: components["schemas"]["MainModelDefaultSettings"] | null;
-            /**
-             * Variant
-             * @default normal
-             */
-            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | null;
+            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
+            /** Variant */
+            variant: components["schemas"]["ModelVariantType"] | components["schemas"]["FluxVariantType"];
             /**
              * Config Path
-             * @description path to the checkpoint model config file
+             * @description Path to the config for this model, if any.
              */
-            config_path?: string | null;
+            config_path: string | null;
             /**
              * Converted At
              * @description When this model was last converted to diffusers
              */
-            converted_at?: number | null;
+            converted_at: number | null;
+            /**
+             * Base
+             * @default flux
+             * @constant
+             */
+            base: "flux";
+            /**
+             * Format
+             * @default gguf_quantized
+             * @constant
+             */
+            format: "gguf_quantized";
             /** @default epsilon */
-            prediction_type?: components["schemas"]["SchedulerPredictionType"];
+            prediction_type: components["schemas"]["SchedulerPredictionType"];
             /**
              * Upcast Attention
              * @default false
              */
-            upcast_attention?: boolean;
+            upcast_attention: boolean;
         };
         /** MainModelDefaultSettings */
         MainModelDefaultSettings: {
@@ -17429,7 +17484,7 @@ export type components = {
              * Variant
              * @description The variant of the model.
              */
-            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | null;
+            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | null;
             /** @description The prediction type of the model. */
             prediction_type?: components["schemas"]["SchedulerPredictionType"] | null;
             /**
@@ -17487,7 +17542,7 @@ export type components = {
          * @description Variant type.
          * @enum {string}
          */
-        ModelVariantType: "normal" | "inpaint" | "depth" | "flux_dev" | "flux_dev_fill" | "flux_schnell";
+        ModelVariantType: "normal" | "inpaint" | "depth";
         /**
          * ModelsList
          * @description Return list of configs.
@@ -20106,19 +20161,10 @@ export type components = {
              */
             name: string;
             /**
-             * Type
-             * @default siglip
-             * @constant
+             * Description
+             * @description Model description
              */
-            type: "siglip";
-            /**
-             * Format
-             * @default diffusers
-             * @constant
-             */
-            format: "diffusers";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
+            description: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -20127,34 +20173,47 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
              */
-            source_api_response?: string | null;
+            source_api_response: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
              */
-            cover_image?: string | null;
+            cover_image: string | null;
             /**
              * Submodels
              * @description Loadable submodels in this model
              */
-            submodels?: {
+            submodels: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
              * Usage Info
              * @description Usage information for this model
              */
-            usage_info?: string | null;
+            usage_info: string | null;
+            /**
+             * Format
+             * @default diffusers
+             * @constant
+             */
+            format: "diffusers";
             /** @default  */
-            repo_variant?: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            /**
+             * Type
+             * @default siglip
+             * @constant
+             */
+            type: "siglip";
+            /**
+             * Base
+             * @default any
+             * @constant
+             */
+            base: "any";
         };
         /**
          * Image-to-Image (Autoscale)
@@ -20255,6 +20314,46 @@ export type components = {
              */
             name: string;
             /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Submodels
+             * @description Loadable submodels in this model
+             */
+            submodels: {
+                [key: string]: components["schemas"]["SubmodelDefinition"];
+            } | null;
+            /**
+             * Usage Info
+             * @description Usage information for this model
+             */
+            usage_info: string | null;
+            /**
+             * Base
+             * @default any
+             * @constant
+             */
+            base: "any";
+            /**
              * Type
              * @default spandrel_image_to_image
              * @constant
@@ -20266,42 +20365,6 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
-            /**
-             * Source
-             * @description The original source of the model (path, URL or repo_id).
-             */
-            source: string;
-            /** @description The type of source */
-            source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
-             * Source Api Response
-             * @description The original API response from the source, as stringified JSON.
-             */
-            source_api_response?: string | null;
-            /**
-             * Cover Image
-             * @description Url for image to preview model
-             */
-            cover_image?: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels?: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
-             * Usage Info
-             * @description Usage information for this model
-             */
-            usage_info?: string | null;
         };
         /**
          * Image-to-Image
@@ -20941,7 +21004,7 @@ export type components = {
             path_or_prefix: string;
             model_type: components["schemas"]["ModelType"];
             /** Variant */
-            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | null;
+            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | null;
         };
         /**
          * Subtract Integers
@@ -21015,19 +21078,10 @@ export type components = {
              */
             name: string;
             /**
-             * Type
-             * @default t2i_adapter
-             * @constant
+             * Description
+             * @description Model description
              */
-            type: "t2i_adapter";
-            /**
-             * Format
-             * @default diffusers
-             * @constant
-             */
-            format: "diffusers";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
+            description: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -21036,36 +21090,47 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
              */
-            source_api_response?: string | null;
+            source_api_response: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
              */
-            cover_image?: string | null;
+            cover_image: string | null;
             /**
              * Submodels
              * @description Loadable submodels in this model
              */
-            submodels?: {
+            submodels: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
              * Usage Info
              * @description Usage information for this model
              */
-            usage_info?: string | null;
-            /** @description Default settings for this model */
-            default_settings?: components["schemas"]["ControlAdapterDefaultSettings"] | null;
+            usage_info: string | null;
+            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
+            /**
+             * Format
+             * @default diffusers
+             * @constant
+             */
+            format: "diffusers";
             /** @default  */
-            repo_variant?: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            /**
+             * Base
+             * @enum {string}
+             */
+            base: "sd-1" | "sd-2" | "sdxl";
+            /**
+             * Type
+             * @default t2i_adapter
+             * @constant
+             */
+            type: "t2i_adapter";
         };
         /** T2IAdapterField */
         T2IAdapterField: {
@@ -21243,6 +21308,46 @@ export type components = {
              */
             name: string;
             /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Submodels
+             * @description Loadable submodels in this model
+             */
+            submodels: {
+                [key: string]: components["schemas"]["SubmodelDefinition"];
+            } | null;
+            /**
+             * Usage Info
+             * @description Usage information for this model
+             */
+            usage_info: string | null;
+            /**
+             * Base
+             * @default any
+             * @constant
+             */
+            base: "any";
+            /**
              * Type
              * @default t5_encoder
              * @constant
@@ -21254,42 +21359,6 @@ export type components = {
              * @constant
              */
             format: "bnb_quantized_int8b";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
-            /**
-             * Source
-             * @description The original source of the model (path, URL or repo_id).
-             */
-            source: string;
-            /** @description The type of source */
-            source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
-             * Source Api Response
-             * @description The original API response from the source, as stringified JSON.
-             */
-            source_api_response?: string | null;
-            /**
-             * Cover Image
-             * @description Url for image to preview model
-             */
-            cover_image?: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels?: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
-             * Usage Info
-             * @description Usage information for this model
-             */
-            usage_info?: string | null;
         };
         /** T5EncoderConfig */
         T5EncoderConfig: {
@@ -21319,6 +21388,46 @@ export type components = {
              */
             name: string;
             /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Submodels
+             * @description Loadable submodels in this model
+             */
+            submodels: {
+                [key: string]: components["schemas"]["SubmodelDefinition"];
+            } | null;
+            /**
+             * Usage Info
+             * @description Usage information for this model
+             */
+            usage_info: string | null;
+            /**
+             * Base
+             * @default any
+             * @constant
+             */
+            base: "any";
+            /**
              * Type
              * @default t5_encoder
              * @constant
@@ -21330,42 +21439,6 @@ export type components = {
              * @constant
              */
             format: "t5_encoder";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
-            /**
-             * Source
-             * @description The original source of the model (path, URL or repo_id).
-             */
-            source: string;
-            /** @description The type of source */
-            source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
-             * Source Api Response
-             * @description The original API response from the source, as stringified JSON.
-             */
-            source_api_response?: string | null;
-            /**
-             * Cover Image
-             * @description Url for image to preview model
-             */
-            cover_image?: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels?: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
-             * Usage Info
-             * @description Usage information for this model
-             */
-            usage_info?: string | null;
         };
         /** T5EncoderField */
         T5EncoderField: {
@@ -21432,6 +21505,45 @@ export type components = {
              */
             name: string;
             /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Submodels
+             * @description Loadable submodels in this model
+             */
+            submodels: {
+                [key: string]: components["schemas"]["SubmodelDefinition"];
+            } | null;
+            /**
+             * Usage Info
+             * @description Usage information for this model
+             */
+            usage_info: string | null;
+            /**
+             * Base
+             * @enum {string}
+             */
+            base: "sd-1" | "sd-2" | "sdxl";
+            /**
              * Type
              * @default embedding
              * @constant
@@ -21443,42 +21555,6 @@ export type components = {
              * @constant
              */
             format: "embedding_file";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
-            /**
-             * Source
-             * @description The original source of the model (path, URL or repo_id).
-             */
-            source: string;
-            /** @description The type of source */
-            source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
-             * Source Api Response
-             * @description The original API response from the source, as stringified JSON.
-             */
-            source_api_response?: string | null;
-            /**
-             * Cover Image
-             * @description Url for image to preview model
-             */
-            cover_image?: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels?: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
-             * Usage Info
-             * @description Usage information for this model
-             */
-            usage_info?: string | null;
         };
         /**
          * TextualInversionFolderConfig
@@ -21511,6 +21587,45 @@ export type components = {
              */
             name: string;
             /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Submodels
+             * @description Loadable submodels in this model
+             */
+            submodels: {
+                [key: string]: components["schemas"]["SubmodelDefinition"];
+            } | null;
+            /**
+             * Usage Info
+             * @description Usage information for this model
+             */
+            usage_info: string | null;
+            /**
+             * Base
+             * @enum {string}
+             */
+            base: "sd-1" | "sd-2" | "sdxl";
+            /**
              * Type
              * @default embedding
              * @constant
@@ -21522,42 +21637,6 @@ export type components = {
              * @constant
              */
             format: "embedding_folder";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
-            /**
-             * Source
-             * @description The original source of the model (path, URL or repo_id).
-             */
-            source: string;
-            /** @description The type of source */
-            source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
-             * Source Api Response
-             * @description The original API response from the source, as stringified JSON.
-             */
-            source_api_response?: string | null;
-            /**
-             * Cover Image
-             * @description Url for image to preview model
-             */
-            cover_image?: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels?: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
-             * Usage Info
-             * @description Usage information for this model
-             */
-            usage_info?: string | null;
         };
         /** Tile */
         Tile: {
@@ -21969,6 +22048,46 @@ export type components = {
              */
             name: string;
             /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Submodels
+             * @description Loadable submodels in this model
+             */
+            submodels: {
+                [key: string]: components["schemas"]["SubmodelDefinition"];
+            } | null;
+            /**
+             * Usage Info
+             * @description Usage information for this model
+             */
+            usage_info: string | null;
+            /**
+             * Base
+             * @default unknown
+             * @constant
+             */
+            base: "unknown";
+            /**
              * Type
              * @default unknown
              * @constant
@@ -21980,46 +22099,6 @@ export type components = {
              * @constant
              */
             format: "unknown";
-            /**
-             * Base
-             * @default unknown
-             * @constant
-             */
-            base: "unknown";
-            /**
-             * Source
-             * @description The original source of the model (path, URL or repo_id).
-             */
-            source: string;
-            /** @description The type of source */
-            source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
-             * Source Api Response
-             * @description The original API response from the source, as stringified JSON.
-             */
-            source_api_response?: string | null;
-            /**
-             * Cover Image
-             * @description Url for image to preview model
-             */
-            cover_image?: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels?: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
-             * Usage Info
-             * @description Usage information for this model
-             */
-            usage_info?: string | null;
         };
         /**
          * Unsharp Mask
@@ -22147,20 +22226,10 @@ export type components = {
              */
             name: string;
             /**
-             * Type
-             * @default vae
-             * @constant
+             * Description
+             * @description Model description
              */
-            type: "vae";
-            /**
-             * Format
-             * @description Format of the provided checkpoint model
-             * @default checkpoint
-             * @enum {string}
-             */
-            format: "checkpoint" | "bnb_quantized_nf4b" | "gguf_quantized";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
+            description: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -22169,42 +22238,54 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
              */
-            source_api_response?: string | null;
+            source_api_response: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
              */
-            cover_image?: string | null;
+            cover_image: string | null;
             /**
              * Submodels
              * @description Loadable submodels in this model
              */
-            submodels?: {
+            submodels: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
              * Usage Info
              * @description Usage information for this model
              */
-            usage_info?: string | null;
+            usage_info: string | null;
             /**
              * Config Path
-             * @description path to the checkpoint model config file
+             * @description Path to the config for this model, if any.
              */
-            config_path?: string | null;
+            config_path: string | null;
             /**
              * Converted At
              * @description When this model was last converted to diffusers
              */
-            converted_at?: number | null;
+            converted_at: number | null;
+            /**
+             * Base
+             * @enum {string}
+             */
+            base: "sd-1" | "sd-2" | "sdxl" | "flux";
+            /**
+             * Type
+             * @default vae
+             * @constant
+             */
+            type: "vae";
+            /**
+             * Format
+             * @default checkpoint
+             * @constant
+             */
+            format: "checkpoint";
         };
         /**
          * VAEDiffusersConfig
@@ -22237,19 +22318,10 @@ export type components = {
              */
             name: string;
             /**
-             * Type
-             * @default vae
-             * @constant
+             * Description
+             * @description Model description
              */
-            type: "vae";
-            /**
-             * Format
-             * @default diffusers
-             * @constant
-             */
-            format: "diffusers";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
+            description: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -22258,32 +22330,46 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
              */
-            source_api_response?: string | null;
+            source_api_response: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
              */
-            cover_image?: string | null;
+            cover_image: string | null;
             /**
              * Submodels
              * @description Loadable submodels in this model
              */
-            submodels?: {
+            submodels: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
              * Usage Info
              * @description Usage information for this model
              */
-            usage_info?: string | null;
+            usage_info: string | null;
+            /**
+             * Format
+             * @default diffusers
+             * @constant
+             */
+            format: "diffusers";
+            /** @default  */
+            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            /**
+             * Base
+             * @enum {string}
+             */
+            base: "sd-1" | "sdxl";
+            /**
+             * Type
+             * @default vae
+             * @constant
+             */
+            type: "vae";
         };
         /** VAEField */
         VAEField: {
@@ -22405,19 +22491,10 @@ export type components = {
              */
             name: string;
             /**
-             * Type
-             * @default video
-             * @constant
+             * Description
+             * @description Model description
              */
-            type: "video";
-            /**
-             * Format
-             * @default api
-             * @constant
-             */
-            format: "api";
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
+            description: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -22426,44 +22503,51 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
              */
-            source_api_response?: string | null;
+            source_api_response: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
              */
-            cover_image?: string | null;
+            cover_image: string | null;
             /**
              * Submodels
              * @description Loadable submodels in this model
              */
-            submodels?: {
+            submodels: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
              * Usage Info
              * @description Usage information for this model
              */
-            usage_info?: string | null;
+            usage_info: string | null;
+            /**
+             * Type
+             * @default video
+             * @constant
+             */
+            type: "video";
+            /**
+             * Base
+             * @enum {string}
+             */
+            base: "veo3" | "runway";
+            /**
+             * Format
+             * @default api
+             * @constant
+             */
+            format: "api";
             /**
              * Trigger Phrases
              * @description Set of trigger phrases for this model
              */
-            trigger_phrases?: string[] | null;
+            trigger_phrases: string[] | null;
             /** @description Default settings for this model */
-            default_settings?: components["schemas"]["MainModelDefaultSettings"] | null;
-            /**
-             * Variant
-             * @default normal
-             */
-            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | null;
+            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
         };
         /**
          * VideoDTO
