@@ -18,7 +18,7 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 FLUX_CONTROL_TRANSFORMER_KEY_REGEX = r"(\w+\.)+(lora_A\.weight|lora_B\.weight|lora_B\.bias|scale)"
 
 
-def is_state_dict_likely_flux_control(state_dict: Dict[str, Any]) -> bool:
+def is_state_dict_likely_flux_control(state_dict: dict[str | int, Any]) -> bool:
     """Checks if the provided state dict is likely in the FLUX Control LoRA format.
 
     This is intended to be a high-precision detector, but it is not guaranteed to have perfect precision. (A
