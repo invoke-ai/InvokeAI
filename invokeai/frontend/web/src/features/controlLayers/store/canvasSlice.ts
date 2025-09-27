@@ -168,14 +168,14 @@ const getNextCanvasName = (canvases: CanvasStateWithHistory[]): string => {
 };
 
 type PayloadWithCanvasId<P> = P & { canvasId: string };
-type PayloadActionWithCanvasId<P> = PayloadAction<PayloadWithCanvasId<P>>;
+type CanvasPayloadAction<P> = PayloadAction<PayloadWithCanvasId<P>>;
 
 const canvasesSlice = createSlice({
   name: 'canvas',
   initialState: getInitialCanvasesHistoryState(),
   reducers: {
     canvasAdded: {
-      reducer: (state, action: PayloadActionWithCanvasId<{ isSelected?: boolean }>) => {
+      reducer: (state, action: CanvasPayloadAction<{ isSelected?: boolean }>) => {
         const { canvasId, isSelected } = action.payload;
 
         const name = getNextCanvasName(Object.values(state.canvases));
@@ -193,12 +193,12 @@ const canvasesSlice = createSlice({
         };
       },
     },
-    canvasCreated: (_state, _action: PayloadActionWithCanvasId<unknown>) => {},
+    canvasCreated: (_state, _action: CanvasPayloadAction<unknown>) => {},
     canvasMigrated: (state) => {
       delete state.migration;
     },
-    canvasMultiCanvasMigrated: (_state, _action: PayloadActionWithCanvasId<unknown>) => {},
-    canvasActivated: (state, action: PayloadActionWithCanvasId<unknown>) => {
+    canvasMultiCanvasMigrated: (_state, _action: CanvasPayloadAction<unknown>) => {},
+    canvasActivated: (state, action: CanvasPayloadAction<unknown>) => {
       const { canvasId } = action.payload;
 
       const canvas = state.canvases[canvasId]?.present;
@@ -208,7 +208,7 @@ const canvasesSlice = createSlice({
 
       state.activeCanvasId = canvas.id;
     },
-    canvasDeleted: (state, action: PayloadActionWithCanvasId<unknown>) => {
+    canvasDeleted: (state, action: CanvasPayloadAction<unknown>) => {
       const { canvasId } = action.payload;
       const canvasIds = Object.keys(state.canvases);
 
@@ -227,7 +227,7 @@ const canvasesSlice = createSlice({
       state.activeCanvasId = canvasIds[nextIndex]!;
       delete state.canvases[canvas.id];
     },
-    canvasRemoved: (_state, _action: PayloadActionWithCanvasId<unknown>) => {},
+    canvasRemoved: (_state, _action: CanvasPayloadAction<unknown>) => {},
   },
 });
 
@@ -235,7 +235,7 @@ const canvasSlice = createSlice({
   name: 'canvas',
   initialState: {} as CanvasState,
   reducers: {
-    canvasNameChanged: (state, action: PayloadActionWithCanvasId<{ name: string }>) => {
+    canvasNameChanged: (state, action: CanvasPayloadAction<{ name: string }>) => {
       const { name } = action.payload;
 
       state.name = name;
@@ -2049,7 +2049,7 @@ export const undoableCanvasesReducer = (
     return state;
   }
 
-  const canvasId = isPayloadActionWithCanvasId(action) ? action.payload.canvasId : state.activeCanvasId;
+  const canvasId = isCanvasPayloadAction(action) ? action.payload.canvasId : state.activeCanvasId;
 
   return {
     ...state,
@@ -2060,7 +2060,7 @@ export const undoableCanvasesReducer = (
   };
 };
 
-const isPayloadActionWithCanvasId = (action: UnknownAction): action is PayloadActionWithCanvasId<unknown> => {
+const isCanvasPayloadAction = (action: UnknownAction): action is CanvasPayloadAction<unknown> => {
   return (
     typeof action.payload === 'object' &&
     action.payload !== null &&
