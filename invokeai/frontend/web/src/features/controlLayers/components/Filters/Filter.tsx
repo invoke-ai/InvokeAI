@@ -35,7 +35,7 @@ const FilterContentAdvanced = memo(
     const config = useStore(adapter.filterer.$filterConfig);
     const isProcessing = useStore(adapter.filterer.$isProcessing);
     const hasImageState = useStore(adapter.filterer.$hasImageState);
-    const autoProcess = useAppSelector(selectAutoProcess);
+    const autoProcess = useAppSelector((state) => selectAutoProcess(state));
 
     const onChangeFilterConfig = useCallback(
       (filterConfig: FilterConfig) => {

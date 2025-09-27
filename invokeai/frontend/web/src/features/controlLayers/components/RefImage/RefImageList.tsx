@@ -6,7 +6,7 @@ import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/Canva
 import { RefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
 import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { useNewGlobalReferenceImageFromBbox } from 'features/controlLayers/hooks/saveCanvasHooks';
-import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import {
   refImageAdded,
   selectIsRefImagePanelOpen,
@@ -132,7 +132,7 @@ AddRefImageDropTargetAndButton.displayName = 'AddRefImageDropTargetAndButton';
 
 const BboxButton = memo(() => {
   const { t } = useTranslation();
-  const isBusy = useCanvasIsBusySafe();
+  const isBusy = useCanvasIsBusy();
   const newGlobalReferenceImageFromBbox = useNewGlobalReferenceImageFromBbox();
 
   return (

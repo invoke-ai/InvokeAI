@@ -6,7 +6,7 @@ import { upperFirst } from 'es-toolkit/compat';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useEntityIsEnabled } from 'features/controlLayers/hooks/useEntityIsEnabled';
 import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import {
   getControlLayerWarnings,
@@ -23,7 +23,7 @@ import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 const buildSelectWarnings = (entityIdentifier: CanvasEntityIdentifier, t: TFunction) => {
-  return createSelector(selectCanvasSlice, selectMainModelConfig, (canvas, model) => {
+  return createSelector(selectActiveCanvas, selectMainModelConfig, (canvas, model) => {
     // This component is used within a <CanvasEntityStateGate /> so we can safely assume that the entity exists.
     // Should never throw.
     const entity = selectEntityOrThrow(canvas, entityIdentifier, 'CanvasEntityHeaderWarnings');

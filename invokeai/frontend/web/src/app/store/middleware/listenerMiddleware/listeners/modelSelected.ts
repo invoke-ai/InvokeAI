@@ -1,14 +1,17 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/store';
 import { bboxSyncedToOptimalDimension, rgRefImageModelChanged } from 'features/controlLayers/store/canvasSlice';
-import { buildSelectIsStaging, selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import {
+  buildSelectIsStagingBySessionId,
+  selectActiveCanvasSessionId,
+} from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraIsEnabledChanged } from 'features/controlLayers/store/lorasSlice';
 import { modelChanged, syncedToOptimalDimension, vaeSelected } from 'features/controlLayers/store/paramsSlice';
 import { refImageModelChanged, selectReferenceImageEntities } from 'features/controlLayers/store/refImagesSlice';
 import {
+  selectActiveCanvas,
   selectAllEntitiesOfType,
   selectBboxModelBase,
-  selectCanvasSlice,
 } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { modelSelected } from 'features/parameters/store/actions';
@@ -118,7 +121,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         const newRegionalRefImageModel = selectRegionalRefImageModels(state)[0] ?? null;
 
         // All regional guidance entities are updated to use the same new model.
-        const canvasState = selectCanvasSlice(state);
+        const canvasState = selectActiveCanvas(state);
         const canvasRegionalGuidanceEntities = selectAllEntitiesOfType(canvasState, 'regional_guidance');
         for (const entity of canvasRegionalGuidanceEntities) {
           for (const refImage of entity.referenceImages) {
@@ -159,7 +162,9 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
       if (modelBase !== state.params.model?.base) {
         // Sync generate tab settings whenever the model base changes
         dispatch(syncedToOptimalDimension());
-        const isStaging = buildSelectIsStaging(selectCanvasSessionId(state))(state);
+        const sessionId = selectActiveCanvasSessionId(state);
+        const selectIsStaging = buildSelectIsStagingBySessionId(sessionId);
+        const isStaging = selectIsStaging(state);
         if (!isStaging) {
           // Canvas tab only syncs if not staging
           dispatch(bboxSyncedToOptimalDimension());

@@ -14,11 +14,12 @@ import {
   PopoverTrigger,
   Portal,
 } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { clamp } from 'es-toolkit/compat';
+import { useCanvasId } from 'features/controlLayers/hooks/useCanvasId';
 import {
-  selectCanvasSettingsSlice,
+  selectBrushWidth,
+  selectEraserWidth,
   settingsBrushWidthChanged,
   settingsEraserWidthChanged,
 } from 'features/controlLayers/store/canvasSettingsSlice';
@@ -180,19 +181,17 @@ const SliderToolWidthPickerComponent = memo(
 );
 SliderToolWidthPickerComponent.displayName = 'SliderToolWidthPickerComponent';
 
-const selectBrushWidth = createSelector(selectCanvasSettingsSlice, (settings) => settings.brushWidth);
-const selectEraserWidth = createSelector(selectCanvasSettingsSlice, (settings) => settings.eraserWidth);
-
 export const ToolWidthPicker = memo(() => {
   const ref = useRef<HTMLDivElement>(null);
   const dispatch = useAppDispatch();
+  const canvasId = useCanvasId();
   const isBrushSelected = useToolIsSelected('brush');
   const isEraserSelected = useToolIsSelected('eraser');
   const isToolSelected = useMemo(() => {
     return isBrushSelected || isEraserSelected;
   }, [isBrushSelected, isEraserSelected]);
-  const brushWidth = useAppSelector(selectBrushWidth);
-  const eraserWidth = useAppSelector(selectEraserWidth);
+  const brushWidth = useAppSelector((state) => selectBrushWidth(state, canvasId));
+  const eraserWidth = useAppSelector((state) => selectEraserWidth(state, canvasId));
   const width = useMemo(() => {
     if (isBrushSelected) {
       return brushWidth;
@@ -229,12 +228,12 @@ export const ToolWidthPicker = memo(() => {
   const onValueChange = useCallback(
     (value: number) => {
       if (isBrushSelected) {
-        dispatch(settingsBrushWidthChanged(value));
+        dispatch(settingsBrushWidthChanged({ canvasId, brushWidth: value }));
       } else if (isEraserSelected) {
-        dispatch(settingsEraserWidthChanged(value));
+        dispatch(settingsEraserWidthChanged({ canvasId, eraserWidth: value }));
       }
     },
-    [isBrushSelected, isEraserSelected, dispatch]
+    [isBrushSelected, isEraserSelected, canvasId, dispatch]
   );
 
   const onChange = useCallback(

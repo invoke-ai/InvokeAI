@@ -11,7 +11,7 @@ import {
   selectRefinerModel,
   selectRefinerStart,
 } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas } from 'features/controlLayers/store/selectors';
 import type { ParamsState } from 'features/controlLayers/store/types';
 import type { BoardField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
@@ -63,7 +63,7 @@ export const selectCanvasOutputFields = (state: RootState) => {
  * Select the destination to use for canvas queue items.
  *
  */
-export const selectCanvasDestination = (state: RootState) => {
+export const selectCanvasDestination = (state: RootState, canvasId: string) => {
   // The canvas will stage images that have its session ID as the destination. When the user has enabled saving all
   // images to gallery, we want to bypass the staging area. So we use 'canvas' as a generic destination. Images will
   // go directly to the gallery.
@@ -73,7 +73,8 @@ export const selectCanvasDestination = (state: RootState) => {
   if (saveAllImagesToGallery) {
     return 'canvas';
   }
-  return selectCanvasSessionId(state);
+
+  return selectCanvasSessionId(state, canvasId);
 };
 
 /**
@@ -121,9 +122,9 @@ export const selectPresetModifiedPrompts = createSelector(
 export const getOriginalAndScaledSizesForTextToImage = (state: RootState) => {
   const tab = selectActiveTab(state);
   const params = selectParamsSlice(state);
-  const canvas = selectCanvasSlice(state);
 
   if (tab === 'canvas') {
+    const canvas = selectActiveCanvas(state);
     const { rect, aspectRatio } = canvas.bbox;
     const { width, height } = rect;
     const originalSize = { width, height };
@@ -143,10 +144,10 @@ export const getOriginalAndScaledSizesForTextToImage = (state: RootState) => {
 
 export const getOriginalAndScaledSizesForOtherModes = (state: RootState) => {
   const tab = selectActiveTab(state);
-  const canvas = selectCanvasSlice(state);
 
   assert(tab === 'canvas', `Cannot get sizes for tab ${tab} - this function is only for the Canvas tab`);
 
+  const canvas = selectActiveCanvas(state);
   const { rect, aspectRatio } = canvas.bbox;
   const { width, height } = rect;
   const originalSize = { width, height };

@@ -85,7 +85,8 @@ import {
 } from 'features/nodes/types/workflow';
 import { atom, computed } from 'nanostores';
 import type { MouseEvent } from 'react';
-import type { UndoableOptions } from 'redux-undo';
+import type { StateWithHistory, UndoableOptions } from 'redux-undo';
+import undoable, { newHistory } from 'redux-undo';
 import { assert } from 'tsafe';
 import type { z } from 'zod';
 
@@ -804,7 +805,9 @@ const reduxUndoOptions: UndoableOptions<NodesState, UnknownAction> = {
   },
 };
 
-export const nodesSliceConfig: SliceConfig<typeof slice> = {
+export const undoableNodesSliceReducer = undoable(slice.reducer, reduxUndoOptions);
+
+export const nodesSliceConfig: SliceConfig<typeof slice, StateWithHistory<NodesState>, NodesState> = {
   slice,
   schema: zNodesState,
   getInitialState,
@@ -816,9 +819,12 @@ export const nodesSliceConfig: SliceConfig<typeof slice> = {
       }
       return zNodesState.parse(state);
     },
-  },
-  undoableConfig: {
-    reduxUndoOptions,
+    wrapState: (state) => {
+      const nodesState = state as NodesState;
+
+      return newHistory([], nodesState, []);
+    },
+    unwrapState: (state) => state.present,
   },
 };
 

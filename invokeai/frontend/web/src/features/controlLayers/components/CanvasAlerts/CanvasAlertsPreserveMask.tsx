@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 export const CanvasAlertsPreserveMask = memo(() => {
   const { t } = useTranslation();
-  const preserveMask = useAppSelector(selectPreserveMask);
+  const preserveMask = useAppSelector((state) => selectPreserveMask(state));
 
   if (!preserveMask) {
     return null;

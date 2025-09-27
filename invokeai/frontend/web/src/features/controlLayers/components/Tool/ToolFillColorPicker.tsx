@@ -9,12 +9,14 @@ import {
   Portal,
   Tooltip,
 } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import RgbaColorPicker from 'common/components/ColorPicker/RgbaColorPicker';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
+import { useCanvasId } from 'features/controlLayers/hooks/useCanvasId';
 import {
-  selectCanvasSettingsSlice,
+  selectActiveColor,
+  selectBgColor,
+  selectFgColor,
   settingsActiveColorToggled,
   settingsBgColorChanged,
   settingsColorsSetToDefault,
@@ -25,15 +27,12 @@ import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/us
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selectActiveColor = createSelector(selectCanvasSettingsSlice, (settings) => settings.activeColor);
-const selectBgColor = createSelector(selectCanvasSettingsSlice, (settings) => settings.bgColor);
-const selectFgColor = createSelector(selectCanvasSettingsSlice, (settings) => settings.fgColor);
-
 export const ToolFillColorPicker = memo(() => {
   const { t } = useTranslation();
-  const activeColorType = useAppSelector(selectActiveColor);
-  const bgColor = useAppSelector(selectBgColor);
-  const fgColor = useAppSelector(selectFgColor);
+  const canvasId = useCanvasId();
+  const activeColorType = useAppSelector((state) => selectActiveColor(state, canvasId));
+  const bgColor = useAppSelector((state) => selectBgColor(state, canvasId));
+  const fgColor = useAppSelector((state) => selectFgColor(state, canvasId));
   const { activeColor, tooltip, bgColorzIndex, fgColorzIndex } = useMemo(() => {
     if (activeColorType === 'bgColor') {
       return { activeColor: bgColor, tooltip: t('controlLayers.fill.bgFillColor'), bgColorzIndex: 2, fgColorzIndex: 1 };
@@ -45,28 +44,28 @@ export const ToolFillColorPicker = memo(() => {
   const onColorChange = useCallback(
     (color: RgbaColor) => {
       if (activeColorType === 'bgColor') {
-        dispatch(settingsBgColorChanged(color));
+        dispatch(settingsBgColorChanged({ canvasId, bgColor: color }));
       } else {
-        dispatch(settingsFgColorChanged(color));
+        dispatch(settingsFgColorChanged({ canvasId, fgColor: color }));
       }
     },
-    [activeColorType, dispatch]
+    [activeColorType, canvasId, dispatch]
   );
 
   useRegisteredHotkeys({
     id: 'setFillColorsToDefault',
     category: 'canvas',
-    callback: () => dispatch(settingsColorsSetToDefault()),
+    callback: () => dispatch(settingsColorsSetToDefault({ canvasId })),
     options: { preventDefault: true },
-    dependencies: [dispatch],
+    dependencies: [canvasId, dispatch],
   });
 
   useRegisteredHotkeys({
     id: 'toggleFillColor',
     category: 'canvas',
-    callback: () => dispatch(settingsActiveColorToggled()),
+    callback: () => dispatch(settingsActiveColorToggled({ canvasId })),
     options: { preventDefault: true },
-    dependencies: [dispatch],
+    dependencies: [canvasId, dispatch],
   });
 
   return (
