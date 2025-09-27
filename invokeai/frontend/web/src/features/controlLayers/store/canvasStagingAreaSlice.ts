@@ -17,14 +17,14 @@ import {
 import { selectActiveCanvasId } from './selectors';
 
 const zCanvasSessionState = z.object({
-  canvasId: z.string(),
+  canvasId: z.string().min(1),
   canvasSessionId: z.string(),
   canvasDiscardedQueueItems: z.array(z.number().int()),
 });
 type CanvasSessionState = z.infer<typeof zCanvasSessionState>;
 const zCanvasStagingAreaState = z.object({
   _version: z.literal(2),
-  sessions: z.array(zCanvasSessionState),
+  sessions: z.record(z.string(), zCanvasSessionState),
 });
 type CanvasStagingAreaState = z.infer<typeof zCanvasStagingAreaState>;
 
@@ -39,17 +39,17 @@ const getInitialCanvasSessionState = (canvasId: string): CanvasSessionState => (
 
 const getInitialState = (): CanvasStagingAreaState => ({
   _version: 2,
-  sessions: [],
+  sessions: {},
 });
 
-const slice = createSlice({
+const canvasStagingAreaSlice = createSlice({
   name: 'canvasSession',
   initialState: getInitialState(),
   reducers: {
     canvasQueueItemDiscarded: (state, action: CanvasPayloadAction<{ itemId: number }>) => {
       const { canvasId, itemId } = action.payload;
 
-      const session = state.sessions.find((session) => session.canvasId === canvasId);
+      const session = state.sessions[canvasId];
       if (!session) {
         return;
       }
@@ -62,7 +62,7 @@ const slice = createSlice({
       reducer: (state, action: CanvasPayloadAction<{ canvasSessionId: string }>) => {
         const { canvasId, canvasSessionId } = action.payload;
 
-        const session = state.sessions.find((session) => session.canvasId === canvasId);
+        const session = state.sessions[canvasId];
         if (!session) {
           return;
         }
@@ -83,25 +83,27 @@ const slice = createSlice({
   extraReducers(builder) {
     builder.addCase(canvasCreated, (state, action) => {
       const session = getInitialCanvasSessionState(action.payload.canvasId);
-      state.sessions.push(session);
+      state.sessions[session.canvasId] = session;
     });
     builder.addCase(canvasRemoved, (state, action) => {
-      state.sessions = state.sessions.filter((session) => session.canvasId !== action.payload.canvasId);
+      delete state.sessions[action.payload.canvasId];
     });
     builder.addCase(canvasMultiCanvasMigrated, (state, action) => {
-      const session = state.sessions.find((session) => session.canvasId === MIGRATION_MULTI_CANVAS_ID_PLACEHOLDER);
+      const session = state.sessions[MIGRATION_MULTI_CANVAS_ID_PLACEHOLDER];
       if (!session) {
         return;
       }
       session.canvasId = action.payload.canvasId;
+      state.sessions[session.canvasId] = session;
+      delete state.sessions[MIGRATION_MULTI_CANVAS_ID_PLACEHOLDER];
     });
   },
 });
 
-export const { canvasSessionReset, canvasQueueItemDiscarded } = slice.actions;
+export const { canvasSessionReset, canvasQueueItemDiscarded } = canvasStagingAreaSlice.actions;
 
-export const canvasSessionSliceConfig: SliceConfig<typeof slice> = {
-  slice,
+export const canvasSessionSliceConfig: SliceConfig<typeof canvasStagingAreaSlice> = {
+  slice: canvasStagingAreaSlice,
   schema: zCanvasStagingAreaState,
   getInitialState,
   persistConfig: {
@@ -119,7 +121,7 @@ export const canvasSessionSliceConfig: SliceConfig<typeof slice> = {
 
         state = {
           _version: 2,
-          sessions: [session],
+          sessions: { [session.canvasId]: session },
         };
       }
 
@@ -128,28 +130,32 @@ export const canvasSessionSliceConfig: SliceConfig<typeof slice> = {
   },
 };
 
-const findSessionByCanvasId = (sessions: CanvasSessionState[], canvasId: string) => {
-  const session = sessions.find((s) => s.canvasId === canvasId);
+const findSessionByCanvasId = (sessions: Record<string, CanvasSessionState>, canvasId: string) => {
+  const session = sessions[canvasId];
   assert(session, 'Session must exist for a canvas once the canvas has been created');
   return session;
 };
 export const selectCanvasSessionByCanvasId = (state: RootState, canvasId: string) =>
   findSessionByCanvasId(state.canvasSession.sessions, canvasId);
-const selectSelectedCanvasSession = (state: RootState) => {
+const selectActiveCanvasSession = (state: RootState) => {
   const canvasId = selectActiveCanvasId(state);
   return findSessionByCanvasId(state.canvasSession.sessions, canvasId);
+};
+export const selectCanvasSessionBySessionId = (state: RootState, sessionId: string) => {
+  const session = Object.values(state.canvasSession.sessions).find((s) => s.canvasSessionId === sessionId);
+  assert(session, 'Session does not exist');
+  return session;
 };
 export const selectCanvasSessionId = (state: RootState, canvasId: string) => {
   const session = selectCanvasSessionByCanvasId(state, canvasId);
   return session.canvasSessionId;
 };
-export const selectSelectedCanvasSessionId = (state: RootState) => {
-  const session = selectSelectedCanvasSession(state);
+export const selectActiveCanvasSessionId = (state: RootState) => {
+  const session = selectActiveCanvasSession(state);
   return session.canvasSessionId;
 };
 const selectCanvasSessionDiscardedItemsBySessionId = (state: RootState, sessionId: string) => {
-  const session = state.canvasSession.sessions.find((s) => s.canvasSessionId === sessionId);
-  assert(session, 'Session does not exist');
+  const session = selectCanvasSessionBySessionId(state, sessionId);
   return session.canvasDiscardedQueueItems;
 };
 export const buildSelectCanvasQueueItemsBySessionId = (sessionId: string) =>

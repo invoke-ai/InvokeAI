@@ -3,7 +3,7 @@ import { isNil } from 'es-toolkit';
 import { bboxHeightChanged, bboxWidthChanged } from 'features/controlLayers/store/canvasSlice';
 import {
   buildSelectIsStagingBySessionId,
-  selectSelectedCanvasSessionId,
+  selectActiveCanvasSessionId,
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   heightChanged,
@@ -118,7 +118,7 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
         }
         const setSizeOptions = { updateAspectRatio: true, clamp: true };
 
-        const sessionId = selectSelectedCanvasSessionId(state);
+        const sessionId = selectActiveCanvasSessionId(state);
         const selectIsStaging = buildSelectIsStagingBySessionId(sessionId);
         const isStaging = selectIsStaging(state);
 
