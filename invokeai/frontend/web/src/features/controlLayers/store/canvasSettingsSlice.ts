@@ -1,5 +1,5 @@
-import type { PayloadAction, Selector } from '@reduxjs/toolkit';
-import { createSelector, createSlice } from '@reduxjs/toolkit';
+import type { PayloadAction, Selector, UnknownAction } from '@reduxjs/toolkit';
+import { createSelector, createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import { isPlainObject } from 'es-toolkit';
@@ -18,7 +18,7 @@ import {
 const zAutoSwitchMode = z.enum(['off', 'switch_on_start', 'switch_on_finish']);
 export type AutoSwitchMode = z.infer<typeof zAutoSwitchMode>;
 
-const zCanvasSharedSettingsState = z.object({
+const zCanvasSharedSettings = z.object({
   /**
    * Whether to show HUD (Heads-Up Display) on the canvas.
    */
@@ -89,9 +89,9 @@ const zCanvasSharedSettingsState = z.object({
    */
   stagingAreaAutoSwitch: zAutoSwitchMode,
 });
-type CanvasSharedSettingsState = z.infer<typeof zCanvasSharedSettingsState>;
+type CanvasSharedSettings = z.infer<typeof zCanvasSharedSettings>;
 
-const zCanvasInstanceSettingsState = z.object({
+const zCanvasInstanceSettings = z.object({
   canvasId: z.string(),
   /**
    * The width of the brush tool.
@@ -108,16 +108,16 @@ const zCanvasInstanceSettingsState = z.object({
   bgColor: zRgbaColor,
   fgColor: zRgbaColor,
 });
-type CanvasInstanceSettingsState = z.infer<typeof zCanvasInstanceSettingsState>;
+type CanvasInstanceSettings = z.infer<typeof zCanvasInstanceSettings>;
 
 const zCanvasSettingsState = z.object({
   _version: z.literal(1),
-  shared: zCanvasSharedSettingsState,
-  canvases: z.array(zCanvasInstanceSettingsState),
+  shared: zCanvasSharedSettings,
+  canvases: z.record(z.string(), zCanvasInstanceSettings),
 });
 type CanvasSettingsState = z.infer<typeof zCanvasSettingsState>;
 
-const getInitialCanvasSharedSettingsState = (): CanvasSharedSettingsState => ({
+const getInitialCanvasSharedSettings = (): CanvasSharedSettings => ({
   showHUD: true,
   clipToBbox: false,
   dynamicGrid: false,
@@ -135,7 +135,7 @@ const getInitialCanvasSharedSettingsState = (): CanvasSharedSettingsState => ({
   saveAllImagesToGallery: false,
   stagingAreaAutoSwitch: 'switch_on_start',
 });
-const getInitialCanvasInstanceSettingsState = (canvasId: string): CanvasInstanceSettingsState => ({
+const getInitialCanvasInstanceSettings = (canvasId: string): CanvasInstanceSettings => ({
   canvasId,
   brushWidth: 50,
   eraserWidth: 50,
@@ -143,18 +143,18 @@ const getInitialCanvasInstanceSettingsState = (canvasId: string): CanvasInstance
   bgColor: RGBA_BLACK,
   fgColor: RGBA_WHITE,
 });
-const getInitialState = (): CanvasSettingsState => ({
+const getInitialCanvasSettingsState = (): CanvasSettingsState => ({
   _version: 1,
-  shared: getInitialCanvasSharedSettingsState(),
-  canvases: [],
+  shared: getInitialCanvasSharedSettings(),
+  canvases: {},
 });
 
-type CanvasPayload<T> = { canvasId: string } & T;
-type CanvasPayloadAction<T> = PayloadAction<CanvasPayload<T>>;
+type PayloadWithCanvasId<P> = P & { canvasId: string };
+type CanvasPayloadAction<P> = PayloadAction<PayloadWithCanvasId<P>>;
 
-const slice = createSlice({
+const canvasSettingsSlice = createSlice({
   name: 'canvasSettings',
-  initialState: getInitialState(),
+  initialState: getInitialCanvasSettingsState(),
   reducers: {
     settingsClipToBboxChanged: (state, action: PayloadAction<{ clipToBbox: boolean }>) => {
       const { clipToBbox } = action.payload;
@@ -166,67 +166,6 @@ const slice = createSlice({
     },
     settingsShowHUDToggled: (state) => {
       state.shared.showHUD = !state.shared.showHUD;
-    },
-    settingsBrushWidthChanged: (state, action: CanvasPayloadAction<{ brushWidth: number }>) => {
-      const { canvasId, brushWidth } = action.payload;
-
-      const settings = state.canvases.find((settings) => settings.canvasId === canvasId);
-      if (!settings) {
-        return;
-      }
-
-      settings.brushWidth = Math.round(brushWidth);
-    },
-    settingsEraserWidthChanged: (state, action: CanvasPayloadAction<{ eraserWidth: number }>) => {
-      const { canvasId, eraserWidth } = action.payload;
-
-      const settings = state.canvases.find((settings) => settings.canvasId === canvasId);
-      if (!settings) {
-        return;
-      }
-
-      settings.eraserWidth = Math.round(eraserWidth);
-    },
-    settingsActiveColorToggled: (state, action: CanvasPayloadAction<unknown>) => {
-      const { canvasId } = action.payload;
-
-      const settings = state.canvases.find((settings) => settings.canvasId === canvasId);
-      if (!settings) {
-        return;
-      }
-
-      settings.activeColor = settings.activeColor === 'bgColor' ? 'fgColor' : 'bgColor';
-    },
-    settingsBgColorChanged: (state, action: CanvasPayloadAction<{ bgColor: Partial<RgbaColor> }>) => {
-      const { canvasId, bgColor } = action.payload;
-
-      const settings = state.canvases.find((settings) => settings.canvasId === canvasId);
-      if (!settings) {
-        return;
-      }
-
-      settings.bgColor = { ...settings.bgColor, ...bgColor };
-    },
-    settingsFgColorChanged: (state, action: CanvasPayloadAction<{ fgColor: Partial<RgbaColor> }>) => {
-      const { canvasId, fgColor } = action.payload;
-
-      const settings = state.canvases.find((settings) => settings.canvasId === canvasId);
-      if (!settings) {
-        return;
-      }
-
-      settings.fgColor = { ...settings.fgColor, ...fgColor };
-    },
-    settingsColorsSetToDefault: (state, action: CanvasPayloadAction<unknown>) => {
-      const { canvasId } = action.payload;
-
-      const settings = state.canvases.find((settings) => settings.canvasId === canvasId);
-      if (!settings) {
-        return;
-      }
-
-      settings.bgColor = RGBA_BLACK;
-      settings.fgColor = RGBA_WHITE;
     },
     settingsInvertScrollForToolWidthChanged: (state, action: PayloadAction<{ invertScrollForToolWidth: boolean }>) => {
       const { invertScrollForToolWidth } = action.payload;
@@ -268,7 +207,7 @@ const slice = createSlice({
     },
     settingsStagingAreaAutoSwitchChanged: (
       state,
-      action: PayloadAction<{ stagingAreaAutoSwitch: CanvasSharedSettingsState['stagingAreaAutoSwitch'] }>
+      action: PayloadAction<{ stagingAreaAutoSwitch: CanvasSharedSettings['stagingAreaAutoSwitch'] }>
     ) => {
       const { stagingAreaAutoSwitch } = action.payload;
 
@@ -277,19 +216,55 @@ const slice = createSlice({
   },
   extraReducers(builder) {
     builder.addCase(canvasCreated, (state, action) => {
-      const canvasSettings = getInitialCanvasInstanceSettingsState(action.payload.canvasId);
-      state.canvases.push(canvasSettings);
+      const canvasSettings = getInitialCanvasInstanceSettings(action.payload.canvasId);
+      state.canvases[canvasSettings.canvasId] = canvasSettings;
     });
     builder.addCase(canvasRemoved, (state, action) => {
-      state.canvases = state.canvases.filter((settings) => settings.canvasId !== action.payload.canvasId);
+      delete state.canvases[action.payload.canvasId];
     });
     builder.addCase(canvasMultiCanvasMigrated, (state, action) => {
-      const settings = state.canvases.find((settings) => settings.canvasId === MIGRATION_MULTI_CANVAS_ID_PLACEHOLDER);
+      const settings = state.canvases[MIGRATION_MULTI_CANVAS_ID_PLACEHOLDER];
       if (!settings) {
         return;
       }
       settings.canvasId = action.payload.canvasId;
+      state.canvases[settings.canvasId] = settings;
+      delete state.canvases[MIGRATION_MULTI_CANVAS_ID_PLACEHOLDER];
     });
+  },
+});
+
+const canvasInstanceSettingsSlice = createSlice({
+  name: 'canvasSettings',
+  initialState: {} as CanvasInstanceSettings,
+  reducers: {
+    settingsBrushWidthChanged: (state, action: CanvasPayloadAction<{ brushWidth: number }>) => {
+      const { brushWidth } = action.payload;
+
+      state.brushWidth = Math.round(brushWidth);
+    },
+    settingsEraserWidthChanged: (state, action: CanvasPayloadAction<{ eraserWidth: number }>) => {
+      const { eraserWidth } = action.payload;
+
+      state.eraserWidth = Math.round(eraserWidth);
+    },
+    settingsActiveColorToggled: (state, _action: CanvasPayloadAction<unknown>) => {
+      state.activeColor = state.activeColor === 'bgColor' ? 'fgColor' : 'bgColor';
+    },
+    settingsBgColorChanged: (state, action: CanvasPayloadAction<{ bgColor: Partial<RgbaColor> }>) => {
+      const { bgColor } = action.payload;
+
+      state.bgColor = { ...state.bgColor, ...bgColor };
+    },
+    settingsFgColorChanged: (state, action: CanvasPayloadAction<{ fgColor: Partial<RgbaColor> }>) => {
+      const { fgColor } = action.payload;
+
+      state.fgColor = { ...state.fgColor, ...fgColor };
+    },
+    settingsColorsSetToDefault: (state, _action: CanvasPayloadAction<unknown>) => {
+      state.bgColor = RGBA_BLACK;
+      state.fgColor = RGBA_WHITE;
+    },
   },
 });
 
@@ -297,12 +272,6 @@ export const {
   settingsClipToBboxChanged,
   settingsDynamicGridToggled,
   settingsShowHUDToggled,
-  settingsBrushWidthChanged,
-  settingsEraserWidthChanged,
-  settingsActiveColorToggled,
-  settingsBgColorChanged,
-  settingsFgColorChanged,
-  settingsColorsSetToDefault,
   settingsInvertScrollForToolWidthChanged,
   settingsOutputOnlyMaskedRegionsToggled,
   settingsAutoProcessToggled,
@@ -316,28 +285,57 @@ export const {
   settingsRuleOfThirdsToggled,
   settingsSaveAllImagesToGalleryToggled,
   settingsStagingAreaAutoSwitchChanged,
-} = slice.actions;
+} = canvasSettingsSlice.actions;
 
-export const canvasSettingsSliceConfig: SliceConfig<typeof slice> = {
-  slice,
+export const {
+  settingsBrushWidthChanged,
+  settingsEraserWidthChanged,
+  settingsActiveColorToggled,
+  settingsBgColorChanged,
+  settingsFgColorChanged,
+  settingsColorsSetToDefault,
+} = canvasInstanceSettingsSlice.actions;
+
+const isCanvasInstanceSettingsAction = isAnyOf(...Object.values(canvasInstanceSettingsSlice.actions));
+
+export const canvasSettingsReducer = (state: CanvasSettingsState, action: UnknownAction): CanvasSettingsState => {
+  state = canvasSettingsSlice.reducer(state, action);
+
+  if (!isCanvasInstanceSettingsAction(action)) {
+    return state;
+  }
+
+  const canvasId = action.payload.canvasId;
+
+  return {
+    ...state,
+    canvases: {
+      ...state.canvases,
+      [canvasId]: canvasInstanceSettingsSlice.reducer(state.canvases[canvasId], action),
+    },
+  };
+};
+
+export const canvasSettingsSliceConfig: SliceConfig<typeof canvasSettingsSlice> = {
+  slice: canvasSettingsSlice,
   schema: zCanvasSettingsState,
-  getInitialState,
+  getInitialState: getInitialCanvasSettingsState,
   persistConfig: {
     migrate: (state) => {
       assert(isPlainObject(state));
       if (!('_version' in state)) {
         // Migrate from v1: slice represented a canvas settings instance -> slice represents multiple canvas settings instances
-        const canvas = {
+        const settings = {
           canvasId: MIGRATION_MULTI_CANVAS_ID_PLACEHOLDER,
           ...state,
-        } as CanvasInstanceSettingsState;
+        } as CanvasInstanceSettings;
 
         state = {
           _version: 1,
           shared: {
             ...state,
           },
-          canvases: [canvas],
+          canvases: { [settings.canvasId]: settings },
         };
       }
 
@@ -359,52 +357,42 @@ export const buildSelectCanvasSettingsByCanvasId = (canvasId: string) =>
   );
 const selectCanvasSharedSettings = (state: RootState) => state.canvasSettings.shared;
 const selectCanvasInstanceSettings = (state: RootState, canvasId: string) => {
-  const settings = state.canvasSettings.canvases.find((settings) => settings.canvasId === canvasId);
+  const settings = state.canvasSettings.canvases[canvasId];
   assert(settings, 'Settings must exist for a canvas once the canvas has been created');
   return settings;
 };
 
 const buildCanvasSharedSettingsSelector =
-  <T>(selector: Selector<CanvasSharedSettingsState, T>) =>
+  <T>(selector: Selector<CanvasSharedSettings, T>) =>
   (state: RootState) =>
     selector(selectCanvasSharedSettings(state));
 const buildCanvasInstanceSettingsSelector =
-  <T>(selector: Selector<CanvasInstanceSettingsState, T>) =>
+  <T>(selector: Selector<CanvasInstanceSettings, T>) =>
   (state: RootState, canvasId: string) =>
     selector(selectCanvasInstanceSettings(state, canvasId));
 
-export const selectPreserveMask = buildCanvasSharedSettingsSelector((settings) => settings.preserveMask);
+export const selectPreserveMask = buildCanvasSharedSettingsSelector((state) => state.preserveMask);
 export const selectOutputOnlyMaskedRegions = buildCanvasSharedSettingsSelector(
-  (settings) => settings.outputOnlyMaskedRegions
+  (state) => state.outputOnlyMaskedRegions
 );
-export const selectDynamicGrid = buildCanvasSharedSettingsSelector((settings) => settings.dynamicGrid);
+export const selectDynamicGrid = buildCanvasSharedSettingsSelector((state) => state.dynamicGrid);
 export const selectInvertScrollForToolWidth = buildCanvasSharedSettingsSelector(
-  (settings) => settings.invertScrollForToolWidth
+  (state) => state.invertScrollForToolWidth
 );
-export const selectBboxOverlay = buildCanvasSharedSettingsSelector((settings) => settings.bboxOverlay);
-export const selectShowHUD = buildCanvasSharedSettingsSelector((settings) => settings.showHUD);
-export const selectClipToBbox = buildCanvasSharedSettingsSelector((settings) => settings.clipToBbox);
-export const selectAutoProcess = buildCanvasSharedSettingsSelector((settings) => settings.autoProcess);
-export const selectSnapToGrid = buildCanvasSharedSettingsSelector((settings) => settings.snapToGrid);
-export const selectShowProgressOnCanvas = buildCanvasSharedSettingsSelector(
-  (settings) => settings.showProgressOnCanvas
-);
-export const selectIsolatedStagingPreview = buildCanvasSharedSettingsSelector(
-  (settings) => settings.isolatedStagingPreview
-);
-export const selectIsolatedLayerPreview = buildCanvasSharedSettingsSelector(
-  (settings) => settings.isolatedLayerPreview
-);
-export const selectPressureSensitivity = buildCanvasSharedSettingsSelector((settings) => settings.pressureSensitivity);
-export const selectRuleOfThirds = buildCanvasSharedSettingsSelector((settings) => settings.ruleOfThirds);
-export const selectSaveAllImagesToGallery = buildCanvasSharedSettingsSelector(
-  (settings) => settings.saveAllImagesToGallery
-);
-export const selectStagingAreaAutoSwitch = buildCanvasSharedSettingsSelector(
-  (settings) => settings.stagingAreaAutoSwitch
-);
-export const selectActiveColor = buildCanvasInstanceSettingsSelector((settings) => settings.activeColor);
-export const selectBgColor = buildCanvasInstanceSettingsSelector((settings) => settings.bgColor);
-export const selectFgColor = buildCanvasInstanceSettingsSelector((settings) => settings.fgColor);
-export const selectBrushWidth = buildCanvasInstanceSettingsSelector((settings) => settings.brushWidth);
-export const selectEraserWidth = buildCanvasInstanceSettingsSelector((settings) => settings.eraserWidth);
+export const selectBboxOverlay = buildCanvasSharedSettingsSelector((state) => state.bboxOverlay);
+export const selectShowHUD = buildCanvasSharedSettingsSelector((state) => state.showHUD);
+export const selectClipToBbox = buildCanvasSharedSettingsSelector((state) => state.clipToBbox);
+export const selectAutoProcess = buildCanvasSharedSettingsSelector((state) => state.autoProcess);
+export const selectSnapToGrid = buildCanvasSharedSettingsSelector((state) => state.snapToGrid);
+export const selectShowProgressOnCanvas = buildCanvasSharedSettingsSelector((state) => state.showProgressOnCanvas);
+export const selectIsolatedStagingPreview = buildCanvasSharedSettingsSelector((state) => state.isolatedStagingPreview);
+export const selectIsolatedLayerPreview = buildCanvasSharedSettingsSelector((state) => state.isolatedLayerPreview);
+export const selectPressureSensitivity = buildCanvasSharedSettingsSelector((state) => state.pressureSensitivity);
+export const selectRuleOfThirds = buildCanvasSharedSettingsSelector((state) => state.ruleOfThirds);
+export const selectSaveAllImagesToGallery = buildCanvasSharedSettingsSelector((state) => state.saveAllImagesToGallery);
+export const selectStagingAreaAutoSwitch = buildCanvasSharedSettingsSelector((state) => state.stagingAreaAutoSwitch);
+export const selectActiveColor = buildCanvasInstanceSettingsSelector((state) => state.activeColor);
+export const selectBgColor = buildCanvasInstanceSettingsSelector((state) => state.bgColor);
+export const selectFgColor = buildCanvasInstanceSettingsSelector((state) => state.fgColor);
+export const selectBrushWidth = buildCanvasInstanceSettingsSelector((state) => state.brushWidth);
+export const selectEraserWidth = buildCanvasInstanceSettingsSelector((state) => state.eraserWidth);

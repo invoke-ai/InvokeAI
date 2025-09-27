@@ -141,7 +141,7 @@ const selectActiveCanvasSession = (state: RootState) => {
   const canvasId = selectActiveCanvasId(state);
   return findSessionByCanvasId(state.canvasSession.sessions, canvasId);
 };
-export const selectCanvasSessionBySessionId = (state: RootState, sessionId: string) => {
+const selectCanvasSessionBySessionId = (state: RootState, sessionId: string) => {
   const session = Object.values(state.canvasSession.sessions).find((s) => s.canvasSessionId === sessionId);
   assert(session, 'Session does not exist');
   return session;

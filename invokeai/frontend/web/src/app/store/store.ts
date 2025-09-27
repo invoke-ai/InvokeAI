@@ -21,7 +21,7 @@ import { deepClone } from 'common/util/deepClone';
 import { merge } from 'es-toolkit';
 import { omit, pick } from 'es-toolkit/compat';
 import { changeBoardModalSliceConfig } from 'features/changeBoardModal/store/slice';
-import { canvasSettingsSliceConfig } from 'features/controlLayers/store/canvasSettingsSlice';
+import { canvasSettingsReducer, canvasSettingsSliceConfig } from 'features/controlLayers/store/canvasSettingsSlice';
 import { canvasSliceConfig, migrateCanvas, undoableCanvasesReducer } from 'features/controlLayers/store/canvasSlice';
 import { canvasSessionSliceConfig } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { lorasSliceConfig } from 'features/controlLayers/store/lorasSlice';
@@ -89,7 +89,7 @@ const SLICE_CONFIGS = {
 const ALL_REDUCERS = {
   [api.reducerPath]: api.reducer,
   [canvasSessionSliceConfig.slice.reducerPath]: canvasSessionSliceConfig.slice.reducer,
-  [canvasSettingsSliceConfig.slice.reducerPath]: canvasSettingsSliceConfig.slice.reducer,
+  [canvasSettingsSliceConfig.slice.reducerPath]: canvasSettingsReducer,
   [canvasSliceConfig.slice.reducerPath]: undoableCanvasesReducer,
   [changeBoardModalSliceConfig.slice.reducerPath]: changeBoardModalSliceConfig.slice.reducer,
   [configSliceConfig.slice.reducerPath]: configSliceConfig.slice.reducer,
