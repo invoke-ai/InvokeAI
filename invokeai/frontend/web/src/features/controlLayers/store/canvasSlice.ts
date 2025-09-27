@@ -1,4 +1,4 @@
-import type { CaseReducer, PayloadAction, UnknownAction } from '@reduxjs/toolkit';
+import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { AppDispatch, RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
@@ -142,8 +142,8 @@ const getInitialCanvasesState = (): CanvasesStateWithoutHistory => {
 
   return {
     _version: 4,
-    selectedCanvasId: canvasId,
-    canvases: [canvas],
+    activeCanvasId: canvasId,
+    canvases: { [canvasId]: canvas },
   };
 };
 
@@ -152,7 +152,9 @@ const getInitialCanvasesHistoryState = (): CanvasesStateWithHistory => {
 
   return {
     ...state,
-    canvases: state.canvases.map((canvas) => newHistory([], canvas, [])),
+    canvases: Object.fromEntries(
+      Object.entries(state.canvases).map(([canvasId, canvas]) => [canvasId, newHistory([], canvas, [])])
+    ),
   };
 };
 
@@ -165,72 +167,79 @@ const getNextCanvasName = (canvases: CanvasStateWithHistory[]): string => {
   }
 };
 
+type PayloadWithCanvasId<P> = P & { canvasId: string };
+type PayloadActionWithCanvasId<P> = PayloadAction<PayloadWithCanvasId<P>>;
+
 const canvasesSlice = createSlice({
   name: 'canvas',
   initialState: getInitialCanvasesHistoryState(),
   reducers: {
     canvasAdded: {
-      reducer: (state, action: PayloadAction<{ id: string; isSelected?: boolean }>) => {
-        const { id, isSelected } = action.payload;
+      reducer: (state, action: PayloadActionWithCanvasId<{ isSelected?: boolean }>) => {
+        const { canvasId, isSelected } = action.payload;
 
-        const name = getNextCanvasName(state.canvases);
-        const canvas = getInitialCanvasHistoryState(id, name);
-        state.canvases.push(canvas);
+        const name = getNextCanvasName(Object.values(state.canvases));
+        const canvas = getInitialCanvasHistoryState(canvasId, name);
+
+        state.canvases[canvasId] = canvas;
 
         if (isSelected) {
-          state.selectedCanvasId = id;
+          state.activeCanvasId = canvasId;
         }
       },
       prepare: (payload: { isSelected?: boolean }) => {
         return {
-          payload: { ...payload, id: getPrefixedId('canvas') },
+          payload: { ...payload, canvasId: getPrefixedId('canvas') },
         };
       },
     },
-    canvasCreated: (_state, _action: PayloadAction<{ id: string }>) => {},
+    canvasCreated: (_state, _action: PayloadActionWithCanvasId<unknown>) => {},
     canvasMigrated: (state) => {
       delete state.migration;
     },
-    canvasMultiCanvasMigrated: (_state, _action: PayloadAction<{ id: string }>) => {},
-    canvasSelected: (state, action: PayloadAction<{ id: string }>) => {
-      const { id } = action.payload;
+    canvasMultiCanvasMigrated: (_state, _action: PayloadActionWithCanvasId<unknown>) => {},
+    canvasActivated: (state, action: PayloadActionWithCanvasId<unknown>) => {
+      const { canvasId } = action.payload;
 
-      const canvas = state.canvases.find((canvas) => canvas.present.id === id)?.present;
+      const canvas = state.canvases[canvasId]?.present;
       if (!canvas) {
         return;
       }
 
-      state.selectedCanvasId = canvas.id;
+      state.activeCanvasId = canvas.id;
     },
-    canvasDeleted: (state, action: PayloadAction<{ id: string }>) => {
-      const { id } = action.payload;
+    canvasDeleted: (state, action: PayloadActionWithCanvasId<unknown>) => {
+      const { canvasId } = action.payload;
+      const canvasIds = Object.keys(state.canvases);
 
-      if (state.canvases.length === 1) {
+      const canvas = state.canvases[canvasId]?.present;
+      if (!canvas) {
+        return;
+      }
+
+      if (canvasIds.length === 1) {
         throw new Error('Last canvas cannot be deleted');
       }
 
-      const index = state.canvases.findIndex((canvas) => canvas.present.id === id);
-      const nextIndex = (index + 1) % state.canvases.length;
+      const index = canvasIds.indexOf(canvas.id);
+      const nextIndex = index > 0 ? index - 1 : index + 1;
 
-      state.selectedCanvasId = state.canvases[nextIndex]!.present.id;
-      state.canvases = state.canvases.filter((canvas) => canvas.present.id !== id);
+      state.activeCanvasId = canvasIds[nextIndex]!;
+      delete state.canvases[canvas.id];
     },
-    canvasRemoved: (_state, _action: PayloadAction<{ id: string }>) => {},
+    canvasRemoved: (_state, _action: PayloadActionWithCanvasId<unknown>) => {},
   },
 });
-
-type WithId<P> = P & { id: string };
-type IdCaseReducer<S, P> = CaseReducer<S, PayloadAction<WithId<P>>>;
 
 const canvasSlice = createSlice({
   name: 'canvas',
   initialState: {} as CanvasState,
   reducers: {
-    canvasNameChanged: ((state, action: PayloadAction<{ name: string }>) => {
+    canvasNameChanged: (state, action: PayloadActionWithCanvasId<{ name: string }>) => {
       const { name } = action.payload;
 
       state.name = name;
-    }) as IdCaseReducer<CanvasState, { name: string }>,
+    },
     //#region Raster layers
     rasterLayerAdjustmentsSet: (
       state,
@@ -1877,8 +1886,8 @@ export const addCanvas = (payload: { isSelected?: boolean }) => (dispatch: AppDi
   const action = canvasesSlice.actions.canvasAdded(payload);
   dispatch(action);
 
-  const { id } = action.payload;
-  dispatch(canvasesSlice.actions.canvasCreated({ id }));
+  const { canvasId } = action.payload;
+  dispatch(canvasesSlice.actions.canvasCreated({ canvasId }));
 };
 
 export const MIGRATION_MULTI_CANVAS_ID_PLACEHOLDER = 'multi-canvas-id-placeholder';
@@ -1887,13 +1896,13 @@ export const migrateCanvas = () => (dispatch: AppDispatch, getState: () => RootS
   const state = getState();
 
   if (state.canvas.migration?.isMultiCanvasMigrationPending) {
-    dispatch(canvasesSlice.actions.canvasMultiCanvasMigrated({ id: state.canvas.canvases[0]!.present.id }));
+    dispatch(canvasesSlice.actions.canvasMultiCanvasMigrated({ canvasId: Object.keys(state.canvas.canvases)[0]! }));
   }
 
   dispatch(canvasesSlice.actions.canvasMigrated());
 };
 
-export const deleteCanvas = (payload: { id: string }) => (dispatch: AppDispatch) => {
+export const deleteCanvas = (payload: { canvasId: string }) => (dispatch: AppDispatch) => {
   dispatch(canvasesSlice.actions.canvasDeleted(payload));
   dispatch(canvasesSlice.actions.canvasRemoved(payload));
 };
@@ -1903,7 +1912,7 @@ export const {
   canvasCreated,
   canvasMultiCanvasMigrated,
   canvasRemoved,
-  canvasSelected,
+  canvasActivated,
 } = canvasesSlice.actions;
 
 export const {
@@ -2040,12 +2049,24 @@ export const undoableCanvasesReducer = (
     return state;
   }
 
+  const canvasId = isPayloadActionWithCanvasId(action) ? action.payload.canvasId : state.activeCanvasId;
+
   return {
     ...state,
-    canvases: state.canvases.map((c) =>
-      c.present.id === state.selectedCanvasId ? undoableCanvasReducer(c, action) : c
-    ),
+    canvases: {
+      ...state.canvases,
+      [canvasId]: undoableCanvasReducer(state.canvases[canvasId], action),
+    },
   };
+};
+
+const isPayloadActionWithCanvasId = (action: UnknownAction): action is PayloadActionWithCanvasId<unknown> => {
+  return (
+    typeof action.payload === 'object' &&
+    action.payload !== null &&
+    'canvasId' in action.payload &&
+    typeof (action.payload as { canvasId: unknown }).canvasId === 'string'
+  );
 };
 
 export const canvasSliceConfig: SliceConfig<
@@ -2072,8 +2093,8 @@ export const canvasSliceConfig: SliceConfig<
 
         state = {
           _version: 4,
-          selectedCanvasId: canvas.id,
-          canvases: [canvas],
+          activeCanvasId: canvas.id,
+          canvases: { [canvasId]: canvas },
           migration: {
             isMultiCanvasMigrationPending: true,
           },
@@ -2086,16 +2107,20 @@ export const canvasSliceConfig: SliceConfig<
 
       return {
         _version: canvasesState._version,
-        selectedCanvasId: canvasesState.selectedCanvasId,
-        canvases: canvasesState.canvases.map((canvas) => newHistory([], canvas, [])),
+        activeCanvasId: canvasesState.activeCanvasId,
+        canvases: Object.fromEntries(
+          Object.entries(canvasesState.canvases).map(([canvasId, canvas]) => [canvasId, newHistory([], canvas, [])])
+        ),
         migration: canvasesState.migration,
       };
     },
     unwrapState: (state) => {
       return {
         _version: state._version,
-        selectedCanvasId: state.selectedCanvasId,
-        canvases: state.canvases.map((canvas) => canvas.present),
+        activeCanvasId: state.activeCanvasId,
+        canvases: Object.fromEntries(
+          Object.entries(state.canvases).map(([canvasId, canvas]) => [canvasId, canvas.present])
+        ),
         migration: state.migration,
       };
     },

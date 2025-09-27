@@ -7,21 +7,21 @@ import { memo, useCallback, useRef } from 'react';
 import { PiPencilBold } from 'react-icons/pi';
 
 interface CanvasTabEditableTitleProps {
-  id: string;
+  canvasId: string;
   name: string;
-  isSelected: boolean;
+  isActive: boolean;
 }
 
-export const CanvasTabEditableTitle = memo(({ id, name, isSelected }: CanvasTabEditableTitleProps) => {
+export const CanvasTabEditableTitle = memo(({ canvasId, name, isActive }: CanvasTabEditableTitleProps) => {
   const dispatch = useAppDispatch();
   const isHovering = useBoolean(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const onChange = useCallback(
     (value: string) => {
-      dispatch(canvasNameChanged({ id, name: value }));
+      dispatch(canvasNameChanged({ canvasId, name: value }));
     },
-    [dispatch, id]
+    [dispatch, canvasId]
   );
 
   const editable = useEditable({
@@ -39,7 +39,7 @@ export const CanvasTabEditableTitle = memo(({ id, name, isSelected }: CanvasTabE
           size="sm"
           fontWeight="semibold"
           userSelect="none"
-          color={isSelected ? 'base.100' : 'base.300'}
+          color={isActive ? 'base.100' : 'base.300'}
           onDoubleClick={editable.startEditing}
           cursor="text"
           noOfLines={1}

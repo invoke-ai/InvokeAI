@@ -9,8 +9,8 @@ import { useEntityTitle } from 'features/controlLayers/hooks/useEntityTitle';
 import { useEntityTypeIsHidden } from 'features/controlLayers/hooks/useEntityTypeIsHidden';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import {
+  selectActiveCanvas,
   selectEntityOrThrow,
-  selectSelectedCanvas,
   selectSelectedEntityIdentifier,
 } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
@@ -32,13 +32,13 @@ type AlertData = {
 
 const buildSelectIsEnabled = (entityIdentifier: CanvasEntityIdentifier) =>
   createSelector(
-    selectSelectedCanvas,
+    selectActiveCanvas,
     (canvas) => selectEntityOrThrow(canvas, entityIdentifier, 'CanvasAlertsSelectedEntityStatusContent').isEnabled
   );
 
 const buildSelectIsLocked = (entityIdentifier: CanvasEntityIdentifier) =>
   createSelector(
-    selectSelectedCanvas,
+    selectActiveCanvas,
     (canvas) => selectEntityOrThrow(canvas, entityIdentifier, 'CanvasAlertsSelectedEntityStatusContent').isLocked
   );
 

@@ -9,9 +9,9 @@ import { loraIsEnabledChanged } from 'features/controlLayers/store/lorasSlice';
 import { modelChanged, syncedToOptimalDimension, vaeSelected } from 'features/controlLayers/store/paramsSlice';
 import { refImageModelChanged, selectReferenceImageEntities } from 'features/controlLayers/store/refImagesSlice';
 import {
+  selectActiveCanvas,
   selectAllEntitiesOfType,
   selectBboxModelBase,
-  selectSelectedCanvas,
 } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { modelSelected } from 'features/parameters/store/actions';
@@ -121,7 +121,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         const newRegionalRefImageModel = selectRegionalRefImageModels(state)[0] ?? null;
 
         // All regional guidance entities are updated to use the same new model.
-        const canvasState = selectSelectedCanvas(state);
+        const canvasState = selectActiveCanvas(state);
         const canvasRegionalGuidanceEntities = selectAllEntitiesOfType(canvasState, 'regional_guidance');
         for (const entity of canvasRegionalGuidanceEntities) {
           for (const refImage of entity.referenceImages) {

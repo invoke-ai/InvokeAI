@@ -3,7 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useCanvasId } from 'features/controlLayers/hooks/useCanvasId';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { $canvasManagers } from 'features/controlLayers/store/ephemeral';
-import { selectSelectedCanvasId } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvasId } from 'features/controlLayers/store/selectors';
 import type { PropsWithChildren } from 'react';
 import { createContext, memo } from 'react';
 import { assert } from 'tsafe';
@@ -12,7 +12,7 @@ const CanvasManagerContext = createContext<{ [canvasId: string]: CanvasManager }
 
 export const CanvasManagerProviderGate = memo(({ children }: PropsWithChildren) => {
   const canvasManagers = useStore($canvasManagers);
-  const selectedCanvasId = useAppSelector(selectSelectedCanvasId);
+  const selectedCanvasId = useAppSelector(selectActiveCanvasId);
 
   if (Object.keys(canvasManagers).length === 0 || !canvasManagers[selectedCanvasId]) {
     return null;

@@ -14,7 +14,7 @@ import {
   canvasRemoved,
   MIGRATION_MULTI_CANVAS_ID_PLACEHOLDER,
 } from './canvasSlice';
-import { selectSelectedCanvasId } from './selectors';
+import { selectActiveCanvasId } from './selectors';
 
 const zCanvasSessionState = z.object({
   canvasId: z.string(),
@@ -82,18 +82,18 @@ const slice = createSlice({
   },
   extraReducers(builder) {
     builder.addCase(canvasCreated, (state, action) => {
-      const session = getInitialCanvasSessionState(action.payload.id);
+      const session = getInitialCanvasSessionState(action.payload.canvasId);
       state.sessions.push(session);
     });
     builder.addCase(canvasRemoved, (state, action) => {
-      state.sessions = state.sessions.filter((session) => session.canvasId !== action.payload.id);
+      state.sessions = state.sessions.filter((session) => session.canvasId !== action.payload.canvasId);
     });
     builder.addCase(canvasMultiCanvasMigrated, (state, action) => {
       const session = state.sessions.find((session) => session.canvasId === MIGRATION_MULTI_CANVAS_ID_PLACEHOLDER);
       if (!session) {
         return;
       }
-      session.canvasId = action.payload.id;
+      session.canvasId = action.payload.canvasId;
     });
   },
 });
@@ -136,7 +136,7 @@ const findSessionByCanvasId = (sessions: CanvasSessionState[], canvasId: string)
 export const selectCanvasSessionByCanvasId = (state: RootState, canvasId: string) =>
   findSessionByCanvasId(state.canvasSession.sessions, canvasId);
 const selectSelectedCanvasSession = (state: RootState) => {
-  const canvasId = selectSelectedCanvasId(state);
+  const canvasId = selectActiveCanvasId(state);
   return findSessionByCanvasId(state.canvasSession.sessions, canvasId);
 };
 export const selectCanvasSessionId = (state: RootState, canvasId: string) => {

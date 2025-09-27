@@ -31,10 +31,10 @@ import {
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSessionByCanvasId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
+  selectActiveCanvas,
   selectAllRenderableEntities,
   selectBbox,
   selectGridSize,
-  selectSelectedCanvas,
 } from 'features/controlLayers/store/selectors';
 import type {
   CanvasState,
@@ -128,7 +128,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * The state is stored in redux.
    */
   getCanvasState = (): CanvasState => {
-    return this.runSelector(selectSelectedCanvas);
+    return this.runSelector(selectActiveCanvas);
   };
 
   /**

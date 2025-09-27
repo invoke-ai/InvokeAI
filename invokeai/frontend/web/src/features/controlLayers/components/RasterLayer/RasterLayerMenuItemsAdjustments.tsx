@@ -3,7 +3,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { rasterLayerAdjustmentsCancel, rasterLayerAdjustmentsSet } from 'features/controlLayers/store/canvasSlice';
-import { selectSelectedCanvas } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas } from 'features/controlLayers/store/selectors';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { makeDefaultRasterLayerAdjustments } from 'features/controlLayers/store/util';
 import { memo, useCallback, useMemo } from 'react';
@@ -15,7 +15,7 @@ export const RasterLayerMenuItemsAdjustments = memo(() => {
   const entityIdentifier = useEntityIdentifierContext<'raster_layer'>();
   const { t } = useTranslation();
   const selectRasterLayer = useMemo(() => {
-    return createSelector(selectSelectedCanvas, (canvas) =>
+    return createSelector(selectActiveCanvas, (canvas) =>
       canvas.rasterLayers.entities.find((e: CanvasRasterLayerState) => e.id === entityIdentifier.id)
     );
   }, [entityIdentifier]);
