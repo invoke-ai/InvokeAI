@@ -2,11 +2,11 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
+  selectActiveCanvas,
   selectControlLayerEntities,
   selectInpaintMaskEntities,
   selectRasterLayerEntities,
   selectRegionalGuidanceEntities,
-  selectSelectedCanvas,
 } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
@@ -54,7 +54,7 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
       this.manager.stateApi.createStoreSubscription(selectRegionalGuidanceEntities, this.createNewRegionalGuidance)
     );
 
-    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectSelectedCanvas, this.arrangeEntities));
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectActiveCanvas, this.arrangeEntities));
   }
 
   initialize = () => {
@@ -63,7 +63,7 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
     this.createNewControlLayers(this.manager.stateApi.runSelector(selectControlLayerEntities));
     this.createNewRegionalGuidance(this.manager.stateApi.runSelector(selectRegionalGuidanceEntities));
     this.createNewInpaintMasks(this.manager.stateApi.runSelector(selectInpaintMaskEntities));
-    this.arrangeEntities(this.manager.stateApi.runSelector(selectSelectedCanvas), null);
+    this.arrangeEntities(this.manager.stateApi.runSelector(selectActiveCanvas), null);
   };
 
   createNewRasterLayers = (entities: CanvasRasterLayerState[]) => {

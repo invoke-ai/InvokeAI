@@ -9,7 +9,7 @@ import {
   entityArrangedToBack,
   entityArrangedToFront,
 } from 'features/controlLayers/store/canvasSlice';
-import { selectSelectedCanvas } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier, CanvasState } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -54,7 +54,7 @@ export const CanvasEntityMenuItemsArrange = memo(() => {
   const isBusy = useCanvasIsBusy();
   const selectValidActions = useMemo(
     () =>
-      createMemoizedSelector(selectSelectedCanvas, (canvas) => {
+      createMemoizedSelector(selectActiveCanvas, (canvas) => {
         const { index, count } = getIndexAndCount(canvas, entityIdentifier);
         return {
           canMoveForwardOne: index < count - 1,

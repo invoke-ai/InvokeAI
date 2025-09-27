@@ -19,7 +19,7 @@ import { Transform } from 'features/controlLayers/components/Transform/Transform
 import { CanvasInstanceContextProvider } from 'features/controlLayers/contexts/CanvasInstanceContextProvider';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
-import { selectSelectedCanvasId } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvasId } from 'features/controlLayers/store/selectors';
 import { memo, useCallback } from 'react';
 import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
 
@@ -119,7 +119,7 @@ const Canvas = memo(({ canvasId }: CanvasProps) => {
 Canvas.displayName = 'Canvas';
 
 export const CanvasWorkspacePanel = memo(() => {
-  const canvasId = useAppSelector(selectSelectedCanvasId);
+  const canvasId = useAppSelector(selectActiveCanvasId);
 
   return (
     <Flex

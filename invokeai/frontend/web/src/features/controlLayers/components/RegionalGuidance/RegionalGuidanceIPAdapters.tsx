@@ -4,7 +4,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { RegionalGuidanceIPAdapterSettings } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceIPAdapterSettings';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { selectEntityOrThrow, selectSelectedCanvas } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import { Fragment, memo, useMemo } from 'react';
 
 export const RegionalGuidanceIPAdapters = memo(() => {
@@ -12,7 +12,7 @@ export const RegionalGuidanceIPAdapters = memo(() => {
 
   const selectIPAdapterIds = useMemo(
     () =>
-      createMemoizedSelector(selectSelectedCanvas, (canvas) => {
+      createMemoizedSelector(selectActiveCanvas, (canvas) => {
         const ipAdapterIds = selectEntityOrThrow(
           canvas,
           entityIdentifier,

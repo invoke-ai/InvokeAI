@@ -1,10 +1,10 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { useScopedCanvasIdSafe } from 'features/controlLayers/contexts/CanvasInstanceContextProvider';
-import { selectSelectedCanvasId } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvasId } from 'features/controlLayers/store/selectors';
 
 export const useCanvasId = () => {
   const scopedCanvasId = useScopedCanvasIdSafe();
-  const canvasId = useAppSelector(selectSelectedCanvasId);
+  const canvasId = useAppSelector(selectActiveCanvasId);
 
   return scopedCanvasId ?? canvasId;
 };

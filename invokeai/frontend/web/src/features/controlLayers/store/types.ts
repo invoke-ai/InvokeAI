@@ -831,8 +831,8 @@ const zCanvasesStateMigration = z.object({
 const zCanvasesState = <T extends z.ZodTypeAny>(canvasStateSchema: T) =>
   z.object({
     _version: z.literal(4),
-    selectedCanvasId: zId,
-    canvases: z.array(canvasStateSchema),
+    activeCanvasId: zId,
+    canvases: z.record(zId, canvasStateSchema),
     migration: zCanvasesStateMigration.optional(),
   });
 export const zCanvasesStateWithHistory = zCanvasesState(zCanvasStateWithHistory);

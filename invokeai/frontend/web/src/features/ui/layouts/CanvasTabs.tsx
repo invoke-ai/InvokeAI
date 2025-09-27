@@ -1,7 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { addCanvas, canvasSelected, deleteCanvas } from 'features/controlLayers/store/canvasSlice';
+import { addCanvas, canvasActivated, deleteCanvas } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvases } from 'features/controlLayers/store/selectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -37,17 +37,17 @@ const AddCanvasButton = memo(() => {
 AddCanvasButton.displayName = 'AddCanvasButton';
 
 interface CloseCanvasButtonProps {
-  id: string;
+  canvasId: string;
   canDelete: boolean;
 }
 
-const CloseCanvasButton = memo(({ id, canDelete }: CloseCanvasButtonProps) => {
+const CloseCanvasButton = memo(({ canvasId, canDelete }: CloseCanvasButtonProps) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
   const onClick = useCallback(() => {
-    dispatch(deleteCanvas({ id }));
-  }, [dispatch, id]);
+    dispatch(deleteCanvas({ canvasId }));
+  }, [dispatch, canvasId]);
 
   return (
     <IconButton
@@ -68,18 +68,18 @@ CloseCanvasButton.displayName = 'CloseCanvasButton';
 interface CanvasTabProps {
   id: string;
   name: string;
-  isSelected: boolean;
+  isActive: boolean;
   canDelete: boolean;
 }
 
-const CanvasTab = memo(({ id, name, isSelected, canDelete }: CanvasTabProps) => {
+const CanvasTab = memo(({ id, name, isActive, canDelete }: CanvasTabProps) => {
   const dispatch = useAppDispatch();
 
   const onClick = useCallback(() => {
-    if (!isSelected) {
-      dispatch(canvasSelected({ id }));
+    if (!isActive) {
+      dispatch(canvasActivated({ canvasId: id }));
     }
-  }, [dispatch, id, isSelected]);
+  }, [dispatch, id, isActive]);
 
   return (
     <Box position="relative" w="full" h={8}>
@@ -92,16 +92,16 @@ const CanvasTab = memo(({ id, name, isSelected, canDelete }: CanvasTabProps) => 
         ps={1}
         pe={1}
         gap={4}
-        bg={isSelected ? 'base.650' : 'base.850'}
+        bg={isActive ? 'base.650' : 'base.850'}
         _hover={_hover}
         w="full"
         h="full"
       >
         <Flex flex={1} justifyContent="center">
-          <CanvasTabEditableTitle id={id} name={name} isSelected={isSelected} />
+          <CanvasTabEditableTitle canvasId={id} name={name} isActive={isActive} />
         </Flex>
         <Flex justifyContent="flex-end">
-          <CloseCanvasButton id={id} canDelete={canDelete} />
+          <CloseCanvasButton canvasId={id} canDelete={canDelete} />
         </Flex>
       </Flex>
     </Box>
@@ -115,8 +115,8 @@ export const CanvasTabs = () => {
   return (
     <Flex w="full" gap={2} alignItems="center" px={2}>
       <AddCanvasButton />
-      {canvases.map(({ id, name, isSelected, canDelete }) => (
-        <CanvasTab key={id} id={id} name={name} isSelected={isSelected} canDelete={canDelete} />
+      {canvases.map(({ id, name, isActive, canDelete }) => (
+        <CanvasTab key={id} id={id} name={name} isActive={isActive} canDelete={canDelete} />
       ))}
     </Flex>
   );

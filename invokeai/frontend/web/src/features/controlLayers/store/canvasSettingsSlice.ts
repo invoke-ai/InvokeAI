@@ -277,18 +277,18 @@ const slice = createSlice({
   },
   extraReducers(builder) {
     builder.addCase(canvasCreated, (state, action) => {
-      const canvasSettings = getInitialCanvasInstanceSettingsState(action.payload.id);
+      const canvasSettings = getInitialCanvasInstanceSettingsState(action.payload.canvasId);
       state.canvases.push(canvasSettings);
     });
     builder.addCase(canvasRemoved, (state, action) => {
-      state.canvases = state.canvases.filter((settings) => settings.canvasId !== action.payload.id);
+      state.canvases = state.canvases.filter((settings) => settings.canvasId !== action.payload.canvasId);
     });
     builder.addCase(canvasMultiCanvasMigrated, (state, action) => {
       const settings = state.canvases.find((settings) => settings.canvasId === MIGRATION_MULTI_CANVAS_ID_PLACEHOLDER);
       if (!settings) {
         return;
       }
-      settings.canvasId = action.payload.id;
+      settings.canvasId = action.payload.canvasId;
     });
   },
 });

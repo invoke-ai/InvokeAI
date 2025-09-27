@@ -11,7 +11,7 @@ import {
   selectRefinerModel,
   selectRefinerStart,
 } from 'features/controlLayers/store/paramsSlice';
-import { selectSelectedCanvas } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas } from 'features/controlLayers/store/selectors';
 import type { ParamsState } from 'features/controlLayers/store/types';
 import type { BoardField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
@@ -124,7 +124,7 @@ export const getOriginalAndScaledSizesForTextToImage = (state: RootState) => {
   const params = selectParamsSlice(state);
 
   if (tab === 'canvas') {
-    const canvas = selectSelectedCanvas(state);
+    const canvas = selectActiveCanvas(state);
     const { rect, aspectRatio } = canvas.bbox;
     const { width, height } = rect;
     const originalSize = { width, height };
@@ -147,7 +147,7 @@ export const getOriginalAndScaledSizesForOtherModes = (state: RootState) => {
 
   assert(tab === 'canvas', `Cannot get sizes for tab ${tab} - this function is only for the Canvas tab`);
 
-  const canvas = selectSelectedCanvas(state);
+  const canvas = selectActiveCanvas(state);
   const { rect, aspectRatio } = canvas.bbox;
   const { width, height } = rect;
   const originalSize = { width, height };
