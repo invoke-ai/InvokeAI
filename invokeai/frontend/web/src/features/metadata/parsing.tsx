@@ -10,6 +10,7 @@ import { loraAllDeleted, loraRecalled } from 'features/controlLayers/store/loras
 import {
   heightChanged,
   negativePromptChanged,
+  paramsDispatch,
   positivePromptChanged,
   refinerModelChanged,
   selectBase,
@@ -276,7 +277,7 @@ const PositivePrompt: SingleMetadataHandler<ParameterPositivePrompt> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(positivePromptChanged(value));
+    paramsDispatch(store, positivePromptChanged, value);
   },
   i18nKey: 'metadata.positivePrompt',
   LabelComponent: MetadataLabel,
@@ -296,7 +297,7 @@ const NegativePrompt: SingleMetadataHandler<ParameterNegativePrompt> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(negativePromptChanged(value || null));
+    paramsDispatch(store, negativePromptChanged, value);
   },
   i18nKey: 'metadata.negativePrompt',
   LabelComponent: MetadataLabel,
@@ -316,7 +317,7 @@ const CFGScale: SingleMetadataHandler<ParameterCFGScale> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(setCfgScale(value));
+    paramsDispatch(store, setCfgScale, value);
   },
   i18nKey: 'metadata.cfgScale',
   LabelComponent: MetadataLabel,
@@ -334,7 +335,7 @@ const CFGRescaleMultiplier: SingleMetadataHandler<ParameterCFGRescaleMultiplier>
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(setCfgRescaleMultiplier(value));
+    paramsDispatch(store, setCfgRescaleMultiplier, value);
   },
   i18nKey: 'metadata.cfgRescaleMultiplier',
   LabelComponent: MetadataLabel,
@@ -354,7 +355,7 @@ const CLIPSkip: SingleMetadataHandler<ParameterCLIPSkip> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(setClipSkip(value));
+    paramsDispatch(store, setClipSkip, value);
   },
   i18nKey: 'metadata.clipSkip',
   LabelComponent: MetadataLabel,
@@ -372,7 +373,7 @@ const Guidance: SingleMetadataHandler<ParameterGuidance> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(setGuidance(value));
+    paramsDispatch(store, setGuidance, value);
   },
   i18nKey: 'metadata.guidance',
   LabelComponent: MetadataLabel,
@@ -390,7 +391,7 @@ const Scheduler: SingleMetadataHandler<ParameterScheduler> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(setScheduler(value));
+    paramsDispatch(store, setScheduler, value);
   },
   i18nKey: 'metadata.scheduler',
   LabelComponent: MetadataLabel,
@@ -412,7 +413,7 @@ const Width: SingleMetadataHandler<ParameterWidth> = {
     if (activeTab === 'canvas') {
       store.dispatch(bboxWidthChanged({ width: value, updateAspectRatio: true, clamp: true }));
     } else if (activeTab === 'generate') {
-      store.dispatch(widthChanged({ width: value, updateAspectRatio: true, clamp: true }));
+      paramsDispatch(store, widthChanged, { width: value, updateAspectRatio: true, clamp: true });
     }
   },
   i18nKey: 'metadata.width',
@@ -435,7 +436,7 @@ const Height: SingleMetadataHandler<ParameterHeight> = {
     if (activeTab === 'canvas') {
       store.dispatch(bboxHeightChanged({ height: value, updateAspectRatio: true, clamp: true }));
     } else if (activeTab === 'generate') {
-      store.dispatch(heightChanged({ height: value, updateAspectRatio: true, clamp: true }));
+      paramsDispatch(store, heightChanged, { height: value, updateAspectRatio: true, clamp: true });
     }
   },
   i18nKey: 'metadata.height',
@@ -454,7 +455,7 @@ const Seed: SingleMetadataHandler<ParameterSeed> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(setSeed(value));
+    paramsDispatch(store, setSeed, value);
   },
   i18nKey: 'metadata.seed',
   LabelComponent: MetadataLabel,
@@ -472,7 +473,7 @@ const Steps: SingleMetadataHandler<ParameterSteps> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(setSteps(value));
+    paramsDispatch(store, setSteps, value);
   },
   i18nKey: 'metadata.steps',
   LabelComponent: MetadataLabel,
@@ -490,7 +491,7 @@ const DenoisingStrength: SingleMetadataHandler<ParameterStrength> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(setImg2imgStrength(value));
+    paramsDispatch(store, setImg2imgStrength, value);
   },
   i18nKey: 'metadata.strength',
   LabelComponent: MetadataLabel,
@@ -508,7 +509,7 @@ const SeamlessX: SingleMetadataHandler<ParameterSeamlessX> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(setSeamlessXAxis(value));
+    paramsDispatch(store, setSeamlessXAxis, value);
   },
   i18nKey: 'metadata.seamlessXAxis',
   LabelComponent: MetadataLabel,
@@ -526,7 +527,7 @@ const SeamlessY: SingleMetadataHandler<ParameterSeamlessY> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(setSeamlessYAxis(value));
+    paramsDispatch(store, setSeamlessYAxis, value);
   },
   i18nKey: 'metadata.seamlessYAxis',
   LabelComponent: MetadataLabel,
@@ -547,7 +548,7 @@ const RefinerModel: SingleMetadataHandler<ParameterSDXLRefinerModel> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(refinerModelChanged(value));
+    paramsDispatch(store, refinerModelChanged, value);
   },
   i18nKey: 'sdxl.refinermodel',
   LabelComponent: MetadataLabel,
@@ -567,7 +568,7 @@ const RefinerSteps: SingleMetadataHandler<ParameterSteps> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(setRefinerSteps(value));
+    paramsDispatch(store, setRefinerSteps, value);
   },
   i18nKey: 'sdxl.refinerSteps',
   LabelComponent: MetadataLabel,
@@ -585,7 +586,7 @@ const RefinerCFGScale: SingleMetadataHandler<ParameterCFGScale> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(setRefinerCFGScale(value));
+    paramsDispatch(store, setRefinerCFGScale, value);
   },
   i18nKey: 'sdxl.cfgScale',
   LabelComponent: MetadataLabel,
@@ -603,7 +604,7 @@ const RefinerScheduler: SingleMetadataHandler<ParameterScheduler> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(setRefinerScheduler(value));
+    paramsDispatch(store, setRefinerScheduler, value);
   },
   i18nKey: 'sdxl.scheduler',
   LabelComponent: MetadataLabel,
@@ -621,7 +622,7 @@ const RefinerPositiveAestheticScore: SingleMetadataHandler<ParameterSDXLRefinerP
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(setRefinerPositiveAestheticScore(value));
+    paramsDispatch(store, setRefinerPositiveAestheticScore, value);
   },
   i18nKey: 'sdxl.posAestheticScore',
   LabelComponent: MetadataLabel,
@@ -641,7 +642,7 @@ const RefinerNegativeAestheticScore: SingleMetadataHandler<ParameterSDXLRefinerN
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(setRefinerNegativeAestheticScore(value));
+    paramsDispatch(store, setRefinerNegativeAestheticScore, value);
   },
   i18nKey: 'sdxl.negAestheticScore',
   LabelComponent: MetadataLabel,
@@ -661,7 +662,7 @@ const RefinerDenoisingStart: SingleMetadataHandler<ParameterSDXLRefinerStart> = 
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(setRefinerStart(value));
+    paramsDispatch(store, setRefinerStart, value);
   },
   i18nKey: 'sdxl.refinerStart',
   LabelComponent: MetadataLabel,
@@ -704,7 +705,7 @@ const VAEModel: SingleMetadataHandler<ParameterVAEModel> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(vaeSelected(value));
+    paramsDispatch(store, vaeSelected, value);
   },
   i18nKey: 'metadata.vae',
   LabelComponent: MetadataLabel,

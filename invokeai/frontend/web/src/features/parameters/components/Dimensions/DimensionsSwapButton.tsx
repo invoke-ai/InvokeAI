@@ -1,16 +1,15 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { dimensionsSwapped } from 'features/controlLayers/store/paramsSlice';
+import { dimensionsSwapped, useParamsDispatch } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsDownUpBold } from 'react-icons/pi';
 
 export const DimensionsSwapButton = memo(() => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
+  const dispatchParams = useParamsDispatch();
   const onClick = useCallback(() => {
-    dispatch(dimensionsSwapped());
-  }, [dispatch]);
+    dispatchParams(dimensionsSwapped);
+  }, [dispatchParams]);
   return (
     <IconButton
       tooltip={t('parameters.swapDimensions')}

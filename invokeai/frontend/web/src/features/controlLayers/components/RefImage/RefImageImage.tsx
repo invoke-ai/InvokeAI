@@ -6,7 +6,7 @@ import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { UploadImageIconButton } from 'common/hooks/useImageUploadButton';
 import { useCanvasIsStaging } from 'features/controlLayers/hooks/useCanvasIsStaging';
 import { bboxSizeOptimized, bboxSizeRecalled } from 'features/controlLayers/store/canvasSlice';
-import { sizeOptimized, sizeRecalled } from 'features/controlLayers/store/paramsSlice';
+import { sizeOptimized, sizeRecalled, useParamsDispatch } from 'features/controlLayers/store/paramsSlice';
 import type { CroppableImageWithDims } from 'features/controlLayers/store/types';
 import { imageDTOToCroppableImage, imageDTOToImageWithDims } from 'features/controlLayers/store/util';
 import { Editor } from 'features/cropper/lib/editor';
@@ -39,6 +39,7 @@ export const RefImageImage = memo(
   }: Props<T>) => {
     const { t } = useTranslation();
     const store = useAppStore();
+    const paramsDispatch = useParamsDispatch();
     const isConnected = useStore($isConnected);
     const tab = useAppSelector(selectActiveTab);
     const isStaging = useCanvasIsStaging();
@@ -77,10 +78,10 @@ export const RefImageImage = memo(
         store.dispatch(bboxSizeRecalled({ width, height }));
         store.dispatch(bboxSizeOptimized());
       } else if (tab === 'generate') {
-        store.dispatch(sizeRecalled({ width, height }));
-        store.dispatch(sizeOptimized());
+        paramsDispatch(sizeRecalled, { width, height });
+        paramsDispatch(sizeOptimized);
       }
-    }, [imageDTO, isStaging, store, tab]);
+    }, [paramsDispatch, imageDTO, isStaging, store, tab]);
 
     const edit = useCallback(() => {
       if (!originalImageDTO) {

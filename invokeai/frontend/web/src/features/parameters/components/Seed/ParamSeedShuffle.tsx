@@ -1,21 +1,21 @@
 import { Button } from '@invoke-ai/ui-library';
 import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import randomInt from 'common/util/randomInt';
-import { selectShouldRandomizeSeed, setSeed } from 'features/controlLayers/store/paramsSlice';
+import { selectShouldRandomizeSeed, setSeed, useParamsDispatch } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiShuffleBold } from 'react-icons/pi';
 
 export const ParamSeedShuffle = memo(() => {
-  const dispatch = useAppDispatch();
+  const dispatchParams = useParamsDispatch();
   const shouldRandomizeSeed = useAppSelector(selectShouldRandomizeSeed);
 
   const { t } = useTranslation();
 
   const handleClickRandomizeSeed = useCallback(
-    () => dispatch(setSeed(randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX))),
-    [dispatch]
+    () => dispatchParams(setSeed, randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX)),
+    [dispatchParams]
   );
 
   return (

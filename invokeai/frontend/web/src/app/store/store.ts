@@ -25,7 +25,7 @@ import { canvasSettingsReducer, canvasSettingsSliceConfig } from 'features/contr
 import { canvasSliceConfig, migrateCanvas, undoableCanvasesReducer } from 'features/controlLayers/store/canvasSlice';
 import { canvasSessionSliceConfig } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { lorasSliceConfig } from 'features/controlLayers/store/lorasSlice';
-import { paramsSliceConfig } from 'features/controlLayers/store/paramsSlice';
+import { paramsSliceConfig, paramsSliceReducer } from 'features/controlLayers/store/paramsSlice';
 import { refImagesSliceConfig } from 'features/controlLayers/store/refImagesSlice';
 import { dynamicPromptsSliceConfig } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { gallerySliceConfig } from 'features/gallery/store/gallerySlice';
@@ -98,7 +98,7 @@ const ALL_REDUCERS = {
   [lorasSliceConfig.slice.reducerPath]: lorasSliceConfig.slice.reducer,
   [modelManagerSliceConfig.slice.reducerPath]: modelManagerSliceConfig.slice.reducer,
   [nodesSliceConfig.slice.reducerPath]: undoableNodesSliceReducer,
-  [paramsSliceConfig.slice.reducerPath]: paramsSliceConfig.slice.reducer,
+  [paramsSliceConfig.slice.reducerPath]: paramsSliceReducer,
   [queueSliceConfig.slice.reducerPath]: queueSliceConfig.slice.reducer,
   [refImagesSliceConfig.slice.reducerPath]: refImagesSliceConfig.slice.reducer,
   [stylePresetSliceConfig.slice.reducerPath]: stylePresetSliceConfig.slice.reducer,

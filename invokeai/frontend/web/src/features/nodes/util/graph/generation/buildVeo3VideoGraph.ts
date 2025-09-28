@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveParams } from 'features/controlLayers/store/paramsSlice';
 import { zImageField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
@@ -30,7 +30,7 @@ export const buildVeo3VideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn =>
   assert(model, 'No model selected');
   assert(model.base === 'veo3', 'Selected model is not a Veo3 model');
 
-  const params = selectParamsSlice(state);
+  const params = selectActiveParams(state);
   const videoParams = selectVideoSlice(state);
   const prompts = selectPresetModifiedPrompts(state);
   assert(prompts.positive.length > 0, 'Veo3 video requires positive prompt to have at least one character');

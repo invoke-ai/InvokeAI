@@ -8,10 +8,10 @@ import {
   useToken,
 } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import WavyLine from 'common/components/WavyLine';
-import { selectImg2imgStrength, setImg2imgStrength } from 'features/controlLayers/store/paramsSlice';
+import { selectImg2imgStrength, setImg2imgStrength, useParamsDispatch } from 'features/controlLayers/store/paramsSlice';
 import { selectActiveRasterLayerEntities } from 'features/controlLayers/store/selectors';
 import { selectImg2imgStrengthConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -25,15 +25,15 @@ const selectHasRasterLayersWithContent = createSelector(
 
 export const ParamDenoisingStrength = memo(() => {
   const img2imgStrength = useAppSelector(selectImg2imgStrength);
-  const dispatch = useAppDispatch();
+  const paramsDispatch = useParamsDispatch();
   const hasRasterLayersWithContent = useAppSelector(selectHasRasterLayersWithContent);
   const selectedModelConfig = useSelectedModelConfig();
 
   const onChange = useCallback(
     (v: number) => {
-      dispatch(setImg2imgStrength(v));
+      paramsDispatch(setImg2imgStrength, v);
     },
-    [dispatch]
+    [paramsDispatch]
   );
 
   const config = useAppSelector(selectImg2imgStrengthConfig);

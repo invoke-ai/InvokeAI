@@ -1,19 +1,19 @@
 import { CompositeNumberInput } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { selectIterations, setIterations } from 'features/controlLayers/store/paramsSlice';
+import { selectIterations, setIterations, useParamsDispatch } from 'features/controlLayers/store/paramsSlice';
 import { selectIterationsConfig } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 
 export const QueueIterationsNumberInput = memo(() => {
   const iterations = useAppSelector(selectIterations);
   const config = useAppSelector(selectIterationsConfig);
-  const dispatch = useAppDispatch();
+  const dispatchParams = useParamsDispatch();
   const handleChange = useCallback(
     (v: number) => {
-      dispatch(setIterations(v));
+      dispatchParams(setIterations, v);
     },
-    [dispatch]
+    [dispatchParams]
   );
 
   return (

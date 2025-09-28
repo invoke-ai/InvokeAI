@@ -30,12 +30,8 @@ import {
   rgAdded,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSessionByCanvasId } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import {
-  selectActiveCanvas,
-  selectAllRenderableEntities,
-  selectBbox,
-  selectGridSize,
-} from 'features/controlLayers/store/selectors';
+import { selectGridSize } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveCanvas, selectAllRenderableEntities, selectBbox } from 'features/controlLayers/store/selectors';
 import type {
   CanvasState,
   EntityBrushLineAddedPayload,

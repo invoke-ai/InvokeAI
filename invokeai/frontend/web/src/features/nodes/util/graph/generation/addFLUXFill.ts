@@ -3,7 +3,7 @@ import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { buildSelectCanvasSettingsByCanvasId } from 'features/controlLayers/store/canvasSettingsSlice';
-import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveParams } from 'features/controlLayers/store/paramsSlice';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   getDenoisingStartAndEnd,
@@ -35,7 +35,7 @@ export const addFLUXFill = async ({
   denoise.width = scaledSize.width;
   denoise.height = scaledSize.height;
 
-  const params = selectParamsSlice(state);
+  const params = selectActiveParams(state);
   const canvasSettings = buildSelectCanvasSettingsByCanvasId(manager.canvasId)(state);
 
   const rasterAdapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');

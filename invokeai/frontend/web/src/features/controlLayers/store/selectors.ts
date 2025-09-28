@@ -1,6 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import type {
   CanvasControlLayerState,
   CanvasEntityIdentifier,
@@ -12,7 +11,6 @@ import type {
   CanvasRegionalGuidanceState,
   CanvasState,
 } from 'features/controlLayers/store/types';
-import { getGridSize, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
@@ -97,22 +95,6 @@ export const selectActiveRegionalGuidanceEntities = createSelector(selectRegiona
  * Selects if the canvas has any entities.
  */
 export const selectHasEntities = createSelector(selectEntityCountAll, (count) => count > 0);
-
-/**
- * Selects the optimal dimension for the canvas based on the currently-selected model
- */
-export const selectOptimalDimension = createSelector(selectParamsSlice, (params): number => {
-  const modelBase = params.model?.base;
-  return getOptimalDimension(modelBase ?? null);
-});
-
-/**
- * Selects the grid size for the canvas based on the currently-selected model
- */
-export const selectGridSize = createSelector(selectParamsSlice, (params): number => {
-  const modelBase = params.model?.base;
-  return getGridSize(modelBase ?? null);
-});
 
 /**
  * Selects a single entity from the canvas slice. If the entity identifier is narrowed to a specific type, the

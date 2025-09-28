@@ -2,7 +2,12 @@ import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
-import { positivePromptAddedToHistory, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
+import {
+  paramsDispatch,
+  positivePromptAddedToHistory,
+  selectActiveParams,
+  selectPositivePrompt,
+} from 'features/controlLayers/store/paramsSlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildMultidiffusionUpscaleGraph } from 'features/nodes/util/graph/buildMultidiffusionUpscaleGraph';
 import { useCallback } from 'react';
@@ -18,8 +23,9 @@ const enqueueUpscaling = async (store: AppStore, prepend: boolean) => {
   dispatch(enqueueRequestedUpscaling());
 
   const state = getState();
+  const params = selectActiveParams(state);
 
-  const model = state.params.model;
+  const model = params.model;
   if (!model) {
     log.error('No model found in state');
     return;
@@ -45,7 +51,7 @@ const enqueueUpscaling = async (store: AppStore, prepend: boolean) => {
   const enqueueResult = await req.unwrap();
 
   // Push to prompt history on successful enqueue
-  dispatch(positivePromptAddedToHistory(selectPositivePrompt(state)));
+  paramsDispatch(store, positivePromptAddedToHistory, selectPositivePrompt(state));
 
   return { batchConfig, enqueueResult };
 };

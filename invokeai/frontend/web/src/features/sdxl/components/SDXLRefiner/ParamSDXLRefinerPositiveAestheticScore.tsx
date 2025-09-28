@@ -1,19 +1,23 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import {
   selectRefinerPositiveAestheticScore,
   setRefinerPositiveAestheticScore,
+  useParamsDispatch,
 } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamSDXLRefinerPositiveAestheticScore = () => {
   const refinerPositiveAestheticScore = useAppSelector(selectRefinerPositiveAestheticScore);
-  const dispatch = useAppDispatch();
+  const dispatchParams = useParamsDispatch();
   const { t } = useTranslation();
 
-  const handleChange = useCallback((v: number) => dispatch(setRefinerPositiveAestheticScore(v)), [dispatch]);
+  const handleChange = useCallback(
+    (v: number) => dispatchParams(setRefinerPositiveAestheticScore, v),
+    [dispatchParams]
+  );
 
   return (
     <FormControl>

@@ -5,7 +5,12 @@ import type { AppStore } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
 import { extractMessageFromAssertionError } from 'common/util/extractMessageFromAssertionError';
 import { withResult, withResultAsync } from 'common/util/result';
-import { positivePromptAddedToHistory, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
+import {
+  paramsDispatch,
+  positivePromptAddedToHistory,
+  selectActiveParams,
+  selectPositivePrompt,
+} from 'features/controlLayers/store/paramsSlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildChatGPT4oGraph } from 'features/nodes/util/graph/generation/buildChatGPT4oGraph';
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
@@ -35,8 +40,9 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
   dispatch(enqueueRequestedGenerate());
 
   const state = getState();
+  const params = selectActiveParams(state);
 
-  const model = state.params.model;
+  const model = params.model;
   if (!model) {
     log.error('No model found in state');
     return;
@@ -126,7 +132,7 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
   const enqueueResult = await req.unwrap();
 
   // Push to prompt history on successful enqueue
-  dispatch(positivePromptAddedToHistory(selectPositivePrompt(state)));
+  paramsDispatch(store, positivePromptAddedToHistory, selectPositivePrompt(state));
 
   return { batchConfig, enqueueResult };
 };

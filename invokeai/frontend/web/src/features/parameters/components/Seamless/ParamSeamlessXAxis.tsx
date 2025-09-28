@@ -1,7 +1,7 @@
 import { FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { selectSeamlessXAxis, setSeamlessXAxis } from 'features/controlLayers/store/paramsSlice';
+import { selectSeamlessXAxis, setSeamlessXAxis, useParamsDispatch } from 'features/controlLayers/store/paramsSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,13 +10,13 @@ const ParamSeamlessXAxis = () => {
   const { t } = useTranslation();
   const seamlessXAxis = useAppSelector(selectSeamlessXAxis);
 
-  const dispatch = useAppDispatch();
+  const dispatchParams = useParamsDispatch();
 
   const handleChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
-      dispatch(setSeamlessXAxis(e.target.checked));
+      dispatchParams(setSeamlessXAxis, e.target.checked);
     },
-    [dispatch]
+    [dispatchParams]
   );
 
   return (

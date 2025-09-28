@@ -1,12 +1,13 @@
 import { Box, Flex, Textarea } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { usePersistedTextAreaSize } from 'common/hooks/usePersistedTextareaSize';
 import {
   positivePromptChanged,
   selectModelSupportsNegativePrompt,
   selectPositivePrompt,
   selectPositivePromptHistory,
+  useParamsDispatch,
 } from 'features/controlLayers/store/paramsSlice';
 import { promptGenerationFromImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
@@ -44,6 +45,7 @@ const persistOptions: Parameters<typeof usePersistedTextAreaSize>[2] = {
 
 const usePromptHistory = () => {
   const store = useAppStore();
+  const dispatchParams = useParamsDispatch();
   const history = useAppSelector(selectPositivePromptHistory);
 
   /**
@@ -79,8 +81,8 @@ const usePromptHistory = () => {
       // Shouldn't happen
       return;
     }
-    store.dispatch(positivePromptChanged(newPrompt));
-  }, [history, store]);
+    dispatchParams(positivePromptChanged, newPrompt);
+  }, [dispatchParams, history, store]);
   const next = useCallback(() => {
     if (history.length === 0) {
       // No history, nothing to do
@@ -94,7 +96,7 @@ const usePromptHistory = () => {
     state.historyIdx = state.historyIdx - 1;
     if (state.historyIdx < 0) {
       // Overshot to the "current" stashed prompt
-      store.dispatch(positivePromptChanged(state.stashedPrompt));
+      dispatchParams(positivePromptChanged, state.stashedPrompt);
       // Clear state bc we're back to current prompt
       stateRef.current = null;
       return;
@@ -105,8 +107,8 @@ const usePromptHistory = () => {
       // Shouldn't happen
       return;
     }
-    store.dispatch(positivePromptChanged(newPrompt));
-  }, [history, store]);
+    dispatchParams(positivePromptChanged, newPrompt);
+  }, [dispatchParams, history]);
   const reset = useCallback(() => {
     // Clear stashed state - used when user clicks away or types in the prompt box
     stateRef.current = null;
@@ -115,7 +117,7 @@ const usePromptHistory = () => {
 };
 
 export const ParamPositivePrompt = memo(() => {
-  const dispatch = useAppDispatch();
+  const dispatchParams = useParamsDispatch();
   const prompt = useAppSelector(selectPositivePrompt);
   const viewMode = useAppSelector(selectStylePresetViewMode);
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
@@ -142,12 +144,12 @@ export const ParamPositivePrompt = memo(() => {
   const { t } = useTranslation();
   const handleChange = useCallback(
     (v: string) => {
-      dispatch(positivePromptChanged(v));
+      dispatchParams(positivePromptChanged, v);
       // When the user changes the prompt, reset the prompt history state. This event is not fired when the prompt is
       // changed via the prompt history navigation.
       promptHistoryApi.reset();
     },
-    [dispatch, promptHistoryApi]
+    [dispatchParams, promptHistoryApi]
   );
   const { onChange, isOpen, onClose, onOpen, onSelect, onKeyDown, onFocus } = usePrompt({
     prompt,

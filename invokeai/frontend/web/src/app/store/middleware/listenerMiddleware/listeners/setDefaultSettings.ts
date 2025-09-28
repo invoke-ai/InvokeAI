@@ -7,6 +7,8 @@ import {
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   heightChanged,
+  paramsDispatch,
+  selectActiveParams,
   setCfgRescaleMultiplier,
   setCfgScale,
   setGuidance,
@@ -37,10 +39,11 @@ import { isNonRefinerMainModelConfig } from 'services/api/types';
 export const addSetDefaultSettingsListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: setDefaultSettings,
-    effect: async (action, { dispatch, getState }) => {
+    effect: async (action, api) => {
+      const { dispatch, getState } = api;
       const state = getState();
 
-      const currentModel = state.params.model;
+      const currentModel = selectActiveParams(state).model;
 
       if (!currentModel) {
         return;
@@ -64,56 +67,56 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
           // we store this as "default" within default settings
           // to distinguish it from no default set
           if (vae === 'default') {
-            dispatch(vaeSelected(null));
+            paramsDispatch(api, vaeSelected, null);
           } else {
             const vaeModel = models.find((model) => model.key === vae);
             const result = zParameterVAEModel.safeParse(vaeModel);
             if (!result.success) {
               return;
             }
-            dispatch(vaeSelected(result.data));
+            paramsDispatch(api, vaeSelected, result.data);
           }
         }
 
         if (vae_precision) {
           if (isParameterPrecision(vae_precision)) {
-            dispatch(vaePrecisionChanged(vae_precision));
+            paramsDispatch(api, vaePrecisionChanged, vae_precision);
           }
         }
 
         if (guidance) {
           if (isParameterGuidance(guidance)) {
-            dispatch(setGuidance(guidance));
+            paramsDispatch(api, setGuidance, guidance);
           }
         }
 
         if (cfg_scale) {
           if (isParameterCFGScale(cfg_scale)) {
-            dispatch(setCfgScale(cfg_scale));
+            paramsDispatch(api, setCfgScale, cfg_scale);
           }
         }
 
         if (!isNil(cfg_rescale_multiplier)) {
           if (isParameterCFGRescaleMultiplier(cfg_rescale_multiplier)) {
-            dispatch(setCfgRescaleMultiplier(cfg_rescale_multiplier));
+            paramsDispatch(api, setCfgRescaleMultiplier, cfg_rescale_multiplier);
           }
         } else {
           // Set this to 0 if it doesn't have a default. This value is
           // easy to miss in the UI when users are resetting defaults
           // and leaving it non-zero could lead to detrimental
           // effects.
-          dispatch(setCfgRescaleMultiplier(0));
+          paramsDispatch(api, setCfgRescaleMultiplier, 0);
         }
 
         if (steps) {
           if (isParameterSteps(steps)) {
-            dispatch(setSteps(steps));
+            paramsDispatch(api, setSteps, steps);
           }
         }
 
         if (scheduler) {
           if (isParameterScheduler(scheduler)) {
-            dispatch(setScheduler(scheduler));
+            paramsDispatch(api, setScheduler, scheduler);
           }
         }
         const setSizeOptions = { updateAspectRatio: true, clamp: true };
@@ -125,10 +128,10 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
         const activeTab = selectActiveTab(getState());
         if (activeTab === 'generate') {
           if (isParameterWidth(width)) {
-            dispatch(widthChanged({ width, ...setSizeOptions }));
+            paramsDispatch(api, widthChanged, { width, ...setSizeOptions });
           }
           if (isParameterHeight(height)) {
-            dispatch(heightChanged({ height, ...setSizeOptions }));
+            paramsDispatch(api, heightChanged, { height, ...setSizeOptions });
           }
         }
 

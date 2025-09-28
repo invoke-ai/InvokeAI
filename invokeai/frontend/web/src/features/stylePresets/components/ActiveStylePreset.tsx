@@ -1,6 +1,10 @@
 import { Badge, Flex, IconButton, Spacer, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { negativePromptChanged, positivePromptChanged } from 'features/controlLayers/store/paramsSlice';
+import {
+  negativePromptChanged,
+  positivePromptChanged,
+  useParamsDispatch,
+} from 'features/controlLayers/store/paramsSlice';
 import { usePresetModifiedPrompts } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
 import {
   activeStylePresetIdChanged,
@@ -31,6 +35,7 @@ export const ActiveStylePreset = () => {
   });
 
   const dispatch = useAppDispatch();
+  const dispatchParams = useParamsDispatch();
   const { t } = useTranslation();
 
   const { presetModifiedPositivePrompt, presetModifiedNegativePrompt } = usePresetModifiedPrompts();
@@ -47,12 +52,12 @@ export const ActiveStylePreset = () => {
   const handleFlattenPrompts = useCallback<MouseEventHandler<HTMLButtonElement>>(
     (e) => {
       e.stopPropagation();
-      dispatch(positivePromptChanged(presetModifiedPositivePrompt));
-      dispatch(negativePromptChanged(presetModifiedNegativePrompt));
+      dispatchParams(positivePromptChanged, presetModifiedPositivePrompt);
+      dispatchParams(negativePromptChanged, presetModifiedNegativePrompt);
       dispatch(viewModeChanged(false));
       dispatch(activeStylePresetIdChanged(null));
     },
-    [dispatch, presetModifiedPositivePrompt, presetModifiedNegativePrompt]
+    [dispatch, dispatchParams, presetModifiedPositivePrompt, presetModifiedNegativePrompt]
   );
 
   const handleToggleViewMode = useCallback<MouseEventHandler<HTMLButtonElement>>(

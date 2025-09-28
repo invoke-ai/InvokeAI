@@ -3,7 +3,7 @@ import { Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui-libra
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectIsFLUX, selectIsSD3, selectParamsSlice, selectVAEKey } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveParams, selectIsFLUX, selectIsSD3, selectVAEKey } from 'features/controlLayers/store/paramsSlice';
 import ParamCFGRescaleMultiplier from 'features/parameters/components/Advanced/ParamCFGRescaleMultiplier';
 import ParamCLIPEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPEmbedModelSelect';
 import ParamCLIPGEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPGEmbedModelSelect';
@@ -36,7 +36,7 @@ export const AdvancedSettingsAccordion = memo(() => {
 
   const selectBadges = useMemo(
     () =>
-      createMemoizedSelector([selectParamsSlice, selectIsFLUX], (params, isFLUX) => {
+      createMemoizedSelector([selectActiveParams, selectIsFLUX], (params, isFLUX) => {
         const badges: (string | number)[] = [];
         if (isFLUX) {
           if (vaeConfig) {

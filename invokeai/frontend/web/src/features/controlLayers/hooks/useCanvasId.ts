@@ -4,7 +4,7 @@ import { selectActiveCanvasId } from 'features/controlLayers/store/selectors';
 
 export const useCanvasId = () => {
   const scopedCanvasId = useScopedCanvasIdSafe();
-  const canvasId = useAppSelector(selectActiveCanvasId);
+  const activeCanvasId = useAppSelector(selectActiveCanvasId);
 
-  return scopedCanvasId ?? canvasId;
+  return scopedCanvasId ?? activeCanvasId;
 };

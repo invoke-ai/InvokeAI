@@ -1,3 +1,4 @@
+import type { PayloadAction } from '@reduxjs/toolkit';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import { zMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
@@ -24,6 +25,7 @@ import {
   zParameterT5EncoderModel,
   zParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
+import type { TabName } from 'features/ui/store/uiTypes';
 import type { JsonObject } from 'type-fest';
 import { z } from 'zod';
 
@@ -683,8 +685,14 @@ const zPositivePromptHistory = z
   .array(zParameterPositivePrompt)
   .transform((arr) => arr.slice(0, MAX_POSITIVE_PROMPT_HISTORY));
 
-export const zParamsState = z.object({
-  _version: z.literal(2),
+type EnrichedPayload<T, P> = P extends undefined ? T : T & { value: P };
+
+export const isParamsTab = (tab: TabName) => tab === 'generate' || tab === 'canvas' || tab === 'upscaling';
+type ParamsTabName = 'generate' | 'canvas' | 'upscaling';
+export type ParamsEnrichedPayload<P = undefined> = EnrichedPayload<{ tab: ParamsTabName; canvasId: string }, P>;
+export type ParamsPayloadAction<P = undefined> = PayloadAction<ParamsEnrichedPayload<P>>;
+
+export const zInstanceParamsState = z.object({
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -731,9 +739,22 @@ export const zParamsState = z.object({
   controlLora: zParameterControlLoRAModel.nullable(),
   dimensions: zDimensionsState,
 });
+export type InstanceParamsState = z.infer<typeof zInstanceParamsState>;
+
+const zCanvasInstanceParamsState = zInstanceParamsState.extend({
+  canvasId: zId,
+});
+export type CanvasInstanceParamsState = z.infer<typeof zCanvasInstanceParamsState>;
+
+export const zParamsState = z.object({
+  _version: z.literal(3),
+  generate: zInstanceParamsState,
+  canvases: z.record(z.string(), zCanvasInstanceParamsState),
+  upscaling: zInstanceParamsState,
+});
 export type ParamsState = z.infer<typeof zParamsState>;
-export const getInitialParamsState = (): ParamsState => ({
-  _version: 2,
+
+export const getInitialInstanceParamsState = (): InstanceParamsState => ({
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -783,6 +804,18 @@ export const getInitialParamsState = (): ParamsState => ({
     height: 512,
     aspectRatio: deepClone(DEFAULT_ASPECT_RATIO_CONFIG),
   },
+});
+
+export const getInitialCanvasInstanceParamsState = (canvasId: string): CanvasInstanceParamsState => ({
+  canvasId,
+  ...getInitialInstanceParamsState(),
+});
+
+export const getInitialParamsState = (): ParamsState => ({
+  _version: 3,
+  generate: getInitialInstanceParamsState(),
+  canvases: {},
+  upscaling: getInitialInstanceParamsState(),
 });
 
 const zInpaintMasks = z.object({

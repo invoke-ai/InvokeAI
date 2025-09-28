@@ -1,14 +1,14 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { selectRefinerCFGScale, setRefinerCFGScale } from 'features/controlLayers/store/paramsSlice';
+import { selectRefinerCFGScale, setRefinerCFGScale, useParamsDispatch } from 'features/controlLayers/store/paramsSlice';
 import { selectCFGScaleConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamSDXLRefinerCFGScale = () => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
+  const dispatchParams = useParamsDispatch();
   const refinerCFGScale = useAppSelector(selectRefinerCFGScale);
   const config = useAppSelector(selectCFGScaleConfig);
   const marks = useMemo(
@@ -16,7 +16,7 @@ const ParamSDXLRefinerCFGScale = () => {
     [config.sliderMax, config.sliderMin]
   );
 
-  const onChange = useCallback((v: number) => dispatch(setRefinerCFGScale(v)), [dispatch]);
+  const onChange = useCallback((v: number) => dispatchParams(setRefinerCFGScale, v), [dispatchParams]);
 
   return (
     <FormControl>

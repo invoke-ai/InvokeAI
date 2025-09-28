@@ -1,15 +1,19 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { selectRefinerScheduler, setRefinerScheduler } from 'features/controlLayers/store/paramsSlice';
+import {
+  selectRefinerScheduler,
+  setRefinerScheduler,
+  useParamsDispatch,
+} from 'features/controlLayers/store/paramsSlice';
 import { SCHEDULER_OPTIONS } from 'features/parameters/types/constants';
 import { isParameterScheduler } from 'features/parameters/types/parameterSchemas';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamSDXLRefinerScheduler = () => {
-  const dispatch = useAppDispatch();
+  const dispatchParams = useParamsDispatch();
   const { t } = useTranslation();
   const refinerScheduler = useAppSelector(selectRefinerScheduler);
 
@@ -18,9 +22,9 @@ const ParamSDXLRefinerScheduler = () => {
       if (!isParameterScheduler(v?.value)) {
         return;
       }
-      dispatch(setRefinerScheduler(v.value));
+      dispatchParams(setRefinerScheduler, v.value);
     },
-    [dispatch]
+    [dispatchParams]
   );
 
   const value = useMemo(() => SCHEDULER_OPTIONS.find((o) => o.value === refinerScheduler), [refinerScheduler]);

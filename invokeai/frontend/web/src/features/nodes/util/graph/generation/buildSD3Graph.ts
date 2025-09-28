@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveParams, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
@@ -27,7 +27,7 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   assert(model, 'No model found in state');
   assert(model.base === 'sd-3');
 
-  const params = selectParamsSlice(state);
+  const params = selectActiveParams(state);
 
   const { cfgScale: cfg_scale, steps, vae, t5EncoderModel, clipLEmbedModel, clipGEmbedModel } = params;
 

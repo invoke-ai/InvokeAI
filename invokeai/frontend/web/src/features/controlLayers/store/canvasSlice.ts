@@ -8,8 +8,7 @@ import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMul
 import { isPlainObject } from 'es-toolkit';
 import { merge } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { canvasReset } from 'features/controlLayers/store/actions';
-import { modelChanged } from 'features/controlLayers/store/paramsSlice';
+import { canvasReset, modelChanged } from 'features/controlLayers/store/actions';
 import {
   selectAllEntities,
   selectAllEntitiesOfType,
@@ -193,7 +192,7 @@ const canvasesSlice = createSlice({
         };
       },
     },
-    canvasCreated: (_state, _action: CanvasPayloadAction<unknown>) => {},
+    canvasAdding: (_state, _action: CanvasPayloadAction<unknown>) => {},
     canvasMigrated: (state) => {
       delete state.migration;
     },
@@ -208,7 +207,7 @@ const canvasesSlice = createSlice({
 
       state.activeCanvasId = canvas.id;
     },
-    canvasDeleted: (state, action: CanvasPayloadAction<unknown>) => {
+    canvasDeleting: (state, action: CanvasPayloadAction<unknown>) => {
       const { canvasId } = action.payload;
       const canvasIds = Object.keys(state.canvases);
 
@@ -227,7 +226,7 @@ const canvasesSlice = createSlice({
       state.activeCanvasId = canvasIds[nextIndex]!;
       delete state.canvases[canvas.id];
     },
-    canvasRemoved: (_state, _action: CanvasPayloadAction<unknown>) => {},
+    canvasDeleted: (_state, _action: CanvasPayloadAction<unknown>) => {},
   },
 });
 
@@ -1809,7 +1808,7 @@ const canvasSlice = createSlice({
       return resetCanvasState(state);
     });
     builder.addCase(modelChanged, (state, action) => {
-      const { model } = action.payload;
+      const { model } = action.payload.value;
       /**
        * Because the bbox depends in part on the model, it needs to be in sync with the model. However, due to
        * complications with managing undo/redo history, we need to store the model in a separate slice from the canvas
@@ -1883,11 +1882,10 @@ const syncScaledSize = (state: CanvasState) => {
 };
 
 export const addCanvas = (payload: { isSelected?: boolean }) => (dispatch: AppDispatch) => {
-  const action = canvasesSlice.actions.canvasAdded(payload);
-  dispatch(action);
+  const canvasAdded = canvasesSlice.actions.canvasAdded(payload);
 
-  const { canvasId } = action.payload;
-  dispatch(canvasesSlice.actions.canvasCreated({ canvasId }));
+  dispatch(canvasesSlice.actions.canvasAdding({ canvasId: canvasAdded.payload.canvasId }));
+  dispatch(canvasAdded);
 };
 
 export const MIGRATION_MULTI_CANVAS_ID_PLACEHOLDER = 'multi-canvas-id-placeholder';
@@ -1903,15 +1901,15 @@ export const migrateCanvas = () => (dispatch: AppDispatch, getState: () => RootS
 };
 
 export const deleteCanvas = (payload: { canvasId: string }) => (dispatch: AppDispatch) => {
+  dispatch(canvasesSlice.actions.canvasDeleting(payload));
   dispatch(canvasesSlice.actions.canvasDeleted(payload));
-  dispatch(canvasesSlice.actions.canvasRemoved(payload));
 };
 
 export const {
   // Canvas
-  canvasCreated,
+  canvasAdding,
   canvasMultiCanvasMigrated,
-  canvasRemoved,
+  canvasDeleted,
   canvasActivated,
 } = canvasesSlice.actions;
 

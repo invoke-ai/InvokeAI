@@ -10,10 +10,10 @@ import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { debounce, groupBy, upperFirst } from 'es-toolkit/compat';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
-import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveParams, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectActiveCanvas } from 'features/controlLayers/store/selectors';
-import type { CanvasState, LoRA, ParamsState, RefImagesState } from 'features/controlLayers/store/types';
+import type { CanvasState, InstanceParamsState, LoRA, RefImagesState } from 'features/controlLayers/store/types';
 import {
   getControlLayerWarnings,
   getGlobalReferenceImageWarnings,
@@ -78,7 +78,7 @@ type UpdateReasonsArg = {
   tab: TabName;
   isConnected: boolean;
   canvas: CanvasState;
-  params: ParamsState;
+  params: InstanceParamsState;
   refImages: RefImagesState;
   dynamicPrompts: DynamicPromptsState;
   canvasIsFiltering: boolean;
@@ -199,7 +199,7 @@ export const useReadinessWatcher = () => {
   const canvasManager = useCanvasManagerSafe();
   const tab = useAppSelector(selectActiveTab);
   const canvas = useAppSelector(selectActiveCanvas);
-  const params = useAppSelector(selectParamsSlice);
+  const params = useAppSelector(selectActiveParams);
   const refImages = useAppSelector(selectRefImagesSlice);
   const dynamicPrompts = useAppSelector(selectDynamicPromptsSlice);
   const nodes = useAppSelector(selectNodesSlice);
@@ -277,7 +277,7 @@ const disconnectedReason = (t: typeof i18n.t) => ({ content: t('parameters.invok
 const getReasonsWhyCannotEnqueueVideoTab = (arg: {
   isConnected: boolean;
   video: VideoState;
-  params: ParamsState;
+  params: InstanceParamsState;
   dynamicPrompts: DynamicPromptsState;
   promptExpansionRequest: PromptExpansionRequestState;
   isVideoEnabled: boolean;
@@ -319,7 +319,7 @@ const getReasonsWhyCannotEnqueueVideoTab = (arg: {
 const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   isConnected: boolean;
   model: MainModelConfig | null | undefined;
-  params: ParamsState;
+  params: InstanceParamsState;
   refImages: RefImagesState;
   loras: LoRA[];
   dynamicPrompts: DynamicPromptsState;
@@ -490,7 +490,7 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
   isConnected: boolean;
   upscale: UpscaleState;
   config: AppConfig;
-  params: ParamsState;
+  params: InstanceParamsState;
   loras: LoRA[];
   promptExpansionRequest: PromptExpansionRequestState;
 }) => {
@@ -553,7 +553,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   isConnected: boolean;
   model: MainModelConfig | null | undefined;
   canvas: CanvasState;
-  params: ParamsState;
+  params: InstanceParamsState;
   refImages: RefImagesState;
   loras: LoRA[];
   dynamicPrompts: DynamicPromptsState;
@@ -821,7 +821,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
 };
 
 export const selectPromptsCount = createSelector(
-  selectParamsSlice,
+  selectActiveParams,
   selectDynamicPromptsSlice,
   (params, dynamicPrompts) => (getShouldProcessPrompt(params.positivePrompt) ? dynamicPrompts.prompts.length : 1)
 );

@@ -1,13 +1,17 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { selectCanvasCoherenceEdgeSize, setCanvasCoherenceEdgeSize } from 'features/controlLayers/store/paramsSlice';
+import {
+  selectCanvasCoherenceEdgeSize,
+  setCanvasCoherenceEdgeSize,
+  useParamsDispatch,
+} from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasCoherenceEdgeSizeConfig } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamCanvasCoherenceEdgeSize = () => {
-  const dispatch = useAppDispatch();
+  const dispatchParams = useParamsDispatch();
   const canvasCoherenceEdgeSize = useAppSelector(selectCanvasCoherenceEdgeSize);
   const config = useAppSelector(selectCanvasCoherenceEdgeSizeConfig);
 
@@ -15,9 +19,9 @@ const ParamCanvasCoherenceEdgeSize = () => {
 
   const handleChange = useCallback(
     (v: number) => {
-      dispatch(setCanvasCoherenceEdgeSize(v));
+      dispatchParams(setCanvasCoherenceEdgeSize, v);
     },
-    [dispatch]
+    [dispatchParams]
   );
 
   return (

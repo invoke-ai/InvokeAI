@@ -9,9 +9,9 @@ import { assert } from 'tsafe';
 import z from 'zod';
 
 import {
-  canvasCreated,
+  canvasAdding,
+  canvasDeleted,
   canvasMultiCanvasMigrated,
-  canvasRemoved,
   MIGRATION_MULTI_CANVAS_ID_PLACEHOLDER,
 } from './canvasSlice';
 import { selectActiveCanvasId } from './selectors';
@@ -81,11 +81,11 @@ const canvasStagingAreaSlice = createSlice({
     },
   },
   extraReducers(builder) {
-    builder.addCase(canvasCreated, (state, action) => {
+    builder.addCase(canvasAdding, (state, action) => {
       const session = getInitialCanvasSessionState(action.payload.canvasId);
       state.sessions[session.canvasId] = session;
     });
-    builder.addCase(canvasRemoved, (state, action) => {
+    builder.addCase(canvasDeleted, (state, action) => {
       delete state.sessions[action.payload.canvasId];
     });
     builder.addCase(canvasMultiCanvasMigrated, (state, action) => {

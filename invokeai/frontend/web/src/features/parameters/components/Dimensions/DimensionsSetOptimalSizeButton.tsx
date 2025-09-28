@@ -1,12 +1,13 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import {
   selectHeight,
   selectIsApiBaseModel,
+  selectOptimalDimension,
   selectWidth,
   sizeOptimized,
+  useParamsDispatch,
 } from 'features/controlLayers/store/paramsSlice';
-import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { getIsSizeTooLarge, getIsSizeTooSmall } from 'features/parameters/util/optimalDimension';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,7 +15,7 @@ import { PiSparkleFill } from 'react-icons/pi';
 
 export const DimensionsSetOptimalSizeButton = memo(() => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
+  const dispatchParams = useParamsDispatch();
   const isApiModel = useAppSelector(selectIsApiBaseModel);
   const width = useAppSelector(selectWidth);
   const height = useAppSelector(selectHeight);
@@ -28,8 +29,8 @@ export const DimensionsSetOptimalSizeButton = memo(() => {
     [height, width, optimalDimension]
   );
   const onClick = useCallback(() => {
-    dispatch(sizeOptimized());
-  }, [dispatch]);
+    dispatchParams(sizeOptimized);
+  }, [dispatchParams]);
   const tooltip = useMemo(() => {
     if (isSizeTooSmall) {
       return t('parameters.setToOptimalSizeTooSmall');

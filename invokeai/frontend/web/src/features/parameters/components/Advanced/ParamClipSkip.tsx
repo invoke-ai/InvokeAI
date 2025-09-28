@@ -1,7 +1,7 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { selectCLIPSkip, selectModel, setClipSkip } from 'features/controlLayers/store/paramsSlice';
+import { selectCLIPSkip, selectModel, setClipSkip, useParamsDispatch } from 'features/controlLayers/store/paramsSlice';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import { selectCLIPSkipConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -12,14 +12,14 @@ const ParamClipSkip = () => {
   const config = useAppSelector(selectCLIPSkipConfig);
   const model = useAppSelector(selectModel);
 
-  const dispatch = useAppDispatch();
+  const dispatchParams = useParamsDispatch();
   const { t } = useTranslation();
 
   const handleClipSkipChange = useCallback(
     (v: number) => {
-      dispatch(setClipSkip(v));
+      dispatchParams(setClipSkip, v);
     },
-    [dispatch]
+    [dispatchParams]
   );
 
   const max = useMemo(() => {

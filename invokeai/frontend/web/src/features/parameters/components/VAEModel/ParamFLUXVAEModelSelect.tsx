@@ -1,8 +1,8 @@
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
-import { fluxVAESelected, selectFLUXVAE } from 'features/controlLayers/store/paramsSlice';
+import { fluxVAESelected, selectFLUXVAE, useParamsDispatch } from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,7 +10,7 @@ import { useFluxVAEModels } from 'services/api/hooks/modelsByType';
 import type { VAEModelConfig } from 'services/api/types';
 
 const ParamFLUXVAEModelSelect = () => {
-  const dispatch = useAppDispatch();
+  const dispatchParams = useParamsDispatch();
   const { t } = useTranslation();
   const vae = useAppSelector(selectFLUXVAE);
   const [modelConfigs, { isLoading }] = useFluxVAEModels();
@@ -18,10 +18,10 @@ const ParamFLUXVAEModelSelect = () => {
   const _onChange = useCallback(
     (vae: VAEModelConfig | null) => {
       if (vae) {
-        dispatch(fluxVAESelected(zModelIdentifierField.parse(vae)));
+        dispatchParams(fluxVAESelected, zModelIdentifierField.parse(vae));
       }
     },
-    [dispatch]
+    [dispatchParams]
   );
 
   const { options, value, onChange, noOptionsMessage } = useGroupedModelCombobox({

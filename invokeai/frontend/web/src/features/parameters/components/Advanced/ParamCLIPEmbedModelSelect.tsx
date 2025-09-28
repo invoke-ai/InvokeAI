@@ -1,7 +1,11 @@
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
-import { clipEmbedModelSelected, selectCLIPEmbedModel } from 'features/controlLayers/store/paramsSlice';
+import {
+  clipEmbedModelSelected,
+  selectCLIPEmbedModel,
+  useParamsDispatch,
+} from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +13,7 @@ import { useCLIPEmbedModels } from 'services/api/hooks/modelsByType';
 import type { CLIPEmbedModelConfig } from 'services/api/types';
 
 const ParamCLIPEmbedModelSelect = () => {
-  const dispatch = useAppDispatch();
+  const dispatchParams = useParamsDispatch();
   const { t } = useTranslation();
   const clipEmbedModel = useAppSelector(selectCLIPEmbedModel);
   const [modelConfigs, { isLoading }] = useCLIPEmbedModels();
@@ -17,10 +21,10 @@ const ParamCLIPEmbedModelSelect = () => {
   const _onChange = useCallback(
     (clipEmbedModel: CLIPEmbedModelConfig | null) => {
       if (clipEmbedModel) {
-        dispatch(clipEmbedModelSelected(zModelIdentifierField.parse(clipEmbedModel)));
+        dispatchParams(clipEmbedModelSelected, zModelIdentifierField.parse(clipEmbedModel));
       }
     },
-    [dispatch]
+    [dispatchParams]
   );
 
   const { options, value, onChange, noOptionsMessage } = useModelCombobox({

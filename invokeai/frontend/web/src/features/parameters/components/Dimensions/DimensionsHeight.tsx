@@ -1,15 +1,21 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { heightChanged, selectHeight, selectIsApiBaseModel } from 'features/controlLayers/store/paramsSlice';
-import { selectGridSize, selectOptimalDimension } from 'features/controlLayers/store/selectors';
+import {
+  heightChanged,
+  selectGridSize,
+  selectHeight,
+  selectIsApiBaseModel,
+  selectOptimalDimension,
+  useParamsDispatch,
+} from 'features/controlLayers/store/paramsSlice';
 import { selectHeightConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const DimensionsHeight = memo(() => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
+  const dispatchParams = useParamsDispatch();
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const height = useAppSelector(selectHeight);
   const config = useAppSelector(selectHeightConfig);
@@ -18,9 +24,9 @@ export const DimensionsHeight = memo(() => {
 
   const onChange = useCallback(
     (v: number) => {
-      dispatch(heightChanged({ height: v }));
+      dispatchParams(heightChanged, { height: v });
     },
-    [dispatch]
+    [dispatchParams]
   );
 
   const marks = useMemo(

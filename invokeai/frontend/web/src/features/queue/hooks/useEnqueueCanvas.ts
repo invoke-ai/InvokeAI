@@ -7,7 +7,12 @@ import { extractMessageFromAssertionError } from 'common/util/extractMessageFrom
 import { withResult, withResultAsync } from 'common/util/result';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { positivePromptAddedToHistory, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
+import {
+  paramsDispatch,
+  positivePromptAddedToHistory,
+  selectActiveParams,
+  selectPositivePrompt,
+} from 'features/controlLayers/store/paramsSlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildChatGPT4oGraph } from 'features/nodes/util/graph/generation/buildChatGPT4oGraph';
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
@@ -37,11 +42,10 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
   dispatch(enqueueRequestedCanvas());
 
   const state = getState();
-
   const destination = selectCanvasDestination(state, canvasManager.canvasId);
-  assert(destination, 'Destination must exist when CanvasManager has already been created');
+  const params = selectActiveParams(state);
 
-  const model = state.params.model;
+  const model = params.model;
   if (!model) {
     log.error('No model found in state');
     return;
@@ -133,7 +137,7 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
   const enqueueResult = await req.unwrap();
 
   // Push to prompt history on successful enqueue
-  dispatch(positivePromptAddedToHistory(selectPositivePrompt(state)));
+  paramsDispatch(store, positivePromptAddedToHistory, selectPositivePrompt(state));
 
   return { batchConfig, enqueueResult };
 };

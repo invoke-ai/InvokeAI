@@ -1,15 +1,15 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { selectInfillMethod, setInfillMethod } from 'features/controlLayers/store/paramsSlice';
+import { selectInfillMethod, setInfillMethod, useParamsDispatch } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetAppConfigQuery } from 'services/api/endpoints/appInfo';
 
 const ParamInfillMethod = () => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
+  const dispatchParams = useParamsDispatch();
   const infillMethod = useAppSelector(selectInfillMethod);
   const { data: appConfigData } = useGetAppConfigQuery();
   const options = useMemo<ComboboxOption[]>(
@@ -28,9 +28,9 @@ const ParamInfillMethod = () => {
       if (!v || !options.find((o) => o.value === v.value)) {
         return;
       }
-      dispatch(setInfillMethod(v.value));
+      dispatchParams(setInfillMethod, v.value);
     },
-    [dispatch, options]
+    [dispatchParams, options]
   );
 
   const value = useMemo(() => options.find((o) => o.value === infillMethod), [options, infillMethod]);

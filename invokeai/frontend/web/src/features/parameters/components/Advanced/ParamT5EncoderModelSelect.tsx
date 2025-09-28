@@ -1,7 +1,11 @@
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
-import { selectT5EncoderModel, t5EncoderModelSelected } from 'features/controlLayers/store/paramsSlice';
+import {
+  selectT5EncoderModel,
+  t5EncoderModelSelected,
+  useParamsDispatch,
+} from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +13,7 @@ import { useT5EncoderModels } from 'services/api/hooks/modelsByType';
 import type { T5EncoderBnbQuantizedLlmInt8bModelConfig, T5EncoderModelConfig } from 'services/api/types';
 
 const ParamT5EncoderModelSelect = () => {
-  const dispatch = useAppDispatch();
+  const dispatchParams = useParamsDispatch();
   const { t } = useTranslation();
   const t5EncoderModel = useAppSelector(selectT5EncoderModel);
   const [modelConfigs, { isLoading }] = useT5EncoderModels();
@@ -17,10 +21,10 @@ const ParamT5EncoderModelSelect = () => {
   const _onChange = useCallback(
     (t5EncoderModel: T5EncoderBnbQuantizedLlmInt8bModelConfig | T5EncoderModelConfig | null) => {
       if (t5EncoderModel) {
-        dispatch(t5EncoderModelSelected(zModelIdentifierField.parse(t5EncoderModel)));
+        dispatchParams(t5EncoderModelSelected, zModelIdentifierField.parse(t5EncoderModel));
       }
     },
-    [dispatch]
+    [dispatchParams]
   );
 
   const { options, value, onChange, noOptionsMessage } = useModelCombobox({

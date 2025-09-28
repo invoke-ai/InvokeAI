@@ -2,7 +2,7 @@ import { Flex, StandaloneAccordion } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectIsFLUX, selectIsSD3, selectParamsSlice, selectVAEKey } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveParams, selectIsFLUX, selectIsSD3, selectVAEKey } from 'features/controlLayers/store/paramsSlice';
 import { ParamSeed } from 'features/parameters/components/Seed/ParamSeed';
 import ParamTileControlNetModel from 'features/parameters/components/Upscale/ParamTileControlNetModel';
 import ParamTileOverlap from 'features/parameters/components/Upscale/ParamTileOverlap';
@@ -23,7 +23,7 @@ export const UpscaleTabAdvancedSettingsAccordion = memo(() => {
 
   const selectBadges = useMemo(
     () =>
-      createMemoizedSelector([selectParamsSlice, selectIsFLUX], (params, isFLUX) => {
+      createMemoizedSelector([selectActiveParams, selectIsFLUX], (params, isFLUX) => {
         const badges: (string | number)[] = [];
         if (isFLUX) {
           if (vaeConfig) {

@@ -1,13 +1,16 @@
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, AppStartListening, RootState } from 'app/store/store';
+import { modelChanged } from 'features/controlLayers/store/actions';
 import { controlLayerModelChanged, rgRefImageModelChanged } from 'features/controlLayers/store/canvasSlice';
 import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
 import {
   clipEmbedModelSelected,
   fluxVAESelected,
-  modelChanged,
+  paramsDispatch,
   refinerModelChanged,
+  selectActiveParams,
   t5EncoderModelSelected,
+  toStore,
   vaeSelected,
 } from 'features/controlLayers/store/paramsSlice';
 import { refImageModelChanged, selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
@@ -103,7 +106,7 @@ type ModelHandler = (
 ) => undefined;
 
 const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
-  const selectedMainModel = state.params.model;
+  const selectedMainModel = selectActiveParams(state).model;
   const allMainModels = models.filter(isNonRefinerMainModelConfig).sort((a) => (a.base === 'sdxl' ? -1 : 1));
 
   const firstModel = allMainModels[0];
@@ -113,7 +116,7 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
     // Only clear the model if we have one currently selected
     if (selectedMainModel !== null) {
       log.debug({ selectedMainModel }, 'No main models available, clearing');
-      dispatch(modelChanged({ model: null }));
+      paramsDispatch(toStore(state, dispatch), modelChanged, { model: null });
     }
     return;
   }
@@ -144,7 +147,7 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
 };
 
 const handleRefinerModels: ModelHandler = (models, state, dispatch, log) => {
-  const selectedRefinerModel = state.params.refinerModel;
+  const selectedRefinerModel = selectActiveParams(state).refinerModel;
 
   // `null` is a valid refiner model - no need to do anything.
   if (selectedRefinerModel === null) {
@@ -163,12 +166,12 @@ const handleRefinerModels: ModelHandler = (models, state, dispatch, log) => {
 
   // Else, we need to clear the refiner model
   log.debug({ selectedRefinerModel }, 'Selected refiner model is not available, clearing');
-  dispatch(refinerModelChanged(null));
+  paramsDispatch(toStore(state, dispatch), refinerModelChanged, null);
   return;
 };
 
 const handleVAEModels: ModelHandler = (models, state, dispatch, log) => {
-  const selectedVAEModel = state.params.vae;
+  const selectedVAEModel = selectActiveParams(state).vae;
 
   // `null` is a valid VAE - it means "use the VAE baked into the currently-selected main model"
   if (selectedVAEModel === null) {
@@ -187,7 +190,7 @@ const handleVAEModels: ModelHandler = (models, state, dispatch, log) => {
 
   // Else, we need to clear the VAE model
   log.debug({ selectedVAEModel }, 'Selected VAE model is not available, clearing');
-  dispatch(vaeSelected(null));
+  paramsDispatch(toStore(state, dispatch), vaeSelected, null);
   return;
 };
 
@@ -417,7 +420,7 @@ const handleTileControlNetModel: ModelHandler = (models, state, dispatch, log) =
 };
 
 const handleT5EncoderModels: ModelHandler = (models, state, dispatch, log) => {
-  const selectedT5EncoderModel = state.params.t5EncoderModel;
+  const selectedT5EncoderModel = selectActiveParams(state).t5EncoderModel;
   const t5EncoderModels = models.filter((m) => isT5EncoderModelConfig(m));
 
   // If the currently selected model is available, we don't need to do anything
@@ -432,20 +435,20 @@ const handleT5EncoderModels: ModelHandler = (models, state, dispatch, log) => {
       { selectedT5EncoderModel, firstModel },
       'No selected T5 encoder model or selected T5 encoder model is not available, selecting first available model'
     );
-    dispatch(t5EncoderModelSelected(zParameterT5EncoderModel.parse(firstModel)));
+    paramsDispatch(toStore(state, dispatch), t5EncoderModelSelected, zParameterT5EncoderModel.parse(firstModel));
     return;
   }
 
   // No available models, we should clear the selected model - but only if we have one selected
   if (selectedT5EncoderModel) {
     log.debug({ selectedT5EncoderModel }, 'Selected T5 encoder model is not available, clearing');
-    dispatch(t5EncoderModelSelected(null));
+    paramsDispatch(toStore(state, dispatch), t5EncoderModelSelected, null);
     return;
   }
 };
 
 const handleCLIPEmbedModels: ModelHandler = (models, state, dispatch, log) => {
-  const selectedCLIPEmbedModel = state.params.clipEmbedModel;
+  const selectedCLIPEmbedModel = selectActiveParams(state).clipEmbedModel;
   const CLIPEmbedModels = models.filter((m) => isCLIPEmbedModelConfig(m));
 
   // If the currently selected model is available, we don't need to do anything
@@ -460,20 +463,20 @@ const handleCLIPEmbedModels: ModelHandler = (models, state, dispatch, log) => {
       { selectedCLIPEmbedModel, firstModel },
       'No selected CLIP embed model or selected CLIP embed model is not available, selecting first available model'
     );
-    dispatch(clipEmbedModelSelected(zParameterCLIPEmbedModel.parse(firstModel)));
+    paramsDispatch(toStore(state, dispatch), clipEmbedModelSelected, zParameterCLIPEmbedModel.parse(firstModel));
     return;
   }
 
   // No available models, we should clear the selected model - but only if we have one selected
   if (selectedCLIPEmbedModel) {
     log.debug({ selectedCLIPEmbedModel }, 'Selected CLIP embed model is not available, clearing');
-    dispatch(clipEmbedModelSelected(null));
+    paramsDispatch(toStore(state, dispatch), clipEmbedModelSelected, null);
     return;
   }
 };
 
 const handleFLUXVAEModels: ModelHandler = (models, state, dispatch, log) => {
-  const selectedFLUXVAEModel = state.params.fluxVAE;
+  const selectedFLUXVAEModel = selectActiveParams(state).fluxVAE;
   const fluxVAEModels = models.filter((m) => isFluxVAEModelConfig(m));
 
   // If the currently selected model is available, we don't need to do anything
@@ -488,14 +491,14 @@ const handleFLUXVAEModels: ModelHandler = (models, state, dispatch, log) => {
       { selectedFLUXVAEModel, firstModel },
       'No selected FLUX VAE model or selected FLUX VAE model is not available, selecting first available model'
     );
-    dispatch(fluxVAESelected(zParameterVAEModel.parse(firstModel)));
+    paramsDispatch(toStore(state, dispatch), fluxVAESelected, zParameterVAEModel.parse(firstModel));
     return;
   }
 
   // No available models, we should clear the selected model - but only if we have one selected
   if (selectedFLUXVAEModel) {
     log.debug({ selectedFLUXVAEModel }, 'Selected FLUX VAE model is not available, clearing');
-    dispatch(fluxVAESelected(null));
+    paramsDispatch(toStore(state, dispatch), fluxVAESelected, null);
     return;
   }
 };

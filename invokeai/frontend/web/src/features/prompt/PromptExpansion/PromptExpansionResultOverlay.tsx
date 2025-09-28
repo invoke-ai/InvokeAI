@@ -1,6 +1,10 @@
 import { ButtonGroup, Flex, Icon, IconButton, Text, Tooltip } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { positivePromptChanged, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
+import { useAppSelector } from 'app/store/storeHooks';
+import {
+  positivePromptChanged,
+  selectPositivePrompt,
+  useParamsDispatch,
+} from 'features/controlLayers/store/paramsSlice';
 import { useCallback } from 'react';
 import { PiCheckBold, PiMagicWandBold, PiPlusBold, PiXBold } from 'react-icons/pi';
 
@@ -11,20 +15,20 @@ interface PromptExpansionResultOverlayProps {
 }
 
 export const PromptExpansionResultOverlay = ({ expandedText }: PromptExpansionResultOverlayProps) => {
-  const dispatch = useAppDispatch();
+  const dispatchParams = useParamsDispatch();
   const positivePrompt = useAppSelector(selectPositivePrompt);
 
   const handleReplace = useCallback(() => {
-    dispatch(positivePromptChanged(expandedText));
+    dispatchParams(positivePromptChanged, expandedText);
     promptExpansionApi.reset();
-  }, [dispatch, expandedText]);
+  }, [dispatchParams, expandedText]);
 
   const handleInsert = useCallback(() => {
     const currentText = positivePrompt;
     const newText = currentText ? `${currentText}\n${expandedText}` : expandedText;
-    dispatch(positivePromptChanged(newText));
+    dispatchParams(positivePromptChanged, newText);
     promptExpansionApi.reset();
-  }, [dispatch, expandedText, positivePrompt]);
+  }, [dispatchParams, expandedText, positivePrompt]);
 
   const handleDiscard = useCallback(() => {
     promptExpansionApi.reset();

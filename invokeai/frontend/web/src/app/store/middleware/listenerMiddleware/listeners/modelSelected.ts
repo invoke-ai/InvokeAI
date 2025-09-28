@@ -1,12 +1,18 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/store';
+import { modelChanged } from 'features/controlLayers/store/actions';
 import { bboxSyncedToOptimalDimension, rgRefImageModelChanged } from 'features/controlLayers/store/canvasSlice';
 import {
   buildSelectIsStagingBySessionId,
   selectActiveCanvasSessionId,
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraIsEnabledChanged } from 'features/controlLayers/store/lorasSlice';
-import { modelChanged, syncedToOptimalDimension, vaeSelected } from 'features/controlLayers/store/paramsSlice';
+import {
+  paramsDispatch,
+  selectActiveParams,
+  syncedToOptimalDimension,
+  vaeSelected,
+} from 'features/controlLayers/store/paramsSlice';
 import { refImageModelChanged, selectReferenceImageEntities } from 'features/controlLayers/store/refImagesSlice';
 import {
   selectActiveCanvas,
@@ -34,7 +40,8 @@ const log = logger('models');
 export const addModelSelectedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: modelSelected,
-    effect: (action, { getState, dispatch }) => {
+    effect: (action, api) => {
+      const { getState, dispatch } = api;
       const state = getState();
       const result = zParameterModel.safeParse(action.payload);
 
@@ -45,7 +52,8 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
 
       const newModel = result.data;
       const newBase = newModel.base;
-      const didBaseModelChange = state.params.model?.base !== newBase;
+      const params = selectActiveParams(state);
+      const didBaseModelChange = params.model?.base !== newBase;
 
       if (didBaseModelChange) {
         // we may need to reset some incompatible submodels
@@ -60,9 +68,9 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         });
 
         // handle incompatible vae
-        const { vae } = state.params;
+        const { vae } = params;
         if (vae && vae.base !== newBase) {
-          dispatch(vaeSelected(null));
+          paramsDispatch(api, vaeSelected, null);
           modelsUpdatedDisabledOrCleared += 1;
         }
 
@@ -155,13 +163,13 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         }
       }
 
-      dispatch(modelChanged({ model: newModel, previousModel: state.params.model }));
+      paramsDispatch(api, modelChanged, { model: newModel, previousModel: params.model });
 
       const modelBase = selectBboxModelBase(state);
 
-      if (modelBase !== state.params.model?.base) {
+      if (modelBase !== params.model?.base) {
         // Sync generate tab settings whenever the model base changes
-        dispatch(syncedToOptimalDimension());
+        paramsDispatch(api, syncedToOptimalDimension);
         const sessionId = selectActiveCanvasSessionId(state);
         const selectIsStaging = buildSelectIsStagingBySessionId(sessionId);
         const isStaging = selectIsStaging(state);

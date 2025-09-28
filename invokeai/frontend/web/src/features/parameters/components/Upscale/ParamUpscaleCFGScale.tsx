@@ -1,7 +1,7 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { selectUpscaleCfgScale, setUpscaleCfgScale } from 'features/controlLayers/store/paramsSlice';
+import { selectUpscaleCfgScale, setUpscaleCfgScale, useParamsDispatch } from 'features/controlLayers/store/paramsSlice';
 import { selectCFGScaleConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,13 +9,13 @@ import { useTranslation } from 'react-i18next';
 const ParamUpscaleCFGScale = () => {
   const cfgScale = useAppSelector(selectUpscaleCfgScale);
   const config = useAppSelector(selectCFGScaleConfig);
-  const dispatch = useAppDispatch();
+  const dispatchParams = useParamsDispatch();
   const { t } = useTranslation();
   const marks = useMemo(
     () => [config.sliderMin, Math.floor(config.sliderMax / 2), config.sliderMax],
     [config.sliderMax, config.sliderMin]
   );
-  const onChange = useCallback((v: number) => dispatch(setUpscaleCfgScale(v)), [dispatch]);
+  const onChange = useCallback((v: number) => dispatchParams(setUpscaleCfgScale, v), [dispatchParams]);
 
   return (
     <FormControl>
