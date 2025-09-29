@@ -4,18 +4,19 @@
 from pathlib import Path
 from typing import Optional
 
-from diffusers import (
-    StableDiffusionInpaintPipeline,
-    StableDiffusionPipeline,
+from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
+from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_inpaint import StableDiffusionInpaintPipeline
+from diffusers.pipelines.stable_diffusion_xl.pipeline_stable_diffusion_xl import StableDiffusionXLPipeline
+from diffusers.pipelines.stable_diffusion_xl.pipeline_stable_diffusion_xl_inpaint import (
     StableDiffusionXLInpaintPipeline,
-    StableDiffusionXLPipeline,
 )
 
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     CheckpointConfigBase,
     DiffusersConfigBase,
-    MainCheckpointConfig,
+    SD_1_2_XL_XLRefiner_CheckpointConfig,
+    SD_1_2_XL_XLRefiner_DiffusersConfig,
 )
 from invokeai.backend.model_manager.load.model_cache.model_cache import get_model_cache_key
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
@@ -107,7 +108,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
                 ModelVariantType.Normal: StableDiffusionXLPipeline,
             },
         }
-        assert isinstance(config, MainCheckpointConfig)
+        assert isinstance(config, (SD_1_2_XL_XLRefiner_DiffusersConfig, SD_1_2_XL_XLRefiner_CheckpointConfig))
         try:
             load_class = load_classes[config.base][config.variant]
         except KeyError as e:
