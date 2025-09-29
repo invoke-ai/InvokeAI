@@ -147,3 +147,7 @@ class ModelOnDisk:
         return any(
             any(key.endswith(suffix) for suffix in _suffixes) for key in state_dict.keys() if isinstance(key, str)
         )
+
+    def common_config_paths(self) -> set[Path]:
+        """Returns common config file paths for models stored in directories."""
+        return {self.path / "config.json", self.path / "model_index.json"}
