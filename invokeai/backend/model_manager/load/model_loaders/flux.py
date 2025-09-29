@@ -40,11 +40,11 @@ from invokeai.backend.model_manager.config import (
     CLIPEmbedDiffusersConfig,
     ControlNetCheckpointConfig,
     ControlNetDiffusersConfig,
+    FLUX_Quantized_BnB_NF4_CheckpointConfig,
+    FLUX_Quantized_GGUF_CheckpointConfig,
+    FLUX_Unquantized_CheckpointConfig,
     FluxReduxConfig,
     IPAdapterCheckpointConfig,
-    MainBnbQuantized4bCheckpointConfig,
-    MainCheckpointConfig,
-    MainGGUFCheckpointConfig,
     T5EncoderBnbQuantizedLlmInt8bConfig,
     T5EncoderConfig,
     VAECheckpointConfig,
@@ -226,7 +226,7 @@ class FluxCheckpointModel(ModelLoader):
         self,
         config: AnyModelConfig,
     ) -> AnyModel:
-        assert isinstance(config, MainCheckpointConfig)
+        assert isinstance(config, FLUX_Unquantized_CheckpointConfig)
         model_path = Path(config.path)
 
         with accelerate.init_empty_weights():
@@ -268,7 +268,7 @@ class FluxGGUFCheckpointModel(ModelLoader):
         self,
         config: AnyModelConfig,
     ) -> AnyModel:
-        assert isinstance(config, MainGGUFCheckpointConfig)
+        assert isinstance(config, FLUX_Quantized_GGUF_CheckpointConfig)
         model_path = Path(config.path)
 
         with accelerate.init_empty_weights():
@@ -314,7 +314,7 @@ class FluxBnbQuantizednf4bCheckpointModel(ModelLoader):
         self,
         config: AnyModelConfig,
     ) -> AnyModel:
-        assert isinstance(config, MainBnbQuantized4bCheckpointConfig)
+        assert isinstance(config, FLUX_Quantized_BnB_NF4_CheckpointConfig)
         if not bnb_available:
             raise ImportError(
                 "The bnb modules are not available. Please install bitsandbytes if available on your platform."
