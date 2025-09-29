@@ -25,6 +25,7 @@ import { canvasSettingsSliceConfig } from 'features/controlLayers/store/canvasSe
 import { canvasSliceConfig } from 'features/controlLayers/store/canvasSlice';
 import { canvasSessionSliceConfig } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { canvasWorkflowSliceConfig } from 'features/controlLayers/store/canvasWorkflowSlice';
+import { canvasWorkflowNodesSliceConfig } from 'features/controlLayers/store/canvasWorkflowNodesSlice';
 import { lorasSliceConfig } from 'features/controlLayers/store/lorasSlice';
 import { paramsSliceConfig } from 'features/controlLayers/store/paramsSlice';
 import { refImagesSliceConfig } from 'features/controlLayers/store/refImagesSlice';
@@ -57,6 +58,8 @@ import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { addArchivedOrDeletedBoardListener } from './middleware/listenerMiddleware/listeners/addArchivedOrDeletedBoardListener';
 import { addImageUploadedFulfilledListener } from './middleware/listenerMiddleware/listeners/imageUploaded';
+import { addCanvasWorkflowFieldChangedListener } from './middleware/listenerMiddleware/listeners/canvasWorkflowFieldChanged';
+import { addCanvasWorkflowRehydratedListener } from './middleware/listenerMiddleware/listeners/canvasWorkflowRehydrated';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -67,6 +70,7 @@ const SLICE_CONFIGS = {
   [canvasSessionSliceConfig.slice.reducerPath]: canvasSessionSliceConfig,
   [canvasSettingsSliceConfig.slice.reducerPath]: canvasSettingsSliceConfig,
   [canvasWorkflowSliceConfig.slice.reducerPath]: canvasWorkflowSliceConfig,
+  [canvasWorkflowNodesSliceConfig.slice.reducerPath]: canvasWorkflowNodesSliceConfig,
   [canvasSliceConfig.slice.reducerPath]: canvasSliceConfig,
   [changeBoardModalSliceConfig.slice.reducerPath]: changeBoardModalSliceConfig,
   [configSliceConfig.slice.reducerPath]: configSliceConfig,
@@ -94,6 +98,7 @@ const ALL_REDUCERS = {
   [canvasSessionSliceConfig.slice.reducerPath]: canvasSessionSliceConfig.slice.reducer,
   [canvasSettingsSliceConfig.slice.reducerPath]: canvasSettingsSliceConfig.slice.reducer,
   [canvasWorkflowSliceConfig.slice.reducerPath]: canvasWorkflowSliceConfig.slice.reducer,
+  [canvasWorkflowNodesSliceConfig.slice.reducerPath]: canvasWorkflowNodesSliceConfig.slice.reducer,
   // Undoable!
   [canvasSliceConfig.slice.reducerPath]: undoable(
     canvasSliceConfig.slice.reducer,
@@ -292,3 +297,7 @@ addAppConfigReceivedListener(startAppListening);
 addAdHocPostProcessingRequestedListener(startAppListening);
 
 addSetDefaultSettingsListener(startAppListening);
+
+// Canvas workflow fields
+addCanvasWorkflowFieldChangedListener(startAppListening);
+addCanvasWorkflowRehydratedListener(startAppListening);

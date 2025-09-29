@@ -1,11 +1,13 @@
+import type { PayloadAction } from '@reduxjs/toolkit';
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import { deepClone } from 'common/util/deepClone';
 import { parseify } from 'common/util/serialize';
-import { $templates } from 'features/nodes/store/nodesSlice';
+import { $templates, getFormFieldInitialValues } from 'features/nodes/store/nodesSlice';
 import type { Templates } from 'features/nodes/store/types';
+import type { StatefulFieldValue } from 'features/nodes/types/field';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { zWorkflowV3 } from 'features/nodes/types/workflow';
 import { serializeError } from 'serialize-error';
@@ -19,6 +21,7 @@ const zCanvasWorkflowState = z.object({
   workflow: zWorkflowV3.nullable(),
   inputNodeId: z.string().nullable(),
   outputNodeId: z.string().nullable(),
+  fieldValues: z.record(z.string(), z.any()),
   status: z.enum(['idle', 'loading', 'succeeded', 'failed']),
   error: z.string().nullable(),
 });
@@ -30,6 +33,7 @@ const getInitialState = (): CanvasWorkflowState => ({
   workflow: null,
   inputNodeId: null,
   outputNodeId: null,
+  fieldValues: {},
   status: 'idle',
   error: null,
 });
@@ -88,7 +92,13 @@ const validateCanvasWorkflow = (workflow: WorkflowV3, templates: Templates): Val
 };
 
 export const selectCanvasWorkflow = createAsyncThunk<
-  { workflowId: string; workflow: WorkflowV3; inputNodeId: string; outputNodeId: string },
+  {
+    workflowId: string;
+    workflow: WorkflowV3;
+    inputNodeId: string;
+    outputNodeId: string;
+    fieldValues: Record<string, StatefulFieldValue>;
+  },
   string,
   { rejectValue: string }
 >('canvasWorkflow/select', async (workflowId, { dispatch, rejectWithValue }) => {
@@ -101,7 +111,8 @@ export const selectCanvasWorkflow = createAsyncThunk<
       throw new Error('Invocation templates are not yet available.');
     }
     const { inputNodeId, outputNodeId } = validateCanvasWorkflow(workflow, templates);
-    return { workflowId: result.workflow_id, workflow, inputNodeId, outputNodeId };
+    const fieldValues = getFormFieldInitialValues(workflow.form, workflow.nodes);
+    return { workflowId: result.workflow_id, workflow, inputNodeId, outputNodeId, fieldValues };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to load workflow.';
     log.error({ error: serializeError(error as Error) }, 'Failed to load canvas workflow');
@@ -116,6 +127,12 @@ const slice = createSlice({
   initialState: getInitialState(),
   reducers: {
     canvasWorkflowCleared: () => getInitialState(),
+    canvasWorkflowFieldValueChanged: (
+      state,
+      action: PayloadAction<{ elementId: string; value: StatefulFieldValue }>
+    ) => {
+      state.fieldValues[action.payload.elementId] = action.payload.value;
+    },
   },
   extraReducers(builder) {
     builder
@@ -128,6 +145,7 @@ const slice = createSlice({
         state.workflow = action.payload.workflow;
         state.inputNodeId = action.payload.inputNodeId;
         state.outputNodeId = action.payload.outputNodeId;
+        state.fieldValues = action.payload.fieldValues;
         state.status = 'succeeded';
         state.error = null;
       })
@@ -138,7 +156,7 @@ const slice = createSlice({
   },
 });
 
-export const { canvasWorkflowCleared } = slice.actions;
+export const { canvasWorkflowCleared, canvasWorkflowFieldValueChanged } = slice.actions;
 
 export const canvasWorkflowSliceConfig: SliceConfig<typeof slice> = {
   slice,
@@ -153,6 +171,7 @@ export const canvasWorkflowSliceConfig: SliceConfig<typeof slice> = {
       }
       return {
         ...parsed.data,
+        fieldValues: parsed.data.fieldValues ?? {},
         status: 'idle',
         error: null,
       } satisfies CanvasWorkflowState;

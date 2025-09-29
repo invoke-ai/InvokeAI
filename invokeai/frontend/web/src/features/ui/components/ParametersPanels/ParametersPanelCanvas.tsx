@@ -2,6 +2,7 @@ import { Box, Button, Flex, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
+import { CanvasWorkflowFieldsPanel } from 'features/controlLayers/components/CanvasWorkflowFieldsPanel';
 import {
   canvasWorkflowCleared,
   selectCanvasWorkflow,
@@ -68,28 +69,33 @@ export const ParametersPanelCanvas = memo(() => {
 
   if (workflowState.workflow) {
     return (
-      <Flex w="full" h="full" flexDir="column" alignItems="center" justifyContent="center" gap={4} p={4}>
-        <Text fontSize="lg" fontWeight="semibold" textAlign="center">
-          {workflowState.workflow.name || t('controlLayers.canvasWorkflowLabel')}
-        </Text>
-        {workflowState.workflow.description && (
-          <Text fontSize="sm" textAlign="center" color="base.300">
-            {workflowState.workflow.description}
+      <Flex w="full" h="full" flexDir="column" gap={2}>
+        <Flex flexDir="column" gap={2} p={4} borderBottom="1px solid" borderColor="base.800">
+          <Text fontSize="lg" fontWeight="semibold">
+            {workflowState.workflow.name || t('controlLayers.canvasWorkflowLabel')}
           </Text>
-        )}
-        {workflowState.error && (
-          <Text fontSize="sm" color="invokeRed.300" textAlign="center">
-            {workflowState.error}
-          </Text>
-        )}
-        <Flex gap={2}>
-          <Button size="sm" onClick={handleChangeWorkflow} isDisabled={workflowState.status === 'loading'}>
-            {t('controlLayers.canvasWorkflowChangeButton')}
-          </Button>
-          <Button size="sm" variant="outline" onClick={handleClearWorkflow}>
-            {t('common.clear')}
-          </Button>
+          {workflowState.workflow.description && (
+            <Text fontSize="sm" color="base.300">
+              {workflowState.workflow.description}
+            </Text>
+          )}
+          {workflowState.error && (
+            <Text fontSize="sm" color="invokeRed.300">
+              {workflowState.error}
+            </Text>
+          )}
+          <Flex gap={2}>
+            <Button size="sm" onClick={handleChangeWorkflow} isDisabled={workflowState.status === 'loading'}>
+              {t('controlLayers.canvasWorkflowChangeButton')}
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleClearWorkflow}>
+              {t('common.clear')}
+            </Button>
+          </Flex>
         </Flex>
+        <Box flex="1" overflowY="auto">
+          <CanvasWorkflowFieldsPanel />
+        </Box>
       </Flex>
     );
   }
