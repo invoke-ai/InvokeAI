@@ -168,25 +168,6 @@ const WorkflowListContent = memo(
       fetchNextPage();
     }, [hasNextPage, isFetching, fetchNextPage]);
 
-    // // TODO(psyche): this causes an infinite loop, the scrollIntoView triggers the onScroll which triggers the
-    // // fetchNextPage which triggers the scrollIntoView again...
-    // useEffect(() => {
-    //   const el = ref.current;
-    //   if (!el) {
-    //     return;
-    //   }
-
-    //   const observer = new MutationObserver(() => {
-    //     el.querySelector(':scope > :last-child')?.scrollIntoView({ behavior: 'smooth' });
-    //   });
-
-    //   observer.observe(el, { childList: true });
-
-    //   return () => {
-    //     observer.disconnect();
-    //   };
-    // }, []);
-
     return (
       <Flex flexDir="column" gap={4} flex={1} minH={0}>
         <Grid
