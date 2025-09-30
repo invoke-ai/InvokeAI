@@ -93,6 +93,10 @@ const zCanvasSettingsState = z.object({
    * The auto-switch mode for the canvas staging area.
    */
   stagingAreaAutoSwitch: zAutoSwitchMode,
+  /**
+   * Whether the fill color picker UI is pinned (persistently shown in the canvas overlay).
+   */
+  fillColorPickerPinned: z.boolean(),
 });
 
 type CanvasSettingsState = z.infer<typeof zCanvasSettingsState>;
@@ -118,6 +122,7 @@ const getInitialState = (): CanvasSettingsState => ({
   ruleOfThirds: false,
   saveAllImagesToGallery: false,
   stagingAreaAutoSwitch: 'switch_on_start',
+  fillColorPickerPinned: false,
 });
 
 const slice = createSlice({
@@ -197,6 +202,9 @@ const slice = createSlice({
     ) => {
       state.stagingAreaAutoSwitch = action.payload;
     },
+    settingsFillColorPickerPinnedSet: (state, action: PayloadAction<boolean>) => {
+      state.fillColorPickerPinned = action.payload;
+    },
   },
 });
 
@@ -223,6 +231,7 @@ export const {
   settingsRuleOfThirdsToggled,
   settingsSaveAllImagesToGalleryToggled,
   settingsStagingAreaAutoSwitchChanged,
+  settingsFillColorPickerPinnedSet,
 } = slice.actions;
 
 export const canvasSettingsSliceConfig: SliceConfig<typeof slice> = {
@@ -237,6 +246,8 @@ export const canvasSettingsSliceConfig: SliceConfig<typeof slice> = {
 export const selectCanvasSettingsSlice = (s: RootState) => s.canvasSettings;
 const createCanvasSettingsSelector = <T>(selector: Selector<CanvasSettingsState, T>) =>
   createSelector(selectCanvasSettingsSlice, selector);
+
+export const selectFillColorPickerPinned = createCanvasSettingsSelector((s) => s.fillColorPickerPinned);
 
 export const selectPreserveMask = createCanvasSettingsSelector((settings) => settings.preserveMask);
 export const selectOutputOnlyMaskedRegions = createCanvasSettingsSelector(
