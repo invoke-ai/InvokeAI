@@ -1,4 +1,3 @@
-import { useAppSelector } from 'app/store/storeHooks';
 import { DividerElementEditMode } from 'features/nodes/components/sidePanel/builder/DividerElementEditMode';
 import { DividerElementViewMode } from 'features/nodes/components/sidePanel/builder/DividerElementViewMode';
 import { useElement } from 'features/nodes/components/sidePanel/builder/use-element';

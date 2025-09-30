@@ -1,6 +1,6 @@
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectWorkflowMode } from 'features/nodes/store/workflowLibrarySlice';
 import type { WorkflowMode } from 'features/nodes/store/types';
+import { selectWorkflowMode } from 'features/nodes/store/workflowLibrarySlice';
 import { createContext, useContext } from 'react';
 
 // Create a context to detect if we're in canvas workflow

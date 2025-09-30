@@ -24,8 +24,8 @@ import { changeBoardModalSliceConfig } from 'features/changeBoardModal/store/sli
 import { canvasSettingsSliceConfig } from 'features/controlLayers/store/canvasSettingsSlice';
 import { canvasSliceConfig } from 'features/controlLayers/store/canvasSlice';
 import { canvasSessionSliceConfig } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { canvasWorkflowSliceConfig } from 'features/controlLayers/store/canvasWorkflowSlice';
 import { canvasWorkflowNodesSliceConfig } from 'features/controlLayers/store/canvasWorkflowNodesSlice';
+import { canvasWorkflowSliceConfig } from 'features/controlLayers/store/canvasWorkflowSlice';
 import { lorasSliceConfig } from 'features/controlLayers/store/lorasSlice';
 import { paramsSliceConfig } from 'features/controlLayers/store/paramsSlice';
 import { refImagesSliceConfig } from 'features/controlLayers/store/refImagesSlice';
@@ -57,9 +57,9 @@ import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { addArchivedOrDeletedBoardListener } from './middleware/listenerMiddleware/listeners/addArchivedOrDeletedBoardListener';
-import { addImageUploadedFulfilledListener } from './middleware/listenerMiddleware/listeners/imageUploaded';
 import { addCanvasWorkflowFieldChangedListener } from './middleware/listenerMiddleware/listeners/canvasWorkflowFieldChanged';
 import { addCanvasWorkflowRehydratedListener } from './middleware/listenerMiddleware/listeners/canvasWorkflowRehydrated';
+import { addImageUploadedFulfilledListener } from './middleware/listenerMiddleware/listeners/imageUploaded';
 
 export const listenerMiddleware = createListenerMiddleware();
 

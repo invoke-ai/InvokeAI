@@ -17,8 +17,8 @@ import { HeadingElement } from 'features/nodes/components/sidePanel/builder/Head
 import { NodeFieldElement } from 'features/nodes/components/sidePanel/builder/NodeFieldElement';
 import { TextElement } from 'features/nodes/components/sidePanel/builder/TextElement';
 import { useElement } from 'features/nodes/components/sidePanel/builder/use-element';
-import { selectFormRootElement } from 'features/nodes/store/selectors';
 import { useWorkflowMode } from 'features/nodes/hooks/useWorkflowMode';
+import { selectFormRootElement } from 'features/nodes/store/selectors';
 import type { ContainerElement } from 'features/nodes/types/workflow';
 import {
   CONTAINER_CLASS_NAME,

@@ -1,4 +1,3 @@
-import { useAppSelector } from 'app/store/storeHooks';
 import { InvocationNodeContextProvider } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { NodeFieldElementEditMode } from 'features/nodes/components/sidePanel/builder/NodeFieldElementEditMode';
 import { NodeFieldElementViewMode } from 'features/nodes/components/sidePanel/builder/NodeFieldElementViewMode';

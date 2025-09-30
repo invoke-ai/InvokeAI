@@ -4,14 +4,56 @@ import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import { deepClone } from 'common/util/deepClone';
 import { getFormFieldInitialValues } from 'features/nodes/store/nodesSlice';
-import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type { NodesState } from 'features/nodes/store/types';
 import { zNodesState } from 'features/nodes/store/types';
-import type { StatefulFieldValue } from 'features/nodes/types/field';
+import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
+import type {
+  BoardFieldValue,
+  BooleanFieldValue,
+  ColorFieldValue,
+  EnumFieldValue,
+  FloatFieldCollectionValue,
+  FloatFieldValue,
+  FloatGeneratorFieldValue,
+  ImageFieldCollectionValue,
+  ImageFieldValue,
+  ImageGeneratorFieldValue,
+  IntegerFieldCollectionValue,
+  IntegerFieldValue,
+  IntegerGeneratorFieldValue,
+  ModelIdentifierFieldValue,
+  SchedulerFieldValue,
+  StatefulFieldValue,
+  StringFieldCollectionValue,
+  StringFieldValue,
+  StringGeneratorFieldValue,
+} from 'features/nodes/types/field';
+import {
+  zBoardFieldValue,
+  zBooleanFieldValue,
+  zColorFieldValue,
+  zEnumFieldValue,
+  zFloatFieldCollectionValue,
+  zFloatFieldValue,
+  zFloatGeneratorFieldValue,
+  zImageFieldCollectionValue,
+  zImageFieldValue,
+  zImageGeneratorFieldValue,
+  zIntegerFieldCollectionValue,
+  zIntegerFieldValue,
+  zIntegerGeneratorFieldValue,
+  zModelIdentifierFieldValue,
+  zSchedulerFieldValue,
+  zStatefulFieldValue,
+  zStringFieldCollectionValue,
+  zStringFieldValue,
+  zStringGeneratorFieldValue,
+} from 'features/nodes/types/field';
 import type { AnyNode } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
-import type { WorkflowV3 } from 'features/nodes/types/workflow';
-import { z } from 'zod';
+import type { ContainerElement } from 'features/nodes/types/workflow';
+import { isContainerElement } from 'features/nodes/types/workflow';
+import type { z } from 'zod';
 
 import { selectCanvasWorkflow } from './canvasWorkflowSlice';
 
@@ -86,62 +128,63 @@ const slice = createSlice({
   reducers: {
     canvasWorkflowNodesCleared: () => getInitialState(),
     // Field value mutations - these update the shadow nodes when fields are changed
-    fieldStringValueChanged: (state, action: FieldValueAction<StatefulFieldValue>) => {
-      fieldValueReducer(state, action, z.any());
-    },
-    fieldIntegerValueChanged: (state, action: FieldValueAction<StatefulFieldValue>) => {
-      fieldValueReducer(state, action, z.any());
-    },
-    fieldFloatValueChanged: (state, action: FieldValueAction<StatefulFieldValue>) => {
-      fieldValueReducer(state, action, z.any());
-    },
-    fieldBooleanValueChanged: (state, action: FieldValueAction<StatefulFieldValue>) => {
-      fieldValueReducer(state, action, z.any());
-    },
-    fieldModelIdentifierValueChanged: (state, action: FieldValueAction<StatefulFieldValue>) => {
-      fieldValueReducer(state, action, z.any());
-    },
-    fieldEnumModelValueChanged: (state, action: FieldValueAction<StatefulFieldValue>) => {
-      fieldValueReducer(state, action, z.any());
-    },
-    fieldSchedulerValueChanged: (state, action: FieldValueAction<StatefulFieldValue>) => {
-      fieldValueReducer(state, action, z.any());
-    },
-    fieldBoardValueChanged: (state, action: FieldValueAction<StatefulFieldValue>) => {
-      fieldValueReducer(state, action, z.any());
-    },
-    fieldImageValueChanged: (state, action: FieldValueAction<StatefulFieldValue>) => {
-      fieldValueReducer(state, action, z.any());
-    },
-    fieldColorValueChanged: (state, action: FieldValueAction<StatefulFieldValue>) => {
-      fieldValueReducer(state, action, z.any());
-    },
-    fieldImageCollectionValueChanged: (state, action: FieldValueAction<StatefulFieldValue>) => {
-      fieldValueReducer(state, action, z.any());
-    },
-    fieldStringCollectionValueChanged: (state, action: FieldValueAction<StatefulFieldValue>) => {
-      fieldValueReducer(state, action, z.any());
-    },
-    fieldIntegerCollectionValueChanged: (state, action: FieldValueAction<StatefulFieldValue>) => {
-      fieldValueReducer(state, action, z.any());
-    },
-    fieldFloatCollectionValueChanged: (state, action: FieldValueAction<StatefulFieldValue>) => {
-      fieldValueReducer(state, action, z.any());
-    },
-    fieldFloatGeneratorValueChanged: (state, action: FieldValueAction<StatefulFieldValue>) => {
-      fieldValueReducer(state, action, z.any());
-    },
-    fieldIntegerGeneratorValueChanged: (state, action: FieldValueAction<StatefulFieldValue>) => {
-      fieldValueReducer(state, action, z.any());
-    },
-    fieldStringGeneratorValueChanged: (state, action: FieldValueAction<StatefulFieldValue>) => {
-      fieldValueReducer(state, action, z.any());
-    },
-    fieldImageGeneratorValueChanged: (state, action: FieldValueAction<StatefulFieldValue>) => {
-      fieldValueReducer(state, action, z.any());
-    },
     fieldValueReset: (state, action: FieldValueAction<StatefulFieldValue>) => {
-      fieldValueReducer(state, action, z.any());
+      fieldValueReducer(state, action, zStatefulFieldValue);
+    },
+    fieldStringValueChanged: (state, action: FieldValueAction<StringFieldValue>) => {
+      console.log('[canvasWorkflowNodesSlice] fieldStringValueChanged:', action.payload);
+      fieldValueReducer(state, action, zStringFieldValue);
+    },
+    fieldStringCollectionValueChanged: (state, action: FieldValueAction<StringFieldCollectionValue>) => {
+      fieldValueReducer(state, action, zStringFieldCollectionValue);
+    },
+    fieldIntegerValueChanged: (state, action: FieldValueAction<IntegerFieldValue>) => {
+      fieldValueReducer(state, action, zIntegerFieldValue);
+    },
+    fieldFloatValueChanged: (state, action: FieldValueAction<FloatFieldValue>) => {
+      fieldValueReducer(state, action, zFloatFieldValue);
+    },
+    fieldFloatCollectionValueChanged: (state, action: FieldValueAction<FloatFieldCollectionValue>) => {
+      fieldValueReducer(state, action, zFloatFieldCollectionValue);
+    },
+    fieldIntegerCollectionValueChanged: (state, action: FieldValueAction<IntegerFieldCollectionValue>) => {
+      fieldValueReducer(state, action, zIntegerFieldCollectionValue);
+    },
+    fieldBooleanValueChanged: (state, action: FieldValueAction<BooleanFieldValue>) => {
+      fieldValueReducer(state, action, zBooleanFieldValue);
+    },
+    fieldBoardValueChanged: (state, action: FieldValueAction<BoardFieldValue>) => {
+      fieldValueReducer(state, action, zBoardFieldValue);
+    },
+    fieldImageValueChanged: (state, action: FieldValueAction<ImageFieldValue>) => {
+      fieldValueReducer(state, action, zImageFieldValue);
+    },
+    fieldImageCollectionValueChanged: (state, action: FieldValueAction<ImageFieldCollectionValue>) => {
+      fieldValueReducer(state, action, zImageFieldCollectionValue);
+    },
+    fieldColorValueChanged: (state, action: FieldValueAction<ColorFieldValue>) => {
+      fieldValueReducer(state, action, zColorFieldValue);
+    },
+    fieldModelIdentifierValueChanged: (state, action: FieldValueAction<ModelIdentifierFieldValue>) => {
+      fieldValueReducer(state, action, zModelIdentifierFieldValue);
+    },
+    fieldEnumModelValueChanged: (state, action: FieldValueAction<EnumFieldValue>) => {
+      fieldValueReducer(state, action, zEnumFieldValue);
+    },
+    fieldSchedulerValueChanged: (state, action: FieldValueAction<SchedulerFieldValue>) => {
+      fieldValueReducer(state, action, zSchedulerFieldValue);
+    },
+    fieldFloatGeneratorValueChanged: (state, action: FieldValueAction<FloatGeneratorFieldValue>) => {
+      fieldValueReducer(state, action, zFloatGeneratorFieldValue);
+    },
+    fieldIntegerGeneratorValueChanged: (state, action: FieldValueAction<IntegerGeneratorFieldValue>) => {
+      fieldValueReducer(state, action, zIntegerGeneratorFieldValue);
+    },
+    fieldStringGeneratorValueChanged: (state, action: FieldValueAction<StringGeneratorFieldValue>) => {
+      fieldValueReducer(state, action, zStringGeneratorFieldValue);
+    },
+    fieldImageGeneratorValueChanged: (state, action: FieldValueAction<ImageGeneratorFieldValue>) => {
+      fieldValueReducer(state, action, zImageGeneratorFieldValue);
     },
   },
   extraReducers(builder) {
@@ -174,36 +217,39 @@ const slice = createSlice({
             }
           }
 
-          if ('data' in element && element.data && 'children' in element.data) {
+          if (isContainerElement(element)) {
             // Filter children and update the container
             const filteredChildren = element.data.children.filter(filterNodeFields);
-            filteredForm.elements[elementId] = {
+            const updatedElement: ContainerElement = {
               ...element,
               data: {
                 ...element.data,
                 children: filteredChildren,
               },
-            } as any;
+            };
+            filteredForm.elements[elementId] = updatedElement;
           }
 
           return true;
         };
 
         // Start filtering from root
-        const filteredChildren = rootElement.data.children.filter(filterNodeFields);
-        filteredForm.elements[filteredForm.rootElementId] = {
-          ...rootElement,
-          data: {
-            ...rootElement.data,
-            children: filteredChildren,
-          },
-        } as any;
+        if (isContainerElement(rootElement)) {
+          const filteredChildren = rootElement.data.children.filter(filterNodeFields);
+          const updatedRootElement: ContainerElement = {
+            ...rootElement,
+            data: {
+              ...rootElement.data,
+              children: filteredChildren,
+            },
+          };
+          filteredForm.elements[filteredForm.rootElementId] = updatedRootElement;
+        }
       }
 
       const formFieldInitialValues = getFormFieldInitialValues(filteredForm, nodes);
 
       const loadedNodes = nodes.map((node: AnyNode) => ({ ...SHARED_NODE_PROPERTIES, ...node }));
-      console.log('[canvasWorkflowNodesSlice] Loading nodes:', loadedNodes.map((n: any) => ({ id: n.id, type: n.type, inputs: n.data?.inputs ? Object.keys(n.data.inputs) : [] })));
 
       // Load the canvas workflow into shadow nodes with filtered form
       return {
@@ -215,7 +261,7 @@ const slice = createSlice({
         edges,
       };
     });
-    builder.addCase(selectCanvasWorkflow.rejected, (state) => {
+    builder.addCase(selectCanvasWorkflow.rejected, () => {
       return getInitialState();
     });
   },

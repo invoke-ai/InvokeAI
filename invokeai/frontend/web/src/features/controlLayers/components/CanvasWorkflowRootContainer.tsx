@@ -2,12 +2,8 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectCanvasWorkflowNodesSlice } from 'features/controlLayers/store/canvasWorkflowNodesSlice';
-import {
-  ContainerContextProvider,
-  DepthContextProvider,
-} from 'features/nodes/components/sidePanel/builder/contexts';
-import { isContainerElement } from 'features/nodes/types/workflow';
-import { ROOT_CONTAINER_CLASS_NAME } from 'features/nodes/types/workflow';
+import { ContainerContextProvider, DepthContextProvider } from 'features/nodes/components/sidePanel/builder/contexts';
+import { isContainerElement, ROOT_CONTAINER_CLASS_NAME } from 'features/nodes/types/workflow';
 import { memo } from 'react';
 
 import { CanvasWorkflowFormElementComponent } from './CanvasWorkflowFormElementComponent';

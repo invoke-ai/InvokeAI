@@ -1,9 +1,5 @@
 import type { AppStartListening } from 'app/store/store';
-import { deepClone } from 'common/util/deepClone';
 import { selectCanvasWorkflow } from 'features/controlLayers/store/canvasWorkflowSlice';
-import { getFormFieldInitialValues } from 'features/nodes/store/nodesSlice';
-import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
-import type { AnyNode } from 'features/nodes/types/invocation';
 import { REMEMBER_REHYDRATED } from 'redux-remember';
 
 /**
@@ -15,7 +11,7 @@ import { REMEMBER_REHYDRATED } from 'redux-remember';
 export const addCanvasWorkflowRehydratedListener = (startListening: AppStartListening) => {
   startListening({
     type: REMEMBER_REHYDRATED,
-    effect: async (_action, { dispatch, getState }) => {
+    effect: (_action, { dispatch, getState }) => {
       const state = getState();
       const { workflow, inputNodeId } = state.canvasWorkflow;
 

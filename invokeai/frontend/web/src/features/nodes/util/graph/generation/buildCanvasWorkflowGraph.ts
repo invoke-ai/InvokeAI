@@ -51,6 +51,8 @@ const buildInvocationNodes = (
 ): Record<string, AnyInvocation> => {
   const invocations: Record<string, AnyInvocation> = {};
 
+  const canvasWorkflowNodes = state.canvasWorkflowNodes.nodes;
+
   for (const node of workflow.nodes) {
     if (node.type !== 'invocation') {
       continue;
@@ -62,7 +64,10 @@ const buildInvocationNodes = (
       continue;
     }
 
-    const transformedInputs = Object.entries(data.inputs).reduce<Record<string, unknown>>((acc, [name, field]) => {
+    const canvasWorkflowNode = canvasWorkflowNodes.find((n) => n.id === id);
+    const nodeInputs = canvasWorkflowNode?.type === 'invocation' ? canvasWorkflowNode.data.inputs : data.inputs;
+
+    const transformedInputs = Object.entries(nodeInputs).reduce<Record<string, unknown>>((acc, [name, field]) => {
       const fieldTemplate = template.inputs[name];
       if (!fieldTemplate) {
         log.warn({ nodeId: id, field: name }, 'Canvas workflow field template not found; skipping field');

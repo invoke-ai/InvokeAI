@@ -17,7 +17,13 @@ export const CanvasWorkflowFieldsPanel = memo(() => {
 
   // Check if form is empty
   const rootElement = nodesState.form.elements[nodesState.form.rootElementId];
-  if (!rootElement || !('data' in rootElement) || !rootElement.data || !('children' in rootElement.data) || rootElement.data.children.length === 0) {
+  if (
+    !rootElement ||
+    !('data' in rootElement) ||
+    !rootElement.data ||
+    !('children' in rootElement.data) ||
+    rootElement.data.children.length === 0
+  ) {
     return (
       <Flex w="full" p={4} justifyContent="center">
         <Text variant="subtext">No fields exposed in this workflow</Text>

@@ -1,4 +1,3 @@
-import { useAppSelector } from 'app/store/storeHooks';
 import { HeadingElementEditMode } from 'features/nodes/components/sidePanel/builder/HeadingElementEditMode';
 import { HeadingElementViewMode } from 'features/nodes/components/sidePanel/builder/HeadingElementViewMode';
 import { useElement } from 'features/nodes/components/sidePanel/builder/use-element';

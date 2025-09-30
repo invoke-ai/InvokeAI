@@ -8,8 +8,7 @@ import {
   useContainerContext,
   useDepthContext,
 } from 'features/nodes/components/sidePanel/builder/contexts';
-import { isContainerElement } from 'features/nodes/types/workflow';
-import { CONTAINER_CLASS_NAME } from 'features/nodes/types/workflow';
+import { CONTAINER_CLASS_NAME, isContainerElement } from 'features/nodes/types/workflow';
 import { memo } from 'react';
 
 import { CanvasWorkflowFormElementComponent } from './CanvasWorkflowFormElementComponent';

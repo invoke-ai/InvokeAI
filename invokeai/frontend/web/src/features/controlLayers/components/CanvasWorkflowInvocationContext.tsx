@@ -2,10 +2,9 @@ import { useStore } from '@nanostores/react';
 import type { Selector } from '@reduxjs/toolkit';
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import { $templates } from 'features/nodes/store/nodesSlice';
-import { selectEdges, selectNodeFieldElements, selectNodes } from 'features/nodes/store/selectors';
 import { InvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
-import type { InvocationNode, InvocationTemplate } from 'features/nodes/types/invocation';
+import { $templates } from 'features/nodes/store/nodesSlice';
+import type { InvocationNode } from 'features/nodes/types/invocation';
 import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
 import type { PropsWithChildren } from 'react';
 import { memo, useMemo } from 'react';
@@ -32,7 +31,9 @@ const selectCanvasWorkflowNodes = (state: RootState) => state.canvasWorkflowNode
 const selectCanvasWorkflowEdges = (state: RootState) => state.canvasWorkflowNodes.edges;
 const selectCanvasWorkflowNodeFieldElements = (state: RootState) => {
   const form = state.canvasWorkflowNodes.form;
-  return Object.values(form.elements).filter((el) => el.type === 'node-field');
+  return Object.values(form.elements).filter(
+    (el): el is Extract<typeof el, { type: 'node-field' }> => el.type === 'node-field'
+  );
 };
 
 export const CanvasWorkflowInvocationNodeContextProvider = memo(
@@ -40,11 +41,12 @@ export const CanvasWorkflowInvocationNodeContextProvider = memo(
     const templates = useStore($templates);
 
     const value = useMemo(() => {
-      const cache: Map<string, Selector<RootState, any>> = new Map();
+      const cache: Map<string, Selector<RootState, unknown>> = new Map();
 
       const selectNodeSafe = getSelectorFromCache(cache, 'selectNodeSafe', () =>
         createSelector(selectCanvasWorkflowNodes, (nodes) => {
-          return (nodes.find(({ id, type }) => type === 'invocation' && id === nodeId) ?? null) as InvocationNode | null;
+          return (nodes.find(({ id, type }) => type === 'invocation' && id === nodeId) ??
+            null) as InvocationNode | null;
         })
       );
       const selectNodeDataSafe = getSelectorFromCache(cache, 'selectNodeDataSafe', () =>
@@ -88,7 +90,9 @@ export const CanvasWorkflowInvocationNodeContextProvider = memo(
 
       const selectNodeOrThrow = getSelectorFromCache(cache, 'selectNodeOrThrow', () =>
         createSelector(selectCanvasWorkflowNodes, (nodes) => {
-          const node = nodes.find(({ id, type }) => type === 'invocation' && id === nodeId) as InvocationNode | undefined;
+          const node = nodes.find(({ id, type }) => type === 'invocation' && id === nodeId) as
+            | InvocationNode
+            | undefined;
           if (node === undefined) {
             throw new Error(`Cannot find node with id ${nodeId}`);
           }
@@ -124,7 +128,10 @@ export const CanvasWorkflowInvocationNodeContextProvider = memo(
           createSelector(selectNodeInputsOrThrow, (inputs) => {
             const field = inputs[fieldName];
             if (field === undefined) {
-              console.error(`[CanvasWorkflowContext] Cannot find input field with name ${fieldName} in node ${nodeId}. Available fields:`, Object.keys(inputs));
+              console.error(
+                `[CanvasWorkflowContext] Cannot find input field with name ${fieldName} in node ${nodeId}. Available fields:`,
+                Object.keys(inputs)
+              );
               throw new Error(`Cannot find input field with name ${fieldName} in node ${nodeId}`);
             }
             return field;
@@ -164,7 +171,7 @@ export const CanvasWorkflowInvocationNodeContextProvider = memo(
         getSelectorFromCache(cache, `buildSelectIsInputFieldAddedToForm-${fieldName}`, () =>
           createSelector(selectCanvasWorkflowNodeFieldElements, (nodeFieldElements) => {
             return nodeFieldElements.some(
-              (el: any) => el.data.fieldIdentifier.nodeId === nodeId && el.data.fieldIdentifier.fieldName === fieldName
+              (el) => el.data.fieldIdentifier.nodeId === nodeId && el.data.fieldIdentifier.fieldName === fieldName
             );
           })
         );
