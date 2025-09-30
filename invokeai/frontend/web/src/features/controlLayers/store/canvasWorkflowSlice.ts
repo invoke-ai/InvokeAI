@@ -61,12 +61,24 @@ const validateCanvasWorkflow = (workflow: WorkflowV3, templates: Templates): Val
     return Boolean(template && template.tags.includes(OUTPUT_TAG));
   });
 
-  if (inputNodes.length !== 1) {
-    throw new Error('A canvas workflow must include exactly one input node.');
+  if (inputNodes.length === 0) {
+    throw new Error('A canvas workflow must include at least one input node with the "canvas-workflow-input" tag.');
   }
 
-  if (outputNodes.length !== 1) {
-    throw new Error('A canvas workflow must include exactly one output node.');
+  if (inputNodes.length > 1) {
+    throw new Error(
+      `A canvas workflow must include exactly one input node, but found ${inputNodes.length}. Remove extra input nodes.`
+    );
+  }
+
+  if (outputNodes.length === 0) {
+    throw new Error('A canvas workflow must include at least one output node with the "canvas-workflow-output" tag.');
+  }
+
+  if (outputNodes.length > 1) {
+    throw new Error(
+      `A canvas workflow must include exactly one output node, but found ${outputNodes.length}. Remove extra output nodes.`
+    );
   }
 
   const inputNode = inputNodes[0]!;
@@ -86,6 +98,55 @@ const validateCanvasWorkflow = (workflow: WorkflowV3, templates: Templates): Val
   }
   if (!('image' in outputTemplate.inputs)) {
     throw new Error('Canvas output node must accept an image input field named "image".');
+  }
+
+  // Validate that all nodes have valid templates
+  for (const node of invocationNodes) {
+    const template = templates[node.data.type];
+    if (!template) {
+      throw new Error(
+        `Node "${node.data.label || node.id}" uses invocation type "${node.data.type}" which is not available. This workflow may have been created with a different version of InvokeAI.`
+      );
+    }
+  }
+
+  // Validate that required fields without connections have values
+  const edges = workflow.edges.filter((edge) => edge.type === 'default');
+  for (const node of invocationNodes) {
+    if (node.type !== 'invocation') {
+      continue;
+    }
+
+    const template = templates[node.data.type];
+    if (!template) {
+      continue; // Already validated above
+    }
+
+    for (const [fieldName, fieldTemplate] of Object.entries(template.inputs)) {
+      // Skip if field is connected (will get value from connection)
+      const isConnected = edges.some((edge) => edge.target === node.id && edge.targetHandle === fieldName);
+      if (isConnected) {
+        continue;
+      }
+
+      // Check if field is required
+      if (fieldTemplate.required) {
+        const fieldInstance = node.data.inputs[fieldName];
+        if (!fieldInstance) {
+          throw new Error(
+            `Node "${node.data.label || node.id}" is missing required field "${fieldTemplate.title || fieldName}".`
+          );
+        }
+
+        // Check if field has a value (not null/undefined/empty)
+        const value = fieldInstance.value;
+        if (value === null || value === undefined || value === '') {
+          throw new Error(
+            `Node "${node.data.label || node.id}" has required field "${fieldTemplate.title || fieldName}" with no value. Please provide a value or connect this field.`
+          );
+        }
+      }
+    }
   }
 
   return { inputNodeId: inputNode.id, outputNodeId: outputNode.id };
