@@ -1,14 +1,13 @@
-import { useAppSelector } from 'app/store/storeHooks';
 import { DividerElementEditMode } from 'features/nodes/components/sidePanel/builder/DividerElementEditMode';
 import { DividerElementViewMode } from 'features/nodes/components/sidePanel/builder/DividerElementViewMode';
 import { useElement } from 'features/nodes/components/sidePanel/builder/use-element';
-import { selectWorkflowMode } from 'features/nodes/store/workflowLibrarySlice';
+import { useWorkflowMode } from 'features/nodes/hooks/useWorkflowMode';
 import { isDividerElement } from 'features/nodes/types/workflow';
 import { memo } from 'react';
 
 export const DividerElement = memo(({ id }: { id: string }) => {
   const el = useElement(id);
-  const mode = useAppSelector(selectWorkflowMode);
+  const mode = useWorkflowMode();
 
   if (!el || !isDividerElement(el)) {
     return;

@@ -1,14 +1,13 @@
-import { useAppSelector } from 'app/store/storeHooks';
 import { HeadingElementEditMode } from 'features/nodes/components/sidePanel/builder/HeadingElementEditMode';
 import { HeadingElementViewMode } from 'features/nodes/components/sidePanel/builder/HeadingElementViewMode';
 import { useElement } from 'features/nodes/components/sidePanel/builder/use-element';
-import { selectWorkflowMode } from 'features/nodes/store/workflowLibrarySlice';
+import { useWorkflowMode } from 'features/nodes/hooks/useWorkflowMode';
 import { isHeadingElement } from 'features/nodes/types/workflow';
 import { memo } from 'react';
 
 export const HeadingElement = memo(({ id }: { id: string }) => {
   const el = useElement(id);
-  const mode = useAppSelector(selectWorkflowMode);
+  const mode = useWorkflowMode();
 
   if (!el || !isHeadingElement(el)) {
     return null;

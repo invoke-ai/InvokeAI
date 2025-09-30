@@ -21,13 +21,28 @@ export const getOutputImageName = (item: S['SessionQueueItem']) => {
   )?.[1][0];
   const output = nodeId ? item.session.results[nodeId] : undefined;
 
-  if (!output) {
+  const getImageNameFromOutput = (result?: S['GraphExecutionState']['results'][string]) => {
+    if (!result) {
+      return null;
+    }
+    for (const [_name, value] of objectEntries(result)) {
+      if (isImageField(value)) {
+        return value.image_name;
+      }
+    }
     return null;
+  };
+
+  const imageName = getImageNameFromOutput(output);
+  if (imageName) {
+    return imageName;
   }
 
-  for (const [_name, value] of objectEntries(output)) {
-    if (isImageField(value)) {
-      return value.image_name;
+  // Fallback: search all results for an image field. Custom workflows may not have a canvas_output-prefixed node id.
+  for (const result of Object.values(item.session.results)) {
+    const fallbackName = getImageNameFromOutput(result);
+    if (fallbackName) {
+      return fallbackName;
     }
   }
 
