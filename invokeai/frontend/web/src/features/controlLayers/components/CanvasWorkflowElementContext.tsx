@@ -15,7 +15,7 @@ type CanvasWorkflowElementContextValue = {
 
 const CanvasWorkflowElementContext = createContext<CanvasWorkflowElementContextValue | null>(null);
 
-export const CanvasWorkflowElementProvider = memo(({ children }: PropsWithChildren) => {
+const CanvasWorkflowElementProvider = memo(({ children }: PropsWithChildren) => {
   const nodesState = useAppSelector(selectCanvasWorkflowNodesSlice);
 
   const value = useMemo<CanvasWorkflowElementContextValue>(

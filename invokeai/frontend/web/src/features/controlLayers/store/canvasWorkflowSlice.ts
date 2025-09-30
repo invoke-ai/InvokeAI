@@ -217,7 +217,7 @@ const slice = createSlice({
   },
 });
 
-export const { canvasWorkflowCleared, canvasWorkflowFieldValueChanged } = slice.actions;
+export const { canvasWorkflowCleared } = slice.actions;
 
 export const canvasWorkflowSliceConfig: SliceConfig<typeof slice> = {
   slice,
@@ -242,24 +242,3 @@ export const canvasWorkflowSliceConfig: SliceConfig<typeof slice> = {
 };
 
 export const selectCanvasWorkflowSlice = (state: RootState) => state.canvasWorkflow;
-
-export const selectCanvasWorkflowStatus = (state: RootState) => selectCanvasWorkflowSlice(state).status;
-
-export const selectCanvasWorkflowError = (state: RootState) => selectCanvasWorkflowSlice(state).error;
-
-export const selectCanvasWorkflowSelection = (state: RootState) => selectCanvasWorkflowSlice(state).selectedWorkflowId;
-
-export const selectCanvasWorkflowData = (state: RootState) => selectCanvasWorkflowSlice(state).workflow;
-
-export const selectCanvasWorkflowNodeIds = (state: RootState) => ({
-  inputNodeId: selectCanvasWorkflowSlice(state).inputNodeId,
-  outputNodeId: selectCanvasWorkflowSlice(state).outputNodeId,
-});
-
-export const selectIsCanvasWorkflowActive = (state: RootState) => {
-  const sliceState = selectCanvasWorkflowSlice(state);
-  return (
-    Boolean(sliceState.workflow && sliceState.inputNodeId && sliceState.outputNodeId) &&
-    (sliceState.status === 'succeeded' || sliceState.status === 'idle')
-  );
-};

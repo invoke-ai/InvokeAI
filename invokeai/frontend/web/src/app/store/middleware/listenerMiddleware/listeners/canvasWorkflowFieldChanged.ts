@@ -100,20 +100,10 @@ export const addCanvasWorkflowFieldChangedListener = (startListening: AppStartLi
 
         // Check if this node exists in canvas workflow nodes
         const canvasWorkflowNode = state.canvasWorkflowNodes.nodes.find((n: AnyNode) => n.id === nodeId);
-        const regularNode = state.nodes.present.nodes.find((n: AnyNode) => n.id === nodeId);
-
-        console.log('[canvasWorkflowFieldChanged] Field changed:', {
-          nodeId,
-          hasCanvasNode: !!canvasWorkflowNode,
-          hasRegularNode: !!regularNode,
-          action: action.type,
-          payload: action.payload,
-        });
 
         // If the node exists in canvas workflow, redirect the action
         // This ensures canvas workflow fields always update the canvas workflow nodes slice
         if (canvasWorkflowNode) {
-          console.log('[canvasWorkflowFieldChanged] Redirecting to canvas workflow nodes:', canvasAction.type);
           dispatch(canvasAction(action.payload));
         }
       },

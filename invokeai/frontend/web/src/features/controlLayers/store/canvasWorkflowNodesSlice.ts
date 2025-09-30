@@ -126,13 +126,11 @@ const slice = createSlice({
   name: 'canvasWorkflowNodes',
   initialState: getInitialState(),
   reducers: {
-    canvasWorkflowNodesCleared: () => getInitialState(),
     // Field value mutations - these update the shadow nodes when fields are changed
     fieldValueReset: (state, action: FieldValueAction<StatefulFieldValue>) => {
       fieldValueReducer(state, action, zStatefulFieldValue);
     },
     fieldStringValueChanged: (state, action: FieldValueAction<StringFieldValue>) => {
-      console.log('[canvasWorkflowNodesSlice] fieldStringValueChanged:', action.payload);
       fieldValueReducer(state, action, zStringFieldValue);
     },
     fieldStringCollectionValueChanged: (state, action: FieldValueAction<StringFieldCollectionValue>) => {
@@ -268,7 +266,6 @@ const slice = createSlice({
 });
 
 export const {
-  canvasWorkflowNodesCleared,
   fieldStringValueChanged,
   fieldIntegerValueChanged,
   fieldFloatValueChanged,

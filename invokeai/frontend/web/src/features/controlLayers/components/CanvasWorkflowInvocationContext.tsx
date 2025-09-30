@@ -128,10 +128,6 @@ export const CanvasWorkflowInvocationNodeContextProvider = memo(
           createSelector(selectNodeInputsOrThrow, (inputs) => {
             const field = inputs[fieldName];
             if (field === undefined) {
-              console.error(
-                `[CanvasWorkflowContext] Cannot find input field with name ${fieldName} in node ${nodeId}. Available fields:`,
-                Object.keys(inputs)
-              );
               throw new Error(`Cannot find input field with name ${fieldName} in node ${nodeId}`);
             }
             return field;

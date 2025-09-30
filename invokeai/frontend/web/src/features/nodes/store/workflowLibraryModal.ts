@@ -40,8 +40,3 @@ export const useWorkflowLibraryModal = () => {
 };
 
 export { $isWorkflowLibraryModalOpen };
-
-export const openWorkflowLibraryModal = (context?: WorkflowLibraryContext) => {
-  $workflowLibraryContext.set(context ?? defaultContext);
-  $isWorkflowLibraryModalOpen.set(true);
-};

@@ -12,8 +12,8 @@ import { DividerElement } from 'features/nodes/components/sidePanel/builder/Divi
 import { HeadingElement } from 'features/nodes/components/sidePanel/builder/HeadingElement';
 import { NodeFieldElementViewMode } from 'features/nodes/components/sidePanel/builder/NodeFieldElementViewMode';
 import { TextElement } from 'features/nodes/components/sidePanel/builder/TextElement';
-import { CONTAINER_CLASS_NAME } from 'features/nodes/types/workflow';
 import {
+  CONTAINER_CLASS_NAME,
   isContainerElement,
   isDividerElement,
   isHeadingElement,
