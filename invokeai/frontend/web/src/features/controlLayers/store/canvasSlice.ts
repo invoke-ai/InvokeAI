@@ -193,10 +193,6 @@ const canvasesSlice = createSlice({
       },
     },
     canvasAdding: (_state, _action: CanvasPayloadAction<unknown>) => {},
-    canvasMigrated: (state) => {
-      delete state.migration;
-    },
-    canvasMultiCanvasMigrated: (_state, _action: CanvasPayloadAction<unknown>) => {},
     canvasActivated: (state, action: CanvasPayloadAction<unknown>) => {
       const { canvasId } = action.payload;
 
@@ -227,10 +223,15 @@ const canvasesSlice = createSlice({
       delete state.canvases[canvas.id];
     },
     canvasDeleted: (_state, _action: CanvasPayloadAction<unknown>) => {},
+    canvasMigrated: (state) => {
+      delete state.migration;
+    },
+    canvasMultiCanvasMigrated: (_state, _action: CanvasPayloadAction<unknown>) => {},
+    canvasInitialized: (_state, _action: CanvasPayloadAction<unknown>) => {},
   },
 });
 
-const canvasSlice = createSlice({
+const canvasFragment = createSlice({
   name: 'canvas',
   initialState: {} as CanvasState,
   reducers: {
@@ -1890,6 +1891,11 @@ export const addCanvas = (payload: { isSelected?: boolean }) => (dispatch: AppDi
 
 export const MIGRATION_MULTI_CANVAS_ID_PLACEHOLDER = 'multi-canvas-id-placeholder';
 
+export const deleteCanvas = (payload: { canvasId: string }) => (dispatch: AppDispatch) => {
+  dispatch(canvasesSlice.actions.canvasDeleting(payload));
+  dispatch(canvasesSlice.actions.canvasDeleted(payload));
+};
+
 export const migrateCanvas = () => (dispatch: AppDispatch, getState: () => RootState) => {
   const state = getState();
 
@@ -1900,17 +1906,19 @@ export const migrateCanvas = () => (dispatch: AppDispatch, getState: () => RootS
   dispatch(canvasesSlice.actions.canvasMigrated());
 };
 
-export const deleteCanvas = (payload: { canvasId: string }) => (dispatch: AppDispatch) => {
-  dispatch(canvasesSlice.actions.canvasDeleting(payload));
-  dispatch(canvasesSlice.actions.canvasDeleted(payload));
+export const initializeCanvasDependencies = () => (dispatch: AppDispatch, getState: () => RootState) => {
+  const state = getState();
+
+  dispatch(canvasInitialized({ canvasId: state.canvas.activeCanvasId }));
 };
 
 export const {
   // Canvas
   canvasAdding,
-  canvasMultiCanvasMigrated,
   canvasDeleted,
   canvasActivated,
+  canvasMultiCanvasMigrated,
+  canvasInitialized,
 } = canvasesSlice.actions;
 
 export const {
@@ -2010,9 +2018,9 @@ export const {
   inpaintMaskDenoiseLimitChanged,
   inpaintMaskDenoiseLimitDeleted,
   // inpaintMaskRecalled,
-} = canvasSlice.actions;
+} = canvasFragment.actions;
 
-const isCanvasSliceAction = isAnyOf(...Object.values(canvasSlice.actions));
+const isCanvasAction = isAnyOf(...Object.values(canvasFragment.actions));
 
 let filter = true;
 const isActionFileterd = isAnyOf(canvasNameChanged, entitySelected);
@@ -2024,7 +2032,7 @@ const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
   clearHistoryType: canvasClearHistory.type,
   filter: (action, _state, _history) => {
     // Ignore both all actions from other slices and canvas management actions
-    if (!action.type.startsWith(canvasSlice.name) || isActionFileterd(action)) {
+    if (!action.type.startsWith(canvasFragment.name) || isActionFileterd(action)) {
       return false;
     }
     // Throttle rapid actions of the same type
@@ -2035,15 +2043,15 @@ const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
   // debug: import.meta.env.MODE === 'development',
 };
 
-const undoableCanvasReducer = undoable(canvasSlice.reducer, canvasUndoableConfig);
+const undoableCanvasReducer = undoable(canvasFragment.reducer, canvasUndoableConfig);
 
 export const undoableCanvasesReducer = (
-  state: CanvasesStateWithHistory,
+  state: CanvasesStateWithHistory | undefined,
   action: UnknownAction
 ): CanvasesStateWithHistory => {
   state = canvasesSlice.reducer(state, action);
 
-  if (!isCanvasSliceAction(action)) {
+  if (!isCanvasAction(action)) {
     return state;
   }
 

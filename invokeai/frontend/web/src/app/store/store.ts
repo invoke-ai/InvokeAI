@@ -22,8 +22,13 @@ import { merge } from 'es-toolkit';
 import { omit, pick } from 'es-toolkit/compat';
 import { changeBoardModalSliceConfig } from 'features/changeBoardModal/store/slice';
 import { canvasSettingsReducer, canvasSettingsSliceConfig } from 'features/controlLayers/store/canvasSettingsSlice';
-import { canvasSliceConfig, migrateCanvas, undoableCanvasesReducer } from 'features/controlLayers/store/canvasSlice';
-import { canvasSessionSliceConfig } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import {
+  canvasSliceConfig,
+  initializeCanvasDependencies,
+  migrateCanvas,
+  undoableCanvasesReducer,
+} from 'features/controlLayers/store/canvasSlice';
+import { canvasSessionReducer, canvasSessionSliceConfig } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { lorasSliceConfig } from 'features/controlLayers/store/lorasSlice';
 import { paramsSliceConfig, paramsSliceReducer } from 'features/controlLayers/store/paramsSlice';
 import { refImagesSliceConfig } from 'features/controlLayers/store/refImagesSlice';
@@ -88,7 +93,7 @@ const SLICE_CONFIGS = {
 // Remember to wrap undoable reducers in `undoable()`!
 const ALL_REDUCERS = {
   [api.reducerPath]: api.reducer,
-  [canvasSessionSliceConfig.slice.reducerPath]: canvasSessionSliceConfig.slice.reducer,
+  [canvasSessionSliceConfig.slice.reducerPath]: canvasSessionReducer,
   [canvasSettingsSliceConfig.slice.reducerPath]: canvasSettingsReducer,
   [canvasSliceConfig.slice.reducerPath]: undoableCanvasesReducer,
   [changeBoardModalSliceConfig.slice.reducerPath]: changeBoardModalSliceConfig.slice.reducer,
@@ -222,6 +227,7 @@ export const createStore = (options?: { persist?: boolean; persistDebounce?: num
     effect: (action, { dispatch, unsubscribe }) => {
       unsubscribe();
       dispatch(migrateCanvas());
+      dispatch(initializeCanvasDependencies());
       options?.onRehydrated?.();
     },
   });

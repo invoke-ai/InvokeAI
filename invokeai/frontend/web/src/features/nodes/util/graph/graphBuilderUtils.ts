@@ -12,7 +12,7 @@ import {
   selectRefinerStart,
 } from 'features/controlLayers/store/paramsSlice';
 import { selectActiveCanvas } from 'features/controlLayers/store/selectors';
-import type { InstanceParamsState } from 'features/controlLayers/store/types';
+import type { InstanceParams } from 'features/controlLayers/store/types';
 import type { BoardField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { buildPresetModifiedPrompt } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
@@ -158,7 +158,7 @@ export const getOriginalAndScaledSizesForOtherModes = (state: RootState) => {
 
 export const getInfill = (
   g: Graph,
-  params: InstanceParamsState
+  params: InstanceParams
 ): Invocation<'infill_patchmatch' | 'infill_cv2' | 'infill_lama' | 'infill_rgba' | 'infill_tile'> => {
   const { infillMethod, infillColorValue, infillPatchmatchDownscaleSize, infillTileSize } = params;
 

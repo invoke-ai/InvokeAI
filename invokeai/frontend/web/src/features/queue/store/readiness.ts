@@ -13,7 +13,7 @@ import { selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
 import { selectActiveParams, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectActiveCanvas } from 'features/controlLayers/store/selectors';
-import type { CanvasState, InstanceParamsState, LoRA, RefImagesState } from 'features/controlLayers/store/types';
+import type { CanvasState, InstanceParams, LoRA, RefImagesState } from 'features/controlLayers/store/types';
 import {
   getControlLayerWarnings,
   getGlobalReferenceImageWarnings,
@@ -78,7 +78,7 @@ type UpdateReasonsArg = {
   tab: TabName;
   isConnected: boolean;
   canvas: CanvasState;
-  params: InstanceParamsState;
+  params: InstanceParams;
   refImages: RefImagesState;
   dynamicPrompts: DynamicPromptsState;
   canvasIsFiltering: boolean;
@@ -277,7 +277,7 @@ const disconnectedReason = (t: typeof i18n.t) => ({ content: t('parameters.invok
 const getReasonsWhyCannotEnqueueVideoTab = (arg: {
   isConnected: boolean;
   video: VideoState;
-  params: InstanceParamsState;
+  params: InstanceParams;
   dynamicPrompts: DynamicPromptsState;
   promptExpansionRequest: PromptExpansionRequestState;
   isVideoEnabled: boolean;
@@ -319,7 +319,7 @@ const getReasonsWhyCannotEnqueueVideoTab = (arg: {
 const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   isConnected: boolean;
   model: MainModelConfig | null | undefined;
-  params: InstanceParamsState;
+  params: InstanceParams;
   refImages: RefImagesState;
   loras: LoRA[];
   dynamicPrompts: DynamicPromptsState;
@@ -490,7 +490,7 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
   isConnected: boolean;
   upscale: UpscaleState;
   config: AppConfig;
-  params: InstanceParamsState;
+  params: InstanceParams;
   loras: LoRA[];
   promptExpansionRequest: PromptExpansionRequestState;
 }) => {
@@ -553,7 +553,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   isConnected: boolean;
   model: MainModelConfig | null | undefined;
   canvas: CanvasState;
-  params: InstanceParamsState;
+  params: InstanceParams;
   refImages: RefImagesState;
   loras: LoRA[];
   dynamicPrompts: DynamicPromptsState;

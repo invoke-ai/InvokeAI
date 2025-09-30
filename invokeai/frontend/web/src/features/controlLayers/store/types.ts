@@ -692,7 +692,7 @@ type ParamsTabName = 'generate' | 'canvas' | 'upscaling';
 export type ParamsEnrichedPayload<P = undefined> = EnrichedPayload<{ tab: ParamsTabName; canvasId: string }, P>;
 export type ParamsPayloadAction<P = undefined> = PayloadAction<ParamsEnrichedPayload<P>>;
 
-export const zInstanceParamsState = z.object({
+export const zInstanceParams = z.object({
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -739,22 +739,22 @@ export const zInstanceParamsState = z.object({
   controlLora: zParameterControlLoRAModel.nullable(),
   dimensions: zDimensionsState,
 });
-export type InstanceParamsState = z.infer<typeof zInstanceParamsState>;
+export type InstanceParams = z.infer<typeof zInstanceParams>;
 
-const zCanvasInstanceParamsState = zInstanceParamsState.extend({
+const zCanvasInstanceParams = zInstanceParams.extend({
   canvasId: zId,
 });
-export type CanvasInstanceParamsState = z.infer<typeof zCanvasInstanceParamsState>;
+export type CanvasInstanceParams = z.infer<typeof zCanvasInstanceParams>;
 
 export const zParamsState = z.object({
   _version: z.literal(3),
-  generate: zInstanceParamsState,
-  canvases: z.record(z.string(), zCanvasInstanceParamsState),
-  upscaling: zInstanceParamsState,
+  generate: zInstanceParams,
+  canvases: z.record(z.string(), zCanvasInstanceParams),
+  upscaling: zInstanceParams,
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 
-export const getInitialInstanceParamsState = (): InstanceParamsState => ({
+export const getInitialInstanceParamsState = (): InstanceParams => ({
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -806,7 +806,7 @@ export const getInitialInstanceParamsState = (): InstanceParamsState => ({
   },
 });
 
-export const getInitialCanvasInstanceParamsState = (canvasId: string): CanvasInstanceParamsState => ({
+export const getInitialCanvasInstanceParamsState = (canvasId: string): CanvasInstanceParams => ({
   canvasId,
   ...getInitialInstanceParamsState(),
 });

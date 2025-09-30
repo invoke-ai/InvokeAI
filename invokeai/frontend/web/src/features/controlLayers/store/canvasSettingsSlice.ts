@@ -11,6 +11,7 @@ import { z } from 'zod';
 import {
   canvasAdding,
   canvasDeleted,
+  canvasInitialized,
   canvasMultiCanvasMigrated,
   MIGRATION_MULTI_CANVAS_ID_PLACEHOLDER,
 } from './canvasSlice';
@@ -154,7 +155,7 @@ type CanvasPayloadAction<P> = PayloadAction<PayloadWithCanvasId<P>>;
 
 const canvasSettingsSlice = createSlice({
   name: 'canvasSettings',
-  initialState: getInitialCanvasSettingsState(),
+  initialState: getInitialCanvasSettingsState,
   reducers: {
     settingsClipToBboxChanged: (state, action: PayloadAction<{ clipToBbox: boolean }>) => {
       const { clipToBbox } = action.payload;
@@ -231,10 +232,16 @@ const canvasSettingsSlice = createSlice({
       state.canvases[settings.canvasId] = settings;
       delete state.canvases[MIGRATION_MULTI_CANVAS_ID_PLACEHOLDER];
     });
+    builder.addCase(canvasInitialized, (state, action) => {
+      const canvasId = action.payload.canvasId;
+      if (!state.canvases[canvasId]) {
+        state.canvases[canvasId] = getInitialCanvasInstanceSettings(canvasId);
+      }
+    });
   },
 });
 
-const canvasInstanceSettingsSlice = createSlice({
+const canvasInstanceSettingsFragment = createSlice({
   name: 'canvasSettings',
   initialState: {} as CanvasInstanceSettings,
   reducers: {
@@ -294,11 +301,14 @@ export const {
   settingsBgColorChanged,
   settingsFgColorChanged,
   settingsColorsSetToDefault,
-} = canvasInstanceSettingsSlice.actions;
+} = canvasInstanceSettingsFragment.actions;
 
-const isCanvasInstanceSettingsAction = isAnyOf(...Object.values(canvasInstanceSettingsSlice.actions));
+const isCanvasInstanceSettingsAction = isAnyOf(...Object.values(canvasInstanceSettingsFragment.actions));
 
-export const canvasSettingsReducer = (state: CanvasSettingsState, action: UnknownAction): CanvasSettingsState => {
+export const canvasSettingsReducer = (
+  state: CanvasSettingsState | undefined,
+  action: UnknownAction
+): CanvasSettingsState => {
   state = canvasSettingsSlice.reducer(state, action);
 
   if (!isCanvasInstanceSettingsAction(action)) {
@@ -311,7 +321,7 @@ export const canvasSettingsReducer = (state: CanvasSettingsState, action: Unknow
     ...state,
     canvases: {
       ...state.canvases,
-      [canvasId]: canvasInstanceSettingsSlice.reducer(state.canvases[canvasId], action),
+      [canvasId]: canvasInstanceSettingsFragment.reducer(state.canvases[canvasId], action),
     },
   };
 };
