@@ -39,8 +39,21 @@ export const useLoadWorkflowFromFile = () => {
             dispatch(workflowLoadedFromFile());
             onSuccess?.(validatedWorkflow);
             resolve(validatedWorkflow);
-          } catch {
-            // This is catching the error from the parsing the JSON file
+          } catch (e) {
+            // Log file parsing/loading errors
+            if (e instanceof SyntaxError) {
+              // eslint-disable-next-line no-console
+              console.error('Workflow file JSON parsing failed:', {
+                fileName: file.name,
+                error: e.message,
+              });
+            } else {
+              // eslint-disable-next-line no-console
+              console.error('Workflow file loading failed:', {
+                fileName: file.name,
+                error: e,
+              });
+            }
             onError?.();
             reject();
           } finally {
