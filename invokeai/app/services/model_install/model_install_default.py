@@ -15,7 +15,6 @@ import torch
 import yaml
 from huggingface_hub import HfFolder
 from pydantic.networks import AnyHttpUrl
-from pydantic_core import Url
 from requests import Session
 
 from invokeai.app.services.config import InvokeAIAppConfig
@@ -454,7 +453,7 @@ class ModelInstallService(ModelInstallServiceBase):
             )
         elif re.match(r"^https?://[^/]+", source):
             source_obj = URLModelSource(
-                url=Url(source),
+                url=AnyHttpUrl(source),
             )
         else:
             raise ValueError(f"Unsupported model source: '{source}'")
