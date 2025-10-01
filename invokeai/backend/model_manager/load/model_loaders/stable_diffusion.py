@@ -16,12 +16,12 @@ from invokeai.backend.model_manager.config import (
     CheckpointConfigBase,
     DiffusersConfigBase,
     Main_Checkpoint_SD1_Config,
-    Main_Diffusers_SD1_Config,
     Main_Checkpoint_SD2_Config,
-    Main_Diffusers_SD2_Config,
     Main_Checkpoint_SDXL_Config,
-    Main_Diffusers_SDXL_Config,
     Main_Checkpoint_SDXLRefiner_Config,
+    Main_Diffusers_SD1_Config,
+    Main_Diffusers_SD2_Config,
+    Main_Diffusers_SDXL_Config,
     Main_Diffusers_SDXLRefiner_Config,
 )
 from invokeai.backend.model_manager.load.model_cache.model_cache import get_model_cache_key
