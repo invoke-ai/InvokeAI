@@ -25,7 +25,9 @@ def is_state_dict_likely_flux_control(state_dict: dict[str | int, Any]) -> bool:
     perfect-precision detector would require checking all keys against a whitelist and verifying tensor shapes.)
     """
 
-    all_keys_match = all(re.match(FLUX_CONTROL_TRANSFORMER_KEY_REGEX, str(k)) for k in state_dict.keys())
+    all_keys_match = all(
+        re.match(FLUX_CONTROL_TRANSFORMER_KEY_REGEX, k) for k in state_dict.keys() if isinstance(k, str)
+    )
 
     # Check the shape of the img_in weight, because this layer shape is modified by FLUX control LoRAs.
     lora_a_weight = state_dict.get("img_in.lora_A.weight", None)
