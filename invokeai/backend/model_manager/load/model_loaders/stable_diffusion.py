@@ -15,8 +15,14 @@ from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     CheckpointConfigBase,
     DiffusersConfigBase,
-    SD_1_2_XL_XLRefiner_CheckpointConfig,
-    SD_1_2_XL_XLRefiner_DiffusersConfig,
+    Main_SD1_Checkpoint_Config,
+    Main_SD1_Diffusers_Config,
+    Main_SD2_Checkpoint_Config,
+    Main_SD2_Diffusers_Config,
+    Main_SDXL_Checkpoint_Config,
+    Main_SDXL_Diffusers_Config,
+    Main_SDXLRefiner_Checkpoint_Config,
+    Main_SDXLRefiner_Diffusers_Config,
 )
 from invokeai.backend.model_manager.load.model_cache.model_cache import get_model_cache_key
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
@@ -108,7 +114,19 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
                 ModelVariantType.Normal: StableDiffusionXLPipeline,
             },
         }
-        assert isinstance(config, (SD_1_2_XL_XLRefiner_DiffusersConfig, SD_1_2_XL_XLRefiner_CheckpointConfig))
+        assert isinstance(
+            config,
+            (
+                Main_SD1_Diffusers_Config,
+                Main_SD2_Diffusers_Config,
+                Main_SDXL_Diffusers_Config,
+                Main_SDXLRefiner_Diffusers_Config,
+                Main_SD1_Checkpoint_Config,
+                Main_SD2_Checkpoint_Config,
+                Main_SDXL_Checkpoint_Config,
+                Main_SDXLRefiner_Checkpoint_Config,
+            ),
+        )
         try:
             load_class = load_classes[config.base][config.variant]
         except KeyError as e:

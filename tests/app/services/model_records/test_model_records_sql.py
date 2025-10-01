@@ -21,7 +21,7 @@ from invokeai.backend.model_manager.config import (
     ControlAdapterDefaultSettings,
     MainDiffusersConfig,
     MainModelDefaultSettings,
-    TextualInversionFileConfig,
+    TI_File_Config,
     VAEDiffusersConfig,
 )
 from invokeai.backend.model_manager.taxonomy import ModelSourceType
@@ -40,8 +40,8 @@ def store(
     return ModelRecordServiceSQL(db, logger)
 
 
-def example_ti_config(key: Optional[str] = None) -> TextualInversionFileConfig:
-    config = TextualInversionFileConfig(
+def example_ti_config(key: Optional[str] = None) -> TI_File_Config:
+    config = TI_File_Config(
         source="test/source/",
         source_type=ModelSourceType.Path,
         path="/tmp/pokemon.bin",
@@ -61,7 +61,7 @@ def test_type(store: ModelRecordServiceBase):
     config = example_ti_config("key1")
     store.add_model(config)
     config1 = store.get_model("key1")
-    assert isinstance(config1, TextualInversionFileConfig)
+    assert isinstance(config1, TI_File_Config)
 
 
 def test_raises_on_violating_uniqueness(store: ModelRecordServiceBase):
