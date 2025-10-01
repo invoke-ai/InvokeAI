@@ -748,44 +748,78 @@ class ControlLoRA_LyCORIS_FLUX_Config(ControlAdapterConfigBase, ModelConfigBase)
             raise NotAMatch(cls, "model state dict does not look like a Flux Control LoRA")
 
 
-# LoRADiffusers_SupportedBases: TypeAlias = Literal[
-#     BaseModelType.StableDiffusion1,
-#     BaseModelType.StableDiffusion2,
-#     BaseModelType.StableDiffusionXL,
-#     BaseModelType.Flux,
-# ]
+class LoRA_Diffusers_Config_Base(LoRAConfigBase):
+    """Model config for LoRA/Diffusers models."""
+
+    # TODO(psyche): Needs base handling. For FLUX, the Diffusers format does not indicate a folder model; it indicates
+    # the weights format. FLUX Diffusers LoRAs are single files.
+
+    format: Literal[ModelFormat.Diffusers] = Field(default=ModelFormat.Diffusers)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, fields: dict[str, Any]) -> Self:
+        _validate_is_dir(cls, mod)
+
+        _validate_override_fields(cls, fields)
+
+        cls._validate_base(mod)
+
+        return cls(**fields)
+
+    @classmethod
+    def _validate_base(cls, mod: ModelOnDisk) -> None:
+        """Raise `NotAMatch` if the model base does not match this config class."""
+        expected_base = cls.model_fields["base"].default.value
+        recognized_base = cls._get_base_or_raise(mod)
+        if expected_base is not recognized_base:
+            raise NotAMatch(cls, f"base is {recognized_base}, not {expected_base}")
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        if _get_flux_lora_format(mod):
+            return BaseModelType.Flux
+
+        # If we've gotten here, we assume that the LoRA is a Stable Diffusion LoRA
+        path_to_weight_file = cls._get_weight_file_or_raise(mod)
+        state_dict = mod.load_state_dict(path_to_weight_file)
+        token_vector_length = lora_token_vector_length(state_dict)
+
+        match token_vector_length:
+            case 768:
+                return BaseModelType.StableDiffusion1
+            case 1024:
+                return BaseModelType.StableDiffusion2
+            case 1280:
+                return BaseModelType.StableDiffusionXL  # recognizes format at https://civitai.com/models/224641
+            case 2048:
+                return BaseModelType.StableDiffusionXL
+            case _:
+                raise NotAMatch(cls, f"unrecognized token vector length {token_vector_length}")
+
+    @classmethod
+    def _get_weight_file_or_raise(cls, mod: ModelOnDisk) -> Path:
+        suffixes = ["bin", "safetensors"]
+        weight_files = [mod.path / f"pytorch_lora_weights.{sfx}" for sfx in suffixes]
+        for wf in weight_files:
+            if wf.exists():
+                return wf
+        raise NotAMatch(cls, "missing pytorch_lora_weights.bin or pytorch_lora_weights.safetensors")
 
 
-# class LoRADiffusersConfig(LoRAConfigBase, ModelConfigBase):
-#     """Model config for LoRA/Diffusers models."""
+class LoRA_SD1_Diffusers_Config(LoRA_Diffusers_Config_Base, ModelConfigBase):
+    base: Literal[BaseModelType.StableDiffusion1] = Field(default=BaseModelType.StableDiffusion1)
 
-#     # TODO(psyche): Needs base handling. For FLUX, the Diffusers format does not indicate a folder model; it indicates
-#     # the weights format. FLUX Diffusers LoRAs are single files.
 
-#     base: LoRADiffusers_SupportedBases = Field()
-#     format: Literal[ModelFormat.Diffusers] = Field(default=ModelFormat.Diffusers)
+class LoRA_SD2_Diffusers_Config(LoRA_Diffusers_Config_Base, ModelConfigBase):
+    base: Literal[BaseModelType.StableDiffusion2] = Field(default=BaseModelType.StableDiffusion2)
 
-#     @classmethod
-#     def from_model_on_disk(cls, mod: ModelOnDisk, fields: dict[str, Any]) -> Self:
-#         _validate_is_dir(cls, mod)
 
-#         _validate_override_fields(cls, fields)
+class LoRA_SDXL_Diffusers_Config(LoRA_Diffusers_Config_Base, ModelConfigBase):
+    base: Literal[BaseModelType.StableDiffusionXL] = Field(default=BaseModelType.StableDiffusionXL)
 
-#         cls._validate_looks_like_diffusers_lora(mod)
 
-#         return cls(**fields)
-
-#     @classmethod
-#     def _validate_looks_like_diffusers_lora(cls, mod: ModelOnDisk) -> None:
-#         suffixes = ["bin", "safetensors"]
-#         weight_files = [mod.path / f"pytorch_lora_weights.{sfx}" for sfx in suffixes]
-#         has_lora_weight_file = any(wf.exists() for wf in weight_files)
-#         if not has_lora_weight_file:
-#             raise NotAMatch(cls, "missing pytorch_lora_weights.bin or pytorch_lora_weights.safetensors")
-
-#         flux_lora_format = _get_flux_lora_format(mod)
-#         if flux_lora_format is not FluxLoRAFormat.Diffusers:
-#             raise NotAMatch(cls, "model does not look like a FLUX Diffusers LoRA")
+class LoRA_FLUX_Diffusers_Config(LoRA_Diffusers_Config_Base, ModelConfigBase):
+    base: Literal[BaseModelType.Flux] = Field(default=BaseModelType.Flux)
 
 
 class VAE_Checkpoint_Config_Base(CheckpointConfigBase):
@@ -2332,8 +2366,11 @@ AnyModelConfig = Annotated[
         # LoRA - OMI format
         Annotated[LoRA_OMI_SDXL_Config, LoRA_OMI_SDXL_Config.get_tag()],
         Annotated[LoRA_OMI_FLUX_Config, LoRA_OMI_FLUX_Config.get_tag()],
-        # LoRA - diffusers format (TODO)
-        # Annotated[LoRADiffusersConfig, LoRADiffusersConfig.get_tag()],
+        # LoRA - diffusers format
+        Annotated[LoRA_SD1_Diffusers_Config, LoRA_SD1_Diffusers_Config.get_tag()],
+        Annotated[LoRA_SD2_Diffusers_Config, LoRA_SD2_Diffusers_Config.get_tag()],
+        Annotated[LoRA_SDXL_Diffusers_Config, LoRA_SDXL_Diffusers_Config.get_tag()],
+        Annotated[LoRA_FLUX_Diffusers_Config, LoRA_FLUX_Diffusers_Config.get_tag()],
         # ControlLoRA - diffusers format
         Annotated[ControlLoRA_LyCORIS_FLUX_Config, ControlLoRA_LyCORIS_FLUX_Config.get_tag()],
         Annotated[T5Encoder_T5Encoder_Config, T5Encoder_T5Encoder_Config.get_tag()],
