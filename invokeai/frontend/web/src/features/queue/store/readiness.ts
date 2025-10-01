@@ -13,7 +13,7 @@ import { selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
 import { selectActiveParams, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectActiveCanvas } from 'features/controlLayers/store/selectors';
-import type { CanvasState, InstanceParams, LoRA, RefImagesState } from 'features/controlLayers/store/types';
+import type { CanvasEntity, InstanceParamsState, LoRA, RefImagesState } from 'features/controlLayers/store/types';
 import {
   getControlLayerWarnings,
   getGlobalReferenceImageWarnings,
@@ -77,8 +77,8 @@ export const $isReadyToEnqueue = computed($reasonsWhyCannotEnqueue, (reasons) =>
 type UpdateReasonsArg = {
   tab: TabName;
   isConnected: boolean;
-  canvas: CanvasState;
-  params: InstanceParams;
+  canvas: CanvasEntity;
+  params: InstanceParamsState;
   refImages: RefImagesState;
   dynamicPrompts: DynamicPromptsState;
   canvasIsFiltering: boolean;
@@ -277,7 +277,7 @@ const disconnectedReason = (t: typeof i18n.t) => ({ content: t('parameters.invok
 const getReasonsWhyCannotEnqueueVideoTab = (arg: {
   isConnected: boolean;
   video: VideoState;
-  params: InstanceParams;
+  params: InstanceParamsState;
   dynamicPrompts: DynamicPromptsState;
   promptExpansionRequest: PromptExpansionRequestState;
   isVideoEnabled: boolean;
@@ -319,7 +319,7 @@ const getReasonsWhyCannotEnqueueVideoTab = (arg: {
 const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   isConnected: boolean;
   model: MainModelConfig | null | undefined;
-  params: InstanceParams;
+  params: InstanceParamsState;
   refImages: RefImagesState;
   loras: LoRA[];
   dynamicPrompts: DynamicPromptsState;
@@ -490,7 +490,7 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
   isConnected: boolean;
   upscale: UpscaleState;
   config: AppConfig;
-  params: InstanceParams;
+  params: InstanceParamsState;
   loras: LoRA[];
   promptExpansionRequest: PromptExpansionRequestState;
 }) => {
@@ -552,8 +552,8 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
 const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   isConnected: boolean;
   model: MainModelConfig | null | undefined;
-  canvas: CanvasState;
-  params: InstanceParams;
+  canvas: CanvasEntity;
+  params: InstanceParamsState;
   refImages: RefImagesState;
   loras: LoRA[];
   dynamicPrompts: DynamicPromptsState;

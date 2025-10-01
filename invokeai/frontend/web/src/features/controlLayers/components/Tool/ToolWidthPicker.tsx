@@ -16,7 +16,6 @@ import {
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { clamp } from 'es-toolkit/compat';
-import { useCanvasId } from 'features/controlLayers/hooks/useCanvasId';
 import {
   selectBrushWidth,
   selectEraserWidth,
@@ -184,14 +183,13 @@ SliderToolWidthPickerComponent.displayName = 'SliderToolWidthPickerComponent';
 export const ToolWidthPicker = memo(() => {
   const ref = useRef<HTMLDivElement>(null);
   const dispatch = useAppDispatch();
-  const canvasId = useCanvasId();
   const isBrushSelected = useToolIsSelected('brush');
   const isEraserSelected = useToolIsSelected('eraser');
   const isToolSelected = useMemo(() => {
     return isBrushSelected || isEraserSelected;
   }, [isBrushSelected, isEraserSelected]);
-  const brushWidth = useAppSelector((state) => selectBrushWidth(state, canvasId));
-  const eraserWidth = useAppSelector((state) => selectEraserWidth(state, canvasId));
+  const brushWidth = useAppSelector(selectBrushWidth);
+  const eraserWidth = useAppSelector(selectEraserWidth);
   const width = useMemo(() => {
     if (isBrushSelected) {
       return brushWidth;
@@ -228,12 +226,12 @@ export const ToolWidthPicker = memo(() => {
   const onValueChange = useCallback(
     (value: number) => {
       if (isBrushSelected) {
-        dispatch(settingsBrushWidthChanged({ canvasId, brushWidth: value }));
+        dispatch(settingsBrushWidthChanged(value));
       } else if (isEraserSelected) {
-        dispatch(settingsEraserWidthChanged({ canvasId, eraserWidth: value }));
+        dispatch(settingsEraserWidthChanged(value));
       }
     },
-    [isBrushSelected, isEraserSelected, canvasId, dispatch]
+    [isBrushSelected, isEraserSelected, dispatch]
   );
 
   const onChange = useCallback(

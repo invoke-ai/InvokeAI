@@ -62,13 +62,13 @@ export const StagingAreaContextProvider = memo(({ canvasId, children }: PropsWit
         });
       },
       onDiscard: ({ item_id, status }) => {
-        store.dispatch(canvasQueueItemDiscarded({ canvasId, itemId: item_id }));
+        store.dispatch(canvasQueueItemDiscarded({ itemId: item_id }));
         if (status === 'in_progress' || status === 'pending') {
           store.dispatch(queueApi.endpoints.cancelQueueItem.initiate({ item_id }, { track: false }));
         }
       },
       onDiscardAll: () => {
-        store.dispatch(canvasSessionReset({ canvasId }));
+        store.dispatch(canvasSessionReset());
         if (sessionId) {
           store.dispatch(
             queueApi.endpoints.cancelQueueItemsByDestination.initiate({ destination: sessionId }, { track: false })
@@ -86,7 +86,7 @@ export const StagingAreaContextProvider = memo(({ canvasId, children }: PropsWit
         };
 
         store.dispatch(rasterLayerAdded({ overrides, isSelected: selectedEntityIdentifier?.type === 'raster_layer' }));
-        store.dispatch(canvasSessionReset({ canvasId }));
+        store.dispatch(canvasSessionReset());
         if (sessionId) {
           store.dispatch(
             queueApi.endpoints.cancelQueueItemsByDestination.initiate({ destination: sessionId }, { track: false })
@@ -94,12 +94,12 @@ export const StagingAreaContextProvider = memo(({ canvasId, children }: PropsWit
         }
       },
       onAutoSwitchChange: (mode) => {
-        store.dispatch(settingsStagingAreaAutoSwitchChanged({ stagingAreaAutoSwitch: mode }));
+        store.dispatch(settingsStagingAreaAutoSwitchChanged(mode));
       },
     };
 
     return _stagingAreaAppApi;
-  }, [canvasId, sessionId, selectQueueItems, socket, store]);
+  }, [sessionId, selectQueueItems, socket, store]);
 
   const [stagingAreaApi] = useState(() => new StagingAreaApi());
 

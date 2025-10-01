@@ -1,4 +1,4 @@
-import type { ActionCreatorWithPayload, Selector, UnknownAction } from '@reduxjs/toolkit';
+import type { ActionCreatorWithPayload, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { AppDispatch, RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -9,8 +9,7 @@ import { isPlainObject } from 'es-toolkit';
 import { clamp } from 'es-toolkit/compat';
 import type {
   AspectRatioID,
-  CanvasInstanceParams,
-  InstanceParams,
+  InstanceParamsState,
   ParamsPayloadAction,
   ParamsState,
   RgbaColor,
@@ -21,9 +20,6 @@ import {
   DEFAULT_ASPECT_RATIO_CONFIG,
   FLUX_KONTEXT_ASPECT_RATIOS,
   GEMINI_2_5_ASPECT_RATIOS,
-  getInitialCanvasInstanceParamsState,
-  getInitialInstanceParamsState,
-  getInitialParamsState,
   IMAGEN_ASPECT_RATIOS,
   isChatGPT4oAspectRatioID,
   isFluxKontextAspectRatioID,
@@ -31,7 +27,7 @@ import {
   isImagenAspectRatioID,
   isParamsTab,
   MAX_POSITIVE_PROMPT_HISTORY,
-  zInstanceParams,
+  zInstanceParamsState,
   zParamsState,
 } from 'features/controlLayers/store/types';
 import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
@@ -72,48 +68,103 @@ import { isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 import { modelChanged } from './actions';
-import {
-  canvasAdding,
-  canvasDeleted,
-  canvasInitialized,
-  canvasMultiCanvasMigrated,
-  MIGRATION_MULTI_CANVAS_ID_PLACEHOLDER,
-} from './canvasSlice';
 import { selectActiveCanvasId } from './selectors';
+
+export const getInitialInstanceParamsState = (): InstanceParamsState => ({
+  maskBlur: 16,
+  maskBlurMethod: 'box',
+  canvasCoherenceMode: 'Gaussian Blur',
+  canvasCoherenceMinDenoise: 0,
+  canvasCoherenceEdgeSize: 16,
+  infillMethod: 'lama',
+  infillTileSize: 32,
+  infillPatchmatchDownscaleSize: 1,
+  infillColorValue: { r: 0, g: 0, b: 0, a: 1 },
+  cfgScale: 7.5,
+  cfgRescaleMultiplier: 0,
+  guidance: 4,
+  img2imgStrength: 0.75,
+  optimizedDenoisingEnabled: true,
+  iterations: 1,
+  scheduler: 'dpmpp_3m_k',
+  upscaleScheduler: 'kdpm_2',
+  upscaleCfgScale: 2,
+  seed: 0,
+  shouldRandomizeSeed: true,
+  steps: 30,
+  model: null,
+  vae: null,
+  vaePrecision: 'fp32',
+  fluxVAE: null,
+  seamlessXAxis: false,
+  seamlessYAxis: false,
+  clipSkip: 0,
+  shouldUseCpuNoise: true,
+  positivePrompt: '',
+  positivePromptHistory: [],
+  negativePrompt: null,
+  refinerModel: null,
+  refinerSteps: 20,
+  refinerCFGScale: 7.5,
+  refinerScheduler: 'euler',
+  refinerPositiveAestheticScore: 6,
+  refinerNegativeAestheticScore: 2.5,
+  refinerStart: 0.8,
+  t5EncoderModel: null,
+  clipEmbedModel: null,
+  clipLEmbedModel: null,
+  clipGEmbedModel: null,
+  controlLora: null,
+  dimensions: {
+    width: 512,
+    height: 512,
+    aspectRatio: deepClone(DEFAULT_ASPECT_RATIO_CONFIG),
+  },
+});
+
+const getInitialParamsState = (): ParamsState => ({
+  _version: 3,
+  generate: getInitialInstanceParamsState(),
+  upscaling: getInitialInstanceParamsState(),
+  video: getInitialInstanceParamsState(),
+});
 
 const paramsSlice = createSlice({
   name: 'params',
   initialState: getInitialParamsState,
   reducers: {},
   extraReducers(builder) {
-    builder.addCase(canvasAdding, (state, action) => {
-      const canvasParams = getInitialCanvasInstanceParamsState(action.payload.canvasId);
-      state.canvases[canvasParams.canvasId] = canvasParams;
-    });
-    builder.addCase(canvasDeleted, (state, action) => {
-      delete state.canvases[action.payload.canvasId];
-    });
-    builder.addCase(canvasMultiCanvasMigrated, (state, action) => {
-      const canvasParams = state.canvases[MIGRATION_MULTI_CANVAS_ID_PLACEHOLDER];
-      if (!canvasParams) {
-        return;
+    builder.addDefaultCase((state, action) => {
+      if (!isInstanceParamsAction(action)) {
+        return state;
       }
-      canvasParams.canvasId = action.payload.canvasId;
-      state.canvases[canvasParams.canvasId] = canvasParams;
-      delete state.canvases[MIGRATION_MULTI_CANVAS_ID_PLACEHOLDER];
-    });
-    builder.addCase(canvasInitialized, (state, action) => {
-      const canvasId = action.payload.canvasId;
-      if (!state.canvases[canvasId]) {
-        state.canvases[canvasId] = getInitialCanvasInstanceParamsState(canvasId);
+
+      const { tab } = action.payload;
+
+      switch (tab) {
+        case 'generate':
+          return {
+            ...state,
+            generate: instanceParamsState.reducer(state.generate, action),
+          };
+        case 'upscaling':
+          return {
+            ...state,
+            upscaling: instanceParamsState.reducer(state.upscaling, action),
+          };
+        case 'video':
+          return {
+            ...state,
+            upscaling: instanceParamsState.reducer(state.video, action),
+          };
       }
     });
   },
 });
 
-const instanceParamsFragment = createSlice({
+export const instanceParamsState = createSlice({
   name: 'params',
-  initialState: {} as InstanceParams,
+  initialState: {} as InstanceParamsState,
   reducers: {
     setIterations: (state, action: ParamsPayloadAction<number>) => {
       state.iterations = action.payload.value;
@@ -161,49 +212,49 @@ const instanceParamsFragment = createSlice({
     },
     vaeSelected: (state, action: ParamsPayloadAction<ParameterVAEModel | null>) => {
       // null is a valid VAE!
-      const result = zInstanceParams.shape.vae.safeParse(action.payload);
+      const result = zInstanceParamsState.shape.vae.safeParse(action.payload);
       if (!result.success) {
         return;
       }
       state.vae = result.data;
     },
     fluxVAESelected: (state, action: ParamsPayloadAction<ParameterVAEModel | null>) => {
-      const result = zInstanceParams.shape.fluxVAE.safeParse(action.payload);
+      const result = zInstanceParamsState.shape.fluxVAE.safeParse(action.payload);
       if (!result.success) {
         return;
       }
       state.fluxVAE = result.data;
     },
     t5EncoderModelSelected: (state, action: ParamsPayloadAction<ParameterT5EncoderModel | null>) => {
-      const result = zInstanceParams.shape.t5EncoderModel.safeParse(action.payload);
+      const result = zInstanceParamsState.shape.t5EncoderModel.safeParse(action.payload);
       if (!result.success) {
         return;
       }
       state.t5EncoderModel = result.data;
     },
     controlLoRAModelSelected: (state, action: ParamsPayloadAction<ParameterControlLoRAModel | null>) => {
-      const result = zInstanceParams.shape.controlLora.safeParse(action.payload);
+      const result = zInstanceParamsState.shape.controlLora.safeParse(action.payload);
       if (!result.success) {
         return;
       }
       state.controlLora = result.data;
     },
     clipEmbedModelSelected: (state, action: ParamsPayloadAction<ParameterCLIPEmbedModel | null>) => {
-      const result = zInstanceParams.shape.clipEmbedModel.safeParse(action.payload);
+      const result = zInstanceParamsState.shape.clipEmbedModel.safeParse(action.payload);
       if (!result.success) {
         return;
       }
       state.clipEmbedModel = result.data;
     },
     clipLEmbedModelSelected: (state, action: ParamsPayloadAction<ParameterCLIPLEmbedModel | null>) => {
-      const result = zInstanceParams.shape.clipLEmbedModel.safeParse(action.payload);
+      const result = zInstanceParamsState.shape.clipLEmbedModel.safeParse(action.payload);
       if (!result.success) {
         return;
       }
       state.clipLEmbedModel = result.data;
     },
     clipGEmbedModelSelected: (state, action: ParamsPayloadAction<ParameterCLIPGEmbedModel | null>) => {
-      const result = zInstanceParams.shape.clipGEmbedModel.safeParse(action.payload);
+      const result = zInstanceParamsState.shape.clipGEmbedModel.safeParse(action.payload);
       if (!result.success) {
         return;
       }
@@ -243,7 +294,7 @@ const instanceParamsFragment = createSlice({
       state.negativePrompt = action.payload.value;
     },
     refinerModelChanged: (state, action: ParamsPayloadAction<ParameterSDXLRefinerModel | null>) => {
-      const result = zInstanceParams.shape.refinerModel.safeParse(action.payload);
+      const result = zInstanceParamsState.shape.refinerModel.safeParse(action.payload);
       if (!result.success) {
         return;
       }
@@ -440,7 +491,7 @@ const instanceParamsFragment = createSlice({
   extraReducers(builder) {
     builder.addCase(modelChanged, (state, action) => {
       const { previousModel } = action.payload.value;
-      const result = zInstanceParams.shape.model.safeParse(action.payload.value.model);
+      const result = zInstanceParamsState.shape.model.safeParse(action.payload.value.model);
       if (!result.success) {
         return;
       }
@@ -492,7 +543,7 @@ const getModelMaxClipSkip = (model: ParameterModel) => {
   return CLIP_SKIP_MAP[model.base]?.maxClip;
 };
 
-const resetState = (state: InstanceParams): InstanceParams => {
+const resetState = (state: InstanceParamsState): InstanceParamsState => {
   // When a new session is requested, we need to keep the current model selections, plus dependent state
   // like VAE precision. Everything else gets reset to default.
   const oldState = deepClone(state);
@@ -564,9 +615,9 @@ export const {
   syncedToOptimalDimension,
 
   paramsReset,
-} = instanceParamsFragment.actions;
+} = instanceParamsState.actions;
 
-const instanceParamsActions = { ...instanceParamsFragment.actions, modelChanged };
+const instanceParamsActions = { ...instanceParamsState.actions, modelChanged };
 
 type InstanceParamsAction = typeof instanceParamsActions;
 type InstanceParamsActionCreator = InstanceParamsAction[keyof InstanceParamsAction];
@@ -621,43 +672,7 @@ const dispatchParamsAction = <AC extends InstanceParamsActionCreator>(
   }
 };
 
-const isInstanceParamsAction = isAnyOf(...Object.values(instanceParamsActions));
-
-export const paramsSliceReducer = (state: ParamsState, action: UnknownAction): ParamsState => {
-  state = paramsSlice.reducer(state, action);
-
-  if (!isInstanceParamsAction(action)) {
-    return state;
-  }
-
-  const { tab, canvasId } = action.payload;
-
-  switch (tab) {
-    case 'generate':
-      return {
-        ...state,
-        generate: instanceParamsFragment.reducer(state.generate, action),
-      };
-    case 'canvas':
-      return {
-        ...state,
-        canvases: {
-          ...state.canvases,
-          [canvasId]: { canvasId, ...instanceParamsFragment.reducer(state.canvases[canvasId], action) },
-        },
-      };
-    case 'upscaling':
-      return {
-        ...state,
-        upscaling: instanceParamsFragment.reducer(state.upscaling, action),
-      };
-    case 'video':
-      return {
-        ...state,
-        upscaling: instanceParamsFragment.reducer(state.video, action),
-      };
-  }
-};
+export const isInstanceParamsAction = isAnyOf(...Object.values(instanceParamsActions));
 
 export const paramsSliceConfig: SliceConfig<typeof paramsSlice> = {
   slice: paramsSlice,
@@ -682,15 +697,9 @@ export const paramsSliceConfig: SliceConfig<typeof paramsSlice> = {
 
       if (state._version === 2) {
         // Migrate from v2 to v3: slice represented shared params -> slice represents multiple tabs/canvases params
-        const canvasParams = {
-          canvasId: MIGRATION_MULTI_CANVAS_ID_PLACEHOLDER,
-          ...state,
-        } as CanvasInstanceParams;
-
         state = {
           _version: 3,
           generate: { ...state },
-          canvases: { [canvasParams.canvasId]: canvasParams },
           upscaling: { ...state },
           video: { ...state },
         };
@@ -711,7 +720,7 @@ export const selectActiveParams = (state: RootState) => {
     case 'generate':
       return state.params.generate;
     case 'canvas': {
-      const params = state.params.canvases[canvasId];
+      const params = state.canvas.canvases[canvasId]?.params;
       assert(params, 'Params must exist for a canvas once the canvas has been created');
       return params;
     }
@@ -726,7 +735,7 @@ export const selectActiveParams = (state: RootState) => {
 };
 
 const buildActiveParamsSelector =
-  <T>(selector: Selector<InstanceParams, T>) =>
+  <T>(selector: Selector<InstanceParamsState, T>) =>
   (state: RootState) =>
     selector(selectActiveParams(state));
 

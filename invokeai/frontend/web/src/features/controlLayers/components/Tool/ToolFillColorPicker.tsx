@@ -12,7 +12,6 @@ import {
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import RgbaColorPicker from 'common/components/ColorPicker/RgbaColorPicker';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
-import { useCanvasId } from 'features/controlLayers/hooks/useCanvasId';
 import {
   selectActiveColor,
   selectBgColor,
@@ -29,10 +28,9 @@ import { useTranslation } from 'react-i18next';
 
 export const ToolFillColorPicker = memo(() => {
   const { t } = useTranslation();
-  const canvasId = useCanvasId();
-  const activeColorType = useAppSelector((state) => selectActiveColor(state, canvasId));
-  const bgColor = useAppSelector((state) => selectBgColor(state, canvasId));
-  const fgColor = useAppSelector((state) => selectFgColor(state, canvasId));
+  const activeColorType = useAppSelector((state) => selectActiveColor(state));
+  const bgColor = useAppSelector((state) => selectBgColor(state));
+  const fgColor = useAppSelector((state) => selectFgColor(state));
   const { activeColor, tooltip, bgColorzIndex, fgColorzIndex } = useMemo(() => {
     if (activeColorType === 'bgColor') {
       return { activeColor: bgColor, tooltip: t('controlLayers.fill.bgFillColor'), bgColorzIndex: 2, fgColorzIndex: 1 };
@@ -44,28 +42,28 @@ export const ToolFillColorPicker = memo(() => {
   const onColorChange = useCallback(
     (color: RgbaColor) => {
       if (activeColorType === 'bgColor') {
-        dispatch(settingsBgColorChanged({ canvasId, bgColor: color }));
+        dispatch(settingsBgColorChanged(color));
       } else {
-        dispatch(settingsFgColorChanged({ canvasId, fgColor: color }));
+        dispatch(settingsFgColorChanged(color));
       }
     },
-    [activeColorType, canvasId, dispatch]
+    [activeColorType, dispatch]
   );
 
   useRegisteredHotkeys({
     id: 'setFillColorsToDefault',
     category: 'canvas',
-    callback: () => dispatch(settingsColorsSetToDefault({ canvasId })),
+    callback: () => dispatch(settingsColorsSetToDefault()),
     options: { preventDefault: true },
-    dependencies: [canvasId, dispatch],
+    dependencies: [dispatch],
   });
 
   useRegisteredHotkeys({
     id: 'toggleFillColor',
     category: 'canvas',
-    callback: () => dispatch(settingsActiveColorToggled({ canvasId })),
+    callback: () => dispatch(settingsActiveColorToggled()),
     options: { preventDefault: true },
-    dependencies: [canvasId, dispatch],
+    dependencies: [dispatch],
   });
 
   return (

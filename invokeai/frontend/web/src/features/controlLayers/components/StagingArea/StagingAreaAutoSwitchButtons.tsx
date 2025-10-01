@@ -16,13 +16,13 @@ export const StagingAreaAutoSwitchButtons = memo(() => {
   const dispatch = useAppDispatch();
 
   const onClickOff = useCallback(() => {
-    dispatch(settingsStagingAreaAutoSwitchChanged({ stagingAreaAutoSwitch: 'off' }));
+    dispatch(settingsStagingAreaAutoSwitchChanged('off'));
   }, [dispatch]);
   const onClickSwitchOnStart = useCallback(() => {
-    dispatch(settingsStagingAreaAutoSwitchChanged({ stagingAreaAutoSwitch: 'switch_on_start' }));
+    dispatch(settingsStagingAreaAutoSwitchChanged('switch_on_start'));
   }, [dispatch]);
   const onClickSwitchOnFinished = useCallback(() => {
-    dispatch(settingsStagingAreaAutoSwitchChanged({ stagingAreaAutoSwitch: 'switch_on_finish' }));
+    dispatch(settingsStagingAreaAutoSwitchChanged('switch_on_finish'));
   }, [dispatch]);
 
   return (

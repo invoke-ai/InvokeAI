@@ -12,8 +12,8 @@ import {
   getIsPrimaryMouseDown,
   getPrefixedId,
 } from 'features/controlLayers/konva/util';
-import { buildSelectCanvasSettingsByCanvasId } from 'features/controlLayers/store/canvasSettingsSlice';
-import { selectCanvasById } from 'features/controlLayers/store/selectors';
+import { selectCanvasSettingsByCanvasId } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectCanvasByCanvasId } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
   CanvasInpaintMaskState,
@@ -137,13 +137,13 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.subscriptions.add(this.manager.$isBusy.listen(this.render));
     this.subscriptions.add(
       this.manager.stateApi.createStoreSubscription(
-        (state) => selectCanvasById(state, this.manager.canvasId),
+        (state) => selectCanvasByCanvasId(state, this.manager.canvasId),
         this.render
       )
     );
     this.subscriptions.add(
       this.manager.stateApi.createStoreSubscription(
-        buildSelectCanvasSettingsByCanvasId(this.manager.canvasId),
+        (state) => selectCanvasSettingsByCanvasId(state, this.manager.canvasId),
         this.render
       )
     );

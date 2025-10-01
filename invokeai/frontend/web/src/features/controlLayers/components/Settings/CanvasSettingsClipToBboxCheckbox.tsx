@@ -10,7 +10,7 @@ export const CanvasSettingsClipToBboxCheckbox = memo(() => {
   const dispatch = useAppDispatch();
   const clipToBbox = useAppSelector((state) => selectClipToBbox(state));
   const onChange = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => dispatch(settingsClipToBboxChanged({ clipToBbox: e.target.checked })),
+    (e: ChangeEvent<HTMLInputElement>) => dispatch(settingsClipToBboxChanged(e.target.checked)),
     [dispatch]
   );
   return (

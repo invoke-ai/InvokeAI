@@ -2,7 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectSaveAllImagesToGallery } from 'features/controlLayers/store/canvasSettingsSlice';
-import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { selectCanvasStagingAreaSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   selectActiveParams,
   selectImg2imgStrength,
@@ -12,7 +12,7 @@ import {
   selectRefinerStart,
 } from 'features/controlLayers/store/paramsSlice';
 import { selectActiveCanvas } from 'features/controlLayers/store/selectors';
-import type { InstanceParams } from 'features/controlLayers/store/types';
+import type { InstanceParamsState } from 'features/controlLayers/store/types';
 import type { BoardField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { buildPresetModifiedPrompt } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
@@ -74,7 +74,7 @@ export const selectCanvasDestination = (state: RootState, canvasId: string) => {
     return 'canvas';
   }
 
-  return selectCanvasSessionId(state, canvasId);
+  return selectCanvasStagingAreaSessionId(state, canvasId);
 };
 
 /**
@@ -158,7 +158,7 @@ export const getOriginalAndScaledSizesForOtherModes = (state: RootState) => {
 
 export const getInfill = (
   g: Graph,
-  params: InstanceParams
+  params: InstanceParamsState
 ): Invocation<'infill_patchmatch' | 'infill_cv2' | 'infill_lama' | 'infill_rgba' | 'infill_tile'> => {
   const { infillMethod, infillColorValue, infillPatchmatchDownscaleSize, infillTileSize } = params;
 

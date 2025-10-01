@@ -14,7 +14,7 @@ export const CanvasSettingsInvertScrollCheckbox = memo(() => {
   const invertScrollForToolWidth = useAppSelector((state) => selectInvertScrollForToolWidth(state));
   const onChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
-      dispatch(settingsInvertScrollForToolWidthChanged({ invertScrollForToolWidth: e.target.checked }));
+      dispatch(settingsInvertScrollForToolWidthChanged(e.target.checked));
     },
     [dispatch]
   );

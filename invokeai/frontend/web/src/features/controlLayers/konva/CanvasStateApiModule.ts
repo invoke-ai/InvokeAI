@@ -9,7 +9,7 @@ import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase'
 import type { SubscriptionHandler } from 'features/controlLayers/konva/util';
 import { createReduxSubscription, getPrefixedId } from 'features/controlLayers/konva/util';
 import {
-  buildSelectCanvasSettingsByCanvasId,
+  selectCanvasSettingsByCanvasId,
   settingsBgColorChanged,
   settingsBrushWidthChanged,
   settingsEraserWidthChanged,
@@ -29,11 +29,11 @@ import {
   rasterLayerAdded,
   rgAdded,
 } from 'features/controlLayers/store/canvasSlice';
-import { selectCanvasSessionByCanvasId } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { selectCanvasStagingAreaByCanvasId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectGridSize } from 'features/controlLayers/store/paramsSlice';
 import { selectActiveCanvas, selectAllRenderableEntities, selectBbox } from 'features/controlLayers/store/selectors';
 import type {
-  CanvasState,
+  CanvasEntity,
   EntityBrushLineAddedPayload,
   EntityEraserLineAddedPayload,
   EntityIdentifierPayload,
@@ -123,7 +123,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    *
    * The state is stored in redux.
    */
-  getCanvasState = (): CanvasState => {
+  getCanvasState = (): CanvasEntity => {
     return this.runSelector(selectActiveCanvas);
   };
 
@@ -215,14 +215,14 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * Sets the brush width, pushing state to redux.
    */
   setBrushWidth = (width: number) => {
-    this.store.dispatch(settingsBrushWidthChanged({ canvasId: this.manager.canvasId, brushWidth: width }));
+    this.store.dispatch(settingsBrushWidthChanged(width));
   };
 
   /**
    * Sets the eraser width, pushing state to redux.
    */
   setEraserWidth = (width: number) => {
-    this.store.dispatch(settingsEraserWidthChanged({ canvasId: this.manager.canvasId, eraserWidth: width }));
+    this.store.dispatch(settingsEraserWidthChanged(width));
   };
 
   /**
@@ -230,8 +230,8 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    */
   setColor = (color: Partial<RgbaColor>) => {
     return this.getSettings().activeColor === 'bgColor'
-      ? this.store.dispatch(settingsBgColorChanged({ canvasId: this.manager.canvasId, bgColor: color }))
-      : this.store.dispatch(settingsFgColorChanged({ canvasId: this.manager.canvasId, fgColor: color }));
+      ? this.store.dispatch(settingsBgColorChanged(color))
+      : this.store.dispatch(settingsFgColorChanged(color));
   };
 
   /**
@@ -308,7 +308,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * Gets the canvas settings from redux.
    */
   getSettings = () => {
-    return this.runSelector(buildSelectCanvasSettingsByCanvasId(this.manager.canvasId));
+    return this.runSelector((state) => selectCanvasSettingsByCanvasId(state, this.manager.canvasId));
   };
 
   /**
@@ -367,7 +367,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * Gets the canvas staging area state from redux.
    */
   getStagingArea = () => {
-    return this.runSelector((state) => selectCanvasSessionByCanvasId(state, this.manager.canvasId));
+    return this.runSelector((state) => selectCanvasStagingAreaByCanvasId(state, this.manager.canvasId));
   };
 
   /**

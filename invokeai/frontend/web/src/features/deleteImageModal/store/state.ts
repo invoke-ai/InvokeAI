@@ -9,7 +9,7 @@ import {
   selectRefImagesSlice,
 } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvases } from 'features/controlLayers/store/selectors';
-import type { CanvasState, RefImagesState } from 'features/controlLayers/store/types';
+import type { CanvasEntity, RefImagesState } from 'features/controlLayers/store/types';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { selectGetImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { itemSelected } from 'features/gallery/store/gallerySlice';
@@ -268,7 +268,7 @@ const deleteRasterLayerImages = (state: RootState, dispatch: AppDispatch, image_
 
 export const getImageUsage = (
   nodes: NodesState,
-  canvases: CanvasState[],
+  canvases: CanvasEntity[],
   upscale: UpscaleState,
   refImages: RefImagesState,
   image_name: string

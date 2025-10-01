@@ -1,7 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { addCanvas, canvasActivated, deleteCanvas } from 'features/controlLayers/store/canvasSlice';
+import { canvasActivated, canvasAdded, canvasDeleted } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvases } from 'features/controlLayers/store/selectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,7 +18,7 @@ const AddCanvasButton = memo(() => {
   const dispatch = useAppDispatch();
 
   const onClick = useCallback(() => {
-    dispatch(addCanvas({ isSelected: true }));
+    dispatch(canvasAdded({ isSelected: true }));
   }, [dispatch]);
 
   return (
@@ -46,7 +46,7 @@ const CloseCanvasButton = memo(({ canvasId, canDelete }: CloseCanvasButtonProps)
   const dispatch = useAppDispatch();
 
   const onClick = useCallback(() => {
-    dispatch(deleteCanvas({ canvasId }));
+    dispatch(canvasDeleted({ canvasId }));
   }, [dispatch, canvasId]);
 
   return (

@@ -55,7 +55,7 @@ export const QueueItemPreviewMini = memo(({ item, index }: Props) => {
 
   const onDoubleClick = useCallback(() => {
     if (autoSwitch !== 'off') {
-      dispatch(settingsStagingAreaAutoSwitchChanged({ stagingAreaAutoSwitch: 'off' }));
+      dispatch(settingsStagingAreaAutoSwitchChanged('off'));
       toast({
         title: 'Auto-Switch Disabled',
       });

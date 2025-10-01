@@ -2,6 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type {
   CanvasControlLayerState,
+  CanvasEntity,
   CanvasEntityIdentifier,
   CanvasEntityState,
   CanvasEntityType,
@@ -9,7 +10,6 @@ import type {
   CanvasMetadata,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
-  CanvasState,
 } from 'features/controlLayers/store/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
@@ -23,9 +23,11 @@ const selectCanvasSlice = (state: RootState) => state.canvas;
  * Selects the canvases
  */
 export const selectCanvases = createSelector(selectCanvasSlice, (state) =>
-  Object.values(state.canvases).map(({ present: canvas }) => ({
-    ...canvas,
-    isActive: canvas.id === state.activeCanvasId,
+  Object.values(state.canvases).map((instance) => ({
+    id: instance.id,
+    name: instance.name,
+    ...instance.canvas.present,
+    isActive: instance.id === state.activeCanvasId,
     canDelete: Object.keys(state.canvases).length > 1,
   }))
 );
@@ -35,16 +37,16 @@ export const selectCanvases = createSelector(selectCanvasSlice, (state) =>
  */
 const selectActiveCanvasWithHistory = createSelector(
   selectCanvasSlice,
-  (state) => state.canvases[state.activeCanvasId]!
+  (state) => state.canvases[state.activeCanvasId]!.canvas
 );
 
 export const selectActiveCanvas = createSelector(selectActiveCanvasWithHistory, (canvas) => canvas.present);
-export const selectActiveCanvasId = createSelector(selectActiveCanvas, (canvas) => canvas.id);
+export const selectActiveCanvasId = createSelector(selectCanvasSlice, (state) => state.activeCanvasId);
 
-export const selectCanvasById = (state: RootState, canvasId: string) => {
-  const canvas = selectCanvasSlice(state).canvases[canvasId];
-  assert(canvas, 'Canvas does not exist');
-  return canvas.present;
+export const selectCanvasByCanvasId = (state: RootState, canvasId: string) => {
+  const instance = selectCanvasSlice(state).canvases[canvasId];
+  assert(instance, 'Canvas does not exist');
+  return instance.canvas.present;
 };
 
 /**
@@ -101,7 +103,7 @@ export const selectHasEntities = createSelector(selectEntityCountAll, (count) =>
  * return type will be narrowed as well.
  */
 export function selectEntity<T extends CanvasEntityIdentifier>(
-  state: CanvasState,
+  state: CanvasEntity,
   entityIdentifier: T
 ): Extract<CanvasEntityState, T> | undefined {
   const { id, type } = entityIdentifier;
@@ -131,7 +133,7 @@ export function selectEntity<T extends CanvasEntityIdentifier>(
  * Selects the entity identifier for the entity that is below the given entity in terms of draw order.
  */
 export function selectEntityIdentifierBelowThisOne<T extends CanvasEntityIdentifier>(
-  state: CanvasState,
+  state: CanvasEntity,
   entityIdentifier: T
 ): Extract<CanvasEntityState, T> | undefined {
   const { id, type } = entityIdentifier;
@@ -174,7 +176,7 @@ export function selectEntityIdentifierBelowThisOne<T extends CanvasEntityIdentif
  * Wrapper around {@link selectEntity}.
  */
 export function selectEntityOrThrow<T extends CanvasEntityIdentifier>(
-  state: CanvasState,
+  state: CanvasEntity,
   entityIdentifier: T,
   caller: string
 ): Extract<CanvasEntityState, T> {
@@ -191,7 +193,7 @@ export const selectEntityExists = <T extends CanvasEntityIdentifier>(entityIdent
  * Selects all entities of the given type.
  */
 export function selectAllEntitiesOfType<T extends CanvasEntityState['type']>(
-  state: CanvasState,
+  state: CanvasEntity,
   type: T
 ): Extract<CanvasEntityState, { type: T }>[] {
   let entities: CanvasEntityState[] = [];
@@ -218,7 +220,7 @@ export function selectAllEntitiesOfType<T extends CanvasEntityState['type']>(
 /**
  * Selects all entities, in the order they are displayed in the list.
  */
-export function selectAllEntities(state: CanvasState): CanvasEntityState[] {
+export function selectAllEntities(state: CanvasEntity): CanvasEntityState[] {
   // These are in the same order as they are displayed in the list!
   return [
     ...state.inpaintMasks.entities.toReversed(),
@@ -236,7 +238,7 @@ export function selectAllEntities(state: CanvasState): CanvasEntityState[] {
  * - Regional guidance
  */
 export function selectAllRenderableEntities(
-  state: CanvasState
+  state: CanvasEntity
 ): (CanvasRasterLayerState | CanvasControlLayerState | CanvasInpaintMaskState | CanvasRegionalGuidanceState)[] {
   return [
     ...state.rasterLayers.entities,
@@ -250,7 +252,7 @@ export function selectAllRenderableEntities(
  * Selects the IP adapter for the specific Regional Guidance layer.
  */
 export function selectRegionalGuidanceReferenceImage(
-  state: CanvasState,
+  state: CanvasEntity,
   entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>,
   referenceImageId: string
 ) {

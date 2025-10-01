@@ -21,16 +21,9 @@ import { deepClone } from 'common/util/deepClone';
 import { merge } from 'es-toolkit';
 import { omit, pick } from 'es-toolkit/compat';
 import { changeBoardModalSliceConfig } from 'features/changeBoardModal/store/slice';
-import { canvasSettingsReducer, canvasSettingsSliceConfig } from 'features/controlLayers/store/canvasSettingsSlice';
-import {
-  canvasSliceConfig,
-  initializeCanvasDependencies,
-  migrateCanvas,
-  undoableCanvasesReducer,
-} from 'features/controlLayers/store/canvasSlice';
-import { canvasSessionReducer, canvasSessionSliceConfig } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { canvasSliceConfig } from 'features/controlLayers/store/canvasSlice';
 import { lorasSliceConfig } from 'features/controlLayers/store/lorasSlice';
-import { paramsSliceConfig, paramsSliceReducer } from 'features/controlLayers/store/paramsSlice';
+import { paramsSliceConfig } from 'features/controlLayers/store/paramsSlice';
 import { refImagesSliceConfig } from 'features/controlLayers/store/refImagesSlice';
 import { dynamicPromptsSliceConfig } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { gallerySliceConfig } from 'features/gallery/store/gallerySlice';
@@ -67,8 +60,6 @@ const log = logger('system');
 
 // When adding a slice, add the config to the SLICE_CONFIGS object below, then add the reducer to ALL_REDUCERS.
 const SLICE_CONFIGS = {
-  [canvasSessionSliceConfig.slice.reducerPath]: canvasSessionSliceConfig,
-  [canvasSettingsSliceConfig.slice.reducerPath]: canvasSettingsSliceConfig,
   [canvasSliceConfig.slice.reducerPath]: canvasSliceConfig,
   [changeBoardModalSliceConfig.slice.reducerPath]: changeBoardModalSliceConfig,
   [configSliceConfig.slice.reducerPath]: configSliceConfig,
@@ -93,9 +84,7 @@ const SLICE_CONFIGS = {
 // Remember to wrap undoable reducers in `undoable()`!
 const ALL_REDUCERS = {
   [api.reducerPath]: api.reducer,
-  [canvasSessionSliceConfig.slice.reducerPath]: canvasSessionReducer,
-  [canvasSettingsSliceConfig.slice.reducerPath]: canvasSettingsReducer,
-  [canvasSliceConfig.slice.reducerPath]: undoableCanvasesReducer,
+  [canvasSliceConfig.slice.reducerPath]: canvasSliceConfig.slice.reducer,
   [changeBoardModalSliceConfig.slice.reducerPath]: changeBoardModalSliceConfig.slice.reducer,
   [configSliceConfig.slice.reducerPath]: configSliceConfig.slice.reducer,
   [dynamicPromptsSliceConfig.slice.reducerPath]: dynamicPromptsSliceConfig.slice.reducer,
@@ -103,7 +92,7 @@ const ALL_REDUCERS = {
   [lorasSliceConfig.slice.reducerPath]: lorasSliceConfig.slice.reducer,
   [modelManagerSliceConfig.slice.reducerPath]: modelManagerSliceConfig.slice.reducer,
   [nodesSliceConfig.slice.reducerPath]: undoableNodesSliceReducer,
-  [paramsSliceConfig.slice.reducerPath]: paramsSliceReducer,
+  [paramsSliceConfig.slice.reducerPath]: paramsSliceConfig.slice.reducer,
   [queueSliceConfig.slice.reducerPath]: queueSliceConfig.slice.reducer,
   [refImagesSliceConfig.slice.reducerPath]: refImagesSliceConfig.slice.reducer,
   [stylePresetSliceConfig.slice.reducerPath]: stylePresetSliceConfig.slice.reducer,
@@ -224,10 +213,8 @@ export const createStore = (options?: { persist?: boolean; persistDebounce?: num
   // Once-off listener to support waiting for rehydration before rendering the app
   startAppListening({
     actionCreator: createAction(REMEMBER_REHYDRATED),
-    effect: (action, { dispatch, unsubscribe }) => {
+    effect: (action, { unsubscribe }) => {
       unsubscribe();
-      dispatch(migrateCanvas());
-      dispatch(initializeCanvasDependencies());
       options?.onRehydrated?.();
     },
   });

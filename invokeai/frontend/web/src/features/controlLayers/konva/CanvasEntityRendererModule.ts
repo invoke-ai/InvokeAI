@@ -10,10 +10,10 @@ import {
 } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
+  CanvasEntity,
   CanvasInpaintMaskState,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
-  CanvasState,
 } from 'features/controlLayers/store/types';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import type { Logger } from 'roarr';
@@ -102,7 +102,7 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
     }
   };
 
-  arrangeEntities = (state: CanvasState, prevState: CanvasState | null) => {
+  arrangeEntities = (state: CanvasEntity, prevState: CanvasEntity | null) => {
     if (
       !prevState ||
       state.rasterLayers.entities !== prevState.rasterLayers.entities ||
