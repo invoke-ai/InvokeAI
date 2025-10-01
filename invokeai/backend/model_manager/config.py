@@ -2162,9 +2162,6 @@ def get_model_discriminator_value(v: Any) -> str:
 # when AnyModelConfig is constructed dynamically using ModelConfigBase.all_config_classes
 AnyModelConfig = Annotated[
     Union[
-        # Annotated[MainDiffusersConfig, MainDiffusersConfig.get_tag()],
-        # Annotated[MainCheckpointConfig, MainCheckpointConfig.get_tag()],
-        # SD_1_2_XL_XLRefiner_CheckpointConfig
         Annotated[FLUX_Unquantized_CheckpointConfig, FLUX_Unquantized_CheckpointConfig.get_tag()],
         Annotated[FLUX_Quantized_BnB_NF4_CheckpointConfig, FLUX_Quantized_BnB_NF4_CheckpointConfig.get_tag()],
         Annotated[FLUX_Quantized_GGUF_CheckpointConfig, FLUX_Quantized_GGUF_CheckpointConfig.get_tag()],
