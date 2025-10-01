@@ -35,8 +35,8 @@ import {
   getScaledBoundingBoxDimensions,
 } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { simplifyFlatNumbersArray } from 'features/controlLayers/util/simplify';
+import { API_BASE_MODELS } from 'features/modelManagerV2/models';
 import { isMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
-import { API_BASE_MODELS } from 'features/parameters/types/constants';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
 import type { UndoableOptions } from 'redux-undo';

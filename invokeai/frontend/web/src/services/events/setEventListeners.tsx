@@ -1,4 +1,4 @@
-import { ExternalLink } from '@invoke-ai/ui-library';
+import { ExternalLink, Flex, Text } from '@invoke-ai/ui-library';
 import { isAnyOf } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { socketConnected } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
@@ -20,13 +20,14 @@ import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescri
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { LRUCache } from 'lru-cache';
+import { Trans } from 'react-i18next';
 import type { ApiTagDescription } from 'services/api';
 import { api, LIST_ALL_TAG, LIST_TAG } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi } from 'services/api/endpoints/queue';
 import { workflowsApi } from 'services/api/endpoints/workflows';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
-import { buildOnModelInstallError } from 'services/events/onModelInstallError';
+import { buildOnModelInstallError, DiscordLink, GitHubIssuesLink } from 'services/events/onModelInstallError';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import type { Socket } from 'socket.io-client';
 import type { JsonObject } from 'type-fest';
@@ -292,7 +293,41 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   socket.on('model_install_complete', (data) => {
     log.debug({ data }, 'Model install complete');
 
-    const { id } = data;
+    const { id, config } = data;
+
+    if (
+      config.type === 'unknown' ||
+      config.base === 'unknown' ||
+      /**
+       * Checking if type/base are 'unknown' technically narrows the config such that it's not possible for a config
+       * that passes to the `config.[type|base] === 'unknown'`  checks. In the future, if we have more model config
+       * classes, this may change, so we will continue to check all three. Any one being 'unknown' is concerning
+       * enough to warrant a toast.
+       */
+      /* @ts-expect-error See note above */
+      config.format === 'unknown'
+    ) {
+      toast({
+        id: 'UNKNOWN_MODEL',
+        title: t('modelManager.unidentifiedModelTitle'),
+        description: (
+          <Flex flexDir="column" gap={2}>
+            <Text fontSize="md" as="span">
+              <Trans i18nKey="modelManager.unidentifiedModelMessage" />
+            </Text>
+            <Text fontSize="md" as="span">
+              <Trans
+                i18nKey="modelManager.unidentifiedModelMessage2"
+                components={{ DiscordLink: <DiscordLink />, GitHubIssuesLink: <GitHubIssuesLink /> }}
+              />
+            </Text>
+          </Flex>
+        ),
+        status: 'error',
+        isClosable: true,
+        duration: null,
+      });
+    }
 
     const installs = selectModelInstalls(getState()).data;
 

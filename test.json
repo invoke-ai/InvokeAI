@@ -1,0 +1,189 @@
+{
+  "$defs": {
+    "ClipVariantType": {
+      "description": "Variant type.",
+      "enum": ["large", "gigantic"],
+      "title": "ClipVariantType",
+      "type": "string"
+    },
+    "ModelSourceType": {
+      "description": "Model source type.",
+      "enum": ["path", "url", "hf_repo_id"],
+      "title": "ModelSourceType",
+      "type": "string"
+    },
+    "ModelType": {
+      "description": "Model type.",
+      "enum": [
+        "onnx",
+        "main",
+        "vae",
+        "lora",
+        "control_lora",
+        "controlnet",
+        "embedding",
+        "ip_adapter",
+        "clip_vision",
+        "clip_embed",
+        "t2i_adapter",
+        "t5_encoder",
+        "spandrel_image_to_image",
+        "siglip",
+        "flux_redux",
+        "llava_onevision",
+        "video",
+        "unknown"
+      ],
+      "title": "ModelType",
+      "type": "string"
+    },
+    "ModelVariantType": {
+      "description": "Variant type.",
+      "enum": ["normal", "inpaint", "depth"],
+      "title": "ModelVariantType",
+      "type": "string"
+    },
+    "SubModelType": {
+      "description": "Submodel type.",
+      "enum": [
+        "unet",
+        "transformer",
+        "text_encoder",
+        "text_encoder_2",
+        "text_encoder_3",
+        "tokenizer",
+        "tokenizer_2",
+        "tokenizer_3",
+        "vae",
+        "vae_decoder",
+        "vae_encoder",
+        "scheduler",
+        "safety_checker"
+      ],
+      "title": "SubModelType",
+      "type": "string"
+    },
+    "SubmodelDefinition": {
+      "properties": {
+        "path_or_prefix": { "title": "Path Or Prefix", "type": "string" },
+        "model_type": { "$ref": "#/$defs/ModelType" },
+        "variant": {
+          "anyOf": [
+            { "$ref": "#/$defs/ModelVariantType" },
+            { "$ref": "#/$defs/ClipVariantType" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "title": "Variant"
+        }
+      },
+      "required": ["path_or_prefix", "model_type"],
+      "title": "SubmodelDefinition",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "key": {
+      "description": "A unique key for this model.",
+      "title": "Key",
+      "type": "string"
+    },
+    "hash": {
+      "description": "The hash of the model file(s).",
+      "title": "Hash",
+      "type": "string"
+    },
+    "path": {
+      "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.",
+      "title": "Path",
+      "type": "string"
+    },
+    "file_size": {
+      "description": "The size of the model in bytes.",
+      "title": "File Size",
+      "type": "integer"
+    },
+    "name": {
+      "description": "Name of the model.",
+      "title": "Name",
+      "type": "string"
+    },
+    "type": {
+      "const": "unknown",
+      "default": "unknown",
+      "title": "Type",
+      "type": "string"
+    },
+    "format": {
+      "const": "unknown",
+      "default": "unknown",
+      "title": "Format",
+      "type": "string"
+    },
+    "base": {
+      "const": "any",
+      "default": "any",
+      "title": "Base",
+      "type": "string"
+    },
+    "source": {
+      "description": "The original source of the model (path, URL or repo_id).",
+      "title": "Source",
+      "type": "string"
+    },
+    "source_type": {
+      "$ref": "#/$defs/ModelSourceType",
+      "description": "The type of source"
+    },
+    "description": {
+      "anyOf": [{ "type": "string" }, { "type": "null" }],
+      "default": null,
+      "description": "Model description",
+      "title": "Description"
+    },
+    "source_api_response": {
+      "anyOf": [{ "type": "string" }, { "type": "null" }],
+      "default": null,
+      "description": "The original API response from the source, as stringified JSON.",
+      "title": "Source Api Response"
+    },
+    "cover_image": {
+      "anyOf": [{ "type": "string" }, { "type": "null" }],
+      "default": null,
+      "description": "Url for image to preview model",
+      "title": "Cover Image"
+    },
+    "submodels": {
+      "anyOf": [
+        {
+          "additionalProperties": { "$ref": "#/$defs/SubmodelDefinition" },
+          "propertyNames": { "$ref": "#/$defs/SubModelType" },
+          "type": "object"
+        },
+        { "type": "null" }
+      ],
+      "default": null,
+      "description": "Loadable submodels in this model",
+      "title": "Submodels"
+    },
+    "usage_info": {
+      "anyOf": [{ "type": "string" }, { "type": "null" }],
+      "default": null,
+      "description": "Usage information for this model",
+      "title": "Usage Info"
+    }
+  },
+  "required": [
+    "hash",
+    "path",
+    "file_size",
+    "name",
+    "source",
+    "source_type",
+    "key",
+    "type",
+    "format"
+  ],
+  "title": "UnknownModelConfig",
+  "type": "object"
+}

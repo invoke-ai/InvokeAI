@@ -2467,7 +2467,7 @@ export type components = {
          * @description Base model type.
          * @enum {string}
          */
-        BaseModelType: "any" | "sd-1" | "sd-2" | "sd-3" | "sdxl" | "sdxl-refiner" | "flux" | "cogview4" | "imagen3" | "imagen4" | "gemini-2.5" | "chatgpt-4o" | "flux-kontext" | "veo3" | "runway";
+        BaseModelType: "any" | "sd-1" | "sd-2" | "sd-3" | "sdxl" | "sdxl-refiner" | "flux" | "cogview4" | "imagen3" | "imagen4" | "gemini-2.5" | "chatgpt-4o" | "flux-kontext" | "veo3" | "runway" | "unknown";
         /** Batch */
         Batch: {
             /**
@@ -12673,6 +12673,7 @@ export type components = {
          *         remote_api_tokens: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.
          *         scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.
          *         unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.
+         *         allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.
          */
         InvokeAIAppConfig: {
             /**
@@ -13028,6 +13029,12 @@ export type components = {
              * @default false
              */
             unsafe_disable_picklescan?: boolean;
+            /**
+             * Allow Unknown Models
+             * @description Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.
+             * @default true
+             */
+            allow_unknown_models?: boolean;
         };
         /**
          * InvokeAIAppConfigWithSetFields
@@ -16907,7 +16914,7 @@ export type components = {
          * @description Storage format of model.
          * @enum {string}
          */
-        ModelFormat: "omi" | "diffusers" | "checkpoint" | "lycoris" | "onnx" | "olive" | "embedding_file" | "embedding_folder" | "invokeai" | "t5_encoder" | "bnb_quantized_int8b" | "bnb_quantized_nf4b" | "gguf_quantized" | "api";
+        ModelFormat: "omi" | "diffusers" | "checkpoint" | "lycoris" | "onnx" | "olive" | "embedding_file" | "embedding_folder" | "invokeai" | "t5_encoder" | "bnb_quantized_int8b" | "bnb_quantized_nf4b" | "gguf_quantized" | "api" | "unknown";
         /** ModelIdentifierField */
         ModelIdentifierField: {
             /**
@@ -17040,6 +17047,11 @@ export type components = {
              * @description Size of the model (may be None for installation of a local path)
              */
             total_bytes: number | null;
+            /**
+             * Config
+             * @description The installed model's config
+             */
+            config: components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRAOmiConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["LlavaOnevisionConfig"] | components["schemas"]["ApiModelConfig"] | components["schemas"]["VideoApiModelConfig"] | components["schemas"]["UnknownModelConfig"];
         };
         /**
          * ModelInstallDownloadProgressEvent
@@ -17205,7 +17217,7 @@ export type components = {
              * Config Out
              * @description After successful installation, this will hold the configuration object.
              */
-            config_out?: (components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRAOmiConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["LlavaOnevisionConfig"] | components["schemas"]["ApiModelConfig"] | components["schemas"]["VideoApiModelConfig"]) | null;
+            config_out?: (components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRAOmiConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["LlavaOnevisionConfig"] | components["schemas"]["ApiModelConfig"] | components["schemas"]["VideoApiModelConfig"] | components["schemas"]["UnknownModelConfig"]) | null;
             /**
              * Inplace
              * @description Leave model in its current location; otherwise install under models directory
@@ -17291,7 +17303,7 @@ export type components = {
              * Config
              * @description The model's config
              */
-            config: components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRAOmiConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["LlavaOnevisionConfig"] | components["schemas"]["ApiModelConfig"] | components["schemas"]["VideoApiModelConfig"];
+            config: components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRAOmiConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["LlavaOnevisionConfig"] | components["schemas"]["ApiModelConfig"] | components["schemas"]["VideoApiModelConfig"] | components["schemas"]["UnknownModelConfig"];
             /**
              * @description The submodel type, if any
              * @default null
@@ -17312,7 +17324,7 @@ export type components = {
              * Config
              * @description The model's config
              */
-            config: components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRAOmiConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["LlavaOnevisionConfig"] | components["schemas"]["ApiModelConfig"] | components["schemas"]["VideoApiModelConfig"];
+            config: components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRAOmiConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["LlavaOnevisionConfig"] | components["schemas"]["ApiModelConfig"] | components["schemas"]["VideoApiModelConfig"] | components["schemas"]["UnknownModelConfig"];
             /**
              * @description The submodel type, if any
              * @default null
@@ -17468,7 +17480,7 @@ export type components = {
          * @description Model type.
          * @enum {string}
          */
-        ModelType: "onnx" | "main" | "vae" | "lora" | "control_lora" | "controlnet" | "embedding" | "ip_adapter" | "clip_vision" | "clip_embed" | "t2i_adapter" | "t5_encoder" | "spandrel_image_to_image" | "siglip" | "flux_redux" | "llava_onevision" | "video";
+        ModelType: "onnx" | "main" | "vae" | "lora" | "control_lora" | "controlnet" | "embedding" | "ip_adapter" | "clip_vision" | "clip_embed" | "t2i_adapter" | "t5_encoder" | "spandrel_image_to_image" | "siglip" | "flux_redux" | "llava_onevision" | "video" | "unknown";
         /**
          * ModelVariantType
          * @description Variant type.
@@ -17481,7 +17493,7 @@ export type components = {
          */
         ModelsList: {
             /** Models */
-            models: (components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRAOmiConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["LlavaOnevisionConfig"] | components["schemas"]["ApiModelConfig"] | components["schemas"]["VideoApiModelConfig"])[];
+            models: (components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRAOmiConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["LlavaOnevisionConfig"] | components["schemas"]["ApiModelConfig"] | components["schemas"]["VideoApiModelConfig"] | components["schemas"]["UnknownModelConfig"])[];
         };
         /**
          * Multiply Integers
@@ -21928,6 +21940,86 @@ export type components = {
              */
             token: string;
         };
+        /** UnknownModelConfig */
+        UnknownModelConfig: {
+            /**
+             * Key
+             * @description A unique key for this model.
+             */
+            key: string;
+            /**
+             * Hash
+             * @description The hash of the model file(s).
+             */
+            hash: string;
+            /**
+             * Path
+             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
+             */
+            path: string;
+            /**
+             * File Size
+             * @description The size of the model in bytes.
+             */
+            file_size: number;
+            /**
+             * Name
+             * @description Name of the model.
+             */
+            name: string;
+            /**
+             * Type
+             * @default unknown
+             * @constant
+             */
+            type: "unknown";
+            /**
+             * Format
+             * @default unknown
+             * @constant
+             */
+            format: "unknown";
+            /**
+             * Base
+             * @default unknown
+             * @constant
+             */
+            base: "unknown";
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response?: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image?: string | null;
+            /**
+             * Submodels
+             * @description Loadable submodels in this model
+             */
+            submodels?: {
+                [key: string]: components["schemas"]["SubmodelDefinition"];
+            } | null;
+            /**
+             * Usage Info
+             * @description Usage information for this model
+             */
+            usage_info?: string | null;
+        };
         /**
          * Unsharp Mask
          * @description Applies an unsharp mask filter to an image
@@ -22938,7 +23030,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRAOmiConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["LlavaOnevisionConfig"] | components["schemas"]["ApiModelConfig"] | components["schemas"]["VideoApiModelConfig"];
+                    "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRAOmiConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["LlavaOnevisionConfig"] | components["schemas"]["ApiModelConfig"] | components["schemas"]["VideoApiModelConfig"] | components["schemas"]["UnknownModelConfig"];
                 };
             };
             /** @description Validation Error */
@@ -22988,7 +23080,7 @@ export interface operations {
                      *       "repo_variant": "fp16",
                      *       "upcast_attention": false
                      *     } */
-                    "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRAOmiConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["LlavaOnevisionConfig"] | components["schemas"]["ApiModelConfig"] | components["schemas"]["VideoApiModelConfig"];
+                    "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRAOmiConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["LlavaOnevisionConfig"] | components["schemas"]["ApiModelConfig"] | components["schemas"]["VideoApiModelConfig"] | components["schemas"]["UnknownModelConfig"];
                 };
             };
             /** @description Bad request */
@@ -23093,7 +23185,7 @@ export interface operations {
                      *       "repo_variant": "fp16",
                      *       "upcast_attention": false
                      *     } */
-                    "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRAOmiConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["LlavaOnevisionConfig"] | components["schemas"]["ApiModelConfig"] | components["schemas"]["VideoApiModelConfig"];
+                    "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRAOmiConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["LlavaOnevisionConfig"] | components["schemas"]["ApiModelConfig"] | components["schemas"]["VideoApiModelConfig"] | components["schemas"]["UnknownModelConfig"];
                 };
             };
             /** @description Bad request */
@@ -23607,7 +23699,7 @@ export interface operations {
                      *       "repo_variant": "fp16",
                      *       "upcast_attention": false
                      *     } */
-                    "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRAOmiConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["LlavaOnevisionConfig"] | components["schemas"]["ApiModelConfig"] | components["schemas"]["VideoApiModelConfig"];
+                    "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRAOmiConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["LlavaOnevisionConfig"] | components["schemas"]["ApiModelConfig"] | components["schemas"]["VideoApiModelConfig"] | components["schemas"]["UnknownModelConfig"];
                 };
             };
             /** @description Bad request */
