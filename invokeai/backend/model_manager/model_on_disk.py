@@ -128,26 +128,3 @@ class ModelOnDisk:
                         f"Please specify the intended file using the 'path' argument"
                     )
         return path
-
-    def has_keys_exact(self, keys: str | set[str], path: Optional[Path] = None) -> bool:
-        _keys = {keys} if isinstance(keys, str) else keys
-        state_dict = self.load_state_dict(path)
-        return _keys.issubset({key for key in state_dict.keys() if isinstance(key, str)})
-
-    def has_keys_starting_with(self, prefixes: str | set[str], path: Optional[Path] = None) -> bool:
-        _prefixes = {prefixes} if isinstance(prefixes, str) else prefixes
-        state_dict = self.load_state_dict(path)
-        return any(
-            any(key.startswith(prefix) for prefix in _prefixes) for key in state_dict.keys() if isinstance(key, str)
-        )
-
-    def has_keys_ending_with(self, suffixes: str | set[str], path: Optional[Path] = None) -> bool:
-        _suffixes = {suffixes} if isinstance(suffixes, str) else suffixes
-        state_dict = self.load_state_dict(path)
-        return any(
-            any(key.endswith(suffix) for suffix in _suffixes) for key in state_dict.keys() if isinstance(key, str)
-        )
-
-    def common_config_paths(self) -> set[Path]:
-        """Returns common config file paths for models stored in directories."""
-        return {self.path / "config.json", self.path / "model_index.json"}
