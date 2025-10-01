@@ -29,7 +29,13 @@ from invokeai.app.services.model_records import (
 )
 from invokeai.app.util.suppress_output import SuppressOutput
 from invokeai.backend.model_manager import BaseModelType, ModelFormat, ModelType
-from invokeai.backend.model_manager.config import AnyModelConfig, SD_1_2_XL_XLRefiner_CheckpointConfig
+from invokeai.backend.model_manager.config import (
+    AnyModelConfig,
+    Main_SD1_Checkpoint_Config,
+    Main_SD2_Checkpoint_Config,
+    Main_SDXL_Checkpoint_Config,
+    Main_SDXLRefiner_Checkpoint_Config,
+)
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
 from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
@@ -738,7 +744,15 @@ async def convert_model(
         logger.error(str(e))
         raise HTTPException(status_code=424, detail=str(e))
 
-    if isinstance(model_config, SD_1_2_XL_XLRefiner_CheckpointConfig):
+    if isinstance(
+        model_config,
+        (
+            Main_SD1_Checkpoint_Config,
+            Main_SD2_Checkpoint_Config,
+            Main_SDXL_Checkpoint_Config,
+            Main_SDXLRefiner_Checkpoint_Config,
+        ),
+    ):
         msg = f"The model with key {key} is not a main SD 1/2/XL checkpoint model."
         logger.error(msg)
         raise HTTPException(400, msg)
