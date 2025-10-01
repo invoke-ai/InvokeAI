@@ -687,8 +687,9 @@ const zPositivePromptHistory = z
 
 type EnrichedPayload<T, P> = P extends undefined ? T : T & { value: P };
 
-export const isParamsTab = (tab: TabName) => tab === 'generate' || tab === 'canvas' || tab === 'upscaling';
-type ParamsTabName = 'generate' | 'canvas' | 'upscaling';
+export const isParamsTab = (tab: TabName) =>
+  tab === 'generate' || tab === 'canvas' || tab === 'upscaling' || tab === 'video';
+type ParamsTabName = 'generate' | 'canvas' | 'upscaling' | 'video';
 export type ParamsEnrichedPayload<P = undefined> = EnrichedPayload<{ tab: ParamsTabName; canvasId: string }, P>;
 export type ParamsPayloadAction<P = undefined> = PayloadAction<ParamsEnrichedPayload<P>>;
 
@@ -751,6 +752,7 @@ export const zParamsState = z.object({
   generate: zInstanceParams,
   canvases: z.record(z.string(), zCanvasInstanceParams),
   upscaling: zInstanceParams,
+  video: zInstanceParams,
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 
@@ -816,6 +818,7 @@ export const getInitialParamsState = (): ParamsState => ({
   generate: getInitialInstanceParamsState(),
   canvases: {},
   upscaling: getInitialInstanceParamsState(),
+  video: getInitialInstanceParamsState(),
 });
 
 const zInpaintMasks = z.object({

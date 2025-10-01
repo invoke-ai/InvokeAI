@@ -651,6 +651,11 @@ export const paramsSliceReducer = (state: ParamsState, action: UnknownAction): P
         ...state,
         upscaling: instanceParamsFragment.reducer(state.upscaling, action),
       };
+    case 'video':
+      return {
+        ...state,
+        upscaling: instanceParamsFragment.reducer(state.video, action),
+      };
   }
 };
 
@@ -687,6 +692,7 @@ export const paramsSliceConfig: SliceConfig<typeof paramsSlice> = {
           generate: { ...state },
           canvases: { [canvasParams.canvasId]: canvasParams },
           upscaling: { ...state },
+          video: { ...state },
         };
       }
 
@@ -695,13 +701,11 @@ export const paramsSliceConfig: SliceConfig<typeof paramsSlice> = {
   },
 };
 
+const initialInstanceParamsState = getInitialInstanceParamsState();
+
 export const selectActiveParams = (state: RootState) => {
   const tab = selectActiveTab(state);
   const canvasId = selectActiveCanvasId(state);
-  assert(
-    tab === 'generate' || tab === 'canvas' || tab === 'upscaling',
-    `Unsupported tab ${tab} for params slice selector`
-  );
 
   switch (tab) {
     case 'generate':
@@ -713,7 +717,12 @@ export const selectActiveParams = (state: RootState) => {
     }
     case 'upscaling':
       return state.params.upscaling;
+    case 'video':
+      return state.params.video;
   }
+
+  // Fallback for global controls
+  return initialInstanceParamsState;
 };
 
 const buildActiveParamsSelector =
