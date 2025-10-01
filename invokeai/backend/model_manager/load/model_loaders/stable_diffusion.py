@@ -15,14 +15,14 @@ from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     CheckpointConfigBase,
     DiffusersConfigBase,
-    Main_SD1_Checkpoint_Config,
-    Main_SD1_Diffusers_Config,
-    Main_SD2_Checkpoint_Config,
-    Main_SD2_Diffusers_Config,
-    Main_SDXL_Checkpoint_Config,
-    Main_SDXL_Diffusers_Config,
-    Main_SDXLRefiner_Checkpoint_Config,
-    Main_SDXLRefiner_Diffusers_Config,
+    Main_Checkpoint_SD1_Config,
+    Main_Diffusers_SD1_Config,
+    Main_Checkpoint_SD2_Config,
+    Main_Diffusers_SD2_Config,
+    Main_Checkpoint_SDXL_Config,
+    Main_Diffusers_SDXL_Config,
+    Main_Checkpoint_SDXLRefiner_Config,
+    Main_Diffusers_SDXLRefiner_Config,
 )
 from invokeai.backend.model_manager.load.model_cache.model_cache import get_model_cache_key
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
@@ -117,14 +117,14 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
         assert isinstance(
             config,
             (
-                Main_SD1_Diffusers_Config,
-                Main_SD2_Diffusers_Config,
-                Main_SDXL_Diffusers_Config,
-                Main_SDXLRefiner_Diffusers_Config,
-                Main_SD1_Checkpoint_Config,
-                Main_SD2_Checkpoint_Config,
-                Main_SDXL_Checkpoint_Config,
-                Main_SDXLRefiner_Checkpoint_Config,
+                Main_Diffusers_SD1_Config,
+                Main_Diffusers_SD2_Config,
+                Main_Diffusers_SDXL_Config,
+                Main_Diffusers_SDXLRefiner_Config,
+                Main_Checkpoint_SD1_Config,
+                Main_Checkpoint_SD2_Config,
+                Main_Checkpoint_SDXL_Config,
+                Main_Checkpoint_SDXLRefiner_Config,
             ),
         )
         try:
