@@ -13,8 +13,8 @@ from invokeai.app.services.model_records.model_records_base import ModelRecordCh
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
+    IPAdapter_InvokeAI_Config_Base,
     IPAdapterCheckpointConfig,
-    IPAdapterInvokeAIConfig,
 )
 from invokeai.backend.model_manager.starter_models import (
     StarterModel,
@@ -123,9 +123,9 @@ class IPAdapterInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> IPAdapterOutput:
         # Lookup the CLIP Vision encoder that is intended to be used with the IP-Adapter model.
         ip_adapter_info = context.models.get_config(self.ip_adapter_model.key)
-        assert isinstance(ip_adapter_info, (IPAdapterInvokeAIConfig, IPAdapterCheckpointConfig))
+        assert isinstance(ip_adapter_info, (IPAdapter_InvokeAI_Config_Base, IPAdapterCheckpointConfig))
 
-        if isinstance(ip_adapter_info, IPAdapterInvokeAIConfig):
+        if isinstance(ip_adapter_info, IPAdapter_InvokeAI_Config_Base):
             image_encoder_model_id = ip_adapter_info.image_encoder_model_id
             image_encoder_model_name = image_encoder_model_id.split("/")[-1].strip()
         else:
