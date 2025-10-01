@@ -31,10 +31,10 @@ from invokeai.app.util.suppress_output import SuppressOutput
 from invokeai.backend.model_manager import BaseModelType, ModelFormat, ModelType
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
-    Main_SD1_Checkpoint_Config,
-    Main_SD2_Checkpoint_Config,
-    Main_SDXL_Checkpoint_Config,
-    Main_SDXLRefiner_Checkpoint_Config,
+    Main_Checkpoint_SD1_Config,
+    Main_Checkpoint_SD2_Config,
+    Main_Checkpoint_SDXL_Config,
+    Main_Checkpoint_SDXLRefiner_Config,
 )
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
@@ -747,10 +747,10 @@ async def convert_model(
     if isinstance(
         model_config,
         (
-            Main_SD1_Checkpoint_Config,
-            Main_SD2_Checkpoint_Config,
-            Main_SDXL_Checkpoint_Config,
-            Main_SDXLRefiner_Checkpoint_Config,
+            Main_Checkpoint_SD1_Config,
+            Main_Checkpoint_SD2_Config,
+            Main_Checkpoint_SDXL_Config,
+            Main_Checkpoint_SDXLRefiner_Config,
         ),
     ):
         msg = f"The model with key {key} is not a main SD 1/2/XL checkpoint model."
