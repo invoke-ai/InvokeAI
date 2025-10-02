@@ -3,7 +3,7 @@
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     InvalidModelConfigException,
-    ModelConfigBase,
+    Config_Base,
     ModelConfigFactory,
 )
 from invokeai.backend.model_manager.legacy_probe import ModelProbe
@@ -30,7 +30,7 @@ __all__ = [
     "ModelConfigFactory",
     "ModelProbe",
     "ModelSearch",
-    "ModelConfigBase",
+    "Config_Base",
     "AnyModel",
     "AnyVariant",
     "BaseModelType",

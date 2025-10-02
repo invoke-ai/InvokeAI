@@ -15,7 +15,7 @@ from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     InvalidModelConfigException,
     MainDiffusersConfig,
-    ModelConfigBase,
+    Config_Base,
     ModelConfigFactory,
     get_model_discriminator_value,
 )
@@ -109,7 +109,7 @@ def test_probe_sd1_diffusers_inpainting(datadir: Path):
     assert config.repo_variant is ModelRepoVariant.FP16
 
 
-class MinimalConfigExample(ModelConfigBase):
+class MinimalConfigExample(Config_Base):
     type: ModelType = ModelType.Main
     format: ModelFormat = ModelFormat.Checkpoint
     fun_quote: str
@@ -175,10 +175,10 @@ def test_regression_against_model_probe(datadir: Path, override_model_loading):
             assert legacy_config.model_dump_json() == new_config.model_dump_json()
 
         elif legacy_config:
-            assert type(legacy_config) in ModelConfigBase.USING_LEGACY_PROBE
+            assert type(legacy_config) in Config_Base.USING_LEGACY_PROBE
 
         elif new_config:
-            assert type(new_config) in ModelConfigBase.USING_CLASSIFY_API
+            assert type(new_config) in Config_Base.USING_CLASSIFY_API
 
         else:
             raise ValueError(f"Both probe and classify failed to classify model at path {path}.")
@@ -186,7 +186,7 @@ def test_regression_against_model_probe(datadir: Path, override_model_loading):
         config_type = type(legacy_config or new_config)
         configs_with_tests.add(config_type)
 
-    untested_configs = ModelConfigBase.all_config_classes() - configs_with_tests - {MinimalConfigExample}
+    untested_configs = Config_Base.all_config_classes() - configs_with_tests - {MinimalConfigExample}
     logger.warning(f"Function test_regression_against_model_probe missing test case for: {untested_configs}")
 
 
@@ -206,7 +206,7 @@ def test_serialisation_roundtrip():
     We need to ensure they are de-serialised into the original config with all relevant fields restored.
     """
     excluded = {MinimalConfigExample}
-    for config_cls in ModelConfigBase.all_config_classes() - excluded:
+    for config_cls in Config_Base.all_config_classes() - excluded:
         trials_per_class = 50
         configs_with_random_data = create_fake_configs(config_cls, trials_per_class)
 
@@ -221,7 +221,7 @@ def test_serialisation_roundtrip():
 def test_discriminator_tagging_for_config_instances():
     """Verify that each ModelConfig instance is assigned the correct, unique Pydantic discriminator tag."""
     excluded = {MinimalConfigExample}
-    config_classes = ModelConfigBase.all_config_classes() - excluded
+    config_classes = Config_Base.all_config_classes() - excluded
 
     tags = {c.get_tag() for c in config_classes}
     assert len(tags) == len(config_classes), "Each config should have its own unique tag"
@@ -246,10 +246,10 @@ def test_inheritance_order():
     It may be worth rethinking our config taxonomy in the future, but in the meantime
     this test can help prevent debugging effort.
     """
-    for config_cls in ModelConfigBase.all_config_classes():
+    for config_cls in Config_Base.all_config_classes():
         excluded = {abc.ABC, pydantic.BaseModel, object}
         inheritance_list = [cls for cls in config_cls.mro() if cls not in excluded]
-        assert inheritance_list[-1] is ModelConfigBase
+        assert inheritance_list[-1] is Config_Base
 
 
 def test_any_model_config_includes_all_config_classes():
@@ -262,7 +262,7 @@ def test_any_model_config_includes_all_config_classes():
         config_class, _ = get_args(annotated_pair)
         extracted.add(config_class)
 
-    expected = set(ModelConfigBase.all_config_classes()) - {MinimalConfigExample}
+    expected = set(Config_Base.all_config_classes()) - {MinimalConfigExample}
     assert extracted == expected
 
 
@@ -270,7 +270,7 @@ def test_config_uniquely_matches_model(datadir: Path):
     model_paths = ModelSearch().search(datadir / "stripped_models")
     for path in model_paths:
         mod = StrippedModelOnDisk(path)
-        matches = {cls for cls in ModelConfigBase.USING_CLASSIFY_API if cls.matches(mod)}
+        matches = {cls for cls in Config_Base.USING_CLASSIFY_API if cls.matches(mod)}
         assert len(matches) <= 1, f"Model at path {path} matches multiple config classes: {matches}"
         if not matches:
             logger.warning(f"Model at path {path} does not match any config classes using classify API.")
