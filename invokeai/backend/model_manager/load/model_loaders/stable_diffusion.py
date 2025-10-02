@@ -13,8 +13,8 @@ from diffusers.pipelines.stable_diffusion_xl.pipeline_stable_diffusion_xl_inpain
 
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
-    CheckpointConfigBase,
-    DiffusersConfigBase,
+    Checkpoint_Config_Base,
+    Diffusers_Config_Base,
     Main_Checkpoint_SD1_Config,
     Main_Checkpoint_SD2_Config,
     Main_Checkpoint_SDXL_Config,
@@ -65,7 +65,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if isinstance(config, CheckpointConfigBase):
+        if isinstance(config, Checkpoint_Config_Base):
             return self._load_from_singlefile(config, submodel_type)
 
         if submodel_type is None:
@@ -73,7 +73,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
 
         model_path = Path(config.path)
         load_class = self.get_hf_load_class(model_path, submodel_type)
-        repo_variant = config.repo_variant if isinstance(config, DiffusersConfigBase) else None
+        repo_variant = config.repo_variant if isinstance(config, Diffusers_Config_Base) else None
         variant = repo_variant.value if repo_variant else None
         model_path = model_path / submodel_type.value
         try:

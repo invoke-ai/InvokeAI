@@ -21,7 +21,7 @@ from invokeai.app.invocations.image_to_latents import ImageToLatentsInvocation
 from invokeai.app.invocations.model import UNetField, VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager import LoadedModel
-from invokeai.backend.model_manager.config import MainConfigBase
+from invokeai.backend.model_manager.config import Main_Config_Base
 from invokeai.backend.model_manager.taxonomy import ModelVariantType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 
@@ -182,7 +182,7 @@ class CreateGradientMaskInvocation(BaseInvocation):
         if self.unet is not None and self.vae is not None and self.image is not None:
             # all three fields must be present at the same time
             main_model_config = context.models.get_config(self.unet.unet.key)
-            assert isinstance(main_model_config, MainConfigBase)
+            assert isinstance(main_model_config, Main_Config_Base)
             if main_model_config.variant is ModelVariantType.Inpaint:
                 mask = dilated_mask_tensor
                 vae_info: LoadedModel = context.models.load(self.vae.vae)

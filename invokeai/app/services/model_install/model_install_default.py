@@ -37,7 +37,7 @@ from invokeai.app.services.model_records import DuplicateModelException, ModelRe
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
-    CheckpointConfigBase,
+    Checkpoint_Config_Base,
     InvalidModelConfigException,
     ModelConfigFactory,
 )
@@ -625,7 +625,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
         info.path = model_path.as_posix()
 
-        if isinstance(info, CheckpointConfigBase) and info.config_path is not None:
+        if isinstance(info, Checkpoint_Config_Base) and info.config_path is not None:
             # Checkpoints have a config file needed for conversion. Same handling as the model weights - if it's in the
             # invoke-managed legacy config dir, we use a relative path.
             legacy_config_path = self.app_config.legacy_conf_path / info.config_path
