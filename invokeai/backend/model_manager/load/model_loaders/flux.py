@@ -36,7 +36,7 @@ from invokeai.backend.flux.redux.flux_redux_model import FluxReduxModel
 from invokeai.backend.flux.util import get_flux_ae_params, get_flux_transformers_params
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
-    CheckpointConfigBase,
+    Checkpoint_Config_Base,
     CLIPEmbed_Diffusers_Config_Base,
     ControlNet_Checkpoint_Config_Base,
     ControlNet_Diffusers_Config_Base,
@@ -211,7 +211,7 @@ class FluxCheckpointModel(ModelLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if not isinstance(config, CheckpointConfigBase):
+        if not isinstance(config, Checkpoint_Config_Base):
             raise ValueError("Only CheckpointConfigBase models are currently supported here.")
 
         match submodel_type:
@@ -253,7 +253,7 @@ class FluxGGUFCheckpointModel(ModelLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if not isinstance(config, CheckpointConfigBase):
+        if not isinstance(config, Checkpoint_Config_Base):
             raise ValueError("Only CheckpointConfigBase models are currently supported here.")
 
         match submodel_type:
@@ -299,7 +299,7 @@ class FluxBnbQuantizednf4bCheckpointModel(ModelLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if not isinstance(config, CheckpointConfigBase):
+        if not isinstance(config, Checkpoint_Config_Base):
             raise ValueError("Only CheckpointConfigBase models are currently supported here.")
 
         match submodel_type:
