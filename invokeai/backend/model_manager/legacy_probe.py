@@ -1,11 +1,9 @@
 import json
-import re
 from pathlib import Path
 from typing import Any, Callable, Dict, Literal, Optional, Union
 
 import picklescan.scanner as pscan
 import safetensors.torch
-import spandrel
 import torch
 
 import invokeai.backend.util.logging as logger
@@ -33,6 +31,7 @@ from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import (
     AnyVariant,
     BaseModelType,
+    FluxVariantType,
     ModelFormat,
     ModelRepoVariant,
     ModelSourceType,
@@ -58,10 +57,10 @@ from invokeai.backend.patches.lora_conversions.flux_onetrainer_lora_conversion_u
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
-from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 CkptType = Dict[str | int, Any]
+
 
 LEGACY_CONFIGS: Dict[BaseModelType, Dict[ModelVariantType, Union[str, Dict[SchedulerPredictionType, str]]]] = {
     BaseModelType.StableDiffusion1: {
@@ -106,7 +105,7 @@ class ProbeBase(object):
         """Get model file format."""
         raise NotImplementedError
 
-    def get_variant_type(self) -> Optional[ModelVariantType]:
+    def get_variant_type(self) -> AnyVariant | None:
         """Get model variant type."""
         return None
 
@@ -256,7 +255,7 @@ class ModelProbe(object):
         if fields["base"] == BaseModelType.StableDiffusion3 and callable(get_submodels):
             fields["submodels"] = get_submodels()
 
-        model_info = ModelConfigFactory.make_config(fields)  # , key=fields.get("key", None))
+        model_info = ModelConfigFactory.make_config(fields)
         return model_info
 
     @classmethod
@@ -337,26 +336,6 @@ class ModelProbe(object):
         # diffusers-ti
         if len(ckpt) < 10 and all(isinstance(v, torch.Tensor) for v in ckpt.values()):
             return ModelType.TextualInversion
-
-        # Check if the model can be loaded as a SpandrelImageToImageModel.
-        # This check is intentionally performed last, as it can be expensive (it requires loading the model from disk).
-        try:
-            # It would be nice to avoid having to load the Spandrel model from disk here. A couple of options were
-            # explored to avoid this:
-            # 1. Call `SpandrelImageToImageModel.load_from_state_dict(ckpt)`, where `ckpt` is a state_dict on the meta
-            #    device. Unfortunately, some Spandrel models perform operations during initialization that are not
-            #    supported on meta tensors.
-            # 2. Spandrel has internal logic to determine a model's type from its state_dict before loading the model.
-            #    This logic is not exposed in spandrel's public API. We could copy the logic here, but then we have to
-            #    maintain it, and the risk of false positive detections is higher.
-            SpandrelImageToImageModel.load_from_file(model_path)
-            return ModelType.SpandrelImageToImage
-        except spandrel.UnsupportedModelError:
-            pass
-        except Exception as e:
-            logger.warning(
-                f"Encountered error while probing to determine if {model_path} is a Spandrel model. Ignoring. Error: {e}"
-            )
 
         raise InvalidModelConfigException(f"Unable to determine model type for {model_path}")
 
@@ -580,7 +559,7 @@ class CheckpointProbeBase(ProbeBase):
             return ModelFormat.GGUFQuantized
         return ModelFormat("checkpoint")
 
-    def get_variant_type(self) -> ModelVariantType:
+    def get_variant_type(self) -> AnyVariant:
         model_type = ModelProbe.get_model_type_from_checkpoint(self.model_path, self.checkpoint)
         base_type = self.get_base_type()
         if model_type != ModelType.Main:
@@ -597,19 +576,26 @@ class CheckpointProbeBase(ProbeBase):
                 )
                 return ModelVariantType.Normal
 
+            is_flux_dev = (
+                "guidance_in.out_layer.weight" in state_dict
+                or "model.diffusion_model.guidance_in.out_layer.weight" in state_dict
+            )
+
             # FLUX Model variant types are distinguished by input channels:
             # - Unquantized Dev and Schnell have in_channels=64
             # - BNB-NF4 Dev and Schnell have in_channels=1
             # - FLUX Fill has in_channels=384
             # - Unsure of quantized FLUX Fill models
             # - Unsure of GGUF-quantized models
-            if in_channels == 384:
+            if is_flux_dev and in_channels == 384:
                 # This is a FLUX Fill model. FLUX Fill needs special handling throughout the application. The variant
                 # type is used to determine whether to use the fill model or the base model.
-                return ModelVariantType.Inpaint
-            else:
+                return FluxVariantType.DevFill
+            elif is_flux_dev:
                 # Fall back on "normal" variant type for all other FLUX models.
-                return ModelVariantType.Normal
+                return FluxVariantType.Dev
+            else:
+                return FluxVariantType.Schnell
 
         in_channels = state_dict["model.diffusion_model.input_blocks.0.0.weight"].shape[1]
         if in_channels == 9:
@@ -667,21 +653,6 @@ class PipelineCheckpointProbe(CheckpointProbeBase):
             return SchedulerPredictionType.Epsilon
 
 
-class VaeCheckpointProbe(CheckpointProbeBase):
-    def get_base_type(self) -> BaseModelType:
-        # VAEs of all base types have the same structure, so we wimp out and
-        # guess using the name.
-        for regexp, basetype in [
-            (r"xl", BaseModelType.StableDiffusionXL),
-            (r"sd2", BaseModelType.StableDiffusion2),
-            (r"vae", BaseModelType.StableDiffusion1),
-            (r"FLUX.1-schnell_ae", BaseModelType.Flux),
-        ]:
-            if re.search(regexp, self.model_path.name, re.IGNORECASE):
-                return basetype
-        raise InvalidModelConfigException("Cannot determine base type")
-
-
 class LoRACheckpointProbe(CheckpointProbeBase):
     """Class for LoRA checkpoints."""
 
@@ -714,32 +685,6 @@ class LoRACheckpointProbe(CheckpointProbeBase):
             return BaseModelType.StableDiffusionXL
         else:
             raise InvalidModelConfigException(f"Unknown LoRA type: {self.model_path}")
-
-
-class TextualInversionCheckpointProbe(CheckpointProbeBase):
-    """Class for probing embeddings."""
-
-    def get_format(self) -> ModelFormat:
-        return ModelFormat.EmbeddingFile
-
-    def get_base_type(self) -> BaseModelType:
-        checkpoint = self.checkpoint
-        if "string_to_token" in checkpoint:
-            token_dim = list(checkpoint["string_to_param"].values())[0].shape[-1]
-        elif "emb_params" in checkpoint:
-            token_dim = checkpoint["emb_params"].shape[-1]
-        elif "clip_g" in checkpoint:
-            token_dim = checkpoint["clip_g"].shape[-1]
-        else:
-            token_dim = list(checkpoint.values())[0].shape[0]
-        if token_dim == 768:
-            return BaseModelType.StableDiffusion1
-        elif token_dim == 1024:
-            return BaseModelType.StableDiffusion2
-        elif token_dim == 1280:
-            return BaseModelType.StableDiffusionXL
-        else:
-            raise InvalidModelConfigException(f"{self.model_path}: Could not determine base type")
 
 
 class ControlNetCheckpointProbe(CheckpointProbeBase):
@@ -934,73 +879,6 @@ class PipelineFolderProbe(FolderProbeBase):
         return ModelVariantType.Normal
 
 
-class VaeFolderProbe(FolderProbeBase):
-    def get_base_type(self) -> BaseModelType:
-        if self._config_looks_like_sdxl():
-            return BaseModelType.StableDiffusionXL
-        elif self._name_looks_like_sdxl():
-            # but SD and SDXL VAE are the same shape (3-channel RGB to 4-channel float scaled down
-            # by a factor of 8), we can't necessarily tell them apart by config hyperparameters.
-            return BaseModelType.StableDiffusionXL
-        else:
-            return BaseModelType.StableDiffusion1
-
-    def _config_looks_like_sdxl(self) -> bool:
-        # config values that distinguish Stability's SD 1.x VAE from their SDXL VAE.
-        config_file = self.model_path / "config.json"
-        if not config_file.exists():
-            raise InvalidModelConfigException(f"Cannot determine base type for {self.model_path}")
-        with open(config_file, "r") as file:
-            config = json.load(file)
-        return config.get("scaling_factor", 0) == 0.13025 and config.get("sample_size") in [512, 1024]
-
-    def _name_looks_like_sdxl(self) -> bool:
-        return bool(re.search(r"xl\b", self._guess_name(), re.IGNORECASE))
-
-    def _guess_name(self) -> str:
-        name = self.model_path.name
-        if name == "vae":
-            name = self.model_path.parent.name
-        return name
-
-
-class TextualInversionFolderProbe(FolderProbeBase):
-    def get_format(self) -> ModelFormat:
-        return ModelFormat.EmbeddingFolder
-
-    def get_base_type(self) -> BaseModelType:
-        path = self.model_path / "learned_embeds.bin"
-        if not path.exists():
-            raise InvalidModelConfigException(
-                f"{self.model_path.as_posix()} does not contain expected 'learned_embeds.bin' file"
-            )
-        return TextualInversionCheckpointProbe(path).get_base_type()
-
-
-class T5EncoderFolderProbe(FolderProbeBase):
-    def get_base_type(self) -> BaseModelType:
-        return BaseModelType.Any
-
-    def get_format(self) -> ModelFormat:
-        path = self.model_path / "text_encoder_2"
-        if (path / "model.safetensors.index.json").exists():
-            return ModelFormat.T5Encoder
-        files = list(path.glob("*.safetensors"))
-        if len(files) == 0:
-            raise InvalidModelConfigException(f"{self.model_path.as_posix()}: no .safetensors files found")
-
-        # shortcut: look for the quantization in the name
-        if any(x for x in files if "llm_int8" in x.as_posix()):
-            return ModelFormat.BnbQuantizedLlmInt8b
-
-        # more reliable path: probe contents for a 'SCB' key
-        ckpt = read_checkpoint_meta(files[0], scan=True)
-        if any("SCB" in x for x in ckpt.keys()):
-            return ModelFormat.BnbQuantizedLlmInt8b
-
-        raise InvalidModelConfigException(f"{self.model_path.as_posix()}: unknown model format")
-
-
 class ONNXFolderProbe(PipelineFolderProbe):
     def get_base_type(self) -> BaseModelType:
         # Due to the way the installer is set up, the configuration file for safetensors
@@ -1090,11 +968,6 @@ class CLIPVisionFolderProbe(FolderProbeBase):
         return BaseModelType.Any
 
 
-class CLIPEmbedFolderProbe(FolderProbeBase):
-    def get_base_type(self) -> BaseModelType:
-        return BaseModelType.Any
-
-
 class SpandrelImageToImageFolderProbe(FolderProbeBase):
     def get_base_type(self) -> BaseModelType:
         raise NotImplementedError()
@@ -1137,31 +1010,23 @@ class T2IAdapterFolderProbe(FolderProbeBase):
 
 # Register probe classes
 ModelProbe.register_probe("diffusers", ModelType.Main, PipelineFolderProbe)
-ModelProbe.register_probe("diffusers", ModelType.VAE, VaeFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.LoRA, LoRAFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.ControlLoRa, LoRAFolderProbe)
-ModelProbe.register_probe("diffusers", ModelType.TextualInversion, TextualInversionFolderProbe)
-ModelProbe.register_probe("diffusers", ModelType.T5Encoder, T5EncoderFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.ControlNet, ControlNetFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.IPAdapter, IPAdapterFolderProbe)
-ModelProbe.register_probe("diffusers", ModelType.CLIPEmbed, CLIPEmbedFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.CLIPVision, CLIPVisionFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.T2IAdapter, T2IAdapterFolderProbe)
-ModelProbe.register_probe("diffusers", ModelType.SpandrelImageToImage, SpandrelImageToImageFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.SigLIP, SigLIPFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.FluxRedux, FluxReduxFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.LlavaOnevision, LlaveOnevisionFolderProbe)
 
 ModelProbe.register_probe("checkpoint", ModelType.Main, PipelineCheckpointProbe)
-ModelProbe.register_probe("checkpoint", ModelType.VAE, VaeCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.LoRA, LoRACheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.ControlLoRa, LoRACheckpointProbe)
-ModelProbe.register_probe("checkpoint", ModelType.TextualInversion, TextualInversionCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.ControlNet, ControlNetCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.IPAdapter, IPAdapterCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.CLIPVision, CLIPVisionCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.T2IAdapter, T2IAdapterCheckpointProbe)
-ModelProbe.register_probe("checkpoint", ModelType.SpandrelImageToImage, SpandrelImageToImageCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.SigLIP, SigLIPCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.FluxRedux, FluxReduxCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.LlavaOnevision, LlavaOnevisionCheckpointProbe)

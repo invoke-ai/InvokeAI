@@ -33,27 +33,28 @@ from invokeai.backend.flux.ip_adapter.xlabs_ip_adapter_flux import (
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.flux.redux.flux_redux_model import FluxReduxModel
-from invokeai.backend.flux.util import ae_params, params
+from invokeai.backend.flux.util import get_flux_ae_params, get_flux_transformers_params
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
-    CheckpointConfigBase,
-    CLIPEmbedDiffusersConfig,
-    ControlNetCheckpointConfig,
-    ControlNetDiffusersConfig,
-    FluxReduxConfig,
-    IPAdapterCheckpointConfig,
-    MainBnbQuantized4bCheckpointConfig,
-    MainCheckpointConfig,
-    MainGGUFCheckpointConfig,
-    T5EncoderBnbQuantizedLlmInt8bConfig,
-    T5EncoderConfig,
-    VAECheckpointConfig,
+    Checkpoint_Config_Base,
+    CLIPEmbed_Diffusers_Config_Base,
+    ControlNet_Checkpoint_Config_Base,
+    ControlNet_Diffusers_Config_Base,
+    FLUXRedux_Checkpoint_Config,
+    IPAdapter_Checkpoint_Config_Base,
+    Main_BnBNF4_FLUX_Config,
+    Main_Checkpoint_FLUX_Config,
+    Main_GGUF_FLUX_Config,
+    T5Encoder_BnBLLMint8_Config,
+    T5Encoder_T5Encoder_Config,
+    VAE_Checkpoint_Config_Base,
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     BaseModelType,
+    FluxVariantType,
     ModelFormat,
     ModelType,
     SubModelType,
@@ -85,12 +86,12 @@ class FluxVAELoader(ModelLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if not isinstance(config, VAECheckpointConfig):
+        if not isinstance(config, VAE_Checkpoint_Config_Base):
             raise ValueError("Only VAECheckpointConfig models are currently supported here.")
         model_path = Path(config.path)
 
         with accelerate.init_empty_weights():
-            model = AutoEncoder(ae_params[config.config_path])
+            model = AutoEncoder(get_flux_ae_params())
         sd = load_file(model_path)
         model.load_state_dict(sd, assign=True)
         # VAE is broken in float16, which mps defaults to
@@ -107,7 +108,7 @@ class FluxVAELoader(ModelLoader):
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.CLIPEmbed, format=ModelFormat.Diffusers)
-class ClipCheckpointModel(ModelLoader):
+class CLIPDiffusersLoader(ModelLoader):
     """Class to load main models."""
 
     def _load_model(
@@ -115,7 +116,7 @@ class ClipCheckpointModel(ModelLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if not isinstance(config, CLIPEmbedDiffusersConfig):
+        if not isinstance(config, CLIPEmbed_Diffusers_Config_Base):
             raise ValueError("Only CLIPEmbedDiffusersConfig models are currently supported here.")
 
         match submodel_type:
@@ -138,7 +139,7 @@ class BnbQuantizedLlmInt8bCheckpointModel(ModelLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if not isinstance(config, T5EncoderBnbQuantizedLlmInt8bConfig):
+        if not isinstance(config, T5Encoder_BnBLLMint8_Config):
             raise ValueError("Only T5EncoderBnbQuantizedLlmInt8bConfig models are currently supported here.")
         if not bnb_available:
             raise ImportError(
@@ -185,7 +186,7 @@ class T5EncoderCheckpointModel(ModelLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if not isinstance(config, T5EncoderConfig):
+        if not isinstance(config, T5Encoder_T5Encoder_Config):
             raise ValueError("Only T5EncoderConfig models are currently supported here.")
 
         match submodel_type:
@@ -210,7 +211,7 @@ class FluxCheckpointModel(ModelLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if not isinstance(config, CheckpointConfigBase):
+        if not isinstance(config, Checkpoint_Config_Base):
             raise ValueError("Only CheckpointConfigBase models are currently supported here.")
 
         match submodel_type:
@@ -225,11 +226,11 @@ class FluxCheckpointModel(ModelLoader):
         self,
         config: AnyModelConfig,
     ) -> AnyModel:
-        assert isinstance(config, MainCheckpointConfig)
+        assert isinstance(config, Main_Checkpoint_FLUX_Config)
         model_path = Path(config.path)
 
         with accelerate.init_empty_weights():
-            model = Flux(params[config.config_path])
+            model = Flux(get_flux_transformers_params(config.variant))
 
         sd = load_file(model_path)
         if "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in sd:
@@ -252,7 +253,7 @@ class FluxGGUFCheckpointModel(ModelLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if not isinstance(config, CheckpointConfigBase):
+        if not isinstance(config, Checkpoint_Config_Base):
             raise ValueError("Only CheckpointConfigBase models are currently supported here.")
 
         match submodel_type:
@@ -267,11 +268,11 @@ class FluxGGUFCheckpointModel(ModelLoader):
         self,
         config: AnyModelConfig,
     ) -> AnyModel:
-        assert isinstance(config, MainGGUFCheckpointConfig)
+        assert isinstance(config, Main_GGUF_FLUX_Config)
         model_path = Path(config.path)
 
         with accelerate.init_empty_weights():
-            model = Flux(params[config.config_path])
+            model = Flux(get_flux_transformers_params(config.variant))
 
         # HACK(ryand): We shouldn't be hard-coding the compute_dtype here.
         sd = gguf_sd_loader(model_path, compute_dtype=torch.bfloat16)
@@ -298,7 +299,7 @@ class FluxBnbQuantizednf4bCheckpointModel(ModelLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if not isinstance(config, CheckpointConfigBase):
+        if not isinstance(config, Checkpoint_Config_Base):
             raise ValueError("Only CheckpointConfigBase models are currently supported here.")
 
         match submodel_type:
@@ -313,7 +314,7 @@ class FluxBnbQuantizednf4bCheckpointModel(ModelLoader):
         self,
         config: AnyModelConfig,
     ) -> AnyModel:
-        assert isinstance(config, MainBnbQuantized4bCheckpointConfig)
+        assert isinstance(config, Main_BnBNF4_FLUX_Config)
         if not bnb_available:
             raise ImportError(
                 "The bnb modules are not available. Please install bitsandbytes if available on your platform."
@@ -322,7 +323,7 @@ class FluxBnbQuantizednf4bCheckpointModel(ModelLoader):
 
         with SilenceWarnings():
             with accelerate.init_empty_weights():
-                model = Flux(params[config.config_path])
+                model = Flux(get_flux_transformers_params(config.variant))
                 model = quantize_model_nf4(model, modules_to_not_convert=set(), compute_dtype=torch.bfloat16)
             sd = load_file(model_path)
             if "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in sd:
@@ -341,9 +342,9 @@ class FluxControlnetModel(ModelLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if isinstance(config, ControlNetCheckpointConfig):
+        if isinstance(config, ControlNet_Checkpoint_Config_Base):
             model_path = Path(config.path)
-        elif isinstance(config, ControlNetDiffusersConfig):
+        elif isinstance(config, ControlNet_Diffusers_Config_Base):
             # If this is a diffusers directory, we simply ignore the config file and load from the weight file.
             model_path = Path(config.path) / "diffusion_pytorch_model.safetensors"
         else:
@@ -362,7 +363,7 @@ class FluxControlnetModel(ModelLoader):
     def _load_xlabs_controlnet(self, sd: dict[str, torch.Tensor]) -> AnyModel:
         with accelerate.init_empty_weights():
             # HACK(ryand): Is it safe to assume dev here?
-            model = XLabsControlNetFlux(params["flux-dev"])
+            model = XLabsControlNetFlux(get_flux_transformers_params(FluxVariantType.Dev))
 
         model.load_state_dict(sd, assign=True)
         return model
@@ -388,7 +389,7 @@ class FluxIpAdapterModel(ModelLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if not isinstance(config, IPAdapterCheckpointConfig):
+        if not isinstance(config, IPAdapter_Checkpoint_Config_Base):
             raise ValueError(f"Unexpected model config type: {type(config)}.")
 
         sd = load_file(Path(config.path))
@@ -411,7 +412,7 @@ class FluxReduxModelLoader(ModelLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if not isinstance(config, FluxReduxConfig):
+        if not isinstance(config, FLUXRedux_Checkpoint_Config):
             raise ValueError(f"Unexpected model config type: {type(config)}.")
 
         sd = load_file(Path(config.path))

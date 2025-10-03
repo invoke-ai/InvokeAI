@@ -141,10 +141,25 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         with self._db.transaction() as cursor:
             record = self.get_model(key)
 
-            # Model configs use pydantic's `validate_assignment`, so each change is validated by pydantic.
-            for field_name in changes.model_fields_set:
-                setattr(record, field_name, getattr(changes, field_name))
+            # The changes may mean the model config class changes. So we need to:
+            #
+            # 1. convert the existing record to a dict
+            # 2. apply the changes to the dict
+            # 3. create a new model config from the updated dict
+            #
+            # This way we ensure that the update does not inadvertently create an invalid model config.
 
+            # 1. convert the existing record to a dict
+            record_as_dict = record.model_dump()
+
+            # 2. apply the changes to the dict
+            for field_name in changes.model_fields_set:
+                record_as_dict[field_name] = getattr(changes, field_name)
+
+            # 3. create a new model config from the updated dict
+            record = ModelConfigFactory.make_config(record_as_dict)
+
+            # If we get this far, the updated model config is valid, so we can save it to the database.
             json_serialized = record.model_dump_json()
 
             cursor.execute(
@@ -277,14 +292,19 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         for row in result:
             try:
                 model_config = ModelConfigFactory.make_config(json.loads(row[0]), timestamp=row[1])
-            except pydantic.ValidationError:
+            except pydantic.ValidationError as e:
                 # We catch this error so that the app can still run if there are invalid model configs in the database.
                 # One reason that an invalid model config might be in the database is if someone had to rollback from a
                 # newer version of the app that added a new model type.
                 row_data = f"{row[0][:64]}..." if len(row[0]) > 64 else row[0]
+                try:
+                    name = json.loads(row[0]).get("name", "<unknown>")
+                except Exception:
+                    name = "<unknown>"
                 self._logger.warning(
-                    f"Found an invalid model config in the database. Ignoring this model. ({row_data})"
+                    f"Skipping invalid model config in the database with name {name}. Ignoring this model. ({row_data})"
                 )
+                self._logger.warning(f"Validation error: {e}")
             else:
                 results.append(model_config)
 

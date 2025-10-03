@@ -9,14 +9,16 @@ from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_L
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
 
-def is_state_dict_likely_in_flux_diffusers_format(state_dict: Dict[str, torch.Tensor]) -> bool:
+def is_state_dict_likely_in_flux_diffusers_format(state_dict: dict[str | int, torch.Tensor]) -> bool:
     """Checks if the provided state dict is likely in the Diffusers FLUX LoRA format.
 
     This is intended to be a reasonably high-precision detector, but it is not guaranteed to have perfect precision. (A
     perfect-precision detector would require checking all keys against a whitelist and verifying tensor shapes.)
     """
     # First, check that all keys end in "lora_A.weight" or "lora_B.weight" (i.e. are in PEFT format).
-    all_keys_in_peft_format = all(k.endswith(("lora_A.weight", "lora_B.weight")) for k in state_dict.keys())
+    all_keys_in_peft_format = all(
+        k.endswith(("lora_A.weight", "lora_B.weight")) for k in state_dict.keys() if isinstance(k, str)
+    )
 
     # Check if keys use transformer prefix
     transformer_prefix_keys = [

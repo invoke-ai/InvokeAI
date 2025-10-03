@@ -31,7 +31,10 @@ from invokeai.app.util.suppress_output import SuppressOutput
 from invokeai.backend.model_manager import BaseModelType, ModelFormat, ModelType
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
-    MainCheckpointConfig,
+    Main_Checkpoint_SD1_Config,
+    Main_Checkpoint_SD2_Config,
+    Main_Checkpoint_SDXL_Config,
+    Main_Checkpoint_SDXLRefiner_Config,
 )
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
@@ -741,9 +744,18 @@ async def convert_model(
         logger.error(str(e))
         raise HTTPException(status_code=424, detail=str(e))
 
-    if not isinstance(model_config, MainCheckpointConfig):
-        logger.error(f"The model with key {key} is not a main checkpoint model.")
-        raise HTTPException(400, f"The model with key {key} is not a main checkpoint model.")
+    if isinstance(
+        model_config,
+        (
+            Main_Checkpoint_SD1_Config,
+            Main_Checkpoint_SD2_Config,
+            Main_Checkpoint_SDXL_Config,
+            Main_Checkpoint_SDXLRefiner_Config,
+        ),
+    ):
+        msg = f"The model with key {key} is not a main SD 1/2/XL checkpoint model."
+        logger.error(msg)
+        raise HTTPException(400, msg)
 
     with TemporaryDirectory(dir=ApiDependencies.invoker.services.configuration.models_path) as tmpdir:
         convert_path = pathlib.Path(tmpdir) / pathlib.Path(model_config.path).stem

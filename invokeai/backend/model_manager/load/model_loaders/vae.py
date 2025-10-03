@@ -3,9 +3,9 @@
 
 from typing import Optional
 
-from diffusers import AutoencoderKL
+from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 
-from invokeai.backend.model_manager.config import AnyModelConfig, VAECheckpointConfig
+from invokeai.backend.model_manager.config import AnyModelConfig, VAE_Checkpoint_Config_Base
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.model_manager.taxonomy import (
@@ -27,7 +27,7 @@ class VAELoader(GenericDiffusersLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if isinstance(config, VAECheckpointConfig):
+        if isinstance(config, VAE_Checkpoint_Config_Base):
             return AutoencoderKL.from_single_file(
                 config.path,
                 torch_dtype=self._torch_dtype,

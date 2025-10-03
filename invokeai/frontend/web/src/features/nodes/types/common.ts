@@ -148,7 +148,9 @@ export const zSubModelType = z.enum([
 
 export const zClipVariantType = z.enum(['large', 'gigantic']);
 export const zModelVariantType = z.enum(['normal', 'inpaint', 'depth']);
-export type ModelVariantType = z.infer<typeof zModelVariantType>;
+export const zFluxVariantType = z.enum(['dev', 'dev_fill', 'schnell']);
+export const zAnyModelVariant = z.union([zModelVariantType, zClipVariantType, zFluxVariantType]);
+export type AnyModelVariant = z.infer<typeof zAnyModelVariant>;
 export const zModelFormat = z.enum([
   'omi',
   'diffusers',

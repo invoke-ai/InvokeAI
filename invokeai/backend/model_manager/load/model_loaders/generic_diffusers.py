@@ -8,7 +8,7 @@ from typing import Any, Optional
 from diffusers.configuration_utils import ConfigMixin
 from diffusers.models.modeling_utils import ModelMixin
 
-from invokeai.backend.model_manager.config import AnyModelConfig, DiffusersConfigBase, InvalidModelConfigException
+from invokeai.backend.model_manager.config import AnyModelConfig, Diffusers_Config_Base, InvalidModelConfigException
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import (
@@ -33,7 +33,7 @@ class GenericDiffusersLoader(ModelLoader):
         model_class = self.get_hf_load_class(model_path)
         if submodel_type is not None:
             raise Exception(f"There are no submodels in models of type {model_class}")
-        repo_variant = config.repo_variant if isinstance(config, DiffusersConfigBase) else None
+        repo_variant = config.repo_variant if isinstance(config, Diffusers_Config_Base) else None
         variant = repo_variant.value if repo_variant else None
         try:
             result: AnyModel = model_class.from_pretrained(model_path, torch_dtype=self._torch_dtype, variant=variant)

@@ -5,7 +5,7 @@ from transformers import CLIPVisionModelWithProjection
 
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
-    DiffusersConfigBase,
+    Diffusers_Config_Base,
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
@@ -21,7 +21,7 @@ class ClipVisionLoader(ModelLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if not isinstance(config, DiffusersConfigBase):
+        if not isinstance(config, Diffusers_Config_Base):
             raise ValueError("Only DiffusersConfigBase models are currently supported here.")
 
         if submodel_type is not None:

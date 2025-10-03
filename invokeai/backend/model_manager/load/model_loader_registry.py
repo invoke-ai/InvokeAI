@@ -20,7 +20,7 @@ from typing import Callable, Dict, Optional, Tuple, Type, TypeVar
 
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
-    ModelConfigBase,
+    Config_Base,
 )
 from invokeai.backend.model_manager.load import ModelLoaderBase
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
@@ -40,7 +40,7 @@ class ModelLoaderRegistryBase(ABC):
     @abstractmethod
     def get_implementation(
         cls, config: AnyModelConfig, submodel_type: Optional[SubModelType]
-    ) -> Tuple[Type[ModelLoaderBase], ModelConfigBase, Optional[SubModelType]]:
+    ) -> Tuple[Type[ModelLoaderBase], Config_Base, Optional[SubModelType]]:
         """
         Get subclass of ModelLoaderBase registered to handle base and type.
 
@@ -84,7 +84,7 @@ class ModelLoaderRegistry(ModelLoaderRegistryBase):
     @classmethod
     def get_implementation(
         cls, config: AnyModelConfig, submodel_type: Optional[SubModelType]
-    ) -> Tuple[Type[ModelLoaderBase], ModelConfigBase, Optional[SubModelType]]:
+    ) -> Tuple[Type[ModelLoaderBase], Config_Base, Optional[SubModelType]]:
         """Get subclass of ModelLoaderBase registered to handle base and type."""
 
         key1 = cls._to_registry_key(config.base, config.type, config.format)  # for a specific base type

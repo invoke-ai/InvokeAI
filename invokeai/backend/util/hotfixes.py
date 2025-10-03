@@ -23,6 +23,7 @@ from diffusers.models.unets.unet_2d_blocks import (
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 from torch import nn
 
+from invokeai.backend.model_manager.taxonomy import BaseModelType, SchedulerPredictionType
 from invokeai.backend.util.logging import InvokeAILogger
 
 # TODO: create PR to diffusers
@@ -407,7 +408,8 @@ class ControlNetModel(ModelMixin, ConfigMixin, FromOriginalModelMixin):
             use_linear_projection=unet.config.use_linear_projection,
             class_embed_type=unet.config.class_embed_type,
             num_class_embeds=unet.config.num_class_embeds,
-            upcast_attention=unet.config.upcast_attention,
+            upcast_attention=unet.config.base is BaseModelType.StableDiffusion2
+            and unet.config.prediction_type is SchedulerPredictionType.VPrediction,
             resnet_time_scale_shift=unet.config.resnet_time_scale_shift,
             projection_class_embeddings_input_dim=unet.config.projection_class_embeddings_input_dim,
             controlnet_conditioning_channel_order=controlnet_conditioning_channel_order,

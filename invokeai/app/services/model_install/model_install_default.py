@@ -5,6 +5,7 @@ import os
 import re
 import threading
 import time
+from copy import deepcopy
 from pathlib import Path
 from queue import Empty, Queue
 from shutil import move, rmtree
@@ -36,11 +37,10 @@ from invokeai.app.services.model_records import DuplicateModelException, ModelRe
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
-    CheckpointConfigBase,
+    Checkpoint_Config_Base,
     InvalidModelConfigException,
-    ModelConfigBase,
+    ModelConfigFactory,
 )
-from invokeai.backend.model_manager.legacy_probe import ModelProbe
 from invokeai.backend.model_manager.metadata import (
     AnyModelRepoMetadata,
     HuggingFaceMetadataFetch,
@@ -370,6 +370,8 @@ class ModelInstallService(ModelInstallServiceBase):
         model_path = self.app_config.models_path / model.path
         if model_path.is_file() or model_path.is_symlink():
             model_path.unlink()
+            assert model_path.parent != self.app_config.models_path
+            os.rmdir(model_path.parent)
         elif model_path.is_dir():
             rmtree(model_path)
         self.unregister(key)
@@ -598,18 +600,11 @@ class ModelInstallService(ModelInstallServiceBase):
         hash_algo = self._app_config.hashing_algorithm
         fields = config.model_dump()
 
-        # WARNING!
-        # The legacy probe relies on the implicit order of tests to determine model classification.
-        # This can lead to regressions between the legacy and new probes.
-        # Do NOT change the order of `probe` and `classify` without implementing one of the following fixes:
-        # Short-term fix: `classify` tests `matches` in the same order as the legacy probe.
-        # Long-term fix: Improve `matches` to be more specific so that only one config matches
-        #   any given model - eliminating ambiguity and removing reliance on order.
-        # After implementing either of these fixes, remove @pytest.mark.xfail from `test_regression_against_model_probe`
-        try:
-            return ModelProbe.probe(model_path=model_path, fields=fields, hash_algo=hash_algo)  # type: ignore
-        except InvalidModelConfigException:
-            return ModelConfigBase.classify(model_path, hash_algo, **fields)
+        return ModelConfigFactory.from_model_on_disk(
+            mod=model_path,
+            overrides=deepcopy(fields),
+            hash_algo=hash_algo,
+        )
 
     def _register(
         self, model_path: Path, config: Optional[ModelRecordChanges] = None, info: Optional[AnyModelConfig] = None
@@ -630,7 +625,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
         info.path = model_path.as_posix()
 
-        if isinstance(info, CheckpointConfigBase):
+        if isinstance(info, Checkpoint_Config_Base) and info.config_path is not None:
             # Checkpoints have a config file needed for conversion. Same handling as the model weights - if it's in the
             # invoke-managed legacy config dir, we use a relative path.
             legacy_config_path = self.app_config.legacy_conf_path / info.config_path
