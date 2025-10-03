@@ -13,14 +13,13 @@ import {
   Text,
   useShiftModifier,
 } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import {
   positivePromptChanged,
   promptHistoryCleared,
   promptRemovedFromHistory,
   selectPositivePromptHistory,
-  useParamsDispatch,
 } from 'features/controlLayers/store/paramsSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
@@ -54,13 +53,13 @@ PositivePromptHistoryIconButton.displayName = 'PositivePromptHistoryIconButton';
 
 const PromptHistoryContent = memo(() => {
   const { t } = useTranslation();
-  const dispatchParams = useParamsDispatch();
+  const dispatch = useAppDispatch();
   const positivePromptHistory = useAppSelector(selectPositivePromptHistory);
   const [searchTerm, setSearchTerm] = useState('');
 
   const onClickClearHistory = useCallback(() => {
-    dispatchParams(promptHistoryCleared);
-  }, [dispatchParams]);
+    dispatch(promptHistoryCleared());
+  }, [dispatch]);
 
   const filteredPrompts = useMemo(() => {
     const trimmedSearchTerm = searchTerm.trim();
@@ -132,16 +131,16 @@ const PromptHistoryContent = memo(() => {
 PromptHistoryContent.displayName = 'PromptHistoryContent';
 
 const PromptItem = memo(({ prompt }: { prompt: string }) => {
-  const dispatchParams = useParamsDispatch();
+  const dispatch = useAppDispatch();
   const shiftKey = useShiftModifier();
 
   const onClickUse = useCallback(() => {
-    dispatchParams(positivePromptChanged, prompt);
-  }, [dispatchParams, prompt]);
+    dispatch(positivePromptChanged(prompt));
+  }, [dispatch, prompt]);
 
   const onClickDelete = useCallback(() => {
-    dispatchParams(promptRemovedFromHistory, prompt);
-  }, [dispatchParams, prompt]);
+    dispatch(promptRemovedFromHistory(prompt));
+  }, [dispatch, prompt]);
 
   return (
     <Flex gap={2}>

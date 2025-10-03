@@ -1,22 +1,22 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { selectMaskBlur, setMaskBlur, useParamsDispatch } from 'features/controlLayers/store/paramsSlice';
+import { selectMaskBlur, setMaskBlur } from 'features/controlLayers/store/paramsSlice';
 import { selectMaskBlurConfig } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamMaskBlur = () => {
   const { t } = useTranslation();
-  const dispatchParams = useParamsDispatch();
+  const dispatch = useAppDispatch();
   const maskBlur = useAppSelector(selectMaskBlur);
   const config = useAppSelector(selectMaskBlurConfig);
 
   const handleChange = useCallback(
     (v: number) => {
-      dispatchParams(setMaskBlur, v);
+      dispatch(setMaskBlur(v));
     },
-    [dispatchParams]
+    [dispatch]
   );
 
   return (

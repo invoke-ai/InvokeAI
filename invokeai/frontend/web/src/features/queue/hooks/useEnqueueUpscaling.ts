@@ -3,7 +3,6 @@ import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
 import {
-  paramsDispatch,
   positivePromptAddedToHistory,
   selectActiveParams,
   selectPositivePrompt,
@@ -51,7 +50,7 @@ const enqueueUpscaling = async (store: AppStore, prepend: boolean) => {
   const enqueueResult = await req.unwrap();
 
   // Push to prompt history on successful enqueue
-  paramsDispatch(store, positivePromptAddedToHistory, selectPositivePrompt(state));
+  dispatch(positivePromptAddedToHistory(selectPositivePrompt(state)));
 
   return { batchConfig, enqueueResult };
 };

@@ -1,17 +1,12 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
-import {
-  selectInfillMethod,
-  selectInfillTileSize,
-  setInfillTileSize,
-  useParamsDispatch,
-} from 'features/controlLayers/store/paramsSlice';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectInfillMethod, selectInfillTileSize, setInfillTileSize } from 'features/controlLayers/store/paramsSlice';
 import { selectInfillTileSizeConfig } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamInfillTileSize = () => {
-  const dispatchParams = useParamsDispatch();
+  const dispatch = useAppDispatch();
   const infillTileSize = useAppSelector(selectInfillTileSize);
   const config = useAppSelector(selectInfillTileSizeConfig);
   const infillMethod = useAppSelector(selectInfillMethod);
@@ -20,9 +15,9 @@ const ParamInfillTileSize = () => {
 
   const handleChange = useCallback(
     (v: number) => {
-      dispatchParams(setInfillTileSize, v);
+      dispatch(setInfillTileSize(v));
     },
-    [dispatchParams]
+    [dispatch]
   );
 
   return (

@@ -1,14 +1,14 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { selectRefinerStart, setRefinerStart, useParamsDispatch } from 'features/controlLayers/store/paramsSlice';
+import { selectRefinerStart, setRefinerStart } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamSDXLRefinerStart = () => {
   const refinerStart = useAppSelector(selectRefinerStart);
-  const dispatchParams = useParamsDispatch();
-  const handleChange = useCallback((v: number) => dispatchParams(setRefinerStart, v), [dispatchParams]);
+  const dispatch = useAppDispatch();
+  const handleChange = useCallback((v: number) => dispatch(setRefinerStart(v)), [dispatch]);
   const { t } = useTranslation();
 
   return (

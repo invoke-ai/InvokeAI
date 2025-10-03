@@ -1,8 +1,8 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { selectVAEPrecision, useParamsDispatch, vaePrecisionChanged } from 'features/controlLayers/store/paramsSlice';
+import { selectVAEPrecision, vaePrecisionChanged } from 'features/controlLayers/store/paramsSlice';
 import { isParameterPrecision } from 'features/parameters/types/parameterSchemas';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,7 +14,7 @@ const options = [
 
 const ParamVAEPrecision = () => {
   const { t } = useTranslation();
-  const dispatchParams = useParamsDispatch();
+  const dispatch = useAppDispatch();
   const vaePrecision = useAppSelector(selectVAEPrecision);
 
   const onChange = useCallback<ComboboxOnChange>(
@@ -23,9 +23,9 @@ const ParamVAEPrecision = () => {
         return;
       }
 
-      dispatchParams(vaePrecisionChanged, v.value);
+      dispatch(vaePrecisionChanged(v.value));
     },
-    [dispatchParams]
+    [dispatch]
   );
 
   const value = useMemo(() => options.find((o) => o.value === vaePrecision), [vaePrecision]);

@@ -1,18 +1,14 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import {
-  selectCanvasCoherenceMode,
-  setCanvasCoherenceMode,
-  useParamsDispatch,
-} from 'features/controlLayers/store/paramsSlice';
+import { selectCanvasCoherenceMode, setCanvasCoherenceMode } from 'features/controlLayers/store/paramsSlice';
 import { isParameterCanvasCoherenceMode } from 'features/parameters/types/parameterSchemas';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamCanvasCoherenceMode = () => {
-  const dispatchParams = useParamsDispatch();
+  const dispatch = useAppDispatch();
   const canvasCoherenceMode = useAppSelector(selectCanvasCoherenceMode);
   const { t } = useTranslation();
 
@@ -31,9 +27,9 @@ const ParamCanvasCoherenceMode = () => {
         return;
       }
 
-      dispatchParams(setCanvasCoherenceMode, v.value);
+      dispatch(setCanvasCoherenceMode(v.value));
     },
-    [dispatchParams]
+    [dispatch]
   );
 
   const value = useMemo(() => options.find((o) => o.value === canvasCoherenceMode), [canvasCoherenceMode, options]);

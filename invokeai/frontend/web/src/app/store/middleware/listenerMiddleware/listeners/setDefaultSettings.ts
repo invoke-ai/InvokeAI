@@ -7,7 +7,6 @@ import {
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   heightChanged,
-  paramsDispatch,
   selectActiveParams,
   setCfgRescaleMultiplier,
   setCfgScale,
@@ -67,56 +66,56 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
           // we store this as "default" within default settings
           // to distinguish it from no default set
           if (vae === 'default') {
-            paramsDispatch(api, vaeSelected, null);
+            dispatch(vaeSelected(null));
           } else {
             const vaeModel = models.find((model) => model.key === vae);
             const result = zParameterVAEModel.safeParse(vaeModel);
             if (!result.success) {
               return;
             }
-            paramsDispatch(api, vaeSelected, result.data);
+            dispatch(vaeSelected(result.data));
           }
         }
 
         if (vae_precision) {
           if (isParameterPrecision(vae_precision)) {
-            paramsDispatch(api, vaePrecisionChanged, vae_precision);
+            dispatch(vaePrecisionChanged(vae_precision));
           }
         }
 
         if (guidance) {
           if (isParameterGuidance(guidance)) {
-            paramsDispatch(api, setGuidance, guidance);
+            dispatch(setGuidance(guidance));
           }
         }
 
         if (cfg_scale) {
           if (isParameterCFGScale(cfg_scale)) {
-            paramsDispatch(api, setCfgScale, cfg_scale);
+            dispatch(setCfgScale(cfg_scale));
           }
         }
 
         if (!isNil(cfg_rescale_multiplier)) {
           if (isParameterCFGRescaleMultiplier(cfg_rescale_multiplier)) {
-            paramsDispatch(api, setCfgRescaleMultiplier, cfg_rescale_multiplier);
+            dispatch(setCfgRescaleMultiplier(cfg_rescale_multiplier));
           }
         } else {
           // Set this to 0 if it doesn't have a default. This value is
           // easy to miss in the UI when users are resetting defaults
           // and leaving it non-zero could lead to detrimental
           // effects.
-          paramsDispatch(api, setCfgRescaleMultiplier, 0);
+          dispatch(setCfgRescaleMultiplier(0));
         }
 
         if (steps) {
           if (isParameterSteps(steps)) {
-            paramsDispatch(api, setSteps, steps);
+            dispatch(setSteps(steps));
           }
         }
 
         if (scheduler) {
           if (isParameterScheduler(scheduler)) {
-            paramsDispatch(api, setScheduler, scheduler);
+            dispatch(setScheduler(scheduler));
           }
         }
         const setSizeOptions = { updateAspectRatio: true, clamp: true };
@@ -128,10 +127,10 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
         const activeTab = selectActiveTab(getState());
         if (activeTab === 'generate') {
           if (isParameterWidth(width)) {
-            paramsDispatch(api, widthChanged, { width, ...setSizeOptions });
+            dispatch(widthChanged({ width, ...setSizeOptions }));
           }
           if (isParameterHeight(height)) {
-            paramsDispatch(api, heightChanged, { height, ...setSizeOptions });
+            dispatch(heightChanged({ height, ...setSizeOptions }));
           }
         }
 

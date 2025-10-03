@@ -1,10 +1,6 @@
 import { IconButton, Tooltip } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
-import {
-  negativePromptChanged,
-  selectHasNegativePrompt,
-  useParamsDispatch,
-} from 'features/controlLayers/store/paramsSlice';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { negativePromptChanged, selectHasNegativePrompt } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusMinusBold } from 'react-icons/pi';
@@ -12,16 +8,15 @@ import { PiPlusMinusBold } from 'react-icons/pi';
 export const NegativePromptToggleButton = memo(() => {
   const { t } = useTranslation();
   const hasNegativePrompt = useAppSelector(selectHasNegativePrompt);
-
-  const dispatchParams = useParamsDispatch();
+  const dispatch = useAppDispatch();
 
   const onClick = useCallback(() => {
     if (hasNegativePrompt) {
-      dispatchParams(negativePromptChanged, null);
+      dispatch(negativePromptChanged(null));
     } else {
-      dispatchParams(negativePromptChanged, '');
+      dispatch(negativePromptChanged(''));
     }
-  }, [dispatchParams, hasNegativePrompt]);
+  }, [dispatch, hasNegativePrompt]);
 
   const label = useMemo(
     () => (hasNegativePrompt ? t('common.removeNegativePrompt') : t('common.addNegativePrompt')),

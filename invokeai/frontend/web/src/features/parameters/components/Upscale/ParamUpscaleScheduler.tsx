@@ -1,19 +1,15 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import {
-  selectUpscaleScheduler,
-  setUpscaleScheduler,
-  useParamsDispatch,
-} from 'features/controlLayers/store/paramsSlice';
+import { selectUpscaleScheduler, setUpscaleScheduler } from 'features/controlLayers/store/paramsSlice';
 import { SCHEDULER_OPTIONS } from 'features/parameters/types/constants';
 import { isParameterScheduler } from 'features/parameters/types/parameterSchemas';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamUpscaleScheduler = () => {
-  const dispatchParams = useParamsDispatch();
+  const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const scheduler = useAppSelector(selectUpscaleScheduler);
 
@@ -22,9 +18,9 @@ const ParamUpscaleScheduler = () => {
       if (!isParameterScheduler(v?.value)) {
         return;
       }
-      dispatchParams(setUpscaleScheduler, v.value);
+      dispatch(setUpscaleScheduler(v.value));
     },
-    [dispatchParams]
+    [dispatch]
   );
 
   const value = useMemo(() => SCHEDULER_OPTIONS.find((o) => o.value === scheduler), [scheduler]);

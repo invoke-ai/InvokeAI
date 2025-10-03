@@ -1,18 +1,17 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import {
   selectInfillMethod,
   selectInfillPatchmatchDownscaleSize,
   setInfillPatchmatchDownscaleSize,
-  useParamsDispatch,
 } from 'features/controlLayers/store/paramsSlice';
 import { selectInfillPatchmatchDownscaleSizeConfig } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamInfillPatchmatchDownscaleSize = () => {
-  const dispatchParams = useParamsDispatch();
+  const dispatch = useAppDispatch();
   const infillMethod = useAppSelector(selectInfillMethod);
   const infillPatchmatchDownscaleSize = useAppSelector(selectInfillPatchmatchDownscaleSize);
   const config = useAppSelector(selectInfillPatchmatchDownscaleSizeConfig);
@@ -21,9 +20,9 @@ const ParamInfillPatchmatchDownscaleSize = () => {
 
   const handleChange = useCallback(
     (v: number) => {
-      dispatchParams(setInfillPatchmatchDownscaleSize, v);
+      dispatch(setInfillPatchmatchDownscaleSize(v));
     },
-    [dispatchParams]
+    [dispatch]
   );
 
   return (

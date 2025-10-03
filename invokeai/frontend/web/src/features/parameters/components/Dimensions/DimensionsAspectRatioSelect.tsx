@@ -1,5 +1,5 @@
 import { FormControl, FormLabel, Select } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import {
   aspectRatioIdChanged,
@@ -9,7 +9,6 @@ import {
   selectIsGemini2_5,
   selectIsImagen3,
   selectIsImagen4,
-  useParamsDispatch,
 } from 'features/controlLayers/store/paramsSlice';
 import {
   isAspectRatioID,
@@ -26,7 +25,7 @@ import { PiCaretDownBold } from 'react-icons/pi';
 
 export const DimensionsAspectRatioSelect = memo(() => {
   const { t } = useTranslation();
-  const dispatchParams = useParamsDispatch();
+  const dispatch = useAppDispatch();
   const id = useAppSelector(selectAspectRatioID);
   const isImagen3 = useAppSelector(selectIsImagen3);
   const isChatGPT4o = useAppSelector(selectIsChatGPT4o);
@@ -57,9 +56,9 @@ export const DimensionsAspectRatioSelect = memo(() => {
       if (!isAspectRatioID(e.target.value)) {
         return;
       }
-      dispatchParams(aspectRatioIdChanged, { id: e.target.value });
+      dispatch(aspectRatioIdChanged({ id: e.target.value }));
     },
-    [dispatchParams]
+    [dispatch]
   );
 
   return (

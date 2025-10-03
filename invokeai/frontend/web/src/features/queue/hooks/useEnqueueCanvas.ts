@@ -8,7 +8,6 @@ import { withResult, withResultAsync } from 'common/util/result';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import {
-  paramsDispatch,
   positivePromptAddedToHistory,
   selectActiveParams,
   selectPositivePrompt,
@@ -137,7 +136,7 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
   const enqueueResult = await req.unwrap();
 
   // Push to prompt history on successful enqueue
-  paramsDispatch(store, positivePromptAddedToHistory, selectPositivePrompt(state));
+  dispatch(positivePromptAddedToHistory(selectPositivePrompt(state)));
 
   return { batchConfig, enqueueResult };
 };

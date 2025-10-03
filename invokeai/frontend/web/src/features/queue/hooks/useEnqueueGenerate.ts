@@ -6,7 +6,6 @@ import { useAppStore } from 'app/store/storeHooks';
 import { extractMessageFromAssertionError } from 'common/util/extractMessageFromAssertionError';
 import { withResult, withResultAsync } from 'common/util/result';
 import {
-  paramsDispatch,
   positivePromptAddedToHistory,
   selectActiveParams,
   selectPositivePrompt,
@@ -132,7 +131,7 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
   const enqueueResult = await req.unwrap();
 
   // Push to prompt history on successful enqueue
-  paramsDispatch(store, positivePromptAddedToHistory, selectPositivePrompt(state));
+  dispatch(positivePromptAddedToHistory(selectPositivePrompt(state)));
 
   return { batchConfig, enqueueResult };
 };

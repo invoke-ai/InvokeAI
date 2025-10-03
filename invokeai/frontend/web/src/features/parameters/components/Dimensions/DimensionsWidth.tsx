@@ -1,12 +1,11 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import {
   selectGridSize,
   selectIsApiBaseModel,
   selectOptimalDimension,
   selectWidth,
-  useParamsDispatch,
   widthChanged,
 } from 'features/controlLayers/store/paramsSlice';
 import { selectWidthConfig } from 'features/system/store/configSlice';
@@ -16,7 +15,7 @@ import { useTranslation } from 'react-i18next';
 
 export const DimensionsWidth = memo(() => {
   const { t } = useTranslation();
-  const dispatchParams = useParamsDispatch();
+  const dispatch = useAppDispatch();
   const width = useAppSelector(selectWidth);
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const config = useAppSelector(selectWidthConfig);
@@ -26,9 +25,9 @@ export const DimensionsWidth = memo(() => {
 
   const onChange = useCallback(
     (v: number) => {
-      dispatchParams(widthChanged, { width: v });
+      dispatch(widthChanged({ width: v }));
     },
-    [dispatchParams]
+    [dispatch]
   );
 
   const marks = useMemo(

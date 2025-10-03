@@ -1,10 +1,9 @@
 import { FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import {
   selectOptimizedDenoisingEnabled,
   setOptimizedDenoisingEnabled,
-  useParamsDispatch,
 } from 'features/controlLayers/store/paramsSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
@@ -12,13 +11,13 @@ import { useTranslation } from 'react-i18next';
 
 export const ParamOptimizedDenoisingToggle = memo(() => {
   const optimizedDenoisingEnabled = useAppSelector(selectOptimizedDenoisingEnabled);
-  const dispatchParams = useParamsDispatch();
+  const dispatch = useAppDispatch();
 
   const onChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
-      dispatchParams(setOptimizedDenoisingEnabled, event.target.checked);
+      dispatch(setOptimizedDenoisingEnabled(event.target.checked));
     },
-    [dispatchParams]
+    [dispatch]
   );
 
   const { t } = useTranslation();

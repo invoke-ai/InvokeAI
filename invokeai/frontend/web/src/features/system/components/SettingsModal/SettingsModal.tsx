@@ -19,11 +19,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { buildUseBoolean } from 'common/hooks/useBoolean';
-import {
-  selectShouldUseCPUNoise,
-  shouldUseCpuNoiseChanged,
-  useParamsDispatch,
-} from 'features/controlLayers/store/paramsSlice';
+import { selectShouldUseCPUNoise, shouldUseCpuNoiseChanged } from 'features/controlLayers/store/paramsSlice';
 import { useRefreshAfterResetModal } from 'features/system/components/SettingsModal/RefreshAfterResetModal';
 import { SettingsDeveloperLogIsEnabled } from 'features/system/components/SettingsModal/SettingsDeveloperLogIsEnabled';
 import { SettingsDeveloperLogLevel } from 'features/system/components/SettingsModal/SettingsDeveloperLogLevel';
@@ -85,7 +81,7 @@ const [useSettingsModal] = buildUseBoolean(false);
 
 const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps) => {
   const dispatch = useAppDispatch();
-  const dispatchParams = useParamsDispatch();
+
   const { t } = useTranslation();
 
   const { isNSFWCheckerAvailable, isWatermarkerAvailable } = useGetAppConfigQuery(undefined, {
@@ -176,9 +172,9 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
   );
   const handleChangeShouldUseCpuNoise = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
-      dispatchParams(shouldUseCpuNoiseChanged, e.target.checked);
+      dispatch(shouldUseCpuNoiseChanged(e.target.checked));
     },
-    [dispatchParams]
+    [dispatch]
   );
 
   const handleChangeShouldShowInvocationProgressDetail = useCallback(

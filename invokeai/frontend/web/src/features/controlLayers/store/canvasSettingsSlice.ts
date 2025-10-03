@@ -1,5 +1,5 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { CanvasSettingsState, RgbaColor } from 'features/controlLayers/store/types';
 import { RGBA_BLACK, RGBA_WHITE } from 'features/controlLayers/store/types';
@@ -108,6 +108,8 @@ export const canvasSettingsState = createSlice({
     },
   },
 });
+
+export const isCanvasSettingsStateAction = isAnyOf(...Object.values(canvasSettingsState.actions));
 
 export const {
   settingsClipToBboxChanged,

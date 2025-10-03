@@ -2,7 +2,7 @@ import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { allEntitiesDeleted, inpaintMaskAdded } from 'features/controlLayers/store/canvasSlice';
-import { paramsReset, useParamsDispatch } from 'features/controlLayers/store/paramsSlice';
+import { paramsReset } from 'features/controlLayers/store/paramsSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,7 +11,6 @@ import { PiArrowsCounterClockwiseBold } from 'react-icons/pi';
 export const SessionMenuItems = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const paramsDispatch = useParamsDispatch();
   const tab = useAppSelector(selectActiveTab);
   const canvasManager = useCanvasManagerSafe();
 
@@ -21,8 +20,8 @@ export const SessionMenuItems = memo(() => {
     canvasManager?.stage.fitBboxToStage();
   }, [dispatch, canvasManager]);
   const resetGenerationSettings = useCallback(() => {
-    paramsDispatch(paramsReset);
-  }, [paramsDispatch]);
+    dispatch(paramsReset());
+  }, [dispatch]);
   return (
     <>
       {tab === 'canvas' && (

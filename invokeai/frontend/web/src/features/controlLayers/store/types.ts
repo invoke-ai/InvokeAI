@@ -1,4 +1,3 @@
-import type { PayloadAction } from '@reduxjs/toolkit';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import { zMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
@@ -25,7 +24,6 @@ import {
   zParameterT5EncoderModel,
   zParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
-import type { TabName } from 'features/ui/store/uiTypes';
 import type { JsonObject } from 'type-fest';
 import { z } from 'zod';
 
@@ -685,15 +683,7 @@ const zPositivePromptHistory = z
   .array(zParameterPositivePrompt)
   .transform((arr) => arr.slice(0, MAX_POSITIVE_PROMPT_HISTORY));
 
-type EnrichedPayload<T, P> = P extends undefined ? T : T & { value: P };
-
-export const isParamsTab = (tab: TabName) =>
-  tab === 'generate' || tab === 'canvas' || tab === 'upscaling' || tab === 'video';
-type ParamsTabName = 'generate' | 'canvas' | 'upscaling' | 'video';
-export type ParamsEnrichedPayload<P = undefined> = EnrichedPayload<{ tab: ParamsTabName; canvasId: string }, P>;
-export type ParamsPayloadAction<P = undefined> = PayloadAction<ParamsEnrichedPayload<P>>;
-
-export const zInstanceParamsState = z.object({
+export const zTabParamsState = z.object({
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -740,12 +730,12 @@ export const zInstanceParamsState = z.object({
   controlLora: zParameterControlLoRAModel.nullable(),
   dimensions: zDimensionsState,
 });
-export type InstanceParamsState = z.infer<typeof zInstanceParamsState>;
+export type TabParamsState = z.infer<typeof zTabParamsState>;
 export const zParamsState = z.object({
   _version: z.literal(3),
-  generate: zInstanceParamsState,
-  upscaling: zInstanceParamsState,
-  video: zInstanceParamsState,
+  generate: zTabParamsState,
+  upscaling: zTabParamsState,
+  video: zTabParamsState,
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 
@@ -890,7 +880,7 @@ const zCanvasInstanceStateBase = z.object({
 const zCanvasInstanceState = <T extends z.ZodTypeAny>(canvasEntitySchema: T) =>
   zCanvasInstanceStateBase.extend({
     canvas: canvasEntitySchema,
-    params: zInstanceParamsState,
+    params: zTabParamsState,
     settings: zCanvasSettingsState,
     staging: zCanvasStagingAreaState,
   });

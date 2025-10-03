@@ -1,11 +1,11 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { UploadImageIconButton } from 'common/hooks/useImageUploadButton';
 import { useCanvasIsStaging } from 'features/controlLayers/hooks/useCanvasIsStaging';
 import { bboxSizeOptimized, bboxSizeRecalled } from 'features/controlLayers/store/canvasSlice';
-import { sizeOptimized, sizeRecalled, useParamsDispatch } from 'features/controlLayers/store/paramsSlice';
+import { sizeOptimized, sizeRecalled } from 'features/controlLayers/store/paramsSlice';
 import type { ImageWithDims } from 'features/controlLayers/store/types';
 import type { setRegionalGuidanceReferenceImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
@@ -29,7 +29,7 @@ type Props = {
 export const RegionalGuidanceRefImageImage = memo(({ image, onChangeImage, dndTarget, dndTargetData }: Props) => {
   const { t } = useTranslation();
   const store = useAppStore();
-  const paramsDispatch = useParamsDispatch();
+  const dispatch = useAppDispatch();
   const isConnected = useStore($isConnected);
   const tab = useAppSelector(selectActiveTab);
   const isStaging = useCanvasIsStaging();
@@ -60,10 +60,10 @@ export const RegionalGuidanceRefImageImage = memo(({ image, onChangeImage, dndTa
       store.dispatch(bboxSizeRecalled({ width, height }));
       store.dispatch(bboxSizeOptimized());
     } else if (tab === 'generate') {
-      paramsDispatch(sizeRecalled, { width, height });
-      paramsDispatch(sizeOptimized);
+      dispatch(sizeRecalled({ width, height }));
+      dispatch(sizeOptimized());
     }
-  }, [paramsDispatch, imageDTO, isStaging, store, tab]);
+  }, [dispatch, imageDTO, isStaging, store, tab]);
 
   return (
     <Flex position="relative" w="full" h="full" alignItems="center" data-error={!imageDTO && !image?.image_name}>

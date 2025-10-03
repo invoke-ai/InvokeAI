@@ -1,5 +1,5 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSelector, createSlice } from '@reduxjs/toolkit';
+import { createSelector, createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import type { RootState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
@@ -43,6 +43,8 @@ export const canvasStagingAreaState = createSlice({
     },
   },
 });
+
+export const isCanvasStagingAreaStateAction = isAnyOf(...Object.values(canvasStagingAreaState.actions));
 
 export const { canvasSessionReset, canvasQueueItemDiscarded } = canvasStagingAreaState.actions;
 

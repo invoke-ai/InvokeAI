@@ -1,6 +1,7 @@
 import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { SliceConfig } from 'app/store/types';
+import { extractTabActionContext } from 'app/store/util';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
@@ -58,9 +59,13 @@ import {
 } from 'services/api/types';
 import { assert } from 'tsafe';
 
-import { canvasSettingsState, getInitialCanvasSettings } from './canvasSettingsSlice';
-import { canvasStagingAreaState, getInitialCanvasStagingAreaState } from './canvasStagingAreaSlice';
-import { getInitialInstanceParamsState, instanceParamsState, isInstanceParamsAction } from './paramsSlice';
+import { canvasSettingsState, getInitialCanvasSettings, isCanvasSettingsStateAction } from './canvasSettingsSlice';
+import {
+  canvasStagingAreaState,
+  getInitialCanvasStagingAreaState,
+  isCanvasStagingAreaStateAction,
+} from './canvasStagingAreaSlice';
+import { getInitialTabParamsState, isTabParamsStateAction, tabParamsState } from './paramsSlice';
 import type {
   AspectRatioID,
   BoundingBoxScaleMethod,
@@ -134,7 +139,7 @@ const getInitialCanvasInstanceState = (id: string, name: string): CanvasInstance
   id,
   name,
   canvas: getInitialCanvasEntity(),
-  params: getInitialInstanceParamsState(),
+  params: getInitialTabParamsState(),
   settings: getInitialCanvasSettings(),
   staging: getInitialCanvasStagingAreaState(),
 });
@@ -183,15 +188,12 @@ const getNextCanvasName = (canvases: CanvasInstanceStateBase[]): string => {
   }
 };
 
-type PayloadWithCanvasId<P> = P & { canvasId: string };
-type CanvasPayloadAction<P> = PayloadAction<PayloadWithCanvasId<P>>;
-
 const canvasSlice = createSlice({
   name: 'canvas',
   initialState: getInitialCanvasHistoryState(),
   reducers: {
     canvasAdded: {
-      reducer: (state, action: CanvasPayloadAction<{ isSelected?: boolean }>) => {
+      reducer: (state, action: PayloadAction<{ canvasId: string; isSelected?: boolean }>) => {
         const { canvasId, isSelected } = action.payload;
 
         const name = getNextCanvasName(Object.values(state.canvases));
@@ -209,7 +211,7 @@ const canvasSlice = createSlice({
         };
       },
     },
-    canvasActivated: (state, action: CanvasPayloadAction<unknown>) => {
+    canvasActivated: (state, action: PayloadAction<{ canvasId: string }>) => {
       const { canvasId } = action.payload;
 
       const canvas = state.canvases[canvasId];
@@ -219,7 +221,7 @@ const canvasSlice = createSlice({
 
       state.activeCanvasId = canvas.id;
     },
-    canvasDeleted: (state, action: CanvasPayloadAction<unknown>) => {
+    canvasDeleted: (state, action: PayloadAction<{ canvasId: string }>) => {
       const { canvasId } = action.payload;
       const canvasIds = Object.keys(state.canvases);
 
@@ -241,14 +243,18 @@ const canvasSlice = createSlice({
   },
   extraReducers(builder) {
     builder.addDefaultCase((state, action) => {
-      const canvasId = isCanvasPayloadAction(action) ? action.payload.canvasId : state.activeCanvasId;
+      const context = extractTabActionContext(action);
 
-      const canvasInstance = state.canvases[canvasId];
+      if (!context || context.tab !== 'canvas' || !context.canvasId) {
+        return;
+      }
+
+      const canvasInstance = state.canvases[context.canvasId];
       if (!canvasInstance) {
         return;
       }
 
-      state.canvases[canvasId] = canvasInstanceState.reducer(canvasInstance, action);
+      state.canvases[context.canvasId] = canvasInstanceState.reducer(canvasInstance, action);
     });
   },
 });
@@ -257,20 +263,26 @@ const canvasInstanceState = createSlice({
   name: 'canvasInstance',
   initialState: {} as CanvasInstanceStateWithHistory,
   reducers: {
-    canvasNameChanged: (state, action: CanvasPayloadAction<{ name: string }>) => {
+    canvasNameChanged: (state, action: PayloadAction<{ canvasId: string; name: string }>) => {
       const { name } = action.payload;
 
       state.name = name;
     },
   },
   extraReducers(builder) {
-    builder.addDefaultCase((state, action) => {
-      const tab = isInstanceParamsAction(action) ? action.payload.tab : undefined;
-
-      state.canvas = undoableCanvasEntityReducer(state.canvas, action);
-      state.params = tab === 'canvas' ? instanceParamsState.reducer(state.params, action) : state.params;
-      state.settings = canvasSettingsState.reducer(state.settings, action);
-      state.staging = canvasStagingAreaState.reducer(state.staging, action);
+    builder.addMatcher(isCanvasInstanceAction, (state, action) => {
+      if (isCanvasEntityStateAction(action)) {
+        state.canvas = undoableCanvasEntityReducer(state.canvas, action);
+      }
+      if (isTabParamsStateAction(action)) {
+        state.params = tabParamsState.reducer(state.params, action);
+      }
+      if (isCanvasSettingsStateAction(action)) {
+        state.settings = canvasSettingsState.reducer(state.settings, action);
+      }
+      if (isCanvasStagingAreaStateAction(action)) {
+        state.staging = canvasStagingAreaState.reducer(state.staging, action);
+      }
     });
   },
 });
@@ -1848,7 +1860,7 @@ const canvasEntityState = createSlice({
       return resetCanvasState(state);
     });
     builder.addCase(modelChanged, (state, action) => {
-      const { model } = action.payload.value;
+      const { model } = action.payload;
       /**
        * Because the bbox depends in part on the model, it needs to be in sync with the model. However, due to
        * complications with managing undo/redo history, we need to store the model in a separate slice from the canvas
@@ -1920,6 +1932,13 @@ const syncScaledSize = (state: CanvasEntity) => {
     );
   }
 };
+
+export const isCanvasInstanceAction = (action: UnknownAction) =>
+  isCanvasEntityStateAction(action) ||
+  isTabParamsStateAction(action) ||
+  isCanvasSettingsStateAction(action) ||
+  isCanvasStagingAreaStateAction(action);
+export const isCanvasEntityStateAction = isAnyOf(...Object.values(canvasEntityState.actions), canvasReset);
 
 export const {
   // Canvas
@@ -2040,7 +2059,7 @@ const canvasEntityUndoableConfig: UndoableOptions<CanvasEntity, UnknownAction> =
   clearHistoryType: canvasClearHistory.type,
   filter: (action, _state, _history) => {
     // Ignore both all actions from other slices and canvas management actions
-    if (!action.type.startsWith(canvasInstanceState.name)) {
+    if (!action.type.startsWith(canvasEntityState.name)) {
       return false;
     }
     // Throttle rapid actions of the same type
@@ -2052,15 +2071,6 @@ const canvasEntityUndoableConfig: UndoableOptions<CanvasEntity, UnknownAction> =
 };
 
 const undoableCanvasEntityReducer = undoable(canvasEntityState.reducer, canvasEntityUndoableConfig);
-
-const isCanvasPayloadAction = (action: UnknownAction): action is CanvasPayloadAction<unknown> => {
-  return (
-    typeof action.payload === 'object' &&
-    action.payload !== null &&
-    'canvasId' in action.payload &&
-    typeof (action.payload as { canvasId: unknown }).canvasId === 'string'
-  );
-};
 
 export const canvasSliceConfig: SliceConfig<typeof canvasSlice, CanvasStateWithHistory, CanvasState> = {
   slice: canvasSlice,

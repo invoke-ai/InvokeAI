@@ -1,7 +1,7 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { selectSteps, setSteps, useParamsDispatch } from 'features/controlLayers/store/paramsSlice';
+import { selectSteps, setSteps } from 'features/controlLayers/store/paramsSlice';
 import { selectStepsConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 const ParamSteps = () => {
   const steps = useAppSelector(selectSteps);
   const config = useAppSelector(selectStepsConfig);
-  const dispatchParams = useParamsDispatch();
+  const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const marks = useMemo(
     () => [config.sliderMin, Math.floor(config.sliderMax / 2), config.sliderMax],
@@ -17,9 +17,9 @@ const ParamSteps = () => {
   );
   const onChange = useCallback(
     (v: number) => {
-      dispatchParams(setSteps, v);
+      dispatch(setSteps(v));
     },
-    [dispatchParams]
+    [dispatch]
   );
 
   return (

@@ -7,12 +7,7 @@ import {
   selectActiveCanvasStagingAreaSessionId,
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraIsEnabledChanged } from 'features/controlLayers/store/lorasSlice';
-import {
-  paramsDispatch,
-  selectActiveParams,
-  syncedToOptimalDimension,
-  vaeSelected,
-} from 'features/controlLayers/store/paramsSlice';
+import { selectActiveParams, syncedToOptimalDimension, vaeSelected } from 'features/controlLayers/store/paramsSlice';
 import { refImageModelChanged, selectReferenceImageEntities } from 'features/controlLayers/store/refImagesSlice';
 import {
   selectActiveCanvas,
@@ -70,7 +65,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         // handle incompatible vae
         const { vae } = params;
         if (vae && vae.base !== newBase) {
-          paramsDispatch(api, vaeSelected, null);
+          dispatch(vaeSelected(null));
           modelsUpdatedDisabledOrCleared += 1;
         }
 
@@ -163,13 +158,13 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         }
       }
 
-      paramsDispatch(api, modelChanged, { model: newModel, previousModel: params.model });
+      dispatch(modelChanged({ model: newModel, previousModel: params.model }));
 
       const modelBase = selectBboxModelBase(state);
 
       if (modelBase !== params.model?.base) {
         // Sync generate tab settings whenever the model base changes
-        paramsDispatch(api, syncedToOptimalDimension);
+        dispatch(syncedToOptimalDimension());
         const sessionId = selectActiveCanvasStagingAreaSessionId(state);
         const selectIsStaging = buildSelectIsStagingBySessionId(sessionId);
         const isStaging = selectIsStaging(state);

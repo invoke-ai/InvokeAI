@@ -1,8 +1,8 @@
 import { Combobox, FormControl, FormLabel, IconButton } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
-import { refinerModelChanged, selectRefinerModel, useParamsDispatch } from 'features/controlLayers/store/paramsSlice';
+import { refinerModelChanged, selectRefinerModel } from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,19 +13,19 @@ import type { MainModelConfig } from 'services/api/types';
 const optionsFilter = (model: MainModelConfig) => model.base === 'sdxl-refiner';
 
 const ParamSDXLRefinerModelSelect = () => {
-  const dispatchParams = useParamsDispatch();
+  const dispatch = useAppDispatch();
   const model = useAppSelector(selectRefinerModel);
   const { t } = useTranslation();
   const [modelConfigs, { isLoading }] = useRefinerModels();
   const _onChange = useCallback(
     (model: MainModelConfig | null) => {
       if (!model) {
-        dispatchParams(refinerModelChanged, null);
+        dispatch(refinerModelChanged(null));
         return;
       }
-      dispatchParams(refinerModelChanged, zModelIdentifierField.parse(model));
+      dispatch(refinerModelChanged(zModelIdentifierField.parse(model)));
     },
-    [dispatchParams]
+    [dispatch]
   );
   const { options, value, onChange, placeholder, noOptionsMessage } = useModelCombobox({
     modelConfigs,

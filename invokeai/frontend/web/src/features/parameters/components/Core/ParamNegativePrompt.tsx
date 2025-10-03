@@ -1,11 +1,7 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { usePersistedTextAreaSize } from 'common/hooks/usePersistedTextareaSize';
-import {
-  negativePromptChanged,
-  selectNegativePromptWithFallback,
-  useParamsDispatch,
-} from 'features/controlLayers/store/paramsSlice';
+import { negativePromptChanged, selectNegativePromptWithFallback } from 'features/controlLayers/store/paramsSlice';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModePrompt';
@@ -26,7 +22,7 @@ const persistOptions: Parameters<typeof usePersistedTextAreaSize>[2] = {
 };
 
 export const ParamNegativePrompt = memo(() => {
-  const dispatchParams = useParamsDispatch();
+  const dispatch = useAppDispatch();
   const prompt = useAppSelector(selectNegativePromptWithFallback);
   const viewMode = useAppSelector(selectStylePresetViewMode);
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
@@ -47,9 +43,9 @@ export const ParamNegativePrompt = memo(() => {
   const { t } = useTranslation();
   const _onChange = useCallback(
     (v: string) => {
-      dispatchParams(negativePromptChanged, v);
+      dispatch(negativePromptChanged(v));
     },
-    [dispatchParams]
+    [dispatch]
   );
   const { onChange, isOpen, onClose, onOpen, onSelect, onKeyDown } = usePrompt({
     prompt,

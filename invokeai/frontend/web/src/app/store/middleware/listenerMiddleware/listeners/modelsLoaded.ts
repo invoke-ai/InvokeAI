@@ -6,11 +6,9 @@ import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
 import {
   clipEmbedModelSelected,
   fluxVAESelected,
-  paramsDispatch,
   refinerModelChanged,
   selectActiveParams,
   t5EncoderModelSelected,
-  toStore,
   vaeSelected,
 } from 'features/controlLayers/store/paramsSlice';
 import { refImageModelChanged, selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
@@ -116,7 +114,7 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
     // Only clear the model if we have one currently selected
     if (selectedMainModel !== null) {
       log.debug({ selectedMainModel }, 'No main models available, clearing');
-      paramsDispatch(toStore(state, dispatch), modelChanged, { model: null });
+      dispatch(modelChanged({ model: null }));
     }
     return;
   }
@@ -166,7 +164,7 @@ const handleRefinerModels: ModelHandler = (models, state, dispatch, log) => {
 
   // Else, we need to clear the refiner model
   log.debug({ selectedRefinerModel }, 'Selected refiner model is not available, clearing');
-  paramsDispatch(toStore(state, dispatch), refinerModelChanged, null);
+  dispatch(refinerModelChanged(null));
   return;
 };
 
@@ -190,7 +188,7 @@ const handleVAEModels: ModelHandler = (models, state, dispatch, log) => {
 
   // Else, we need to clear the VAE model
   log.debug({ selectedVAEModel }, 'Selected VAE model is not available, clearing');
-  paramsDispatch(toStore(state, dispatch), vaeSelected, null);
+  dispatch(vaeSelected(null));
   return;
 };
 
@@ -435,14 +433,14 @@ const handleT5EncoderModels: ModelHandler = (models, state, dispatch, log) => {
       { selectedT5EncoderModel, firstModel },
       'No selected T5 encoder model or selected T5 encoder model is not available, selecting first available model'
     );
-    paramsDispatch(toStore(state, dispatch), t5EncoderModelSelected, zParameterT5EncoderModel.parse(firstModel));
+    dispatch(t5EncoderModelSelected(zParameterT5EncoderModel.parse(firstModel)));
     return;
   }
 
   // No available models, we should clear the selected model - but only if we have one selected
   if (selectedT5EncoderModel) {
     log.debug({ selectedT5EncoderModel }, 'Selected T5 encoder model is not available, clearing');
-    paramsDispatch(toStore(state, dispatch), t5EncoderModelSelected, null);
+    dispatch(t5EncoderModelSelected(null));
     return;
   }
 };
@@ -463,14 +461,14 @@ const handleCLIPEmbedModels: ModelHandler = (models, state, dispatch, log) => {
       { selectedCLIPEmbedModel, firstModel },
       'No selected CLIP embed model or selected CLIP embed model is not available, selecting first available model'
     );
-    paramsDispatch(toStore(state, dispatch), clipEmbedModelSelected, zParameterCLIPEmbedModel.parse(firstModel));
+    dispatch(clipEmbedModelSelected(zParameterCLIPEmbedModel.parse(firstModel)));
     return;
   }
 
   // No available models, we should clear the selected model - but only if we have one selected
   if (selectedCLIPEmbedModel) {
     log.debug({ selectedCLIPEmbedModel }, 'Selected CLIP embed model is not available, clearing');
-    paramsDispatch(toStore(state, dispatch), clipEmbedModelSelected, null);
+    dispatch(clipEmbedModelSelected(null));
     return;
   }
 };
@@ -491,14 +489,14 @@ const handleFLUXVAEModels: ModelHandler = (models, state, dispatch, log) => {
       { selectedFLUXVAEModel, firstModel },
       'No selected FLUX VAE model or selected FLUX VAE model is not available, selecting first available model'
     );
-    paramsDispatch(toStore(state, dispatch), fluxVAESelected, zParameterVAEModel.parse(firstModel));
+    dispatch(fluxVAESelected(zParameterVAEModel.parse(firstModel)));
     return;
   }
 
   // No available models, we should clear the selected model - but only if we have one selected
   if (selectedFLUXVAEModel) {
     log.debug({ selectedFLUXVAEModel }, 'Selected FLUX VAE model is not available, clearing');
-    paramsDispatch(toStore(state, dispatch), fluxVAESelected, null);
+    dispatch(fluxVAESelected(null));
     return;
   }
 };

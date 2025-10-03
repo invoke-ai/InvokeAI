@@ -1,19 +1,17 @@
 import { Box, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import RgbaColorPicker from 'common/components/ColorPicker/RgbaColorPicker';
 import {
   selectInfillColorValue,
   selectInfillMethod,
   setInfillColorValue,
-  useParamsDispatch,
 } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 import type { RgbaColor } from 'react-colorful';
 import { useTranslation } from 'react-i18next';
 
 const ParamInfillColorOptions = () => {
-  const dispatchParams = useParamsDispatch();
-
+  const dispatch = useAppDispatch();
   const infillColor = useAppSelector(selectInfillColorValue);
   const infillMethod = useAppSelector(selectInfillMethod);
 
@@ -21,9 +19,9 @@ const ParamInfillColorOptions = () => {
 
   const handleInfillColor = useCallback(
     (v: RgbaColor) => {
-      dispatchParams(setInfillColorValue, v);
+      dispatch(setInfillColorValue(v));
     },
-    [dispatchParams]
+    [dispatch]
   );
 
   return (

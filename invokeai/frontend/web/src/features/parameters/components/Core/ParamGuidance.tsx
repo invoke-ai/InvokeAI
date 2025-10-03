@@ -1,7 +1,7 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { selectGuidance, setGuidance, useParamsDispatch } from 'features/controlLayers/store/paramsSlice';
+import { selectGuidance, setGuidance } from 'features/controlLayers/store/paramsSlice';
 import { selectGuidanceConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 const ParamGuidance = () => {
   const guidance = useAppSelector(selectGuidance);
   const config = useAppSelector(selectGuidanceConfig);
-  const dispatchParams = useParamsDispatch();
+  const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const marks = useMemo(
     () => [
@@ -19,7 +19,7 @@ const ParamGuidance = () => {
     ],
     [config.sliderMax, config.sliderMin]
   );
-  const onChange = useCallback((v: number) => dispatchParams(setGuidance, v), [dispatchParams]);
+  const onChange = useCallback((v: number) => dispatch(setGuidance(v)), [dispatch]);
 
   return (
     <FormControl>

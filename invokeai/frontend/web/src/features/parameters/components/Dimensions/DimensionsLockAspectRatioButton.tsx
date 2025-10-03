@@ -1,10 +1,9 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   aspectRatioLockToggled,
   selectAspectRatioIsLocked,
   selectIsApiBaseModel,
-  useParamsDispatch,
 } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,13 +11,13 @@ import { PiLockSimpleFill, PiLockSimpleOpenBold } from 'react-icons/pi';
 
 export const DimensionsLockAspectRatioButton = memo(() => {
   const { t } = useTranslation();
-  const dispatchParams = useParamsDispatch();
+  const dispatch = useAppDispatch();
   const isLocked = useAppSelector(selectAspectRatioIsLocked);
   const isApiModel = useAppSelector(selectIsApiBaseModel);
 
   const onClick = useCallback(() => {
-    dispatchParams(aspectRatioLockToggled);
-  }, [dispatchParams]);
+    dispatch(aspectRatioLockToggled());
+  }, [dispatch]);
 
   return (
     <IconButton

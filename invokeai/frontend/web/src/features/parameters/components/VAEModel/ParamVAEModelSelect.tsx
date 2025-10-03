@@ -1,8 +1,8 @@
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
-import { selectBase, selectVAE, useParamsDispatch, vaeSelected } from 'features/controlLayers/store/paramsSlice';
+import { selectBase, selectVAE, vaeSelected } from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,7 +10,7 @@ import { useVAEModels } from 'services/api/hooks/modelsByType';
 import type { VAEModelConfig } from 'services/api/types';
 
 const ParamVAEModelSelect = () => {
-  const dispatchParams = useParamsDispatch();
+  const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const base = useAppSelector(selectBase);
   const vae = useAppSelector(selectVAE);
@@ -25,9 +25,9 @@ const ParamVAEModelSelect = () => {
   );
   const _onChange = useCallback(
     (vae: VAEModelConfig | null) => {
-      dispatchParams(vaeSelected, vae ? zModelIdentifierField.parse(vae) : null);
+      dispatch(vaeSelected(vae ? zModelIdentifierField.parse(vae) : null));
     },
-    [dispatchParams]
+    [dispatch]
   );
   const { options, value, onChange, noOptionsMessage } = useGroupedModelCombobox({
     modelConfigs,

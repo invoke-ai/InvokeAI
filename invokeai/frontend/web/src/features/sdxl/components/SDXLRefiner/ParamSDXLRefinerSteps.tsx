@@ -1,14 +1,14 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { selectRefinerSteps, setRefinerSteps, useParamsDispatch } from 'features/controlLayers/store/paramsSlice';
+import { selectRefinerSteps, setRefinerSteps } from 'features/controlLayers/store/paramsSlice';
 import { selectStepsConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamSDXLRefinerSteps = () => {
   const { t } = useTranslation();
-  const dispatchParams = useParamsDispatch();
+  const dispatch = useAppDispatch();
   const refinerSteps = useAppSelector(selectRefinerSteps);
   const config = useAppSelector(selectStepsConfig);
 
@@ -19,9 +19,9 @@ const ParamSDXLRefinerSteps = () => {
 
   const onChange = useCallback(
     (v: number) => {
-      dispatchParams(setRefinerSteps, v);
+      dispatch(setRefinerSteps(v));
     },
-    [dispatchParams]
+    [dispatch]
   );
 
   return (
