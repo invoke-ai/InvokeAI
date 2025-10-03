@@ -3,8 +3,8 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import type { RootState } from 'app/store/store';
-import type { SliceConfig } from 'app/store/types';
-import { clamp } from 'es-toolkit/compat';
+import type { SerializedStateFromDenyList, SliceConfig } from 'app/store/types';
+import { clamp, merge, omit } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type {
   CroppableImageWithDims,
@@ -279,13 +279,21 @@ export const {
   refImagesRecalled,
 } = slice.actions;
 
-export const refImagesSliceConfig: SliceConfig<typeof slice> = {
+const denyList = ['selectedEntityId', 'isPanelOpen'] as const;
+type SerializedRefImagesState = SerializedStateFromDenyList<RefImagesState, typeof denyList>;
+
+export const refImagesSliceConfig: SliceConfig<typeof slice, RefImagesState, SerializedRefImagesState> = {
   slice,
   schema: zRefImagesState,
   getInitialState: getInitialRefImagesState,
   persistConfig: {
     migrate: (state) => zRefImagesState.parse(state),
-    persistDenylist: ['selectedEntityId', 'isPanelOpen'],
+    serialize: (state) => omit(state, denyList),
+    deserialize: (state) => {
+      const refImagesState = state as SerializedRefImagesState;
+
+      return merge(refImagesState, getInitialRefImagesState());
+    },
   },
 };
 

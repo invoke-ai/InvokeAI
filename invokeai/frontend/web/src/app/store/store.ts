@@ -17,9 +17,6 @@ import { addModelSelectedListener } from 'app/store/middleware/listenerMiddlewar
 import { addModelsLoadedListener } from 'app/store/middleware/listenerMiddleware/listeners/modelsLoaded';
 import { addSetDefaultSettingsListener } from 'app/store/middleware/listenerMiddleware/listeners/setDefaultSettings';
 import { addSocketConnectedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
-import { deepClone } from 'common/util/deepClone';
-import { merge } from 'es-toolkit';
-import { omit, pick } from 'es-toolkit/compat';
 import { changeBoardModalSliceConfig } from 'features/changeBoardModal/store/slice';
 import { canvasSliceConfig } from 'features/controlLayers/store/canvasSlice';
 import { lorasSliceConfig } from 'features/controlLayers/store/lorasSlice';
@@ -117,21 +114,14 @@ const unserialize: UnserializeFunction = (data, key) => {
   const { getInitialState, persistConfig } = sliceConfig;
   let state;
   try {
-    const initialState = getInitialState();
-    const parsed = JSON.parse(data);
-
-    // We need to inject non-persisted values from initial state into the rehydrated state. These values always are
-    // required to be in the state, but won't be in the persisted data. Build an object that consists of only these
-    // values, then merge it with the rehydrated state.
-    const nonPersistedSubsetOfState = pick(initialState, persistConfig.persistDenylist ?? []);
-    const stateToMigrate = merge(deepClone(parsed), nonPersistedSubsetOfState);
+    const parsedState = JSON.parse(data);
 
     // Run migrations to bring old state up to date with the current version.
-    const migrated = persistConfig.migrate(stateToMigrate);
+    const migrated = persistConfig.migrate(parsedState);
 
     log.debug(
       {
-        persistedData: parsed as JsonObject,
+        persistedData: parsedState as JsonObject,
         rehydratedData: migrated as JsonObject,
         diff: diff(data, migrated) as JsonObject,
       },
@@ -146,7 +136,7 @@ const unserialize: UnserializeFunction = (data, key) => {
     state = getInitialState();
   }
 
-  return persistConfig.wrapState ? persistConfig.wrapState(state) : state;
+  return persistConfig.deserialize ? persistConfig.deserialize(state) : state;
 };
 
 const serialize: SerializeFunction = (data, key) => {
@@ -155,12 +145,9 @@ const serialize: SerializeFunction = (data, key) => {
     throw new Error(`No persist config for slice "${key}"`);
   }
 
-  const result = omit(
-    sliceConfig.persistConfig.unwrapState ? sliceConfig.persistConfig.unwrapState(data) : data,
-    sliceConfig.persistConfig.persistDenylist ?? []
-  );
+  const state = sliceConfig.persistConfig.serialize ? sliceConfig.persistConfig.serialize(data) : data;
 
-  return JSON.stringify(result);
+  return JSON.stringify(state);
 };
 
 const PERSISTED_KEYS = Object.values(SLICE_CONFIGS)

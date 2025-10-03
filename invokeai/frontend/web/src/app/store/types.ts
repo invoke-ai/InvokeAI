@@ -2,6 +2,7 @@ import type { Slice } from '@reduxjs/toolkit';
 import type { ZodType } from 'zod';
 
 type StateFromSlice<T extends Slice> = T extends Slice<infer U> ? U : never;
+export type SerializedStateFromDenyList<S, T extends readonly (keyof S)[]> = Omit<S, T[number]>;
 
 export type SliceConfig<T extends Slice, TInternalState = StateFromSlice<T>, TSerializedState = StateFromSlice<T>> = {
   /**
@@ -29,22 +30,18 @@ export type SliceConfig<T extends Slice, TInternalState = StateFromSlice<T>, TSe
      */
     migrate: (state: unknown) => TSerializedState;
     /**
-     * Keys to omit from the persisted state.
-     */
-    persistDenylist?: (keyof StateFromSlice<T>)[];
-    /**
-     * Wraps state into state with history
+     * Serializes the state
      *
-     * @param state The state without history
-     * @returns The state with history
+     * @param state The internal state
+     * @returns The serialized state
      */
-    wrapState?: (state: unknown) => TInternalState;
+    serialize?: (state: TInternalState) => TSerializedState;
     /**
-     * Unwraps state with history
+     * Deserializes the state
      *
-     * @param state The state with history
-     * @returns The state without history
+     * @param state The serialized state
+     * @returns The internal state
      */
-    unwrapState?: (state: TInternalState) => TSerializedState;
+    deserialize?: (state: unknown) => TInternalState;
   };
 };

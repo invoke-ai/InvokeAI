@@ -819,12 +819,12 @@ export const nodesSliceConfig: SliceConfig<typeof slice, StateWithHistory<NodesS
       }
       return zNodesState.parse(state);
     },
-    wrapState: (state) => {
+    serialize: (state) => state.present,
+    deserialize: (state) => {
       const nodesState = state as NodesState;
 
       return newHistory([], nodesState, []);
     },
-    unwrapState: (state) => state.present,
   },
 };
 

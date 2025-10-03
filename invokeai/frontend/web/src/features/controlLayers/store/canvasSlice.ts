@@ -1938,7 +1938,7 @@ export const isCanvasInstanceAction = (action: UnknownAction) =>
   isTabParamsStateAction(action) ||
   isCanvasSettingsStateAction(action) ||
   isCanvasStagingAreaStateAction(action);
-export const isCanvasEntityStateAction = isAnyOf(...Object.values(canvasEntityState.actions), canvasReset);
+const isCanvasEntityStateAction = isAnyOf(...Object.values(canvasEntityState.actions), canvasReset);
 
 export const {
   // Canvas
@@ -2102,7 +2102,22 @@ export const canvasSliceConfig: SliceConfig<typeof canvasSlice, CanvasStateWithH
       }
       return zCanvasStateWithoutHistory.parse(state);
     },
-    wrapState: (state) => {
+    serialize: (state) => {
+      return {
+        _version: state._version,
+        activeCanvasId: state.activeCanvasId,
+        canvases: Object.fromEntries(
+          Object.entries(state.canvases).map(([canvasId, instance]) => [
+            canvasId,
+            {
+              ...instance,
+              canvas: instance.canvas.present,
+            },
+          ])
+        ),
+      };
+    },
+    deserialize: (state) => {
       const canvasState = state as CanvasState;
 
       return {
@@ -2111,19 +2126,10 @@ export const canvasSliceConfig: SliceConfig<typeof canvasSlice, CanvasStateWithH
         canvases: Object.fromEntries(
           Object.entries(canvasState.canvases).map(([canvasId, instance]) => [
             canvasId,
-            { ...instance, canvas: newHistory([], instance.canvas, []) },
-          ])
-        ),
-      };
-    },
-    unwrapState: (state) => {
-      return {
-        _version: state._version,
-        activeCanvasId: state.activeCanvasId,
-        canvases: Object.fromEntries(
-          Object.entries(state.canvases).map(([canvasId, instance]) => [
-            canvasId,
-            { ...instance, canvas: instance.canvas.present },
+            {
+              ...instance,
+              canvas: newHistory([], instance.canvas, []),
+            },
           ])
         ),
       };

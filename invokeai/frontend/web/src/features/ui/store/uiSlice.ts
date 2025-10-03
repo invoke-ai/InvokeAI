@@ -1,8 +1,9 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import type { SliceConfig } from 'app/store/types';
+import type { SerializedStateFromDenyList, SliceConfig } from 'app/store/types';
 import { isPlainObject } from 'es-toolkit';
+import { merge, omit } from 'es-toolkit/compat';
 import { assert } from 'tsafe';
 
 import { getInitialUIState, type UIState, zUIState } from './uiTypes';
@@ -87,7 +88,10 @@ export const {
 
 export const selectUiSlice = (state: RootState) => state.ui;
 
-export const uiSliceConfig: SliceConfig<typeof slice> = {
+const denyList = ['shouldShowItemDetails'] as const;
+type SerializedUIState = SerializedStateFromDenyList<UIState, typeof denyList>;
+
+export const uiSliceConfig: SliceConfig<typeof slice, UIState, SerializedUIState> = {
   slice,
   schema: zUIState,
   getInitialState: getInitialUIState,
@@ -111,6 +115,11 @@ export const uiSliceConfig: SliceConfig<typeof slice> = {
       }
       return zUIState.parse(state);
     },
-    persistDenylist: ['shouldShowItemDetails'],
+    serialize: (state) => omit(state, denyList),
+    deserialize: (state) => {
+      const uiState = state as SerializedUIState;
+
+      return merge(uiState, getInitialUIState());
+    },
   },
 };
