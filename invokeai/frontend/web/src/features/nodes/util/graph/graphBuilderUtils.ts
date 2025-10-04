@@ -4,7 +4,7 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectSaveAllImagesToGallery } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectCanvasStagingAreaSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
-  selectActiveParams,
+  selectActiveTabParams,
   selectImg2imgStrength,
   selectMainModelConfig,
   selectOptimizedDenoisingEnabled,
@@ -81,7 +81,7 @@ export const selectCanvasDestination = (state: RootState, canvasId: string) => {
  * Gets the prompts, modified for the active style preset.
  */
 export const selectPresetModifiedPrompts = createSelector(
-  selectActiveParams,
+  selectActiveTabParams,
   selectStylePresetSlice,
   selectListStylePresetsRequestState,
   (params, stylePresetSlice, listStylePresetsRequestState) => {
@@ -121,7 +121,7 @@ export const selectPresetModifiedPrompts = createSelector(
 
 export const getOriginalAndScaledSizesForTextToImage = (state: RootState) => {
   const tab = selectActiveTab(state);
-  const params = selectActiveParams(state);
+  const params = selectActiveTabParams(state);
 
   if (tab === 'canvas') {
     const canvas = selectActiveCanvas(state);

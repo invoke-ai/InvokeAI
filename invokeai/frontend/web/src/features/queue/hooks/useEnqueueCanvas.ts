@@ -9,7 +9,7 @@ import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasMana
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import {
   positivePromptAddedToHistory,
-  selectActiveParams,
+  selectActiveTabParams,
   selectPositivePrompt,
 } from 'features/controlLayers/store/paramsSlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
@@ -42,7 +42,7 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
 
   const state = getState();
   const destination = selectCanvasDestination(state, canvasManager.canvasId);
-  const params = selectActiveParams(state);
+  const params = selectActiveTabParams(state);
 
   const model = params.model;
   if (!model) {

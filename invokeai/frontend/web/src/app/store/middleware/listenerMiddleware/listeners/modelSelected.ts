@@ -7,7 +7,7 @@ import {
   selectActiveCanvasStagingAreaSessionId,
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraIsEnabledChanged } from 'features/controlLayers/store/lorasSlice';
-import { selectActiveParams, syncedToOptimalDimension, vaeSelected } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTabParams, syncedToOptimalDimension, vaeSelected } from 'features/controlLayers/store/paramsSlice';
 import { refImageModelChanged, selectReferenceImageEntities } from 'features/controlLayers/store/refImagesSlice';
 import {
   selectActiveCanvas,
@@ -47,7 +47,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
 
       const newModel = result.data;
       const newBase = newModel.base;
-      const params = selectActiveParams(state);
+      const params = selectActiveTabParams(state);
       const didBaseModelChange = params.model?.base !== newBase;
 
       if (didBaseModelChange) {

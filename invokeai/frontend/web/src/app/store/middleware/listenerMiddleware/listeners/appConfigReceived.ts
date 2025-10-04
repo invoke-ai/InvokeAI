@@ -1,5 +1,5 @@
 import type { AppStartListening } from 'app/store/store';
-import { selectActiveParams, setInfillMethod } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTabParams, setInfillMethod } from 'features/controlLayers/store/paramsSlice';
 import { shouldUseNSFWCheckerChanged, shouldUseWatermarkerChanged } from 'features/system/store/systemSlice';
 import { appInfoApi } from 'services/api/endpoints/appInfo';
 
@@ -9,7 +9,7 @@ export const addAppConfigReceivedListener = (startAppListening: AppStartListenin
     effect: (action, api) => {
       const { getState, dispatch } = api;
       const { infill_methods = [], nsfw_methods = [], watermarking_methods = [] } = action.payload;
-      const infillMethod = selectActiveParams(getState()).infillMethod;
+      const infillMethod = selectActiveTabParams(getState()).infillMethod;
 
       if (!infill_methods.includes(infillMethod)) {
         // If the selected infill method does not exist, prefer 'lama' if it's in the list, otherwise 'tile'.

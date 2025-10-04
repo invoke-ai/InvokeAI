@@ -4,7 +4,7 @@ import type { AppStore } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
 import {
   positivePromptAddedToHistory,
-  selectActiveParams,
+  selectActiveTabParams,
   selectPositivePrompt,
 } from 'features/controlLayers/store/paramsSlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
@@ -22,7 +22,7 @@ const enqueueUpscaling = async (store: AppStore, prepend: boolean) => {
   dispatch(enqueueRequestedUpscaling());
 
   const state = getState();
-  const params = selectActiveParams(state);
+  const params = selectActiveTabParams(state);
 
   const model = params.model;
   if (!model) {

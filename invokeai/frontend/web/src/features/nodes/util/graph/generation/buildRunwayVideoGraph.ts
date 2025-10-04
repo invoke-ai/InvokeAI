@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectActiveParams } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTabParams } from 'features/controlLayers/store/paramsSlice';
 import { zImageField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
@@ -30,7 +30,7 @@ export const buildRunwayVideoGraph = (arg: GraphBuilderArg): GraphBuilderReturn 
   assert(model, 'No model selected');
   assert(model.base === 'runway', 'Selected model is not a Runway model');
 
-  const params = selectActiveParams(state);
+  const params = selectActiveTabParams(state);
   const videoParams = selectVideoSlice(state);
   const prompts = selectPresetModifiedPrompts(state);
   assert(prompts.positive.length > 0, 'Runway video requires positive prompt to have at least one character');

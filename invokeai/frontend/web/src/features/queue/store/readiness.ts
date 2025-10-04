@@ -10,7 +10,7 @@ import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { debounce, groupBy, upperFirst } from 'es-toolkit/compat';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
-import { selectActiveParams, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTabParams, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectActiveCanvas } from 'features/controlLayers/store/selectors';
 import type { CanvasEntity, LoRA, RefImagesState, TabParamsState } from 'features/controlLayers/store/types';
@@ -199,7 +199,7 @@ export const useReadinessWatcher = () => {
   const canvasManager = useCanvasManagerSafe();
   const tab = useAppSelector(selectActiveTab);
   const canvas = useAppSelector(selectActiveCanvas);
-  const params = useAppSelector(selectActiveParams);
+  const params = useAppSelector(selectActiveTabParams);
   const refImages = useAppSelector(selectRefImagesSlice);
   const dynamicPrompts = useAppSelector(selectDynamicPromptsSlice);
   const nodes = useAppSelector(selectNodesSlice);
@@ -821,7 +821,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
 };
 
 export const selectPromptsCount = createSelector(
-  selectActiveParams,
+  selectActiveTabParams,
   selectDynamicPromptsSlice,
   (params, dynamicPrompts) => (getShouldProcessPrompt(params.positivePrompt) ? dynamicPrompts.prompts.length : 1)
 );

@@ -1,6 +1,6 @@
 import type { RootState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectActiveParams } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTabParams } from 'features/controlLayers/store/paramsSlice';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addSDXLLoRAs } from 'features/nodes/util/graph/generation/addSDXLLoRAs';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
@@ -19,7 +19,7 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
     steps,
     vaePrecision,
     vae,
-  } = selectActiveParams(state);
+  } = selectActiveTabParams(state);
   const {
     upscaleModel,
     upscaleInitialImage,

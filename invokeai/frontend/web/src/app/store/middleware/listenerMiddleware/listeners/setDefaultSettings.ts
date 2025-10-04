@@ -7,7 +7,7 @@ import {
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   heightChanged,
-  selectActiveParams,
+  selectActiveTabParams,
   setCfgRescaleMultiplier,
   setCfgScale,
   setGuidance,
@@ -42,7 +42,7 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
       const { dispatch, getState } = api;
       const state = getState();
 
-      const currentModel = selectActiveParams(state).model;
+      const currentModel = selectActiveTabParams(state).model;
 
       if (!currentModel) {
         return;

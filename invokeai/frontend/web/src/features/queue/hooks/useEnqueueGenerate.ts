@@ -7,7 +7,7 @@ import { extractMessageFromAssertionError } from 'common/util/extractMessageFrom
 import { withResult, withResultAsync } from 'common/util/result';
 import {
   positivePromptAddedToHistory,
-  selectActiveParams,
+  selectActiveTabParams,
   selectPositivePrompt,
 } from 'features/controlLayers/store/paramsSlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
@@ -39,7 +39,7 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
   dispatch(enqueueRequestedGenerate());
 
   const state = getState();
-  const params = selectActiveParams(state);
+  const params = selectActiveTabParams(state);
 
   const model = params.model;
   if (!model) {

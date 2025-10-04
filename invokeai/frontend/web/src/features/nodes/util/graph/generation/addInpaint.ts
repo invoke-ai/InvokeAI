@@ -3,7 +3,7 @@ import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsByCanvasId } from 'features/controlLayers/store/canvasSettingsSlice';
-import { selectActiveParams } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTabParams } from 'features/controlLayers/store/paramsSlice';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   getDenoisingStartAndEnd,
@@ -48,7 +48,7 @@ export const addInpaint = async ({
   denoise.denoising_start = denoising_start;
   denoise.denoising_end = denoising_end;
 
-  const params = selectActiveParams(state);
+  const params = selectActiveTabParams(state);
   const canvasSettings = selectCanvasSettingsByCanvasId(state, manager.canvasId);
 
   const { originalSize, scaledSize, rect } = getOriginalAndScaledSizesForOtherModes(state);

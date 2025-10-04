@@ -7,7 +7,7 @@ import {
   clipEmbedModelSelected,
   fluxVAESelected,
   refinerModelChanged,
-  selectActiveParams,
+  selectActiveTabParams,
   t5EncoderModelSelected,
   vaeSelected,
 } from 'features/controlLayers/store/paramsSlice';
@@ -104,7 +104,7 @@ type ModelHandler = (
 ) => undefined;
 
 const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
-  const selectedMainModel = selectActiveParams(state).model;
+  const selectedMainModel = selectActiveTabParams(state).model;
   const allMainModels = models.filter(isNonRefinerMainModelConfig).sort((a) => (a.base === 'sdxl' ? -1 : 1));
 
   const firstModel = allMainModels[0];
@@ -145,7 +145,7 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
 };
 
 const handleRefinerModels: ModelHandler = (models, state, dispatch, log) => {
-  const selectedRefinerModel = selectActiveParams(state).refinerModel;
+  const selectedRefinerModel = selectActiveTabParams(state).refinerModel;
 
   // `null` is a valid refiner model - no need to do anything.
   if (selectedRefinerModel === null) {
@@ -169,7 +169,7 @@ const handleRefinerModels: ModelHandler = (models, state, dispatch, log) => {
 };
 
 const handleVAEModels: ModelHandler = (models, state, dispatch, log) => {
-  const selectedVAEModel = selectActiveParams(state).vae;
+  const selectedVAEModel = selectActiveTabParams(state).vae;
 
   // `null` is a valid VAE - it means "use the VAE baked into the currently-selected main model"
   if (selectedVAEModel === null) {
@@ -418,7 +418,7 @@ const handleTileControlNetModel: ModelHandler = (models, state, dispatch, log) =
 };
 
 const handleT5EncoderModels: ModelHandler = (models, state, dispatch, log) => {
-  const selectedT5EncoderModel = selectActiveParams(state).t5EncoderModel;
+  const selectedT5EncoderModel = selectActiveTabParams(state).t5EncoderModel;
   const t5EncoderModels = models.filter((m) => isT5EncoderModelConfig(m));
 
   // If the currently selected model is available, we don't need to do anything
@@ -446,7 +446,7 @@ const handleT5EncoderModels: ModelHandler = (models, state, dispatch, log) => {
 };
 
 const handleCLIPEmbedModels: ModelHandler = (models, state, dispatch, log) => {
-  const selectedCLIPEmbedModel = selectActiveParams(state).clipEmbedModel;
+  const selectedCLIPEmbedModel = selectActiveTabParams(state).clipEmbedModel;
   const CLIPEmbedModels = models.filter((m) => isCLIPEmbedModelConfig(m));
 
   // If the currently selected model is available, we don't need to do anything
@@ -474,7 +474,7 @@ const handleCLIPEmbedModels: ModelHandler = (models, state, dispatch, log) => {
 };
 
 const handleFLUXVAEModels: ModelHandler = (models, state, dispatch, log) => {
-  const selectedFLUXVAEModel = selectActiveParams(state).fluxVAE;
+  const selectedFLUXVAEModel = selectActiveTabParams(state).fluxVAE;
   const fluxVAEModels = models.filter((m) => isFluxVAEModelConfig(m));
 
   // If the currently selected model is available, we don't need to do anything

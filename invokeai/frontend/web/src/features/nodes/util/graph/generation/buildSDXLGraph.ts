@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectActiveParams, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTabParams, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasByCanvasId, selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import { addControlNets, addT2IAdapters } from 'features/nodes/util/graph/generation/addControlAdapters';
@@ -35,7 +35,7 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   assert(model, 'No model selected');
   assert(model.base === 'sdxl', 'Selected model is not a SDXL Kontext model');
 
-  const params = selectActiveParams(state);
+  const params = selectActiveTabParams(state);
   const canvas = manager ? selectCanvasByCanvasId(state, manager.canvasId) : null;
   const refImages = selectRefImagesSlice(state);
 

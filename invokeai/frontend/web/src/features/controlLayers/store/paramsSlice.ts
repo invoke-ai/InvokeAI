@@ -636,7 +636,7 @@ export const paramsSliceConfig: SliceConfig<typeof paramsSlice> = {
 
 const initialTabParamsState = getInitialTabParamsState();
 
-export const selectActiveParams = (state: RootState) => {
+export const selectActiveTabParams = (state: RootState) => {
   const tab = selectActiveTab(state);
   const canvasId = selectActiveCanvasId(state);
 
@@ -644,9 +644,7 @@ export const selectActiveParams = (state: RootState) => {
     case 'generate':
       return state.params.generate;
     case 'canvas': {
-      const params = state.canvas.canvases[canvasId]?.params;
-      assert(params, 'Params must exist for a canvas once the canvas has been created');
-      return params;
+      return state.canvas.canvases[canvasId]!.params;
     }
     case 'upscaling':
       return state.params.upscaling;
@@ -658,19 +656,19 @@ export const selectActiveParams = (state: RootState) => {
   return initialTabParamsState;
 };
 
-const buildActiveParamsSelector =
+const buildActiveTabParamsSelector =
   <T>(selector: Selector<TabParamsState, T>) =>
   (state: RootState) =>
-    selector(selectActiveParams(state));
+    selector(selectActiveTabParams(state));
 
-export const selectBase = buildActiveParamsSelector((params) => params.model?.base);
-export const selectIsSDXL = buildActiveParamsSelector((params) => params.model?.base === 'sdxl');
-export const selectIsFLUX = buildActiveParamsSelector((params) => params.model?.base === 'flux');
-export const selectIsSD3 = buildActiveParamsSelector((params) => params.model?.base === 'sd-3');
-export const selectIsCogView4 = buildActiveParamsSelector((params) => params.model?.base === 'cogview4');
-export const selectIsImagen3 = buildActiveParamsSelector((params) => params.model?.base === 'imagen3');
-export const selectIsImagen4 = buildActiveParamsSelector((params) => params.model?.base === 'imagen4');
-export const selectIsFluxKontext = buildActiveParamsSelector((params) => {
+export const selectBase = buildActiveTabParamsSelector((params) => params.model?.base);
+export const selectIsSDXL = buildActiveTabParamsSelector((params) => params.model?.base === 'sdxl');
+export const selectIsFLUX = buildActiveTabParamsSelector((params) => params.model?.base === 'flux');
+export const selectIsSD3 = buildActiveTabParamsSelector((params) => params.model?.base === 'sd-3');
+export const selectIsCogView4 = buildActiveTabParamsSelector((params) => params.model?.base === 'cogview4');
+export const selectIsImagen3 = buildActiveTabParamsSelector((params) => params.model?.base === 'imagen3');
+export const selectIsImagen4 = buildActiveTabParamsSelector((params) => params.model?.base === 'imagen4');
+export const selectIsFluxKontext = buildActiveTabParamsSelector((params) => {
   if (params.model?.base === 'flux-kontext') {
     return true;
   }
@@ -679,42 +677,42 @@ export const selectIsFluxKontext = buildActiveParamsSelector((params) => {
   }
   return false;
 });
-export const selectIsChatGPT4o = buildActiveParamsSelector((params) => params.model?.base === 'chatgpt-4o');
-export const selectIsGemini2_5 = buildActiveParamsSelector((params) => params.model?.base === 'gemini-2.5');
+export const selectIsChatGPT4o = buildActiveTabParamsSelector((params) => params.model?.base === 'chatgpt-4o');
+export const selectIsGemini2_5 = buildActiveTabParamsSelector((params) => params.model?.base === 'gemini-2.5');
 
-export const selectModel = buildActiveParamsSelector((params) => params.model);
-export const selectModelKey = buildActiveParamsSelector((params) => params.model?.key);
-export const selectVAE = buildActiveParamsSelector((params) => params.vae);
-export const selectFLUXVAE = buildActiveParamsSelector((params) => params.fluxVAE);
-export const selectVAEKey = buildActiveParamsSelector((params) => params.vae?.key);
-export const selectT5EncoderModel = buildActiveParamsSelector((params) => params.t5EncoderModel);
-export const selectCLIPEmbedModel = buildActiveParamsSelector((params) => params.clipEmbedModel);
-export const selectCLIPLEmbedModel = buildActiveParamsSelector((params) => params.clipLEmbedModel);
+export const selectModel = buildActiveTabParamsSelector((params) => params.model);
+export const selectModelKey = buildActiveTabParamsSelector((params) => params.model?.key);
+export const selectVAE = buildActiveTabParamsSelector((params) => params.vae);
+export const selectFLUXVAE = buildActiveTabParamsSelector((params) => params.fluxVAE);
+export const selectVAEKey = buildActiveTabParamsSelector((params) => params.vae?.key);
+export const selectT5EncoderModel = buildActiveTabParamsSelector((params) => params.t5EncoderModel);
+export const selectCLIPEmbedModel = buildActiveTabParamsSelector((params) => params.clipEmbedModel);
+export const selectCLIPLEmbedModel = buildActiveTabParamsSelector((params) => params.clipLEmbedModel);
 
-export const selectCLIPGEmbedModel = buildActiveParamsSelector((params) => params.clipGEmbedModel);
+export const selectCLIPGEmbedModel = buildActiveTabParamsSelector((params) => params.clipGEmbedModel);
 
-export const selectCFGScale = buildActiveParamsSelector((params) => params.cfgScale);
-export const selectGuidance = buildActiveParamsSelector((params) => params.guidance);
-export const selectSteps = buildActiveParamsSelector((params) => params.steps);
-export const selectCFGRescaleMultiplier = buildActiveParamsSelector((params) => params.cfgRescaleMultiplier);
-export const selectCLIPSkip = buildActiveParamsSelector((params) => params.clipSkip);
-export const selectHasModelCLIPSkip = buildActiveParamsSelector((params) => hasModelClipSkip(params.model));
-export const selectCanvasCoherenceEdgeSize = buildActiveParamsSelector((params) => params.canvasCoherenceEdgeSize);
-export const selectCanvasCoherenceMinDenoise = buildActiveParamsSelector((params) => params.canvasCoherenceMinDenoise);
-export const selectCanvasCoherenceMode = buildActiveParamsSelector((params) => params.canvasCoherenceMode);
-export const selectMaskBlur = buildActiveParamsSelector((params) => params.maskBlur);
-export const selectInfillMethod = buildActiveParamsSelector((params) => params.infillMethod);
-export const selectInfillTileSize = buildActiveParamsSelector((params) => params.infillTileSize);
-export const selectInfillPatchmatchDownscaleSize = buildActiveParamsSelector(
+export const selectCFGScale = buildActiveTabParamsSelector((params) => params.cfgScale);
+export const selectGuidance = buildActiveTabParamsSelector((params) => params.guidance);
+export const selectSteps = buildActiveTabParamsSelector((params) => params.steps);
+export const selectCFGRescaleMultiplier = buildActiveTabParamsSelector((params) => params.cfgRescaleMultiplier);
+export const selectCLIPSkip = buildActiveTabParamsSelector((params) => params.clipSkip);
+export const selectHasModelCLIPSkip = buildActiveTabParamsSelector((params) => hasModelClipSkip(params.model));
+export const selectCanvasCoherenceEdgeSize = buildActiveTabParamsSelector((params) => params.canvasCoherenceEdgeSize);
+export const selectCanvasCoherenceMinDenoise = buildActiveTabParamsSelector((params) => params.canvasCoherenceMinDenoise);
+export const selectCanvasCoherenceMode = buildActiveTabParamsSelector((params) => params.canvasCoherenceMode);
+export const selectMaskBlur = buildActiveTabParamsSelector((params) => params.maskBlur);
+export const selectInfillMethod = buildActiveTabParamsSelector((params) => params.infillMethod);
+export const selectInfillTileSize = buildActiveTabParamsSelector((params) => params.infillTileSize);
+export const selectInfillPatchmatchDownscaleSize = buildActiveTabParamsSelector(
   (params) => params.infillPatchmatchDownscaleSize
 );
-export const selectInfillColorValue = buildActiveParamsSelector((params) => params.infillColorValue);
-export const selectImg2imgStrength = buildActiveParamsSelector((params) => params.img2imgStrength);
-export const selectOptimizedDenoisingEnabled = buildActiveParamsSelector((params) => params.optimizedDenoisingEnabled);
-export const selectPositivePrompt = buildActiveParamsSelector((params) => params.positivePrompt);
-export const selectNegativePrompt = buildActiveParamsSelector((params) => params.negativePrompt);
-export const selectNegativePromptWithFallback = buildActiveParamsSelector((params) => params.negativePrompt ?? '');
-export const selectHasNegativePrompt = buildActiveParamsSelector((params) => params.negativePrompt !== null);
+export const selectInfillColorValue = buildActiveTabParamsSelector((params) => params.infillColorValue);
+export const selectImg2imgStrength = buildActiveTabParamsSelector((params) => params.img2imgStrength);
+export const selectOptimizedDenoisingEnabled = buildActiveTabParamsSelector((params) => params.optimizedDenoisingEnabled);
+export const selectPositivePrompt = buildActiveTabParamsSelector((params) => params.positivePrompt);
+export const selectNegativePrompt = buildActiveTabParamsSelector((params) => params.negativePrompt);
+export const selectNegativePromptWithFallback = buildActiveTabParamsSelector((params) => params.negativePrompt ?? '');
+export const selectHasNegativePrompt = buildActiveTabParamsSelector((params) => params.negativePrompt !== null);
 export const selectModelSupportsNegativePrompt = createSelector(
   selectModel,
   (model) => !!model && SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS.includes(model.base)
@@ -743,45 +741,45 @@ export const selectModelSupportsOptimizedDenoising = createSelector(
   selectModel,
   (model) => !!model && SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS.includes(model.base)
 );
-export const selectScheduler = buildActiveParamsSelector((params) => params.scheduler);
-export const selectSeamlessXAxis = buildActiveParamsSelector((params) => params.seamlessXAxis);
-export const selectSeamlessYAxis = buildActiveParamsSelector((params) => params.seamlessYAxis);
-export const selectSeed = buildActiveParamsSelector((params) => params.seed);
-export const selectShouldRandomizeSeed = buildActiveParamsSelector((params) => params.shouldRandomizeSeed);
-export const selectVAEPrecision = buildActiveParamsSelector((params) => params.vaePrecision);
-export const selectIterations = buildActiveParamsSelector((params) => params.iterations);
-export const selectShouldUseCPUNoise = buildActiveParamsSelector((params) => params.shouldUseCpuNoise);
+export const selectScheduler = buildActiveTabParamsSelector((params) => params.scheduler);
+export const selectSeamlessXAxis = buildActiveTabParamsSelector((params) => params.seamlessXAxis);
+export const selectSeamlessYAxis = buildActiveTabParamsSelector((params) => params.seamlessYAxis);
+export const selectSeed = buildActiveTabParamsSelector((params) => params.seed);
+export const selectShouldRandomizeSeed = buildActiveTabParamsSelector((params) => params.shouldRandomizeSeed);
+export const selectVAEPrecision = buildActiveTabParamsSelector((params) => params.vaePrecision);
+export const selectIterations = buildActiveTabParamsSelector((params) => params.iterations);
+export const selectShouldUseCPUNoise = buildActiveTabParamsSelector((params) => params.shouldUseCpuNoise);
 
-export const selectUpscaleScheduler = buildActiveParamsSelector((params) => params.upscaleScheduler);
-export const selectUpscaleCfgScale = buildActiveParamsSelector((params) => params.upscaleCfgScale);
+export const selectUpscaleScheduler = buildActiveTabParamsSelector((params) => params.upscaleScheduler);
+export const selectUpscaleCfgScale = buildActiveTabParamsSelector((params) => params.upscaleCfgScale);
 
-export const selectPositivePromptHistory = buildActiveParamsSelector((params) => params.positivePromptHistory);
-export const selectRefinerCFGScale = buildActiveParamsSelector((params) => params.refinerCFGScale);
-export const selectRefinerModel = buildActiveParamsSelector((params) => params.refinerModel);
-export const selectIsRefinerModelSelected = buildActiveParamsSelector((params) => Boolean(params.refinerModel));
-export const selectRefinerPositiveAestheticScore = buildActiveParamsSelector(
+export const selectPositivePromptHistory = buildActiveTabParamsSelector((params) => params.positivePromptHistory);
+export const selectRefinerCFGScale = buildActiveTabParamsSelector((params) => params.refinerCFGScale);
+export const selectRefinerModel = buildActiveTabParamsSelector((params) => params.refinerModel);
+export const selectIsRefinerModelSelected = buildActiveTabParamsSelector((params) => Boolean(params.refinerModel));
+export const selectRefinerPositiveAestheticScore = buildActiveTabParamsSelector(
   (params) => params.refinerPositiveAestheticScore
 );
-export const selectRefinerNegativeAestheticScore = buildActiveParamsSelector(
+export const selectRefinerNegativeAestheticScore = buildActiveTabParamsSelector(
   (params) => params.refinerNegativeAestheticScore
 );
-export const selectRefinerScheduler = buildActiveParamsSelector((params) => params.refinerScheduler);
-export const selectRefinerStart = buildActiveParamsSelector((params) => params.refinerStart);
-export const selectRefinerSteps = buildActiveParamsSelector((params) => params.refinerSteps);
+export const selectRefinerScheduler = buildActiveTabParamsSelector((params) => params.refinerScheduler);
+export const selectRefinerStart = buildActiveTabParamsSelector((params) => params.refinerStart);
+export const selectRefinerSteps = buildActiveTabParamsSelector((params) => params.refinerSteps);
 
-export const selectWidth = buildActiveParamsSelector((params) => params.dimensions.width);
-export const selectHeight = buildActiveParamsSelector((params) => params.dimensions.height);
-export const selectAspectRatioID = buildActiveParamsSelector((params) => params.dimensions.aspectRatio.id);
-export const selectAspectRatioValue = buildActiveParamsSelector((params) => params.dimensions.aspectRatio.value);
-export const selectAspectRatioIsLocked = buildActiveParamsSelector((params) => params.dimensions.aspectRatio.isLocked);
-export const selectOptimalDimension = buildActiveParamsSelector((params) =>
+export const selectWidth = buildActiveTabParamsSelector((params) => params.dimensions.width);
+export const selectHeight = buildActiveTabParamsSelector((params) => params.dimensions.height);
+export const selectAspectRatioID = buildActiveTabParamsSelector((params) => params.dimensions.aspectRatio.id);
+export const selectAspectRatioValue = buildActiveTabParamsSelector((params) => params.dimensions.aspectRatio.value);
+export const selectAspectRatioIsLocked = buildActiveTabParamsSelector((params) => params.dimensions.aspectRatio.isLocked);
+export const selectOptimalDimension = buildActiveTabParamsSelector((params) =>
   getOptimalDimension(params.model?.base ?? null)
 );
-export const selectGridSize = buildActiveParamsSelector((params) => getGridSize(params.model?.base ?? null));
+export const selectGridSize = buildActiveTabParamsSelector((params) => getGridSize(params.model?.base ?? null));
 
 export const selectMainModelConfig = createSelector(
   selectModelConfigsQuery,
-  selectActiveParams,
+  selectActiveTabParams,
   (modelConfigs, { model }) => {
     if (!modelConfigs.data) {
       return null;

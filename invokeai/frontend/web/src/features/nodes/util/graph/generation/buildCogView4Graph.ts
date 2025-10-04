@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectActiveParams, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTabParams, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
@@ -29,7 +29,7 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
   assert(model, 'No model selected');
   assert(model.base === 'cogview4', 'Selected model is not a CogView4 model');
 
-  const params = selectActiveParams(state);
+  const params = selectActiveTabParams(state);
 
   const { cfgScale: cfg_scale, steps } = params;
 

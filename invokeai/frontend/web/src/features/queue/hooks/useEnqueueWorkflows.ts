@@ -2,7 +2,7 @@ import { createAction } from '@reduxjs/toolkit';
 import type { AppDispatch, AppStore, RootState } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
 import { groupBy } from 'es-toolkit/compat';
-import { selectActiveParams } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTabParams } from 'features/controlLayers/store/paramsSlice';
 import {
   $outputNodeId,
   getPublishInputs,
@@ -133,7 +133,7 @@ const enqueueWorkflows = async (
   const nodesState = selectNodesSlice(state);
   const graph = buildNodesGraph(state, templates);
   const workflow = buildWorkflowWithValidation(nodesState);
-  const params = selectActiveParams(state);
+  const params = selectActiveTabParams(state);
 
   if (workflow) {
     // embedded workflows don't have an id
