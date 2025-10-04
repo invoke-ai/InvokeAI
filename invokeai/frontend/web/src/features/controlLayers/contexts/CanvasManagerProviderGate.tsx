@@ -1,6 +1,5 @@
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useCanvasId } from 'features/controlLayers/hooks/useCanvasId';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { $canvasManagers } from 'features/controlLayers/store/ephemeral';
 import { selectActiveCanvasId } from 'features/controlLayers/store/selectors';
@@ -38,7 +37,7 @@ export const useCanvasManager = (): CanvasManager => {
  */
 export const useCanvasManagerSafe = (): CanvasManager | null => {
   const canvasManagers = useStore($canvasManagers);
-  const canvasId = useCanvasId();
+  const canvasId = useAppSelector(selectActiveCanvasId);
 
   return canvasManagers[canvasId] ?? null;
 };

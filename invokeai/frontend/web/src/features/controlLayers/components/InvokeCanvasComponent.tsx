@@ -1,12 +1,11 @@
 import { Box } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useInvokeCanvas } from 'features/controlLayers/hooks/useInvokeCanvas';
+import { selectActiveCanvasId } from 'features/controlLayers/store/selectors';
 import { memo } from 'react';
 
-interface InvokeCanvasComponent {
-  canvasId: string;
-}
-
-export const InvokeCanvasComponent = memo(({ canvasId }: InvokeCanvasComponent) => {
+export const InvokeCanvasComponent = memo(() => {
+  const canvasId = useAppSelector(selectActiveCanvasId);
   const ref = useInvokeCanvas(canvasId);
 
   return (
