@@ -1,17 +1,18 @@
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, AppStartListening, RootState } from 'app/store/store';
+import { modelChanged } from 'features/controlLayers/store/actions';
 import { controlLayerModelChanged, rgRefImageModelChanged } from 'features/controlLayers/store/canvasSlice';
-import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
+import { loraDeleted, selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
 import {
   clipEmbedModelSelected,
   fluxVAESelected,
-  modelChanged,
   refinerModelChanged,
+  selectActiveTabParams,
   t5EncoderModelSelected,
   vaeSelected,
 } from 'features/controlLayers/store/paramsSlice';
 import { refImageModelChanged, selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas } from 'features/controlLayers/store/selectors';
 import {
   getEntityIdentifier,
   isFLUXReduxConfig,
@@ -103,7 +104,7 @@ type ModelHandler = (
 ) => undefined;
 
 const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
-  const selectedMainModel = state.params.model;
+  const selectedMainModel = selectActiveTabParams(state).model;
   const allMainModels = models.filter(isNonRefinerMainModelConfig).sort((a) => (a.base === 'sdxl' ? -1 : 1));
 
   const firstModel = allMainModels[0];
@@ -144,7 +145,7 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
 };
 
 const handleRefinerModels: ModelHandler = (models, state, dispatch, log) => {
-  const selectedRefinerModel = state.params.refinerModel;
+  const selectedRefinerModel = selectActiveTabParams(state).refinerModel;
 
   // `null` is a valid refiner model - no need to do anything.
   if (selectedRefinerModel === null) {
@@ -168,7 +169,7 @@ const handleRefinerModels: ModelHandler = (models, state, dispatch, log) => {
 };
 
 const handleVAEModels: ModelHandler = (models, state, dispatch, log) => {
-  const selectedVAEModel = state.params.vae;
+  const selectedVAEModel = selectActiveTabParams(state).vae;
 
   // `null` is a valid VAE - it means "use the VAE baked into the currently-selected main model"
   if (selectedVAEModel === null) {
@@ -193,7 +194,7 @@ const handleVAEModels: ModelHandler = (models, state, dispatch, log) => {
 
 const handleLoRAModels: ModelHandler = (models, state, dispatch, log) => {
   const loraModels = models.filter(isLoRAModelConfig);
-  state.loras.loras.forEach((lora) => {
+  selectAddedLoRAs(state).forEach((lora) => {
     const isLoRAAvailable = loraModels.some((m) => m.key === lora.model.key);
     if (isLoRAAvailable) {
       return;
@@ -221,7 +222,7 @@ const handleVideoModels: ModelHandler = (models, state, dispatch, log) => {
 
 const handleControlAdapterModels: ModelHandler = (models, state, dispatch, log) => {
   const caModels = models.filter(isControlLayerModelConfig);
-  selectCanvasSlice(state).controlLayers.entities.forEach((entity) => {
+  selectActiveCanvas(state).controlLayers.entities.forEach((entity) => {
     const selectedControlAdapterModel = entity.controlAdapter.model;
     // `null` is a valid control adapter model - no need to do anything.
     if (!selectedControlAdapterModel) {
@@ -256,7 +257,7 @@ const handleIPAdapterModels: ModelHandler = (models, state, dispatch, log) => {
     dispatch(refImageModelChanged({ id: entity.id, modelConfig: null }));
   });
 
-  selectCanvasSlice(state).regionalGuidance.entities.forEach((entity) => {
+  selectActiveCanvas(state).regionalGuidance.entities.forEach((entity) => {
     entity.referenceImages.forEach(({ id: referenceImageId, config }) => {
       if (!isRegionalGuidanceIPAdapterConfig(config)) {
         return;
@@ -299,7 +300,7 @@ const handleFLUXReduxModels: ModelHandler = (models, state, dispatch, log) => {
     dispatch(refImageModelChanged({ id: entity.id, modelConfig: null }));
   });
 
-  selectCanvasSlice(state).regionalGuidance.entities.forEach((entity) => {
+  selectActiveCanvas(state).regionalGuidance.entities.forEach((entity) => {
     entity.referenceImages.forEach(({ id: referenceImageId, config }) => {
       if (!isRegionalGuidanceFLUXReduxConfig(config)) {
         return;
@@ -417,7 +418,7 @@ const handleTileControlNetModel: ModelHandler = (models, state, dispatch, log) =
 };
 
 const handleT5EncoderModels: ModelHandler = (models, state, dispatch, log) => {
-  const selectedT5EncoderModel = state.params.t5EncoderModel;
+  const selectedT5EncoderModel = selectActiveTabParams(state).t5EncoderModel;
   const t5EncoderModels = models.filter((m) => isT5EncoderModelConfig(m));
 
   // If the currently selected model is available, we don't need to do anything
@@ -445,7 +446,7 @@ const handleT5EncoderModels: ModelHandler = (models, state, dispatch, log) => {
 };
 
 const handleCLIPEmbedModels: ModelHandler = (models, state, dispatch, log) => {
-  const selectedCLIPEmbedModel = state.params.clipEmbedModel;
+  const selectedCLIPEmbedModel = selectActiveTabParams(state).clipEmbedModel;
   const CLIPEmbedModels = models.filter((m) => isCLIPEmbedModelConfig(m));
 
   // If the currently selected model is available, we don't need to do anything
@@ -473,7 +474,7 @@ const handleCLIPEmbedModels: ModelHandler = (models, state, dispatch, log) => {
 };
 
 const handleFLUXVAEModels: ModelHandler = (models, state, dispatch, log) => {
-  const selectedFLUXVAEModel = state.params.fluxVAE;
+  const selectedFLUXVAEModel = selectActiveTabParams(state).fluxVAE;
   const fluxVAEModels = models.filter((m) => isFluxVAEModelConfig(m));
 
   // If the currently selected model is available, we don't need to do anything

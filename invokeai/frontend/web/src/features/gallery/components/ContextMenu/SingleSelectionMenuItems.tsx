@@ -1,6 +1,7 @@
 import { MenuDivider } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IconMenuItemGroup } from 'common/components/IconMenuItem';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
 import { ContextMenuItemChangeBoard } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemChangeBoard';
 import { ContextMenuItemCopy } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemCopy';
 import { ContextMenuItemDownload } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemDownload';
@@ -20,7 +21,6 @@ import { ContextMenuItemUseAsRefImage } from 'features/gallery/components/Contex
 import { ContextMenuItemUseForPromptGeneration } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemUseForPromptGeneration';
 import { ItemDTOContextProvider } from 'features/gallery/contexts/ItemDTOContext';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { ImageDTO } from 'services/api/types';
 
 import { ContextMenuItemDeleteImage } from './MenuItems/ContextMenuItemDeleteImage';

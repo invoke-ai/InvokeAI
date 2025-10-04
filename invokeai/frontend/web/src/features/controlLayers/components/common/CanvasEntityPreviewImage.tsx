@@ -6,7 +6,7 @@ import { debounce } from 'es-toolkit/compat';
 import { useEntityAdapter } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
-import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas, selectEntity } from 'features/controlLayers/store/selectors';
 import React, { memo, useEffect, useMemo, useRef } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -20,7 +20,7 @@ export const CanvasEntityPreviewImage = memo(() => {
   const adapter = useEntityAdapter(entityIdentifier);
   const selectMaskColor = useMemo(
     () =>
-      createSelector(selectCanvasSlice, (state) => {
+      createSelector(selectActiveCanvas, (state) => {
         const entity = selectEntity(state, entityIdentifier);
         if (!entity) {
           return null;

@@ -7,7 +7,7 @@ import {
   inpaintMaskDenoiseLimitChanged,
   inpaintMaskDenoiseLimitDeleted,
 } from 'features/controlLayers/store/canvasSlice';
-import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -19,7 +19,7 @@ export const InpaintMaskDenoiseLimitSlider = memo(() => {
   const selectDenoiseLimit = useMemo(
     () =>
       createSelector(
-        selectCanvasSlice,
+        selectActiveCanvas,
         (canvas) => selectEntityOrThrow(canvas, entityIdentifier, 'InpaintMaskDenoiseLimitSlider').denoiseLimit
       ),
     [entityIdentifier]

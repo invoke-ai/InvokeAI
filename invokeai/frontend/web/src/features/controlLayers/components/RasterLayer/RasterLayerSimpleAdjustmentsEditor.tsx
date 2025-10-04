@@ -3,7 +3,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { rasterLayerAdjustmentsSimpleUpdated } from 'features/controlLayers/store/canvasSlice';
-import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas, selectEntity } from 'features/controlLayers/store/selectors';
 import type { SimpleAdjustmentsConfig } from 'features/controlLayers/store/types';
 import React, { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,7 +21,7 @@ const AdjustmentSliderRow = ({ label, name, onChange, min = -1, max = 1, step = 
   const entityIdentifier = useEntityIdentifierContext<'raster_layer'>();
   const selectValue = useMemo(() => {
     return createSelector(
-      selectCanvasSlice,
+      selectActiveCanvas,
       (canvas) =>
         selectEntity(canvas, entityIdentifier)?.adjustments?.simple?.[name] ?? DEFAULT_SIMPLE_ADJUSTMENTS[name]
     );
@@ -54,7 +54,7 @@ export const RasterLayerSimpleAdjustmentsEditor = memo(() => {
   const { t } = useTranslation();
   const selectIsDisabled = useMemo(() => {
     return createSelector(
-      selectCanvasSlice,
+      selectActiveCanvas,
       (canvas) => selectEntity(canvas, entityIdentifier)?.adjustments?.enabled !== true
     );
   }, [entityIdentifier]);

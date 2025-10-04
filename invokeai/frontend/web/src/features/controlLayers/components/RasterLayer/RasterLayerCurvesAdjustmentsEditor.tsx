@@ -5,7 +5,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEntityAdapterContext } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { rasterLayerAdjustmentsCurvesUpdated } from 'features/controlLayers/store/canvasSlice';
-import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas, selectEntity } from 'features/controlLayers/store/selectors';
 import type { ChannelName, ChannelPoints, CurvesAdjustmentsConfig } from 'features/controlLayers/store/types';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -72,7 +72,7 @@ export const RasterLayerCurvesAdjustmentsEditor = memo(() => {
   const { t } = useTranslation();
   const selectCurves = useMemo(() => {
     return createSelector(
-      selectCanvasSlice,
+      selectActiveCanvas,
       (canvas) => selectEntity(canvas, entityIdentifier)?.adjustments?.curves ?? DEFAULT_CURVES
     );
   }, [entityIdentifier]);
@@ -80,7 +80,7 @@ export const RasterLayerCurvesAdjustmentsEditor = memo(() => {
 
   const selectIsDisabled = useMemo(() => {
     return createSelector(
-      selectCanvasSlice,
+      selectActiveCanvas,
       (canvas) => selectEntity(canvas, entityIdentifier)?.adjustments?.enabled !== true
     );
   }, [entityIdentifier]);

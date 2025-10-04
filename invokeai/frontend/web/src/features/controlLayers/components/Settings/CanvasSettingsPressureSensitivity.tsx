@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 export const CanvasSettingsPressureSensitivityCheckbox = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const pressureSensitivity = useAppSelector(selectPressureSensitivity);
+  const pressureSensitivity = useAppSelector((state) => selectPressureSensitivity(state));
   const onChange = useCallback<ChangeEventHandler<HTMLInputElement>>(() => {
     dispatch(settingsPressureSensitivityToggled());
   }, [dispatch]);

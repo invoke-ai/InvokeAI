@@ -10,10 +10,10 @@ import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { debounce, groupBy, upperFirst } from 'es-toolkit/compat';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
-import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTabParams, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import type { CanvasState, LoRA, ParamsState, RefImagesState } from 'features/controlLayers/store/types';
+import { selectActiveCanvas, selectActiveTab } from 'features/controlLayers/store/selectors';
+import type { CanvasEntity, LoRA, ParamsState, RefImagesState, TabName } from 'features/controlLayers/store/types';
 import {
   getControlLayerWarnings,
   getGlobalReferenceImageWarnings,
@@ -42,8 +42,6 @@ import type { ParameterModel } from 'features/parameters/types/parameterSchemas'
 import { getGridSize } from 'features/parameters/util/optimalDimension';
 import { promptExpansionApi, type PromptExpansionRequestState } from 'features/prompt/PromptExpansion/state';
 import { selectAllowVideo, selectConfigSlice } from 'features/system/store/configSlice';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import type { TabName } from 'features/ui/store/uiTypes';
 import i18n from 'i18next';
 import { atom, computed } from 'nanostores';
 import { useEffect } from 'react';
@@ -77,7 +75,7 @@ export const $isReadyToEnqueue = computed($reasonsWhyCannotEnqueue, (reasons) =>
 type UpdateReasonsArg = {
   tab: TabName;
   isConnected: boolean;
-  canvas: CanvasState;
+  canvas: CanvasEntity;
   params: ParamsState;
   refImages: RefImagesState;
   dynamicPrompts: DynamicPromptsState;
@@ -198,8 +196,8 @@ export const useReadinessWatcher = () => {
   const store = useAppStore();
   const canvasManager = useCanvasManagerSafe();
   const tab = useAppSelector(selectActiveTab);
-  const canvas = useAppSelector(selectCanvasSlice);
-  const params = useAppSelector(selectParamsSlice);
+  const canvas = useAppSelector(selectActiveCanvas);
+  const params = useAppSelector(selectActiveTabParams);
   const refImages = useAppSelector(selectRefImagesSlice);
   const dynamicPrompts = useAppSelector(selectDynamicPromptsSlice);
   const nodes = useAppSelector(selectNodesSlice);
@@ -552,7 +550,7 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
 const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   isConnected: boolean;
   model: MainModelConfig | null | undefined;
-  canvas: CanvasState;
+  canvas: CanvasEntity;
   params: ParamsState;
   refImages: RefImagesState;
   loras: LoRA[];
@@ -821,7 +819,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
 };
 
 export const selectPromptsCount = createSelector(
-  selectParamsSlice,
+  selectActiveTabParams,
   selectDynamicPromptsSlice,
   (params, dynamicPrompts) => (getShouldProcessPrompt(params.positivePrompt) ? dynamicPrompts.prompts.length : 1)
 );

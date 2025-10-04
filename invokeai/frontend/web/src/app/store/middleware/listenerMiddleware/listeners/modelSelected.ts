@@ -1,14 +1,18 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/store';
+import { modelChanged } from 'features/controlLayers/store/actions';
 import { bboxSyncedToOptimalDimension, rgRefImageModelChanged } from 'features/controlLayers/store/canvasSlice';
-import { buildSelectIsStaging, selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { loraIsEnabledChanged } from 'features/controlLayers/store/lorasSlice';
-import { modelChanged, syncedToOptimalDimension, vaeSelected } from 'features/controlLayers/store/paramsSlice';
+import {
+  buildSelectIsStagingBySessionId,
+  selectActiveCanvasStagingAreaSessionId,
+} from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { loraIsEnabledChanged, selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
+import { selectActiveTabParams, syncedToOptimalDimension, vaeSelected } from 'features/controlLayers/store/paramsSlice';
 import { refImageModelChanged, selectReferenceImageEntities } from 'features/controlLayers/store/refImagesSlice';
 import {
+  selectActiveCanvas,
   selectAllEntitiesOfType,
   selectBboxModelBase,
-  selectCanvasSlice,
 } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { modelSelected } from 'features/parameters/store/actions';
@@ -31,7 +35,8 @@ const log = logger('models');
 export const addModelSelectedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: modelSelected,
-    effect: (action, { getState, dispatch }) => {
+    effect: (action, api) => {
+      const { getState, dispatch } = api;
       const state = getState();
       const result = zParameterModel.safeParse(action.payload);
 
@@ -42,14 +47,15 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
 
       const newModel = result.data;
       const newBase = newModel.base;
-      const didBaseModelChange = state.params.model?.base !== newBase;
+      const params = selectActiveTabParams(state);
+      const didBaseModelChange = params.model?.base !== newBase;
 
       if (didBaseModelChange) {
         // we may need to reset some incompatible submodels
         let modelsUpdatedDisabledOrCleared = 0;
 
         // handle incompatible loras
-        state.loras.loras.forEach((lora) => {
+        selectAddedLoRAs(state).forEach((lora) => {
           if (lora.model.base !== newBase) {
             dispatch(loraIsEnabledChanged({ id: lora.id, isEnabled: false }));
             modelsUpdatedDisabledOrCleared += 1;
@@ -57,7 +63,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         });
 
         // handle incompatible vae
-        const { vae } = state.params;
+        const { vae } = params;
         if (vae && vae.base !== newBase) {
           dispatch(vaeSelected(null));
           modelsUpdatedDisabledOrCleared += 1;
@@ -118,7 +124,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         const newRegionalRefImageModel = selectRegionalRefImageModels(state)[0] ?? null;
 
         // All regional guidance entities are updated to use the same new model.
-        const canvasState = selectCanvasSlice(state);
+        const canvasState = selectActiveCanvas(state);
         const canvasRegionalGuidanceEntities = selectAllEntitiesOfType(canvasState, 'regional_guidance');
         for (const entity of canvasRegionalGuidanceEntities) {
           for (const refImage of entity.referenceImages) {
@@ -152,14 +158,16 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         }
       }
 
-      dispatch(modelChanged({ model: newModel, previousModel: state.params.model }));
+      dispatch(modelChanged({ model: newModel, previousModel: params.model }));
 
       const modelBase = selectBboxModelBase(state);
 
-      if (modelBase !== state.params.model?.base) {
+      if (modelBase !== params.model?.base) {
         // Sync generate tab settings whenever the model base changes
         dispatch(syncedToOptimalDimension());
-        const isStaging = buildSelectIsStaging(selectCanvasSessionId(state))(state);
+        const sessionId = selectActiveCanvasStagingAreaSessionId(state);
+        const selectIsStaging = buildSelectIsStagingBySessionId(sessionId);
+        const isStaging = selectIsStaging(state);
         if (!isStaging) {
           // Canvas tab only syncs if not staging
           dispatch(bboxSyncedToOptimalDimension());

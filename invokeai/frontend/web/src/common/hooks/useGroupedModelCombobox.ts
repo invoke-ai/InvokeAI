@@ -3,7 +3,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { GroupBase } from 'chakra-react-select';
 import { groupBy, reduce } from 'es-toolkit/compat';
-import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTabParams } from 'features/controlLayers/store/paramsSlice';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { selectSystemShouldEnableModelDescriptions } from 'features/system/store/systemSlice';
 import { useCallback, useMemo } from 'react';
@@ -31,7 +31,7 @@ const groupByBaseFunc = <T extends AnyModelConfig>(model: T) => model.base.toUpp
 const groupByBaseAndTypeFunc = <T extends AnyModelConfig>(model: T) =>
   `${model.base.toUpperCase()} / ${model.type.replaceAll('_', ' ').toUpperCase()}`;
 
-const selectBaseWithSDXLFallback = createSelector(selectParamsSlice, (params) => params.model?.base ?? 'sdxl');
+const selectBaseWithSDXLFallback = createSelector(selectActiveTabParams, (params) => params.model?.base ?? 'sdxl');
 
 export const useGroupedModelCombobox = <T extends AnyModelConfig>(
   arg: UseGroupedModelComboboxArg<T>

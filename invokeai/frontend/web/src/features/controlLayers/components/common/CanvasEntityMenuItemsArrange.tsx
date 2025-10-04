@@ -9,14 +9,14 @@ import {
   entityArrangedToBack,
   entityArrangedToFront,
 } from 'features/controlLayers/store/canvasSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import type { CanvasEntityIdentifier, CanvasState } from 'features/controlLayers/store/types';
+import { selectActiveCanvas } from 'features/controlLayers/store/selectors';
+import type { CanvasEntity, CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowDownBold, PiArrowLineDownBold, PiArrowLineUpBold, PiArrowUpBold } from 'react-icons/pi';
 
 const getIndexAndCount = (
-  canvas: CanvasState,
+  canvas: CanvasEntity,
   { id, type }: CanvasEntityIdentifier
 ): { index: number; count: number } => {
   if (type === 'raster_layer') {
@@ -54,7 +54,7 @@ export const CanvasEntityMenuItemsArrange = memo(() => {
   const isBusy = useCanvasIsBusy();
   const selectValidActions = useMemo(
     () =>
-      createMemoizedSelector(selectCanvasSlice, (canvas) => {
+      createMemoizedSelector(selectActiveCanvas, (canvas) => {
         const { index, count } = getIndexAndCount(canvas, entityIdentifier);
         return {
           canMoveForwardOne: index < count - 1,

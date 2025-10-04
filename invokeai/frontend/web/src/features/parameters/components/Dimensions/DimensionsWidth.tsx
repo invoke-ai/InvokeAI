@@ -1,10 +1,15 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { selectIsApiBaseModel, selectWidth, widthChanged } from 'features/controlLayers/store/paramsSlice';
-import { selectGridSize, selectOptimalDimension } from 'features/controlLayers/store/selectors';
+import {
+  selectGridSize,
+  selectIsApiBaseModel,
+  selectOptimalDimension,
+  selectWidth,
+  widthChanged,
+} from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
 import { selectWidthConfig } from 'features/system/store/configSlice';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 

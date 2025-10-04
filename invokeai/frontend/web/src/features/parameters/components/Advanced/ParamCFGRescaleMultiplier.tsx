@@ -9,8 +9,8 @@ import { useTranslation } from 'react-i18next';
 const ParamCFGRescaleMultiplier = () => {
   const cfgRescaleMultiplier = useAppSelector(selectCFGRescaleMultiplier);
   const config = useAppSelector(selectCFGRescaleMultiplierConfig);
-
   const dispatch = useAppDispatch();
+
   const { t } = useTranslation();
 
   const handleChange = useCallback((v: number) => dispatch(setCfgRescaleMultiplier(v)), [dispatch]);

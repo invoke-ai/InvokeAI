@@ -1,12 +1,12 @@
 import { Button, Divider, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
 import { useDeleteVideo } from 'features/deleteImageModal/hooks/use-delete-video';
 import { DeleteVideoButton } from 'features/deleteVideoModal/components/DeleteVideoButton';
 import SingleSelectionVideoMenuItems from 'features/gallery/components/ContextMenu/SingleSelectionVideoMenuItems';
 import { boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { useGalleryPanel } from 'features/ui/layouts/use-gallery-panel';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { useVideoViewerContext } from 'features/video/context/VideoViewerContext';
 import { useCaptureVideoFrame } from 'features/video/hooks/useCaptureVideoFrame';
 import { memo, useCallback, useState } from 'react';

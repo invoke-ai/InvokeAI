@@ -1,8 +1,8 @@
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTabParams, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectActiveTab, selectCanvasByCanvasId, selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import { addControlNets, addT2IAdapters } from 'features/nodes/util/graph/generation/addControlAdapters';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
@@ -17,7 +17,6 @@ import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermar
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
@@ -35,8 +34,8 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   assert(model, 'No model selected');
   assert(model.base === 'sdxl', 'Selected model is not a SDXL Kontext model');
 
-  const params = selectParamsSlice(state);
-  const canvas = selectCanvasSlice(state);
+  const params = selectActiveTabParams(state);
+  const canvas = manager ? selectCanvasByCanvasId(state, manager.canvasId) : null;
   const refImages = selectRefImagesSlice(state);
 
   const {
@@ -234,7 +233,7 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     assert<Equals<typeof generationMode, never>>(false);
   }
 
-  if (manager !== null) {
+  if (manager !== null && canvas !== null) {
     const controlNetCollector = g.addNode({
       type: 'collect',
       id: getPrefixedId('control_net_collector'),
@@ -284,7 +283,7 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   });
   let totalIPAdaptersAdded = ipAdapterResult.addedIPAdapters;
 
-  if (manager !== null) {
+  if (manager !== null && canvas !== null) {
     const regionsResult = await addRegions({
       manager,
       regions: canvas.regionalGuidance.entities,

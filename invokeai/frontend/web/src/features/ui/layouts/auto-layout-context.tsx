@@ -1,6 +1,6 @@
 import type { FocusRegionName } from 'common/hooks/focus';
 import type { IDockviewPanelProps, IGridviewPanelProps } from 'dockview';
-import type { TabName } from 'features/ui/store/uiTypes';
+import type { TabName } from 'features/controlLayers/store/types';
 import type { FunctionComponent, PropsWithChildren } from 'react';
 import { createContext, memo, useContext, useMemo } from 'react';
 

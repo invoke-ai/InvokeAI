@@ -9,7 +9,6 @@ import { useTranslation } from 'react-i18next';
 const ParamSeamlessXAxis = () => {
   const { t } = useTranslation();
   const seamlessXAxis = useAppSelector(selectSeamlessXAxis);
-
   const dispatch = useAppDispatch();
 
   const handleChange = useCallback(

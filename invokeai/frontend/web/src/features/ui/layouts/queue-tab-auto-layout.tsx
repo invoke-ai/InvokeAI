@@ -1,9 +1,9 @@
 import type { GridviewApi, IGridviewReactProps } from 'dockview';
 import { GridviewReact, LayoutPriority, Orientation } from 'dockview';
+import type { TabName } from 'features/controlLayers/store/types';
 import QueueTab from 'features/ui/components/tabs/QueueTab';
 import type { RootLayoutGridviewComponents } from 'features/ui/layouts/auto-layout-context';
 import { AutoLayoutProvider } from 'features/ui/layouts/auto-layout-context';
-import type { TabName } from 'features/ui/store/uiTypes';
 import { memo, useCallback, useEffect } from 'react';
 
 import { navigationApi } from './navigation-api';
