@@ -664,7 +664,7 @@
         "loraTriggerPhrases": "Frasi Trigger LoRA",
         "mainModelTriggerPhrases": "Frasi Trigger del modello principale",
         "inplaceInstall": "Installazione sul posto",
-        "inplaceInstallDesc": "Installa i modelli senza copiare i file. Quando si utilizza il modello, verrà caricato da questa posizione. Se disabilitato, i file del modello verranno copiati nella directory dei modelli gestiti da Invoke durante l'installazione.",
+        "inplaceInstallDesc": "Installa i modelli senza spostare i file. Quando si utilizza il modello, verrà caricato dalla posizione originale. Se disabilitato, i file del modello verranno spostati nella directory dei modelli gestiti da Invoke durante l'installazione.",
         "installQueue": "Coda di installazione",
         "install": "Installa",
         "installRepo": "Installa Repository",
