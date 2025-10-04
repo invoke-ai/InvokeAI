@@ -1,5 +1,5 @@
 import { GridviewPanel, type GridviewPanelApi, type IGridviewPanel } from 'dockview';
-import type { TabName } from 'features/ui/store/uiTypes';
+import type { TabName } from 'features/controlLayers/store/types';
 import { atom } from 'nanostores';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 

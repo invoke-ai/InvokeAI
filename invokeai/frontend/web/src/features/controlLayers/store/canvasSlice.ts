@@ -65,7 +65,7 @@ import {
   getInitialCanvasStagingAreaState,
   isCanvasStagingAreaStateAction,
 } from './canvasStagingAreaSlice';
-import { getInitialTabParamsState, isTabParamsStateAction, tabParamsState } from './paramsSlice';
+import { getInitialTabInstanceParamsState, isTabInstanceParamsAction, tabInstanceParamsSlice } from './tabSlice';
 import type {
   AspectRatioID,
   BoundingBoxScaleMethod,
@@ -139,7 +139,7 @@ const getInitialCanvasInstanceState = (id: string, name: string): CanvasInstance
   id,
   name,
   canvas: getInitialCanvasEntity(),
-  params: getInitialTabParamsState(),
+  params: getInitialTabInstanceParamsState(),
   settings: getInitialCanvasSettings(),
   staging: getInitialCanvasStagingAreaState(),
 });
@@ -242,7 +242,7 @@ const canvasSlice = createSlice({
     },
   },
   extraReducers(builder) {
-    builder.addDefaultCase((state, action) => {
+    builder.addMatcher(isCanvasInstanceAction, (state, action) => {
       const context = extractTabActionContext(action);
 
       if (!context || context.tab !== 'canvas' || !context.canvasId) {
@@ -263,19 +263,19 @@ const canvasInstanceState = createSlice({
   name: 'canvasInstance',
   initialState: {} as CanvasInstanceStateWithHistory,
   reducers: {
-    canvasNameChanged: (state, action: PayloadAction<{ canvasId: string; name: string }>) => {
+    canvasNameChanged: (state, action: PayloadAction<{ name: string }>) => {
       const { name } = action.payload;
 
       state.name = name;
     },
   },
   extraReducers(builder) {
-    builder.addMatcher(isCanvasInstanceAction, (state, action) => {
+    builder.addDefaultCase((state, action) => {
       if (isCanvasEntityStateAction(action)) {
         state.canvas = undoableCanvasEntityReducer(state.canvas, action);
       }
-      if (isTabParamsStateAction(action)) {
-        state.params = tabParamsState.reducer(state.params, action);
+      if (isTabInstanceParamsAction(action)) {
+        state.params = tabInstanceParamsSlice.reducer(state.params, action);
       }
       if (isCanvasSettingsStateAction(action)) {
         state.settings = canvasSettingsState.reducer(state.settings, action);
@@ -1934,11 +1934,13 @@ const syncScaledSize = (state: CanvasEntity) => {
 };
 
 export const isCanvasInstanceAction = (action: UnknownAction) =>
+  isCanvasInstanceStateAction(action) ||
   isCanvasEntityStateAction(action) ||
-  isTabParamsStateAction(action) ||
+  isTabInstanceParamsAction(action) ||
   isCanvasSettingsStateAction(action) ||
   isCanvasStagingAreaStateAction(action);
-const isCanvasEntityStateAction = isAnyOf(...Object.values(canvasEntityState.actions), canvasReset);
+const isCanvasInstanceStateAction = isAnyOf(...Object.values(canvasInstanceState.actions));
+const isCanvasEntityStateAction = isAnyOf(...Object.values(canvasEntityState.actions), modelChanged, canvasReset);
 
 export const {
   // Canvas

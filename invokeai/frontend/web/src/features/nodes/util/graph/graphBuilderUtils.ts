@@ -11,13 +11,12 @@ import {
   selectRefinerModel,
   selectRefinerStart,
 } from 'features/controlLayers/store/paramsSlice';
-import { selectActiveCanvas } from 'features/controlLayers/store/selectors';
-import type { TabParamsState } from 'features/controlLayers/store/types';
+import { selectActiveCanvas, selectActiveTab } from 'features/controlLayers/store/selectors';
+import type { ParamsState } from 'features/controlLayers/store/types';
 import type { BoardField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { buildPresetModifiedPrompt } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
 import { selectStylePresetSlice } from 'features/stylePresets/store/stylePresetSlice';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { selectListStylePresetsRequestState } from 'services/api/endpoints/stylePresets';
 import type { Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -158,7 +157,7 @@ export const getOriginalAndScaledSizesForOtherModes = (state: RootState) => {
 
 export const getInfill = (
   g: Graph,
-  params: TabParamsState
+  params: ParamsState
 ): Invocation<'infill_patchmatch' | 'infill_cv2' | 'infill_lama' | 'infill_rgba' | 'infill_tile'> => {
   const { infillMethod, infillColorValue, infillPatchmatchDownscaleSize, infillTileSize } = params;
 

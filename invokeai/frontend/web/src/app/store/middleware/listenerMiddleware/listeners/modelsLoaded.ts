@@ -2,7 +2,7 @@ import { logger } from 'app/logging/logger';
 import type { AppDispatch, AppStartListening, RootState } from 'app/store/store';
 import { modelChanged } from 'features/controlLayers/store/actions';
 import { controlLayerModelChanged, rgRefImageModelChanged } from 'features/controlLayers/store/canvasSlice';
-import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
+import { loraDeleted, selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
 import {
   clipEmbedModelSelected,
   fluxVAESelected,
@@ -194,7 +194,7 @@ const handleVAEModels: ModelHandler = (models, state, dispatch, log) => {
 
 const handleLoRAModels: ModelHandler = (models, state, dispatch, log) => {
   const loraModels = models.filter(isLoRAModelConfig);
-  state.loras.loras.forEach((lora) => {
+  selectAddedLoRAs(state).forEach((lora) => {
     const isLoRAAvailable = loraModels.some((m) => m.key === lora.model.key);
     if (isLoRAAvailable) {
       return;

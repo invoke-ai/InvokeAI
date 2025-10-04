@@ -1,4 +1,4 @@
-import type { TabName } from 'features/ui/store/uiTypes';
+import type { TabName } from 'features/controlLayers/store/types';
 
 import {
   GALLERY_PANEL_DEFAULT_HEIGHT_PX,

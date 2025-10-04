@@ -1,9 +1,8 @@
 import type { Middleware, UnknownAction } from '@reduxjs/toolkit';
 import { injectTabActionContext } from 'app/store/util';
 import { isCanvasInstanceAction } from 'features/controlLayers/store/canvasSlice';
-import { isTabParamsStateAction } from 'features/controlLayers/store/paramsSlice';
-import { selectActiveCanvasId } from 'features/controlLayers/store/selectors';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { selectActiveCanvasId, selectActiveTab } from 'features/controlLayers/store/selectors';
+import { isTabInstanceParamsAction } from 'features/controlLayers/store/tabSlice';
 
 export const actionContextMiddleware: Middleware = (store) => (next) => (action) => {
   const currentAction = action as UnknownAction;
@@ -20,5 +19,5 @@ export const actionContextMiddleware: Middleware = (store) => (next) => (action)
 };
 
 const isTabActionContextRequired = (action: UnknownAction) => {
-  return isTabParamsStateAction(action) || isCanvasInstanceAction(action);
+  return isTabInstanceParamsAction(action) || isCanvasInstanceAction(action);
 };

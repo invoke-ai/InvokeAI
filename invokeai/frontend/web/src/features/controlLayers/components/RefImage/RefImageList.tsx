@@ -13,10 +13,10 @@ import {
   selectRefImageEntityIds,
   selectSelectedRefEntityId,
 } from 'features/controlLayers/store/refImagesSlice';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
 import { imageDTOToCroppableImage } from 'features/controlLayers/store/util';
 import { addGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold, PiUploadBold } from 'react-icons/pi';

@@ -8,6 +8,7 @@ import {
   selectPositivePrompt,
   selectPositivePromptHistory,
 } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
 import { promptGenerationFromImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { ShowDynamicPromptsPreviewButton } from 'features/dynamicPrompts/components/ShowDynamicPromptsPreviewButton';
@@ -27,7 +28,6 @@ import {
 } from 'features/stylePresets/store/stylePresetSlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { selectAllowPromptExpansion } from 'features/system/store/configSlice';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import React, { memo, useCallback, useMemo, useRef } from 'react';
 import type { HotkeyCallback } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';

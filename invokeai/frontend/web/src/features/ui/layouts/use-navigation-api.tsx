@@ -1,8 +1,9 @@
 import { useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import { dockviewStorageKeyChanged, setActiveTab } from 'features/ui/store/uiSlice';
-import type { TabName } from 'features/ui/store/uiTypes';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
+import { setActiveTab } from 'features/controlLayers/store/tabSlice';
+import type { TabName } from 'features/controlLayers/store/types';
+import { dockviewStorageKeyChanged } from 'features/ui/store/uiSlice';
 import { useEffect, useMemo } from 'react';
 import type { JsonObject } from 'type-fest';
 

@@ -98,7 +98,7 @@ const CanvasTab = memo(({ id, name, isActive, canDelete }: CanvasTabProps) => {
         h="full"
       >
         <Flex flex={1} justifyContent="center">
-          <CanvasTabEditableTitle canvasId={id} name={name} isActive={isActive} />
+          <CanvasTabEditableTitle name={name} isActive={isActive} />
         </Flex>
         <Flex justifyContent="flex-end">
           <CloseCanvasButton canvasId={id} canDelete={canDelete} />

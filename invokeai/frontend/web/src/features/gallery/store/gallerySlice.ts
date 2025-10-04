@@ -192,7 +192,10 @@ export const gallerySliceConfig: SliceConfig<typeof slice, GalleryState, Seriali
       }
       return zGalleryState.parse(state);
     },
-    serialize: (state) => omit(state, denyList),
+    serialize: (state) => {
+      const a = omit(state, denyList);
+      return a;
+    },
     deserialize: (state) => {
       const galleryState = state as SerializedGalleryState;
 

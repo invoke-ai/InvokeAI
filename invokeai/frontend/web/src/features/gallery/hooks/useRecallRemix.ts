@@ -1,7 +1,7 @@
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useCanvasIsStaging } from 'features/controlLayers/hooks/useCanvasIsStaging';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
 import { ImageMetadataHandlers, MetadataUtils } from 'features/metadata/parsing';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { useCallback, useMemo } from 'react';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 import type { ImageDTO } from 'services/api/types';

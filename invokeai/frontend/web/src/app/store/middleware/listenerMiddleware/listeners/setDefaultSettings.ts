@@ -17,6 +17,7 @@ import {
   vaeSelected,
   widthChanged,
 } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
 import { setDefaultSettings } from 'features/parameters/store/actions';
 import {
   isParameterCFGRescaleMultiplier,
@@ -30,7 +31,6 @@ import {
   zParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import { isNonRefinerMainModelConfig } from 'services/api/types';

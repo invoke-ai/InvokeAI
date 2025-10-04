@@ -6,7 +6,7 @@ import {
   buildSelectIsStagingBySessionId,
   selectActiveCanvasStagingAreaSessionId,
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { loraIsEnabledChanged } from 'features/controlLayers/store/lorasSlice';
+import { loraIsEnabledChanged, selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
 import { selectActiveTabParams, syncedToOptimalDimension, vaeSelected } from 'features/controlLayers/store/paramsSlice';
 import { refImageModelChanged, selectReferenceImageEntities } from 'features/controlLayers/store/refImagesSlice';
 import {
@@ -55,7 +55,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         let modelsUpdatedDisabledOrCleared = 0;
 
         // handle incompatible loras
-        state.loras.loras.forEach((lora) => {
+        selectAddedLoRAs(state).forEach((lora) => {
           if (lora.model.base !== newBase) {
             dispatch(loraIsEnabledChanged({ id: lora.id, isEnabled: false }));
             modelsUpdatedDisabledOrCleared += 1;

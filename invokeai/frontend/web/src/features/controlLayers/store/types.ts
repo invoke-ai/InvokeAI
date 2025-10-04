@@ -532,13 +532,17 @@ export const zCanvasEntityIdentifer = z.object({
 });
 export type CanvasEntityIdentifier<T extends CanvasEntityType = CanvasEntityType> = { id: string; type: T };
 
-export const zLoRA = z.object({
+const zLoRA = z.object({
   id: z.string(),
   isEnabled: z.boolean(),
   model: zModelIdentifierField,
   weight: z.number().gte(-10).lte(10),
 });
 export type LoRA = z.infer<typeof zLoRA>;
+const zLoRAsState = z.object({
+  loras: z.array(zLoRA),
+});
+export type LoRAsState = z.infer<typeof zLoRAsState>;
 
 export const zAspectRatioID = z.enum(['Free', '21:9', '16:9', '3:2', '4:3', '1:1', '3:4', '2:3', '9:16', '9:21']);
 export type AspectRatioID = z.infer<typeof zAspectRatioID>;
@@ -683,7 +687,17 @@ const zPositivePromptHistory = z
   .array(zParameterPositivePrompt)
   .transform((arr) => arr.slice(0, MAX_POSITIVE_PROMPT_HISTORY));
 
-export const zTabParamsState = z.object({
+const zRefImagesState = z.object({
+  selectedEntityId: z.string().nullable(),
+  isPanelOpen: z.boolean(),
+  entities: z.array(zRefImageState),
+});
+export type RefImagesState = z.infer<typeof zRefImagesState>;
+
+export const zTabName = z.enum(['generate', 'canvas', 'upscaling', 'workflows', 'models', 'queue', 'video']);
+export type TabName = z.infer<typeof zTabName>;
+
+export const zParamsState = z.object({
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -730,14 +744,21 @@ export const zTabParamsState = z.object({
   controlLora: zParameterControlLoRAModel.nullable(),
   dimensions: zDimensionsState,
 });
-export type TabParamsState = z.infer<typeof zTabParamsState>;
-export const zParamsState = z.object({
-  _version: z.literal(3),
-  generate: zTabParamsState,
-  upscaling: zTabParamsState,
-  video: zTabParamsState,
-});
 export type ParamsState = z.infer<typeof zParamsState>;
+
+const zTabInstanceParamsState = z.object({
+  loras: zLoRAsState,
+  params: zParamsState,
+  refImages: zRefImagesState,
+});
+export type TabInstanceState = z.infer<typeof zTabInstanceParamsState>;
+export const zTabState = z.object({
+  activeTab: zTabName,
+  generate: zTabInstanceParamsState,
+  upscaling: zTabInstanceParamsState,
+  video: zTabInstanceParamsState,
+});
+export type TabState = z.infer<typeof zTabState>;
 
 const zInpaintMasks = z.object({
   isHidden: z.boolean(),
@@ -880,7 +901,7 @@ const zCanvasInstanceStateBase = z.object({
 const zCanvasInstanceState = <T extends z.ZodTypeAny>(canvasEntitySchema: T) =>
   zCanvasInstanceStateBase.extend({
     canvas: canvasEntitySchema,
-    params: zTabParamsState,
+    params: zTabInstanceParamsState,
     settings: zCanvasSettingsState,
     staging: zCanvasStagingAreaState,
   });
@@ -899,18 +920,6 @@ export const zCanvasStateWithoutHistory = zCanvasState(zCanvasInstanceStateWitho
 export const zCanvasStateWithHistory = zCanvasState(zCanvasInstanceStateWithHistory);
 export type CanvasState = z.infer<typeof zCanvasStateWithoutHistory>;
 export type CanvasStateWithHistory = z.infer<typeof zCanvasStateWithHistory>;
-
-export const zRefImagesState = z.object({
-  selectedEntityId: z.string().nullable(),
-  isPanelOpen: z.boolean(),
-  entities: z.array(zRefImageState),
-});
-export type RefImagesState = z.infer<typeof zRefImagesState>;
-export const getInitialRefImagesState = (): RefImagesState => ({
-  selectedEntityId: null,
-  isPanelOpen: false,
-  entities: [],
-});
 
 export const zCanvasReferenceImageState_OLD = zCanvasEntityBase.extend({
   type: z.literal('reference_image'),

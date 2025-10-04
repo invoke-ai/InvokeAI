@@ -3,7 +3,12 @@ import { Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui-libra
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectActiveTabParams, selectIsFLUX, selectIsSD3, selectVAEKey } from 'features/controlLayers/store/paramsSlice';
+import {
+  selectActiveTabParams,
+  selectIsFLUX,
+  selectIsSD3,
+  selectVAEKey,
+} from 'features/controlLayers/store/paramsSlice';
 import ParamCFGRescaleMultiplier from 'features/parameters/components/Advanced/ParamCFGRescaleMultiplier';
 import ParamCLIPEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPEmbedModelSelect';
 import ParamCLIPGEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPGEmbedModelSelect';

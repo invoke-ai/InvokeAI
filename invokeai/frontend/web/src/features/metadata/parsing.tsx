@@ -33,6 +33,7 @@ import {
   widthChanged,
 } from 'features/controlLayers/store/paramsSlice';
 import { refImagesRecalled } from 'features/controlLayers/store/refImagesSlice';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
 import type {
   CanvasMetadata,
   LoRA,
@@ -101,7 +102,6 @@ import {
   zParameterStrength,
 } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
 import type { ComponentType } from 'react';
 import { useCallback, useEffect, useState } from 'react';

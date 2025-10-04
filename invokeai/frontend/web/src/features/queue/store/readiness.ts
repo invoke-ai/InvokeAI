@@ -12,8 +12,8 @@ import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasMana
 import { selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
 import { selectActiveTabParams, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { selectActiveCanvas } from 'features/controlLayers/store/selectors';
-import type { CanvasEntity, LoRA, RefImagesState, TabParamsState } from 'features/controlLayers/store/types';
+import { selectActiveCanvas, selectActiveTab } from 'features/controlLayers/store/selectors';
+import type { CanvasEntity, LoRA, ParamsState, RefImagesState, TabName } from 'features/controlLayers/store/types';
 import {
   getControlLayerWarnings,
   getGlobalReferenceImageWarnings,
@@ -42,8 +42,6 @@ import type { ParameterModel } from 'features/parameters/types/parameterSchemas'
 import { getGridSize } from 'features/parameters/util/optimalDimension';
 import { promptExpansionApi, type PromptExpansionRequestState } from 'features/prompt/PromptExpansion/state';
 import { selectAllowVideo, selectConfigSlice } from 'features/system/store/configSlice';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import type { TabName } from 'features/ui/store/uiTypes';
 import i18n from 'i18next';
 import { atom, computed } from 'nanostores';
 import { useEffect } from 'react';
@@ -78,7 +76,7 @@ type UpdateReasonsArg = {
   tab: TabName;
   isConnected: boolean;
   canvas: CanvasEntity;
-  params: TabParamsState;
+  params: ParamsState;
   refImages: RefImagesState;
   dynamicPrompts: DynamicPromptsState;
   canvasIsFiltering: boolean;
@@ -277,7 +275,7 @@ const disconnectedReason = (t: typeof i18n.t) => ({ content: t('parameters.invok
 const getReasonsWhyCannotEnqueueVideoTab = (arg: {
   isConnected: boolean;
   video: VideoState;
-  params: TabParamsState;
+  params: ParamsState;
   dynamicPrompts: DynamicPromptsState;
   promptExpansionRequest: PromptExpansionRequestState;
   isVideoEnabled: boolean;
@@ -319,7 +317,7 @@ const getReasonsWhyCannotEnqueueVideoTab = (arg: {
 const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   isConnected: boolean;
   model: MainModelConfig | null | undefined;
-  params: TabParamsState;
+  params: ParamsState;
   refImages: RefImagesState;
   loras: LoRA[];
   dynamicPrompts: DynamicPromptsState;
@@ -490,7 +488,7 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
   isConnected: boolean;
   upscale: UpscaleState;
   config: AppConfig;
-  params: TabParamsState;
+  params: ParamsState;
   loras: LoRA[];
   promptExpansionRequest: PromptExpansionRequestState;
 }) => {
@@ -553,7 +551,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   isConnected: boolean;
   model: MainModelConfig | null | undefined;
   canvas: CanvasEntity;
-  params: TabParamsState;
+  params: ParamsState;
   refImages: RefImagesState;
   loras: LoRA[];
   dynamicPrompts: DynamicPromptsState;

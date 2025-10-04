@@ -1,11 +1,11 @@
 import { objectEquals } from '@observ33r/object-equals';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSelector, createSlice } from '@reduxjs/toolkit';
+import { createSelector, createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import type { RootState } from 'app/store/store';
-import type { SerializedStateFromDenyList, SliceConfig } from 'app/store/types';
-import { clamp, merge, omit } from 'es-toolkit/compat';
+import { clamp } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
 import type {
   CroppableImageWithDims,
   FLUXReduxImageInfluence,
@@ -21,8 +21,9 @@ import type {
 import { assert } from 'tsafe';
 import type { PartialDeep } from 'type-fest';
 
+import { selectActiveCanvasId } from './selectors';
 import type { CLIPVisionModelV2, IPMethodV2, RefImageState } from './types';
-import { getInitialRefImagesState, isFLUXReduxConfig, isIPAdapterConfig, zRefImagesState } from './types';
+import { isFLUXReduxConfig, isIPAdapterConfig } from './types';
 import {
   getReferenceImageState,
   initialChatGPT4oReferenceImage,
@@ -32,6 +33,12 @@ import {
   initialIPAdapter,
 } from './util';
 
+export const getInitialRefImagesState = (): RefImagesState => ({
+  selectedEntityId: null,
+  isPanelOpen: false,
+  entities: [],
+});
+
 type PayloadActionWithId<T = void> = T extends void
   ? PayloadAction<{ id: string }>
   : PayloadAction<
@@ -40,7 +47,7 @@ type PayloadActionWithId<T = void> = T extends void
       } & T
     >;
 
-const slice = createSlice({
+export const refImagesSlice = createSlice({
   name: 'refImages',
   initialState: getInitialRefImagesState(),
   reducers: {
@@ -264,6 +271,8 @@ const slice = createSlice({
   },
 });
 
+export const isRefImagesStateAction = isAnyOf(...Object.values(refImagesSlice.actions));
+
 export const {
   refImageSelected,
   refImageAdded,
@@ -277,27 +286,32 @@ export const {
   refImageFLUXReduxImageInfluenceChanged,
   refImageIsEnabledToggled,
   refImagesRecalled,
-} = slice.actions;
+} = refImagesSlice.actions;
 
-const denyList = ['selectedEntityId', 'isPanelOpen'] as const;
-type SerializedRefImagesState = SerializedStateFromDenyList<RefImagesState, typeof denyList>;
+export const refImagesDenyList = ['selectedEntityId', 'isPanelOpen'] as const;
 
-export const refImagesSliceConfig: SliceConfig<typeof slice, RefImagesState, SerializedRefImagesState> = {
-  slice,
-  schema: zRefImagesState,
-  getInitialState: getInitialRefImagesState,
-  persistConfig: {
-    migrate: (state) => zRefImagesState.parse(state),
-    serialize: (state) => omit(state, denyList),
-    deserialize: (state) => {
-      const refImagesState = state as SerializedRefImagesState;
+const initialRefImages = getInitialRefImagesState();
 
-      return merge(refImagesState, getInitialRefImagesState());
-    },
-  },
+const selectActiveTabRefImages = (state: RootState) => {
+  const tab = selectActiveTab(state);
+  const canvasId = selectActiveCanvasId(state);
+
+  switch (tab) {
+    case 'generate':
+      return state.tab.generate.refImages;
+    case 'canvas':
+      return state.canvas.canvases[canvasId]!.params.refImages;
+    case 'upscaling':
+      return state.tab.upscaling.refImages;
+    case 'video':
+      return state.tab.video.refImages;
+    default:
+      // Fallback for global controls in other tabs
+      return initialRefImages;
+  }
 };
 
-export const selectRefImagesSlice = (state: RootState) => state.refImages;
+export const selectRefImagesSlice = (state: RootState) => selectActiveTabRefImages(state);
 
 export const selectReferenceImageEntities = createSelector(selectRefImagesSlice, (state) => state.entities);
 export const selectSelectedRefEntityId = createSelector(selectRefImagesSlice, (state) => state.selectedEntityId);

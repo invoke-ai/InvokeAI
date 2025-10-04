@@ -19,9 +19,7 @@ import { addSetDefaultSettingsListener } from 'app/store/middleware/listenerMidd
 import { addSocketConnectedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
 import { changeBoardModalSliceConfig } from 'features/changeBoardModal/store/slice';
 import { canvasSliceConfig } from 'features/controlLayers/store/canvasSlice';
-import { lorasSliceConfig } from 'features/controlLayers/store/lorasSlice';
-import { paramsSliceConfig } from 'features/controlLayers/store/paramsSlice';
-import { refImagesSliceConfig } from 'features/controlLayers/store/refImagesSlice';
+import { tabSliceConfig } from 'features/controlLayers/store/tabSlice';
 import { dynamicPromptsSliceConfig } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { gallerySliceConfig } from 'features/gallery/store/gallerySlice';
 import { modelManagerSliceConfig } from 'features/modelManagerV2/store/modelManagerV2Slice';
@@ -63,12 +61,10 @@ const SLICE_CONFIGS = {
   [configSliceConfig.slice.reducerPath]: configSliceConfig,
   [dynamicPromptsSliceConfig.slice.reducerPath]: dynamicPromptsSliceConfig,
   [gallerySliceConfig.slice.reducerPath]: gallerySliceConfig,
-  [lorasSliceConfig.slice.reducerPath]: lorasSliceConfig,
+  [tabSliceConfig.slice.reducerPath]: tabSliceConfig,
   [modelManagerSliceConfig.slice.reducerPath]: modelManagerSliceConfig,
   [nodesSliceConfig.slice.reducerPath]: nodesSliceConfig,
-  [paramsSliceConfig.slice.reducerPath]: paramsSliceConfig,
   [queueSliceConfig.slice.reducerPath]: queueSliceConfig,
-  [refImagesSliceConfig.slice.reducerPath]: refImagesSliceConfig,
   [stylePresetSliceConfig.slice.reducerPath]: stylePresetSliceConfig,
   [systemSliceConfig.slice.reducerPath]: systemSliceConfig,
   [uiSliceConfig.slice.reducerPath]: uiSliceConfig,
@@ -87,12 +83,10 @@ const ALL_REDUCERS = {
   [configSliceConfig.slice.reducerPath]: configSliceConfig.slice.reducer,
   [dynamicPromptsSliceConfig.slice.reducerPath]: dynamicPromptsSliceConfig.slice.reducer,
   [gallerySliceConfig.slice.reducerPath]: gallerySliceConfig.slice.reducer,
-  [lorasSliceConfig.slice.reducerPath]: lorasSliceConfig.slice.reducer,
+  [tabSliceConfig.slice.reducerPath]: tabSliceConfig.slice.reducer,
   [modelManagerSliceConfig.slice.reducerPath]: modelManagerSliceConfig.slice.reducer,
   [nodesSliceConfig.slice.reducerPath]: undoableNodesSliceReducer,
-  [paramsSliceConfig.slice.reducerPath]: paramsSliceConfig.slice.reducer,
   [queueSliceConfig.slice.reducerPath]: queueSliceConfig.slice.reducer,
-  [refImagesSliceConfig.slice.reducerPath]: refImagesSliceConfig.slice.reducer,
   [stylePresetSliceConfig.slice.reducerPath]: stylePresetSliceConfig.slice.reducer,
   [systemSliceConfig.slice.reducerPath]: systemSliceConfig.slice.reducer,
   [uiSliceConfig.slice.reducerPath]: uiSliceConfig.slice.reducer,

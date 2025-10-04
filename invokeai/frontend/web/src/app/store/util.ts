@@ -1,5 +1,5 @@
 import type { UnknownAction } from '@reduxjs/toolkit';
-import type { TabName } from 'features/ui/store/uiTypes';
+import type { TabName } from 'features/controlLayers/store/types';
 
 const TAB_KEY = Symbol('tab');
 const CANVAS_ID_KEY = Symbol('canvasId');

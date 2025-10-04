@@ -12,9 +12,6 @@ const slice = createSlice({
   name: 'ui',
   initialState: getInitialUIState(),
   reducers: {
-    setActiveTab: (state, action: PayloadAction<UIState['activeTab']>) => {
-      state.activeTab = action.payload;
-    },
     setShouldShowItemDetails: (state, action: PayloadAction<UIState['shouldShowItemDetails']>) => {
       state.shouldShowItemDetails = action.payload;
     },
@@ -75,7 +72,6 @@ const slice = createSlice({
 });
 
 export const {
-  setActiveTab,
   setShouldShowItemDetails,
   setShouldShowProgressInViewer,
   accordionStateChanged,

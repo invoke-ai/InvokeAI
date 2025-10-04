@@ -15,6 +15,11 @@ import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 /**
+ * Selects the active tab
+ */
+export const selectActiveTab = (state: RootState) => state.tab.activeTab;
+
+/**
  * Selects the canvas slice from the root state
  */
 const selectCanvasSlice = (state: RootState) => state.canvas;
