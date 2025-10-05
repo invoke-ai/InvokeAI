@@ -4,21 +4,22 @@ These are nodes that have been developed by the community, for the community. If
 
 If you'd like to submit a node for the community, please refer to the [node creation overview](contributingNodes.md).
 
-To use a node, add the node to the `nodes` folder found in your InvokeAI install location. 
+To use a node, add the node to the `nodes` folder found in your InvokeAI install location.
 
-The suggested method is to use `git clone` to clone the repository the node is found in. This allows for easy updates of the node in the future. 
+The suggested method is to use `git clone` to clone the repository the node is found in. This allows for easy updates of the node in the future.
 
-If you'd prefer, you can also just download the whole node folder from the linked repository and add it to the `nodes` folder. 
+If you'd prefer, you can also just download the whole node folder from the linked repository and add it to the `nodes` folder.
 
-To use a community workflow, download the `.json` node graph file and load it into Invoke AI via the **Load Workflow** button in the Workflow Editor. 
+To use a community workflow, download the `.json` node graph file and load it into Invoke AI via the **Load Workflow** button in the Workflow Editor.
 
 - Community Nodes
     + [Anamorphic Tools](#anamorphic-tools)
     + [Adapters-Linked](#adapters-linked-nodes)
     + [Autostereogram](#autostereogram-nodes)
     + [Average Images](#average-images)
+    + [BiRefNet Background Removal](#birefnet-background-removal)
     + [Clean Image Artifacts After Cut](#clean-image-artifacts-after-cut)
-    + [Close Color Mask](#close-color-mask) 
+    + [Close Color Mask](#close-color-mask)
     + [Clothing Mask](#clothing-mask)
     + [Contrast Limited Adaptive Histogram Equalization](#contrast-limited-adaptive-histogram-equalization)
     + [Curves](#curves)
@@ -34,6 +35,7 @@ To use a community workflow, download the `.json` node graph file and load it in
     + [Hand Refiner with MeshGraphormer](#hand-refiner-with-meshgraphormer)
     + [Image and Mask Composition Pack](#image-and-mask-composition-pack)
     + [Image Dominant Color](#image-dominant-color)
+    + [Image Export](#image-export)
     + [Image to Character Art Image Nodes](#image-to-character-art-image-nodes)
     + [Image Picker](#image-picker)
     + [Image Resize Plus](#image-resize-plus)
@@ -51,7 +53,7 @@ To use a community workflow, download the `.json` node graph file and load it in
     + [Prompt Tools](#prompt-tools)
     + [Remote Image](#remote-image)
     + [BriaAI Background Remove](#briaai-remove-background)
-    + [Remove Background](#remove-background)    
+    + [Remove Background](#remove-background)
     + [Retroize](#retroize)
     + [Stereogram](#stereogram-nodes)
     + [Size Stepper Nodes](#size-stepper-nodes)
@@ -81,7 +83,7 @@ To use a community workflow, download the `.json` node graph file and load it in
 - `IP-Adapter-Linked` - Collects IP-Adapter info to pass to other nodes.
 - `T2I-Adapter-Linked` - Collects T2I-Adapter info to pass to other nodes.
 
-Note: These are inherited from the core nodes so any update to the core nodes should be reflected in these. 
+Note: These are inherited from the core nodes so any update to the core nodes should be reflected in these.
 
 **Node Link:** https://github.com/skunkworxdark/adapters-linked-nodes
 
@@ -102,6 +104,20 @@ Note: These are inherited from the core nodes so any update to the core nodes sh
 **Description:** This node takes in a collection of images of the same size and averages them as output. It converts everything to RGB mode first.
 
 **Node Link:** https://github.com/JPPhoto/average-images-node
+
+--------------------------------
+### BiRefNet Background Removal
+
+**Description:** Remove image backgrounds using BiRefNet (Bilateral Reference Network), a high-quality segmentation model. Supports multiple model variants including standard, high-resolution, matting, portrait, and specialized models for different use cases.
+
+**Node Link:** https://github.com/veeliks/invoke_birefnet
+
+**Output Examples**
+
+<section>
+  <img src="https://raw.githubusercontent.com/veeliks/invoke_birefnet/main/.readme/example_before_removal.png" width="49%" alt="Before background removal">
+  <img src="https://raw.githubusercontent.com/veeliks/invoke_birefnet/main/.readme/example_after_removal.png" width="49%" alt="After background removal">
+</section>
 
 --------------------------------
 ### Clean Image Artifacts After Cut
@@ -216,7 +232,7 @@ This includes 3 Nodes:
 
 **Node Link:** https://github.com/mickr777/GPT2RandomPromptMaker
 
-**Output Examples** 
+**Output Examples**
 
 Generated Prompt: An enchanted weapon will be usable by any character regardless of their alignment.
 
@@ -231,7 +247,7 @@ Generated Prompt: An enchanted weapon will be usable by any character regardless
 
 **Example Node Graph:**  https://github.com/mildmisery/invokeai-GridToGifNode/blob/main/Grid%20to%20Gif%20Example%20Workflow.json
 
-**Output Examples** 
+**Output Examples**
 
 <img src="https://raw.githubusercontent.com/mildmisery/invokeai-GridToGifNode/main/input.png" width="300" />
 <img src="https://raw.githubusercontent.com/mildmisery/invokeai-GridToGifNode/main/output.gif" width="300" />
@@ -293,7 +309,7 @@ This includes 15 Nodes:
 - *Text Mask (simple 2D)* - create and position a white on black (or black on white) line of text using any font locally available to Invoke.
 
 **Node Link:** https://github.com/dwringer/composition-nodes
-  
+
 </br><img src="https://raw.githubusercontent.com/dwringer/composition-nodes/main/composition_pack_overview.jpg" width="500" />
 
 --------------------------------
@@ -305,6 +321,23 @@ Node Link: https://github.com/VeyDlin/image-dominant-color-node
 
 View:
 </br><img src="https://raw.githubusercontent.com/VeyDlin/image-dominant-color-node/master/.readme/node.png" width="500" />
+
+--------------------------------
+### Image Export
+
+**Description:** Export images in multiple formats (AVIF, JPEG, PNG, TIFF, WebP) with format-specific compression and quality options.
+
+**Node Link:** https://github.com/veeliks/invoke_image_export
+
+**Nodes:**
+
+<section>
+  <img src="https://raw.githubusercontent.com/veeliks/invoke_image_export/main/.readme/node_avif.png" width="19%" alt="Save Image as AVIF">
+  <img src="https://raw.githubusercontent.com/veeliks/invoke_image_export/main/.readme/node_jpeg.png" width="19%" alt="Save Image as JPEG">
+  <img src="https://raw.githubusercontent.com/veeliks/invoke_image_export/main/.readme/node_png.png" width="19%" alt="Save Image as PNG">
+  <img src="https://raw.githubusercontent.com/veeliks/invoke_image_export/main/.readme/node_tiff.png" width="19%" alt="Save Image as TIFF">
+  <img src="https://raw.githubusercontent.com/veeliks/invoke_image_export/main/.readme/node_webp.png" width="19%" alt="Save Image as WebP">
+</section>
 
 --------------------------------
 ### Image to Character Art Image Nodes
@@ -352,7 +385,7 @@ View:
 
 **Node Link:** https://github.com/helix4u/load_video_frame
 
-**Output Example:** 
+**Output Example:**
 <img src="https://raw.githubusercontent.com/helix4u/load_video_frame/refs/heads/main/_git_assets/dance1736978273.gif" width="500" />
 
 --------------------------------
@@ -364,7 +397,7 @@ View:
 
 **Example Node Graph:**  https://gitlab.com/srcrr/shift3d/-/raw/main/example-workflow.json?ref_type=heads&inline=false
 
-**Output Examples** 
+**Output Examples**
 
 <img src="https://gitlab.com/srcrr/shift3d/-/raw/main/example-1.png" width="300" />
 <img src="https://gitlab.com/srcrr/shift3d/-/raw/main/example-2.png" width="300" />
@@ -386,13 +419,13 @@ View:
 - Option to only transfer luminance channel.
 - Option to save output as grayscale
 
-A good use case for this node is to normalize the colors of an image that has been through the tiled scaling workflow of my XYGrid Nodes. 
+A good use case for this node is to normalize the colors of an image that has been through the tiled scaling workflow of my XYGrid Nodes.
 
 See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/main/README.md
 
 **Node Link:** https://github.com/skunkworxdark/match_histogram
 
-**Output Examples** 
+**Output Examples**
 
 <img src="https://github.com/skunkworxdark/match_histogram/assets/21961335/ed12f329-a0ef-444a-9bae-129ed60d6097" />
 
@@ -410,12 +443,12 @@ See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/mai
 - `Metadata To Bool` - Extracts Bool types from metadata
 - `Metadata To Model` - Extracts model types from metadata
 - `Metadata To SDXL Model` - Extracts SDXL model types from metadata
-- `Metadata To LoRAs` - Extracts Loras from metadata. 
+- `Metadata To LoRAs` - Extracts Loras from metadata.
 - `Metadata To SDXL LoRAs` - Extracts SDXL Loras from metadata
 - `Metadata To ControlNets` - Extracts ControNets from metadata
 - `Metadata To IP-Adapters` - Extracts IP-Adapters from metadata
 - `Metadata To T2I-Adapters` - Extracts T2I-Adapters from metadata
-- `Denoise Latents + Metadata` - This is an inherited version of the existing `Denoise Latents` node but with a metadata input and output. 
+- `Denoise Latents + Metadata` - This is an inherited version of the existing `Denoise Latents` node but with a metadata input and output.
 
 **Node Link:** https://github.com/skunkworxdark/metadata-linked-nodes
 
@@ -445,7 +478,7 @@ View:
 
 **Example Node Graph:**  https://github.com/Jonseed/Ollama-Node/blob/main/Ollama-Node-Flux-example.json
 
-**View:** 
+**View:**
 
 ![ollama node](https://raw.githubusercontent.com/Jonseed/Ollama-Node/a3e7cdc55e394cb89c1ea7ed54e106c212c85e8c/ollama-node-screenshot.png)
 
@@ -454,7 +487,7 @@ View:
 
 <img src="https://raw.githubusercontent.com/AIrjen/OneButtonPrompt_X_InvokeAI/refs/heads/main/images/background.png" width="800" />
 
-**Description:** an extensive suite of auto prompt generation and prompt helper nodes based on extensive logic. Get creative with the best prompt generator in the world. 
+**Description:** an extensive suite of auto prompt generation and prompt helper nodes based on extensive logic. Get creative with the best prompt generator in the world.
 
 The main node generates interesting prompts based on a set of parameters. There are also some additional nodes such as Auto Negative Prompt, One Button Artify, Create Prompt Variant and other cool prompt toys to play around with.
 
@@ -491,14 +524,14 @@ a Text-Generation-Webui instance (might work remotely too, but I never tried it)
 This node works best with SDXL models, especially as the style can be described independently of the LLM's output.
 
 --------------------------------
-### Prompt Tools 
+### Prompt Tools
 
 **Description:** A set of InvokeAI nodes that add general prompt (string) manipulation tools.  Designed to accompany the `Prompts From File` node and other prompt generation nodes.
 
 1. `Prompt To File` - saves a prompt or collection of prompts to a file. one per line. There is an append/overwrite option.
-2. `PTFields Collect` - Converts image generation fields into a Json format string that can be passed to Prompt to file. 
+2. `PTFields Collect` - Converts image generation fields into a Json format string that can be passed to Prompt to file.
 3. `PTFields Expand` - Takes Json string and converts it to individual generation parameters. This can be fed from the Prompts to file node.
-4. `Prompt Strength` - Formats prompt with strength like the weighted format of compel 
+4. `Prompt Strength` - Formats prompt with strength like the weighted format of compel
 5. `Prompt Strength Combine` - Combines weighted prompts for .and()/.blend()
 6. `CSV To Index String` - Gets a string from a CSV by index. Includes a Random index option
 
@@ -513,7 +546,7 @@ See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/mai
 
 **Node Link:** https://github.com/skunkworxdark/Prompt-tools-nodes
 
-**Workflow Examples** 
+**Workflow Examples**
 
 <img src="https://raw.githubusercontent.com/skunkworxdark/prompt-tools/refs/heads/main/images/CSVToIndexStringNode.png"/>
 
@@ -648,7 +681,7 @@ Highlights/Midtones/Shadows (with LUT blur enabled):
 - Generate grids of images from multiple input images
 - Create XY grid images with labels from parameters
 - Split images into overlapping tiles for processing (for super-resolution workflows)
-- Recombine image tiles into a single output image blending the seams 
+- Recombine image tiles into a single output image blending the seams
 
 The nodes include:
 1. `Images To Grids` - Combine multiple images into a grid of images
@@ -661,7 +694,7 @@ See full docs here: https://github.com/skunkworxdark/XYGrid_nodes/edit/main/READ
 
 **Node Link:** https://github.com/skunkworxdark/XYGrid_nodes
 
-**Output Examples** 
+**Output Examples**
 
 <img src="https://raw.githubusercontent.com/skunkworxdark/XYGrid_nodes/refs/heads/main/images/collage.png" />
 
@@ -675,7 +708,7 @@ See full docs here: https://github.com/skunkworxdark/XYGrid_nodes/edit/main/READ
 
 **Example Workflow:**  https://github.com/invoke-ai/InvokeAI/blob/docs/main/docs/workflows/Prompt_from_File.json
 
-**Output Examples** 
+**Output Examples**
 
 </br><img src="https://invoke-ai.github.io/InvokeAI/assets/invoke_ai_banner.png" width="500" />
 
@@ -686,5 +719,5 @@ The nodes linked have been developed and contributed by members of the Invoke AI
 
 
 ## Help
-If you run into any issues with a node, please post in the [InvokeAI Discord](https://discord.gg/ZmtBAhwWhy). 
+If you run into any issues with a node, please post in the [InvokeAI Discord](https://discord.gg/ZmtBAhwWhy).
 
