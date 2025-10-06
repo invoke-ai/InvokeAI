@@ -3,7 +3,6 @@ import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasWorkflowState } from 'features/controlLayers/store/canvasWorkflowSlice';
-import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import type { Templates } from 'features/nodes/store/types';
@@ -17,7 +16,6 @@ import {
   selectCanvasOutputFields,
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { AnyInvocation, AnyInvocationInputField, AnyInvocationOutputField } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -185,19 +183,6 @@ export const buildCanvasWorkflowGraph = async ({ state, manager, workflowState }
   const outputNode = g.getNode(graphOutputNodeId);
   assert(outputNode, 'Canvas workflow output node missing from graph');
   g.updateNode(outputNode, selectCanvasOutputFields(state));
-
-  if (selectActiveTab(state) === 'canvas') {
-    g.upsertMetadata(selectCanvasMetadata(state));
-  }
-
-  g.setMetadataReceivingNode(outputNode);
-  g.upsertMetadata({
-    positive_prompt: prompts.positive,
-    negative_prompt: prompts.negative ?? '',
-  });
-  g.addEdgeToMetadata(seed, 'value', 'seed');
-  g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
-  g.updateNode(positivePrompt, { value: prompts.positive });
 
   return {
     g,

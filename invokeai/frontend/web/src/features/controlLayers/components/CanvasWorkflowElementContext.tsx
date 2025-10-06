@@ -1,4 +1,5 @@
 import { useAppSelector } from 'app/store/storeHooks';
+import { WorkflowContext } from 'app/store/workflowContext';
 import { selectCanvasWorkflowNodesSlice } from 'features/controlLayers/store/canvasWorkflowNodesSlice';
 import type { FormElement } from 'features/nodes/types/workflow';
 import type { PropsWithChildren } from 'react';
@@ -15,17 +16,23 @@ type CanvasWorkflowElementContextValue = {
 
 const CanvasWorkflowElementContext = createContext<CanvasWorkflowElementContextValue | null>(null);
 
-const CanvasWorkflowElementProvider = memo(({ children }: PropsWithChildren) => {
+export const CanvasWorkflowElementProvider = memo(({ children }: PropsWithChildren) => {
   const nodesState = useAppSelector(selectCanvasWorkflowNodesSlice);
 
-  const value = useMemo<CanvasWorkflowElementContextValue>(
+  const elementValue = useMemo<CanvasWorkflowElementContextValue>(
     () => ({
       getElement: (id: string) => nodesState.form.elements[id],
     }),
     [nodesState.form.elements]
   );
 
-  return <CanvasWorkflowElementContext.Provider value={value}>{children}</CanvasWorkflowElementContext.Provider>;
+  const workflowValue = useMemo(() => ({ isCanvasWorkflow: true }), []);
+
+  return (
+    <WorkflowContext.Provider value={workflowValue}>
+      <CanvasWorkflowElementContext.Provider value={elementValue}>{children}</CanvasWorkflowElementContext.Provider>
+    </WorkflowContext.Provider>
+  );
 });
 CanvasWorkflowElementProvider.displayName = 'CanvasWorkflowElementProvider';
 

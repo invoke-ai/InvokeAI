@@ -57,7 +57,6 @@ import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { addArchivedOrDeletedBoardListener } from './middleware/listenerMiddleware/listeners/addArchivedOrDeletedBoardListener';
-import { addCanvasWorkflowFieldChangedListener } from './middleware/listenerMiddleware/listeners/canvasWorkflowFieldChanged';
 import { addCanvasWorkflowRehydratedListener } from './middleware/listenerMiddleware/listeners/canvasWorkflowRehydrated';
 import { addImageUploadedFulfilledListener } from './middleware/listenerMiddleware/listeners/imageUploaded';
 
@@ -299,5 +298,4 @@ addAdHocPostProcessingRequestedListener(startAppListening);
 addSetDefaultSettingsListener(startAppListening);
 
 // Canvas workflow fields
-addCanvasWorkflowFieldChangedListener(startAppListening);
 addCanvasWorkflowRehydratedListener(startAppListening);

@@ -50,12 +50,14 @@ export const ParametersPanelCanvas = memo(() => {
           return;
         }
         isProcessingRef.current = true;
-        const result = await dispatch(selectCanvasWorkflow(workflowId));
+        const result = (await dispatch(selectCanvasWorkflow(workflowId))) as
+          | ReturnType<typeof selectCanvasWorkflow.fulfilled>
+          | ReturnType<typeof selectCanvasWorkflow.rejected>;
         if (selectCanvasWorkflow.fulfilled.match(result)) {
           toast({ status: 'success', title: t('controlLayers.canvasWorkflowSelected') });
           workflowLibraryModal.close();
         } else {
-          const message = result.payload ?? result.error.message ?? t('common.error');
+          const message = result.payload ?? result.error?.message ?? t('common.error');
           toast({ status: 'error', title: message });
         }
         isProcessingRef.current = false;

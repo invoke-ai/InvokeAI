@@ -6,11 +6,16 @@ import type { SliceConfig } from 'app/store/types';
 import { deepClone } from 'common/util/deepClone';
 import { parseify } from 'common/util/serialize';
 import { $templates, getFormFieldInitialValues } from 'features/nodes/store/nodesSlice';
-import type { Templates } from 'features/nodes/store/types';
+import type { NodesState, Templates } from 'features/nodes/store/types';
+import { getInvocationNodeErrors } from 'features/nodes/store/util/fieldValidators';
 import type { StatefulFieldValue } from 'features/nodes/types/field';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
-import { zWorkflowV3 } from 'features/nodes/types/workflow';
+import { isWorkflowInvocationNode, zWorkflowV3 } from 'features/nodes/types/workflow';
+import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
 import { serializeError } from 'serialize-error';
+import { boardsApi } from 'services/api/endpoints/boards';
+import { imagesApi } from 'services/api/endpoints/images';
+import { modelsApi } from 'services/api/endpoints/models';
 import { workflowsApi } from 'services/api/endpoints/workflows';
 import { z } from 'zod';
 
@@ -46,10 +51,29 @@ type ValidateResult = {
 const INPUT_TAG = 'canvas-workflow-input';
 const OUTPUT_TAG = 'canvas-workflow-output';
 
-const validateCanvasWorkflow = (workflow: WorkflowV3, templates: Templates): ValidateResult => {
-  const invocationNodes = workflow.nodes.filter(
-    (node): node is WorkflowV3['nodes'][number] => node.type === 'invocation'
-  );
+const validateCanvasWorkflow = async (
+  workflow: unknown,
+  templates: Templates,
+  checkImageAccess: (name: string) => Promise<boolean>,
+  checkBoardAccess: (id: string) => Promise<boolean>,
+  checkModelAccess: (key: string) => Promise<boolean>
+): Promise<{ workflow: WorkflowV3; inputNodeId: string; outputNodeId: string }> => {
+  // First, use the robust validateWorkflow utility to handle parsing, migration, and general validation
+  const { workflow: validatedWorkflow, warnings } = await validateWorkflow({
+    workflow,
+    templates,
+    checkImageAccess,
+    checkBoardAccess,
+    checkModelAccess,
+  });
+
+  // Log any warnings from validation
+  if (warnings.length > 0) {
+    log.warn({ warnings }, 'Canvas workflow validation warnings');
+  }
+
+  // Now perform canvas-specific validation
+  const invocationNodes = validatedWorkflow.nodes.filter(isWorkflowInvocationNode);
 
   const inputNodes = invocationNodes.filter((node) => {
     const template = templates[node.data.type];
@@ -100,56 +124,37 @@ const validateCanvasWorkflow = (workflow: WorkflowV3, templates: Templates): Val
     throw new Error('Canvas output node must accept an image input field named "image".');
   }
 
-  // Validate that all nodes have valid templates
+  // Validate that required fields without connections have values using the existing field validator
+  // Create a temporary nodes state for validation - only nodes and edges are used by the validator
+  const tempNodesState = {
+    nodes: invocationNodes,
+    edges: validatedWorkflow.edges,
+  } as NodesState;
+
   for (const node of invocationNodes) {
-    const template = templates[node.data.type];
-    if (!template) {
-      throw new Error(
-        `Node "${node.data.label || node.id}" uses invocation type "${node.data.type}" which is not available. This workflow may have been created with a different version of InvokeAI.`
-      );
-    }
-  }
+    const errors = getInvocationNodeErrors(node.id, templates, tempNodesState);
 
-  // Validate that required fields without connections have values
-  const edges = workflow.edges.filter((edge) => edge.type === 'default');
-  for (const node of invocationNodes) {
-    if (node.type !== 'invocation') {
-      continue;
-    }
-
-    const template = templates[node.data.type];
-    if (!template) {
-      continue; // Already validated above
-    }
-
-    for (const [fieldName, fieldTemplate] of Object.entries(template.inputs)) {
-      // Skip if field is connected (will get value from connection)
-      const isConnected = edges.some((edge) => edge.target === node.id && edge.targetHandle === fieldName);
-      if (isConnected) {
-        continue;
+    // Filter out "no image input" errors for the input node - it will be populated by the graph builder
+    const relevantErrors = errors.filter((error) => {
+      if (error.type === 'field-error' && error.nodeId === inputNode.id && error.fieldName === 'image') {
+        return false; // Skip validation for the input node's image field
       }
+      return true;
+    });
 
-      // Check if field is required
-      if (fieldTemplate.required) {
-        const fieldInstance = node.data.inputs[fieldName];
-        if (!fieldInstance) {
-          throw new Error(
-            `Node "${node.data.label || node.id}" is missing required field "${fieldTemplate.title || fieldName}".`
-          );
-        }
-
-        // Check if field has a value (not null/undefined/empty)
-        const value = fieldInstance.value;
-        if (value === null || value === undefined || value === '') {
-          throw new Error(
-            `Node "${node.data.label || node.id}" has required field "${fieldTemplate.title || fieldName}" with no value. Please provide a value or connect this field.`
-          );
+    if (relevantErrors.length > 0) {
+      const firstError = relevantErrors[0];
+      if (firstError) {
+        if (firstError.type === 'field-error') {
+          throw new Error(`${firstError.prefix}: ${firstError.issue}`);
+        } else {
+          throw new Error(`Node "${node.id}": ${firstError.issue}`);
         }
       }
     }
   }
 
-  return { inputNodeId: inputNode.id, outputNodeId: outputNode.id };
+  return { workflow: validatedWorkflow, inputNodeId: inputNode.id, outputNodeId: outputNode.id };
 };
 
 export const selectCanvasWorkflow = createAsyncThunk<
@@ -166,12 +171,56 @@ export const selectCanvasWorkflow = createAsyncThunk<
   const request = dispatch(workflowsApi.endpoints.getWorkflow.initiate(workflowId, { subscribe: false }));
   try {
     const result = await request.unwrap();
-    const workflow = zWorkflowV3.parse(deepClone(result.workflow));
     const templates = $templates.get();
     if (!Object.keys(templates).length) {
       throw new Error('Invocation templates are not yet available.');
     }
-    const { inputNodeId, outputNodeId } = validateCanvasWorkflow(workflow, templates);
+
+    // Define access check functions for workflow validation
+    const checkImageAccess = async (name: string): Promise<boolean> => {
+      const imageRequest = dispatch(imagesApi.endpoints.getImageDTO.initiate(name));
+      try {
+        await imageRequest.unwrap();
+        return true;
+      } catch {
+        return false;
+      } finally {
+        imageRequest.unsubscribe();
+      }
+    };
+
+    const checkBoardAccess = async (id: string): Promise<boolean> => {
+      const boardsRequest = dispatch(boardsApi.endpoints.listAllBoards.initiate({}));
+      try {
+        const boards = await boardsRequest.unwrap();
+        return boards.some((board) => board.board_id === id);
+      } catch {
+        return false;
+      } finally {
+        boardsRequest.unsubscribe();
+      }
+    };
+
+    const checkModelAccess = async (key: string): Promise<boolean> => {
+      const modelRequest = dispatch(modelsApi.endpoints.getModelConfig.initiate(key));
+      try {
+        await modelRequest.unwrap();
+        return true;
+      } catch {
+        return false;
+      } finally {
+        modelRequest.unsubscribe();
+      }
+    };
+
+    // Use validateWorkflow to parse, migrate, and validate the workflow
+    const { workflow, inputNodeId, outputNodeId } = await validateCanvasWorkflow(
+      result.workflow,
+      templates,
+      checkImageAccess,
+      checkBoardAccess,
+      checkModelAccess
+    );
     const fieldValues = getFormFieldInitialValues(workflow.form, workflow.nodes);
     return { workflowId: result.workflow_id, workflow, inputNodeId, outputNodeId, fieldValues };
   } catch (error) {

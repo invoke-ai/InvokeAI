@@ -1,33 +1,15 @@
-import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
+import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import { deepClone } from 'common/util/deepClone';
+import { isCanvasWorkflowAction } from 'features/nodes/store/actionRouter';
 import { getFormFieldInitialValues } from 'features/nodes/store/nodesSlice';
+import * as nodesSliceActions from 'features/nodes/store/nodesSlice';
 import type { NodesState } from 'features/nodes/store/types';
 import { zNodesState } from 'features/nodes/store/types';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
-import type {
-  BoardFieldValue,
-  BooleanFieldValue,
-  ColorFieldValue,
-  EnumFieldValue,
-  FloatFieldCollectionValue,
-  FloatFieldValue,
-  FloatGeneratorFieldValue,
-  ImageFieldCollectionValue,
-  ImageFieldValue,
-  ImageGeneratorFieldValue,
-  IntegerFieldCollectionValue,
-  IntegerFieldValue,
-  IntegerGeneratorFieldValue,
-  ModelIdentifierFieldValue,
-  SchedulerFieldValue,
-  StatefulFieldValue,
-  StringFieldCollectionValue,
-  StringFieldValue,
-  StringGeneratorFieldValue,
-} from 'features/nodes/types/field';
+import type { StatefulFieldValue } from 'features/nodes/types/field';
 import {
   zBoardFieldValue,
   zBooleanFieldValue,
@@ -125,67 +107,9 @@ const fieldValueReducer = <T extends StatefulFieldValue>(
 const slice = createSlice({
   name: 'canvasWorkflowNodes',
   initialState: getInitialState(),
-  reducers: {
-    // Field value mutations - these update the shadow nodes when fields are changed
-    fieldValueReset: (state, action: FieldValueAction<StatefulFieldValue>) => {
-      fieldValueReducer(state, action, zStatefulFieldValue);
-    },
-    fieldStringValueChanged: (state, action: FieldValueAction<StringFieldValue>) => {
-      fieldValueReducer(state, action, zStringFieldValue);
-    },
-    fieldStringCollectionValueChanged: (state, action: FieldValueAction<StringFieldCollectionValue>) => {
-      fieldValueReducer(state, action, zStringFieldCollectionValue);
-    },
-    fieldIntegerValueChanged: (state, action: FieldValueAction<IntegerFieldValue>) => {
-      fieldValueReducer(state, action, zIntegerFieldValue);
-    },
-    fieldFloatValueChanged: (state, action: FieldValueAction<FloatFieldValue>) => {
-      fieldValueReducer(state, action, zFloatFieldValue);
-    },
-    fieldFloatCollectionValueChanged: (state, action: FieldValueAction<FloatFieldCollectionValue>) => {
-      fieldValueReducer(state, action, zFloatFieldCollectionValue);
-    },
-    fieldIntegerCollectionValueChanged: (state, action: FieldValueAction<IntegerFieldCollectionValue>) => {
-      fieldValueReducer(state, action, zIntegerFieldCollectionValue);
-    },
-    fieldBooleanValueChanged: (state, action: FieldValueAction<BooleanFieldValue>) => {
-      fieldValueReducer(state, action, zBooleanFieldValue);
-    },
-    fieldBoardValueChanged: (state, action: FieldValueAction<BoardFieldValue>) => {
-      fieldValueReducer(state, action, zBoardFieldValue);
-    },
-    fieldImageValueChanged: (state, action: FieldValueAction<ImageFieldValue>) => {
-      fieldValueReducer(state, action, zImageFieldValue);
-    },
-    fieldImageCollectionValueChanged: (state, action: FieldValueAction<ImageFieldCollectionValue>) => {
-      fieldValueReducer(state, action, zImageFieldCollectionValue);
-    },
-    fieldColorValueChanged: (state, action: FieldValueAction<ColorFieldValue>) => {
-      fieldValueReducer(state, action, zColorFieldValue);
-    },
-    fieldModelIdentifierValueChanged: (state, action: FieldValueAction<ModelIdentifierFieldValue>) => {
-      fieldValueReducer(state, action, zModelIdentifierFieldValue);
-    },
-    fieldEnumModelValueChanged: (state, action: FieldValueAction<EnumFieldValue>) => {
-      fieldValueReducer(state, action, zEnumFieldValue);
-    },
-    fieldSchedulerValueChanged: (state, action: FieldValueAction<SchedulerFieldValue>) => {
-      fieldValueReducer(state, action, zSchedulerFieldValue);
-    },
-    fieldFloatGeneratorValueChanged: (state, action: FieldValueAction<FloatGeneratorFieldValue>) => {
-      fieldValueReducer(state, action, zFloatGeneratorFieldValue);
-    },
-    fieldIntegerGeneratorValueChanged: (state, action: FieldValueAction<IntegerGeneratorFieldValue>) => {
-      fieldValueReducer(state, action, zIntegerGeneratorFieldValue);
-    },
-    fieldStringGeneratorValueChanged: (state, action: FieldValueAction<StringGeneratorFieldValue>) => {
-      fieldValueReducer(state, action, zStringGeneratorFieldValue);
-    },
-    fieldImageGeneratorValueChanged: (state, action: FieldValueAction<ImageGeneratorFieldValue>) => {
-      fieldValueReducer(state, action, zImageGeneratorFieldValue);
-    },
-  },
+  reducers: {},
   extraReducers(builder) {
+    // addCase must come before addMatcher
     builder.addCase(selectCanvasWorkflow.fulfilled, (state, action) => {
       const { workflow, inputNodeId } = action.payload;
       const { nodes, edges, ...workflowExtra } = workflow;
@@ -262,30 +186,103 @@ const slice = createSlice({
     builder.addCase(selectCanvasWorkflow.rejected, () => {
       return getInitialState();
     });
+
+    // Listen for field mutation actions from nodesSlice and handle them if they're for canvas workflow
+    // addMatcher must come after addCase
+    builder.addMatcher(
+      isAnyOf(
+        nodesSliceActions.fieldValueReset,
+        nodesSliceActions.fieldStringValueChanged,
+        nodesSliceActions.fieldStringCollectionValueChanged,
+        nodesSliceActions.fieldIntegerValueChanged,
+        nodesSliceActions.fieldFloatValueChanged,
+        nodesSliceActions.fieldFloatCollectionValueChanged,
+        nodesSliceActions.fieldIntegerCollectionValueChanged,
+        nodesSliceActions.fieldBooleanValueChanged,
+        nodesSliceActions.fieldBoardValueChanged,
+        nodesSliceActions.fieldImageValueChanged,
+        nodesSliceActions.fieldImageCollectionValueChanged,
+        nodesSliceActions.fieldColorValueChanged,
+        nodesSliceActions.fieldModelIdentifierValueChanged,
+        nodesSliceActions.fieldEnumModelValueChanged,
+        nodesSliceActions.fieldSchedulerValueChanged,
+        nodesSliceActions.fieldFloatGeneratorValueChanged,
+        nodesSliceActions.fieldIntegerGeneratorValueChanged,
+        nodesSliceActions.fieldStringGeneratorValueChanged,
+        nodesSliceActions.fieldImageGeneratorValueChanged
+      ),
+      (
+        state,
+        action: PayloadAction<{ nodeId: string; fieldName: string; value: StatefulFieldValue }> & UnknownAction
+      ) => {
+        // Only handle if this is a canvas workflow action
+        if (!isCanvasWorkflowAction(action)) {
+          return;
+        }
+
+        // Determine which schema to use based on action type
+        const actionType = action.type;
+        let schema;
+        if (actionType.includes('String')) {
+          schema = zStringFieldValue;
+        } else if (actionType.includes('StringCollection')) {
+          schema = zStringFieldCollectionValue;
+        } else if (
+          actionType.includes('Integer') &&
+          !actionType.includes('Generator') &&
+          !actionType.includes('Collection')
+        ) {
+          schema = zIntegerFieldValue;
+        } else if (actionType.includes('IntegerCollection')) {
+          schema = zIntegerFieldCollectionValue;
+        } else if (
+          actionType.includes('Float') &&
+          !actionType.includes('Generator') &&
+          !actionType.includes('Collection')
+        ) {
+          schema = zFloatFieldValue;
+        } else if (actionType.includes('FloatCollection')) {
+          schema = zFloatFieldCollectionValue;
+        } else if (actionType.includes('Boolean')) {
+          schema = zBooleanFieldValue;
+        } else if (actionType.includes('Board')) {
+          schema = zBoardFieldValue;
+        } else if (
+          actionType.includes('Image') &&
+          !actionType.includes('Generator') &&
+          !actionType.includes('Collection')
+        ) {
+          schema = zImageFieldValue;
+        } else if (actionType.includes('ImageCollection')) {
+          schema = zImageFieldCollectionValue;
+        } else if (actionType.includes('Color')) {
+          schema = zColorFieldValue;
+        } else if (actionType.includes('ModelIdentifier')) {
+          schema = zModelIdentifierFieldValue;
+        } else if (actionType.includes('Enum')) {
+          schema = zEnumFieldValue;
+        } else if (actionType.includes('Scheduler')) {
+          schema = zSchedulerFieldValue;
+        } else if (actionType.includes('FloatGenerator')) {
+          schema = zFloatGeneratorFieldValue;
+        } else if (actionType.includes('IntegerGenerator')) {
+          schema = zIntegerGeneratorFieldValue;
+        } else if (actionType.includes('StringGenerator')) {
+          schema = zStringGeneratorFieldValue;
+        } else if (actionType.includes('ImageGenerator')) {
+          schema = zImageGeneratorFieldValue;
+        } else {
+          schema = zStatefulFieldValue;
+        }
+
+        fieldValueReducer(state, action, schema);
+      }
+    );
   },
 });
 
-export const {
-  fieldStringValueChanged,
-  fieldIntegerValueChanged,
-  fieldFloatValueChanged,
-  fieldBooleanValueChanged,
-  fieldModelIdentifierValueChanged,
-  fieldEnumModelValueChanged,
-  fieldSchedulerValueChanged,
-  fieldBoardValueChanged,
-  fieldImageValueChanged,
-  fieldColorValueChanged,
-  fieldImageCollectionValueChanged,
-  fieldStringCollectionValueChanged,
-  fieldIntegerCollectionValueChanged,
-  fieldFloatCollectionValueChanged,
-  fieldFloatGeneratorValueChanged,
-  fieldIntegerGeneratorValueChanged,
-  fieldStringGeneratorValueChanged,
-  fieldImageGeneratorValueChanged,
-  fieldValueReset,
-} = slice.actions;
+// No need to export these actions anymore - they are handled via action routing
+// export const { ... } = slice.actions;
 
 export const canvasWorkflowNodesSliceConfig: SliceConfig<typeof slice> = {
   slice,
@@ -293,7 +290,7 @@ export const canvasWorkflowNodesSliceConfig: SliceConfig<typeof slice> = {
   getInitialState,
   persistConfig: {
     migrate: (state) => state as NodesState,
-    // We don't persist this slice - it's derived from canvasWorkflow
+    // Only persist nodes and edges - field changes should persist, but not other workflow metadata
     persistDenylist: [
       '_version',
       'formFieldInitialValues',
@@ -307,8 +304,6 @@ export const canvasWorkflowNodesSliceConfig: SliceConfig<typeof slice> = {
       'exposedFields',
       'meta',
       'form',
-      'nodes',
-      'edges',
       'id',
     ],
   },

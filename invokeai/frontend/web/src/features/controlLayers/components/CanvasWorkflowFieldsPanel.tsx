@@ -1,5 +1,6 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { CanvasWorkflowElementProvider } from 'features/controlLayers/components/CanvasWorkflowElementContext';
 import { CanvasWorkflowModeProvider } from 'features/controlLayers/components/CanvasWorkflowModeContext';
 import { CanvasWorkflowRootContainer } from 'features/controlLayers/components/CanvasWorkflowRootContainer';
 import { selectCanvasWorkflowNodesSlice } from 'features/controlLayers/store/canvasWorkflowNodesSlice';
@@ -32,11 +33,13 @@ export const CanvasWorkflowFieldsPanel = memo(() => {
   }
 
   return (
-    <CanvasWorkflowModeProvider>
-      <Flex w="full" justifyContent="center" p={4}>
-        <CanvasWorkflowRootContainer />
-      </Flex>
-    </CanvasWorkflowModeProvider>
+    <CanvasWorkflowElementProvider>
+      <CanvasWorkflowModeProvider>
+        <Flex w="full" justifyContent="center" p={4}>
+          <CanvasWorkflowRootContainer />
+        </Flex>
+      </CanvasWorkflowModeProvider>
+    </CanvasWorkflowElementProvider>
   );
 });
 CanvasWorkflowFieldsPanel.displayName = 'CanvasWorkflowFieldsPanel';
