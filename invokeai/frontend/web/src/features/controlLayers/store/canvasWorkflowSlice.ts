@@ -3,7 +3,6 @@ import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
-import { deepClone } from 'common/util/deepClone';
 import { parseify } from 'common/util/serialize';
 import { $templates, getFormFieldInitialValues } from 'features/nodes/store/nodesSlice';
 import type { NodesState, Templates } from 'features/nodes/store/types';
@@ -42,11 +41,6 @@ const getInitialState = (): CanvasWorkflowState => ({
   status: 'idle',
   error: null,
 });
-
-type ValidateResult = {
-  inputNodeId: string;
-  outputNodeId: string;
-};
 
 const INPUT_TAG = 'canvas-workflow-input';
 const OUTPUT_TAG = 'canvas-workflow-output';
