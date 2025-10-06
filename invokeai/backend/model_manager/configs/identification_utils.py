@@ -21,6 +21,18 @@ class NotAMatchError(Exception):
 
 
 def get_config_dict_or_raise(config_path: Path | set[Path]) -> dict[str, Any]:
+    """Load the diffusers/transformers model config file and return it as a dictionary. The config file is expected
+    to be in JSON format.
+
+    Args:
+        config_path: The path to the config file, or a set of paths to try.
+
+    Returns:
+        The config file as a dictionary.
+
+    Raises:
+        NotAMatch if the config file is missing or cannot be loaded.
+    """
     paths_to_check = config_path if isinstance(config_path, set) else {config_path}
 
     problems: dict[Path, str] = {}
@@ -44,6 +56,12 @@ def get_config_dict_or_raise(config_path: Path | set[Path]) -> dict[str, Any]:
 
 def get_class_name_from_config_dict_or_raise(config_path: Path | set[Path]) -> str:
     """Load the diffusers/transformers model config file and return the class name.
+
+    Args:
+        config_path: The path to the config file, or a set of paths to try.
+
+    Returns:
+        The class name from the config file.
 
     Raises:
         NotAMatch if the config file is missing or does not contain a valid class name.
@@ -69,20 +87,22 @@ def get_class_name_from_config_dict_or_raise(config_path: Path | set[Path]) -> s
     return config_class_name
 
 
-def raise_for_class_name(config_path: Path | set[Path], expected: set[str]) -> None:
+def raise_for_class_name(config_path: Path | set[Path], class_name: str | set[str]) -> None:
     """Get the class name from the config file and raise NotAMatch if it is not in the expected set.
 
     Args:
-        config_path: The path to the config file.
-        expected: The expected class names.
+        config_path: The path to the config file, or a set of paths to try.
+        class_name: The expected class name, or a set of expected class names.
 
     Raises:
         NotAMatch if the class name is not in the expected set.
     """
 
-    class_name = get_class_name_from_config_dict_or_raise(config_path)
-    if class_name not in expected:
-        raise NotAMatchError(f"invalid class name from config: {class_name}")
+    class_name = {class_name} if isinstance(class_name, str) else class_name
+
+    actual_class_name = get_class_name_from_config_dict_or_raise(config_path)
+    if actual_class_name not in class_name:
+        raise NotAMatchError(f"invalid class name from config: {actual_class_name}")
 
 
 def raise_for_override_fields(candidate_config_class: type[BaseModel], override_fields: dict[str, Any]) -> None:
@@ -90,6 +110,9 @@ def raise_for_override_fields(candidate_config_class: type[BaseModel], override_
 
     For example, if the candidate config class has a field "base" of type Literal[BaseModelType.StableDiffusion1], and
     the override fields contain "base": BaseModelType.Flux, this function will raise NotAMatch.
+
+    Internally, this function extracts the pydantic schema for each individual override field from the candidate config
+    class and validates the override value against that schema. Post-instantiation validators are not run.
 
     Args:
         candidate_config_class: The config class that is being tested.
