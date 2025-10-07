@@ -12,12 +12,10 @@ from pydantic import BaseModel, Field
 
 from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
-    ControlAdapterDefaultSettings,
-    LoraModelDefaultSettings,
-    MainModelDefaultSettings,
-)
+from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.configs.lora import LoraModelDefaultSettings
+from invokeai.backend.model_manager.configs.main import MainModelDefaultSettings
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ClipVariantType,

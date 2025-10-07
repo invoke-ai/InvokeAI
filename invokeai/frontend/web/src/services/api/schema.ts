@@ -2200,7 +2200,7 @@ export type components = {
              */
             type: "alpha_mask_to_tensor";
         };
-        AnyModelConfig: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["ExternalAPI_ChatGPT4o_Config"] | components["schemas"]["ExternalAPI_Gemini2_5_Config"] | components["schemas"]["ExternalAPI_Imagen3_Config"] | components["schemas"]["ExternalAPI_Imagen4_Config"] | components["schemas"]["ExternalAPI_FluxKontext_Config"] | components["schemas"]["ExternalAPI_Runway_Config"] | components["schemas"]["Unknown_Config"];
+        AnyModelConfig: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["Main_ExternalAPI_ChatGPT4o_Config"] | components["schemas"]["Main_ExternalAPI_Gemini2_5_Config"] | components["schemas"]["Main_ExternalAPI_Imagen3_Config"] | components["schemas"]["Main_ExternalAPI_Imagen4_Config"] | components["schemas"]["Main_ExternalAPI_FluxKontext_Config"] | components["schemas"]["Video_ExternalAPI_Veo3_Config"] | components["schemas"]["Video_ExternalAPI_Runway_Config"] | components["schemas"]["Unknown_Config"];
         /**
          * AppConfig
          * @description App Config Response
@@ -3423,13 +3423,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -3441,7 +3434,7 @@ export type components = {
              */
             format: "diffusers";
             /** @default  */
-            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"];
             /**
              * Base
              * @default any
@@ -3511,13 +3504,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -3529,7 +3515,7 @@ export type components = {
              */
             format: "diffusers";
             /** @default  */
-            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"];
             /**
              * Base
              * @default any
@@ -3695,13 +3681,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -3713,7 +3692,7 @@ export type components = {
              */
             format: "diffusers";
             /** @default  */
-            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"];
             /**
              * Base
              * @default any
@@ -5208,13 +5187,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -5406,28 +5378,15 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
             usage_info: string | null;
-            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
             config_path: string | null;
-            /**
-             * Converted At
-             * @description When this model was last converted to diffusers
-             */
-            converted_at: number | null;
             /**
              * Type
              * @default controlnet
@@ -5440,6 +5399,7 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
+            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Base
              * @default flux
@@ -5497,28 +5457,15 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
             usage_info: string | null;
-            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
             config_path: string | null;
-            /**
-             * Converted At
-             * @description When this model was last converted to diffusers
-             */
-            converted_at: number | null;
             /**
              * Type
              * @default controlnet
@@ -5531,6 +5478,7 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
+            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Base
              * @default sd-1
@@ -5588,28 +5536,15 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
             usage_info: string | null;
-            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
             config_path: string | null;
-            /**
-             * Converted At
-             * @description When this model was last converted to diffusers
-             */
-            converted_at: number | null;
             /**
              * Type
              * @default controlnet
@@ -5622,6 +5557,7 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
+            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Base
              * @default sd-2
@@ -5679,28 +5615,15 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
             usage_info: string | null;
-            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
             config_path: string | null;
-            /**
-             * Converted At
-             * @description When this model was last converted to diffusers
-             */
-            converted_at: number | null;
             /**
              * Type
              * @default controlnet
@@ -5713,6 +5636,7 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
+            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Base
              * @default sdxl
@@ -5770,18 +5694,10 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
             usage_info: string | null;
-            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Format
              * @default diffusers
@@ -5789,13 +5705,14 @@ export type components = {
              */
             format: "diffusers";
             /** @default  */
-            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"];
             /**
              * Type
              * @default controlnet
              * @constant
              */
             type: "controlnet";
+            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Base
              * @default flux
@@ -5853,18 +5770,10 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
             usage_info: string | null;
-            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Format
              * @default diffusers
@@ -5872,13 +5781,14 @@ export type components = {
              */
             format: "diffusers";
             /** @default  */
-            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"];
             /**
              * Type
              * @default controlnet
              * @constant
              */
             type: "controlnet";
+            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Base
              * @default sd-1
@@ -5936,18 +5846,10 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
             usage_info: string | null;
-            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Format
              * @default diffusers
@@ -5955,13 +5857,14 @@ export type components = {
              */
             format: "diffusers";
             /** @default  */
-            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"];
             /**
              * Type
              * @default controlnet
              * @constant
              */
             type: "controlnet";
+            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Base
              * @default sd-2
@@ -6019,18 +5922,10 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
             usage_info: string | null;
-            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Format
              * @default diffusers
@@ -6038,13 +5933,14 @@ export type components = {
              */
             format: "diffusers";
             /** @default  */
-            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"];
             /**
              * Type
              * @default controlnet
              * @constant
              */
             type: "controlnet";
+            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Base
              * @default sdxl
@@ -7516,528 +7412,6 @@ export type components = {
             /** Fieldname */
             fieldName: string;
         };
-        /** ExternalAPI_ChatGPT4o_Config */
-        ExternalAPI_ChatGPT4o_Config: {
-            /**
-             * Key
-             * @description A unique key for this model.
-             */
-            key: string;
-            /**
-             * Hash
-             * @description The hash of the model file(s).
-             */
-            hash: string;
-            /**
-             * Path
-             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
-             */
-            path: string;
-            /**
-             * File Size
-             * @description The size of the model in bytes.
-             */
-            file_size: number;
-            /**
-             * Name
-             * @description Name of the model.
-             */
-            name: string;
-            /**
-             * Description
-             * @description Model description
-             */
-            description: string | null;
-            /**
-             * Source
-             * @description The original source of the model (path, URL or repo_id).
-             */
-            source: string;
-            /** @description The type of source */
-            source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Source Api Response
-             * @description The original API response from the source, as stringified JSON.
-             */
-            source_api_response: string | null;
-            /**
-             * Cover Image
-             * @description Url for image to preview model
-             */
-            cover_image: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
-             * Usage Info
-             * @description Usage information for this model
-             */
-            usage_info: string | null;
-            /**
-             * Type
-             * @default main
-             * @constant
-             */
-            type: "main";
-            /**
-             * Trigger Phrases
-             * @description Set of trigger phrases for this model
-             */
-            trigger_phrases: string[] | null;
-            /** @description Default settings for this model */
-            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
-            /**
-             * Format
-             * @default api
-             * @constant
-             */
-            format: "api";
-            /**
-             * Base
-             * @default chatgpt-4o
-             * @constant
-             */
-            base: "chatgpt-4o";
-        };
-        /** ExternalAPI_FluxKontext_Config */
-        ExternalAPI_FluxKontext_Config: {
-            /**
-             * Key
-             * @description A unique key for this model.
-             */
-            key: string;
-            /**
-             * Hash
-             * @description The hash of the model file(s).
-             */
-            hash: string;
-            /**
-             * Path
-             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
-             */
-            path: string;
-            /**
-             * File Size
-             * @description The size of the model in bytes.
-             */
-            file_size: number;
-            /**
-             * Name
-             * @description Name of the model.
-             */
-            name: string;
-            /**
-             * Description
-             * @description Model description
-             */
-            description: string | null;
-            /**
-             * Source
-             * @description The original source of the model (path, URL or repo_id).
-             */
-            source: string;
-            /** @description The type of source */
-            source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Source Api Response
-             * @description The original API response from the source, as stringified JSON.
-             */
-            source_api_response: string | null;
-            /**
-             * Cover Image
-             * @description Url for image to preview model
-             */
-            cover_image: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
-             * Usage Info
-             * @description Usage information for this model
-             */
-            usage_info: string | null;
-            /**
-             * Type
-             * @default main
-             * @constant
-             */
-            type: "main";
-            /**
-             * Trigger Phrases
-             * @description Set of trigger phrases for this model
-             */
-            trigger_phrases: string[] | null;
-            /** @description Default settings for this model */
-            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
-            /**
-             * Format
-             * @default api
-             * @constant
-             */
-            format: "api";
-            /**
-             * Base
-             * @default flux-kontext
-             * @constant
-             */
-            base: "flux-kontext";
-        };
-        /** ExternalAPI_Gemini2_5_Config */
-        ExternalAPI_Gemini2_5_Config: {
-            /**
-             * Key
-             * @description A unique key for this model.
-             */
-            key: string;
-            /**
-             * Hash
-             * @description The hash of the model file(s).
-             */
-            hash: string;
-            /**
-             * Path
-             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
-             */
-            path: string;
-            /**
-             * File Size
-             * @description The size of the model in bytes.
-             */
-            file_size: number;
-            /**
-             * Name
-             * @description Name of the model.
-             */
-            name: string;
-            /**
-             * Description
-             * @description Model description
-             */
-            description: string | null;
-            /**
-             * Source
-             * @description The original source of the model (path, URL or repo_id).
-             */
-            source: string;
-            /** @description The type of source */
-            source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Source Api Response
-             * @description The original API response from the source, as stringified JSON.
-             */
-            source_api_response: string | null;
-            /**
-             * Cover Image
-             * @description Url for image to preview model
-             */
-            cover_image: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
-             * Usage Info
-             * @description Usage information for this model
-             */
-            usage_info: string | null;
-            /**
-             * Type
-             * @default main
-             * @constant
-             */
-            type: "main";
-            /**
-             * Trigger Phrases
-             * @description Set of trigger phrases for this model
-             */
-            trigger_phrases: string[] | null;
-            /** @description Default settings for this model */
-            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
-            /**
-             * Format
-             * @default api
-             * @constant
-             */
-            format: "api";
-            /**
-             * Base
-             * @default gemini-2.5
-             * @constant
-             */
-            base: "gemini-2.5";
-        };
-        /** ExternalAPI_Imagen3_Config */
-        ExternalAPI_Imagen3_Config: {
-            /**
-             * Key
-             * @description A unique key for this model.
-             */
-            key: string;
-            /**
-             * Hash
-             * @description The hash of the model file(s).
-             */
-            hash: string;
-            /**
-             * Path
-             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
-             */
-            path: string;
-            /**
-             * File Size
-             * @description The size of the model in bytes.
-             */
-            file_size: number;
-            /**
-             * Name
-             * @description Name of the model.
-             */
-            name: string;
-            /**
-             * Description
-             * @description Model description
-             */
-            description: string | null;
-            /**
-             * Source
-             * @description The original source of the model (path, URL or repo_id).
-             */
-            source: string;
-            /** @description The type of source */
-            source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Source Api Response
-             * @description The original API response from the source, as stringified JSON.
-             */
-            source_api_response: string | null;
-            /**
-             * Cover Image
-             * @description Url for image to preview model
-             */
-            cover_image: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
-             * Usage Info
-             * @description Usage information for this model
-             */
-            usage_info: string | null;
-            /**
-             * Type
-             * @default main
-             * @constant
-             */
-            type: "main";
-            /**
-             * Trigger Phrases
-             * @description Set of trigger phrases for this model
-             */
-            trigger_phrases: string[] | null;
-            /** @description Default settings for this model */
-            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
-            /**
-             * Format
-             * @default api
-             * @constant
-             */
-            format: "api";
-            /**
-             * Base
-             * @default imagen3
-             * @constant
-             */
-            base: "imagen3";
-        };
-        /** ExternalAPI_Imagen4_Config */
-        ExternalAPI_Imagen4_Config: {
-            /**
-             * Key
-             * @description A unique key for this model.
-             */
-            key: string;
-            /**
-             * Hash
-             * @description The hash of the model file(s).
-             */
-            hash: string;
-            /**
-             * Path
-             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
-             */
-            path: string;
-            /**
-             * File Size
-             * @description The size of the model in bytes.
-             */
-            file_size: number;
-            /**
-             * Name
-             * @description Name of the model.
-             */
-            name: string;
-            /**
-             * Description
-             * @description Model description
-             */
-            description: string | null;
-            /**
-             * Source
-             * @description The original source of the model (path, URL or repo_id).
-             */
-            source: string;
-            /** @description The type of source */
-            source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Source Api Response
-             * @description The original API response from the source, as stringified JSON.
-             */
-            source_api_response: string | null;
-            /**
-             * Cover Image
-             * @description Url for image to preview model
-             */
-            cover_image: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
-             * Usage Info
-             * @description Usage information for this model
-             */
-            usage_info: string | null;
-            /**
-             * Type
-             * @default main
-             * @constant
-             */
-            type: "main";
-            /**
-             * Trigger Phrases
-             * @description Set of trigger phrases for this model
-             */
-            trigger_phrases: string[] | null;
-            /** @description Default settings for this model */
-            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
-            /**
-             * Format
-             * @default api
-             * @constant
-             */
-            format: "api";
-            /**
-             * Base
-             * @default imagen4
-             * @constant
-             */
-            base: "imagen4";
-        };
-        /** ExternalAPI_Runway_Config */
-        ExternalAPI_Runway_Config: {
-            /**
-             * Key
-             * @description A unique key for this model.
-             */
-            key: string;
-            /**
-             * Hash
-             * @description The hash of the model file(s).
-             */
-            hash: string;
-            /**
-             * Path
-             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
-             */
-            path: string;
-            /**
-             * File Size
-             * @description The size of the model in bytes.
-             */
-            file_size: number;
-            /**
-             * Name
-             * @description Name of the model.
-             */
-            name: string;
-            /**
-             * Description
-             * @description Model description
-             */
-            description: string | null;
-            /**
-             * Source
-             * @description The original source of the model (path, URL or repo_id).
-             */
-            source: string;
-            /** @description The type of source */
-            source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Source Api Response
-             * @description The original API response from the source, as stringified JSON.
-             */
-            source_api_response: string | null;
-            /**
-             * Cover Image
-             * @description Url for image to preview model
-             */
-            cover_image: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
-             * Usage Info
-             * @description Usage information for this model
-             */
-            usage_info: string | null;
-            /**
-             * Type
-             * @default video
-             * @constant
-             */
-            type: "video";
-            /**
-             * Trigger Phrases
-             * @description Set of trigger phrases for this model
-             */
-            trigger_phrases: string[] | null;
-            /** @description Default settings for this model */
-            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
-            /**
-             * Format
-             * @default api
-             * @constant
-             */
-            format: "api";
-            /**
-             * Base
-             * @default flux-kontext
-             * @constant
-             */
-            base: "flux-kontext";
-        };
         /**
          * Apply LoRA Collection - FLUX
          * @description Applies a collection of LoRAs to a FLUX transformer.
@@ -8143,13 +7517,6 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
             /**
              * Usage Info
              * @description Usage information for this model
@@ -10761,13 +10128,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -10840,13 +10200,6 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
             /**
              * Usage Info
              * @description Usage information for this model
@@ -10921,13 +10274,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -11001,13 +10347,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -11080,13 +10419,6 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
             /**
              * Usage Info
              * @description Usage information for this model
@@ -11163,13 +10495,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -11244,13 +10569,6 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
             /**
              * Usage Info
              * @description Usage information for this model
@@ -15401,13 +14719,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -15419,7 +14730,7 @@ export type components = {
              */
             format: "diffusers";
             /** @default  */
-            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"];
             /**
              * Type
              * @default llava_onevision
@@ -15432,12 +14743,6 @@ export type components = {
              * @constant
              */
             base: "any";
-            /**
-             * Variant
-             * @default normal
-             * @constant
-             */
-            variant: "normal";
         };
         /**
          * Apply LoRA Collection - SD1.5
@@ -15694,13 +14999,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -15780,13 +15078,6 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
             /**
              * Usage Info
              * @description Usage information for this model
@@ -15868,13 +15159,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -15954,13 +15238,6 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
             /**
              * Usage Info
              * @description Usage information for this model
@@ -16042,13 +15319,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -16128,13 +15398,6 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
             /**
              * Usage Info
              * @description Usage information for this model
@@ -16216,13 +15479,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -16302,13 +15558,6 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
             /**
              * Usage Info
              * @description Usage information for this model
@@ -16390,13 +15639,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -16476,13 +15718,6 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
             /**
              * Usage Info
              * @description Usage information for this model
@@ -16778,13 +16013,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -16807,11 +16035,6 @@ export type components = {
              * @description Path to the config for this model, if any.
              */
             config_path: string | null;
-            /**
-             * Converted At
-             * @description When this model was last converted to diffusers
-             */
-            converted_at: number | null;
             /**
              * Base
              * @default flux
@@ -16879,13 +16102,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -16908,11 +16124,6 @@ export type components = {
              * @description Path to the config for this model, if any.
              */
             config_path: string | null;
-            /**
-             * Converted At
-             * @description When this model was last converted to diffusers
-             */
-            converted_at: number | null;
             /**
              * Format
              * @default checkpoint
@@ -16977,13 +16188,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -17006,11 +16210,6 @@ export type components = {
              * @description Path to the config for this model, if any.
              */
             config_path: string | null;
-            /**
-             * Converted At
-             * @description When this model was last converted to diffusers
-             */
-            converted_at: number | null;
             /**
              * Format
              * @default checkpoint
@@ -17076,13 +16275,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -17105,11 +16297,6 @@ export type components = {
              * @description Path to the config for this model, if any.
              */
             config_path: string | null;
-            /**
-             * Converted At
-             * @description When this model was last converted to diffusers
-             */
-            converted_at: number | null;
             /**
              * Format
              * @default checkpoint
@@ -17175,13 +16362,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -17204,11 +16384,6 @@ export type components = {
              * @description Path to the config for this model, if any.
              */
             config_path: string | null;
-            /**
-             * Converted At
-             * @description When this model was last converted to diffusers
-             */
-            converted_at: number | null;
             /**
              * Format
              * @default checkpoint
@@ -17274,13 +16449,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -17303,11 +16471,6 @@ export type components = {
              * @description Path to the config for this model, if any.
              */
             config_path: string | null;
-            /**
-             * Converted At
-             * @description When this model was last converted to diffusers
-             */
-            converted_at: number | null;
             /**
              * Format
              * @default checkpoint
@@ -17373,13 +16536,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -17404,7 +16560,7 @@ export type components = {
              */
             format: "diffusers";
             /** @default  */
-            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"];
             /**
              * Base
              * @default cogview4
@@ -17462,13 +16618,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -17493,7 +16642,7 @@ export type components = {
              */
             format: "diffusers";
             /** @default  */
-            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"];
             prediction_type: components["schemas"]["SchedulerPredictionType"];
             variant: components["schemas"]["ModelVariantType"];
             /**
@@ -17553,13 +16702,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -17584,7 +16726,7 @@ export type components = {
              */
             format: "diffusers";
             /** @default  */
-            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"];
             prediction_type: components["schemas"]["SchedulerPredictionType"];
             variant: components["schemas"]["ModelVariantType"];
             /**
@@ -17644,13 +16786,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -17675,13 +16810,20 @@ export type components = {
              */
             format: "diffusers";
             /** @default  */
-            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"];
             /**
              * Base
              * @default sd-3
              * @constant
              */
             base: "sd-3";
+            /**
+             * Submodels
+             * @description Loadable submodels in this model
+             */
+            submodels: {
+                [key: string]: components["schemas"]["SubmodelDefinition"];
+            } | null;
         };
         /** Main_Diffusers_SDXLRefiner_Config */
         Main_Diffusers_SDXLRefiner_Config: {
@@ -17733,13 +16875,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -17764,7 +16899,7 @@ export type components = {
              */
             format: "diffusers";
             /** @default  */
-            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"];
             prediction_type: components["schemas"]["SchedulerPredictionType"];
             variant: components["schemas"]["ModelVariantType"];
             /**
@@ -17824,13 +16959,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -17855,7 +16983,7 @@ export type components = {
              */
             format: "diffusers";
             /** @default  */
-            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"];
             prediction_type: components["schemas"]["SchedulerPredictionType"];
             variant: components["schemas"]["ModelVariantType"];
             /**
@@ -17864,6 +16992,406 @@ export type components = {
              * @constant
              */
             base: "sdxl";
+        };
+        /** Main_ExternalAPI_ChatGPT4o_Config */
+        Main_ExternalAPI_ChatGPT4o_Config: {
+            /**
+             * Key
+             * @description A unique key for this model.
+             */
+            key: string;
+            /**
+             * Hash
+             * @description The hash of the model file(s).
+             */
+            hash: string;
+            /**
+             * Path
+             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
+             */
+            path: string;
+            /**
+             * File Size
+             * @description The size of the model in bytes.
+             */
+            file_size: number;
+            /**
+             * Name
+             * @description Name of the model.
+             */
+            name: string;
+            /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Usage Info
+             * @description Usage information for this model
+             */
+            usage_info: string | null;
+            /**
+             * Type
+             * @default main
+             * @constant
+             */
+            type: "main";
+            /**
+             * Trigger Phrases
+             * @description Set of trigger phrases for this model
+             */
+            trigger_phrases: string[] | null;
+            /** @description Default settings for this model */
+            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
+            /**
+             * Format
+             * @default api
+             * @constant
+             */
+            format: "api";
+            /**
+             * Base
+             * @default chatgpt-4o
+             * @constant
+             */
+            base: "chatgpt-4o";
+        };
+        /** Main_ExternalAPI_FluxKontext_Config */
+        Main_ExternalAPI_FluxKontext_Config: {
+            /**
+             * Key
+             * @description A unique key for this model.
+             */
+            key: string;
+            /**
+             * Hash
+             * @description The hash of the model file(s).
+             */
+            hash: string;
+            /**
+             * Path
+             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
+             */
+            path: string;
+            /**
+             * File Size
+             * @description The size of the model in bytes.
+             */
+            file_size: number;
+            /**
+             * Name
+             * @description Name of the model.
+             */
+            name: string;
+            /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Usage Info
+             * @description Usage information for this model
+             */
+            usage_info: string | null;
+            /**
+             * Type
+             * @default main
+             * @constant
+             */
+            type: "main";
+            /**
+             * Trigger Phrases
+             * @description Set of trigger phrases for this model
+             */
+            trigger_phrases: string[] | null;
+            /** @description Default settings for this model */
+            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
+            /**
+             * Format
+             * @default api
+             * @constant
+             */
+            format: "api";
+            /**
+             * Base
+             * @default flux-kontext
+             * @constant
+             */
+            base: "flux-kontext";
+        };
+        /** Main_ExternalAPI_Gemini2_5_Config */
+        Main_ExternalAPI_Gemini2_5_Config: {
+            /**
+             * Key
+             * @description A unique key for this model.
+             */
+            key: string;
+            /**
+             * Hash
+             * @description The hash of the model file(s).
+             */
+            hash: string;
+            /**
+             * Path
+             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
+             */
+            path: string;
+            /**
+             * File Size
+             * @description The size of the model in bytes.
+             */
+            file_size: number;
+            /**
+             * Name
+             * @description Name of the model.
+             */
+            name: string;
+            /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Usage Info
+             * @description Usage information for this model
+             */
+            usage_info: string | null;
+            /**
+             * Type
+             * @default main
+             * @constant
+             */
+            type: "main";
+            /**
+             * Trigger Phrases
+             * @description Set of trigger phrases for this model
+             */
+            trigger_phrases: string[] | null;
+            /** @description Default settings for this model */
+            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
+            /**
+             * Format
+             * @default api
+             * @constant
+             */
+            format: "api";
+            /**
+             * Base
+             * @default gemini-2.5
+             * @constant
+             */
+            base: "gemini-2.5";
+        };
+        /** Main_ExternalAPI_Imagen3_Config */
+        Main_ExternalAPI_Imagen3_Config: {
+            /**
+             * Key
+             * @description A unique key for this model.
+             */
+            key: string;
+            /**
+             * Hash
+             * @description The hash of the model file(s).
+             */
+            hash: string;
+            /**
+             * Path
+             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
+             */
+            path: string;
+            /**
+             * File Size
+             * @description The size of the model in bytes.
+             */
+            file_size: number;
+            /**
+             * Name
+             * @description Name of the model.
+             */
+            name: string;
+            /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Usage Info
+             * @description Usage information for this model
+             */
+            usage_info: string | null;
+            /**
+             * Type
+             * @default main
+             * @constant
+             */
+            type: "main";
+            /**
+             * Trigger Phrases
+             * @description Set of trigger phrases for this model
+             */
+            trigger_phrases: string[] | null;
+            /** @description Default settings for this model */
+            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
+            /**
+             * Format
+             * @default api
+             * @constant
+             */
+            format: "api";
+            /**
+             * Base
+             * @default imagen3
+             * @constant
+             */
+            base: "imagen3";
+        };
+        /** Main_ExternalAPI_Imagen4_Config */
+        Main_ExternalAPI_Imagen4_Config: {
+            /**
+             * Key
+             * @description A unique key for this model.
+             */
+            key: string;
+            /**
+             * Hash
+             * @description The hash of the model file(s).
+             */
+            hash: string;
+            /**
+             * Path
+             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
+             */
+            path: string;
+            /**
+             * File Size
+             * @description The size of the model in bytes.
+             */
+            file_size: number;
+            /**
+             * Name
+             * @description Name of the model.
+             */
+            name: string;
+            /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Usage Info
+             * @description Usage information for this model
+             */
+            usage_info: string | null;
+            /**
+             * Type
+             * @default main
+             * @constant
+             */
+            type: "main";
+            /**
+             * Trigger Phrases
+             * @description Set of trigger phrases for this model
+             */
+            trigger_phrases: string[] | null;
+            /** @description Default settings for this model */
+            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
+            /**
+             * Format
+             * @default api
+             * @constant
+             */
+            format: "api";
+            /**
+             * Base
+             * @default imagen4
+             * @constant
+             */
+            base: "imagen4";
         };
         /**
          * Main_GGUF_FLUX_Config
@@ -17918,13 +17446,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -17947,11 +17468,6 @@ export type components = {
              * @description Path to the config for this model, if any.
              */
             config_path: string | null;
-            /**
-             * Converted At
-             * @description When this model was last converted to diffusers
-             */
-            converted_at: number | null;
             /**
              * Base
              * @default flux
@@ -19794,7 +19310,7 @@ export type components = {
              * Config
              * @description The installed model's config
              */
-            config: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["ExternalAPI_ChatGPT4o_Config"] | components["schemas"]["ExternalAPI_Gemini2_5_Config"] | components["schemas"]["ExternalAPI_Imagen3_Config"] | components["schemas"]["ExternalAPI_Imagen4_Config"] | components["schemas"]["ExternalAPI_FluxKontext_Config"] | components["schemas"]["ExternalAPI_Runway_Config"] | components["schemas"]["Unknown_Config"];
+            config: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["Main_ExternalAPI_ChatGPT4o_Config"] | components["schemas"]["Main_ExternalAPI_Gemini2_5_Config"] | components["schemas"]["Main_ExternalAPI_Imagen3_Config"] | components["schemas"]["Main_ExternalAPI_Imagen4_Config"] | components["schemas"]["Main_ExternalAPI_FluxKontext_Config"] | components["schemas"]["Video_ExternalAPI_Veo3_Config"] | components["schemas"]["Video_ExternalAPI_Runway_Config"] | components["schemas"]["Unknown_Config"];
         };
         /**
          * ModelInstallDownloadProgressEvent
@@ -19960,7 +19476,7 @@ export type components = {
              * Config Out
              * @description After successful installation, this will hold the configuration object.
              */
-            config_out?: (components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["ExternalAPI_ChatGPT4o_Config"] | components["schemas"]["ExternalAPI_Gemini2_5_Config"] | components["schemas"]["ExternalAPI_Imagen3_Config"] | components["schemas"]["ExternalAPI_Imagen4_Config"] | components["schemas"]["ExternalAPI_FluxKontext_Config"] | components["schemas"]["ExternalAPI_Runway_Config"] | components["schemas"]["Unknown_Config"]) | null;
+            config_out?: (components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["Main_ExternalAPI_ChatGPT4o_Config"] | components["schemas"]["Main_ExternalAPI_Gemini2_5_Config"] | components["schemas"]["Main_ExternalAPI_Imagen3_Config"] | components["schemas"]["Main_ExternalAPI_Imagen4_Config"] | components["schemas"]["Main_ExternalAPI_FluxKontext_Config"] | components["schemas"]["Video_ExternalAPI_Veo3_Config"] | components["schemas"]["Video_ExternalAPI_Runway_Config"] | components["schemas"]["Unknown_Config"]) | null;
             /**
              * Inplace
              * @description Leave model in its current location; otherwise install under models directory
@@ -20046,7 +19562,7 @@ export type components = {
              * Config
              * @description The model's config
              */
-            config: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["ExternalAPI_ChatGPT4o_Config"] | components["schemas"]["ExternalAPI_Gemini2_5_Config"] | components["schemas"]["ExternalAPI_Imagen3_Config"] | components["schemas"]["ExternalAPI_Imagen4_Config"] | components["schemas"]["ExternalAPI_FluxKontext_Config"] | components["schemas"]["ExternalAPI_Runway_Config"] | components["schemas"]["Unknown_Config"];
+            config: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["Main_ExternalAPI_ChatGPT4o_Config"] | components["schemas"]["Main_ExternalAPI_Gemini2_5_Config"] | components["schemas"]["Main_ExternalAPI_Imagen3_Config"] | components["schemas"]["Main_ExternalAPI_Imagen4_Config"] | components["schemas"]["Main_ExternalAPI_FluxKontext_Config"] | components["schemas"]["Video_ExternalAPI_Veo3_Config"] | components["schemas"]["Video_ExternalAPI_Runway_Config"] | components["schemas"]["Unknown_Config"];
             /**
              * @description The submodel type, if any
              * @default null
@@ -20067,7 +19583,7 @@ export type components = {
              * Config
              * @description The model's config
              */
-            config: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["ExternalAPI_ChatGPT4o_Config"] | components["schemas"]["ExternalAPI_Gemini2_5_Config"] | components["schemas"]["ExternalAPI_Imagen3_Config"] | components["schemas"]["ExternalAPI_Imagen4_Config"] | components["schemas"]["ExternalAPI_FluxKontext_Config"] | components["schemas"]["ExternalAPI_Runway_Config"] | components["schemas"]["Unknown_Config"];
+            config: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["Main_ExternalAPI_ChatGPT4o_Config"] | components["schemas"]["Main_ExternalAPI_Gemini2_5_Config"] | components["schemas"]["Main_ExternalAPI_Imagen3_Config"] | components["schemas"]["Main_ExternalAPI_Imagen4_Config"] | components["schemas"]["Main_ExternalAPI_FluxKontext_Config"] | components["schemas"]["Video_ExternalAPI_Veo3_Config"] | components["schemas"]["Video_ExternalAPI_Runway_Config"] | components["schemas"]["Unknown_Config"];
             /**
              * @description The submodel type, if any
              * @default null
@@ -20236,7 +19752,7 @@ export type components = {
          */
         ModelsList: {
             /** Models */
-            models: (components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["ExternalAPI_ChatGPT4o_Config"] | components["schemas"]["ExternalAPI_Gemini2_5_Config"] | components["schemas"]["ExternalAPI_Imagen3_Config"] | components["schemas"]["ExternalAPI_Imagen4_Config"] | components["schemas"]["ExternalAPI_FluxKontext_Config"] | components["schemas"]["ExternalAPI_Runway_Config"] | components["schemas"]["Unknown_Config"])[];
+            models: (components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["Main_ExternalAPI_ChatGPT4o_Config"] | components["schemas"]["Main_ExternalAPI_Gemini2_5_Config"] | components["schemas"]["Main_ExternalAPI_Imagen3_Config"] | components["schemas"]["Main_ExternalAPI_Imagen4_Config"] | components["schemas"]["Main_ExternalAPI_FluxKontext_Config"] | components["schemas"]["Video_ExternalAPI_Veo3_Config"] | components["schemas"]["Video_ExternalAPI_Runway_Config"] | components["schemas"]["Unknown_Config"])[];
         };
         /**
          * Multiply Integers
@@ -22870,13 +22386,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -22888,7 +22397,7 @@ export type components = {
              */
             format: "diffusers";
             /** @default  */
-            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"];
             /**
              * Type
              * @default siglip
@@ -23078,13 +22587,6 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
             /**
              * Usage Info
              * @description Usage information for this model
@@ -23932,18 +23434,10 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
             usage_info: string | null;
-            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Format
              * @default diffusers
@@ -23951,13 +23445,14 @@ export type components = {
              */
             format: "diffusers";
             /** @default  */
-            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"];
             /**
              * Type
              * @default t2i_adapter
              * @constant
              */
             type: "t2i_adapter";
+            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Base
              * @default sd-1
@@ -24015,18 +23510,10 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
             usage_info: string | null;
-            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Format
              * @default diffusers
@@ -24034,13 +23521,14 @@ export type components = {
              */
             format: "diffusers";
             /** @default  */
-            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"];
             /**
              * Type
              * @default t2i_adapter
              * @constant
              */
             type: "t2i_adapter";
+            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Base
              * @default sdxl
@@ -24060,7 +23548,10 @@ export type components = {
              */
             loras: components["schemas"]["LoRAField"][];
         };
-        /** T5Encoder_BnBLLMint8_Config */
+        /**
+         * T5Encoder_BnBLLMint8_Config
+         * @description Configuration for T5 Encoder models quantized by bitsandbytes' LLM.int8.
+         */
         T5Encoder_BnBLLMint8_Config: {
             /**
              * Key
@@ -24110,13 +23601,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -24140,7 +23624,11 @@ export type components = {
              */
             format: "bnb_quantized_int8b";
         };
-        /** T5Encoder_T5Encoder_Config */
+        /**
+         * T5Encoder_T5Encoder_Config
+         * @description Configuration for T5 Encoder models in a bespoke, diffusers-like format. The model weights are expected to be in
+         *     a folder called text_encoder_2 inside the model directory, with a config file named model.safetensors.index.json.
+         */
         T5Encoder_T5Encoder_Config: {
             /**
              * Key
@@ -24189,13 +23677,6 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
             /**
              * Usage Info
              * @description Usage information for this model
@@ -24281,13 +23762,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -24360,13 +23834,6 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
             /**
              * Usage Info
              * @description Usage information for this model
@@ -24441,13 +23908,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -24520,13 +23980,6 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
             /**
              * Usage Info
              * @description Usage information for this model
@@ -24601,13 +24054,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -24680,13 +24126,6 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
             /**
              * Usage Info
              * @description Usage information for this model
@@ -25157,13 +24596,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -25394,13 +24826,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -25410,11 +24835,6 @@ export type components = {
              * @description Path to the config for this model, if any.
              */
             config_path: string | null;
-            /**
-             * Converted At
-             * @description When this model was last converted to diffusers
-             */
-            converted_at: number | null;
             /**
              * Type
              * @default vae
@@ -25484,13 +24904,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -25500,11 +24913,6 @@ export type components = {
              * @description Path to the config for this model, if any.
              */
             config_path: string | null;
-            /**
-             * Converted At
-             * @description When this model was last converted to diffusers
-             */
-            converted_at: number | null;
             /**
              * Type
              * @default vae
@@ -25574,13 +24982,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -25590,11 +24991,6 @@ export type components = {
              * @description Path to the config for this model, if any.
              */
             config_path: string | null;
-            /**
-             * Converted At
-             * @description When this model was last converted to diffusers
-             */
-            converted_at: number | null;
             /**
              * Type
              * @default vae
@@ -25664,13 +25060,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -25680,11 +25069,6 @@ export type components = {
              * @description Path to the config for this model, if any.
              */
             config_path: string | null;
-            /**
-             * Converted At
-             * @description When this model was last converted to diffusers
-             */
-            converted_at: number | null;
             /**
              * Type
              * @default vae
@@ -25754,13 +25138,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -25772,7 +25149,7 @@ export type components = {
              */
             format: "diffusers";
             /** @default  */
-            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"];
             /**
              * Type
              * @default vae
@@ -25836,13 +25213,6 @@ export type components = {
              */
             cover_image: string | null;
             /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
              * Usage Info
              * @description Usage information for this model
              */
@@ -25854,7 +25224,7 @@ export type components = {
              */
             format: "diffusers";
             /** @default  */
-            repo_variant: components["schemas"]["ModelRepoVariant"] | null;
+            repo_variant: components["schemas"]["ModelRepoVariant"];
             /**
              * Type
              * @default vae
@@ -26052,6 +25422,166 @@ export type components = {
              * @description The video's new `starred` state
              */
             starred?: boolean | null;
+        };
+        /** Video_ExternalAPI_Runway_Config */
+        Video_ExternalAPI_Runway_Config: {
+            /**
+             * Key
+             * @description A unique key for this model.
+             */
+            key: string;
+            /**
+             * Hash
+             * @description The hash of the model file(s).
+             */
+            hash: string;
+            /**
+             * Path
+             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
+             */
+            path: string;
+            /**
+             * File Size
+             * @description The size of the model in bytes.
+             */
+            file_size: number;
+            /**
+             * Name
+             * @description Name of the model.
+             */
+            name: string;
+            /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Usage Info
+             * @description Usage information for this model
+             */
+            usage_info: string | null;
+            /**
+             * Type
+             * @default video
+             * @constant
+             */
+            type: "video";
+            /**
+             * Trigger Phrases
+             * @description Set of trigger phrases for this model
+             */
+            trigger_phrases: string[] | null;
+            /** @description Default settings for this model */
+            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
+            /**
+             * Format
+             * @default api
+             * @constant
+             */
+            format: "api";
+            /**
+             * Base
+             * @default runway
+             * @constant
+             */
+            base: "runway";
+        };
+        /** Video_ExternalAPI_Veo3_Config */
+        Video_ExternalAPI_Veo3_Config: {
+            /**
+             * Key
+             * @description A unique key for this model.
+             */
+            key: string;
+            /**
+             * Hash
+             * @description The hash of the model file(s).
+             */
+            hash: string;
+            /**
+             * Path
+             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
+             */
+            path: string;
+            /**
+             * File Size
+             * @description The size of the model in bytes.
+             */
+            file_size: number;
+            /**
+             * Name
+             * @description Name of the model.
+             */
+            name: string;
+            /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Usage Info
+             * @description Usage information for this model
+             */
+            usage_info: string | null;
+            /**
+             * Type
+             * @default video
+             * @constant
+             */
+            type: "video";
+            /**
+             * Trigger Phrases
+             * @description Set of trigger phrases for this model
+             */
+            trigger_phrases: string[] | null;
+            /** @description Default settings for this model */
+            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
+            /**
+             * Format
+             * @default api
+             * @constant
+             */
+            format: "api";
+            /**
+             * Base
+             * @default veo3
+             * @constant
+             */
+            base: "veo3";
         };
         /** Workflow */
         Workflow: {
@@ -26461,7 +25991,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["ExternalAPI_ChatGPT4o_Config"] | components["schemas"]["ExternalAPI_Gemini2_5_Config"] | components["schemas"]["ExternalAPI_Imagen3_Config"] | components["schemas"]["ExternalAPI_Imagen4_Config"] | components["schemas"]["ExternalAPI_FluxKontext_Config"] | components["schemas"]["ExternalAPI_Runway_Config"] | components["schemas"]["Unknown_Config"];
+                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["Main_ExternalAPI_ChatGPT4o_Config"] | components["schemas"]["Main_ExternalAPI_Gemini2_5_Config"] | components["schemas"]["Main_ExternalAPI_Imagen3_Config"] | components["schemas"]["Main_ExternalAPI_Imagen4_Config"] | components["schemas"]["Main_ExternalAPI_FluxKontext_Config"] | components["schemas"]["Video_ExternalAPI_Veo3_Config"] | components["schemas"]["Video_ExternalAPI_Runway_Config"] | components["schemas"]["Unknown_Config"];
                 };
             };
             /** @description Validation Error */
@@ -26493,7 +26023,25 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["ExternalAPI_ChatGPT4o_Config"] | components["schemas"]["ExternalAPI_Gemini2_5_Config"] | components["schemas"]["ExternalAPI_Imagen3_Config"] | components["schemas"]["ExternalAPI_Imagen4_Config"] | components["schemas"]["ExternalAPI_FluxKontext_Config"] | components["schemas"]["ExternalAPI_Runway_Config"] | components["schemas"]["Unknown_Config"];
+                    /** @example {
+                     *       "path": "string",
+                     *       "name": "string",
+                     *       "base": "sd-1",
+                     *       "type": "main",
+                     *       "format": "checkpoint",
+                     *       "config_path": "string",
+                     *       "key": "string",
+                     *       "hash": "string",
+                     *       "file_size": 1,
+                     *       "description": "string",
+                     *       "source": "string",
+                     *       "converted_at": 0,
+                     *       "variant": "normal",
+                     *       "prediction_type": "epsilon",
+                     *       "repo_variant": "fp16",
+                     *       "upcast_attention": false
+                     *     } */
+                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["Main_ExternalAPI_ChatGPT4o_Config"] | components["schemas"]["Main_ExternalAPI_Gemini2_5_Config"] | components["schemas"]["Main_ExternalAPI_Imagen3_Config"] | components["schemas"]["Main_ExternalAPI_Imagen4_Config"] | components["schemas"]["Main_ExternalAPI_FluxKontext_Config"] | components["schemas"]["Video_ExternalAPI_Veo3_Config"] | components["schemas"]["Video_ExternalAPI_Runway_Config"] | components["schemas"]["Unknown_Config"];
                 };
             };
             /** @description Bad request */
@@ -26580,7 +26128,25 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["ExternalAPI_ChatGPT4o_Config"] | components["schemas"]["ExternalAPI_Gemini2_5_Config"] | components["schemas"]["ExternalAPI_Imagen3_Config"] | components["schemas"]["ExternalAPI_Imagen4_Config"] | components["schemas"]["ExternalAPI_FluxKontext_Config"] | components["schemas"]["ExternalAPI_Runway_Config"] | components["schemas"]["Unknown_Config"];
+                    /** @example {
+                     *       "path": "string",
+                     *       "name": "string",
+                     *       "base": "sd-1",
+                     *       "type": "main",
+                     *       "format": "checkpoint",
+                     *       "config_path": "string",
+                     *       "key": "string",
+                     *       "hash": "string",
+                     *       "file_size": 1,
+                     *       "description": "string",
+                     *       "source": "string",
+                     *       "converted_at": 0,
+                     *       "variant": "normal",
+                     *       "prediction_type": "epsilon",
+                     *       "repo_variant": "fp16",
+                     *       "upcast_attention": false
+                     *     } */
+                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["Main_ExternalAPI_ChatGPT4o_Config"] | components["schemas"]["Main_ExternalAPI_Gemini2_5_Config"] | components["schemas"]["Main_ExternalAPI_Imagen3_Config"] | components["schemas"]["Main_ExternalAPI_Imagen4_Config"] | components["schemas"]["Main_ExternalAPI_FluxKontext_Config"] | components["schemas"]["Video_ExternalAPI_Veo3_Config"] | components["schemas"]["Video_ExternalAPI_Runway_Config"] | components["schemas"]["Unknown_Config"];
                 };
             };
             /** @description Bad request */
@@ -27076,7 +26642,25 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["ExternalAPI_ChatGPT4o_Config"] | components["schemas"]["ExternalAPI_Gemini2_5_Config"] | components["schemas"]["ExternalAPI_Imagen3_Config"] | components["schemas"]["ExternalAPI_Imagen4_Config"] | components["schemas"]["ExternalAPI_FluxKontext_Config"] | components["schemas"]["ExternalAPI_Runway_Config"] | components["schemas"]["Unknown_Config"];
+                    /** @example {
+                     *       "path": "string",
+                     *       "name": "string",
+                     *       "base": "sd-1",
+                     *       "type": "main",
+                     *       "format": "checkpoint",
+                     *       "config_path": "string",
+                     *       "key": "string",
+                     *       "hash": "string",
+                     *       "file_size": 1,
+                     *       "description": "string",
+                     *       "source": "string",
+                     *       "converted_at": 0,
+                     *       "variant": "normal",
+                     *       "prediction_type": "epsilon",
+                     *       "repo_variant": "fp16",
+                     *       "upcast_attention": false
+                     *     } */
+                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["Main_ExternalAPI_ChatGPT4o_Config"] | components["schemas"]["Main_ExternalAPI_Gemini2_5_Config"] | components["schemas"]["Main_ExternalAPI_Imagen3_Config"] | components["schemas"]["Main_ExternalAPI_Imagen4_Config"] | components["schemas"]["Main_ExternalAPI_FluxKontext_Config"] | components["schemas"]["Video_ExternalAPI_Veo3_Config"] | components["schemas"]["Video_ExternalAPI_Runway_Config"] | components["schemas"]["Unknown_Config"];
                 };
             };
             /** @description Bad request */
@@ -28932,6 +28516,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+                    /** @example [
+                     *       "15e9eb28-8cfe-47c9-b610-37907a79fc3c",
+                     *       "71272e82-0e5f-46d5-bca9-9a61f4bd8a82",
+                     *       "a5d7cd49-1b98-4534-a475-aeee4ccf5fa2"
+                     *     ] */
                     "application/json": string[];
                 };
             };
@@ -29070,6 +28659,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+                    /** @example [
+                     *       "ca562b14-995e-4a42-90c1-9528f1a5921d",
+                     *       "cc0c2b8a-c62e-41d6-878e-cc74dde5ca8f",
+                     *       "18ca7649-6a9e-47d5-bc17-41ab1e8cec81",
+                     *       "7c12d1b2-0ef9-4bec-ba55-797b2d8f2ee1",
+                     *       "c382eaa3-0e28-4ab0-9446-408667699aeb",
+                     *       "71272e82-0e5f-46d5-bca9-9a61f4bd8a82",
+                     *       "a5d7cd49-1b98-4534-a475-aeee4ccf5fa2"
+                     *     ] */
                     "application/json": string[];
                 };
             };

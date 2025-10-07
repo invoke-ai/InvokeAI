@@ -191,8 +191,8 @@ class Config_Base(ABC, BaseModel):
         else:
             raise TypeError("Model config discriminator value must be computed from a dict or ModelConfigBase instance")
 
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
         """Given the model on disk and any override fields, attempt to construct an instance of this config class.
 

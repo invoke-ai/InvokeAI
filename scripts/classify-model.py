@@ -8,7 +8,7 @@ from typing import get_args
 
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS
 from invokeai.backend.model_manager import InvalidModelConfigException, ModelProbe
-from invokeai.backend.model_manager.config import ModelConfigFactory
+from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
 
 algos = ", ".join(set(get_args(HASHING_ALGORITHMS)))
 
