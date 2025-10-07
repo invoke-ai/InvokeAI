@@ -89,14 +89,6 @@ class LoadedModel(LoadedModelWithoutConfig):
         self.config = config
 
 
-# TODO(MM2):
-# Some "intermediary" subclasses in the ModelLoaderBase class hierarchy define methods that their subclasses don't
-# know about. I think the problem may be related to this class being an ABC.
-#
-# For example, GenericDiffusersLoader defines `get_hf_load_class()`, and StableDiffusionDiffusersModel attempts to
-# call it. However, the method is not defined in the ABC, so it is not guaranteed to be implemented.
-
-
 class ModelLoaderBase(ABC):
     """Abstract base class for loading models into RAM/VRAM."""
 
