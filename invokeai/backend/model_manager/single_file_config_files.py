@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelType,
@@ -14,6 +15,12 @@ class LegacyConfigKey:
     base: BaseModelType
     variant: ModelVariantType | None = None
     pred: SchedulerPredictionType | None = None
+
+    @classmethod
+    def from_model_config(cls, config: AnyModelConfig) -> "LegacyConfigKey":
+        variant = getattr(config, "variant", None)
+        pred = getattr(config, "prediction_type", None)
+        return cls(type=config.type, base=config.base, variant=variant, pred=pred)
 
 
 LEGACY_CONFIG_MAP: dict[LegacyConfigKey, str] = {
