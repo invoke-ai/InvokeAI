@@ -5,7 +5,6 @@ from pydantic import Field
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import (
     NotAMatchError,
-    common_config_paths,
     raise_for_class_name,
     raise_for_override_fields,
     raise_if_not_dir,
@@ -29,12 +28,9 @@ class T5Encoder_T5Encoder_Config(Config_Base):
 
         raise_for_override_fields(cls, override_fields)
 
-        raise_for_class_name(
-            common_config_paths(mod.path),
-            {
-                "T5EncoderModel",
-            },
-        )
+        expected_config_path = mod.path / "text_encoder_2" / "config.json"
+        expected_class_name = "T5EncoderModel"
+        raise_for_class_name(expected_config_path, expected_class_name)
 
         cls.raise_if_doesnt_have_unquantized_config_file(mod)
 
@@ -61,12 +57,9 @@ class T5Encoder_BnBLLMint8_Config(Config_Base):
 
         raise_for_override_fields(cls, override_fields)
 
-        raise_for_class_name(
-            common_config_paths(mod.path),
-            {
-                "T5EncoderModel",
-            },
-        )
+        expected_config_path = mod.path / "text_encoder_2" / "config.json"
+        expected_class_name = "T5EncoderModel"
+        raise_for_class_name(expected_config_path, expected_class_name)
 
         cls.raise_if_filename_doesnt_look_like_bnb_quantized(mod)
 
