@@ -264,6 +264,18 @@ class Main_Checkpoint_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Conf
     base: Literal[BaseModelType.Flux] = Field(default=BaseModelType.Flux)
 
     variant: FluxVariantType = Field()
+    # Prior to v6.8.0, we used an awkward combination of `config_path` and `variant` to distinguish between FLUX
+    # variants.
+    #
+    # `config_path` was set to one of:
+    #  - flux-dev
+    #  - flux-dev-fill
+    #  - flux-schnell
+    #
+    # `variant` was set to ModelVariantType.Inpaint for FLUX Fill models and ModelVariantType.Normal for all other FLUX
+    # models.
+    #
+    # We now use the `variant` field to directly represent the FLUX variant type, and `config_path` is no longer used.
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
