@@ -210,6 +210,12 @@ AnyModelConfig = Annotated[
 ]
 
 AnyModelConfigValidator = TypeAdapter[AnyModelConfig](AnyModelConfig)
+"""Pydantic TypeAdapter for the AnyModelConfig union, used for parsing and validation.
+
+If you need to parse/validate a dict or JSON into an AnyModelConfig, you should probably use
+ModelConfigFactory.from_dict or ModelConfigFactory.from_json instead as they may implement
+additional logic in the future.
+"""
 
 
 class ModelConfigFactory:
@@ -217,6 +223,12 @@ class ModelConfigFactory:
     def from_dict(fields: dict[str, Any]) -> AnyModelConfig:
         """Return the appropriate config object from raw dict values."""
         model = AnyModelConfigValidator.validate_python(fields)
+        return model
+
+    @staticmethod
+    def from_json(json: str | bytes | bytearray) -> AnyModelConfig:
+        """Return the appropriate config object from json."""
+        model = AnyModelConfigValidator.validate_json(json)
         return model
 
     @staticmethod
@@ -320,8 +332,9 @@ class ModelConfigFactory:
             # - SD main models can look like a LoRA when they have merged in LoRA weights. Prefer the main model.
             # - SD main models in diffusers format can look like a CLIP Embed; they have a text_encoder folder with
             #   a config.json file. Prefer the main model.
-
-            # Sort the matching according to known special cases.
+            #
+            # Given the above cases, we can prioritize the matches by type. If we find more cases, we may need a more
+            # sophisticated approach.
             def sort_key(m: AnyModelConfig) -> int:
                 match m.type:
                     case ModelType.Main:
