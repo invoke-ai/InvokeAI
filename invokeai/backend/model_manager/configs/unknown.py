@@ -2,6 +2,7 @@ from typing import Any, Literal, Self
 
 from pydantic import Field
 
+from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
@@ -11,14 +12,30 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
 )
 
+app_config = get_config()
+
 
 class Unknown_Config(Config_Base):
-    """Model config for unknown models, used as a fallback when we cannot identify a model."""
+    """Model config for unknown models, used as a fallback when we cannot positively identify a model."""
 
     base: Literal[BaseModelType.Unknown] = Field(default=BaseModelType.Unknown)
     type: Literal[ModelType.Unknown] = Field(default=ModelType.Unknown)
     format: Literal[ModelFormat.Unknown] = Field(default=ModelFormat.Unknown)
 
     @classmethod
-    def from_model_on_disk(cls, mod: ModelOnDisk, fields: dict[str, Any]) -> Self:
-        raise NotAMatchError("unknown model config cannot match any model")
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        """Create an Unknown_Config for models that couldn't be positively identified.
+
+        Note: Basic path validation (file extensions, directory structure) is already
+        performed by ModelConfigFactory before this method is called.
+        """
+        if not app_config.allow_unknown_models:
+            raise NotAMatchError("unknown models are not allowed by configuration")
+
+        return cls(
+            **override_fields,
+            # Override the type/format/base to ensure it's marked as unknown.
+            base=BaseModelType.Unknown,
+            type=ModelType.Unknown,
+            format=ModelFormat.Unknown,
+        )
