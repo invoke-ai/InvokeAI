@@ -660,6 +660,7 @@ describe('Graph', () => {
           cover_image: null,
           type: 'main',
           trigger_phrases: null,
+          prediction_type: 'epsilon',
           default_settings: {
             vae: null,
             vae_precision: null,
@@ -673,7 +674,6 @@ describe('Graph', () => {
           variant: 'inpaint',
           format: 'diffusers',
           repo_variant: 'fp16',
-          submodels: null,
           usage_info: null,
         });
         expect(field).toEqual({

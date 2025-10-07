@@ -6,8 +6,8 @@ from typing import (
 from pydantic import Field
 from typing_extensions import Any
 
-from invokeai.backend.model_manager.config import ControlAdapterDefaultSettings
 from invokeai.backend.model_manager.configs.base import Config_Base, Diffusers_Config_Base
+from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
 from invokeai.backend.model_manager.configs.identification_utils import (
     NotAMatchError,
     common_config_paths,

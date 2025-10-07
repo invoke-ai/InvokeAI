@@ -3,14 +3,13 @@ from typing import (
     Self,
 )
 
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import Any
 
 from invokeai.backend.flux.controlnet.state_dict_utils import (
     is_state_dict_instantx_controlnet,
     is_state_dict_xlabs_controlnet,
 )
-from invokeai.backend.model_manager.config import ControlAdapterDefaultSettings
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base, Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import (
     NotAMatchError,
@@ -28,6 +27,42 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelFormat,
     ModelType,
 )
+
+MODEL_NAME_TO_PREPROCESSOR = {
+    "canny": "canny_image_processor",
+    "mlsd": "mlsd_image_processor",
+    "depth": "depth_anything_image_processor",
+    "bae": "normalbae_image_processor",
+    "normal": "normalbae_image_processor",
+    "sketch": "pidi_image_processor",
+    "scribble": "lineart_image_processor",
+    "lineart anime": "lineart_anime_image_processor",
+    "lineart_anime": "lineart_anime_image_processor",
+    "lineart": "lineart_image_processor",
+    "soft": "hed_image_processor",
+    "softedge": "hed_image_processor",
+    "hed": "hed_image_processor",
+    "shuffle": "content_shuffle_image_processor",
+    "pose": "dw_openpose_image_processor",
+    "mediapipe": "mediapipe_face_processor",
+    "pidi": "pidi_image_processor",
+    "zoe": "zoe_depth_image_processor",
+    "color": "color_map_image_processor",
+}
+
+
+class ControlAdapterDefaultSettings(BaseModel):
+    # This could be narrowed to controlnet processor nodes, but they change. Leaving this a string is safer.
+    preprocessor: str | None
+    model_config = ConfigDict(extra="forbid")
+
+    @classmethod
+    def from_model_name(cls, model_name: str) -> Self:
+        for k, v in MODEL_NAME_TO_PREPROCESSOR.items():
+            model_name_lower = model_name.lower()
+            if k in model_name_lower:
+                return cls(preprocessor=v)
+        return cls(preprocessor=None)
 
 
 class ControlNet_Diffusers_Config_Base(Diffusers_Config_Base):

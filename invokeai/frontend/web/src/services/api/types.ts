@@ -108,6 +108,7 @@ export const isVideoDTO = (dto: ImageDTO | VideoDTO): dto is VideoDTO => {
 // Model Configs
 export type AnyModelConfig = S['AnyModelConfig'];
 export type MainModelConfig = Extract<S['AnyModelConfig'], { type: 'main' }>;
+export type FLUXModelConfig = Extract<S['AnyModelConfig'], { type: 'main'; base: 'flux' }>;
 export type ControlLoRAModelConfig = Extract<S['AnyModelConfig'], { type: 'control_lora' }>;
 export type LoRAModelConfig = Extract<S['AnyModelConfig'], { type: 'lora' }>;
 export type VAEModelConfig = Extract<S['AnyModelConfig'], { type: 'vae' }>;
@@ -134,6 +135,7 @@ type UnknownModelConfig = Extract<S['AnyModelConfig'], { type: 'unknown' }>;
 export type FLUXKontextModelConfig = MainModelConfig;
 export type ChatGPT4oModelConfig = ApiModelConfig;
 export type Gemini2_5ModelConfig = ApiModelConfig;
+type SubmodelDefinition = S['SubmodelDefinition'];
 
 /**
  * Checks if a list of submodels contains any that match a given variant or type
@@ -141,7 +143,7 @@ export type Gemini2_5ModelConfig = ApiModelConfig;
  * @param checkStr The string to check against for variant or type
  * @returns A boolean
  */
-const checkSubmodel = (submodels: AnyModelConfig['submodels'], checkStr: string): boolean => {
+const checkSubmodel = (submodels: Record<string, SubmodelDefinition>, checkStr: string): boolean => {
   for (const submodel in submodels) {
     if (
       submodel &&
@@ -164,6 +166,7 @@ const checkSubmodels = (identifiers: string[], config: AnyModelConfig): boolean 
   return identifiers.every(
     (identifier) =>
       config.type === 'main' &&
+      'submodels' in config &&
       config.submodels &&
       (identifier in config.submodels || checkSubmodel(config.submodels, identifier))
   );
@@ -332,7 +335,7 @@ export const isRefinerMainModelModelConfig = (config: AnyModelConfig): config is
 };
 
 export const isFluxFillMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
-  return config.type === 'main' && config.base === 'flux' && config.variant === 'inpaint';
+  return config.type === 'main' && config.base === 'flux' && config.variant === 'dev_fill';
 };
 
 export const isTIModelConfig = (config: AnyModelConfig): config is MainModelConfig => {

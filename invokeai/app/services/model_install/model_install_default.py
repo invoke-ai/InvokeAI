@@ -35,10 +35,9 @@ from invokeai.app.services.model_install.model_install_common import (
 )
 from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
-from invokeai.backend.model_manager.config import (
+from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
+from invokeai.backend.model_manager.configs.factory import (
     AnyModelConfig,
-    Checkpoint_Config_Base,
-    InvalidModelConfigException,
     ModelConfigFactory,
 )
 from invokeai.backend.model_manager.metadata import (
@@ -532,7 +531,7 @@ class ModelInstallService(ModelInstallServiceBase):
             x.content_type is not None and "text/html" in x.content_type for x in multifile_download_job.download_parts
         ):
             install_job.set_error(
-                InvalidModelConfigException(
+                ValueError(
                     f"At least one file in {install_job.local_path} is an HTML page, not a model. This can happen when an access token is required to download."
                 )
             )
@@ -602,7 +601,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
         return ModelConfigFactory.from_model_on_disk(
             mod=model_path,
-            overrides=deepcopy(fields),
+            override_fields=deepcopy(fields),
             hash_algo=hash_algo,
         )
 
