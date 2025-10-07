@@ -14,6 +14,7 @@ from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.clip_embed import CLIPEmbed_Diffusers_G_Config, CLIPEmbed_Diffusers_L_Config
 from invokeai.backend.model_manager.configs.clip_vision import CLIPVision_Diffusers_Config
 from invokeai.backend.model_manager.configs.controlnet import (
+    ControlAdapterDefaultSettings,
     ControlNet_Checkpoint_FLUX_Config,
     ControlNet_Checkpoint_SD1_Config,
     ControlNet_Checkpoint_SD2_Config,
@@ -47,6 +48,7 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_LyCORIS_SDXL_Config,
     LoRA_OMI_FLUX_Config,
     LoRA_OMI_SDXL_Config,
+    LoraModelDefaultSettings,
 )
 from invokeai.backend.model_manager.configs.main import (
     Main_BnBNF4_FLUX_Config,
@@ -67,6 +69,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_ExternalAPI_Imagen3_Config,
     Main_ExternalAPI_Imagen4_Config,
     Main_GGUF_FLUX_Config,
+    MainModelDefaultSettings,
     Video_ExternalAPI_Runway_Config,
     Video_ExternalAPI_Veo3_Config,
 )
@@ -332,9 +335,52 @@ class ModelConfigFactory:
 
             matches.sort(key=sort_key)
             logger.warning(
-                f"Multiple model config classes matched for model {mod.name}: {[type(m).__name__ for m in matches]}. Using {type(matches[0]).__name__}."
+                f"Multiple model config classes matched for model {mod.name}: {[type(m).__name__ for m in matches]}."
             )
 
         instance = matches[0]
         logger.info(f"Model {mod.name} classified as {type(instance).__name__}")
+
+        # Now do any post-processing needed for specific model types/bases/etc.
+        match instance.type:
+            case ModelType.Main:
+                match instance.base:
+                    case BaseModelType.StableDiffusion1:
+                        instance.default_settings = MainModelDefaultSettings(width=512, height=512)
+                    case BaseModelType.StableDiffusion2:
+                        instance.default_settings = MainModelDefaultSettings(width=768, height=768)
+                    case BaseModelType.StableDiffusionXL:
+                        instance.default_settings = MainModelDefaultSettings(width=1024, height=1024)
+                    case _:
+                        pass
+            case ModelType.ControlNet | ModelType.T2IAdapter | ModelType.ControlLoRa:
+                instance.default_settings = ControlAdapterDefaultSettings.from_model_name(instance.name)
+            case ModelType.LoRA:
+                instance.default_settings = LoraModelDefaultSettings()
+            case _:
+                pass
+
         return instance
+
+
+MODEL_NAME_TO_PREPROCESSOR = {
+    "canny": "canny_image_processor",
+    "mlsd": "mlsd_image_processor",
+    "depth": "depth_anything_image_processor",
+    "bae": "normalbae_image_processor",
+    "normal": "normalbae_image_processor",
+    "sketch": "pidi_image_processor",
+    "scribble": "lineart_image_processor",
+    "lineart anime": "lineart_anime_image_processor",
+    "lineart_anime": "lineart_anime_image_processor",
+    "lineart": "lineart_image_processor",
+    "soft": "hed_image_processor",
+    "softedge": "hed_image_processor",
+    "hed": "hed_image_processor",
+    "shuffle": "content_shuffle_image_processor",
+    "pose": "dw_openpose_image_processor",
+    "mediapipe": "mediapipe_face_processor",
+    "pidi": "pidi_image_processor",
+    "zoe": "zoe_depth_image_processor",
+    "color": "color_map_image_processor",
+}

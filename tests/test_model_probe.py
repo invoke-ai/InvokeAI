@@ -13,9 +13,9 @@ from torch import tensor
 from invokeai.backend.model_manager import BaseModelType, ModelFormat, ModelRepoVariant, ModelType, ModelVariantType
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
+    Config_Base,
     InvalidModelConfigException,
     MainDiffusersConfig,
-    Config_Base,
     ModelConfigFactory,
     get_model_discriminator_value,
 )

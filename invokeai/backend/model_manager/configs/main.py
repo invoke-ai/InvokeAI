@@ -685,8 +685,8 @@ class Video_Config_Base(ABC, BaseModel):
 
 
 class Video_ExternalAPI_Veo3_Config(ExternalAPI_Config_Base, Video_Config_Base, Config_Base):
-    base: Literal[BaseModelType.FluxKontext] = Field(default=BaseModelType.FluxKontext)
+    base: Literal[BaseModelType.Veo3] = Field(default=BaseModelType.Veo3)
 
 
 class Video_ExternalAPI_Runway_Config(ExternalAPI_Config_Base, Video_Config_Base, Config_Base):
-    base: Literal[BaseModelType.FluxKontext] = Field(default=BaseModelType.FluxKontext)
+    base: Literal[BaseModelType.Runway] = Field(default=BaseModelType.Runway)

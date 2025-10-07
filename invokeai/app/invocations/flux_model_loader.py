@@ -14,9 +14,7 @@ from invokeai.app.util.t5_model_identifier import (
     preprocess_t5_tokenizer_model_identifier,
 )
 from invokeai.backend.flux.util import get_flux_max_seq_length
-from invokeai.backend.model_manager.config import (
-    Checkpoint_Config_Base,
-)
+from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
 
 

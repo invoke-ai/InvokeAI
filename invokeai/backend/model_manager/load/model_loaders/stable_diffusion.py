@@ -11,10 +11,9 @@ from diffusers.pipelines.stable_diffusion_xl.pipeline_stable_diffusion_xl_inpain
     StableDiffusionXLInpaintPipeline,
 )
 
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
-    Checkpoint_Config_Base,
-    Diffusers_Config_Base,
+from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Diffusers_Config_Base
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_SD1_Config,
     Main_Checkpoint_SD2_Config,
     Main_Checkpoint_SDXL_Config,

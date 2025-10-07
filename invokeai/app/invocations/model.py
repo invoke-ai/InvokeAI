@@ -12,9 +12,7 @@ from invokeai.app.invocations.baseinvocation import (
 from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input, InputField, OutputField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.shared.models import FreeUConfig
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
-)
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
 
 
