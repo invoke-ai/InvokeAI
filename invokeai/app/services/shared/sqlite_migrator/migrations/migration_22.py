@@ -2,7 +2,7 @@ import json
 import sqlite3
 from logging import Logger
 from pathlib import Path
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 from pydantic import ValidationError
 
@@ -29,8 +29,9 @@ class Migration22Callback:
 
         for model_id, config_json in rows:
             try:
+                migrated_config_dict = self._migrate_config(config_json)
                 # Get the model config as a pydantic object
-                config = AnyModelConfigValidator.validate_json(config_json)
+                config = AnyModelConfigValidator.validate_python(migrated_config_dict)
             except ValidationError:
                 # This could happen if the config schema changed in a way that makes old configs invalid. Unlikely
                 # for users, more likely for devs testing out migration paths.
@@ -75,6 +76,26 @@ class Migration22Callback:
             cursor.execute("RELEASE SAVEPOINT migrate_model")
 
         self._prune_empty_directories()
+
+    def _migrate_config(self, config_json: Any) -> str | None:
+        config_dict = json.loads(config_json)
+
+        # TODO: migrate fields, review changes to ensure we hit all cases for v6.7.0 to v6.8.0 upgrade.
+
+        # Prior to v6.8.0, we used an awkward combination of `config_path` and `variant` to distinguish between FLUX
+        # variants.
+        #
+        # `config_path` was set to one of:
+        #  - flux-dev
+        #  - flux-dev-fill
+        #  - flux-schnell
+        #
+        # `variant` was set to ModelVariantType.Inpaint for FLUX Fill models and ModelVariantType.Normal for all other FLUX
+        # models.
+        #
+        # We now use the `variant` field to directly represent the FLUX variant type, and `config_path` is no longer used.
+
+        return config_dict
 
     def _normalize_model_storage(self, key: str, path_value: str) -> NormalizeResult:
         models_dir = self._models_dir
