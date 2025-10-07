@@ -81,12 +81,12 @@ class IPAdapter_InvokeAI_Config_Base(IPAdapter_Config_Base):
             raise NotAMatchError(f"unable to determine cross attention dimension: {e}") from e
 
         match cross_attention_dim:
-            case 1280:
-                return BaseModelType.StableDiffusionXL
             case 768:
                 return BaseModelType.StableDiffusion1
             case 1024:
                 return BaseModelType.StableDiffusion2
+            case 2048:
+                return BaseModelType.StableDiffusionXL
             case _:
                 raise NotAMatchError(f"unrecognized cross attention dimension {cross_attention_dim}")
 
@@ -154,12 +154,12 @@ class IPAdapter_Checkpoint_Config_Base(IPAdapter_Config_Base):
             raise NotAMatchError(f"unable to determine cross attention dimension: {e}") from e
 
         match cross_attention_dim:
-            case 1280:
-                return BaseModelType.StableDiffusionXL
             case 768:
                 return BaseModelType.StableDiffusion1
             case 1024:
                 return BaseModelType.StableDiffusion2
+            case 2048:
+                return BaseModelType.StableDiffusionXL
             case _:
                 raise NotAMatchError(f"unrecognized cross attention dimension {cross_attention_dim}")
 
