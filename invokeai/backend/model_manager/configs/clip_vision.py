@@ -8,8 +8,9 @@ from typing_extensions import Any
 
 from invokeai.backend.model_manager.configs.base import Config_Base, Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import (
-    common_config_paths,
-    raise_for_class_name,
+    NotAMatchError,
+    get_class_name_from_config_dict_or_raise,
+    get_config_dict_or_raise,
     raise_for_override_fields,
     raise_if_not_dir,
 )
@@ -34,11 +35,23 @@ class CLIPVision_Diffusers_Config(Diffusers_Config_Base, Config_Base):
 
         raise_for_override_fields(cls, override_fields)
 
-        raise_for_class_name(
-            common_config_paths(mod.path),
-            {
-                "CLIPVisionModelWithProjection",
-            },
-        )
+        cls.raise_if_config_doesnt_look_like_clip_vision(mod)
 
         return cls(**override_fields)
+
+    @classmethod
+    def raise_if_config_doesnt_look_like_clip_vision(cls, mod: ModelOnDisk) -> None:
+        config_dict = get_config_dict_or_raise(mod.path / "config.json")
+        class_name = get_class_name_from_config_dict_or_raise(config_dict)
+
+        if class_name == "CLIPVisionModelWithProjection":
+            looks_like_clip_vision = True
+        elif class_name == "CLIPModel" and "vision_config" in config_dict:
+            looks_like_clip_vision = True
+        else:
+            looks_like_clip_vision = False
+
+        if not looks_like_clip_vision:
+            raise NotAMatchError(
+                f"config class name is {class_name}, not CLIPVisionModelWithProjection or CLIPModel with vision_config"
+            )
