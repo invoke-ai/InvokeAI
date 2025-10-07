@@ -34,21 +34,22 @@ from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.flux.redux.flux_redux_model import FluxReduxModel
 from invokeai.backend.flux.util import get_flux_ae_params, get_flux_transformers_params
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
-    Checkpoint_Config_Base,
-    CLIPEmbed_Diffusers_Config_Base,
+from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
+from invokeai.backend.model_manager.configs.clip_embed import CLIPEmbed_Diffusers_Config_Base
+from invokeai.backend.model_manager.configs.controlnet import (
     ControlNet_Checkpoint_Config_Base,
     ControlNet_Diffusers_Config_Base,
-    FLUXRedux_Checkpoint_Config,
-    IPAdapter_Checkpoint_Config_Base,
+)
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.configs.flux_redux import FLUXRedux_Checkpoint_Config
+from invokeai.backend.model_manager.configs.ip_adapter import IPAdapter_Checkpoint_Config_Base
+from invokeai.backend.model_manager.configs.main import (
     Main_BnBNF4_FLUX_Config,
     Main_Checkpoint_FLUX_Config,
     Main_GGUF_FLUX_Config,
-    T5Encoder_BnBLLMint8_Config,
-    T5Encoder_T5Encoder_Config,
-    VAE_Checkpoint_Config_Base,
 )
+from invokeai.backend.model_manager.configs.t5_encoder import T5Encoder_BnBLLMint8_Config, T5Encoder_T5Encoder_Config
+from invokeai.backend.model_manager.configs.vae import VAE_Checkpoint_Config_Base
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import (

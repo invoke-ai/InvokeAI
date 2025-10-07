@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
-from invokeai.backend.model_manager.config import AnyModelConfigValidator
+from invokeai.backend.model_manager.configs.factory import AnyModelConfigValidator
 
 
 class NormalizeResult(NamedTuple):

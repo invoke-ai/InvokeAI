@@ -20,9 +20,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.image_to_latents import ImageToLatentsInvocation
 from invokeai.app.invocations.model import UNetField, VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager import LoadedModel
-from invokeai.backend.model_manager.config import Main_Config_Base
-from invokeai.backend.model_manager.taxonomy import ModelVariantType
+from invokeai.backend.model_manager.taxonomy import FluxVariantType, ModelType, ModelVariantType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 
 
@@ -182,10 +180,11 @@ class CreateGradientMaskInvocation(BaseInvocation):
         if self.unet is not None and self.vae is not None and self.image is not None:
             # all three fields must be present at the same time
             main_model_config = context.models.get_config(self.unet.unet.key)
-            assert isinstance(main_model_config, Main_Config_Base)
-            if main_model_config.variant is ModelVariantType.Inpaint:
+            assert main_model_config.type is ModelType.Main
+            variant = getattr(main_model_config, "variant", None)
+            if variant is ModelVariantType.Inpaint or variant is FluxVariantType.DevFill:
                 mask = dilated_mask_tensor
-                vae_info: LoadedModel = context.models.load(self.vae.vae)
+                vae_info = context.models.load(self.vae.vae)
                 image = context.images.get_pil(self.image.image_name)
                 image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
                 if image_tensor.dim() == 3:

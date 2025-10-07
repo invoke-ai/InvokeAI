@@ -9,10 +9,10 @@ from typing import (
 from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import Any
 
-from invokeai.backend.model_manager.config import ControlAdapterDefaultSettings
 from invokeai.backend.model_manager.configs.base import (
     Config_Base,
 )
+from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
 from invokeai.backend.model_manager.configs.identification_utils import (
     NotAMatchError,
     raise_for_override_fields,

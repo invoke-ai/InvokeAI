@@ -28,9 +28,8 @@ from invokeai.app.services.model_records import (
     UnknownModelException,
 )
 from invokeai.app.util.suppress_output import SuppressOutput
-from invokeai.backend.model_manager import BaseModelType, ModelFormat, ModelType
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_SD1_Config,
     Main_Checkpoint_SD2_Config,
     Main_Checkpoint_SDXL_Config,
@@ -47,6 +46,7 @@ from invokeai.backend.model_manager.starter_models import (
     StarterModelBundle,
     StarterModelWithoutDependencies,
 )
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 
 model_manager_router = APIRouter(prefix="/v2/models", tags=["model_manager"])
 

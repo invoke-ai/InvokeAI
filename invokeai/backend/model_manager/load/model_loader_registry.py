@@ -18,10 +18,8 @@ Use like this:
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Optional, Tuple, Type, TypeVar
 
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
-    Config_Base,
-)
+from invokeai.backend.model_manager.configs.base import Config_Base
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load import ModelLoaderBase
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
 
