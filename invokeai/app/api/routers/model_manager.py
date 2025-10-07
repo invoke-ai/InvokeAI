@@ -744,7 +744,7 @@ async def convert_model(
         logger.error(str(e))
         raise HTTPException(status_code=424, detail=str(e))
 
-    if isinstance(
+    if not isinstance(
         model_config,
         (
             Main_Checkpoint_SD1_Config,
