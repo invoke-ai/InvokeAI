@@ -11,8 +11,8 @@ from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.configs.ip_adapter import (
     IPAdapter_Checkpoint_Config_Base,
     IPAdapter_InvokeAI_Config_Base,
 )

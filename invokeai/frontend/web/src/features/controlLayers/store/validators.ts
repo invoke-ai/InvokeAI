@@ -154,7 +154,7 @@ export const getControlLayerWarnings = (
       warnings.push(WARNINGS.CONTROL_ADAPTER_INCOMPATIBLE_BASE_MODEL);
     } else if (
       model.base === 'flux' &&
-      model.variant === 'inpaint' &&
+      model.variant === 'dev_fill' &&
       entity.controlAdapter.model.type === 'control_lora'
     ) {
       // FLUX inpaint variants are FLUX Fill models - not compatible w/ Control LoRA

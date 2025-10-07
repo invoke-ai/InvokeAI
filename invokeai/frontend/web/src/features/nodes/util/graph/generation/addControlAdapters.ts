@@ -5,7 +5,7 @@ import type { CanvasControlLayerState, Rect } from 'features/controlLayers/store
 import { getControlLayerWarnings } from 'features/controlLayers/store/validators';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { serializeError } from 'serialize-error';
-import type { ImageDTO, Invocation, MainModelConfig } from 'services/api/types';
+import type { FLUXModelConfig, ImageDTO, Invocation, MainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 const log = logger('system');
@@ -113,7 +113,7 @@ type AddControlLoRAArg = {
   entities: CanvasControlLayerState[];
   g: Graph;
   rect: Rect;
-  model: MainModelConfig;
+  model: FLUXModelConfig;
   denoise: Invocation<'flux_denoise'>;
 };
 
@@ -129,7 +129,7 @@ export const addControlLoRA = async ({ manager, entities, g, rect, model, denois
     return;
   }
 
-  assert(model.variant !== 'inpaint', 'FLUX Control LoRA is not compatible with FLUX Fill.');
+  assert(model.variant !== 'dev_fill', 'FLUX Control LoRA is not compatible with FLUX Fill.');
   assert(validControlLayers.length <= 1, 'Cannot add more than one FLUX control LoRA.');
 
   const getImageDTOResult = await withResultAsync(() => {

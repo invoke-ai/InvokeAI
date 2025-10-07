@@ -17,6 +17,7 @@ import { selectImg2imgStrengthConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
+import { isFluxFillMainModelModelConfig } from 'services/api/types';
 
 const selectHasRasterLayersWithContent = createSelector(
   selectActiveRasterLayerEntities,
@@ -46,11 +47,7 @@ export const ParamDenoisingStrength = memo(() => {
       // Denoising strength does nothing if there are no raster layers w/ content
       return true;
     }
-    if (
-      selectedModelConfig?.type === 'main' &&
-      selectedModelConfig?.base === 'flux' &&
-      selectedModelConfig.variant === 'inpaint'
-    ) {
+    if (selectedModelConfig && isFluxFillMainModelModelConfig(selectedModelConfig)) {
       // Denoising strength is ignored by FLUX Fill, which is indicated by the variant being 'inpaint'
       return true;
     }
