@@ -48,7 +48,7 @@ from invokeai.backend.flux.sampling_utils import (
     unpack,
 )
 from invokeai.backend.flux.text_conditioning import FluxReduxConditioning, FluxTextConditioning
-from invokeai.backend.model_manager.taxonomy import FluxVariantType, ModelFormat
+from invokeai.backend.model_manager.taxonomy import BaseModelType, FluxVariantType, ModelFormat, ModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -232,6 +232,7 @@ class FluxDenoiseInvocation(BaseInvocation):
         )
 
         transformer_config = context.models.get_config(self.transformer.transformer)
+        assert transformer_config.base is BaseModelType.Flux and transformer_config.type is ModelType.Main
         is_schnell = transformer_config.variant is FluxVariantType.Schnell
 
         # Calculate the timestep schedule.
