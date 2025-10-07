@@ -323,7 +323,13 @@ class ModelConfigFactory:
 
         if not matches and app_config.allow_unknown_models:
             logger.warning(f"Unable to identify model {mod.name}, falling back to Unknown_Config")
-            return Unknown_Config(**fields)
+            return Unknown_Config(
+                **fields,
+                # Override the type/format/base to ensure it's marked as unknown.
+                base=BaseModelType.Unknown,
+                type=ModelType.Unknown,
+                format=ModelFormat.Unknown,
+            )
 
         if len(matches) > 1:
             # We have multiple matches, in which case at most 1 is correct. We need to pick one.
