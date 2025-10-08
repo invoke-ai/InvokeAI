@@ -1,3 +1,4 @@
+from copy import deepcopy
 from typing import Any, Literal, Self
 
 from pydantic import Field
@@ -31,6 +32,11 @@ class Unknown_Config(Config_Base):
         """
         if not app_config.allow_unknown_models:
             raise NotAMatchError("unknown models are not allowed by configuration")
+
+        cloned_override_fields = deepcopy(override_fields)
+        cloned_override_fields.pop("base", None)
+        cloned_override_fields.pop("type", None)
+        cloned_override_fields.pop("format", None)
 
         return cls(
             **override_fields,
