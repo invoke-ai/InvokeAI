@@ -733,12 +733,9 @@ class ColorCorrectInvocation(BaseInvocation, WithMetadata, WithBoard):
         if self.mask is not None:
             # Load mask as grayscale
             mask_image = context.images.get_pil(self.mask.image_name, "L")
-            # Invert mask: Image.paste uses white to paste, but we want white=original, black=result
-            # So we paste the corrected image where mask is black (inverted)
-            inverted_mask = ImageOps.invert(mask_image)
-            # Start with base image, paste corrected where mask is black (now white in inverted)
-            result = base_image.convert("RGB").copy()
-            result.paste(corrected_image, mask=inverted_mask)
+            # Start with corrected image, paste base image where mask is white
+            result = corrected_image.copy()
+            result.paste(base_image.convert("RGB"), mask=mask_image)
         else:
             result = corrected_image
 
