@@ -408,6 +408,8 @@ class ModelConfigFactory:
                 results[class_name] = e
                 logger.debug(f"Unexpected exception while matching {mod.name} to {config_class.__name__}: {e}")
 
+        # Extract just the successful matches
+        # NOTE: This will include Unknown_Config matches, which we will handle later.
         matches = [r for r in results.values() if isinstance(r, Config_Base)]
 
         if not matches:
@@ -443,7 +445,10 @@ class ModelConfigFactory:
 
         matches.sort(key=sort_key)
 
-        if len(matches) > 1:
+        # Warn if we have multiple non-unknown matches
+        has_unknown = any(isinstance(m, Unknown_Config) for m in matches)
+        real_match_count = len(matches) - (1 if has_unknown else 0)
+        if real_match_count > 1:
             logger.warning(
                 f"Multiple model config classes matched for model {mod.path}: {[type(m).__name__ for m in matches]}."
             )
@@ -457,15 +462,7 @@ class ModelConfigFactory:
         # Now do any post-processing needed for specific model types/bases/etc.
         match instance.type:
             case ModelType.Main:
-                match instance.base:
-                    case BaseModelType.StableDiffusion1:
-                        instance.default_settings = MainModelDefaultSettings(width=512, height=512)
-                    case BaseModelType.StableDiffusion2:
-                        instance.default_settings = MainModelDefaultSettings(width=768, height=768)
-                    case BaseModelType.StableDiffusionXL:
-                        instance.default_settings = MainModelDefaultSettings(width=1024, height=1024)
-                    case _:
-                        pass
+                instance.default_settings = MainModelDefaultSettings.from_base(instance.base)
             case ModelType.ControlNet | ModelType.T2IAdapter | ModelType.ControlLoRa:
                 instance.default_settings = ControlAdapterDefaultSettings.from_model_name(instance.name)
             case ModelType.LoRA:

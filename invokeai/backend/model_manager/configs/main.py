@@ -51,6 +51,19 @@ class MainModelDefaultSettings(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    @classmethod
+    def from_base(cls, base: BaseModelType) -> Self | None:
+        match base:
+            case BaseModelType.StableDiffusion1:
+                return cls(width=512, height=512)
+            case BaseModelType.StableDiffusion2:
+                return cls(width=768, height=768)
+            case BaseModelType.StableDiffusionXL:
+                return cls(width=1024, height=1024)
+            case _:
+                # TODO(psyche): Do we want defaults for other base types?
+                return None
+
 
 class Main_Config_Base(ABC, BaseModel):
     type: Literal[ModelType.Main] = Field(default=ModelType.Main)

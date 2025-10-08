@@ -32,9 +32,8 @@ from invokeai.app.services.model_install.model_install_common import (
     URLModelSource,
 )
 from invokeai.app.services.model_records import ModelRecordChanges, UnknownModelException
-from invokeai.backend.model_manager.config import (
+from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
-    InvalidModelConfigException,
     ModelFormat,
     ModelRepoVariant,
     ModelType,
@@ -71,7 +70,7 @@ def test_registration_meta(mm2_installer: ModelInstallServiceBase, embedding_fil
 
 def test_registration_meta_override_fail(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
     key = None
-    with pytest.raises((ValidationError, InvalidModelConfigException)):
+    with pytest.raises(ValidationError):
         key = mm2_installer.register_path(
             embedding_file, ModelRecordChanges(name="banana_sushi", type=ModelType("lora"))
         )

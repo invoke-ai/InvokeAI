@@ -152,8 +152,8 @@ class LoRA_LyCORIS_Config_Base(LoRA_Config_Base):
     def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
         # First rule out ControlLoRA and Diffusers LoRA
         flux_format = _get_flux_lora_format(mod)
-        if flux_format in [FluxLoRAFormat.Control, FluxLoRAFormat.Diffusers]:
-            raise NotAMatchError("model looks like ControlLoRA or Diffusers LoRA")
+        if flux_format in [FluxLoRAFormat.Control]:
+            raise NotAMatchError("model looks like Control LoRA")
 
         # Note: Existence of these key prefixes/suffixes does not guarantee that this is a LoRA.
         # Some main models have these keys, likely due to the creator merging in a LoRA.
