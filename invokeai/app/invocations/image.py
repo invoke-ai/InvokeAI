@@ -709,7 +709,7 @@ class ColorCorrectInvocation(BaseInvocation, WithMetadata, WithBoard):
         else:
             # Convert to YCbCr colorspace
             base_ycbcr = base_image.convert("YCbCr")
-            ref_ycbcr = color_reference.convert("RGB").convert("YCbCr")
+            ref_ycbcr = color_reference.convert("YCbCr")
 
             base_array = numpy.asarray(base_ycbcr, dtype=numpy.uint8)
             ref_array = numpy.asarray(ref_ycbcr, dtype=numpy.uint8)
