@@ -46,7 +46,11 @@ class Migration22Callback:
         )
 
         # Step 3: Copy all data from the old table to the new table
-        cursor.execute("INSERT INTO models SELECT * FROM models_old;")
+        # Only copy the stored columns (id, config, created_at, updated_at), not the virtual columns
+        cursor.execute(
+            "INSERT INTO models (id, config, created_at, updated_at) "
+            "SELECT id, config, created_at, updated_at FROM models_old;"
+        )
 
         # Step 4: Drop the old table
         cursor.execute("DROP TABLE models_old;")
