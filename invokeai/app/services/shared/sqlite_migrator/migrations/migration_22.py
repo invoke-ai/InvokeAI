@@ -1,20 +1,8 @@
-import json
 import sqlite3
 from logging import Logger
-from pathlib import Path
-from typing import Any, NamedTuple
-
-from pydantic import ValidationError
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
-from invokeai.backend.model_manager.configs.factory import AnyModelConfig, AnyModelConfigValidator
-from invokeai.backend.model_manager.taxonomy import BaseModelType, FluxVariantType, ModelType, SchedulerPredictionType
-
-
-class NormalizeResult(NamedTuple):
-    new_relative_path: str | None
-    rollback_ops: list[tuple[Path, Path]]
 
 
 class Migration22Callback:
@@ -24,271 +12,70 @@ class Migration22Callback:
         self._models_dir = app_config.models_path.resolve()
 
     def __call__(self, cursor: sqlite3.Cursor) -> None:
-        # Grab all model records
-        cursor.execute("SELECT id, config FROM models;")
-        rows = cursor.fetchall()
+        self._logger.info("Removing UNIQUE(name, base, type) constraint from models table")
 
-        for model_id, config_json in rows:
-            try:
-                # Migrate the config JSON to the latest schema
-                config = self._parse_and_migrate_config(config_json)
-            except ValidationError:
-                # This could happen if the config schema changed in a way that makes old configs invalid. Unlikely
-                # for users, more likely for devs testing out migration paths.
-                self._logger.warning("Skipping model %s: invalid config schema", model_id)
-                continue
-            except json.JSONDecodeError:
-                # This should never happen, as we use pydantic to serialize the config to JSON.
-                self._logger.warning("Skipping model %s: invalid config JSON", model_id)
-                continue
+        # Step 1: Rename the existing models table
+        cursor.execute("ALTER TABLE models RENAME TO models_old;")
 
-            # We'll use a savepoint so we can roll back the database update if something goes wrong, and a simple
-            # rollback of file operations if needed.
-            cursor.execute("SAVEPOINT migrate_model")
-            try:
-                new_relative_path, rollback_ops = self._normalize_model_storage(
-                    key=config.key,
-                    path_value=config.path,
-                )
-            except Exception as err:
-                self._logger.error("Error normalizing model %s: %s", config.key, err)
-                cursor.execute("ROLLBACK TO SAVEPOINT migrate_model")
-                cursor.execute("RELEASE SAVEPOINT migrate_model")
-                continue
+        # Step 2: Create the new models table without the UNIQUE(name, base, type) constraint
+        cursor.execute(
+            """--sql
+            CREATE TABLE models (
+                id TEXT NOT NULL PRIMARY KEY,
+                hash TEXT GENERATED ALWAYS as (json_extract(config, '$.hash')) VIRTUAL NOT NULL,
+                base TEXT GENERATED ALWAYS as (json_extract(config, '$.base')) VIRTUAL NOT NULL,
+                type TEXT GENERATED ALWAYS as (json_extract(config, '$.type')) VIRTUAL NOT NULL,
+                path TEXT GENERATED ALWAYS as (json_extract(config, '$.path')) VIRTUAL NOT NULL,
+                format TEXT GENERATED ALWAYS as (json_extract(config, '$.format')) VIRTUAL NOT NULL,
+                name TEXT GENERATED ALWAYS as (json_extract(config, '$.name')) VIRTUAL NOT NULL,
+                description TEXT GENERATED ALWAYS as (json_extract(config, '$.description')) VIRTUAL,
+                source TEXT GENERATED ALWAYS as (json_extract(config, '$.source')) VIRTUAL NOT NULL,
+                source_type TEXT GENERATED ALWAYS as (json_extract(config, '$.source_type')) VIRTUAL NOT NULL,
+                source_api_response TEXT GENERATED ALWAYS as (json_extract(config, '$.source_api_response')) VIRTUAL,
+                trigger_phrases TEXT GENERATED ALWAYS as (json_extract(config, '$.trigger_phrases')) VIRTUAL,
+                file_size INTEGER GENERATED ALWAYS as (json_extract(config, '$.file_size')) VIRTUAL NOT NULL,
+                -- Serialized JSON representation of the whole config object, which will contain additional fields from subclasses
+                config TEXT NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+                -- Updated via trigger
+                updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+                -- Explicit unique constraint on path
+                UNIQUE(path)
+            );
+            """
+        )
 
-            if new_relative_path is None:
-                cursor.execute("RELEASE SAVEPOINT migrate_model")
-                continue
+        # Step 3: Copy all data from the old table to the new table
+        cursor.execute("INSERT INTO models SELECT * FROM models_old;")
 
-            config.path = new_relative_path
-            try:
-                cursor.execute(
-                    "UPDATE models SET config = ? WHERE id = ?;",
-                    (config.model_dump_json(), model_id),
-                )
-            except Exception as err:
-                self._logger.error("Database update failed for model %s: %s", config.key, err)
-                cursor.execute("ROLLBACK TO SAVEPOINT migrate_model")
-                cursor.execute("RELEASE SAVEPOINT migrate_model")
-                self._rollback_file_ops(rollback_ops)
-                raise
+        # Step 4: Drop the old table
+        cursor.execute("DROP TABLE models_old;")
 
-            cursor.execute("RELEASE SAVEPOINT migrate_model")
+        # Step 5: Recreate indexes
+        cursor.execute("CREATE INDEX IF NOT EXISTS base_index ON models(base);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS type_index ON models(type);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS name_index ON models(name);")
 
-        self._prune_empty_directories()
-
-    def _parse_and_migrate_config(self, config_json: Any) -> AnyModelConfig:
-        config_dict: dict[str, Any] = json.loads(config_json)
-
-        # In v6.8.0 we made some improvements to the model taxonomy and the model config schemas. There are a changes
-        # we need to make to old configs to bring them up to date.
-
-        base = config_dict.get("base")
-        type = config_dict.get("type")
-        if base == BaseModelType.Flux.value and type == ModelType.Main.value:
-            # Prior to v6.8.0, we used an awkward combination of `config_path` and `variant` to distinguish between FLUX
-            # variants.
-            #
-            # `config_path` was set to one of:
-            #  - flux-dev
-            #  - flux-dev-fill
-            #  - flux-schnell
-            #
-            # `variant` was set to ModelVariantType.Inpaint for FLUX Fill models and ModelVariantType.Normal for all other FLUX
-            # models.
-            #
-            # We now use the `variant` field to directly represent the FLUX variant type, and `config_path` is no longer used.
-
-            # Extract and remove `config_path` if present.
-            config_path = config_dict.pop("config_path", None)
-
-            match config_path:
-                case "flux-dev":
-                    config_dict["variant"] = FluxVariantType.Dev.value
-                case "flux-dev-fill":
-                    config_dict["variant"] = FluxVariantType.DevFill.value
-                case "flux-schnell":
-                    config_dict["variant"] = FluxVariantType.Schnell.value
-                case _:
-                    # Unknown config_path - default to Dev variant
-                    config_dict["variant"] = FluxVariantType.Dev.value
-
-        if (
-            base
-            in {
-                BaseModelType.StableDiffusion1.value,
-                BaseModelType.StableDiffusion2.value,
-                BaseModelType.StableDiffusionXL.value,
-                BaseModelType.StableDiffusionXLRefiner.value,
-            }
-            and type == "main"
-        ):
-            # Prior to v6.8.0, the prediction_type field was optional and would default to Epsilon if not present.
-            # We now make it explicit and always present. Use the existing value if present, otherwise default to
-            # Epsilon, matching the probe logic.
-            #
-            # It's only on SD1.x, SD2.x, and SDXL main models.
-            config_dict["prediction_type"] = config_dict.get("prediction_type", SchedulerPredictionType.Epsilon.value)
-
-        if type == ModelType.CLIPVision.value:
-            # Prior to v6.8.0, some CLIP Vision models were associated with a specific base model architecture:
-            # - CLIP-ViT-bigG-14-laion2B-39B-b160k is the image encoder for SDXL IP Adapter and was associated with SDXL
-            # - CLIP-ViT-H-14-laion2B-s32B-b79K is the image encoder for SD1.5 IP Adapter and was associated with SD1.5
-            #
-            # While this made some sense at the time, it is more correct and flexible to treat CLIP Vision models
-            # as independent of any specific base model architecture.
-            config_dict["base"] = BaseModelType.Any.value
-
-        migrated_config = AnyModelConfigValidator.validate_python(config_dict)
-        return migrated_config
-
-    def _normalize_model_storage(self, key: str, path_value: str) -> NormalizeResult:
-        models_dir = self._models_dir
-        stored_path = Path(path_value)
-
-        relative_path: Path | None
-        if stored_path.is_absolute():
-            # If the stored path is absolute, we need to check if it's inside the models directory, which means it is
-            # an Invoke-managed model. If it's outside, it is user-managed we leave it alone.
-            try:
-                relative_path = stored_path.resolve().relative_to(models_dir)
-            except ValueError:
-                self._logger.info("Leaving user-managed model %s at %s", key, stored_path)
-                return NormalizeResult(new_relative_path=None, rollback_ops=[])
-        else:
-            # Relative paths are always relative to the models directory and thus Invoke-managed.
-            relative_path = stored_path
-
-        # If the relative path is empty, assume something is wrong. Warn and skip.
-        if not relative_path.parts:
-            self._logger.warning("Skipping model %s: empty relative path", key)
-            return NormalizeResult(new_relative_path=None, rollback_ops=[])
-
-        # Sanity check: the path is relative. It should be present in the models directory.
-        absolute_path = (models_dir / relative_path).resolve()
-        if not absolute_path.exists():
-            self._logger.warning(
-                "Skipping model %s: expected model files at %s but nothing was found",
-                key,
-                absolute_path,
-            )
-            return NormalizeResult(new_relative_path=None, rollback_ops=[])
-
-        if relative_path.parts[0] == key:
-            # Already normalized. Still ensure the stored path is relative.
-            normalized_path = relative_path.as_posix()
-            # If the stored path is already the normalized path, no change is needed.
-            new_relative_path = normalized_path if stored_path.as_posix() != normalized_path else None
-            return NormalizeResult(new_relative_path=new_relative_path, rollback_ops=[])
-
-        # We'll store the file operations we perform so we can roll them back if needed.
-        rollback_ops: list[tuple[Path, Path]] = []
-
-        # Destination directory is models_dir/<key> - a flat directory structure.
-        destination_dir = models_dir / key
-
-        try:
-            if absolute_path.is_file():
-                destination_dir.mkdir(parents=True, exist_ok=True)
-                dest_file = destination_dir / absolute_path.name
-                # This really shouldn't happen.
-                if dest_file.exists():
-                    self._logger.warning(
-                        "Destination for model %s already exists at %s; skipping move",
-                        key,
-                        dest_file,
-                    )
-                    return NormalizeResult(new_relative_path=None, rollback_ops=[])
-
-                self._logger.info("Moving model file %s -> %s", absolute_path, dest_file)
-
-                # `Path.rename()` effectively moves the file or directory.
-                absolute_path.rename(dest_file)
-                rollback_ops.append((dest_file, absolute_path))
-
-                return NormalizeResult(
-                    new_relative_path=(Path(key) / dest_file.name).as_posix(),
-                    rollback_ops=rollback_ops,
-                )
-
-            if absolute_path.is_dir():
-                dest_path = destination_dir
-                # This really shouldn't happen.
-                if dest_path.exists():
-                    self._logger.warning(
-                        "Destination directory %s already exists for model %s; skipping",
-                        dest_path,
-                        key,
-                    )
-                    return NormalizeResult(new_relative_path=None, rollback_ops=[])
-
-                self._logger.info("Moving model directory %s -> %s", absolute_path, dest_path)
-
-                # `Path.rename()` effectively moves the file or directory.
-                absolute_path.rename(dest_path)
-                rollback_ops.append((dest_path, absolute_path))
-
-                return NormalizeResult(
-                    new_relative_path=Path(key).as_posix(),
-                    rollback_ops=rollback_ops,
-                )
-
-            # Maybe a broken symlink or something else weird?
-            self._logger.warning("Skipping model %s: path %s is neither a file nor directory", key, absolute_path)
-            return NormalizeResult(new_relative_path=None, rollback_ops=[])
-        except Exception:
-            self._rollback_file_ops(rollback_ops)
-            raise
-
-    def _rollback_file_ops(self, rollback_ops: list[tuple[Path, Path]]) -> None:
-        # This is a super-simple rollback that just reverses the move operations we performed.
-        for source, destination in reversed(rollback_ops):
-            try:
-                if source.exists():
-                    source.rename(destination)
-            except Exception as err:
-                self._logger.error("Failed to rollback move %s -> %s: %s", source, destination, err)
-
-    def _prune_empty_directories(self) -> None:
-        # These directories are system directories we want to keep even if empty. Technically, the app should not
-        # have any problems if these are removed, creating them as needed, but it's cleaner to just leave them alone.
-        keep_names = {"model_images", ".download_cache"}
-        keep_dirs = {self._models_dir / name for name in keep_names}
-        removed_dirs: set[Path] = set()
-
-        # Walk the models directory tree from the bottom up, removing empty directories. We sort by path length
-        # descending to ensure we visit children before parents.
-        for directory in sorted(self._models_dir.rglob("*"), key=lambda p: len(p.parts), reverse=True):
-            if not directory.is_dir():
-                continue
-            if directory == self._models_dir:
-                continue
-            if any(directory == keep or keep in directory.parents for keep in keep_dirs):
-                continue
-
-            try:
-                next(directory.iterdir())
-            except StopIteration:
-                try:
-                    directory.rmdir()
-                    removed_dirs.add(directory)
-                    self._logger.debug("Removed empty directory %s", directory)
-                except OSError:
-                    # Directory not empty (or some other error) - bail out.
-                    self._logger.warning("Failed to prune directory %s - not empty?", directory)
-                    continue
-            except OSError:
-                continue
-
-        self._logger.info("Pruned %d empty directories under %s", len(removed_dirs), self._models_dir)
+        # Step 6: Recreate the updated_at trigger
+        cursor.execute(
+            """--sql
+            CREATE TRIGGER models_updated_at
+            AFTER UPDATE
+            ON models FOR EACH ROW
+            BEGIN
+                UPDATE models SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
+                    WHERE id = old.id;
+            END;
+            """
+        )
 
 
 def build_migration_22(app_config: InvokeAIAppConfig, logger: Logger) -> Migration:
     """Builds the migration object for migrating from version 21 to version 22.
 
-    This migration normalizes on-disk model storage so that each model lives within
-    a directory named by its key inside the Invoke-managed models directory, and
-    updates database records to reference the new relative paths.
+    This migration:
+    - Removes the UNIQUE constraint on the combination of (base, name, type) columns in the models table
+    - Adds an explicit UNIQUE contraint on the path column
     """
 
     return Migration(
