@@ -4,7 +4,7 @@ from typing import Literal, Optional
 
 import cv2
 import numpy
-from PIL import Image, ImageChops, ImageCms, ImageFilter, ImageOps
+from PIL import Image, ImageChops, ImageFilter, ImageOps
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -660,7 +660,7 @@ class ColorCorrectInvocation(BaseInvocation, WithMetadata, WithBoard):
     base_image: ImageField = InputField(description="The image to color-correct")
     color_reference: ImageField = InputField(description="Reference image for color-correction")
     mask: Optional[ImageField] = InputField(default=None, description="Optional mask to limit color correction area")
-    colorspace: Literal["RGB", "LAB", "LAB-Color", "LAB-Luminance"] = InputField(
+    colorspace: Literal["RGB", "YCbCr", "YCbCr-Chroma", "YCbCr-Luma"] = InputField(
         default="RGB", description="Colorspace in which to apply histogram matching"
     )
 
@@ -707,29 +707,20 @@ class ColorCorrectInvocation(BaseInvocation, WithMetadata, WithBoard):
             ref_array = numpy.asarray(color_reference.convert("RGB"), dtype=numpy.uint8)
             channels_to_match = [0, 1, 2]  # R, G, B
         else:
-            # Convert to LAB colorspace
-            profile_srgb = ImageCms.createProfile("sRGB")
-            profile_lab = ImageCms.createProfile("LAB", colorTemp=6500)
-            xform_to_lab = ImageCms.buildTransformFromOpenProfiles(
-                profile_srgb, profile_lab, "RGB", "LAB", renderingIntent=2, flags=0x2400
-            )
-            xform_from_lab = ImageCms.buildTransformFromOpenProfiles(
-                profile_lab, profile_srgb, "LAB", "RGB", renderingIntent=2, flags=0x2400
-            )
+            # Convert to YCbCr colorspace
+            base_ycbcr = base_image.convert("RGB").convert("YCbCr")
+            ref_ycbcr = color_reference.convert("RGB").convert("YCbCr")
 
-            base_lab = ImageCms.applyTransform(base_image.convert("RGB"), xform_to_lab)
-            ref_lab = ImageCms.applyTransform(color_reference.convert("RGB"), xform_to_lab)
-
-            base_array = numpy.asarray(base_lab, dtype=numpy.uint8)
-            ref_array = numpy.asarray(ref_lab, dtype=numpy.uint8)
+            base_array = numpy.asarray(base_ycbcr, dtype=numpy.uint8)
+            ref_array = numpy.asarray(ref_ycbcr, dtype=numpy.uint8)
 
             # Determine which channels to match based on mode
-            if self.colorspace == "LAB":
-                channels_to_match = [0, 1, 2]  # L, A, B
-            elif self.colorspace == "LAB-Color":
-                channels_to_match = [1, 2]  # A, B only
-            else:  # LAB-Luminance
-                channels_to_match = [0]  # L only
+            if self.colorspace == "YCbCr":
+                channels_to_match = [0, 1, 2]  # Y, Cb, Cr
+            elif self.colorspace == "YCbCr-Chroma":
+                channels_to_match = [1, 2]  # Cb, Cr only
+            else:  # YCbCr-Luma
+                channels_to_match = [0]  # Y only
 
         # Apply histogram matching to selected channels
         corrected_array = base_array.copy()
@@ -738,10 +729,10 @@ class ColorCorrectInvocation(BaseInvocation, WithMetadata, WithBoard):
                 base_array[:, :, channel_idx], ref_array[:, :, channel_idx]
             )
 
-        # Convert back to RGB if we were in LAB
+        # Convert back to RGB if we were in YCbCr
         if self.colorspace != "RGB":
-            corrected_image = Image.fromarray(corrected_array, mode="LAB")
-            corrected_image = ImageCms.applyTransform(corrected_image, xform_from_lab)
+            corrected_image = Image.fromarray(corrected_array, mode="YCbCr")
+            corrected_image = corrected_image.convert("RGB")
             corrected_array = numpy.asarray(corrected_image, dtype=numpy.uint8)
         else:
             corrected_image = Image.fromarray(corrected_array, mode="RGB")
