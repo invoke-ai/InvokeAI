@@ -674,9 +674,11 @@ class ColorCorrectInvocation(BaseInvocation, WithMetadata, WithBoard):
         source_cdf = source_hist.cumsum()
         reference_cdf = reference_hist.cumsum()
 
-        # Normalize CDFs
-        source_cdf = source_cdf / source_cdf[-1]
-        reference_cdf = reference_cdf / reference_cdf[-1]
+        # Normalize CDFs (avoid division by zero)
+        if source_cdf[-1] > 0:
+            source_cdf = source_cdf / source_cdf[-1]
+        if reference_cdf[-1] > 0:
+            reference_cdf = reference_cdf / reference_cdf[-1]
 
         # Create lookup table using linear interpolation
         lookup_table = numpy.interp(source_cdf, reference_cdf, numpy.arange(256))
