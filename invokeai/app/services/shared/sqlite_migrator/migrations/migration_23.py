@@ -1,5 +1,6 @@
 import json
 import sqlite3
+from copy import deepcopy
 from logging import Logger
 from typing import Any
 
@@ -8,7 +9,14 @@ from pydantic import ValidationError
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, AnyModelConfigValidator
-from invokeai.backend.model_manager.taxonomy import BaseModelType, FluxVariantType, ModelType, SchedulerPredictionType
+from invokeai.backend.model_manager.configs.unknown import Unknown_Config
+from invokeai.backend.model_manager.taxonomy import (
+    BaseModelType,
+    FluxVariantType,
+    ModelFormat,
+    ModelType,
+    SchedulerPredictionType,
+)
 
 
 class Migration23Callback:
@@ -100,7 +108,21 @@ class Migration23Callback:
             # as independent of any specific base model architecture.
             config_dict["base"] = BaseModelType.Any.value
 
-        migrated_config = AnyModelConfigValidator.validate_python(config_dict)
+        try:
+            migrated_config = AnyModelConfigValidator.validate_python(config_dict)
+        except ValidationError as e:
+            self._logger.error("Failed to validate migrated config, attempting to save as unknown model: %s", e)
+            cloned_config_dict = deepcopy(config_dict)
+            cloned_config_dict.pop("base", None)
+            cloned_config_dict.pop("type", None)
+            cloned_config_dict.pop("format", None)
+
+            migrated_config = Unknown_Config(
+                **cloned_config_dict,
+                base=BaseModelType.Unknown,
+                type=ModelType.Unknown,
+                format=ModelFormat.Unknown,
+            )
         return migrated_config
 
 
