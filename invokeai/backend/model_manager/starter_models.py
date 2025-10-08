@@ -37,16 +37,20 @@ cyberrealistic_negative = StarterModel(
 )
 
 # region CLIP Image Encoders
+
+# This is CLIP-ViT-H-14-laion2B-s32B-b79K
 ip_adapter_sd_image_encoder = StarterModel(
     name="IP Adapter SD1.5 Image Encoder",
-    base=BaseModelType.StableDiffusion1,
+    base=BaseModelType.Any,
     source="InvokeAI/ip_adapter_sd_image_encoder",
     description="IP Adapter SD Image Encoder",
     type=ModelType.CLIPVision,
 )
+
+# This is CLIP-ViT-bigG-14-laion2B-39B-b160k
 ip_adapter_sdxl_image_encoder = StarterModel(
     name="IP Adapter SDXL Image Encoder",
-    base=BaseModelType.StableDiffusionXL,
+    base=BaseModelType.Any,
     source="InvokeAI/ip_adapter_sdxl_image_encoder",
     description="IP Adapter SDXL Image Encoder",
     type=ModelType.CLIPVision,
