@@ -694,12 +694,6 @@ class ColorCorrectInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Store original alpha channel
         original_alpha = base_image.getchannel("A")
 
-        # Load mask if provided
-        mask_array = None
-        if self.mask is not None:
-            mask_image = context.images.get_pil(self.mask.image_name, "L")
-            mask_array = numpy.asarray(mask_image, dtype=numpy.uint8) / 255.0
-
         # Convert to working colorspace
         if self.colorspace == "RGB":
             # Work directly in RGB
@@ -731,21 +725,25 @@ class ColorCorrectInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         # Convert back to RGB if we were in YCbCr
         if self.colorspace != "RGB":
-            corrected_image = Image.fromarray(corrected_array, mode="YCbCr")
-            corrected_image = corrected_image.convert("RGB")
-            corrected_array = numpy.asarray(corrected_image, dtype=numpy.uint8)
+            corrected_image = Image.fromarray(corrected_array, mode="YCbCr").convert("RGB")
         else:
             corrected_image = Image.fromarray(corrected_array, mode="RGB")
 
         # Apply mask if provided (white = original, black = result)
-        if mask_array is not None:
-            base_rgb_array = numpy.asarray(base_image.convert("RGB"), dtype=numpy.uint8)
-            # Blend: white (1.0) = original, black (0.0) = corrected result
-            mask_3d = numpy.stack([mask_array] * 3, axis=2)
-            corrected_array = (base_rgb_array * mask_3d + corrected_array * (1 - mask_3d)).astype(numpy.uint8)
+        if self.mask is not None:
+            # Load mask as grayscale
+            mask_image = context.images.get_pil(self.mask.image_name, "L")
+            # Invert mask: Image.paste uses white to paste, but we want white=original, black=result
+            # So we paste the corrected image where mask is black (inverted)
+            inverted_mask = ImageOps.invert(mask_image)
+            # Start with base image, paste corrected where mask is black (now white in inverted)
+            result = base_image.convert("RGB").copy()
+            result.paste(corrected_image, mask=inverted_mask)
+        else:
+            result = corrected_image
 
-        # Create final RGBA image with original alpha
-        result = Image.fromarray(corrected_array, mode="RGB").convert("RGBA")
+        # Convert to RGBA and restore original alpha
+        result = result.convert("RGBA")
         result.putalpha(original_alpha)
 
         # Save and return
