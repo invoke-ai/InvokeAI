@@ -697,8 +697,8 @@ class ColorCorrectInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Load mask if provided
         mask_array = None
         if self.mask is not None:
-            mask_image = context.images.get_pil(self.mask.image_name, "RGBA")
-            mask_array = numpy.asarray(mask_image.convert("L"), dtype=numpy.uint8) / 255.0
+            mask_image = context.images.get_pil(self.mask.image_name, "L")
+            mask_array = numpy.asarray(mask_image, dtype=numpy.uint8) / 255.0
 
         # Convert to working colorspace
         if self.colorspace == "RGB":
@@ -746,12 +746,12 @@ class ColorCorrectInvocation(BaseInvocation, WithMetadata, WithBoard):
         else:
             corrected_image = Image.fromarray(corrected_array, mode="RGB")
 
-        # Apply mask if provided
+        # Apply mask if provided (white = original, black = result)
         if mask_array is not None:
             base_rgb_array = numpy.asarray(base_image.convert("RGB"), dtype=numpy.uint8)
-            # Blend corrected and original based on mask
+            # Blend: white (1.0) = original, black (0.0) = corrected result
             mask_3d = numpy.stack([mask_array] * 3, axis=2)
-            corrected_array = (corrected_array * mask_3d + base_rgb_array * (1 - mask_3d)).astype(numpy.uint8)
+            corrected_array = (base_rgb_array * mask_3d + corrected_array * (1 - mask_3d)).astype(numpy.uint8)
 
         # Create final RGBA image with original alpha
         result = Image.fromarray(corrected_array, mode="RGB").convert("RGBA")
