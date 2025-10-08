@@ -708,7 +708,7 @@ class ColorCorrectInvocation(BaseInvocation, WithMetadata, WithBoard):
             channels_to_match = [0, 1, 2]  # R, G, B
         else:
             # Convert to YCbCr colorspace
-            base_ycbcr = base_image.convert("RGB").convert("YCbCr")
+            base_ycbcr = base_image.convert("YCbCr")
             ref_ycbcr = color_reference.convert("RGB").convert("YCbCr")
 
             base_array = numpy.asarray(base_ycbcr, dtype=numpy.uint8)
