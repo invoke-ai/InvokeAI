@@ -2,8 +2,10 @@
 
 import asyncio
 from logging import Logger
+from pathlib import Path
 
 import torch
+from torchvision.datasets.clevr import json
 
 from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
 from invokeai.app.services.board_images.board_images_default import BoardImagesService
@@ -187,6 +189,17 @@ class ApiDependencies:
         )
 
         ApiDependencies.invoker = Invoker(services)
+        all_models = ApiDependencies.invoker.services.model_manager.store.search_by_attr()
+        for m in all_models:
+            path = Path(m.path)
+            if path.is_absolute():
+                continue
+
+            metadata_path = config.models_path / m.key / "__metadata__.json"
+            print(f"Writing metadata for model {m.name} to {metadata_path}")
+            content = {"source": m.source, "expected_config_attrs": m.model_dump(), "notes": ""}
+            content_json = json.dumps(content, indent=2)
+            metadata_path.write_text(content_json)
         db.clean()
 
     @staticmethod
