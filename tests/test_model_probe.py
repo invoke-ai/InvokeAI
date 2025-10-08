@@ -5,29 +5,26 @@ from typing import Any, get_args
 
 import pydantic
 import pytest
-import torch
 from polyfactory.factories.pydantic_factory import ModelFactory
 from sympy.testing.pytest import slow
-from torch import tensor
 
-from invokeai.backend.model_manager import BaseModelType, ModelFormat, ModelRepoVariant, ModelType, ModelVariantType
-from invokeai.backend.model_manager.config import (
+from invokeai.backend.model_manager.configs.base import Config_Base
+from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
+from invokeai.backend.model_manager.configs.factory import (
     AnyModelConfig,
-    Config_Base,
-    InvalidModelConfigException,
-    MainDiffusersConfig,
     ModelConfigFactory,
-    get_model_discriminator_value,
 )
-from invokeai.backend.model_manager.legacy_probe import (
-    CkptType,
-    ModelProbe,
-    VaeFolderProbe,
-    get_default_settings_control_adapters,
-    get_default_settings_main,
-)
+from invokeai.backend.model_manager.configs.main import Main_Diffusers_SD1_Config, MainModelDefaultSettings
+from invokeai.backend.model_manager.configs.vae import VAE_Diffusers_Config_Base
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.search import ModelSearch
+from invokeai.backend.model_manager.taxonomy import (
+    BaseModelType,
+    ModelFormat,
+    ModelRepoVariant,
+    ModelType,
+    ModelVariantType,
+)
 from invokeai.backend.util.logging import InvokeAILogger
 from scripts.strip_models import StrippedModelOnDisk
 
@@ -44,66 +41,47 @@ logger = InvokeAILogger.get_logger(__file__)
     ],
 )
 def test_get_base_type(vae_path: str, expected_type: BaseModelType, datadir: Path):
-    sd1_vae_path = datadir / "vae" / vae_path
-    probe = VaeFolderProbe(sd1_vae_path)
-    base_type = probe.get_base_type()
-    assert base_type == expected_type
-    repo_variant = probe.get_repo_variant()
-    assert repo_variant == ModelRepoVariant.Default
+    mod = ModelOnDisk(datadir / "vae" / vae_path)
+    config = ModelConfigFactory.from_model_on_disk(mod)
+    assert isinstance(config, VAE_Diffusers_Config_Base)
+    assert config.base == expected_type
+    assert config.repo_variant == ModelRepoVariant.Default
 
 
 def test_repo_variant(datadir: Path):
-    probe = VaeFolderProbe(datadir / "vae" / "taesdxl-fp16")
-    repo_variant = probe.get_repo_variant()
-    assert repo_variant == ModelRepoVariant.FP16
+    mod = ModelOnDisk(datadir / "vae" / "taesdxl-fp16")
+    config = ModelConfigFactory.from_model_on_disk(mod)
+    assert isinstance(config, VAE_Diffusers_Config_Base)
+    assert config.repo_variant == ModelRepoVariant.FP16
 
 
 def test_controlnet_t2i_default_settings():
-    assert get_default_settings_control_adapters("some_canny_model").preprocessor == "canny_image_processor"
-    assert get_default_settings_control_adapters("some_depth_model").preprocessor == "depth_anything_image_processor"
-    assert get_default_settings_control_adapters("some_pose_model").preprocessor == "dw_openpose_image_processor"
-    assert get_default_settings_control_adapters("i like turtles") is None
+    assert ControlAdapterDefaultSettings.from_model_name("some_canny_model").preprocessor == "canny_image_processor"
+    assert (
+        ControlAdapterDefaultSettings.from_model_name("some_depth_model").preprocessor
+        == "depth_anything_image_processor"
+    )
+    assert (
+        ControlAdapterDefaultSettings.from_model_name("some_pose_model").preprocessor == "dw_openpose_image_processor"
+    )
+    assert ControlAdapterDefaultSettings.from_model_name("i like turtles") is None
 
 
 def test_default_settings_main():
-    assert get_default_settings_main(BaseModelType.StableDiffusion1).width == 512
-    assert get_default_settings_main(BaseModelType.StableDiffusion1).height == 512
-    assert get_default_settings_main(BaseModelType.StableDiffusion2).width == 512
-    assert get_default_settings_main(BaseModelType.StableDiffusion2).height == 512
-    assert get_default_settings_main(BaseModelType.StableDiffusionXL).width == 1024
-    assert get_default_settings_main(BaseModelType.StableDiffusionXL).height == 1024
-    assert get_default_settings_main(BaseModelType.StableDiffusionXLRefiner) is None
-    assert get_default_settings_main(BaseModelType.Any) is None
-
-
-def test_probe_handles_state_dict_with_integer_keys(tmp_path: Path):
-    # This structure isn't supported by invoke, but we still need to handle it gracefully.
-    # See https://github.com/invoke-ai/InvokeAI/issues/6044
-    state_dict_with_integer_keys: CkptType = {
-        320: (
-            {
-                "linear1.weight": tensor([1.0]),
-                "linear1.bias": tensor([1.0]),
-                "linear2.weight": tensor([1.0]),
-                "linear2.bias": tensor([1.0]),
-            },
-            {
-                "linear1.weight": tensor([1.0]),
-                "linear1.bias": tensor([1.0]),
-                "linear2.weight": tensor([1.0]),
-                "linear2.bias": tensor([1.0]),
-            },
-        ),
-    }
-    sd_path = tmp_path / "sd.pt"
-    torch.save(state_dict_with_integer_keys, sd_path)
-    with pytest.raises(InvalidModelConfigException):
-        ModelProbe.get_model_type_from_checkpoint(sd_path, state_dict_with_integer_keys)
+    assert MainModelDefaultSettings.from_base(BaseModelType.StableDiffusion1).width == 512
+    assert MainModelDefaultSettings.from_base(BaseModelType.StableDiffusion1).height == 512
+    assert MainModelDefaultSettings.from_base(BaseModelType.StableDiffusion2).width == 512
+    assert MainModelDefaultSettings.from_base(BaseModelType.StableDiffusion2).height == 512
+    assert MainModelDefaultSettings.from_base(BaseModelType.StableDiffusionXL).width == 1024
+    assert MainModelDefaultSettings.from_base(BaseModelType.StableDiffusionXL).height == 1024
+    assert MainModelDefaultSettings.from_base(BaseModelType.StableDiffusionXLRefiner) is None
+    assert MainModelDefaultSettings.from_base(BaseModelType.Any) is None
 
 
 def test_probe_sd1_diffusers_inpainting(datadir: Path):
-    config = ModelProbe.probe(datadir / "sd-1/main/dreamshaper-8-inpainting")
-    assert isinstance(config, MainDiffusersConfig)
+    mod = ModelOnDisk(datadir / "sd-1/main/dreamshaper-8-inpainting")
+    config = ModelConfigFactory.from_model_on_disk(mod)
+    assert isinstance(config, Main_Diffusers_SD1_Config)
     assert config.base is BaseModelType.StableDiffusion1
     assert config.variant is ModelVariantType.Inpaint
     assert config.repo_variant is ModelRepoVariant.FP16
