@@ -98,7 +98,7 @@ def _has_main_keys(state_dict: dict[str | int, Any]) -> bool:
     return False
 
 
-class Main_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
+class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
     """Model config for main checkpoint models."""
 
     format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
@@ -196,19 +196,19 @@ class Main_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
             raise NotAMatchError("state dict does not look like a main model")
 
 
-class Main_Checkpoint_SD1_Config(Main_Checkpoint_Config_Base, Config_Base):
+class Main_Checkpoint_SD1_Config(Main_SD_Checkpoint_Config_Base, Config_Base):
     base: Literal[BaseModelType.StableDiffusion1] = Field(default=BaseModelType.StableDiffusion1)
 
 
-class Main_Checkpoint_SD2_Config(Main_Checkpoint_Config_Base, Config_Base):
+class Main_Checkpoint_SD2_Config(Main_SD_Checkpoint_Config_Base, Config_Base):
     base: Literal[BaseModelType.StableDiffusion2] = Field(default=BaseModelType.StableDiffusion2)
 
 
-class Main_Checkpoint_SDXL_Config(Main_Checkpoint_Config_Base, Config_Base):
+class Main_Checkpoint_SDXL_Config(Main_SD_Checkpoint_Config_Base, Config_Base):
     base: Literal[BaseModelType.StableDiffusionXL] = Field(default=BaseModelType.StableDiffusionXL)
 
 
-class Main_Checkpoint_SDXLRefiner_Config(Main_Checkpoint_Config_Base, Config_Base):
+class Main_Checkpoint_SDXLRefiner_Config(Main_SD_Checkpoint_Config_Base, Config_Base):
     base: Literal[BaseModelType.StableDiffusionXLRefiner] = Field(default=BaseModelType.StableDiffusionXLRefiner)
 
 
@@ -425,7 +425,7 @@ class Main_GGUF_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Bas
             raise NotAMatchError("state dict does not look like GGUF quantized")
 
 
-class Main_Diffusers_Config_Base(Diffusers_Config_Base, Main_Config_Base):
+class Main_SD_Diffusers_Config_Base(Diffusers_Config_Base, Main_Config_Base):
     prediction_type: SchedulerPredictionType = Field()
     variant: ModelVariantType = Field()
 
@@ -525,19 +525,19 @@ class Main_Diffusers_Config_Base(Diffusers_Config_Base, Main_Config_Base):
                 raise NotAMatchError(f"unrecognized unet in_channels {in_channels} for base '{base}'")
 
 
-class Main_Diffusers_SD1_Config(Main_Diffusers_Config_Base, Config_Base):
+class Main_Diffusers_SD1_Config(Main_SD_Diffusers_Config_Base, Config_Base):
     base: Literal[BaseModelType.StableDiffusion1] = Field(BaseModelType.StableDiffusion1)
 
 
-class Main_Diffusers_SD2_Config(Main_Diffusers_Config_Base, Config_Base):
+class Main_Diffusers_SD2_Config(Main_SD_Diffusers_Config_Base, Config_Base):
     base: Literal[BaseModelType.StableDiffusion2] = Field(BaseModelType.StableDiffusion2)
 
 
-class Main_Diffusers_SDXL_Config(Main_Diffusers_Config_Base, Config_Base):
+class Main_Diffusers_SDXL_Config(Main_SD_Diffusers_Config_Base, Config_Base):
     base: Literal[BaseModelType.StableDiffusionXL] = Field(BaseModelType.StableDiffusionXL)
 
 
-class Main_Diffusers_SDXLRefiner_Config(Main_Diffusers_Config_Base, Config_Base):
+class Main_Diffusers_SDXLRefiner_Config(Main_SD_Diffusers_Config_Base, Config_Base):
     base: Literal[BaseModelType.StableDiffusionXLRefiner] = Field(BaseModelType.StableDiffusionXLRefiner)
 
 
