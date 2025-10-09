@@ -649,7 +649,7 @@ class MaskCombineInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Color Correct",
     tags=["image", "color"],
     category="image",
-    version="1.3.0",
+    version="2.0.0",
 )
 class ColorCorrectInvocation(BaseInvocation, WithMetadata, WithBoard):
     """
