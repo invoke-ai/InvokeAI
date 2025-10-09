@@ -45,7 +45,7 @@ class ModelOnDisk:
         if self.path.is_file():
             return {self.path}
         extensions = {".safetensors", ".pt", ".pth", ".ckpt", ".bin", ".gguf"}
-        return {f for f in self.path.rglob("*") if f.suffix in extensions}
+        return {f for f in self.path.rglob("*") if f.suffix in extensions and f.is_file()}
 
     def metadata(self, path: Optional[Path] = None) -> dict[str, str]:
         path = path or self.path
