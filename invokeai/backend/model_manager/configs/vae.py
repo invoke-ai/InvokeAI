@@ -15,6 +15,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
     raise_for_class_name,
     raise_for_override_fields,
     raise_if_not_dir,
+    raise_if_not_file,
     state_dict_has_any_keys_starting_with,
 )
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
@@ -40,7 +41,7 @@ class VAE_Checkpoint_Config_Base(Checkpoint_Config_Base):
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
-        raise_if_not_dir(mod)
+        raise_if_not_file(mod)
 
         raise_for_override_fields(cls, override_fields)
 
