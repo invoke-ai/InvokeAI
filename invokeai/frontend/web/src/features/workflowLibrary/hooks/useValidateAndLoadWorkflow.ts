@@ -1,5 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { createZodErrorSummary, logZodError } from 'common/util/zodErrorLogger';
 import { getIsFormEmpty } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import { $nodeExecutionStates } from 'features/nodes/hooks/useNodeExecutionState';
 import { $templates, workflowLoaded } from 'features/nodes/store/nodesSlice';
@@ -16,7 +17,6 @@ import { useCallback } from 'react';
 import { serializeError } from 'serialize-error';
 import { checkBoardAccess, checkImageAccess, checkModelAccess } from 'services/api/hooks/accessChecks';
 import { z } from 'zod';
-import { fromZodError } from 'zod-validation-error/v4';
 
 const log = logger('workflows');
 
@@ -120,10 +120,46 @@ export const useValidateAndLoadWorkflow = () => {
           });
         } else if (e instanceof z.ZodError) {
           // There was a problem validating the workflow itself
-          const { message } = fromZodError(e, {
-            prefix: t('nodes.workflowValidation'),
-          });
-          log.error({ error: serializeError(e) }, message);
+
+          // Log comprehensive error information for developers
+          logZodError(e, { context: 'Workflow validation' });
+
+          // Create human-readable message for toast with node-specific formatting
+          const pathFormatter = (path: string, message: string) => {
+            const nodeMatch = path.match(/nodes\.(\d+)\.data\.inputs\.([^.]+)(?:\.(.+))?/);
+            const nodeDataMatch = path.match(/nodes\.(\d+)\.data\.([^.]+)/);
+            const nodeMatch2 = path.match(/nodes\.(\d+)\.([^.]+)/);
+
+            if (nodeMatch) {
+              const [, nodeIndex, fieldName, subField] = nodeMatch;
+              const fieldPath = subField ? `${fieldName}.${subField}` : fieldName;
+              return `Node ${parseInt(nodeIndex, 10) + 1} input "${fieldPath}": ${message}`;
+            } else if (nodeDataMatch) {
+              const [, nodeIndex, fieldName] = nodeDataMatch;
+              return `Node ${parseInt(nodeIndex, 10) + 1} data "${fieldName}": ${message}`;
+            } else if (nodeMatch2) {
+              const [, nodeIndex, fieldName] = nodeMatch2;
+              return `Node ${parseInt(nodeIndex, 10) + 1} "${fieldName}": ${message}`;
+            } else if (path.startsWith('nodes.')) {
+              const pathParts = path.split('.');
+              const nodeIndex = pathParts[1];
+              const remainingPath = pathParts.slice(2).join('.');
+              return `Node ${parseInt(nodeIndex, 10) + 1} (${remainingPath || 'general'}): ${message}`;
+            } else {
+              return `${path || 'Workflow'}: ${message}`;
+            }
+          };
+
+          const errorSummary = createZodErrorSummary(e, 10, pathFormatter);
+          const message = `${t('nodes.workflowValidation')}: ${errorSummary}`;
+
+          log.error(
+            {
+              error: serializeError(e),
+              totalIssues: e.issues.length,
+            },
+            `Workflow validation failed with ${e.issues.length} issues: ${message}`
+          );
           toast({
             id: 'UNABLE_TO_VALIDATE_WORKFLOW',
             title: t('nodes.unableToValidateWorkflow'),
