@@ -27,6 +27,7 @@ from invokeai.app.services.model_install.model_install_common import (
     MODEL_SOURCE_TO_TYPE_MAP,
     HFModelSource,
     InstallStatus,
+    InvalidModelConfigException,
     LocalModelSource,
     ModelInstallJob,
     ModelSource,
@@ -599,11 +600,17 @@ class ModelInstallService(ModelInstallServiceBase):
         hash_algo = self._app_config.hashing_algorithm
         fields = config.model_dump()
 
-        return ModelConfigFactory.from_model_on_disk(
+        result = ModelConfigFactory.from_model_on_disk(
             mod=model_path,
             override_fields=deepcopy(fields),
             hash_algo=hash_algo,
+            allow_unknown=self.app_config.allow_unknown_models,
         )
+
+        if result.config is None:
+            raise InvalidModelConfigException(f"Could not identify model type for {model_path}")
+
+        return result.config
 
     def _register(
         self, model_path: Path, config: Optional[ModelRecordChanges] = None, info: Optional[AnyModelConfig] = None

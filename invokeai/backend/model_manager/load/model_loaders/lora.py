@@ -30,6 +30,7 @@ from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import (
     lora_model_from_flux_control_state_dict,
 )
 from invokeai.backend.patches.lora_conversions.flux_diffusers_lora_conversion_utils import (
+    is_state_dict_likely_in_flux_diffusers_format,
     lora_model_from_flux_diffusers_state_dict,
 )
 from invokeai.backend.patches.lora_conversions.flux_kohya_lora_conversion_utils import (
@@ -96,15 +97,19 @@ class LoRALoader(ModelLoader):
             state_dict = convert_sdxl_keys_to_diffusers_format(state_dict)
             model = lora_model_from_sd_state_dict(state_dict=state_dict)
         elif self._model_base == BaseModelType.Flux:
-            if config.format in [ModelFormat.Diffusers, ModelFormat.OMI]:
+            if config.format is ModelFormat.OMI:
                 # HACK(ryand): We set alpha=None for diffusers PEFT format models. These models are typically
                 # distributed as a single file without the associated metadata containing the alpha value. We chose
                 # alpha=None, because this is treated as alpha=rank internally in `LoRALayerBase.scale()`. alpha=rank
                 # is a popular choice. For example, in the diffusers training scripts:
                 # https://github.com/huggingface/diffusers/blob/main/examples/dreambooth/train_dreambooth_lora_flux.py#L1194
+                #
+                # We assume the same for LyCORIS models in diffusers key format.
                 model = lora_model_from_flux_diffusers_state_dict(state_dict=state_dict, alpha=None)
-            elif config.format == ModelFormat.LyCORIS:
-                if is_state_dict_likely_in_flux_kohya_format(state_dict=state_dict):
+            elif config.format is ModelFormat.LyCORIS:
+                if is_state_dict_likely_in_flux_diffusers_format(state_dict=state_dict):
+                    model = lora_model_from_flux_diffusers_state_dict(state_dict=state_dict, alpha=None)
+                elif is_state_dict_likely_in_flux_kohya_format(state_dict=state_dict):
                     model = lora_model_from_flux_kohya_state_dict(state_dict=state_dict)
                 elif is_state_dict_likely_in_flux_onetrainer_format(state_dict=state_dict):
                     model = lora_model_from_flux_onetrainer_state_dict(state_dict=state_dict)
