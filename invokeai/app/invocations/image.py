@@ -689,21 +689,20 @@ class ColorCorrectInvocation(BaseInvocation, WithMetadata, WithBoard):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         # Load images as RGBA
         base_image = context.images.get_pil(self.base_image.image_name, "RGBA")
-        color_reference = context.images.get_pil(self.color_reference.image_name, "RGBA")
 
         # Store original alpha channel
         original_alpha = base_image.getchannel("A")
 
         # Convert to working colorspace
         if self.colorspace == "RGB":
-            # Work directly in RGB
             base_array = numpy.asarray(base_image.convert("RGB"), dtype=numpy.uint8)
-            ref_array = numpy.asarray(color_reference.convert("RGB"), dtype=numpy.uint8)
+            ref_rgb = context.images.get_pil(self.color_reference.image_name, "RGB")
+            ref_array = numpy.asarray(ref_rgb, dtype=numpy.uint8)
             channels_to_match = [0, 1, 2]  # R, G, B
         else:
             # Convert to YCbCr colorspace
             base_ycbcr = base_image.convert("YCbCr")
-            ref_ycbcr = color_reference.convert("YCbCr")
+            ref_ycbcr = context.images.get_pil(self.color_reference.image_name, "YCbCr")
 
             base_array = numpy.asarray(base_ycbcr, dtype=numpy.uint8)
             ref_array = numpy.asarray(ref_ycbcr, dtype=numpy.uint8)

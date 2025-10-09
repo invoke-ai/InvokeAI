@@ -4776,8 +4776,8 @@ export type components = {
         };
         /**
          * Color Correct
-         * @description Shifts the colors of a target image to match the reference image, optionally
-         *     using a mask to only color-correct certain regions of the target image.
+         * @description Matches the color histogram of a base image to a reference image, optionally
+         *     using a mask to only color-correct certain regions of the base image.
          */
         ColorCorrectInvocation: {
             /**
@@ -4811,23 +4811,24 @@ export type components = {
              * @description The image to color-correct
              * @default null
              */
-            image?: components["schemas"]["ImageField"] | null;
+            base_image?: components["schemas"]["ImageField"] | null;
             /**
              * @description Reference image for color-correction
              * @default null
              */
-            reference?: components["schemas"]["ImageField"] | null;
+            color_reference?: components["schemas"]["ImageField"] | null;
             /**
-             * @description Mask to use when applying color-correction
+             * @description Optional mask to limit color correction area
              * @default null
              */
             mask?: components["schemas"]["ImageField"] | null;
             /**
-             * Mask Blur Radius
-             * @description Mask blur radius
-             * @default 8
+             * Colorspace
+             * @description Colorspace in which to apply histogram matching
+             * @default RGB
+             * @enum {string}
              */
-            mask_blur_radius?: number;
+            colorspace?: "RGB" | "YCbCr" | "YCbCr-Chroma" | "YCbCr-Luma";
             /**
              * type
              * @default color_correct
