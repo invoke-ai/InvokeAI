@@ -661,7 +661,7 @@ class ColorCorrectInvocation(BaseInvocation, WithMetadata, WithBoard):
     color_reference: ImageField = InputField(description="Reference image for color-correction")
     mask: Optional[ImageField] = InputField(default=None, description="Optional mask to limit color correction area")
     colorspace: Literal["RGB", "YCbCr", "YCbCr-Chroma", "YCbCr-Luma"] = InputField(
-        default="RGB", description="Colorspace in which to apply histogram matching"
+        default="RGB", description="Colorspace in which to apply histogram matching", title="Color Space"
     )
 
     def _match_histogram_channel(self, source: numpy.ndarray, reference: numpy.ndarray) -> numpy.ndarray:
