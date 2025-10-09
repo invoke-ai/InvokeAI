@@ -52,8 +52,10 @@ class Migration23Callback:
         # In v6.8.0 we made some improvements to the model taxonomy and the model config schemas. There are a changes
         # we need to make to old configs to bring them up to date.
 
-        base = config_dict.get("base")
         type = config_dict.get("type")
+        format = config_dict.get("format")
+        base = config_dict.get("base")
+
         if base == BaseModelType.Flux.value and type == ModelType.Main.value:
             # Prior to v6.8.0, we used an awkward combination of `config_path` and `variant` to distinguish between FLUX
             # variants.
@@ -90,7 +92,7 @@ class Migration23Callback:
                 BaseModelType.StableDiffusionXL.value,
                 BaseModelType.StableDiffusionXLRefiner.value,
             }
-            and type == "main"
+            and type == ModelType.Main.value
         ):
             # Prior to v6.8.0, the prediction_type field was optional and would default to Epsilon if not present.
             # We now make it explicit and always present. Use the existing value if present, otherwise default to
@@ -98,6 +100,20 @@ class Migration23Callback:
             #
             # It's only on SD1.x, SD2.x, and SDXL main models.
             config_dict["prediction_type"] = config_dict.get("prediction_type", SchedulerPredictionType.Epsilon.value)
+
+        if base == BaseModelType.Flux and type == ModelType.LoRA.value and format == ModelFormat.Diffusers.value:
+            # Prior to v6.8.0, we used the Diffusers format for FLUX LoRA models that used the diffusers _key_
+            # structure. This was misleading, as everywhere else in the application, we used the Diffusers format
+            # to indicate that the model files were in the Diffusers _file_ format (i.e. a directory containing
+            # the weights and config files).
+            #
+            # At runtime, we check the LoRA's state dict directly to determine the key structure, so we do not need
+            # to rely on the format field for this purpose. As of v6.8.0, we always use the LyCORIS format for single-
+            # file LoRAs, regardless of the key structure.
+            #
+            # This change allows LoRA model identification to not need a special case for FLUX LoRAs in the diffusers
+            # key format.
+            config_dict["format"] = ModelFormat.LyCORIS.value
 
         if type == ModelType.CLIPVision.value:
             # Prior to v6.8.0, some CLIP Vision models were associated with a specific base model architecture:

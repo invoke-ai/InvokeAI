@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     Union,
@@ -241,6 +242,30 @@ additional logic in the future.
 """
 
 
+@dataclass
+class ModelClassificationResult:
+    """Result of attempting to classify a model on disk into a specific model config.
+
+    Attributes:
+        match: The best matching model config, or None if no match was found.
+        results: A mapping of model config class names to either an instance of that class (if it matched)
+            or an Exception (if it didn't match or an error occurred during matching).
+    """
+
+    config: AnyModelConfig | None
+    details: dict[str, AnyModelConfig | Exception]
+
+    @property
+    def all_matches(self) -> list[AnyModelConfig]:
+        """Returns a list of all matching model configs found."""
+        return [r for r in self.details.values() if isinstance(r, Config_Base)]
+
+    @property
+    def match_count(self) -> int:
+        """Returns the number of matching model configs found."""
+        return len(self.all_matches)
+
+
 class ModelConfigFactory:
     @staticmethod
     def from_dict(fields: dict[str, Any]) -> AnyModelConfig:
@@ -311,23 +336,25 @@ class ModelConfigFactory:
             path: The path to validate
 
         Raises:
-            RuntimeError: If the path doesn't look like a model
+            ValueError: If the path doesn't look like a model
         """
         if path.is_file():
             # For files, just check the extension
             if path.suffix.lower() not in _MODEL_EXTENSIONS:
-                raise RuntimeError(
+                raise ValueError(
                     f"File extension {path.suffix} is not a recognized model format. "
                     f"Expected one of: {', '.join(sorted(_MODEL_EXTENSIONS))}"
                 )
         else:
             # For directories, do a quick file count check with early exit
             total_files = 0
-            for item in path.rglob("*"):
+            # Ignore hidden files and directories
+            paths_to_check = (p for p in path.rglob("*") if not p.name.startswith("."))
+            for item in paths_to_check:
                 if item.is_file():
                     total_files += 1
                     if total_files > _MAX_FILES_IN_MODEL_DIR:
-                        raise RuntimeError(
+                        raise ValueError(
                             f"Directory contains more than {_MAX_FILES_IN_MODEL_DIR} files. "
                             "This looks like a general-purpose directory rather than a model. "
                             "Please provide a path to a specific model file or model directory."
@@ -355,22 +382,58 @@ class ModelConfigFactory:
                 return False
 
             if not find_model_files(path, 0):
-                raise RuntimeError(
+                raise ValueError(
                     f"No model files or config files found in directory {path}. "
                     f"Expected to find model files with extensions: {', '.join(sorted(_MODEL_EXTENSIONS))} "
                     f"or config files: {', '.join(sorted(_CONFIG_FILES))}"
                 )
 
     @staticmethod
+    def matches_sort_key(m: AnyModelConfig) -> int:
+        """Sort key function to prioritize model config matches in case of multiple matches."""
+
+        # It is possible that we have multiple matches. We need to prioritize them.
+
+        # Known cases where multiple matches can occur:
+        # - SD main models can look like a LoRA when they have merged in LoRA weights. Prefer the main model.
+        # - SD main models in diffusers format can look like a CLIP Embed; they have a text_encoder folder with
+        #   a config.json file. Prefer the main model.
+
+        # Given the above cases, we can prioritize the matches by type. If we find more cases, we may need a more
+        # sophisticated approach.
+        match m.type:
+            case ModelType.Main:
+                return 0
+            case ModelType.LoRA:
+                return 1
+            case ModelType.CLIPEmbed:
+                return 2
+            case _:
+                return 3
+
+    @staticmethod
     def from_model_on_disk(
         mod: str | Path | ModelOnDisk,
         override_fields: dict[str, Any] | None = None,
         hash_algo: HASHING_ALGORITHMS = "blake3_single",
-    ) -> AnyModelConfig:
-        """
-        Returns the best matching ModelConfig instance from a model's file/folder path.
-        Raises InvalidModelConfigException if no valid configuration is found.
-        Created to deprecate ModelProbe.probe
+        allow_unknown: bool = True,
+    ) -> ModelClassificationResult:
+        """Classify a model on disk and return the best matching model config.
+
+        Args:
+            mod: The model on disk to classify. Can be a path (str or Path) or a ModelOnDisk instance.
+            override_fields: Optional dictionary of fields to override. These fields will take precedence
+                over the values extracted from the model on disk, but this cannot force a match if the
+                model on disk doesn't actually match the config class.
+            hash_algo: The hashing algorithm to use when computing the model hash if needed.
+
+        Returns:
+            A ModelClassificationResult containing the best matching model config (or None if no match)
+            and a mapping of all attempted model config classes to either an instance of that class (if it matched)
+            or an Exception (if it didn't match or an error occurred during matching).
+
+        Raises:
+            ValueError: If the provided path doesn't look like a model.
         """
         if isinstance(mod, Path | str):
             mod = ModelOnDisk(Path(mod), hash_algo)
@@ -384,93 +447,57 @@ class ModelConfigFactory:
 
         # Store results as a mapping of config class to either an instance of that class or an exception
         # that was raised when trying to build it.
-        results: dict[str, AnyModelConfig | Exception] = {}
+        details: dict[str, AnyModelConfig | Exception] = {}
 
         # Try to build an instance of each model config class that uses the classify API.
         # Each class will either return an instance of itself or raise NotAMatch if it doesn't match.
         # Other exceptions may be raised if something unexpected happens during matching or building.
-        for config_class in Config_Base.CONFIG_CLASSES:
-            class_name = config_class.__name__
+        for candidate_class in filter(lambda x: x is not Unknown_Config, Config_Base.CONFIG_CLASSES):
+            candidate_name = candidate_class.__name__
             try:
-                instance = config_class.from_model_on_disk(mod, fields)
                 # Technically, from_model_on_disk returns a Config_Base, but in practice it will always be a member of
                 # the AnyModelConfig union.
-                results[class_name] = instance  # type: ignore
+                details[candidate_name] = candidate_class.from_model_on_disk(mod, fields)  # type: ignore
             except NotAMatchError as e:
-                results[class_name] = e
-                logger.debug(f"No match for {config_class.__name__} on model {mod.name}")
+                # This means the model didn't match this config class. It's not an error, just no match.
+                details[candidate_name] = e
             except ValidationError as e:
                 # This means the model matched, but we couldn't create the pydantic model instance for the config.
                 # Maybe invalid overrides were provided?
-                results[class_name] = e
-                logger.warning(f"Schema validation error for {config_class.__name__} on model {mod.name}: {e}")
+                details[candidate_name] = e
             except Exception as e:
-                results[class_name] = e
-                logger.debug(f"Unexpected exception while matching {mod.name} to {config_class.__name__}: {e}")
+                # Some other unexpected error occurred. Store the exception for reporting later.
+                details[candidate_name] = e
 
         # Extract just the successful matches
-        # NOTE: This will include Unknown_Config matches, which we will handle later.
-        matches = [r for r in results.values() if isinstance(r, Config_Base)]
+        matches = [r for r in details.values() if isinstance(r, Config_Base)]
 
         if not matches:
-            # No matches at all. This should be very rare, but just in case, we will fall back to Unknown_Config.
-            msg = f"No model config matched for model {mod.path}"
-            logger.error(msg)
-            raise RuntimeError(msg)
+            if not allow_unknown:
+                # No matches and we are not allowed to fall back to Unknown_Config
+                return ModelClassificationResult(config=None, details=details)
+            else:
+                # Fall back to Unknown_Config
+                # This should always succeed as Unknown_Config.from_model_on_disk never raises NotAMatch
+                config = Unknown_Config.from_model_on_disk(mod, fields)
+                details[Unknown_Config.__name__] = config
+                return ModelClassificationResult(config=config, details=details)
 
-        # It is possible that we have multiple matches. We need to prioritize them.
-        #
-        # Known cases where multiple matches can occur:
-        # - SD main models can look like a LoRA when they have merged in LoRA weights. Prefer the main model.
-        # - SD main models in diffusers format can look like a CLIP Embed; they have a text_encoder folder with
-        #   a config.json file. Prefer the main model.
-        #
-        # Given the above cases, we can prioritize the matches by type. If we find more cases, we may need a more
-        # sophisticated approach.
-        #
-        # Unknown models should always be the last resort fallback.
-        def sort_key(m: AnyModelConfig) -> int:
-            match m.type:
-                case ModelType.Main:
-                    return 0
-                case ModelType.LoRA:
-                    return 1
-                case ModelType.CLIPEmbed:
-                    return 2
-                case ModelType.Unknown:
-                    # Unknown should always be tried last as a fallback
-                    return 999
-                case _:
-                    return 3
-
-        matches.sort(key=sort_key)
-
-        # Warn if we have multiple non-unknown matches
-        has_unknown = any(isinstance(m, Unknown_Config) for m in matches)
-        real_match_count = len(matches) - (1 if has_unknown else 0)
-        if real_match_count > 1:
-            logger.warning(
-                f"Multiple model config classes matched for model {mod.path}: {[type(m).__name__ for m in matches]}."
-            )
-
-        instance = matches[0]
-        if isinstance(instance, Unknown_Config):
-            logger.warning(f"Unable to identify model {mod.path}, falling back to Unknown_Config")
-        else:
-            logger.info(f"Model {mod.path} classified as {type(instance).__name__}")
+        matches.sort(key=ModelConfigFactory.matches_sort_key)
+        config = matches[0]
 
         # Now do any post-processing needed for specific model types/bases/etc.
-        match instance.type:
+        match config.type:
             case ModelType.Main:
-                instance.default_settings = MainModelDefaultSettings.from_base(instance.base)
+                config.default_settings = MainModelDefaultSettings.from_base(config.base)
             case ModelType.ControlNet | ModelType.T2IAdapter | ModelType.ControlLoRa:
-                instance.default_settings = ControlAdapterDefaultSettings.from_model_name(instance.name)
+                config.default_settings = ControlAdapterDefaultSettings.from_model_name(config.name)
             case ModelType.LoRA:
-                instance.default_settings = LoraModelDefaultSettings()
+                config.default_settings = LoraModelDefaultSettings()
             case _:
                 pass
 
-        return instance
+        return ModelClassificationResult(config=config, details=details)
 
 
 MODEL_NAME_TO_PREPROCESSOR = {

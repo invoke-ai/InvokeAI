@@ -116,15 +116,18 @@ class VAE_Diffusers_Config_Base(Diffusers_Config_Base):
             },
         )
 
-        cls._validate_base(mod)
+        # Unfortunately it is difficult to distinguish SD1 and SDXL VAEs by config alone, so we may need to
+        # guess based on name if the config is inconclusive.
+        override_name = override_fields.get("name")
+        cls._validate_base(mod, override_name)
 
         return cls(**override_fields)
 
     @classmethod
-    def _validate_base(cls, mod: ModelOnDisk) -> None:
+    def _validate_base(cls, mod: ModelOnDisk, override_name: str | None = None) -> None:
         """Raise `NotAMatch` if the model base does not match this config class."""
         expected_base = cls.model_fields["base"].default
-        recognized_base = cls._get_base_or_raise(mod)
+        recognized_base = cls._get_base_or_raise(mod, override_name)
         if expected_base is not recognized_base:
             raise NotAMatchError(f"base is {recognized_base}, not {expected_base}")
 
@@ -134,25 +137,18 @@ class VAE_Diffusers_Config_Base(Diffusers_Config_Base):
         return config.get("scaling_factor", 0) == 0.13025 and config.get("sample_size") in [512, 1024]
 
     @classmethod
-    def _name_looks_like_sdxl(cls, mod: ModelOnDisk) -> bool:
+    def _name_looks_like_sdxl(cls, mod: ModelOnDisk, override_name: str | None = None) -> bool:
         # Heuristic: SD and SDXL VAE are the same shape (3-channel RGB to 4-channel float scaled down
         # by a factor of 8), so we can't necessarily tell them apart by config hyperparameters. Best
         # we can do is guess based on name.
-        return bool(re.search(r"xl\b", cls._guess_name(mod), re.IGNORECASE))
+        return bool(re.search(r"xl\b", override_name or mod.path.name, re.IGNORECASE))
 
     @classmethod
-    def _guess_name(cls, mod: ModelOnDisk) -> str:
-        name = mod.path.name
-        if name == "vae":
-            name = mod.path.parent.name
-        return name
-
-    @classmethod
-    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+    def _get_base_or_raise(cls, mod: ModelOnDisk, override_name: str | None = None) -> BaseModelType:
         config_dict = get_config_dict_or_raise(common_config_paths(mod.path))
         if cls._config_looks_like_sdxl(config_dict):
             return BaseModelType.StableDiffusionXL
-        elif cls._name_looks_like_sdxl(mod):
+        elif cls._name_looks_like_sdxl(mod, override_name):
             return BaseModelType.StableDiffusionXL
         else:
             # TODO(psyche): Figure out how to positively identify SD1 here, and raise if we can't. Until then, YOLO.

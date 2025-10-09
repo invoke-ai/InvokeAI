@@ -15,6 +15,12 @@ from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant, ModelSourceType
 
 
+class InvalidModelConfigException(Exception):
+    """Raised when a model configuration is invalid."""
+
+    pass
+
+
 class InstallStatus(str, Enum):
     """State of an install job running in the background."""
 

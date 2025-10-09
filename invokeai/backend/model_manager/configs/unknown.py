@@ -5,7 +5,6 @@ from pydantic import Field
 
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.model_manager.configs.base import Config_Base
-from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
@@ -30,8 +29,6 @@ class Unknown_Config(Config_Base):
         Note: Basic path validation (file extensions, directory structure) is already
         performed by ModelConfigFactory before this method is called.
         """
-        if not app_config.allow_unknown_models:
-            raise NotAMatchError("unknown models are not allowed by configuration")
 
         cloned_override_fields = deepcopy(override_fields)
         cloned_override_fields.pop("base", None)
