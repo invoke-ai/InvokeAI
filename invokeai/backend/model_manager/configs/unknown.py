@@ -36,7 +36,7 @@ class Unknown_Config(Config_Base):
         cloned_override_fields.pop("format", None)
 
         return cls(
-            **override_fields,
+            **cloned_override_fields,
             # Override the type/format/base to ensure it's marked as unknown.
             base=BaseModelType.Unknown,
             type=ModelType.Unknown,
