@@ -4,3 +4,4 @@
 * text=auto
 docker/** text eol=lf
 tests/test_model_probe/stripped_models/** filter=lfs diff=lfs merge=lfs -text
+tests/model_identification/stripped_models/** filter=lfs diff=lfs merge=lfs -text
