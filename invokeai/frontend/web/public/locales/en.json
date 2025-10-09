@@ -2794,9 +2794,9 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "Select Object v2: Improved object selection with point and box inputs or text prompts.",
-            "Raster Layer Adjustments: Easily adjust layer brightness, contrast, saturation, curves and more.",
-            "Prompt History: Review and quickly recall your last 100 prompts."
+            "Crop tool for Ref Images",
+            "Improved Model Manager tab UI",
+            "Navigate prompt history with keyboard shortcuts (alt/option + up/down)"
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
