@@ -4823,7 +4823,7 @@ export type components = {
              */
             mask?: components["schemas"]["ImageField"] | null;
             /**
-             * Colorspace
+             * Color Space
              * @description Colorspace in which to apply histogram matching
              * @default RGB
              * @enum {string}
