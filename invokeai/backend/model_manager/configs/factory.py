@@ -408,6 +408,8 @@ class ModelConfigFactory:
                 results[class_name] = e
                 logger.debug(f"Unexpected exception while matching {mod.name} to {config_class.__name__}: {e}")
 
+        # Extract just the successful matches
+        # NOTE: This will include Unknown_Config matches, which we will handle later.
         matches = [r for r in results.values() if isinstance(r, Config_Base)]
 
         if not matches:
@@ -443,7 +445,10 @@ class ModelConfigFactory:
 
         matches.sort(key=sort_key)
 
-        if len(matches) > 1:
+        # Warn if we have multiple non-unknown matches
+        has_unknown = any(isinstance(m, Unknown_Config) for m in matches)
+        real_match_count = len(matches) - (1 if has_unknown else 0)
+        if real_match_count > 1:
             logger.warning(
                 f"Multiple model config classes matched for model {mod.path}: {[type(m).__name__ for m in matches]}."
             )
