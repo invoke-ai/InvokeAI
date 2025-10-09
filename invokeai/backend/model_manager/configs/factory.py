@@ -457,15 +457,7 @@ class ModelConfigFactory:
         # Now do any post-processing needed for specific model types/bases/etc.
         match instance.type:
             case ModelType.Main:
-                match instance.base:
-                    case BaseModelType.StableDiffusion1:
-                        instance.default_settings = MainModelDefaultSettings(width=512, height=512)
-                    case BaseModelType.StableDiffusion2:
-                        instance.default_settings = MainModelDefaultSettings(width=768, height=768)
-                    case BaseModelType.StableDiffusionXL:
-                        instance.default_settings = MainModelDefaultSettings(width=1024, height=1024)
-                    case _:
-                        pass
+                instance.default_settings = MainModelDefaultSettings.from_base(instance.base)
             case ModelType.ControlNet | ModelType.T2IAdapter | ModelType.ControlLoRa:
                 instance.default_settings = ControlAdapterDefaultSettings.from_model_name(instance.name)
             case ModelType.LoRA:
