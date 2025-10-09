@@ -734,7 +734,10 @@ class ColorCorrectInvocation(BaseInvocation, WithMetadata, WithBoard):
             mask_image = context.images.get_pil(self.mask.image_name, "L")
             # Start with corrected image, paste base image where mask is white
             result = corrected_image.copy()
-            result.paste(base_image.convert("RGB"), mask=mask_image)
+            if mask_image.size != result.size:
+                raise ValueError("Mask size must match base image size.")
+            else:
+                result.paste(base_image.convert("RGB"), mask=mask_image)
         else:
             result = corrected_image
 
