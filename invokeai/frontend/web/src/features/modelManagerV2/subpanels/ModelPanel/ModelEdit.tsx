@@ -8,6 +8,7 @@ import {
   Heading,
   Input,
   SimpleGrid,
+  Text,
   Textarea,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
@@ -126,6 +127,10 @@ export const ModelEdit = memo(({ modelConfig }: Props) => {
             <Heading as="h3" fontSize="md" mt="4">
               {t('modelManager.modelSettings')}
             </Heading>
+            <Text variant="subtext" color="warning.300">
+              Careful! Change these settings only if Invoke didn&apos;t detect them correctly when you installed the
+              model. If you choose the wrong settings, the model may not work properly.
+            </Text>
             <SimpleGrid columns={2} gap={4}>
               <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                 <FormLabel>{t('modelManager.modelType')}</FormLabel>
