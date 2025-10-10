@@ -2,6 +2,7 @@
 Test the model installer
 """
 
+import gc
 import platform
 import uuid
 from pathlib import Path
@@ -220,6 +221,8 @@ def test_delete_install(
     model_record = store.get_model(key)
     assert (mm2_app_config.models_path / model_record.path).exists()
     assert not embedding_file.exists()
+    # ensure file handles are released on Windows
+    gc.collect()
     mm2_installer.delete(key)
     # after deletion, installed copy should not exist
     assert not (mm2_app_config.models_path / model_record.path).exists()
