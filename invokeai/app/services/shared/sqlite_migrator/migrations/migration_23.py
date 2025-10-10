@@ -49,7 +49,7 @@ class Migration23Callback:
     def _parse_and_migrate_config(self, config_json: Any) -> AnyModelConfig:
         config_dict: dict[str, Any] = json.loads(config_json)
 
-        # In v6.8.0 we made some improvements to the model taxonomy and the model config schemas. There are a changes
+        # In v6.9.0 we made some improvements to the model taxonomy and the model config schemas. There are a changes
         # we need to make to old configs to bring them up to date.
 
         type = config_dict.get("type")
@@ -57,7 +57,7 @@ class Migration23Callback:
         base = config_dict.get("base")
 
         if base == BaseModelType.Flux.value and type == ModelType.Main.value:
-            # Prior to v6.8.0, we used an awkward combination of `config_path` and `variant` to distinguish between FLUX
+            # Prior to v6.9.0, we used an awkward combination of `config_path` and `variant` to distinguish between FLUX
             # variants.
             #
             # `config_path` was set to one of:
@@ -94,7 +94,7 @@ class Migration23Callback:
             }
             and type == ModelType.Main.value
         ):
-            # Prior to v6.8.0, the prediction_type field was optional and would default to Epsilon if not present.
+            # Prior to v6.9.0, the prediction_type field was optional and would default to Epsilon if not present.
             # We now make it explicit and always present. Use the existing value if present, otherwise default to
             # Epsilon, matching the probe logic.
             #
@@ -102,13 +102,13 @@ class Migration23Callback:
             config_dict["prediction_type"] = config_dict.get("prediction_type", SchedulerPredictionType.Epsilon.value)
 
         if base == BaseModelType.Flux and type == ModelType.LoRA.value and format == ModelFormat.Diffusers.value:
-            # Prior to v6.8.0, we used the Diffusers format for FLUX LoRA models that used the diffusers _key_
+            # Prior to v6.9.0, we used the Diffusers format for FLUX LoRA models that used the diffusers _key_
             # structure. This was misleading, as everywhere else in the application, we used the Diffusers format
             # to indicate that the model files were in the Diffusers _file_ format (i.e. a directory containing
             # the weights and config files).
             #
             # At runtime, we check the LoRA's state dict directly to determine the key structure, so we do not need
-            # to rely on the format field for this purpose. As of v6.8.0, we always use the LyCORIS format for single-
+            # to rely on the format field for this purpose. As of v6.9.0, we always use the LyCORIS format for single-
             # file LoRAs, regardless of the key structure.
             #
             # This change allows LoRA model identification to not need a special case for FLUX LoRAs in the diffusers
@@ -116,7 +116,7 @@ class Migration23Callback:
             config_dict["format"] = ModelFormat.LyCORIS.value
 
         if type == ModelType.CLIPVision.value:
-            # Prior to v6.8.0, some CLIP Vision models were associated with a specific base model architecture:
+            # Prior to v6.9.0, some CLIP Vision models were associated with a specific base model architecture:
             # - CLIP-ViT-bigG-14-laion2B-39B-b160k is the image encoder for SDXL IP Adapter and was associated with SDXL
             # - CLIP-ViT-H-14-laion2B-s32B-b79K is the image encoder for SD1.5 IP Adapter and was associated with SD1.5
             #
@@ -145,7 +145,7 @@ class Migration23Callback:
 def build_migration_23(app_config: InvokeAIAppConfig, logger: Logger) -> Migration:
     """Builds the migration object for migrating from version 22 to version 23.
 
-    This migration updates model configurations to the latest config schemas for v6.8.0.
+    This migration updates model configurations to the latest config schemas for v6.9.0.
     """
 
     return Migration(
