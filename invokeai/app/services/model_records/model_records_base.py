@@ -127,12 +127,14 @@ class ModelRecordServiceBase(ABC):
         pass
 
     @abstractmethod
-    def update_model(self, key: str, changes: ModelRecordChanges) -> AnyModelConfig:
+    def update_model(self, key: str, changes: ModelRecordChanges, allow_class_change: bool = False) -> AnyModelConfig:
         """
         Update the model, returning the updated version.
 
         :param key: Unique key for the model to be updated.
         :param changes: A set of changes to apply to this model. Changes are validated before being written.
+        :param allow_class_change: If True, allows changes that would change the model config class. For example,
+        changing a LoRA into a Main model. This does not disable validation, so the changes must still be valid.
         """
         pass
 
