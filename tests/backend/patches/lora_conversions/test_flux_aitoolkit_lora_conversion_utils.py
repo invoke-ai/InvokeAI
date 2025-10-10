@@ -3,7 +3,7 @@ import pytest
 
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.util import get_flux_transformers_params
-from invokeai.backend.model_manager.taxonomy import ModelVariantType
+from invokeai.backend.model_manager.taxonomy import FluxVariantType
 from invokeai.backend.patches.lora_conversions.flux_aitoolkit_lora_conversion_utils import (
     _group_state_by_submodel,
     is_state_dict_likely_in_flux_aitoolkit_format,
@@ -45,7 +45,7 @@ def test_flux_aitoolkit_transformer_state_dict_is_in_invoke_format():
 
     # Initialize a FLUX model on the meta device.
     with accelerate.init_empty_weights():
-        model = Flux(get_flux_transformers_params(ModelVariantType.FluxSchnell))
+        model = Flux(get_flux_transformers_params(FluxVariantType.Schnell))
     model_keys = set(model.state_dict().keys())
 
     for converted_key_prefix in converted_key_prefixes:
