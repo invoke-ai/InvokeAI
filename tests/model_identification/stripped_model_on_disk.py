@@ -67,7 +67,7 @@ class StrippedModelOnDisk(ModelOnDisk):
                 )
             case {"shape": shape, "dtype": dtype_str, "fakeTensor": True}:
                 dtype = cls.STR_TO_DTYPE[dtype_str]
-                return torch.empty(shape, dtype=dtype)
+                return torch.empty(shape, dtype=dtype, device="meta")
             case dict():
                 return {k: cls.dress(v) for k, v in v.items()}
             case list() | tuple():
