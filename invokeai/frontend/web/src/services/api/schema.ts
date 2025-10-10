@@ -7204,7 +7204,7 @@ export type components = {
             /**
              * Use Cache
              * @description Whether or not to use the cache
-             * @default false
+             * @default true
              */
             use_cache?: boolean;
             /**
@@ -20477,7 +20477,7 @@ export type components = {
             /**
              * Use Cache
              * @description Whether or not to use the cache
-             * @default false
+             * @default true
              */
             use_cache?: boolean;
             /**
@@ -20524,7 +20524,7 @@ export type components = {
             /**
              * Use Cache
              * @description Whether or not to use the cache
-             * @default false
+             * @default true
              */
             use_cache?: boolean;
             /**
@@ -20565,7 +20565,7 @@ export type components = {
             /**
              * Use Cache
              * @description Whether or not to use the cache
-             * @default false
+             * @default true
              */
             use_cache?: boolean;
             /**
@@ -21656,7 +21656,7 @@ export type components = {
             /**
              * Use Cache
              * @description Whether or not to use the cache
-             * @default false
+             * @default true
              */
             use_cache?: boolean;
             /**
@@ -24545,7 +24545,7 @@ export type components = {
         };
         /**
          * Unknown_Config
-         * @description Model config for unknown models, used as a fallback when we cannot identify a model.
+         * @description Model config for unknown models, used as a fallback when we cannot positively identify a model.
          */
         Unknown_Config: {
             /**
