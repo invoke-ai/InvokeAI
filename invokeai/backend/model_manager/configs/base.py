@@ -155,21 +155,21 @@ class Config_Base(ABC, BaseModel):
                 if isinstance(type_, Enum):
                     type_ = str(type_.value)
                 elif not isinstance(type_, str):
-                    raise TypeError("Model config dict 'type' field must be a string or Enum")
+                    raise ValueError("Model config dict 'type' field must be a string or Enum")
                 tag_strings.append(type_)
 
             if format_ := v.get("format"):
                 if isinstance(format_, Enum):
                     format_ = str(format_.value)
                 elif not isinstance(format_, str):
-                    raise TypeError("Model config dict 'format' field must be a string or Enum")
+                    raise ValueError("Model config dict 'format' field must be a string or Enum")
                 tag_strings.append(format_)
 
             if base_ := v.get("base"):
                 if isinstance(base_, Enum):
                     base_ = str(base_.value)
                 elif not isinstance(base_, str):
-                    raise TypeError("Model config dict 'base' field must be a string or Enum")
+                    raise ValueError("Model config dict 'base' field must be a string or Enum")
                 tag_strings.append(base_)
 
             # Special case: CLIP Embed models also need the variant to distinguish them.
@@ -182,14 +182,16 @@ class Config_Base(ABC, BaseModel):
                     if isinstance(variant_, Enum):
                         variant_ = variant_.value
                     elif not isinstance(variant_, str):
-                        raise TypeError("Model config dict 'variant' field must be a string or Enum")
+                        raise ValueError("Model config dict 'variant' field must be a string or Enum")
                     tag_strings.append(variant_)
                 else:
                     raise ValueError("CLIP Embed model config dict must include a 'variant' field")
 
             return ".".join(tag_strings)
         else:
-            raise TypeError("Model config discriminator value must be computed from a dict or ModelConfigBase instance")
+            raise ValueError(
+                "Model config discriminator value must be computed from a dict or ModelConfigBase instance"
+            )
 
     @classmethod
     @abstractmethod
