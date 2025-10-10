@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any, Dict
 
 import pytest
-from pydantic import ValidationError
 from pydantic_core import Url
 
 from invokeai.app.services.config import InvokeAIAppConfig
@@ -27,6 +26,7 @@ from invokeai.app.services.model_install import (
 )
 from invokeai.app.services.model_install.model_install_common import (
     InstallStatus,
+    InvalidModelConfigException,
     LocalModelSource,
     ModelInstallJob,
     URLModelSource,
@@ -63,18 +63,14 @@ def test_registration_meta(mm2_installer: ModelInstallServiceBase, embedding_fil
     assert Path(model_record.path) == embedding_file
     assert Path(model_record.path).exists()
     assert model_record.base == BaseModelType("sd-1")
-    assert model_record.description is not None
+    assert model_record.description is None
     assert model_record.source is not None
     assert Path(model_record.source) == embedding_file
 
 
 def test_registration_meta_override_fail(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
-    key = None
-    with pytest.raises(ValidationError):
-        key = mm2_installer.register_path(
-            embedding_file, ModelRecordChanges(name="banana_sushi", type=ModelType("lora"))
-        )
-    assert key is None
+    with pytest.raises(InvalidModelConfigException):
+        mm2_installer.register_path(embedding_file, ModelRecordChanges(name="banana_sushi", type=ModelType("lora")))
 
 
 def test_registration_meta_override_succeed(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
@@ -106,7 +102,11 @@ def test_rename(
     key = mm2_installer.install_path(embedding_file)
     model_record = store.get_model(key)
     assert model_record.path.endswith(f"{key}/test_embedding.safetensors")
-    new_model_record = store.update_model(key, ModelRecordChanges(name="new model name", base=BaseModelType("sd-2")))
+    new_model_record = store.update_model(
+        key,
+        ModelRecordChanges(name="new model name", base=BaseModelType.StableDiffusion2),
+        allow_class_change=True,
+    )
     # Renaming the model record shouldn't rename the file
     assert new_model_record.name == "new model name"
     assert model_record.path.endswith(f"{key}/test_embedding.safetensors")
