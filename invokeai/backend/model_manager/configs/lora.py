@@ -55,7 +55,7 @@ def _get_flux_lora_format(mod: ModelOnDisk) -> FluxLoRAFormat | None:
     # TODO(psyche): Moving this import to the function to avoid circular imports. Refactor later.
     from invokeai.backend.patches.lora_conversions.formats import flux_format_from_state_dict
 
-    state_dict = mod.load_state_dict(mod.path)
+    state_dict = mod.load_state_dict()
     value = flux_format_from_state_dict(state_dict, mod.metadata())
     return value
 
