@@ -664,7 +664,7 @@
         "loraTriggerPhrases": "Frasi Trigger LoRA",
         "mainModelTriggerPhrases": "Frasi Trigger del modello principale",
         "inplaceInstall": "Installazione sul posto",
-        "inplaceInstallDesc": "Installa i modelli senza copiare i file. Quando si utilizza il modello, verrà caricato da questa posizione. Se disabilitato, i file del modello verranno copiati nella directory dei modelli gestiti da Invoke durante l'installazione.",
+        "inplaceInstallDesc": "Installa i modelli senza spostare i file. Quando si utilizza il modello, verrà caricato dalla posizione originale. Se disabilitato, i file del modello verranno spostati nella directory dei modelli gestiti da Invoke durante l'installazione.",
         "installQueue": "Coda di installazione",
         "install": "Installa",
         "installRepo": "Installa Repository",
@@ -2803,9 +2803,9 @@
         "readReleaseNotes": "Leggi le note di rilascio",
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "items": [
-            "Seleziona oggetto v2: selezione degli oggetti migliorata con input di punti e riquadri o prompt di testo.",
-            "Regolazioni del livello raster: regola facilmente la luminosità, il contrasto, la saturazione, le curve e altro ancora del livello.",
-            "Cronologia prompt: rivedi e richiama rapidamente i tuoi ultimi 100 prompt."
+            "Strumento di ritaglio per immagini di riferimento",
+            "Interfaccia utente migliorata della scheda Gestione modelli",
+            "Esplora la cronologia dei prompt con le scorciatoie da tastiera (alt/opzione + su/giù)"
         ],
         "watchUiUpdatesOverview": "Guarda la panoramica degli aggiornamenti dell'interfaccia utente"
     },
