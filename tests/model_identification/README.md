@@ -23,7 +23,7 @@ pytest -v tests/test_model_probe/test_identification.py
 
 ## Stripped Model Files
 
-Invoke abstracts the loading of a model's state dict and metadata in a class called [`ModelOnDisk`](../invokeai/backend/model_manager/model_on_disk.py). This class loads real model weights. We use it to inspect models and identify them.
+Invoke abstracts the loading of a model's state dict and metadata in a class called [`ModelOnDisk`](../../invokeai/backend/model_manager/model_on_disk.py). This class loads real model weights. We use it to inspect models and identify them.
 
 For testing purposes, we create a stripped-down version of model weights that contain only the model structure and metadata for each key, without the actual tensor data. The state dict structure is typically all we need to identify models; the tensors themselves are not needed. This allows us to store test cases in the repo without adding many gigabytes of data.
 
@@ -85,7 +85,7 @@ A string indicating the source of the model (e.g. a Hugging Face repo ID or URL)
 - Example HF Repo ID: `"RunDiffusion/Juggernaut-XL-v9"`
 - Example URL: `"https://huggingface.co/XpucT/Deliberate/resolve/main/Deliberate_v5.safetensors"`
 
-### `"file_name"`
+#### `"file_name"`
 
 If the model is a single file (e.g. a `.safetensors` file), this is the name of that file. The test suite will look for this file in the test case directory.
 
@@ -95,7 +95,7 @@ If the model is multi-file (e.g. diffusers-style), omit this key or set it to a 
 
 > The `strip_model.py` script will automatically fill this field in for single-file models.
 
-### `"expected_config_attrs"`
+#### `"expected_config_attrs"`
 
 This field is a dict of expected configuration attributes for the model. It is required for all test cases.
 
@@ -112,7 +112,7 @@ Depending on the kind of model, these additional keys may be useful:
 - `"prediction_type"`: The prediction type used by the model. This is the value of the `SchedulerPredictionType` enum.
 - `"variant"`: The variant of the model, if applicable. This is the value of the `ModelVariantType` enum.
 
-To see all possible values for these enums, check out their definitions in [`invokeai/backend/model_manager/taxonomy.py`](../invokeai/backend/model_manager/taxonomy.py).
+To see all possible values for these enums, check out their definitions in [`invokeai/backend/model_manager/taxonomy.py`](../../invokeai/backend/model_manager/taxonomy.py).
 
 For example, for a SD1.5 main (pipeline) inpainting model in diffusers format, you might have:
 
@@ -128,11 +128,11 @@ For example, for a SD1.5 main (pipeline) inpainting model in diffusers format, y
 }
 ```
 
-### `"notes"`
+#### `"notes"`
 
 This is an optional string field where you can add any notes or comments about the test case. It can be useful for providing context or explaining any special considerations.
 
-### `"override_fields"`
+#### `"override_fields"`
 
 In some rare cases, we may need to provide additional hints to the identification system to help it identify the model correctly.
 
