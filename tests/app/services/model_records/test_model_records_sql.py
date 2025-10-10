@@ -17,6 +17,7 @@ from invokeai.app.services.model_records import (
 )
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
+from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_SDXL_Config
 from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_SD1_Config,
     Main_Diffusers_SD2_Config,
@@ -97,7 +98,29 @@ def test_model_records_updates_model(store: ModelRecordServiceBase):
     assert new_config.name == new_name
 
 
-def test_model_records_rejects_invalid_changes(store: ModelRecordServiceBase):
+def test_model_records_updates_model_class(store: ModelRecordServiceBase):
+    config = example_ti_config("key1")
+    store.add_model(config)
+    changes = ModelRecordChanges(
+        type=ModelType.LoRA,
+        format=ModelFormat.LyCORIS,
+        base=BaseModelType.StableDiffusionXL,
+    )
+    new_config = store.update_model(config.key, changes, allow_class_change=True)
+    assert isinstance(new_config, LoRA_LyCORIS_SDXL_Config)
+
+
+def test_model_records_rejects_invalid_attr_changes(store: ModelRecordServiceBase):
+    config = example_ti_config("key1")
+    store.add_model(config)
+    config = store.get_model("key1")
+    # upcast_attention is an invalid field for TIs
+    changes = ModelRecordChanges(upcast_attention=True)
+    with pytest.raises(ValidationError):
+        store.update_model(config.key, changes)
+
+
+def test_model_records_rejects_invalid_attr_changes_that_change_class(store: ModelRecordServiceBase):
     config = example_ti_config("key1")
     store.add_model(config)
     config = store.get_model("key1")
@@ -191,7 +214,7 @@ def test_filter(store: ModelRecordServiceBase):
     assert len(matches) == 3
 
 
-def test_unique(store: ModelRecordServiceBase):
+def test_unique_by_path(store: ModelRecordServiceBase):
     config1 = Main_Diffusers_SD1_Config(
         path="/tmp/config1",
         base=BaseModelType.StableDiffusion1,
@@ -230,7 +253,7 @@ def test_unique(store: ModelRecordServiceBase):
         repo_variant=ModelRepoVariant.Default,
     )
     config4 = Main_Diffusers_SD1_Config(
-        path="/tmp/config4",
+        path="/tmp/config1",
         base=BaseModelType.StableDiffusion1,
         type=ModelType.Main,
         name="nonuniquename",
@@ -242,13 +265,13 @@ def test_unique(store: ModelRecordServiceBase):
         prediction_type=SchedulerPredictionType.Epsilon,
         repo_variant=ModelRepoVariant.Default,
     )
-    # config1, config2 and config3 are compatible because they have unique combos
+    # config1, config2 and config3 are compatible because they have unique paths
     # of name, type and base
     for c in config1, config2, config3:
         c.key = sha256(c.path.encode("utf-8")).hexdigest()
         store.add_model(c)
 
-    # config4 clashes with config1 and should raise an integrity error
+    # config4 clashes with config1 (same path) and should raise an integrity error
     with pytest.raises(DuplicateModelException):
         config4.key = sha256(config4.path.encode("utf-8")).hexdigest()
         store.add_model(config4)

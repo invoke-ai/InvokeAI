@@ -77,7 +77,7 @@ def diffusers_dir(mm2_model_files: Path) -> Path:
 
 @pytest.fixture
 def mm2_app_config(mm2_root_dir: Path) -> InvokeAIAppConfig:
-    app_config = InvokeAIAppConfig(models_dir=mm2_root_dir / "models", log_level="info")
+    app_config = InvokeAIAppConfig(models_dir=mm2_root_dir / "models", log_level="info", allow_unknown_models=False)
     app_config._root = mm2_root_dir
     return app_config
 
