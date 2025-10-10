@@ -5,7 +5,7 @@
 from pathlib import Path
 from typing import Optional
 
-from invokeai.backend.model_manager.config import AnyModelConfig
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.model_manager.taxonomy import (

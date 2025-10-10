@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Optional
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_manager.config import AnyModelConfig, DiffusersConfigBase, InvalidModelConfigException
+from invokeai.backend.model_manager.configs.base import Diffusers_Config_Base
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache, get_model_cache_key
@@ -50,7 +51,7 @@ class ModelLoader(ModelLoaderBase):
         model_path = self._get_model_path(model_config)
 
         if not model_path.exists():
-            raise InvalidModelConfigException(f"Files for model '{model_config.name}' not found at {model_path}")
+            raise FileNotFoundError(f"Files for model '{model_config.name}' not found at {model_path}")
 
         with skip_torch_weight_init():
             cache_record = self._load_and_cache(model_config, submodel_type)
@@ -90,7 +91,7 @@ class ModelLoader(ModelLoaderBase):
         return calc_model_size_by_fs(
             model_path=model_path,
             subfolder=submodel_type.value if submodel_type else None,
-            variant=config.repo_variant if isinstance(config, DiffusersConfigBase) else None,
+            variant=config.repo_variant if isinstance(config, Diffusers_Config_Base) else None,
         )
 
     # This needs to be implemented in the subclass

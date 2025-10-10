@@ -25,9 +25,7 @@ export const MainModelPicker = memo(() => {
 
   const isFluxDevSelected = useMemo(
     () =>
-      selectedModelConfig &&
-      isCheckpointMainModelConfig(selectedModelConfig) &&
-      selectedModelConfig.config_path === 'flux-dev',
+      selectedModelConfig && isCheckpointMainModelConfig(selectedModelConfig) && selectedModelConfig.variant === 'dev',
     [selectedModelConfig]
   );
 

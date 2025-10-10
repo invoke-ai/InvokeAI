@@ -44,7 +44,7 @@ FLUX_KOHYA_CLIP_KEY_REGEX = r"lora_te1_text_model_encoder_layers_(\d+)_(mlp|self
 FLUX_KOHYA_T5_KEY_REGEX = r"lora_te2_encoder_block_(\d+)_layer_(\d+)_(DenseReluDense|SelfAttention)_(\w+)_?(\w+)?\.?.*"
 
 
-def is_state_dict_likely_in_flux_kohya_format(state_dict: Dict[str, Any]) -> bool:
+def is_state_dict_likely_in_flux_kohya_format(state_dict: dict[str | int, Any]) -> bool:
     """Checks if the provided state dict is likely in the Kohya FLUX LoRA format.
 
     This is intended to be a high-precision detector, but it is not guaranteed to have perfect precision. (A
@@ -56,6 +56,7 @@ def is_state_dict_likely_in_flux_kohya_format(state_dict: Dict[str, Any]) -> boo
         or re.match(FLUX_KOHYA_CLIP_KEY_REGEX, k)
         or re.match(FLUX_KOHYA_T5_KEY_REGEX, k)
         for k in state_dict.keys()
+        if isinstance(k, str)
     )
 
 

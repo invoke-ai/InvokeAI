@@ -12,15 +12,14 @@ from pydantic import BaseModel, Field
 
 from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
-    ControlAdapterDefaultSettings,
-    LoraModelDefaultSettings,
-    MainModelDefaultSettings,
-)
+from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.configs.lora import LoraModelDefaultSettings
+from invokeai.backend.model_manager.configs.main import MainModelDefaultSettings
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ClipVariantType,
+    FluxVariantType,
     ModelFormat,
     ModelSourceType,
     ModelType,
@@ -90,7 +89,9 @@ class ModelRecordChanges(BaseModelExcludeNull):
 
     # Checkpoint-specific changes
     # TODO(MM2): Should we expose these? Feels footgun-y...
-    variant: Optional[ModelVariantType | ClipVariantType] = Field(description="The variant of the model.", default=None)
+    variant: Optional[ModelVariantType | ClipVariantType | FluxVariantType] = Field(
+        description="The variant of the model.", default=None
+    )
     prediction_type: Optional[SchedulerPredictionType] = Field(
         description="The prediction type of the model.", default=None
     )
@@ -126,12 +127,14 @@ class ModelRecordServiceBase(ABC):
         pass
 
     @abstractmethod
-    def update_model(self, key: str, changes: ModelRecordChanges) -> AnyModelConfig:
+    def update_model(self, key: str, changes: ModelRecordChanges, allow_class_change: bool = False) -> AnyModelConfig:
         """
         Update the model, returning the updated version.
 
         :param key: Unique key for the model to be updated.
         :param changes: A set of changes to apply to this model. Changes are validated before being written.
+        :param allow_class_change: If True, allows changes that would change the model config class. For example,
+        changing a LoRA into a Main model. This does not disable validation, so the changes must still be valid.
         """
         pass
 

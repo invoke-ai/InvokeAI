@@ -12,7 +12,6 @@ from invokeai.app.services.download import DownloadQueueServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_install.model_install_common import ModelInstallJob, ModelSource
 from invokeai.app.services.model_records import ModelRecordChanges, ModelRecordServiceBase
-from invokeai.backend.model_manager import AnyModelConfig
 
 if TYPE_CHECKING:
     from invokeai.app.services.events.events_base import EventServiceBase
@@ -229,19 +228,6 @@ class ModelInstallServiceBase(ABC):
         :param timeout: Wait up to indicated number of seconds. Raise an Exception('timeout') if
         installs do not complete within the indicated time. A timeout of zero (the default)
         will block indefinitely until the installs complete.
-        """
-
-    @abstractmethod
-    def sync_model_path(self, key: str) -> AnyModelConfig:
-        """
-        Move model into the location indicated by its basetype, type and name.
-
-        Call this after updating a model's attributes in order to move
-        the model's path into the location indicated by its basetype, type and
-        name. Applies only to models whose paths are within the root `models_dir`
-        directory.
-
-        May raise an UnknownModelException.
         """
 
     @abstractmethod

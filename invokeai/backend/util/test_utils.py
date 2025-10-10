@@ -7,7 +7,8 @@ import torch
 
 from invokeai.app.services.model_manager import ModelManagerServiceBase
 from invokeai.app.services.model_records import UnknownModelException
-from invokeai.backend.model_manager import BaseModelType, LoadedModel, ModelType, SubModelType
+from invokeai.backend.model_manager.load.load_base import LoadedModel
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
 
 
 @pytest.fixture(scope="session")

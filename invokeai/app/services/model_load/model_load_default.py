@@ -11,7 +11,7 @@ from torch import load as torch_load
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_load.model_load_base import ModelLoadServiceBase
-from invokeai.backend.model_manager.config import AnyModelConfig
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load import (
     LoadedModel,
     LoadedModelWithoutConfig,

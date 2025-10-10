@@ -49,7 +49,7 @@ import {
   zVideoDuration,
   zVideoResolution,
 } from 'features/controlLayers/store/types';
-import type { ModelIdentifierField } from 'features/nodes/types/common';
+import type { ModelIdentifierField, ModelType } from 'features/nodes/types/common';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { zModelIdentifier } from 'features/nodes/types/v2/common';
 import { modelSelected } from 'features/parameters/store/actions';
@@ -108,7 +108,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
-import type { AnyModelConfig, ModelType } from 'services/api/types';
+import type { AnyModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import z from 'zod';
 

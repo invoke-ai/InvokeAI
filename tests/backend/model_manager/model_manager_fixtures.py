@@ -14,15 +14,19 @@ from invokeai.app.services.model_install import ModelInstallService, ModelInstal
 from invokeai.app.services.model_load import ModelLoadService, ModelLoadServiceBase
 from invokeai.app.services.model_manager import ModelManagerService, ModelManagerServiceBase
 from invokeai.app.services.model_records import ModelRecordServiceBase, ModelRecordServiceSQL
-from invokeai.backend.model_manager import BaseModelType, ModelFormat, ModelType, ModelVariantType
-from invokeai.backend.model_manager.config import (
-    LoRADiffusersConfig,
-    MainCheckpointConfig,
-    MainDiffusersConfig,
-    VAEDiffusersConfig,
-)
+from invokeai.backend.model_manager.configs.lora import LoRA_Diffusers_SD1_Config, LoRA_Diffusers_SDXL_Config
+from invokeai.backend.model_manager.configs.main import Main_Checkpoint_SD1_Config, Main_Diffusers_SDXL_Config
+from invokeai.backend.model_manager.configs.vae import VAE_Diffusers_SD1_Config
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
-from invokeai.backend.model_manager.taxonomy import ModelSourceType
+from invokeai.backend.model_manager.taxonomy import (
+    BaseModelType,
+    ModelFormat,
+    ModelRepoVariant,
+    ModelSourceType,
+    ModelType,
+    ModelVariantType,
+    SchedulerPredictionType,
+)
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_metadata.metadata_examples import (
@@ -73,7 +77,7 @@ def diffusers_dir(mm2_model_files: Path) -> Path:
 
 @pytest.fixture
 def mm2_app_config(mm2_root_dir: Path) -> InvokeAIAppConfig:
-    app_config = InvokeAIAppConfig(models_dir=mm2_root_dir / "models", log_level="info")
+    app_config = InvokeAIAppConfig(models_dir=mm2_root_dir / "models", log_level="info", allow_unknown_models=False)
     app_config._root = mm2_root_dir
     return app_config
 
@@ -132,19 +136,20 @@ def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceBas
     db = create_mock_sqlite_database(mm2_app_config, logger)
     store = ModelRecordServiceSQL(db, logger)
     # add five simple config records to the database
-    config1 = VAEDiffusersConfig(
+    config1 = VAE_Diffusers_SD1_Config(
         key="test_config_1",
         path="/tmp/foo1",
         format=ModelFormat.Diffusers,
         name="test2",
-        base=BaseModelType.StableDiffusion2,
+        base=BaseModelType.StableDiffusion1,
         type=ModelType.VAE,
         hash="111222333444",
         file_size=4096,
         source="stabilityai/sdxl-vae",
         source_type=ModelSourceType.HFRepoID,
+        repo_variant=ModelRepoVariant.Default,
     )
-    config2 = MainCheckpointConfig(
+    config2 = Main_Checkpoint_SD1_Config(
         key="test_config_2",
         path="/tmp/foo2.ckpt",
         name="model1",
@@ -157,8 +162,9 @@ def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceBas
         file_size=8192,
         source="https://civitai.com/models/206883/split",
         source_type=ModelSourceType.Url,
+        prediction_type=SchedulerPredictionType.Epsilon,
     )
-    config3 = MainDiffusersConfig(
+    config3 = Main_Diffusers_SDXL_Config(
         key="test_config_3",
         path="/tmp/foo3",
         format=ModelFormat.Diffusers,
@@ -170,8 +176,11 @@ def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceBas
         source="author3/model3",
         description="This is test 3",
         source_type=ModelSourceType.HFRepoID,
+        variant=ModelVariantType.Normal,
+        prediction_type=SchedulerPredictionType.Epsilon,
+        repo_variant=ModelRepoVariant.Default,
     )
-    config4 = LoRADiffusersConfig(
+    config4 = LoRA_Diffusers_SDXL_Config(
         key="test_config_4",
         path="/tmp/foo4",
         format=ModelFormat.Diffusers,
@@ -183,7 +192,7 @@ def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceBas
         source="author4/model4",
         source_type=ModelSourceType.HFRepoID,
     )
-    config5 = LoRADiffusersConfig(
+    config5 = LoRA_Diffusers_SD1_Config(
         key="test_config_5",
         path="/tmp/foo5",
         format=ModelFormat.Diffusers,

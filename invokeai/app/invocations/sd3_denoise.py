@@ -23,7 +23,7 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.sd3_text_encoder import SD3_T5_MAX_SEQ_LEN
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
-from invokeai.backend.model_manager import BaseModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import SD3ConditioningInfo

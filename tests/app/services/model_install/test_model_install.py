@@ -2,13 +2,13 @@
 Test the model installer
 """
 
+import gc
 import platform
 import uuid
 from pathlib import Path
 from typing import Any, Dict
 
 import pytest
-from pydantic import ValidationError
 from pydantic_core import Url
 
 from invokeai.app.services.config import InvokeAIAppConfig
@@ -27,14 +27,14 @@ from invokeai.app.services.model_install import (
 )
 from invokeai.app.services.model_install.model_install_common import (
     InstallStatus,
+    InvalidModelConfigException,
     LocalModelSource,
     ModelInstallJob,
     URLModelSource,
 )
 from invokeai.app.services.model_records import ModelRecordChanges, UnknownModelException
-from invokeai.backend.model_manager.config import (
+from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
-    InvalidModelConfigException,
     ModelFormat,
     ModelRepoVariant,
     ModelType,
@@ -64,18 +64,14 @@ def test_registration_meta(mm2_installer: ModelInstallServiceBase, embedding_fil
     assert Path(model_record.path) == embedding_file
     assert Path(model_record.path).exists()
     assert model_record.base == BaseModelType("sd-1")
-    assert model_record.description is not None
+    assert model_record.description is None
     assert model_record.source is not None
     assert Path(model_record.source) == embedding_file
 
 
 def test_registration_meta_override_fail(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
-    key = None
-    with pytest.raises((ValidationError, InvalidModelConfigException)):
-        key = mm2_installer.register_path(
-            embedding_file, ModelRecordChanges(name="banana_sushi", type=ModelType("lora"))
-        )
-    assert key is None
+    with pytest.raises(InvalidModelConfigException):
+        mm2_installer.register_path(embedding_file, ModelRecordChanges(name="banana_sushi", type=ModelType("lora")))
 
 
 def test_registration_meta_override_succeed(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
@@ -95,7 +91,7 @@ def test_install(
     store = mm2_installer.record_store
     key = mm2_installer.install_path(embedding_file)
     model_record = store.get_model(key)
-    assert model_record.path.endswith("sd-1/embedding/test_embedding.safetensors")
+    assert model_record.path.endswith(f"{key}/test_embedding.safetensors")
     assert (mm2_app_config.models_path / model_record.path).exists()
     assert model_record.source == embedding_file.as_posix()
 
@@ -106,24 +102,28 @@ def test_rename(
     store = mm2_installer.record_store
     key = mm2_installer.install_path(embedding_file)
     model_record = store.get_model(key)
-    assert model_record.path.endswith("sd-1/embedding/test_embedding.safetensors")
-    store.update_model(key, ModelRecordChanges(name="new model name", base=BaseModelType("sd-2")))
-    new_model_record = mm2_installer.sync_model_path(key)
+    assert model_record.path.endswith(f"{key}/test_embedding.safetensors")
+    new_model_record = store.update_model(
+        key,
+        ModelRecordChanges(name="new model name", base=BaseModelType.StableDiffusion2),
+        allow_class_change=True,
+    )
     # Renaming the model record shouldn't rename the file
     assert new_model_record.name == "new model name"
-    assert new_model_record.path.endswith("sd-2/embedding/test_embedding.safetensors")
+    assert model_record.path.endswith(f"{key}/test_embedding.safetensors")
 
 
 @pytest.mark.parametrize(
-    "fixture_name,size,destination",
+    "fixture_name,size,key,destination",
     [
-        ("embedding_file", 15440, "sd-1/embedding/test_embedding.safetensors"),
-        ("diffusers_dir", 8241 if OS == "Windows" else 7907, "sdxl/main/test-diffusers-main"),  # EOL chars
+        ("embedding_file", 15440, "foo", "foo/test_embedding.safetensors"),
+        ("diffusers_dir", 8241 if OS == "Windows" else 7907, "bar", "bar"),  # EOL chars
     ],
 )
 def test_background_install(
     mm2_installer: ModelInstallServiceBase,
     fixture_name: str,
+    key: str,
     size: int,
     destination: str,
     mm2_app_config: InvokeAIAppConfig,
@@ -133,7 +133,7 @@ def test_background_install(
     path: Path = request.getfixturevalue(fixture_name)
     description = "Test of metadata assignment"
     source = LocalModelSource(path=path, inplace=False)
-    job = mm2_installer.import_model(source, config=ModelRecordChanges(description=description))
+    job = mm2_installer.import_model(source, config=ModelRecordChanges(key=key, description=description))
     assert job is not None
     assert isinstance(job, ModelInstallJob)
 
@@ -221,6 +221,8 @@ def test_delete_install(
     model_record = store.get_model(key)
     assert (mm2_app_config.models_path / model_record.path).exists()
     assert not embedding_file.exists()
+    # ensure file handles are released on Windows
+    gc.collect()
     mm2_installer.delete(key)
     # after deletion, installed copy should not exist
     assert not (mm2_app_config.models_path / model_record.path).exists()

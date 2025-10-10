@@ -49,7 +49,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   assert(clipEmbedModel, 'No CLIP Embed model found in state');
   assert(fluxVAE, 'No FLUX VAE model found in state');
 
-  const isFLUXFill = model.variant === 'inpaint';
+  const isFLUXFill = model.variant === 'dev_fill';
   let guidance = baseGuidance;
   if (isFLUXFill) {
     // FLUX Fill doesn't work with Text to Image or Image to Image generation modes. Well, technically, it does, but

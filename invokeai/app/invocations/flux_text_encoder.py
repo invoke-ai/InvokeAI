@@ -17,7 +17,7 @@ from invokeai.app.invocations.model import CLIPField, T5EncoderField
 from invokeai.app.invocations.primitives import FluxConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.modules.conditioner import HFEncoder
-from invokeai.backend.model_manager import ModelFormat
+from invokeai.backend.model_manager.taxonomy import ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_CLIP_PREFIX, FLUX_LORA_T5_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw

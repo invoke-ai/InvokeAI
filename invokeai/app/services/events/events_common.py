@@ -16,8 +16,8 @@ from invokeai.app.services.session_queue.session_queue_common import (
 )
 from invokeai.app.services.shared.graph import AnyInvocation, AnyInvocationOutput
 from invokeai.app.util.misc import get_timestamp
-from invokeai.backend.model_manager import SubModelType
-from invokeai.backend.model_manager.config import AnyModelConfig
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.taxonomy import SubModelType
 
 if TYPE_CHECKING:
     from invokeai.app.services.download.download_base import DownloadJob
@@ -546,11 +546,18 @@ class ModelInstallCompleteEvent(ModelEventBase):
     source: ModelSource = Field(description="Source of the model; local path, repo_id or url")
     key: str = Field(description="Model config record key")
     total_bytes: Optional[int] = Field(description="Size of the model (may be None for installation of a local path)")
+    config: AnyModelConfig = Field(description="The installed model's config")
 
     @classmethod
     def build(cls, job: "ModelInstallJob") -> "ModelInstallCompleteEvent":
         assert job.config_out is not None
-        return cls(id=job.id, source=job.source, key=(job.config_out.key), total_bytes=job.total_bytes)
+        return cls(
+            id=job.id,
+            source=job.source,
+            key=(job.config_out.key),
+            total_bytes=job.total_bytes,
+            config=job.config_out,
+        )
 
 
 @payload_schema.register
