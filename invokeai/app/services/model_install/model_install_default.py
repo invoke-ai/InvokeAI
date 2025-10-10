@@ -369,11 +369,18 @@ class ModelInstallService(ModelInstallServiceBase):
     def unconditionally_delete(self, key: str) -> None:  # noqa D102
         model = self.record_store.get_model(key)
         model_path = self.app_config.models_path / model.path
+        # Models are stored in a directory named by their key. To delete the model on disk, we delete the entire
+        # directory. However, the path we store in the model record may be either a file within the key directory,
+        # or the directory itself. So we have to handle both cases.
         if model_path.is_file() or model_path.is_symlink():
-            model_path.unlink()
+            # Sanity check - file models should be in their own directory under the models dir. The parent of the
+            # file should be the model's directory, not the Invoke models dir!
             assert model_path.parent != self.app_config.models_path
             rmtree(model_path.parent)
         elif model_path.is_dir():
+            # Sanity check - folder models should be in their own directory under the models dir. The path should
+            # not be the Invoke models dir itself!
+            assert model_path != self.app_config.models_path
             rmtree(model_path)
         self.unregister(key)
 
