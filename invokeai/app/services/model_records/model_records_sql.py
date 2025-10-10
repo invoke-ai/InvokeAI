@@ -134,30 +134,36 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             if cursor.rowcount == 0:
                 raise UnknownModelException("model not found")
 
-    def update_model(self, key: str, changes: ModelRecordChanges) -> AnyModelConfig:
+    def update_model(self, key: str, changes: ModelRecordChanges, allow_class_change: bool = False) -> AnyModelConfig:
         with self._db.transaction() as cursor:
             record = self.get_model(key)
 
-            # The changes may mean the model config class changes. So we need to:
-            #
-            # 1. convert the existing record to a dict
-            # 2. apply the changes to the dict
-            # 3. create a new model config from the updated dict
-            #
-            # This way we ensure that the update does not inadvertently create an invalid model config.
+            if allow_class_change:
+                # The changes may cause the model config class to change. To handle this, we need to construct the new
+                # class from scratch rather than trying to modify the existing instance in place.
+                #
+                # 1. Convert the existing record to a dict
+                # 2. Apply the changes to the dict
+                # 3. Attempt to create a new model config from the updated dict
 
-            # 1. convert the existing record to a dict
-            record_as_dict = record.model_dump()
+                # 1. Convert the existing record to a dict
+                record_as_dict = record.model_dump()
 
-            # 2. apply the changes to the dict
-            for field_name in changes.model_fields_set:
-                record_as_dict[field_name] = getattr(changes, field_name)
+                # 2. Apply the changes to the dict
+                for field_name in changes.model_fields_set:
+                    record_as_dict[field_name] = getattr(changes, field_name)
 
-            # 3. create a new model config from the updated dict
-            record = ModelConfigFactory.from_dict(record_as_dict)
+                # 3. Attempt to create a new model config from the updated dict
+                record = ModelConfigFactory.from_dict(record_as_dict)
 
-            # If we get this far, the updated model config is valid, so we can save it to the database.
-            json_serialized = record.model_dump_json()
+                # If we get this far, the updated model config is valid, so we can save it to the database.
+                json_serialized = record.model_dump_json()
+            else:
+                # We are not allowing the model config class to change, so we can just update the existing instance in
+                # place. If the changes are invalid for the existing class, an exception will be raised by pydantic.
+                for field_name in changes.model_fields_set:
+                    setattr(record, field_name, getattr(changes, field_name))
+                json_serialized = record.model_dump_json()
 
             cursor.execute(
                 """--sql

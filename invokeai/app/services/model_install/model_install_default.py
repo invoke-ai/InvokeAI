@@ -41,6 +41,7 @@ from invokeai.backend.model_manager.configs.factory import (
     AnyModelConfig,
     ModelConfigFactory,
 )
+from invokeai.backend.model_manager.configs.unknown import Unknown_Config
 from invokeai.backend.model_manager.metadata import (
     AnyModelRepoMetadata,
     HuggingFaceMetadataFetch,
@@ -608,7 +609,10 @@ class ModelInstallService(ModelInstallServiceBase):
         )
 
         if result.config is None:
-            raise InvalidModelConfigException(f"Could not identify model type for {model_path}")
+            self._logger.error(f"Could not identify model for {model_path}, detailed results: {result.details}")
+            raise InvalidModelConfigException(f"Could not identify model for {model_path}")
+        elif isinstance(result.config, Unknown_Config):
+            self._logger.error(f"Could not identify model for {model_path}, detailed results: {result.details}")
 
         return result.config
 
