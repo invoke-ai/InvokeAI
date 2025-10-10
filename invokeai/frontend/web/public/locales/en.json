@@ -953,6 +953,7 @@
         "modelManager": "Model Manager",
         "modelName": "Model Name",
         "modelSettings": "Model Settings",
+        "modelSettingsWarning": "These settings tell Invoke what kind of model this is and how to load it. If Invoke didn't detect these correctly when you installed the model, or if the model is classified as Unknown, you may need to edit them manually.",
         "modelType": "Model Type",
         "modelUpdated": "Model Updated",
         "modelUpdateFailed": "Model Update Failed",

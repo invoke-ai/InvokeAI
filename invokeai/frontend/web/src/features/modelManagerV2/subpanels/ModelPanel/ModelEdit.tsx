@@ -128,8 +128,7 @@ export const ModelEdit = memo(({ modelConfig }: Props) => {
               {t('modelManager.modelSettings')}
             </Heading>
             <Text variant="subtext" color="warning.300">
-              Careful! Change these settings only if Invoke didn&apos;t detect them correctly when you installed the
-              model. If you choose the wrong settings, the model may not work properly.
+              {t('modelManager.modelSettingsWarning')}
             </Text>
             <SimpleGrid columns={2} gap={4}>
               <FormControl flexDir="column" alignItems="flex-start" gap={1}>
