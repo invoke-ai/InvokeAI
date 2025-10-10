@@ -372,7 +372,7 @@ class ModelInstallService(ModelInstallServiceBase):
         if model_path.is_file() or model_path.is_symlink():
             model_path.unlink()
             assert model_path.parent != self.app_config.models_path
-            os.rmdir(model_path.parent)
+            rmtree(model_path.parent)
         elif model_path.is_dir():
             rmtree(model_path)
         self.unregister(key)
