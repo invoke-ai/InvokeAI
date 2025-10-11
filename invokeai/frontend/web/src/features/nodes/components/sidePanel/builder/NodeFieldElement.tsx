@@ -1,15 +1,14 @@
-import { useAppSelector } from 'app/store/storeHooks';
 import { InvocationNodeContextProvider } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { NodeFieldElementEditMode } from 'features/nodes/components/sidePanel/builder/NodeFieldElementEditMode';
 import { NodeFieldElementViewMode } from 'features/nodes/components/sidePanel/builder/NodeFieldElementViewMode';
 import { useElement } from 'features/nodes/components/sidePanel/builder/use-element';
-import { selectWorkflowMode } from 'features/nodes/store/workflowLibrarySlice';
+import { useWorkflowMode } from 'features/nodes/hooks/useWorkflowMode';
 import { isNodeFieldElement } from 'features/nodes/types/workflow';
 import { memo } from 'react';
 
 export const NodeFieldElement = memo(({ id }: { id: string }) => {
   const el = useElement(id);
-  const mode = useAppSelector(selectWorkflowMode);
+  const mode = useWorkflowMode();
 
   if (!el || !isNodeFieldElement(el)) {
     return null;

@@ -31,124 +31,141 @@ const sx: SystemStyleObject = {
   },
 };
 
-export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordListItemWithThumbnailDTO }) => {
-  const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const workflowId = useAppSelector(selectWorkflowId);
-  const loadWorkflowWithDialog = useLoadWorkflowWithDialog();
+export const WorkflowListItem = memo(
+  ({
+    workflow,
+    onSelectWorkflow,
+    isCanvasMode,
+  }: {
+    workflow: WorkflowRecordListItemWithThumbnailDTO;
+    onSelectWorkflow?: (workflowId: string) => void;
+    isCanvasMode: boolean;
+  }) => {
+    const { t } = useTranslation();
+    const dispatch = useAppDispatch();
+    const workflowId = useAppSelector(selectWorkflowId);
+    const loadWorkflowWithDialog = useLoadWorkflowWithDialog();
 
-  const isActive = useMemo(() => {
-    return workflowId === workflow.workflow_id;
-  }, [workflowId, workflow.workflow_id]);
+    const isActive = useMemo(() => {
+      return workflowId === workflow.workflow_id;
+    }, [workflowId, workflow.workflow_id]);
 
-  const handleClickLoad = useCallback(() => {
-    loadWorkflowWithDialog({
-      type: 'library',
-      data: workflow.workflow_id,
-      onSuccess: () => {
-        dispatch(workflowModeChanged('view'));
-      },
-    });
-  }, [dispatch, loadWorkflowWithDialog, workflow.workflow_id]);
+    const handleClick = useCallback(() => {
+      if (onSelectWorkflow) {
+        onSelectWorkflow(workflow.workflow_id);
+        return;
+      }
 
-  return (
-    <Flex
-      position="relative"
-      role="button"
-      onClick={handleClickLoad}
-      bg="base.750"
-      borderRadius="base"
-      w="full"
-      alignItems="stretch"
-      sx={sx}
-      gap={2}
-    >
-      <Flex p={2} pr={0}>
-        <Image
-          src={workflow.thumbnail_url ?? undefined}
-          fallbackStrategy="beforeLoadOrError"
-          fallback={workflow.category === 'default' ? <DefaultThumbnailFallback /> : <UserThumbnailFallback />}
-          objectFit="cover"
-          objectPosition="50% 50%"
-          height={IMAGE_THUMBNAIL_SIZE}
-          width={IMAGE_THUMBNAIL_SIZE}
-          minHeight={IMAGE_THUMBNAIL_SIZE}
-          minWidth={IMAGE_THUMBNAIL_SIZE}
-          borderRadius="base"
-        />
-      </Flex>
-      <Flex flexDir="column" gap={1} justifyContent="space-between" w="full">
-        <Flex flexDir="column" gap={1} alignItems="flex-start" pt={2} pe={2} w="full">
-          <Flex gap={2} alignItems="flex-start" justifyContent="space-between" w="full">
-            <Text noOfLines={2}>{workflow.name}</Text>
-            <Flex gap={2} alignItems="center">
-              {isActive && !workflow.is_published && (
-                <Badge
-                  color="invokeBlue.400"
-                  borderColor="invokeBlue.700"
-                  borderWidth={1}
-                  bg="transparent"
-                  flexShrink={0}
-                  variant="subtle"
-                >
-                  {t('workflows.opened')}
-                </Badge>
-              )}
-              {workflow.is_published && (
-                <Badge
-                  color="invokeGreen.400"
-                  borderColor="invokeGreen.700"
-                  borderWidth={1}
-                  bg="transparent"
-                  flexShrink={0}
-                  variant="subtle"
-                >
-                  {t('workflows.builder.published')}
-                </Badge>
-              )}
-              {workflow.category === 'project' && <Icon as={PiUsersBold} color="base.200" />}
-              {workflow.category === 'default' && (
-                <Image
-                  src={InvokeLogo}
-                  alt="invoke-logo"
-                  w="14px"
-                  h="14px"
-                  minW="14px"
-                  minH="14px"
-                  userSelect="none"
-                  opacity={0.5}
-                />
-              )}
+      loadWorkflowWithDialog({
+        type: 'library',
+        data: workflow.workflow_id,
+        onSuccess: () => {
+          dispatch(workflowModeChanged('view'));
+        },
+      });
+    }, [dispatch, loadWorkflowWithDialog, onSelectWorkflow, workflow.workflow_id]);
+
+    return (
+      <Flex
+        position="relative"
+        role="button"
+        onClick={handleClick}
+        bg="base.750"
+        borderRadius="base"
+        w="full"
+        alignItems="stretch"
+        sx={sx}
+        gap={2}
+      >
+        <Flex p={2} pr={0}>
+          <Image
+            src={workflow.thumbnail_url ?? undefined}
+            fallbackStrategy="beforeLoadOrError"
+            fallback={workflow.category === 'default' ? <DefaultThumbnailFallback /> : <UserThumbnailFallback />}
+            objectFit="cover"
+            objectPosition="50% 50%"
+            height={IMAGE_THUMBNAIL_SIZE}
+            width={IMAGE_THUMBNAIL_SIZE}
+            minHeight={IMAGE_THUMBNAIL_SIZE}
+            minWidth={IMAGE_THUMBNAIL_SIZE}
+            borderRadius="base"
+          />
+        </Flex>
+        <Flex flexDir="column" gap={1} justifyContent="space-between" w="full">
+          <Flex flexDir="column" gap={1} alignItems="flex-start" pt={2} pe={2} w="full">
+            <Flex gap={2} alignItems="flex-start" justifyContent="space-between" w="full">
+              <Text noOfLines={2}>{workflow.name}</Text>
+              <Flex gap={2} alignItems="center">
+                {isActive && !workflow.is_published && (
+                  <Badge
+                    color="invokeBlue.400"
+                    borderColor="invokeBlue.700"
+                    borderWidth={1}
+                    bg="transparent"
+                    flexShrink={0}
+                    variant="subtle"
+                  >
+                    {t('workflows.opened')}
+                  </Badge>
+                )}
+                {workflow.is_published && (
+                  <Badge
+                    color="invokeGreen.400"
+                    borderColor="invokeGreen.700"
+                    borderWidth={1}
+                    bg="transparent"
+                    flexShrink={0}
+                    variant="subtle"
+                  >
+                    {t('workflows.builder.published')}
+                  </Badge>
+                )}
+                {workflow.category === 'project' && <Icon as={PiUsersBold} color="base.200" />}
+                {workflow.category === 'default' && (
+                  <Image
+                    src={InvokeLogo}
+                    alt="invoke-logo"
+                    w="14px"
+                    h="14px"
+                    minW="14px"
+                    minH="14px"
+                    userSelect="none"
+                    opacity={0.5}
+                  />
+                )}
+              </Flex>
             </Flex>
-          </Flex>
-          <Text variant="subtext" fontSize="xs" noOfLines={3}>
-            {workflow.description}
-          </Text>
-        </Flex>
-        <Flex className={WORKFLOW_ACTION_BUTTONS_CN} alignItems="center" display="none" h={8}>
-          {workflow.opened_at && (
-            <Text variant="subtext" fontSize="xs" noOfLines={1} justifySelf="flex-end" pb={0.5}>
-              {t('workflows.opened')} {new Date(workflow.opened_at).toLocaleString()}
+            <Text variant="subtext" fontSize="xs" noOfLines={3}>
+              {workflow.description}
             </Text>
+          </Flex>
+          {!isCanvasMode && (
+            <Flex className={WORKFLOW_ACTION_BUTTONS_CN} alignItems="center" display="none" h={8}>
+              {workflow.opened_at && (
+                <Text variant="subtext" fontSize="xs" noOfLines={1} justifySelf="flex-end" pb={0.5}>
+                  {t('workflows.opened')} {new Date(workflow.opened_at).toLocaleString()}
+                </Text>
+              )}
+              <Spacer />
+              {workflow.category === 'default' && !workflow.is_published && (
+                <ViewWorkflow workflowId={workflow.workflow_id} />
+              )}
+              {workflow.category !== 'default' && !workflow.is_published && (
+                <>
+                  <EditWorkflow workflowId={workflow.workflow_id} />
+                  <DownloadWorkflow workflowId={workflow.workflow_id} />
+                  <DeleteWorkflow workflowId={workflow.workflow_id} />
+                </>
+              )}
+              {workflow.category === 'project' && <ShareWorkflowButton workflow={workflow} />}
+              {workflow.is_published && <LockedWorkflowIcon />}
+            </Flex>
           )}
-          <Spacer />
-          {workflow.category === 'default' && !workflow.is_published && (
-            <ViewWorkflow workflowId={workflow.workflow_id} />
-          )}
-          {workflow.category !== 'default' && !workflow.is_published && (
-            <>
-              <EditWorkflow workflowId={workflow.workflow_id} />
-              <DownloadWorkflow workflowId={workflow.workflow_id} />
-              <DeleteWorkflow workflowId={workflow.workflow_id} />
-            </>
-          )}
-          {workflow.category === 'project' && <ShareWorkflowButton workflow={workflow} />}
-          {workflow.is_published && <LockedWorkflowIcon />}
         </Flex>
       </Flex>
-    </Flex>
-  );
-});
+    );
+  }
+);
 WorkflowListItem.displayName = 'WorkflowListItem';
 
 const UserThumbnailFallback = memo(() => {

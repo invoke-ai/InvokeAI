@@ -4,6 +4,7 @@ import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent'
 import { GalleryPanel } from 'features/gallery/components/Gallery';
 import { ImageViewerPanel } from 'features/gallery/components/ImageViewer/ImageViewerPanel';
 import NodeEditor from 'features/nodes/components/NodeEditor';
+import { NodesWorkflowProvider } from 'features/nodes/components/NodesWorkflowProvider';
 import WorkflowsTabLeftPanel from 'features/nodes/components/sidePanel/WorkflowsTabLeftPanel';
 import { FloatingLeftPanelButtons } from 'features/ui/components/FloatingLeftPanelButtons';
 import { FloatingRightPanelButtons } from 'features/ui/components/FloatingRightPanelButtons';
@@ -53,9 +54,17 @@ const tabComponents = {
   [DOCKVIEW_TAB_LAUNCHPAD_ID]: DockviewTabLaunchpad,
 };
 
+// Wrap NodeEditor with NodesWorkflowProvider to ensure action routing works correctly
+const NodeEditorWithProvider = memo(() => (
+  <NodesWorkflowProvider>
+    <NodeEditor />
+  </NodesWorkflowProvider>
+));
+NodeEditorWithProvider.displayName = 'NodeEditorWithProvider';
+
 const mainPanelComponents: AutoLayoutDockviewComponents = {
   [LAUNCHPAD_PANEL_ID]: withPanelContainer(WorkflowsLaunchpadPanel),
-  [WORKSPACE_PANEL_ID]: withPanelContainer(NodeEditor),
+  [WORKSPACE_PANEL_ID]: withPanelContainer(NodeEditorWithProvider),
   [VIEWER_PANEL_ID]: withPanelContainer(ImageViewerPanel),
 };
 

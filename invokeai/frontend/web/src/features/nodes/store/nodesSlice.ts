@@ -19,6 +19,7 @@ import {
   removeElement,
   reparentElement,
 } from 'features/nodes/components/sidePanel/builder/form-manipulation';
+import { isNodesWorkflowAction } from 'features/nodes/store/actionRouter';
 import { type NodesState, zNodesState } from 'features/nodes/store/types';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
@@ -152,9 +153,14 @@ const getField = (nodeId: string, fieldName: string, state: NodesState) => {
 
 const fieldValueReducer = <T extends FieldValue>(
   state: NodesState,
-  action: FieldValueAction<T>,
+  action: FieldValueAction<T> & UnknownAction,
   schema: z.ZodType<T>
 ) => {
+  // Only handle actions marked for nodes workflow
+  if (!isNodesWorkflowAction(action)) {
+    return;
+  }
+
   const { nodeId, fieldName, value } = action.payload;
   const field = getField(nodeId, fieldName, state);
   if (!field) {

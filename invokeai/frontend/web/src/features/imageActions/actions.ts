@@ -35,6 +35,7 @@ import {
 import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import type { BoardId } from 'features/gallery/store/types';
+import { injectCanvasWorkflowKey, injectNodesWorkflowKey } from 'features/nodes/store/actionRouter';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
@@ -71,9 +72,37 @@ export const setNodeImageFieldImage = (arg: {
   imageDTO: ImageDTO;
   fieldIdentifier: FieldIdentifier;
   dispatch: AppDispatch;
+  getState?: AppGetState;
 }) => {
-  const { imageDTO, fieldIdentifier, dispatch } = arg;
-  dispatch(fieldImageValueChanged({ ...fieldIdentifier, value: imageDTO }));
+  const { imageDTO, fieldIdentifier, dispatch, getState } = arg;
+
+  // Create the action
+  const action = fieldImageValueChanged({ ...fieldIdentifier, value: imageDTO });
+
+  // Only inject workflow routing metadata if getState is available (DND path)
+  // Otherwise, the action will be handled by useAppDispatch (UI component path)
+  if (getState) {
+    // Check if this node belongs to canvas workflow or regular nodes workflow
+    // We need to check the active tab to determine which workflow is currently being used
+    const state = getState();
+    const activeTab = state.ui.activeTab;
+    const canvasWorkflowNode = state.canvasWorkflowNodes.nodes.find((n) => n.id === fieldIdentifier.nodeId);
+
+    // Determine which workflow to route to based on active tab and node presence
+    // Priority: active tab determines the workflow, as the same workflow might be loaded in both slices
+    const shouldUseCanvasWorkflow = activeTab === 'canvas' && canvasWorkflowNode;
+
+    // Inject the appropriate workflow routing metadata
+    if (shouldUseCanvasWorkflow) {
+      // This is a canvas workflow node - inject canvas workflow key
+      injectCanvasWorkflowKey(action);
+    } else {
+      // This is a regular nodes workflow node - inject nodes workflow key
+      injectNodesWorkflowKey(action);
+    }
+  }
+
+  dispatch(action);
 };
 
 export const setComparisonImage = (arg: { image_name: string; dispatch: AppDispatch }) => {

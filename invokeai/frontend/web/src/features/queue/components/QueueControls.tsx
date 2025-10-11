@@ -7,6 +7,7 @@ import { memo } from 'react';
 
 import { CancelAllExceptCurrentIconButton } from './CancelAllExceptCurrentIconButton';
 import { CancelCurrentQueueItemIconButton } from './CancelCurrentQueueItemIconButton';
+import { CanvasWorkflowTrigger } from './CanvasWorkflowTrigger';
 import { InvokeButton } from './InvokeQueueBackButton';
 
 const QueueControls = () => {
@@ -14,6 +15,7 @@ const QueueControls = () => {
     <Flex w="full" position="relative" borderRadius="base" gap={2} flexDir="column">
       <Flex gap={2}>
         <InvokeButton />
+        <CanvasWorkflowTrigger />
         <Spacer />
         <QueueActionsMenuButton />
         <CancelIconButton />
