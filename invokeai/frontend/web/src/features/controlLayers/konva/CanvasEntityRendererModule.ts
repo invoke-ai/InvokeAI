@@ -2,7 +2,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
-  selectCanvasSlice,
+  selectActiveCanvas,
   selectControlLayerEntities,
   selectInpaintMaskEntities,
   selectRasterLayerEntities,
@@ -10,10 +10,10 @@ import {
 } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
+  CanvasEntity,
   CanvasInpaintMaskState,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
-  CanvasState,
 } from 'features/controlLayers/store/types';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import type { Logger } from 'roarr';
@@ -54,7 +54,7 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
       this.manager.stateApi.createStoreSubscription(selectRegionalGuidanceEntities, this.createNewRegionalGuidance)
     );
 
-    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSlice, this.arrangeEntities));
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectActiveCanvas, this.arrangeEntities));
   }
 
   initialize = () => {
@@ -63,7 +63,7 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
     this.createNewControlLayers(this.manager.stateApi.runSelector(selectControlLayerEntities));
     this.createNewRegionalGuidance(this.manager.stateApi.runSelector(selectRegionalGuidanceEntities));
     this.createNewInpaintMasks(this.manager.stateApi.runSelector(selectInpaintMaskEntities));
-    this.arrangeEntities(this.manager.stateApi.runSelector(selectCanvasSlice), null);
+    this.arrangeEntities(this.manager.stateApi.runSelector(selectActiveCanvas), null);
   };
 
   createNewRasterLayers = (entities: CanvasRasterLayerState[]) => {
@@ -102,7 +102,7 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
     }
   };
 
-  arrangeEntities = (state: CanvasState, prevState: CanvasState | null) => {
+  arrangeEntities = (state: CanvasEntity, prevState: CanvasEntity | null) => {
     if (
       !prevState ||
       state.rasterLayers.entities !== prevState.rasterLayers.entities ||

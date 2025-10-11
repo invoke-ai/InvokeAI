@@ -19,7 +19,7 @@ import {
 } from 'features/controlLayers/store/canvasSlice';
 import { getFilterForModel } from 'features/controlLayers/store/filters';
 import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier, ControlModeV2 } from 'features/controlLayers/store/types';
 import { replaceCanvasEntityObjectsWithImage } from 'features/imageActions/actions';
 import { memo, useCallback, useMemo } from 'react';
@@ -33,7 +33,7 @@ import type {
 } from 'services/api/types';
 
 const buildSelectControlAdapter = (entityIdentifier: CanvasEntityIdentifier<'control_layer'>) =>
-  createSelector(selectCanvasSlice, (canvas) => {
+  createSelector(selectActiveCanvas, (canvas) => {
     const layer = selectEntityOrThrow(canvas, entityIdentifier, 'ControlLayerControlAdapter');
     return layer.controlAdapter;
   });

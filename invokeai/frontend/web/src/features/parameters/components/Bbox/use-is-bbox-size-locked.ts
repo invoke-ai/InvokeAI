@@ -1,5 +1,5 @@
 import { useAppSelector } from 'app/store/storeHooks';
-import { useCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { useCanvasIsStaging } from 'features/controlLayers/hooks/useCanvasIsStaging';
 import { selectIsApiBaseModel } from 'features/controlLayers/store/paramsSlice';
 
 export const useIsBboxSizeLocked = () => {

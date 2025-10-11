@@ -4,13 +4,13 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { bboxScaleMethodChanged } from 'features/controlLayers/store/canvasSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas } from 'features/controlLayers/store/selectors';
 import { isBoundingBoxScaleMethod } from 'features/controlLayers/store/types';
 import { useIsBboxSizeLocked } from 'features/parameters/components/Bbox/use-is-bbox-size-locked';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selectScaleMethod = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.scaleMethod);
+const selectScaleMethod = createSelector(selectActiveCanvas, (canvas) => canvas.bbox.scaleMethod);
 
 const BboxScaleMethod = () => {
   const dispatch = useAppDispatch();

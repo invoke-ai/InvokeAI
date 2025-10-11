@@ -1,8 +1,9 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import type { SliceConfig } from 'app/store/types';
+import type { SerializedStateFromDenyList, SliceConfig } from 'app/store/types';
 import { isPlainObject } from 'es-toolkit';
+import { merge, omit } from 'es-toolkit/compat';
 import { zModelType } from 'features/nodes/types/common';
 import { assert } from 'tsafe';
 import z from 'zod';
@@ -67,7 +68,10 @@ export const {
   shouldInstallInPlaceChanged,
 } = slice.actions;
 
-export const modelManagerSliceConfig: SliceConfig<typeof slice> = {
+const denyList = ['selectedModelKey', 'selectedModelMode', 'filteredModelType', 'searchTerm'] as const;
+type SerializedModelManagerState = SerializedStateFromDenyList<ModelManagerState, typeof denyList>;
+
+export const modelManagerSliceConfig: SliceConfig<typeof slice, ModelManagerState, SerializedModelManagerState> = {
   slice,
   schema: zModelManagerState,
   getInitialState,
@@ -79,7 +83,12 @@ export const modelManagerSliceConfig: SliceConfig<typeof slice> = {
       }
       return zModelManagerState.parse(state);
     },
-    persistDenylist: ['selectedModelKey', 'selectedModelMode', 'filteredModelType', 'searchTerm'],
+    serialize: (state) => omit(state, denyList),
+    deserialize: (state) => {
+      const modelManagerState = state as SerializedModelManagerState;
+
+      return merge(modelManagerState, getInitialState());
+    },
   },
 };
 

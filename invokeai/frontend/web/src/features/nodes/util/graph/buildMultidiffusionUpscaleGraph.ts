@@ -1,5 +1,6 @@
 import type { RootState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { selectActiveTabParams } from 'features/controlLayers/store/paramsSlice';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addSDXLLoRAs } from 'features/nodes/util/graph/generation/addSDXLLoRAs';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
@@ -11,7 +12,14 @@ import { getBoardField, selectPresetModifiedPrompts } from './graphBuilderUtils'
 import type { GraphBuilderReturn } from './types';
 
 export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise<GraphBuilderReturn> => {
-  const { model, upscaleCfgScale: cfg_scale, upscaleScheduler: scheduler, steps, vaePrecision, vae } = state.params;
+  const {
+    model,
+    upscaleCfgScale: cfg_scale,
+    upscaleScheduler: scheduler,
+    steps,
+    vaePrecision,
+    vae,
+  } = selectActiveTabParams(state);
   const {
     upscaleModel,
     upscaleInitialImage,

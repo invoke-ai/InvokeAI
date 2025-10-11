@@ -1,6 +1,6 @@
 import { zFilterType } from 'features/controlLayers/store/filters';
+import { zTabName } from 'features/controlLayers/store/types';
 import { zParameterPrecision, zParameterScheduler } from 'features/parameters/types/parameterSchemas';
-import { zTabName } from 'features/ui/store/uiTypes';
 import type { PartialDeep } from 'type-fest';
 import z from 'zod';
 

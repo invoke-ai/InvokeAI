@@ -15,7 +15,7 @@ import { CanvasStagingAreaModule } from 'features/controlLayers/konva/CanvasStag
 import { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
 import { CanvasWorkerModule } from 'features/controlLayers/konva/CanvasWorkerModule.js';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { $canvasManager } from 'features/controlLayers/store/ephemeral';
+import { $canvasManagers } from 'features/controlLayers/store/ephemeral';
 import type { CanvasEntityIdentifier, CanvasEntityType } from 'features/controlLayers/store/types';
 import {
   isControlLayerEntityIdentifier,
@@ -38,6 +38,7 @@ import { CanvasStateApiModule } from './CanvasStateApiModule';
 export class CanvasManager extends CanvasModuleBase {
   readonly type = 'manager';
   readonly id: string;
+  readonly canvasId: string;
   readonly path: string[];
   readonly manager: CanvasManager;
   readonly parent: CanvasManager;
@@ -75,9 +76,10 @@ export class CanvasManager extends CanvasModuleBase {
    */
   $isBusy: Atom<boolean>;
 
-  constructor(container: HTMLDivElement, store: AppStore, socket: AppSocket) {
+  constructor(canvasId: string, container: HTMLDivElement, store: AppStore, socket: AppSocket) {
     super();
     this.id = getPrefixedId(this.type);
+    this.canvasId = canvasId;
     this.path = [this.id];
     this.manager = this;
     this.parent = this;
@@ -251,7 +253,10 @@ export class CanvasManager extends CanvasModuleBase {
       canvasModule.initialize?.();
     }
 
-    $canvasManager.set(this);
+    $canvasManagers.set({
+      ...$canvasManagers.get(),
+      [this.canvasId]: this,
+    });
   };
 
   destroy = () => {
@@ -265,7 +270,9 @@ export class CanvasManager extends CanvasModuleBase {
       canvasModule.destroy();
     }
 
-    $canvasManager.set(null);
+    const managers = { ...$canvasManagers.get() };
+    delete managers[this.canvasId];
+    $canvasManagers.set(managers);
   };
 
   repr = () => {

@@ -9,12 +9,13 @@ import {
   Portal,
   Tooltip,
 } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import RgbaColorPicker from 'common/components/ColorPicker/RgbaColorPicker';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import {
-  selectCanvasSettingsSlice,
+  selectActiveColor,
+  selectBgColor,
+  selectFgColor,
   settingsActiveColorToggled,
   settingsBgColorChanged,
   settingsColorsSetToDefault,
@@ -25,15 +26,11 @@ import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/us
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selectActiveColor = createSelector(selectCanvasSettingsSlice, (settings) => settings.activeColor);
-const selectBgColor = createSelector(selectCanvasSettingsSlice, (settings) => settings.bgColor);
-const selectFgColor = createSelector(selectCanvasSettingsSlice, (settings) => settings.fgColor);
-
 export const ToolFillColorPicker = memo(() => {
   const { t } = useTranslation();
-  const activeColorType = useAppSelector(selectActiveColor);
-  const bgColor = useAppSelector(selectBgColor);
-  const fgColor = useAppSelector(selectFgColor);
+  const activeColorType = useAppSelector((state) => selectActiveColor(state));
+  const bgColor = useAppSelector((state) => selectBgColor(state));
+  const fgColor = useAppSelector((state) => selectFgColor(state));
   const { activeColor, tooltip, bgColorzIndex, fgColorzIndex } = useMemo(() => {
     if (activeColorType === 'bgColor') {
       return { activeColor: bgColor, tooltip: t('controlLayers.fill.bgFillColor'), bgColorzIndex: 2, fgColorzIndex: 1 };

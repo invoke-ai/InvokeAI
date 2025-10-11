@@ -8,7 +8,6 @@ import { PiPlusMinusBold } from 'react-icons/pi';
 export const NegativePromptToggleButton = memo(() => {
   const { t } = useTranslation();
   const hasNegativePrompt = useAppSelector(selectHasNegativePrompt);
-
   const dispatch = useAppDispatch();
 
   const onClick = useCallback(() => {

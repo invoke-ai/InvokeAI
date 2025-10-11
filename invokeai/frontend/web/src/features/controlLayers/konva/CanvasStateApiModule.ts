@@ -9,7 +9,7 @@ import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase'
 import type { SubscriptionHandler } from 'features/controlLayers/konva/util';
 import { createReduxSubscription, getPrefixedId } from 'features/controlLayers/konva/util';
 import {
-  selectCanvasSettingsSlice,
+  selectCanvasSettingsByCanvasId,
   settingsBgColorChanged,
   settingsBrushWidthChanged,
   settingsEraserWidthChanged,
@@ -29,15 +29,11 @@ import {
   rasterLayerAdded,
   rgAdded,
 } from 'features/controlLayers/store/canvasSlice';
-import { selectCanvasSessionSlice } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import {
-  selectAllRenderableEntities,
-  selectBbox,
-  selectCanvasSlice,
-  selectGridSize,
-} from 'features/controlLayers/store/selectors';
+import { selectCanvasStagingAreaByCanvasId } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { selectGridSize } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveCanvas, selectAllRenderableEntities, selectBbox } from 'features/controlLayers/store/selectors';
 import type {
-  CanvasState,
+  CanvasEntity,
   EntityBrushLineAddedPayload,
   EntityEraserLineAddedPayload,
   EntityIdentifierPayload,
@@ -127,8 +123,8 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    *
    * The state is stored in redux.
    */
-  getCanvasState = (): CanvasState => {
-    return this.runSelector(selectCanvasSlice);
+  getCanvasState = (): CanvasEntity => {
+    return this.runSelector(selectActiveCanvas);
   };
 
   /**
@@ -312,7 +308,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * Gets the canvas settings from redux.
    */
   getSettings = () => {
-    return this.runSelector(selectCanvasSettingsSlice);
+    return this.runSelector((state) => selectCanvasSettingsByCanvasId(state, this.manager.canvasId));
   };
 
   /**
@@ -371,7 +367,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * Gets the canvas staging area state from redux.
    */
   getStagingArea = () => {
-    return this.runSelector(selectCanvasSessionSlice);
+    return this.runSelector((state) => selectCanvasStagingAreaByCanvasId(state, this.manager.canvasId));
   };
 
   /**

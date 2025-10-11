@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 export const CanvasSettingsRuleOfThirdsSwitch = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const ruleOfThirds = useAppSelector(selectRuleOfThirds);
+  const ruleOfThirds = useAppSelector((state) => selectRuleOfThirds(state));
   const onChange = useCallback(() => {
     dispatch(settingsRuleOfThirdsToggled());
   }, [dispatch]);

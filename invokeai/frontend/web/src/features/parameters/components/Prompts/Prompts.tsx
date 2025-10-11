@@ -6,9 +6,9 @@ import {
   selectModelSupportsNegativePrompt,
   selectModelSupportsRefImages,
 } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
 import { ParamNegativePrompt } from 'features/parameters/components/Core/ParamNegativePrompt';
 import { ParamPositivePrompt } from 'features/parameters/components/Core/ParamPositivePrompt';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 
 export const Prompts = memo(() => {

@@ -18,7 +18,7 @@ export const SelectObjectActionButtons = memo(({ adapter }: SelectObjectActionBu
   const isProcessing = useStore(adapter.segmentAnything.$isProcessing);
   const hasInput = useStore(adapter.segmentAnything.$hasInputData);
   const hasImageState = useStore(adapter.segmentAnything.$hasImageState);
-  const autoProcess = useAppSelector(selectAutoProcess);
+  const autoProcess = useAppSelector((state) => selectAutoProcess(state));
 
   return (
     <ButtonGroup isAttached={false} size="sm" w="full">

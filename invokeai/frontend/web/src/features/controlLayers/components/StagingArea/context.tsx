@@ -1,14 +1,15 @@
 import { useStore } from '@nanostores/react';
-import { useAppStore } from 'app/store/storeHooks';
+import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import {
   selectStagingAreaAutoSwitch,
   settingsStagingAreaAutoSwitchChanged,
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
 import {
-  buildSelectCanvasQueueItems,
+  buildSelectCanvasQueueItemsBySessionId,
   canvasQueueItemDiscarded,
   canvasSessionReset,
+  selectActiveCanvasStagingAreaSessionId,
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectBboxRect, selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
@@ -26,14 +27,17 @@ import { getInitialProgressData, StagingAreaApi } from './state';
 
 const StagingAreaContext = createContext<StagingAreaApi | null>(null);
 
-export const StagingAreaContextProvider = memo(({ children, sessionId }: PropsWithChildren<{ sessionId: string }>) => {
+export const StagingAreaContextProvider = memo(({ children }: PropsWithChildren) => {
   const store = useAppStore();
   const socket = useStore($socket);
-  const stagingAreaAppApi = useMemo<StagingAreaAppApi>(() => {
-    const selectQueueItems = buildSelectCanvasQueueItems(sessionId);
+  const sessionId = useAppSelector(selectActiveCanvasStagingAreaSessionId);
+  const selectQueueItems = useMemo(() => buildSelectCanvasQueueItemsBySessionId(sessionId), [sessionId]);
 
+  const stagingAreaAppApi = useMemo<StagingAreaAppApi>(() => {
     const _stagingAreaAppApi: StagingAreaAppApi = {
-      getAutoSwitch: () => selectStagingAreaAutoSwitch(store.getState()),
+      getAutoSwitch: () => {
+        return selectStagingAreaAutoSwitch(store.getState());
+      },
       getImageDTO: (imageName: string) => getImageDTOSafe(imageName),
       onInvocationProgress: (handler) => {
         socket?.on('invocation_progress', handler);
@@ -65,9 +69,11 @@ export const StagingAreaContextProvider = memo(({ children, sessionId }: PropsWi
       },
       onDiscardAll: () => {
         store.dispatch(canvasSessionReset());
-        store.dispatch(
-          queueApi.endpoints.cancelQueueItemsByDestination.initiate({ destination: sessionId }, { track: false })
-        );
+        if (sessionId) {
+          store.dispatch(
+            queueApi.endpoints.cancelQueueItemsByDestination.initiate({ destination: sessionId }, { track: false })
+          );
+        }
       },
       onAccept: (item, imageDTO) => {
         const bboxRect = selectBboxRect(store.getState());
@@ -81,9 +87,11 @@ export const StagingAreaContextProvider = memo(({ children, sessionId }: PropsWi
 
         store.dispatch(rasterLayerAdded({ overrides, isSelected: selectedEntityIdentifier?.type === 'raster_layer' }));
         store.dispatch(canvasSessionReset());
-        store.dispatch(
-          queueApi.endpoints.cancelQueueItemsByDestination.initiate({ destination: sessionId }, { track: false })
-        );
+        if (sessionId) {
+          store.dispatch(
+            queueApi.endpoints.cancelQueueItemsByDestination.initiate({ destination: sessionId }, { track: false })
+          );
+        }
       },
       onAutoSwitchChange: (mode) => {
         store.dispatch(settingsStagingAreaAutoSwitchChanged(mode));
@@ -91,11 +99,17 @@ export const StagingAreaContextProvider = memo(({ children, sessionId }: PropsWi
     };
 
     return _stagingAreaAppApi;
-  }, [sessionId, socket, store]);
+  }, [sessionId, selectQueueItems, socket, store]);
 
   const [stagingAreaApi] = useState(() => new StagingAreaApi());
 
   useEffect(() => {
+    if (!sessionId) {
+      return () => {
+        stagingAreaApi.cleanup();
+      };
+    }
+
     stagingAreaApi.connectToApp(sessionId, stagingAreaAppApi);
 
     // We need to subscribe to the queue items query manually to ensure the staging area actually gets the items

@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 export const CanvasSettingsIsolatedStagingPreviewSwitch = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const isolatedStagingPreview = useAppSelector(selectIsolatedStagingPreview);
+  const isolatedStagingPreview = useAppSelector((state) => selectIsolatedStagingPreview(state));
   const onChange = useCallback(() => {
     dispatch(settingsIsolatedStagingPreviewToggled());
   }, [dispatch]);

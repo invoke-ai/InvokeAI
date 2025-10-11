@@ -8,8 +8,9 @@ import { useTranslation } from 'react-i18next';
 
 const ParamSeamlessYAxis = () => {
   const { t } = useTranslation();
-  const seamlessYAxis = useAppSelector(selectSeamlessYAxis);
   const dispatch = useAppDispatch();
+  const seamlessYAxis = useAppSelector(selectSeamlessYAxis);
+
   const handleChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(setSeamlessYAxis(e.target.checked));
