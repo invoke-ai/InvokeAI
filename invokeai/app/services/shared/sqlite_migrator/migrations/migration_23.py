@@ -12,9 +12,11 @@ from invokeai.backend.model_manager.configs.factory import AnyModelConfig, AnyMo
 from invokeai.backend.model_manager.configs.unknown import Unknown_Config
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
+    ClipVariantType,
     FluxVariantType,
     ModelFormat,
     ModelType,
+    ModelVariantType,
     SchedulerPredictionType,
 )
 
@@ -30,10 +32,20 @@ class Migration23Callback:
         cursor.execute("SELECT id, config FROM models;")
         rows = cursor.fetchall()
 
+        migrated_count = 0
+        fallback_count = 0
+
         for model_id, config_json in rows:
             try:
                 # Migrate the config JSON to the latest schema
-                migrated_config = self._parse_and_migrate_config(config_json)
+                config_dict: dict[str, Any] = json.loads(config_json)
+                migrated_config = self._parse_and_migrate_config(config_dict)
+
+                if isinstance(migrated_config, Unknown_Config):
+                    fallback_count += 1
+                else:
+                    migrated_count += 1
+
                 # Write the migrated config back to the database
                 cursor.execute(
                     "UPDATE models SET config = ? WHERE id = ?;",
@@ -46,9 +58,21 @@ class Migration23Callback:
                 self._logger.error("Invalid config JSON for model %s: %s", model_id, e)
                 raise
 
-    def _parse_and_migrate_config(self, config_json: Any) -> AnyModelConfig:
-        config_dict: dict[str, Any] = json.loads(config_json)
+        if migrated_count > 0 and fallback_count == 0:
+            self._logger.info(f"Migration complete: {migrated_count} model configs migrated")
+        elif migrated_count > 0 and fallback_count > 0:
+            self._logger.warning(
+                f"Migration complete: {migrated_count} model configs migrated, "
+                f"{fallback_count} model configs could not be migrated and were saved as unknown models",
+            )
+        elif migrated_count == 0 and fallback_count > 0:
+            self._logger.warning(
+                f"Migration complete: all {fallback_count} model configs could not be migrated and were saved as unknown models",
+            )
+        else:
+            self._logger.info("Migration complete: no model configs needed migration")
 
+    def _parse_and_migrate_config(self, config_dict: dict[str, Any]) -> AnyModelConfig:
         # In v6.9.0 we made some improvements to the model taxonomy and the model config schemas. There are a changes
         # we need to make to old configs to bring them up to date.
 
@@ -101,7 +125,12 @@ class Migration23Callback:
             # It's only on SD1.x, SD2.x, and SDXL main models.
             config_dict["prediction_type"] = config_dict.get("prediction_type", SchedulerPredictionType.Epsilon.value)
 
-        if base == BaseModelType.Flux and type == ModelType.LoRA.value and format == ModelFormat.Diffusers.value:
+            # Prior to v6.9.0, the variant field was optional and would default to Normal if not present.
+            # We now make it explicit and always present. Use the existing value if present, otherwise default to
+            # Normal. It's only on SD main models.
+            config_dict["variant"] = config_dict.get("variant", ModelVariantType.Normal.value)
+
+        if base == BaseModelType.Flux.value and type == ModelType.LoRA.value and format == ModelFormat.Diffusers.value:
             # Prior to v6.9.0, we used the Diffusers format for FLUX LoRA models that used the diffusers _key_
             # structure. This was misleading, as everywhere else in the application, we used the Diffusers format
             # to indicate that the model files were in the Diffusers _file_ format (i.e. a directory containing
@@ -124,9 +153,18 @@ class Migration23Callback:
             # as independent of any specific base model architecture.
             config_dict["base"] = BaseModelType.Any.value
 
+        if type == ModelType.CLIPEmbed.value:
+            # Prior to v6.9.0, some CLIP Embed models did not have a variant set. The default was the L variant.
+            # We now make it explicit and always present. Use the existing value if present, otherwise default to
+            # L variant. Also, treat CLIP Embed models as independent of any specific base model architecture.
+            config_dict["base"] = BaseModelType.Any.value
+            config_dict["variant"] = config_dict.get("variant", ClipVariantType.L.value)
+
         try:
             migrated_config = AnyModelConfigValidator.validate_python(config_dict)
-        except ValidationError as e:
+        # This could be a ValidationError or any other error that occurs during validation. A failure to generate a
+        # union discriminator could raise a ValueError, for example. Who knows what else could fail - catch all.
+        except Exception as e:
             self._logger.error("Failed to validate migrated config, attempting to save as unknown model: %s", e)
             cloned_config_dict = deepcopy(config_dict)
             cloned_config_dict.pop("base", None)
