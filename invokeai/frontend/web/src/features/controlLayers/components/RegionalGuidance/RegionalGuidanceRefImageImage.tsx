@@ -3,7 +3,7 @@ import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { UploadImageIconButton } from 'common/hooks/useImageUploadButton';
-import { useCanvasIsStaging } from 'features/controlLayers/hooks/useCanvasIsStaging';
+import { useActiveCanvasIsStaging } from 'features/controlLayers/hooks/useCanvasIsStaging';
 import { bboxSizeOptimized, bboxSizeRecalled } from 'features/controlLayers/store/canvasSlice';
 import { sizeOptimized, sizeRecalled } from 'features/controlLayers/store/paramsSlice';
 import { selectActiveTab } from 'features/controlLayers/store/selectors';
@@ -32,7 +32,7 @@ export const RegionalGuidanceRefImageImage = memo(({ image, onChangeImage, dndTa
   const dispatch = useAppDispatch();
   const isConnected = useStore($isConnected);
   const tab = useAppSelector(selectActiveTab);
-  const isStaging = useCanvasIsStaging();
+  const isStaging = useActiveCanvasIsStaging();
   const { currentData: imageDTO, isError } = useGetImageDTOQuery(image?.image_name ?? skipToken);
   const handleResetControlImage = useCallback(() => {
     onChangeImage(null);

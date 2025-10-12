@@ -1,6 +1,6 @@
 import { Flex, Heading, Icon, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useCanvasIsStaging } from 'features/controlLayers/hooks/useCanvasIsStaging';
+import { useActiveCanvasIsStaging } from 'features/controlLayers/hooks/useCanvasIsStaging';
 import { selectActiveTab } from 'features/controlLayers/store/selectors';
 import { LaunchpadButton } from 'features/ui/layouts/LaunchpadButton';
 import { memo, useCallback } from 'react';
@@ -18,7 +18,7 @@ const focusOnPrompt = () => {
 export const LaunchpadGenerateFromTextButton = memo((props: { extraAction?: () => void }) => {
   const { t } = useTranslation();
   const tab = useAppSelector(selectActiveTab);
-  const isStaging = useCanvasIsStaging();
+  const isStaging = useActiveCanvasIsStaging();
 
   const onClick = useCallback(() => {
     focusOnPrompt();

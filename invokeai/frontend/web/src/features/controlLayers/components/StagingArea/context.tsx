@@ -6,9 +6,9 @@ import {
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
 import {
-  buildSelectCanvasQueueItemsBySessionId,
   canvasQueueItemDiscarded,
   canvasSessionReset,
+  selectActiveCanvasQueueItems,
   selectActiveCanvasStagingAreaSessionId,
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectBboxRect, selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
@@ -31,7 +31,6 @@ export const StagingAreaContextProvider = memo(({ children }: PropsWithChildren)
   const store = useAppStore();
   const socket = useStore($socket);
   const sessionId = useAppSelector(selectActiveCanvasStagingAreaSessionId);
-  const selectQueueItems = useMemo(() => buildSelectCanvasQueueItemsBySessionId(sessionId), [sessionId]);
 
   const stagingAreaAppApi = useMemo<StagingAreaAppApi>(() => {
     const _stagingAreaAppApi: StagingAreaAppApi = {
@@ -54,7 +53,7 @@ export const StagingAreaContextProvider = memo(({ children }: PropsWithChildren)
       onItemsChanged: (handler) => {
         let prev: S['SessionQueueItem'][] = [];
         return store.subscribe(() => {
-          const next = selectQueueItems(store.getState());
+          const next = selectActiveCanvasQueueItems(store.getState());
           if (prev !== next) {
             prev = next;
             handler(next);
@@ -99,7 +98,7 @@ export const StagingAreaContextProvider = memo(({ children }: PropsWithChildren)
     };
 
     return _stagingAreaAppApi;
-  }, [sessionId, selectQueueItems, socket, store]);
+  }, [sessionId, socket, store]);
 
   const [stagingAreaApi] = useState(() => new StagingAreaApi());
 

@@ -1,5 +1,5 @@
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
-import { useCanvasIsStaging } from 'features/controlLayers/hooks/useCanvasIsStaging';
+import { useActiveCanvasIsStaging } from 'features/controlLayers/hooks/useCanvasIsStaging';
 import { selectActiveTab } from 'features/controlLayers/store/selectors';
 import { ImageMetadataHandlers, MetadataUtils } from 'features/metadata/parsing';
 import { useCallback, useMemo } from 'react';
@@ -11,7 +11,7 @@ import { useClearStylePresetWithToast } from './useClearStylePresetWithToast';
 export const useRecallRemix = (imageDTO: ImageDTO) => {
   const store = useAppStore();
   const tab = useAppSelector(selectActiveTab);
-  const isStaging = useCanvasIsStaging();
+  const isStaging = useActiveCanvasIsStaging();
   const clearStylePreset = useClearStylePresetWithToast();
 
   const { metadata, isLoading } = useDebouncedMetadata(imageDTO.image_name);

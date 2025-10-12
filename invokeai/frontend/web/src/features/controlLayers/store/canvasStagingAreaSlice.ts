@@ -48,48 +48,45 @@ export const isCanvasStagingAreaStateAction = isAnyOf(...Object.values(canvasSta
 
 export const { canvasSessionReset, canvasQueueItemDiscarded } = canvasStagingAreaState.actions;
 
-const findCanvasStagingAreaByCanvasId = (state: RootState, canvasId: string) => {
+export const selectCanvasStagingAreaByCanvasId = (state: RootState, canvasId: string) => {
   const instance = state.canvas.canvases[canvasId];
   assert(instance, 'Canvas does not exist');
   return instance.staging;
-};
-export const selectCanvasStagingAreaByCanvasId = (state: RootState, canvasId: string) =>
-  findCanvasStagingAreaByCanvasId(state, canvasId);
-const selectActiveCanvasStagingArea = (state: RootState) => {
-  const canvasId = selectActiveCanvasId(state);
-  return findCanvasStagingAreaByCanvasId(state, canvasId);
 };
 const selectCanvasStagingAreaBySessionId = (state: RootState, sessionId: string) => {
   const instance = Object.values(state.canvas.canvases).find((canvas) => canvas.staging.canvasSessionId === sessionId);
   assert(instance, 'Canvas does not exist');
   return instance.staging;
 };
-export const selectCanvasStagingAreaSessionId = (state: RootState, canvasId: string) => {
-  const session = selectCanvasStagingAreaByCanvasId(state, canvasId);
-  return session.canvasSessionId;
+const selectActiveCanvasStagingArea = (state: RootState) => {
+  const canvasId = selectActiveCanvasId(state);
+  return selectCanvasStagingAreaByCanvasId(state, canvasId);
 };
 export const selectActiveCanvasStagingAreaSessionId = (state: RootState) => {
   const session = selectActiveCanvasStagingArea(state);
   return session.canvasSessionId;
 };
-const selectCanvasStagingAreaDiscardedItemsBySessionId = (state: RootState, sessionId: string) => {
-  const session = selectCanvasStagingAreaBySessionId(state, sessionId);
-  return session.canvasDiscardedQueueItems;
-};
-export const buildSelectCanvasQueueItemsBySessionId = (sessionId: string) =>
-  createSelector(
-    queueApi.endpoints.listAllQueueItems.select({ destination: sessionId }),
-    (state: RootState) => selectCanvasStagingAreaDiscardedItemsBySessionId(state, sessionId),
-    ({ data }, discardedItems) => {
-      if (!data) {
-        return EMPTY_ARRAY;
-      }
-      return data.filter(
-        ({ status, item_id }) => status !== 'canceled' && status !== 'failed' && !discardedItems?.includes(item_id)
-      );
+const selectCanvasQueueItemsBySessionId = createSelector(
+  (state: RootState, sessionId: string) =>
+    queueApi.endpoints.listAllQueueItems.select({ destination: sessionId })(state),
+  (state: RootState, sessionId: string) => selectCanvasStagingAreaBySessionId(state, sessionId),
+  ({ data }, session) => {
+    if (!data) {
+      return EMPTY_ARRAY;
     }
-  );
-export const buildSelectIsStagingBySessionId = (sessionId: string) =>
-  createSelector(buildSelectCanvasQueueItemsBySessionId(sessionId), (queueItems) => {
-    return queueItems.length > 0;
-  });
+    return data.filter(
+      ({ status, item_id }) =>
+        status !== 'canceled' && status !== 'failed' && !session.canvasDiscardedQueueItems?.includes(item_id)
+    );
+  }
+);
+export const selectActiveCanvasQueueItems = (state: RootState) => {
+  const session = selectActiveCanvasStagingArea(state);
+
+  return selectCanvasQueueItemsBySessionId(state, session.canvasSessionId);
+};
+export const selectActiveCanvasIsStaging = (state: RootState) => {
+  const queueItems = selectActiveCanvasQueueItems(state);
+
+  return queueItems.length > 0;
+};

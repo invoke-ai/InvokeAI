@@ -2,10 +2,7 @@ import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/store';
 import { modelChanged } from 'features/controlLayers/store/actions';
 import { bboxSyncedToOptimalDimension, rgRefImageModelChanged } from 'features/controlLayers/store/canvasSlice';
-import {
-  buildSelectIsStagingBySessionId,
-  selectActiveCanvasStagingAreaSessionId,
-} from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { selectActiveCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraIsEnabledChanged, selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
 import { selectActiveTabParams, syncedToOptimalDimension, vaeSelected } from 'features/controlLayers/store/paramsSlice';
 import { refImageModelChanged, selectReferenceImageEntities } from 'features/controlLayers/store/refImagesSlice';
@@ -165,9 +162,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
       if (modelBase !== params.model?.base) {
         // Sync generate tab settings whenever the model base changes
         dispatch(syncedToOptimalDimension());
-        const sessionId = selectActiveCanvasStagingAreaSessionId(state);
-        const selectIsStaging = buildSelectIsStagingBySessionId(sessionId);
-        const isStaging = selectIsStaging(state);
+        const isStaging = selectActiveCanvasIsStaging(state);
         if (!isStaging) {
           // Canvas tab only syncs if not staging
           dispatch(bboxSyncedToOptimalDimension());

@@ -4,7 +4,7 @@ import { objectEquals } from '@observ33r/object-equals';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { UploadImageIconButton } from 'common/hooks/useImageUploadButton';
-import { useCanvasIsStaging } from 'features/controlLayers/hooks/useCanvasIsStaging';
+import { useActiveCanvasIsStaging } from 'features/controlLayers/hooks/useCanvasIsStaging';
 import { bboxSizeOptimized, bboxSizeRecalled } from 'features/controlLayers/store/canvasSlice';
 import { sizeOptimized, sizeRecalled } from 'features/controlLayers/store/paramsSlice';
 import { selectActiveTab } from 'features/controlLayers/store/selectors';
@@ -42,7 +42,7 @@ export const RefImageImage = memo(
     const dispatch = useAppDispatch();
     const isConnected = useStore($isConnected);
     const tab = useAppSelector(selectActiveTab);
-    const isStaging = useCanvasIsStaging();
+    const isStaging = useActiveCanvasIsStaging();
     const imageWithDims = image?.crop?.image ?? image?.original.image ?? null;
     const croppedImageDTOReq = useGetImageDTOQuery(image?.crop?.image?.image_name ?? skipToken);
     const originalImageDTOReq = useGetImageDTOQuery(image?.original.image.image_name ?? skipToken);

@@ -1,13 +1,6 @@
 import { useAppSelector } from 'app/store/storeHooks';
-import {
-  buildSelectIsStagingBySessionId,
-  selectActiveCanvasStagingAreaSessionId,
-} from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { useMemo } from 'react';
+import { selectActiveCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 
-export const useCanvasIsStaging = () => {
-  const sessionId = useAppSelector(selectActiveCanvasStagingAreaSessionId);
-  const selectIsStagingBySessionIdSelector = useMemo(() => buildSelectIsStagingBySessionId(sessionId), [sessionId]);
-
-  return useAppSelector(selectIsStagingBySessionIdSelector);
+export const useActiveCanvasIsStaging = () => {
+  return useAppSelector(selectActiveCanvasIsStaging);
 };

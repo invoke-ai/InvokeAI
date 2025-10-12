@@ -1,10 +1,7 @@
 import type { AppStartListening } from 'app/store/store';
 import { isNil } from 'es-toolkit';
 import { bboxHeightChanged, bboxWidthChanged } from 'features/controlLayers/store/canvasSlice';
-import {
-  buildSelectIsStagingBySessionId,
-  selectActiveCanvasStagingAreaSessionId,
-} from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { selectActiveCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   heightChanged,
   selectActiveTabParams,
@@ -120,9 +117,7 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
         }
         const setSizeOptions = { updateAspectRatio: true, clamp: true };
 
-        const sessionId = selectActiveCanvasStagingAreaSessionId(state);
-        const selectIsStaging = buildSelectIsStagingBySessionId(sessionId);
-        const isStaging = selectIsStaging(state);
+        const isStaging = selectActiveCanvasIsStaging(state);
 
         const activeTab = selectActiveTab(getState());
         if (activeTab === 'generate') {

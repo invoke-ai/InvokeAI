@@ -2,7 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectSaveAllImagesToGallery } from 'features/controlLayers/store/canvasSettingsSlice';
-import { selectCanvasStagingAreaSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { selectCanvasStagingAreaByCanvasId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   selectActiveTabParams,
   selectImg2imgStrength,
@@ -73,7 +73,9 @@ export const selectCanvasDestination = (state: RootState, canvasId: string) => {
     return 'canvas';
   }
 
-  return selectCanvasStagingAreaSessionId(state, canvasId);
+  const session = selectCanvasStagingAreaByCanvasId(state, canvasId);
+
+  return session.canvasSessionId;
 };
 
 /**
