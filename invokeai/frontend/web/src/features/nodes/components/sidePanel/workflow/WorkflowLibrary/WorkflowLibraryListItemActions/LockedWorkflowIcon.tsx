@@ -11,7 +11,7 @@ export const LockedWorkflowIcon = memo(() => {
       <IconButton
         size="sm"
         cursor="not-allowed"
-        variant="link"
+        variant="ghost"
         alignSelf="stretch"
         aria-label={t('workflows.builder.publishedWorkflowsLocked')}
         icon={<PiLockBold />}

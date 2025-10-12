@@ -22,7 +22,7 @@ export const ShareWorkflowButton = memo(({ workflow }: { workflow: WorkflowRecor
     <Tooltip label={t('workflows.copyShareLink')} closeOnScroll>
       <IconButton
         size="sm"
-        variant="link"
+        variant="ghost"
         alignSelf="stretch"
         aria-label={t('workflows.copyShareLink')}
         onClick={handleClickShare}

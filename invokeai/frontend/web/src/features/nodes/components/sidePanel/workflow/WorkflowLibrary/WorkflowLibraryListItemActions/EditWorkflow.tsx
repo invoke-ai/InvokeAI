@@ -30,7 +30,7 @@ export const EditWorkflow = ({ workflowId }: { workflowId: string }) => {
     <Tooltip label={t('workflows.edit')} closeOnScroll>
       <IconButton
         size="sm"
-        variant="link"
+        variant="ghost"
         alignSelf="stretch"
         aria-label={t('workflows.edit')}
         onClick={handleClickEdit}
