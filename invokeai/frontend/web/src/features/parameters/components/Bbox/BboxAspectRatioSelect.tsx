@@ -1,8 +1,8 @@
 import { FormControl, FormLabel, Select } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { useActiveCanvasIsStaging } from 'features/controlLayers/hooks/useCanvasIsStaging';
 import { bboxAspectRatioIdChanged } from 'features/controlLayers/store/canvasSlice';
-import { useCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   selectIsChatGPT4o,
   selectIsFluxKontext,
@@ -26,7 +26,7 @@ export const BboxAspectRatioSelect = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const id = useAppSelector(selectAspectRatioID);
-  const isStaging = useCanvasIsStaging();
+  const isStaging = useActiveCanvasIsStaging();
   const isImagen3 = useAppSelector(selectIsImagen3);
   const isChatGPT4o = useAppSelector(selectIsChatGPT4o);
   const isImagen4 = useAppSelector(selectIsImagen4);

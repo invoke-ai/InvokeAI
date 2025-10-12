@@ -2,11 +2,12 @@ import { Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { objectEquals } from '@observ33r/object-equals';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { UploadImageIconButton } from 'common/hooks/useImageUploadButton';
+import { useActiveCanvasIsStaging } from 'features/controlLayers/hooks/useCanvasIsStaging';
 import { bboxSizeOptimized, bboxSizeRecalled } from 'features/controlLayers/store/canvasSlice';
-import { useCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { sizeOptimized, sizeRecalled } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
 import type { CroppableImageWithDims } from 'features/controlLayers/store/types';
 import { imageDTOToCroppableImage, imageDTOToImageWithDims } from 'features/controlLayers/store/util';
 import { Editor } from 'features/cropper/lib/editor';
@@ -15,7 +16,6 @@ import type { setGlobalReferenceImageDndTarget, setRegionalGuidanceReferenceImag
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
 import { DndImageIcon } from 'features/dnd/DndImageIcon';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiCropBold, PiRulerBold } from 'react-icons/pi';
@@ -39,9 +39,10 @@ export const RefImageImage = memo(
   }: Props<T>) => {
     const { t } = useTranslation();
     const store = useAppStore();
+    const dispatch = useAppDispatch();
     const isConnected = useStore($isConnected);
     const tab = useAppSelector(selectActiveTab);
-    const isStaging = useCanvasIsStaging();
+    const isStaging = useActiveCanvasIsStaging();
     const imageWithDims = image?.crop?.image ?? image?.original.image ?? null;
     const croppedImageDTOReq = useGetImageDTOQuery(image?.crop?.image?.image_name ?? skipToken);
     const originalImageDTOReq = useGetImageDTOQuery(image?.original.image.image_name ?? skipToken);
@@ -77,10 +78,10 @@ export const RefImageImage = memo(
         store.dispatch(bboxSizeRecalled({ width, height }));
         store.dispatch(bboxSizeOptimized());
       } else if (tab === 'generate') {
-        store.dispatch(sizeRecalled({ width, height }));
-        store.dispatch(sizeOptimized());
+        dispatch(sizeRecalled({ width, height }));
+        dispatch(sizeOptimized());
       }
-    }, [imageDTO, isStaging, store, tab]);
+    }, [dispatch, imageDTO, isStaging, store, tab]);
 
     const edit = useCallback(() => {
       if (!originalImageDTO) {

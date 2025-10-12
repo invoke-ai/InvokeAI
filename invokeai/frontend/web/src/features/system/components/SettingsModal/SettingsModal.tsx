@@ -81,6 +81,7 @@ const [useSettingsModal] = buildUseBoolean(false);
 
 const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps) => {
   const dispatch = useAppDispatch();
+
   const { t } = useTranslation();
 
   const { isNSFWCheckerAvailable, isWatermarkerAvailable } = useGetAppConfigQuery(undefined, {

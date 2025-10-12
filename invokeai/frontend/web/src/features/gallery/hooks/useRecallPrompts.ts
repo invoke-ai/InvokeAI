@@ -1,7 +1,7 @@
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
+import type { TabName } from 'features/controlLayers/store/types';
 import { ImageMetadataHandlers, MetadataUtils } from 'features/metadata/parsing';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import type { TabName } from 'features/ui/store/uiTypes';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 import type { ImageDTO } from 'services/api/types';

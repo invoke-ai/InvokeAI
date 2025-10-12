@@ -2,14 +2,15 @@ import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { bboxScaledWidthChanged } from 'features/controlLayers/store/canvasSlice';
-import { selectCanvasSlice, selectGridSize, selectOptimalDimension } from 'features/controlLayers/store/selectors';
+import { selectGridSize, selectOptimalDimension } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveCanvas } from 'features/controlLayers/store/selectors';
 import { useIsBboxSizeLocked } from 'features/parameters/components/Bbox/use-is-bbox-size-locked';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selectIsManual = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.scaleMethod === 'manual');
-const selectScaledWidth = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.scaledSize.width);
+const selectIsManual = createSelector(selectActiveCanvas, (canvas) => canvas.bbox.scaleMethod === 'manual');
+const selectScaledWidth = createSelector(selectActiveCanvas, (canvas) => canvas.bbox.scaledSize.width);
 const selectScaledBoundingBoxWidthConfig = createSelector(
   selectConfigSlice,
   (config) => config.sd.scaledBoundingBoxWidth

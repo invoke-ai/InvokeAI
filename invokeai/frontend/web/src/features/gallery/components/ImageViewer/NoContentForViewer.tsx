@@ -3,12 +3,12 @@ import { Alert, AlertDescription, AlertIcon, Button, Divider, Flex, Link, Spinne
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { InvokeLogoIcon } from 'common/components/InvokeLogoIcon';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
 import { LOADING_SYMBOL, useHasImages } from 'features/gallery/hooks/useHasImages';
 import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectIsLocal } from 'features/system/store/configSlice';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { PropsWithChildren } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';

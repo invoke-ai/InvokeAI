@@ -6,17 +6,17 @@ import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/Canva
 import { RefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
 import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { useNewGlobalReferenceImageFromBbox } from 'features/controlLayers/hooks/saveCanvasHooks';
-import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import {
   refImageAdded,
   selectIsRefImagePanelOpen,
   selectRefImageEntityIds,
   selectSelectedRefEntityId,
 } from 'features/controlLayers/store/refImagesSlice';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
 import { imageDTOToCroppableImage } from 'features/controlLayers/store/util';
 import { addGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold, PiUploadBold } from 'react-icons/pi';
@@ -132,7 +132,7 @@ AddRefImageDropTargetAndButton.displayName = 'AddRefImageDropTargetAndButton';
 
 const BboxButton = memo(() => {
   const { t } = useTranslation();
-  const isBusy = useCanvasIsBusySafe();
+  const isBusy = useCanvasIsBusy();
   const newGlobalReferenceImageFromBbox = useNewGlobalReferenceImageFromBbox();
 
   return (

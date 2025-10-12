@@ -3,7 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { setFocusedRegion } from 'common/hooks/focus';
 import { useCallbackOnDragEnter } from 'common/hooks/useCallbackOnDragEnter';
 import type { IDockviewPanelHeaderProps } from 'dockview';
-import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { selectActiveCanvasStagingAreaSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { useCurrentQueueItemDestination } from 'features/queue/hooks/useCurrentQueueItemDestination';
 import ProgressBar from 'features/system/components/ProgressBar';
 import { memo, useCallback, useRef } from 'react';
@@ -15,7 +15,7 @@ import type { DockviewPanelParameters } from './auto-layout-context';
 export const DockviewTabCanvasWorkspace = memo((props: IDockviewPanelHeaderProps<DockviewPanelParameters>) => {
   const { t } = useTranslation();
   const isGenerationInProgress = useIsGenerationInProgress();
-  const canvasSessionId = useAppSelector(selectCanvasSessionId);
+  const canvasSessionId = useAppSelector(selectActiveCanvasStagingAreaSessionId);
   const currentQueueItemDestination = useCurrentQueueItemDestination();
 
   const ref = useRef<HTMLDivElement>(null);

@@ -14,11 +14,11 @@ import {
   PopoverTrigger,
   Portal,
 } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { clamp } from 'es-toolkit/compat';
 import {
-  selectCanvasSettingsSlice,
+  selectBrushWidth,
+  selectEraserWidth,
   settingsBrushWidthChanged,
   settingsEraserWidthChanged,
 } from 'features/controlLayers/store/canvasSettingsSlice';
@@ -179,9 +179,6 @@ const SliderToolWidthPickerComponent = memo(
   }
 );
 SliderToolWidthPickerComponent.displayName = 'SliderToolWidthPickerComponent';
-
-const selectBrushWidth = createSelector(selectCanvasSettingsSlice, (settings) => settings.brushWidth);
-const selectEraserWidth = createSelector(selectCanvasSettingsSlice, (settings) => settings.eraserWidth);
 
 export const ToolWidthPicker = memo(() => {
   const ref = useRef<HTMLDivElement>(null);

@@ -12,7 +12,6 @@ import { useTranslation } from 'react-i18next';
 
 const ParamInfillColorOptions = () => {
   const dispatch = useAppDispatch();
-
   const infillColor = useAppSelector(selectInfillColorValue);
   const infillMethod = useAppSelector(selectInfillMethod);
 

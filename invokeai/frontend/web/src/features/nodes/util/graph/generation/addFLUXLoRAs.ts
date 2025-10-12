@@ -1,5 +1,6 @@
 import type { RootState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { Invocation, S } from 'services/api/types';
@@ -11,7 +12,7 @@ export const addFLUXLoRAs = (
   modelLoader: Invocation<'flux_model_loader'>,
   fluxTextEncoder: Invocation<'flux_text_encoder'>
 ): void => {
-  const enabledLoRAs = state.loras.loras.filter((l) => l.isEnabled && l.model.base === 'flux');
+  const enabledLoRAs = selectAddedLoRAs(state).filter((l) => l.isEnabled && l.model.base === 'flux');
   const loraCount = enabledLoRAs.length;
 
   if (loraCount === 0) {

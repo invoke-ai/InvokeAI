@@ -1,5 +1,5 @@
 import { clamp } from 'es-toolkit';
-import type { AutoSwitchMode } from 'features/controlLayers/store/canvasSettingsSlice';
+import type { AutoSwitchMode } from 'features/controlLayers/store/types';
 import type { ProgressImage } from 'features/nodes/types/common';
 import type { MapStore } from 'nanostores';
 import { atom, computed, map } from 'nanostores';

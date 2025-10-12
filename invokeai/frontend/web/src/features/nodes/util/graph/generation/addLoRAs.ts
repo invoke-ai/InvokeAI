@@ -1,5 +1,6 @@
 import type { RootState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { Invocation, S } from 'services/api/types';
@@ -14,7 +15,7 @@ export const addLoRAs = (
   posCond: Invocation<'compel'>,
   negCond: Invocation<'compel'>
 ): void => {
-  const enabledLoRAs = state.loras.loras.filter(
+  const enabledLoRAs = selectAddedLoRAs(state).filter(
     (l) => l.isEnabled && (l.model.base === 'sd-1' || l.model.base === 'sd-2')
   );
   const loraCount = enabledLoRAs.length;

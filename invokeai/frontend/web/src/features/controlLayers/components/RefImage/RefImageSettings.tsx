@@ -28,6 +28,7 @@ import {
   selectRefImageEntityOrThrow,
   selectRefImagesSlice,
 } from 'features/controlLayers/store/refImagesSlice';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
 import type {
   CLIPVisionModelV2,
   CroppableImageWithDims,
@@ -37,7 +38,6 @@ import type {
 import { isFLUXReduxConfig, isIPAdapterConfig } from 'features/controlLayers/store/types';
 import type { SetGlobalReferenceImageDndTargetData } from 'features/dnd/dnd';
 import { setGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo } from 'react';
 import type {
   ChatGPT4oModelConfig,

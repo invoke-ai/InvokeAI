@@ -1,8 +1,8 @@
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTabParams, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectActiveTab, selectCanvasByCanvasId, selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import { isFluxKontextReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { zImageField } from 'features/nodes/types/common';
@@ -20,7 +20,6 @@ import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { selectCanvasOutputFields } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
@@ -39,8 +38,8 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   assert(model, 'No model selected');
   assert(model.base === 'flux', 'Selected model is not a FLUX model');
 
-  const params = selectParamsSlice(state);
-  const canvas = selectCanvasSlice(state);
+  const params = selectActiveTabParams(state);
+  const canvas = manager ? selectCanvasByCanvasId(state, manager.canvasId) : null;
   const refImages = selectRefImagesSlice(state);
 
   const { guidance: baseGuidance, steps, fluxVAE, t5EncoderModel, clipEmbedModel } = params;
@@ -254,7 +253,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     assert<Equals<typeof generationMode, never>>(false);
   }
 
-  if (manager !== null) {
+  if (manager !== null && canvas !== null) {
     const controlNetCollector = g.addNode({
       type: 'collect',
       id: getPrefixedId('control_net_collector'),
@@ -308,7 +307,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   });
   let totalReduxesAdded = fluxReduxResult.addedFLUXReduxes;
 
-  if (manager !== null) {
+  if (manager !== null && canvas !== null) {
     const regionsResult = await addRegions({
       manager,
       regions: canvas.regionalGuidance.entities,

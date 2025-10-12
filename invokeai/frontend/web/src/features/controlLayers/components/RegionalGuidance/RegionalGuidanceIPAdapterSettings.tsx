@@ -21,7 +21,7 @@ import {
   rgRefImageIPAdapterWeightChanged,
   rgRefImageModelChanged,
 } from 'features/controlLayers/store/canvasSlice';
-import { selectCanvasSlice, selectRegionalGuidanceReferenceImage } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas, selectRegionalGuidanceReferenceImage } from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityIdentifier,
   CLIPVisionModelV2,
@@ -51,7 +51,7 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
   }, [dispatch, entityIdentifier, referenceImageId]);
   const selectConfig = useMemo(
     () =>
-      createSelector(selectCanvasSlice, (canvas) => {
+      createSelector(selectActiveCanvas, (canvas) => {
         const referenceImage = selectRegionalGuidanceReferenceImage(canvas, entityIdentifier, referenceImageId);
         assert(referenceImage, `Regional Guidance IP Adapter with id ${referenceImageId} not found`);
         return referenceImage.config;
@@ -190,7 +190,7 @@ const buildSelectIPAdapterHasImage = (
   entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>,
   referenceImageId: string
 ) =>
-  createSelector(selectCanvasSlice, (canvas) => {
+  createSelector(selectActiveCanvas, (canvas) => {
     const referenceImage = selectRegionalGuidanceReferenceImage(canvas, entityIdentifier, referenceImageId);
     return !!referenceImage && referenceImage.config.image !== null;
   });

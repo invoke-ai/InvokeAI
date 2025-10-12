@@ -1,6 +1,6 @@
 import { useAppStore } from 'app/store/storeHooks';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { useCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { useActiveCanvasIsStaging } from 'features/controlLayers/hooks/useCanvasIsStaging';
 import { newCanvasFromImage } from 'features/imageActions/actions';
 import { toast } from 'features/toast/toast';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -14,7 +14,7 @@ export const useEditImage = (imageDTO?: ImageDTO | null) => {
 
   const { getState, dispatch } = useAppStore();
   const canvasManager = useCanvasManagerSafe();
-  const isStaging = useCanvasIsStaging();
+  const isStaging = useActiveCanvasIsStaging();
 
   const isEnabled = useMemo(() => {
     if (!imageDTO) {

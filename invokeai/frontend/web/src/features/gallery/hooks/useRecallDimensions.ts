@@ -1,14 +1,14 @@
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
-import { useCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { useActiveCanvasIsStaging } from 'features/controlLayers/hooks/useCanvasIsStaging';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
 import { MetadataUtils } from 'features/metadata/parsing';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { useCallback, useMemo } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
 export const useRecallDimensions = (imageDTO: ImageDTO) => {
   const store = useAppStore();
   const tab = useAppSelector(selectActiveTab);
-  const isStaging = useCanvasIsStaging();
+  const isStaging = useActiveCanvasIsStaging();
 
   const isEnabled = useMemo(() => {
     if (tab !== 'canvas' && tab !== 'generate') {

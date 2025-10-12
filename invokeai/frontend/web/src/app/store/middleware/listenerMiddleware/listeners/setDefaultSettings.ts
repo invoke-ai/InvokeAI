@@ -1,9 +1,10 @@
 import type { AppStartListening } from 'app/store/store';
 import { isNil } from 'es-toolkit';
 import { bboxHeightChanged, bboxWidthChanged } from 'features/controlLayers/store/canvasSlice';
-import { buildSelectIsStaging, selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { selectActiveCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   heightChanged,
+  selectActiveTabParams,
   setCfgRescaleMultiplier,
   setCfgScale,
   setGuidance,
@@ -13,6 +14,7 @@ import {
   vaeSelected,
   widthChanged,
 } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
 import { setDefaultSettings } from 'features/parameters/store/actions';
 import {
   isParameterCFGRescaleMultiplier,
@@ -26,7 +28,6 @@ import {
   zParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
@@ -34,10 +35,11 @@ import { isNonRefinerMainModelConfig } from 'services/api/types';
 export const addSetDefaultSettingsListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: setDefaultSettings,
-    effect: async (action, { dispatch, getState }) => {
+    effect: async (action, api) => {
+      const { dispatch, getState } = api;
       const state = getState();
 
-      const currentModel = state.params.model;
+      const currentModel = selectActiveTabParams(state).model;
 
       if (!currentModel) {
         return;
@@ -115,7 +117,7 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
         }
         const setSizeOptions = { updateAspectRatio: true, clamp: true };
 
-        const isStaging = buildSelectIsStaging(selectCanvasSessionId(state))(state);
+        const isStaging = selectActiveCanvasIsStaging(state);
 
         const activeTab = selectActiveTab(getState());
         if (activeTab === 'generate') {

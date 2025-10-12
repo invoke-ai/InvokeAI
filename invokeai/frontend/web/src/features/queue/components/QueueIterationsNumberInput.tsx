@@ -6,9 +6,10 @@ import { selectIterationsConfig } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 
 export const QueueIterationsNumberInput = memo(() => {
+  const dispatch = useAppDispatch();
   const iterations = useAppSelector(selectIterations);
   const config = useAppSelector(selectIterationsConfig);
-  const dispatch = useAppDispatch();
+
   const handleChange = useCallback(
     (v: number) => {
       dispatch(setIterations(v));

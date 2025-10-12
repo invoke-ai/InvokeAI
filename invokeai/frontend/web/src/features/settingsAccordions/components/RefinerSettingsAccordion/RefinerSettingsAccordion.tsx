@@ -2,7 +2,7 @@ import type { FormLabelProps } from '@invoke-ai/ui-library';
 import { Flex, FormControlGroup, StandaloneAccordion, Text } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectIsRefinerModelSelected, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTabParams, selectIsRefinerModelSelected } from 'features/controlLayers/store/paramsSlice';
 import ParamSDXLRefinerCFGScale from 'features/sdxl/components/SDXLRefiner/ParamSDXLRefinerCFGScale';
 import ParamSDXLRefinerModelSelect from 'features/sdxl/components/SDXLRefiner/ParamSDXLRefinerModelSelect';
 import ParamSDXLRefinerNegativeAestheticScore from 'features/sdxl/components/SDXLRefiner/ParamSDXLRefinerNegativeAestheticScore';
@@ -23,7 +23,7 @@ const stepsScaleLabelProps: FormLabelProps = {
   minW: '5rem',
 };
 
-const selectBadges = createMemoizedSelector(selectParamsSlice, (params) =>
+const selectBadges = createMemoizedSelector(selectActiveTabParams, (params) =>
   params.refinerModel ? ['Enabled'] : undefined
 );
 

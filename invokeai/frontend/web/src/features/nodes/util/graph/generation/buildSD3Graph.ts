@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
+import { selectActiveTabParams, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTab, selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
@@ -11,7 +11,6 @@ import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermar
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
@@ -27,7 +26,7 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
   assert(model, 'No model found in state');
   assert(model.base === 'sd-3');
 
-  const params = selectParamsSlice(state);
+  const params = selectActiveTabParams(state);
 
   const { cfgScale: cfg_scale, steps, vae, t5EncoderModel, clipLEmbedModel, clipGEmbedModel } = params;
 
