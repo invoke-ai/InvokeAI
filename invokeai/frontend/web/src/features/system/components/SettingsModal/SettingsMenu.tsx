@@ -14,19 +14,10 @@ import HotkeysModal from 'features/system/components/HotkeysModal/HotkeysModal';
 import { discordLink, githubLink } from 'features/system/store/constants';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  PiBugBeetleBold,
-  PiGearSixFill,
-  PiInfoBold,
-  PiKeyboardBold,
-  PiShareNetworkFill,
-  PiToggleRightFill,
-  PiUsersBold,
-} from 'react-icons/pi';
+import { PiBugBeetleBold, PiGearSixFill, PiInfoBold, PiKeyboardBold, PiToggleRightFill } from 'react-icons/pi';
 import { RiDiscordFill, RiGithubFill } from 'react-icons/ri';
 
 import SettingsModal from './SettingsModal';
-import { SettingsUpsellMenuItem } from './SettingsUpsellMenuItem';
 const SettingsMenu = () => {
   const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -43,11 +34,6 @@ const SettingsMenu = () => {
       />
       <Portal>
         <MenuList>
-          <MenuGroup title={t('upsell.professional')}>
-            <SettingsUpsellMenuItem menuText={t('upsell.inviteTeammates')} menuIcon={<PiUsersBold />} />
-            <SettingsUpsellMenuItem menuText={t('upsell.shareAccess')} menuIcon={<PiShareNetworkFill />} />
-          </MenuGroup>
-
           <MenuGroup title={t('common.communityLabel')}>
             <MenuItem as="a" href={githubLink} target="_blank" icon={<RiGithubFill />}>
               {t('common.githubLabel')}

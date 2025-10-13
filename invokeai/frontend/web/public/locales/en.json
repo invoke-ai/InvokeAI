@@ -2612,12 +2612,7 @@
         "viewModeTooltip": "This is how your prompt will look with your currently selected template. To edit your prompt, click anywhere in the text box.",
         "togglePromptPreviews": "Toggle Prompt Previews"
     },
-    "upsell": {
-        "inviteTeammates": "Invite Teammates",
-        "professional": "Professional",
-        "professionalUpsell": "Available in Invoke's Professional Edition. Click here or visit invoke.com/pricing for more details.",
-        "shareAccess": "Share Access"
-    },
+
     "ui": {
         "tabs": {
             "generate": "Generate",
