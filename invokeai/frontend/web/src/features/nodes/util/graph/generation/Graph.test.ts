@@ -674,7 +674,6 @@ describe('Graph', () => {
           variant: 'inpaint',
           format: 'diffusers',
           repo_variant: 'fp16',
-          usage_info: null,
         });
         expect(field).toEqual({
           key: 'b00ee8df-523d-40d2-9578-597283b07cb2',

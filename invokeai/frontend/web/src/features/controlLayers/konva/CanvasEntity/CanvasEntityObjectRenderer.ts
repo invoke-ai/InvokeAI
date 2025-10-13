@@ -1,4 +1,3 @@
-import { $authToken } from 'app/store/nanostores/authToken';
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { SyncableMap } from 'common/util/SyncableMap/SyncableMap';
 import { throttle } from 'es-toolkit/compat';
@@ -38,7 +37,7 @@ function setFillPatternImage(shape: Konva.Shape, ...args: Parameters<typeof getP
   imageElement.onload = () => {
     shape.fillPatternImage(imageElement);
   };
-  imageElement.crossOrigin = $authToken.get() ? 'use-credentials' : 'anonymous';
+  imageElement.crossOrigin = 'anonymous';
   imageElement.src = getPatternSVG(...args);
   return imageElement;
 }

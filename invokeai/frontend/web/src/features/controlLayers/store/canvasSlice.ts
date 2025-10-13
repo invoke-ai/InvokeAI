@@ -35,7 +35,6 @@ import {
   getScaledBoundingBoxDimensions,
 } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { simplifyFlatNumbersArray } from 'features/controlLayers/util/simplify';
-import { API_BASE_MODELS } from 'features/modelManagerV2/models';
 import { isMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
@@ -73,17 +72,9 @@ import type {
 } from './types';
 import {
   ASPECT_RATIO_MAP,
-  CHATGPT_ASPECT_RATIOS,
   DEFAULT_ASPECT_RATIO_CONFIG,
-  FLUX_KONTEXT_ASPECT_RATIOS,
-  GEMINI_2_5_ASPECT_RATIOS,
   getEntityIdentifier,
   getInitialCanvasState,
-  IMAGEN_ASPECT_RATIOS,
-  isChatGPT4oAspectRatioID,
-  isFluxKontextAspectRatioID,
-  isGemini2_5AspectRatioID,
-  isImagenAspectRatioID,
   isRegionalGuidanceFLUXReduxConfig,
   isRegionalGuidanceIPAdapterConfig,
   zCanvasState,
@@ -1227,33 +1218,6 @@ const slice = createSlice({
       state.bbox.aspectRatio.id = id;
       if (id === 'Free') {
         state.bbox.aspectRatio.isLocked = false;
-      } else if (
-        (state.bbox.modelBase === 'imagen3' || state.bbox.modelBase === 'imagen4') &&
-        isImagenAspectRatioID(id)
-      ) {
-        const { width, height } = IMAGEN_ASPECT_RATIOS[id];
-        state.bbox.rect.width = width;
-        state.bbox.rect.height = height;
-        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
-        state.bbox.aspectRatio.isLocked = true;
-      } else if (state.bbox.modelBase === 'chatgpt-4o' && isChatGPT4oAspectRatioID(id)) {
-        const { width, height } = CHATGPT_ASPECT_RATIOS[id];
-        state.bbox.rect.width = width;
-        state.bbox.rect.height = height;
-        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
-        state.bbox.aspectRatio.isLocked = true;
-      } else if (state.bbox.modelBase === 'gemini-2.5' && isGemini2_5AspectRatioID(id)) {
-        const { width, height } = GEMINI_2_5_ASPECT_RATIOS[id];
-        state.bbox.rect.width = width;
-        state.bbox.rect.height = height;
-        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
-        state.bbox.aspectRatio.isLocked = true;
-      } else if (state.bbox.modelBase === 'flux-kontext' && isFluxKontextAspectRatioID(id)) {
-        const { width, height } = FLUX_KONTEXT_ASPECT_RATIOS[id];
-        state.bbox.rect.width = width;
-        state.bbox.rect.height = height;
-        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
-        state.bbox.aspectRatio.isLocked = true;
       } else {
         state.bbox.aspectRatio.isLocked = true;
         state.bbox.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
@@ -1700,14 +1664,6 @@ const slice = createSlice({
       const base = model?.base;
       if (isMainModelBase(base) && state.bbox.modelBase !== base) {
         state.bbox.modelBase = base;
-        if (API_BASE_MODELS.includes(base)) {
-          state.bbox.aspectRatio.isLocked = true;
-          state.bbox.aspectRatio.value = 1;
-          state.bbox.aspectRatio.id = '1:1';
-          state.bbox.rect.width = 1024;
-          state.bbox.rect.height = 1024;
-        }
-
         syncScaledSize(state);
       }
     });
@@ -1832,10 +1788,6 @@ export const {
 } = slice.actions;
 
 const syncScaledSize = (state: CanvasState) => {
-  if (API_BASE_MODELS.includes(state.bbox.modelBase)) {
-    // Imagen3 has fixed sizes. Scaled bbox is not supported.
-    return;
-  }
   if (state.bbox.scaleMethod === 'auto') {
     // Sync both aspect ratio and size
     const { width, height } = state.bbox.rect;

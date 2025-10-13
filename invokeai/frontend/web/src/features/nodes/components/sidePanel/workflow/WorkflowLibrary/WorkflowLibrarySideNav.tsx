@@ -26,7 +26,6 @@ import {
   workflowLibraryTagToggled,
   workflowLibraryViewChanged,
 } from 'features/nodes/store/workflowLibrarySlice';
-import { selectAllowPublishWorkflows } from 'features/system/store/configSlice';
 import { NewWorkflowButton } from 'features/workflowLibrary/components/NewWorkflowButton';
 import { UploadWorkflowButton } from 'features/workflowLibrary/components/UploadWorkflowButton';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
@@ -40,7 +39,6 @@ export const WorkflowLibrarySideNav = () => {
   const { t } = useTranslation();
   const categoryOptions = useStore($workflowLibraryCategoriesOptions);
   const view = useAppSelector(selectWorkflowLibraryView);
-  const allowPublishWorkflows = useAppSelector(selectAllowPublishWorkflows);
 
   return (
     <Flex h="full" minH={0} overflow="hidden" flexDir="column" w={64} gap={0}>
@@ -59,9 +57,6 @@ export const WorkflowLibrarySideNav = () => {
               </WorkflowLibraryViewButton>
             </Flex>
           </Collapse>
-        )}
-        {allowPublishWorkflows && (
-          <WorkflowLibraryViewButton view="published">{t('workflows.published')}</WorkflowLibraryViewButton>
         )}
       </Flex>
       <Flex h="full" minH={0} overflow="hidden" flexDir="column">

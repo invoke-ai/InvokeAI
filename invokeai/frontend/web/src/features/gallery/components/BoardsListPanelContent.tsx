@@ -5,7 +5,6 @@ import { useDisclosure } from 'common/hooks/useBoolean';
 import { BoardsListWrapper } from 'features/gallery/components/Boards/BoardsList/BoardsListWrapper';
 import { BoardsSearch } from 'features/gallery/components/Boards/BoardsList/BoardsSearch';
 import { BoardsSettingsPopover } from 'features/gallery/components/Boards/BoardsSettingsPopover';
-import { GalleryHeader } from 'features/gallery/components/GalleryHeader';
 import { selectBoardSearchText } from 'features/gallery/store/gallerySelectors';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
@@ -61,9 +60,6 @@ export const BoardsPanel = memo(() => {
           >
             {t('boards.boards')}
           </Button>
-        </Flex>
-        <Flex>
-          <GalleryHeader />
         </Flex>
         <Flex flexGrow={1} flexBasis={0} justifyContent="flex-end">
           <BoardsSettingsPopover />

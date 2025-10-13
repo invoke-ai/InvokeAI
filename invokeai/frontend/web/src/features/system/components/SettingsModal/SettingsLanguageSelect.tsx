@@ -2,7 +2,6 @@ import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { map } from 'es-toolkit/compat';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectLanguage } from 'features/system/store/systemSelectors';
 import { languageChanged } from 'features/system/store/systemSlice';
 import type { Language } from 'features/system/store/types';
@@ -42,7 +41,6 @@ export const SettingsLanguageSelect = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const language = useAppSelector(selectLanguage);
-  const isLocalizationEnabled = useFeatureStatus('localization');
 
   const value = useMemo(() => options.find((o) => o.value === language), [language]);
 
@@ -56,7 +54,7 @@ export const SettingsLanguageSelect = memo(() => {
     [dispatch]
   );
   return (
-    <FormControl isDisabled={!isLocalizationEnabled}>
+    <FormControl>
       <FormLabel>{t('common.languagePickerLabel')}</FormLabel>
       <Combobox value={value} options={options} onChange={onChange} />
     </FormControl>

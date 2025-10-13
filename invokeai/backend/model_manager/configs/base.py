@@ -28,6 +28,17 @@ if TYPE_CHECKING:
     pass
 
 
+class URLModelSource(BaseModel):
+    type: Literal[ModelSourceType.Url] = Field(default=ModelSourceType.Url)
+    url: str = Field(
+        description="The URL from which the model was installed.",
+    )
+    api_response: str | None = Field(
+        default=None,
+        description="The original API response from the source, as stringified JSON.",
+    )
+
+
 class Config_Base(ABC, BaseModel):
     """
     Abstract base class for model configurations. A model config describes a specific combination of model base, type and
@@ -80,10 +91,6 @@ class Config_Base(ABC, BaseModel):
     cover_image: str | None = Field(
         default=None,
         description="Url for image to preview model",
-    )
-    usage_info: str | None = Field(
-        default=None,
-        description="Usage information for this model",
     )
 
     CONFIG_CLASSES: ClassVar[set[Type["Config_Base"]]] = set()

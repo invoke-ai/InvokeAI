@@ -9,15 +9,12 @@ import {
 } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 import {
-  isChatGPT4oModelConfig,
   isCLIPEmbedModelConfigOrSubmodel,
   isControlLayerModelConfig,
   isControlNetModelConfig,
-  isFluxKontextApiModelConfig,
   isFluxKontextModelConfig,
   isFluxReduxModelConfig,
   isFluxVAEModelConfig,
-  isGemini2_5ModelConfig,
   isIPAdapterModelConfig,
   isLoRAModelConfig,
   isNonRefinerMainModelConfig,
@@ -26,7 +23,6 @@ import {
   isT5EncoderModelConfigOrSubmodel,
   isTIModelConfig,
   isVAEModelConfigOrSubmodel,
-  isVideoModelConfig,
 } from 'services/api/types';
 
 const buildModelsHook =
@@ -58,18 +54,11 @@ export const useEmbeddingModels = buildModelsHook(isTIModelConfig);
 export const useVAEModels = () => buildModelsHook(isVAEModelConfigOrSubmodel)();
 export const useFluxVAEModels = () => buildModelsHook(isFluxVAEModelConfig)();
 export const useGlobalReferenceImageModels = buildModelsHook(
-  (config) =>
-    isIPAdapterModelConfig(config) ||
-    isFluxReduxModelConfig(config) ||
-    isChatGPT4oModelConfig(config) ||
-    isFluxKontextApiModelConfig(config) ||
-    isFluxKontextModelConfig(config) ||
-    isGemini2_5ModelConfig(config)
+  (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config) || isFluxKontextModelConfig(config)
 );
 export const useRegionalReferenceImageModels = buildModelsHook(
   (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config)
 );
-export const useVideoModels = buildModelsHook(isVideoModelConfig);
 
 const buildModelsSelector =
   <T extends AnyModelConfig>(typeGuard: (config: AnyModelConfig) => config is T): Selector<RootState, T[]> =>
@@ -82,13 +71,7 @@ const buildModelsSelector =
   };
 export const selectIPAdapterModels = buildModelsSelector(isIPAdapterModelConfig);
 export const selectGlobalRefImageModels = buildModelsSelector(
-  (config) =>
-    isIPAdapterModelConfig(config) ||
-    isFluxReduxModelConfig(config) ||
-    isChatGPT4oModelConfig(config) ||
-    isFluxKontextApiModelConfig(config) ||
-    isFluxKontextModelConfig(config) ||
-    isGemini2_5ModelConfig(config)
+  (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config) || isFluxKontextModelConfig(config)
 );
 export const selectRegionalRefImageModels = buildModelsSelector(
   (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config)

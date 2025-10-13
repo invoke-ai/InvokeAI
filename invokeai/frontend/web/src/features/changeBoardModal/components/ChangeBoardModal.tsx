@@ -13,7 +13,6 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import { useAddImagesToBoardMutation, useRemoveImagesFromBoardMutation } from 'services/api/endpoints/images';
-import { useAddVideosToBoardMutation, useRemoveVideosFromBoardMutation } from 'services/api/endpoints/videos';
 
 const selectImagesToChange = createSelector(
   selectChangeBoardModalSlice,
@@ -41,8 +40,6 @@ const ChangeBoardModal = () => {
   const videosToChange = useAppSelector(selectVideosToChange);
   const [addImagesToBoard] = useAddImagesToBoardMutation();
   const [removeImagesFromBoard] = useRemoveImagesFromBoardMutation();
-  const [addVideosToBoard] = useAddVideosToBoardMutation();
-  const [removeVideosFromBoard] = useRemoveVideosFromBoardMutation();
   const { t } = useTranslation();
 
   const options = useMemo<ComboboxOption[]>(() => {
@@ -80,27 +77,8 @@ const ChangeBoardModal = () => {
         });
       }
     }
-    if (videosToChange.length) {
-      if (selectedBoardId === 'none') {
-        removeVideosFromBoard({ video_ids: videosToChange });
-      } else {
-        addVideosToBoard({
-          video_ids: videosToChange,
-          board_id: selectedBoardId,
-        });
-      }
-    }
     dispatch(changeBoardReset());
-  }, [
-    addImagesToBoard,
-    dispatch,
-    imagesToChange,
-    videosToChange,
-    removeImagesFromBoard,
-    selectedBoardId,
-    addVideosToBoard,
-    removeVideosFromBoard,
-  ]);
+  }, [addImagesToBoard, dispatch, imagesToChange, videosToChange, removeImagesFromBoard, selectedBoardId]);
 
   const onChange = useCallback<ComboboxOnChange>((v) => {
     if (!v) {

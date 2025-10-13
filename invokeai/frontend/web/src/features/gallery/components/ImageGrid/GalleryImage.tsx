@@ -217,7 +217,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
           maxH="full"
           borderRadius="base"
         />
-        <GalleryItemHoverIcons itemDTO={imageDTO} isHovered={isHovered} />
+        <GalleryItemHoverIcons imageDTO={imageDTO} isHovered={isHovered} />
       </Flex>
       {dragPreviewState?.type === 'multiple-image' ? createMultipleImageDragPreview(dragPreviewState) : null}
       {dragPreviewState?.type === 'single-image' ? createSingleImageDragPreview(dragPreviewState) : null}

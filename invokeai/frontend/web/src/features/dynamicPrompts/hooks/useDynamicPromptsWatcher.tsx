@@ -9,7 +9,6 @@ import {
 } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
 import { selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useEffect, useMemo } from 'react';
 import { utilitiesApi } from 'services/api/endpoints/utilities';
 
@@ -23,8 +22,6 @@ export const useDynamicPromptsWatcher = () => {
   // The prompt to process is derived from the preset-modified prompts
   const presetModifiedPrompts = useAppSelector(selectPresetModifiedPrompts);
   const maxPrompts = useAppSelector(selectDynamicPromptsMaxPrompts);
-
-  const dynamicPrompting = useFeatureStatus('dynamicPrompting');
 
   const debouncedUpdateDynamicPrompts = useMemo(
     () =>
@@ -55,10 +52,6 @@ export const useDynamicPromptsWatcher = () => {
   );
 
   useEffect(() => {
-    if (!dynamicPrompting) {
-      return;
-    }
-
     // Before we execute, imperatively check the dynamic prompts query cache to see if we have already fetched this prompt
     const state = getState();
 
@@ -88,5 +81,5 @@ export const useDynamicPromptsWatcher = () => {
     }
 
     debouncedUpdateDynamicPrompts(presetModifiedPrompts.positive, maxPrompts);
-  }, [debouncedUpdateDynamicPrompts, dispatch, dynamicPrompting, getState, maxPrompts, presetModifiedPrompts]);
+  }, [debouncedUpdateDynamicPrompts, dispatch, getState, maxPrompts, presetModifiedPrompts]);
 };

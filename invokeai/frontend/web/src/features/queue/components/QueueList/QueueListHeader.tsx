@@ -1,15 +1,12 @@
 import { Flex } from '@invoke-ai/ui-library';
-import { selectShouldShowCredits } from 'features/system/store/configSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSelector } from 'react-redux';
 
 import { COLUMN_WIDTHS } from './constants';
 import QueueListHeaderColumn from './QueueListHeaderColumn';
 
 const QueueListHeader = () => {
   const { t } = useTranslation();
-  const shouldShowCredits = useSelector(selectShouldShowCredits);
 
   return (
     <Flex
@@ -38,14 +35,6 @@ const QueueListHeader = () => {
       />
 
       <QueueListHeaderColumn displayName={t('queue.time')} ps={0.5} w={COLUMN_WIDTHS.time} alignItems="center" />
-      {shouldShowCredits && (
-        <QueueListHeaderColumn
-          displayName={t('queue.credits')}
-          ps={0.5}
-          w={COLUMN_WIDTHS.credits}
-          alignItems="center"
-        />
-      )}
       <QueueListHeaderColumn
         displayName={`${t('queue.origin')} / ${t('queue.destination')}`}
         ps={0.5}

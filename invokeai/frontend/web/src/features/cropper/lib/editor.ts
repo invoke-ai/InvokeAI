@@ -1,4 +1,3 @@
-import { $crossOrigin } from 'app/store/nanostores/authToken';
 import { TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -1098,7 +1097,7 @@ export class Editor {
     return new Promise((resolve, reject) => {
       const img = new Image();
 
-      img.crossOrigin = $crossOrigin.get();
+      img.crossOrigin = 'anonymous';
 
       img.onload = () => {
         this.originalImage = img;

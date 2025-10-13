@@ -2,7 +2,6 @@ import type { RootState } from 'app/store/store';
 import { generateSeeds } from 'common/util/generateSeeds';
 import { range } from 'es-toolkit/compat';
 import type { SeedBehaviour } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
-import { API_BASE_MODELS, VIDEO_BASE_MODELS } from 'features/modelManagerV2/models';
 import type { BaseModelType } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { components } from 'services/api/schema';
@@ -14,11 +13,8 @@ const getExtendedPrompts = (arg: {
   prompts: string[];
   base: BaseModelType;
 }): string[] => {
-  const { seedBehaviour, iterations, prompts, base } = arg;
-  // Normally, the seed behaviour implicity determines the batch size. But when we use models without seeds (like
-  // ChatGPT 4o) in conjunction with the per-prompt seed behaviour, we lose out on that implicit batch size. To rectify
-  // this, we need to create a batch of the right size by repeating the prompts.
-  if (seedBehaviour === 'PER_PROMPT' || API_BASE_MODELS.includes(base) || VIDEO_BASE_MODELS.includes(base)) {
+  const { seedBehaviour, iterations, prompts } = arg;
+  if (seedBehaviour === 'PER_PROMPT') {
     return range(iterations).flatMap(() => prompts);
   }
   return prompts;

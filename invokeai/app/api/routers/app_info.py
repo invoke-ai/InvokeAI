@@ -2,7 +2,6 @@ import typing
 from enum import Enum
 from importlib.metadata import distributions
 from pathlib import Path
-from typing import Optional
 
 import torch
 from fastapi import Body
@@ -39,8 +38,6 @@ class AppVersion(BaseModel):
     """App Version Response"""
 
     version: str = Field(description="App version")
-
-    highlights: Optional[list[str]] = Field(default=None, description="Highlights of release")
 
 
 class AppConfig(BaseModel):

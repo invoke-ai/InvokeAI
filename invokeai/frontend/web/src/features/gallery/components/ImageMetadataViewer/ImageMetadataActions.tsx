@@ -13,7 +13,6 @@ import {
   useCollectionMetadataDatum,
   useSingleMetadataDatum,
   useUnrecallableMetadataDatum,
-  VideoMetadataHandlers,
 } from 'features/metadata/parsing';
 import { memo, useCallback } from 'react';
 import { PiArrowBendUpLeftBold } from 'react-icons/pi';
@@ -63,28 +62,6 @@ export const ImageMetadataActions = memo((props: Props) => {
 });
 
 ImageMetadataActions.displayName = 'ImageMetadataActions';
-
-export const VideoMetadataActions = memo((props: Props) => {
-  const { metadata } = props;
-
-  if (!metadata || Object.keys(metadata).length === 0) {
-    return null;
-  }
-
-  return (
-    <Flex flexDir="column" ps={8}>
-      <UnrecallableMetadataDatum metadata={metadata} handler={VideoMetadataHandlers.GenerationMode} />
-      <SingleMetadataDatum metadata={metadata} handler={VideoMetadataHandlers.PositivePrompt} />
-      <SingleMetadataDatum metadata={metadata} handler={VideoMetadataHandlers.Seed} />
-      <SingleMetadataDatum metadata={metadata} handler={VideoMetadataHandlers.VideoAspectRatio} />
-      <SingleMetadataDatum metadata={metadata} handler={VideoMetadataHandlers.VideoDuration} />
-      <SingleMetadataDatum metadata={metadata} handler={VideoMetadataHandlers.VideoResolution} />
-      <SingleMetadataDatum metadata={metadata} handler={VideoMetadataHandlers.VideoModel} />
-    </Flex>
-  );
-});
-
-VideoMetadataActions.displayName = 'VideoMetadataActions';
 
 export const UnrecallableMetadataDatum = typedMemo(
   <T,>({ metadata, handler }: { metadata: unknown; handler: UnrecallableMetadataHandler<T> }) => {

@@ -1,9 +1,7 @@
 import { Button, ExternalLink, Spinner, Text } from '@invoke-ai/ui-library';
-import { skipToken } from '@reduxjs/toolkit/query';
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { discordLink, githubIssuesLink } from 'features/system/store/constants';
 import { toast, toastApi } from 'features/toast/toast';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -145,8 +143,7 @@ export const buildOnModelInstallError = (getState: AppGetState, dispatch: AppDis
 };
 
 const HFUnauthorizedToastDescription = () => {
-  const isEnabled = useFeatureStatus('hfToken');
-  const { data } = useGetHFTokenStatusQuery(isEnabled ? undefined : skipToken);
+  const { data } = useGetHFTokenStatusQuery();
 
   const { t } = useTranslation();
 

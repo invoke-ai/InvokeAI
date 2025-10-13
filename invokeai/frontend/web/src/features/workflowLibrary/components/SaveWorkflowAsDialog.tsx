@@ -115,7 +115,6 @@ const Content = memo(({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef
     workflow.id = undefined;
     workflow.name = name;
     workflow.meta.category = shouldSaveToProject ? 'project' : 'user';
-    workflow.is_published = false;
 
     // We've just made the workflow a draft, but TS doesn't know that. We need to assert it.
     assert(isDraftWorkflow(workflow));

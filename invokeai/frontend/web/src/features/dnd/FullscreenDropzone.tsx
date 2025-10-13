@@ -7,12 +7,10 @@ import { Box, Flex, Heading } from '@invoke-ai/ui-library';
 import { getStore } from 'app/store/nanostores/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { getFocusedRegion } from 'common/hooks/focus';
-import { useClientSideUpload } from 'common/hooks/useClientSideUpload';
 import { setFileToPaste } from 'features/controlLayers/components/CanvasPasteModal';
 import { DndDropOverlay } from 'features/dnd/DndDropOverlay';
 import type { DndTargetState } from 'features/dnd/types';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
-import { selectIsClientSideUploadEnabled } from 'features/system/store/configSlice';
 import { toast } from 'features/toast/toast';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
@@ -68,11 +66,9 @@ export const FullscreenDropzone = memo(() => {
   const ref = useRef<HTMLDivElement>(null);
   const [dndState, setDndState] = useState<DndTargetState>('idle');
   const activeTab = useAppSelector(selectActiveTab);
-  const isClientSideUploadEnabled = useAppSelector(selectIsClientSideUploadEnabled);
-  const clientSideUpload = useClientSideUpload();
 
   const validateAndUploadFiles = useCallback(
-    async (files: File[]) => {
+    (files: File[]) => {
       const { getState } = getStore();
       const parseResult = z.array(zUploadFile).safeParse(files);
 
@@ -100,23 +96,17 @@ export const FullscreenDropzone = memo(() => {
 
       const autoAddBoardId = selectAutoAddBoardId(getState());
 
-      if (isClientSideUploadEnabled && files.length > 1) {
-        for (const [i, file] of files.entries()) {
-          await clientSideUpload(file, i);
-        }
-      } else {
-        const uploadArgs: UploadImageArg[] = files.map((file, i) => ({
-          file,
-          image_category: 'user',
-          is_intermediate: false,
-          board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-          isFirstUploadOfBatch: i === 0,
-        }));
+      const uploadArgs: UploadImageArg[] = files.map((file, i) => ({
+        file,
+        image_category: 'user',
+        is_intermediate: false,
+        board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+        isFirstUploadOfBatch: i === 0,
+      }));
 
-        uploadImages(uploadArgs);
-      }
+      uploadImages(uploadArgs);
     },
-    [activeTab, t, isClientSideUploadEnabled, clientSideUpload]
+    [activeTab, t]
   );
 
   const onPaste = useCallback(

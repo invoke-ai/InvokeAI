@@ -37,26 +37,6 @@ export const CLIP_SKIP_MAP: { [key in BaseModelType]?: { maxClip: number; marker
     maxClip: 0,
     markers: [],
   },
-  imagen3: {
-    maxClip: 0,
-    markers: [],
-  },
-  imagen4: {
-    maxClip: 0,
-    markers: [],
-  },
-  'chatgpt-4o': {
-    maxClip: 0,
-    markers: [],
-  },
-  'flux-kontext': {
-    maxClip: 0,
-    markers: [],
-  },
-  'gemini-2.5': {
-    maxClip: 0,
-    markers: [],
-  },
 };
 
 /**

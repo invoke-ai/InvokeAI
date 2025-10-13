@@ -1,7 +1,6 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Box, useGlobalMenuClose } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { useZoomToNode } from 'features/nodes/hooks/useZoomToNode';
@@ -23,7 +22,6 @@ const NonInvocationNodeWrapper = (props: NonInvocationNodeWrapperProps) => {
   const { nodeId, width, children, selected } = props;
   const mouseOverNode = useMouseOverNode(nodeId);
   const zoomToNode = useZoomToNode(nodeId);
-  const isLocked = useIsWorkflowEditorLocked();
 
   const executionState = useNodeExecutionState(nodeId);
   const isInProgress = executionState?.status === zNodeStatus.enum.IN_PROGRESS;
@@ -66,7 +64,6 @@ const NonInvocationNodeWrapper = (props: NonInvocationNodeWrapperProps) => {
       sx={containerSx}
       width={width || NODE_WIDTH}
       opacity={opacity}
-      data-is-editor-locked={isLocked}
       data-is-selected={selected}
     >
       <Box sx={shadowsSx} />

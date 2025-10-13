@@ -1,5 +1,4 @@
 import { skipToken } from '@reduxjs/toolkit/query';
-import { $authToken } from 'app/store/nanostores/authToken';
 import { getStore } from 'app/store/nanostores/store';
 import type { CroppableImageWithDims } from 'features/controlLayers/store/types';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
@@ -579,10 +578,6 @@ export const uploadImages = async (args: UploadImageArg[]): Promise<ImageDTO[]> 
  */
 export const imageDTOToFile = async (imageDTO: ImageDTO): Promise<File> => {
   const init: RequestInit = {};
-  const authToken = $authToken.get();
-  if (authToken) {
-    init.headers = { Authorization: `Bearer ${authToken}` };
-  }
   const res = await fetch(imageDTO.image_url, init);
   const blob = await res.blob();
   // Create a new file with the same name, which we will upload

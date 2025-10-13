@@ -2,13 +2,8 @@ import { createAction } from '@reduxjs/toolkit';
 import type { AppDispatch, AppStore, RootState } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
 import { groupBy } from 'es-toolkit/compat';
-import {
-  $outputNodeId,
-  getPublishInputs,
-  selectFieldIdentifiersWithInvocationTypes,
-} from 'features/nodes/components/sidePanel/workflow/publish';
 import { $templates } from 'features/nodes/store/nodesSlice';
-import { selectNodeData, selectNodesSlice } from 'features/nodes/store/selectors';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { Templates } from 'features/nodes/store/types';
 import { isBatchNode, isInvocationNode } from 'features/nodes/types/invocation';
 import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
@@ -16,8 +11,7 @@ import { resolveBatchValue } from 'features/nodes/util/node/resolveBatchValue';
 import { buildWorkflowWithValidation } from 'features/nodes/util/workflow/buildWorkflow';
 import { useCallback } from 'react';
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
-import type { Batch, EnqueueBatchArg, S } from 'services/api/types';
-import { assert } from 'tsafe';
+import type { Batch, EnqueueBatchArg } from 'services/api/types';
 
 export const enqueueRequestedWorkflows = createAction('app/enqueueRequestedWorkflows');
 
@@ -79,52 +73,7 @@ const getBatchDataForWorkflowGeneration = async (state: RootState, dispatch: App
   return data;
 };
 
-const getValidationRunData = (state: RootState, templates: Templates): S['ValidationRunData'] => {
-  const nodesState = selectNodesSlice(state);
-
-  // Derive the input fields from the builder's selected node field elements
-  const fieldIdentifiers = selectFieldIdentifiersWithInvocationTypes(state);
-  const inputs = getPublishInputs(fieldIdentifiers, templates);
-  const api_input_fields = inputs.publishable.map(({ nodeId, fieldName, label }) => {
-    return {
-      kind: 'input',
-      node_id: nodeId,
-      field_name: fieldName,
-      user_label: label,
-    } satisfies S['FieldIdentifier'];
-  });
-
-  // Derive the output fields from the builder's selected output node
-  const outputNodeId = $outputNodeId.get();
-  assert(outputNodeId !== null, 'Output node not selected');
-  const outputNodeType = selectNodeData(selectNodesSlice(state), outputNodeId).type;
-  const outputNodeTemplate = templates[outputNodeType];
-  assert(outputNodeTemplate, `Template for node type ${outputNodeType} not found`);
-  const outputFieldNames = Object.keys(outputNodeTemplate.outputs);
-  const api_output_fields = outputFieldNames.map((fieldName) => {
-    return {
-      kind: 'output',
-      node_id: outputNodeId,
-      field_name: fieldName,
-      user_label: null,
-    } satisfies S['FieldIdentifier'];
-  });
-
-  assert(nodesState.id, 'Workflow without ID cannot be used for API validation run');
-
-  return {
-    workflow_id: nodesState.id,
-    input_fields: api_input_fields,
-    output_fields: api_output_fields,
-  };
-};
-
-const enqueueWorkflows = async (
-  store: AppStore,
-  templates: Templates,
-  prepend: boolean,
-  isApiValidationRun: boolean
-) => {
+const enqueueWorkflows = async (store: AppStore, templates: Templates, prepend: boolean) => {
   const { dispatch, getState } = store;
 
   dispatch(enqueueRequestedWorkflows());
@@ -153,13 +102,6 @@ const enqueueWorkflows = async (
     prepend,
   };
 
-  if (isApiValidationRun) {
-    batchConfig.validation_run_data = getValidationRunData(state, templates);
-
-    // If the batch is an API validation run, we only want to run it once
-    batchConfig.batch.runs = 1;
-  }
-
   const req = dispatch(
     queueApi.endpoints.enqueueBatch.initiate(batchConfig, { ...enqueueMutationFixedCacheKeyOptions, track: false })
   );
@@ -171,8 +113,8 @@ const enqueueWorkflows = async (
 export const useEnqueueWorkflows = () => {
   const store = useAppStore();
   const enqueue = useCallback(
-    (prepend: boolean, isApiValidationRun: boolean) => {
-      return enqueueWorkflows(store, $templates.get(), prepend, isApiValidationRun);
+    (prepend: boolean) => {
+      return enqueueWorkflows(store, $templates.get(), prepend);
     },
     [store]
   );

@@ -6,9 +6,6 @@ import {
   selectAspectRatioID,
   selectAspectRatioIsLocked,
   selectHeight,
-  selectModelSupportsAspectRatio,
-  selectModelSupportsPixelDimensions,
-  selectModelSupportsSeed,
   selectShouldRandomizeSeed,
   selectWidth,
 } from 'features/controlLayers/store/paramsSlice';
@@ -19,45 +16,20 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selectBadges = createMemoizedSelector(
-  [
-    selectWidth,
-    selectHeight,
-    selectAspectRatioID,
-    selectAspectRatioIsLocked,
-    selectShouldRandomizeSeed,
-    selectModelSupportsSeed,
-    selectModelSupportsAspectRatio,
-    selectModelSupportsPixelDimensions,
-  ],
-  (
-    width,
-    height,
-    aspectRatioID,
-    aspectRatioIsLocked,
-    shouldRandomizeSeed,
-    modelSupportsSeed,
-    modelSupportsAspectRatio,
-    modelSupportsPixelDimensions
-  ) => {
+  [selectWidth, selectHeight, selectAspectRatioID, selectAspectRatioIsLocked, selectShouldRandomizeSeed],
+  (width, height, aspectRatioID, aspectRatioIsLocked, shouldRandomizeSeed) => {
     const badges: string[] = [];
 
-    if (modelSupportsPixelDimensions) {
-      badges.push(`${width}×${height}`);
+    badges.push(`${width}×${height}`);
+
+    badges.push(aspectRatioID);
+
+    if (aspectRatioIsLocked) {
+      badges.push('locked');
     }
 
-    if (modelSupportsAspectRatio) {
-      badges.push(aspectRatioID);
-
-      // If a model does not support pixel dimensions, the ratio is essentially always locked.
-      if (modelSupportsPixelDimensions && aspectRatioIsLocked) {
-        badges.push('locked');
-      }
-    }
-
-    if (modelSupportsSeed) {
-      if (!shouldRandomizeSeed) {
-        badges.push('Manual Seed');
-      }
+    if (!shouldRandomizeSeed) {
+      badges.push('Manual Seed');
     }
 
     if (badges.length === 0) {
@@ -75,12 +47,6 @@ export const GenerateTabImageSettingsAccordion = memo(() => {
     id: 'image-settings-generate-tab',
     defaultIsOpen: true,
   });
-  const supportsSeed = useAppSelector(selectModelSupportsSeed);
-  const supportsAspectRatio = useAppSelector(selectModelSupportsAspectRatio);
-
-  if (!supportsAspectRatio && !supportsSeed) {
-    return;
-  }
 
   return (
     <StandaloneAccordion
@@ -90,8 +56,8 @@ export const GenerateTabImageSettingsAccordion = memo(() => {
       onToggle={onToggleAccordion}
     >
       <Flex px={4} pt={4} pb={4} w="full" h="full" flexDir="column" data-testid="image-settings-accordion">
-        {supportsAspectRatio && <Dimensions />}
-        {supportsSeed && <ParamSeed py={3} />}
+        <Dimensions />
+        <ParamSeed py={3} />
       </Flex>
     </StandaloneAccordion>
   );

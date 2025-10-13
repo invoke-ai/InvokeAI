@@ -14,9 +14,6 @@ export type GetImageNamesResult =
   paths['/api/v1/images/names']['get']['responses']['200']['content']['application/json'];
 export type GetImageNamesArgs = NonNullable<paths['/api/v1/images/names']['get']['parameters']['query']>;
 
-export type GetVideoIdsResult = paths['/api/v1/videos/ids']['get']['responses']['200']['content']['application/json'];
-export type GetVideoIdsArgs = NonNullable<paths['/api/v1/videos/ids']['get']['parameters']['query']>;
-
 export type ListBoardsArgs = NonNullable<paths['/api/v1/boards/']['get']['parameters']['query']>;
 
 export type CreateBoardArg = paths['/api/v1/boards/']['post']['parameters']['query'];
@@ -76,34 +73,9 @@ const _zImageDTO = z.object({
 });
 export type ImageDTO = z.infer<typeof _zImageDTO>;
 assert<Equals<ImageDTO, S['ImageDTO']>>();
-export const isImageDTO = (dto: ImageDTO | VideoDTO): dto is ImageDTO => {
-  return 'image_name' in dto;
-};
 
 export type BoardDTO = S['BoardDTO'];
 export type OffsetPaginatedResults_ImageDTO_ = S['OffsetPaginatedResults_ImageDTO_'];
-
-// Videos
-const _zVideoDTO = z.object({
-  video_id: z.string(),
-  video_url: z.string(),
-  thumbnail_url: z.string(),
-  width: z.number().int().gt(0),
-  height: z.number().int().gt(0),
-  created_at: z.string(),
-  updated_at: z.string(),
-  deleted_at: z.string().nullish(),
-  starred: z.boolean(),
-  board_id: z.string().nullish(),
-  is_intermediate: z.boolean(),
-  session_id: z.string().nullish(),
-  node_id: z.string().nullish(),
-});
-export type VideoDTO = z.infer<typeof _zVideoDTO>;
-assert<Equals<VideoDTO, S['VideoDTO']>>();
-export const isVideoDTO = (dto: ImageDTO | VideoDTO): dto is VideoDTO => {
-  return 'video_id' in dto;
-};
 
 // Model Configs
 export type AnyModelConfig = S['AnyModelConfig'];
@@ -298,28 +270,12 @@ export const isFluxReduxModelConfig = (config: AnyModelConfig): config is FLUXRe
   return config.type === 'flux_redux';
 };
 
-export const isChatGPT4oModelConfig = (config: AnyModelConfig): config is ChatGPT4oModelConfig => {
-  return config.type === 'main' && config.base === 'chatgpt-4o';
-};
-
-export const isVideoModelConfig = (config: AnyModelConfig): config is VideoApiModelConfig => {
-  return config.type === 'video';
-};
-
 export const isUnknownModelConfig = (config: AnyModelConfig): config is UnknownModelConfig => {
   return config.type === 'unknown';
 };
 
-export const isFluxKontextApiModelConfig = (config: AnyModelConfig): config is ApiModelConfig => {
-  return config.type === 'main' && config.base === 'flux-kontext';
-};
-
 export const isFluxKontextModelConfig = (config: AnyModelConfig): config is FLUXKontextModelConfig => {
   return config.type === 'main' && config.base === 'flux' && config.name.toLowerCase().includes('kontext');
-};
-
-export const isGemini2_5ModelConfig = (config: AnyModelConfig): config is ApiModelConfig => {
-  return config.type === 'main' && config.base === 'gemini-2.5';
 };
 
 export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {

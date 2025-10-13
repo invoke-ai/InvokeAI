@@ -1,7 +1,5 @@
-import { useAppDispatch } from 'app/store/storeHooks';
 import { useClipboard } from 'common/hooks/useClipboard';
 import { convertImageUrlToBlob } from 'common/util/convertImageUrlToBlob';
-import { imageCopiedToClipboard } from 'features/gallery/store/actions';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +7,6 @@ import { useTranslation } from 'react-i18next';
 export const useCopyImageToClipboard = () => {
   const { t } = useTranslation();
   const clipboard = useClipboard();
-  const dispatch = useAppDispatch();
 
   const copyImageToClipboard = useCallback(
     async (image_url: string) => {
@@ -26,7 +23,6 @@ export const useCopyImageToClipboard = () => {
             title: t('toast.imageCopied'),
             status: 'success',
           });
-          dispatch(imageCopiedToClipboard());
         });
       } catch (err) {
         toast({
@@ -37,7 +33,7 @@ export const useCopyImageToClipboard = () => {
         });
       }
     },
-    [clipboard, t, dispatch]
+    [clipboard, t]
   );
 
   return copyImageToClipboard;

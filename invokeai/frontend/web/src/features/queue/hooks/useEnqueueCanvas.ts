@@ -9,13 +9,8 @@ import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasMana
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { positivePromptAddedToHistory, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
-import { buildChatGPT4oGraph } from 'features/nodes/util/graph/generation/buildChatGPT4oGraph';
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
-import { buildFluxKontextGraph } from 'features/nodes/util/graph/generation/buildFluxKontextGraph';
-import { buildGemini2_5Graph } from 'features/nodes/util/graph/generation/buildGemini2_5Graph';
-import { buildImagen3Graph } from 'features/nodes/util/graph/generation/buildImagen3Graph';
-import { buildImagen4Graph } from 'features/nodes/util/graph/generation/buildImagen4Graph';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSD3Graph } from 'features/nodes/util/graph/generation/buildSD3Graph';
 import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
@@ -64,16 +59,6 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
         return await buildFLUXGraph(graphBuilderArg);
       case 'cogview4':
         return await buildCogView4Graph(graphBuilderArg);
-      case 'imagen3':
-        return buildImagen3Graph(graphBuilderArg);
-      case 'imagen4':
-        return buildImagen4Graph(graphBuilderArg);
-      case 'chatgpt-4o':
-        return await buildChatGPT4oGraph(graphBuilderArg);
-      case 'flux-kontext':
-        return buildFluxKontextGraph(graphBuilderArg);
-      case 'gemini-2.5':
-        return buildGemini2_5Graph(graphBuilderArg);
       default:
         assert(false, `No graph builders for base ${base}`);
     }

@@ -1,20 +1,16 @@
 import { useAppStore } from 'app/store/storeHooks';
 import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
-import { useDeleteVideoModalApi } from 'features/deleteVideoModal/store/state';
 import { selectSelection } from 'features/gallery/store/gallerySelectors';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { useDeleteCurrentQueueItem } from 'features/queue/hooks/useDeleteCurrentQueueItem';
 import { useInvoke } from 'features/queue/hooks/useInvoke';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 
 import { getFocusedRegion } from './focus';
 
 export const useGlobalHotkeys = () => {
   const { dispatch, getState } = useAppStore();
-  const isVideoEnabled = useFeatureStatus('video');
-  const isModelManagerEnabled = useFeatureStatus('modelManager');
   const queue = useInvoke();
 
   useRegisteredHotkeys({
@@ -95,18 +91,6 @@ export const useGlobalHotkeys = () => {
   });
 
   useRegisteredHotkeys({
-    id: 'selectVideoTab',
-    category: 'app',
-    callback: () => {
-      navigationApi.switchToTab('video');
-    },
-    options: {
-      enabled: isVideoEnabled,
-    },
-    dependencies: [dispatch],
-  });
-
-  useRegisteredHotkeys({
     id: 'selectWorkflowsTab',
     category: 'app',
     callback: () => {
@@ -121,10 +105,7 @@ export const useGlobalHotkeys = () => {
     callback: () => {
       navigationApi.switchToTab('models');
     },
-    options: {
-      enabled: isModelManagerEnabled,
-    },
-    dependencies: [dispatch, isModelManagerEnabled],
+    dependencies: [dispatch],
   });
 
   useRegisteredHotkeys({
@@ -133,11 +114,10 @@ export const useGlobalHotkeys = () => {
     callback: () => {
       navigationApi.switchToTab('queue');
     },
-    dependencies: [dispatch, isModelManagerEnabled],
+    dependencies: [dispatch],
   });
 
   const deleteImageModalApi = useDeleteImageModalApi();
-  const deleteVideoModalApi = useDeleteVideoModalApi();
 
   useRegisteredHotkeys({
     id: 'deleteSelection',
@@ -153,8 +133,6 @@ export const useGlobalHotkeys = () => {
       }
       if (selection.every(({ type }) => type === 'image')) {
         deleteImageModalApi.delete(selection.map((s) => s.id));
-      } else if (selection.every(({ type }) => type === 'video')) {
-        deleteVideoModalApi.delete(selection.map((s) => s.id));
       } else {
         // no-op, we expect selections to always be only images or only video
       }

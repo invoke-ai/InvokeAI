@@ -1,19 +1,9 @@
 import { ExternalLink, Flex, Text } from '@invoke-ai/ui-library';
-import { isAnyOf } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { socketConnected } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
-import { $baseUrl } from 'app/store/nanostores/baseUrl';
-import { $bulkDownloadId } from 'app/store/nanostores/bulkDownloadId';
-import { $queueId } from 'app/store/nanostores/queueId';
 import type { AppStore } from 'app/store/store';
-import { listenerMiddleware } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { forEach, isNil, round } from 'es-toolkit/compat';
-import {
-  $isInPublishFlow,
-  $outputNodeId,
-  $validationRunData,
-} from 'features/nodes/components/sidePanel/workflow/publish';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
@@ -25,7 +15,6 @@ import type { ApiTagDescription } from 'services/api';
 import { api, LIST_ALL_TAG, LIST_TAG } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi } from 'services/api/endpoints/queue';
-import { workflowsApi } from 'services/api/endpoints/workflows';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import { buildOnModelInstallError, DiscordLink, GitHubIssuesLink } from 'services/events/onModelInstallError';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
@@ -55,12 +44,8 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.debug('Connected');
     setIsConnected(true);
     dispatch(socketConnected());
-    const queue_id = $queueId.get();
-    socket.emit('subscribe_queue', { queue_id });
-    if (!$baseUrl.get()) {
-      const bulk_download_id = $bulkDownloadId.get();
-      socket.emit('subscribe_bulk_download', { bulk_download_id });
-    }
+    socket.emit('subscribe_queue', { queue_id: 'default' });
+    socket.emit('subscribe_bulk_download', { bulk_download_id: 'default' });
     $lastProgressEvent.set(null);
   });
 
@@ -371,7 +356,6 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     // we've got new status for the queue item, batch and queue
     const {
       item_id,
-      session_id,
       status,
       batch_status,
       error_type,
@@ -441,67 +425,17 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     } else if (status === 'completed' || status === 'failed' || status === 'canceled') {
       finishedQueueItemIds.set(item_id, true);
       if (status === 'failed' && error_type) {
-        const isLocal = getState().config.isLocal ?? true;
-        const sessionId = session_id;
-
         toast({
           id: `INVOCATION_ERROR_${error_type}`,
           title: getTitle(error_type),
           status: 'error',
           duration: null,
-          updateDescription: isLocal,
-          description: (
-            <ErrorToastDescription
-              errorType={error_type}
-              errorMessage={error_message}
-              sessionId={sessionId}
-              isLocal={isLocal}
-            />
-          ),
+          updateDescription: true,
+          description: <ErrorToastDescription errorType={error_type} errorMessage={error_message} />,
         });
       }
       // If the queue item is completed, failed, or cancelled, we want to clear the last progress event
       $lastProgressEvent.set(null);
-      // $progressImages.setKey(session_id, undefined);
-
-      // When a validation run is completed, we want to clear the validation run batch ID & set the workflow as published
-      const validationRunData = $validationRunData.get();
-      if (!validationRunData || batch_status.batch_id !== validationRunData.batchId || status !== 'completed') {
-        return;
-      }
-
-      // The published status of a workflow is server state, provided to the client in by the getWorkflow query.
-      // After successfully publishing a workflow, we need to invalidate the query cache so that the published status is
-      // seen throughout the app. We also need to reset the publish flow state.
-      //
-      // But, there is a race condition! If we invalidate the query cache and then immediately clear the publish flow state,
-      // between the time when the publish state is cleared and the query is re-fetched, we will render the wrong UI.
-      //
-      // So, we really need to wait for the query re-fetch to complete before clearing the publish flow state. This isn't
-      // possible using the `invalidateTags()` API. But we can fudge it by adding a once-off listener for that query.
-
-      listenerMiddleware.startListening({
-        matcher: isAnyOf(
-          workflowsApi.endpoints.getWorkflow.matchFulfilled,
-          workflowsApi.endpoints.getWorkflow.matchRejected
-        ),
-        effect: (action, listenerApi) => {
-          if (workflowsApi.endpoints.getWorkflow.matchFulfilled(action)) {
-            // If this query was re-fetching the workflow that was just published, we can clear the publish flow state and
-            // unsubscribe from the listener
-            if (action.payload.workflow_id === validationRunData.workflowId) {
-              listenerApi.unsubscribe();
-              $validationRunData.set(null);
-              $isInPublishFlow.set(false);
-              $outputNodeId.set(null);
-            }
-          } else if (workflowsApi.endpoints.getWorkflow.matchRejected(action)) {
-            // If the query failed, we can unsubscribe from the listener
-            listenerApi.unsubscribe();
-          }
-        },
-      });
-      dispatch(workflowsApi.util.invalidateTags([{ type: 'Workflow', id: validationRunData.workflowId }]));
     }
   });
 

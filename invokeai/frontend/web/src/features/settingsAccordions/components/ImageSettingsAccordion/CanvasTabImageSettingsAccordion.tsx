@@ -4,10 +4,7 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
-  selectModelSupportsAspectRatio,
   selectModelSupportsOptimizedDenoising,
-  selectModelSupportsPixelDimensions,
-  selectModelSupportsSeed,
   selectShouldRandomizeSeed,
 } from 'features/controlLayers/store/paramsSlice';
 import { selectBbox, selectScaleMethod } from 'features/controlLayers/store/selectors';
@@ -22,46 +19,30 @@ import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selectBadges = createMemoizedSelector(
-  [
-    selectBbox,
-    selectShouldRandomizeSeed,
-    selectModelSupportsSeed,
-    selectModelSupportsAspectRatio,
-    selectModelSupportsPixelDimensions,
-  ],
-  (bbox, shouldRandomizeSeed, modelSupportsSeed, modelSupportsAspectRatio, modelSupportsPixelDimensions) => {
-    const badges: string[] = [];
+const selectBadges = createMemoizedSelector([selectBbox, selectShouldRandomizeSeed], (bbox, shouldRandomizeSeed) => {
+  const badges: string[] = [];
 
-    const { aspectRatio, rect } = bbox;
-    const { width, height } = rect;
+  const { aspectRatio, rect } = bbox;
+  const { width, height } = rect;
 
-    if (modelSupportsPixelDimensions) {
-      badges.push(`${width}×${height}`);
-    }
+  badges.push(`${width}×${height}`);
 
-    if (modelSupportsAspectRatio) {
-      badges.push(aspectRatio.id);
+  badges.push(aspectRatio.id);
 
-      // If a model does not support pixel dimensions, the ratio is essentially always locked.
-      if (modelSupportsPixelDimensions && aspectRatio.isLocked) {
-        badges.push('locked');
-      }
-    }
-
-    if (modelSupportsSeed) {
-      if (!shouldRandomizeSeed) {
-        badges.push('Manual Seed');
-      }
-    }
-
-    if (badges.length === 0) {
-      return EMPTY_ARRAY;
-    }
-
-    return badges;
+  if (aspectRatio.isLocked) {
+    badges.push('locked');
   }
-);
+
+  if (!shouldRandomizeSeed) {
+    badges.push('Manual Seed');
+  }
+
+  if (badges.length === 0) {
+    return EMPTY_ARRAY;
+  }
+
+  return badges;
+});
 
 const scalingLabelProps: FormLabelProps = {
   minW: '4.5rem',
@@ -80,15 +61,6 @@ export const CanvasTabImageSettingsAccordion = memo(() => {
     defaultIsOpen: false,
   });
   const modelSupportsOptimizedDenoising = useAppSelector(selectModelSupportsOptimizedDenoising);
-  const modelSupportsSeed = useAppSelector(selectModelSupportsSeed);
-  const modelSupportsAspectRatio = useAppSelector(selectModelSupportsAspectRatio);
-  const modelSupportsPixelDimensions = useAppSelector(selectModelSupportsPixelDimensions);
-
-  if (!modelSupportsAspectRatio && !modelSupportsSeed) {
-    return null;
-  }
-
-  const withAdvancedSettingsExpander = modelSupportsPixelDimensions;
 
   return (
     <StandaloneAccordion
@@ -97,31 +69,21 @@ export const CanvasTabImageSettingsAccordion = memo(() => {
       isOpen={isOpenAccordion}
       onToggle={onToggleAccordion}
     >
-      <Flex
-        px={4}
-        pt={4}
-        pb={withAdvancedSettingsExpander ? 0 : 4}
-        w="full"
-        h="full"
-        flexDir="column"
-        data-testid="image-settings-accordion"
-      >
+      <Flex px={4} pt={4} pb={0} w="full" h="full" flexDir="column" data-testid="image-settings-accordion">
         <BboxSettings />
-        {modelSupportsSeed && <ParamSeed pt={3} pb={withAdvancedSettingsExpander ? 0 : 3} />}
-        {withAdvancedSettingsExpander && (
-          <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
-            <Flex gap={4} pb={4} flexDir="column">
-              {modelSupportsOptimizedDenoising && <ParamOptimizedDenoisingToggle />}
-              <BboxScaleMethod />
-              {scaleMethod !== 'none' && (
-                <FormControlGroup formLabelProps={scalingLabelProps}>
-                  <BboxScaledWidth />
-                  <BboxScaledHeight />
-                </FormControlGroup>
-              )}
-            </Flex>
-          </Expander>
-        )}
+        <ParamSeed pt={3} pb={0} />
+        <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
+          <Flex gap={4} pb={4} flexDir="column">
+            {modelSupportsOptimizedDenoising && <ParamOptimizedDenoisingToggle />}
+            <BboxScaleMethod />
+            {scaleMethod !== 'none' && (
+              <FormControlGroup formLabelProps={scalingLabelProps}>
+                <BboxScaledWidth />
+                <BboxScaledHeight />
+              </FormControlGroup>
+            )}
+          </Flex>
+        </Expander>
       </Flex>
     </StandaloneAccordion>
   );
