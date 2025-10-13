@@ -7,11 +7,12 @@ import {
   ModalContent,
   ModalHeader,
   ModalOverlay,
+  Text,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
+import { $workflowLibraryContext, useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
 import {
   $workflowLibraryCategoriesOptions,
   selectWorkflowLibraryView,
@@ -28,6 +29,7 @@ import { WorkflowList } from './WorkflowList';
 export const WorkflowLibraryModal = memo(() => {
   const { t } = useTranslation();
   const workflowLibraryModal = useWorkflowLibraryModal();
+  const context = useStore($workflowLibraryContext);
   const didSync = useSyncInitialWorkflowLibraryCategories();
   return (
     <Modal isOpen={workflowLibraryModal.isOpen} onClose={workflowLibraryModal.close} isCentered>
@@ -38,16 +40,23 @@ export const WorkflowLibraryModal = memo(() => {
         h="calc(100% - var(--invoke-sizes-40))"
         maxH="calc(100% - var(--invoke-sizes-40))"
       >
-        <ModalHeader>{t('workflows.workflowLibrary')}</ModalHeader>
+        <ModalHeader>
+          {context.mode === 'canvas' ? t('controlLayers.canvasWorkflowModalTitle') : t('workflows.workflowLibrary')}
+        </ModalHeader>
         <ModalCloseButton />
         <ModalBody pb={6}>
+          {context.mode === 'canvas' && (
+            <Text mb={4} fontSize="sm" color="base.300">
+              {t('controlLayers.canvasWorkflowModalDescription')}
+            </Text>
+          )}
           {didSync && (
             <Flex gap={4} h="100%">
               <WorkflowLibrarySideNav />
               <Divider orientation="vertical" />
               <Flex flexDir="column" flex={1} gap={4}>
                 <WorkflowLibraryTopNav />
-                <WorkflowList />
+                <WorkflowList context={context} />
               </Flex>
             </Flex>
           )}

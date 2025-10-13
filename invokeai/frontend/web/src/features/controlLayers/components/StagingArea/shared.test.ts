@@ -64,7 +64,7 @@ describe('StagingAreaApi Utility Functions', () => {
       expect(getOutputImageName(queueItem)).toBe('test-output.png');
     });
 
-    it('should return null when no canvas output node found', () => {
+    it('should use fallback when no canvas output node found', () => {
       const queueItem = {
         item_id: 1,
         status: 'completed',
@@ -93,7 +93,8 @@ describe('StagingAreaApi Utility Functions', () => {
         },
       } as unknown as S['SessionQueueItem'];
 
-      expect(getOutputImageName(queueItem)).toBe(null);
+      // Fallback mechanism finds image in other nodes when no canvas_output node exists
+      expect(getOutputImageName(queueItem)).toBe('test-output.png');
     });
 
     it('should return null when output node has no results', () => {

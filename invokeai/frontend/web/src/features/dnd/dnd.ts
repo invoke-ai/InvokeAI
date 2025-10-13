@@ -288,10 +288,10 @@ export const setNodeImageFieldImageDndTarget: DndTarget<SetNodeImageFieldImageDn
       }
       return false;
     },
-    handler: ({ sourceData, targetData, dispatch }) => {
+    handler: ({ sourceData, targetData, dispatch, getState }) => {
       const { imageDTO } = sourceData.payload;
       const { fieldIdentifier } = targetData.payload;
-      setNodeImageFieldImage({ fieldIdentifier, imageDTO, dispatch });
+      setNodeImageFieldImage({ fieldIdentifier, imageDTO, dispatch, getState });
     },
   };
 //#endregion

@@ -17,8 +17,8 @@ import { HeadingElement } from 'features/nodes/components/sidePanel/builder/Head
 import { NodeFieldElement } from 'features/nodes/components/sidePanel/builder/NodeFieldElement';
 import { TextElement } from 'features/nodes/components/sidePanel/builder/TextElement';
 import { useElement } from 'features/nodes/components/sidePanel/builder/use-element';
+import { useWorkflowMode } from 'features/nodes/hooks/useWorkflowMode';
 import { selectFormRootElement } from 'features/nodes/store/selectors';
-import { selectWorkflowMode } from 'features/nodes/store/workflowLibrarySlice';
 import type { ContainerElement } from 'features/nodes/types/workflow';
 import {
   CONTAINER_CLASS_NAME,
@@ -36,7 +36,7 @@ import { assert } from 'tsafe';
 
 const ContainerElementComponent = memo(({ id }: { id: string }) => {
   const el = useElement(id);
-  const mode = useAppSelector(selectWorkflowMode);
+  const mode = useWorkflowMode();
 
   if (!el || !isContainerElement(el)) {
     return null;

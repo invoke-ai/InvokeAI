@@ -27,6 +27,10 @@ const CleanEditorContent = () => {
     dispatch(workflowModeChanged('edit'));
   }, [dispatch]);
 
+  const onClickBrowseWorkflows = useCallback(() => {
+    workflowLibraryModal.open();
+  }, [workflowLibraryModal]);
+
   return (
     <Flex flexDir="column" h="full" w="full" alignItems="center">
       <Flex flexDir="column" gap={8} w="full" pt="20vh" px={8} maxW={768}>
@@ -39,7 +43,7 @@ const CleanEditorContent = () => {
             </Text>
           </Flex>
         </LaunchpadButton>
-        <LaunchpadButton onClick={workflowLibraryModal.open} gap={8}>
+        <LaunchpadButton onClick={onClickBrowseWorkflows} gap={8}>
           <Icon as={PiFolderOpenBold} boxSize={6} color="base.500" />
           <Flex flexDir="column" alignItems="flex-start" gap={2}>
             <Heading size="sm">{t('nodes.loadWorkflow')}</Heading>

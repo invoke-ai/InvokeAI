@@ -47,7 +47,7 @@ type InvocationNodeContextValue = {
   selectNodeNeedsUpdate: Selector<RootState, boolean>;
 };
 
-const InvocationNodeContext = createContext<InvocationNodeContextValue | null>(null);
+export const InvocationNodeContext = createContext<InvocationNodeContextValue | null>(null);
 
 const getSelectorFromCache = <T extends Selector>(cache: Map<string, Selector>, key: string, fallback: () => T): T => {
   let selector = cache.get(key);

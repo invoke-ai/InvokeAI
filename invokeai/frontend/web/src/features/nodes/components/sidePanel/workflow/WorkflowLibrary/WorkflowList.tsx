@@ -2,6 +2,7 @@ import { Button, Flex, Grid, GridItem, Spacer, Spinner } from '@invoke-ai/ui-lib
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import type { WorkflowLibraryContext } from 'features/nodes/store/workflowLibraryModal';
 import type { WorkflowLibraryView } from 'features/nodes/store/workflowLibrarySlice';
 import {
   selectWorkflowLibraryDirection,
@@ -84,7 +85,7 @@ const queryOptions = {
   },
 } satisfies Parameters<typeof useListWorkflowsInfiniteInfiniteQuery>[1];
 
-export const WorkflowList = memo(() => {
+export const WorkflowList = memo(({ context }: { context: WorkflowLibraryContext }) => {
   const queryArg = useInfiniteQueryAry();
   const { items, isFetching, isLoading, fetchNextPage, hasNextPage } = useListWorkflowsInfiniteInfiniteQuery(
     queryArg,
@@ -109,6 +110,8 @@ export const WorkflowList = memo(() => {
       hasNextPage={hasNextPage}
       fetchNextPage={fetchNextPage}
       isFetching={isFetching}
+      onSelectWorkflow={context.mode === 'canvas' ? context.onSelect : undefined}
+      isCanvasMode={context.mode === 'canvas'}
     />
   );
 });
@@ -134,11 +137,15 @@ const WorkflowListContent = memo(
     hasNextPage,
     isFetching,
     fetchNextPage,
+    onSelectWorkflow,
+    isCanvasMode,
   }: {
     items: S['WorkflowRecordListItemWithThumbnailDTO'][];
     hasNextPage: boolean;
     isFetching: boolean;
     fetchNextPage: ReturnType<typeof useListWorkflowsInfiniteInfiniteQuery>['fetchNextPage'];
+    onSelectWorkflow?: (workflowId: string) => void;
+    isCanvasMode: boolean;
   }) => {
     const { t } = useTranslation();
     const ref = useRef<HTMLDivElement>(null);
@@ -199,7 +206,12 @@ const WorkflowListContent = memo(
         >
           {items.map((workflow) => (
             <GridItem id={`grid-${workflow.workflow_id}`} key={workflow.workflow_id}>
-              <WorkflowListItem workflow={workflow} key={workflow.workflow_id} />
+              <WorkflowListItem
+                workflow={workflow}
+                key={workflow.workflow_id}
+                onSelectWorkflow={onSelectWorkflow}
+                isCanvasMode={isCanvasMode}
+              />
             </GridItem>
           ))}
         </Grid>
