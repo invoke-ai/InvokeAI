@@ -12,7 +12,7 @@ import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasState, RefImagesState } from 'features/controlLayers/store/types';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { selectGetImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
-import { itemSelected } from 'features/gallery/store/gallerySlice';
+import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { fieldImageCollectionValueChanged, fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState } from 'features/nodes/store/types';
@@ -89,14 +89,12 @@ const handleDeletions = async (image_names: string[], store: AppStore) => {
     const newImageNames = data?.image_names.filter((name) => !deleted_images.includes(name)) || [];
     const newSelectedImage = newImageNames[index ?? 0] || null;
 
-    const galleryImageNames = state.gallery.selection.map((s) => s.id);
-
-    if (intersection(galleryImageNames, image_names).length > 0) {
+    if (intersection(state.gallery.selection, image_names).length > 0) {
       if (newSelectedImage) {
         // Some selected images were deleted, clear selection
-        dispatch(itemSelected({ type: 'image', id: newSelectedImage }));
+        dispatch(imageSelected(newSelectedImage));
       } else {
-        dispatch(itemSelected(null));
+        dispatch(imageSelected(null));
       }
     }
 

@@ -131,11 +131,7 @@ export const useGlobalHotkeys = () => {
       if (!selection.length) {
         return;
       }
-      if (selection.every(({ type }) => type === 'image')) {
-        deleteImageModalApi.delete(selection.map((s) => s.id));
-      } else {
-        // no-op, we expect selections to always be only images or only video
-      }
+      deleteImageModalApi.delete(selection);
     },
     dependencies: [getState, deleteImageModalApi],
   });

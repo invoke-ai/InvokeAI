@@ -1,6 +1,6 @@
 import { useAppDispatch } from 'app/store/storeHooks';
 import { DndImageIcon } from 'features/dnd/DndImageIcon';
-import { imageToCompareChanged, itemSelected } from 'features/gallery/store/gallerySlice';
+import { imageSelected, imageToCompareChanged } from 'features/gallery/store/gallerySlice';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import { memo, useCallback } from 'react';
@@ -18,7 +18,7 @@ export const GalleryItemOpenInViewerIconButton = memo(({ imageDTO }: Props) => {
 
   const onClick = useCallback(() => {
     dispatch(imageToCompareChanged(null));
-    dispatch(itemSelected({ type: 'image', id: imageDTO.image_name }));
+    dispatch(imageSelected(imageDTO.image_name));
     navigationApi.focusPanelInActiveTab(VIEWER_PANEL_ID);
   }, [dispatch, imageDTO]);
 

@@ -24,9 +24,6 @@ const selectGalleryQueryCategories = createSelector(selectGalleryView, (galleryV
   if (galleryView === 'images') {
     return IMAGE_CATEGORIES;
   }
-  if (galleryView === 'videos') {
-    return [];
-  }
   return ASSETS_CATEGORIES;
 });
 const selectGallerySearchTerm = createSelector(selectGallerySlice, (gallery) => gallery.searchTerm);
