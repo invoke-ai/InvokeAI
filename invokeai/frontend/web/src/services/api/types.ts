@@ -102,7 +102,6 @@ type CLIPVisionDiffusersConfig = Extract<S['AnyModelConfig'], { type: 'clip_visi
 type SigLipModelConfig = Extract<S['AnyModelConfig'], { type: 'siglip' }>;
 export type FLUXReduxModelConfig = Extract<S['AnyModelConfig'], { type: 'flux_redux' }>;
 type ApiModelConfig = Extract<S['AnyModelConfig'], { format: 'api' }>;
-export type VideoApiModelConfig = Extract<S['AnyModelConfig'], { type: 'video'; format: 'api' }>;
 type UnknownModelConfig = Extract<S['AnyModelConfig'], { type: 'unknown' }>;
 export type FLUXKontextModelConfig = MainModelConfig;
 export type ChatGPT4oModelConfig = ApiModelConfig;

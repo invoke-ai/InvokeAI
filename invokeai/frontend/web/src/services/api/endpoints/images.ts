@@ -475,7 +475,6 @@ export const {
   useGetImageWorkflowQuery,
   useLazyGetImageWorkflowQuery,
   useUploadImageMutation,
-  useCreateImageUploadEntryMutation,
   useClearIntermediatesMutation,
   useAddImagesToBoardMutation,
   useRemoveImagesFromBoardMutation,
@@ -526,25 +525,6 @@ export const getImageDTO = (
     ...options,
   };
   const req = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(image_name, _options));
-  return req.unwrap();
-};
-
-/**
- * Imperative RTKQ helper to fetch an image's metadata.
- * @param image_name The name of the image
- * @param options The options for the query. By default, the query will not subscribe to the store.
- * @raises Error if the image metadata is not found or there is an error fetching the image metadata. Images without
- * metadata will return undefined.
- */
-export const getImageMetadata = (
-  image_name: string,
-  options?: Parameters<typeof imagesApi.endpoints.getImageMetadata.initiate>[1]
-): Promise<JsonObject | undefined> => {
-  const _options = {
-    subscribe: false,
-    ...options,
-  };
-  const req = getStore().dispatch(imagesApi.endpoints.getImageMetadata.initiate(image_name, _options));
   return req.unwrap();
 };
 

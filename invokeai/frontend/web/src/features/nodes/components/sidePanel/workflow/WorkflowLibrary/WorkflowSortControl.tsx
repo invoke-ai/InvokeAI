@@ -1,15 +1,14 @@
 import { Flex, FormControl, FormLabel, Select } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
-  $workflowLibrarySortOptions,
   selectWorkflowLibraryDirection,
   selectWorkflowLibraryOrderBy,
+  WORKFLOW_LIBRARY_SORT_OPTIONS,
   workflowLibraryDirectionChanged,
   workflowLibraryOrderByChanged,
 } from 'features/nodes/store/workflowLibrarySlice';
 import type { ChangeEvent } from 'react';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
@@ -26,7 +25,6 @@ export const WorkflowSortControl = () => {
 
   const orderBy = useAppSelector(selectWorkflowLibraryOrderBy);
   const direction = useAppSelector(selectWorkflowLibraryDirection);
-  const sortOptions = useStore($workflowLibrarySortOptions);
 
   const ORDER_BY_LABELS = useMemo(
     () => ({
@@ -68,19 +66,12 @@ export const WorkflowSortControl = () => {
     [dispatch]
   );
 
-  useEffect(() => {
-    if (!sortOptions.includes('opened_at')) {
-      dispatch(workflowLibraryOrderByChanged('name'));
-      dispatch(workflowLibraryDirectionChanged('ASC'));
-    }
-  }, [sortOptions, dispatch]);
-
   return (
     <Flex flexDir="row" gap={6}>
       <FormControl orientation="horizontal" gap={0} w="auto">
         <FormLabel>{t('common.orderBy')}</FormLabel>
-        <Select value={orderBy ?? sortOptions[0]} onChange={onChangeOrderBy} size="sm">
-          {sortOptions.map((option) => (
+        <Select value={orderBy} onChange={onChangeOrderBy} size="sm">
+          {WORKFLOW_LIBRARY_SORT_OPTIONS.map((option) => (
             <option key={option} value={option}>
               {ORDER_BY_LABELS[option]}
             </option>

@@ -57,20 +57,3 @@ export const getTagsToInvalidateForImageMutation = (image_names: string[]): ApiT
 
   return tags;
 };
-
-export const getTagsToInvalidateForVideoMutation = (video_ids: string[]): ApiTagDescription[] => {
-  const tags: ApiTagDescription[] = [];
-
-  for (const video_id of video_ids) {
-    tags.push({
-      type: 'Video',
-      id: video_id,
-    });
-    // tags.push({
-    //     type: 'VideoMetadata',
-    //     id: video_id,
-    // });
-  }
-
-  return tags;
-};

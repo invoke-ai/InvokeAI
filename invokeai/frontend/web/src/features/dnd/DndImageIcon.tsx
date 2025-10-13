@@ -3,7 +3,7 @@ import { IconButton } from '@invoke-ai/ui-library';
 import type { MouseEvent } from 'react';
 import { memo } from 'react';
 
-export const imageButtonSx: SystemStyleObject = {
+const imageButtonSx: SystemStyleObject = {
   minW: 0,
   svg: {
     transitionProperty: 'common',

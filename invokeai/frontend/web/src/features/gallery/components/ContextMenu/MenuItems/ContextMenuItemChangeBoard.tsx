@@ -1,9 +1,6 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import {
-  imagesToChangeSelected,
-  isModalOpenChanged,
-} from 'features/changeBoardModal/store/slice';
+import { imagesToChangeSelected, isModalOpenChanged } from 'features/changeBoardModal/store/slice';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,7 +12,7 @@ export const ContextMenuItemChangeBoard = memo(() => {
   const imageDTO = useImageDTOContext();
 
   const onClick = useCallback(() => {
-      dispatch(imagesToChangeSelected([imageDTO.image_name]));
+    dispatch(imagesToChangeSelected([imageDTO.image_name]));
     dispatch(isModalOpenChanged(true));
   }, [dispatch, imageDTO]);
 

@@ -1,4 +1,3 @@
-import { createAction } from '@reduxjs/toolkit';
 import type { AppDispatch, AppStore, RootState } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
 import { groupBy } from 'es-toolkit/compat';
@@ -12,8 +11,6 @@ import { buildWorkflowWithValidation } from 'features/nodes/util/workflow/buildW
 import { useCallback } from 'react';
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
 import type { Batch, EnqueueBatchArg } from 'services/api/types';
-
-export const enqueueRequestedWorkflows = createAction('app/enqueueRequestedWorkflows');
 
 const getBatchDataForWorkflowGeneration = async (state: RootState, dispatch: AppDispatch): Promise<Batch['data']> => {
   const nodesState = selectNodesSlice(state);
@@ -76,7 +73,6 @@ const getBatchDataForWorkflowGeneration = async (state: RootState, dispatch: App
 const enqueueWorkflows = async (store: AppStore, templates: Templates, prepend: boolean) => {
   const { dispatch, getState } = store;
 
-  dispatch(enqueueRequestedWorkflows());
   const state = getState();
   const nodesState = selectNodesSlice(state);
   const graph = buildNodesGraph(state, templates);

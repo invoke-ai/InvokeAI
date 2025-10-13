@@ -12,7 +12,7 @@ export const ContextMenuItemDeleteImage = memo(() => {
 
   const onClick = useCallback(async () => {
     try {
-        await deleteImageModal.delete([imageDTO.image_name]);
+      await deleteImageModal.delete([imageDTO.image_name]);
     } catch {
       // noop;
     }

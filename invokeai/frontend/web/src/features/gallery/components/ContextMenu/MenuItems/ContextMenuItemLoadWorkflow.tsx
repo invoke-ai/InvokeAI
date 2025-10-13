@@ -14,11 +14,11 @@ export const ContextMenuItemLoadWorkflow = memo(() => {
   const hasTemplates = useStore($hasTemplates);
 
   const onClick = useCallback(() => {
-      loadWorkflowWithDialog({ type: 'image', data: imageDTO.image_name });
+    loadWorkflowWithDialog({ type: 'image', data: imageDTO.image_name });
   }, [loadWorkflowWithDialog, imageDTO]);
 
   const isDisabled = useMemo(() => {
-      return !imageDTO.has_workflow || !hasTemplates;
+    return !imageDTO.has_workflow || !hasTemplates;
   }, [imageDTO, hasTemplates]);
 
   return (

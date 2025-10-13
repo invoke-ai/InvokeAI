@@ -1,5 +1,4 @@
 import type { AlertStatus } from '@invoke-ai/ui-library';
-import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
@@ -22,12 +21,8 @@ import { assert, AssertionError } from 'tsafe';
 
 const log = logger('generation');
 
-export const enqueueRequestedGenerate = createAction('app/enqueueRequestedGenerate');
-
 const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
   const { dispatch, getState } = store;
-
-  dispatch(enqueueRequestedGenerate());
 
   const state = getState();
 

@@ -12,16 +12,14 @@ import {
   Text,
   Tooltip,
 } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
 import type { WorkflowLibraryView, WorkflowTagCategory } from 'features/nodes/store/workflowLibrarySlice';
 import {
-  $workflowLibraryCategoriesOptions,
-  $workflowLibraryTagCategoriesOptions,
-  $workflowLibraryTagOptions,
   selectWorkflowLibrarySelectedTags,
   selectWorkflowLibraryView,
+  WORKFLOW_LIBRARY_TAG_CATEGORIES,
+  WORKFLOW_LIBRARY_TAGS,
   workflowLibraryTagsReset,
   workflowLibraryTagToggled,
   workflowLibraryViewChanged,
@@ -31,33 +29,18 @@ import { UploadWorkflowButton } from 'features/workflowLibrary/components/Upload
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowCounterClockwiseBold, PiStarFill, PiUsersBold } from 'react-icons/pi';
+import { PiArrowCounterClockwiseBold, PiStarFill } from 'react-icons/pi';
 import { useDispatch } from 'react-redux';
 import { useGetCountsByTagQuery } from 'services/api/endpoints/workflows';
 
 export const WorkflowLibrarySideNav = () => {
   const { t } = useTranslation();
-  const categoryOptions = useStore($workflowLibraryCategoriesOptions);
-  const view = useAppSelector(selectWorkflowLibraryView);
 
   return (
     <Flex h="full" minH={0} overflow="hidden" flexDir="column" w={64} gap={0}>
       <Flex flexDir="column" w="full" pb={2} gap={2}>
         <WorkflowLibraryViewButton view="recent">{t('workflows.recentlyOpened')}</WorkflowLibraryViewButton>
         <WorkflowLibraryViewButton view="yours">{t('workflows.yourWorkflows')}</WorkflowLibraryViewButton>
-        {categoryOptions.includes('project') && (
-          <Collapse in={view === 'yours' || view === 'shared' || view === 'private'}>
-            <Flex flexDir="column" gap={2} pl={4} pt={2}>
-              <WorkflowLibraryViewButton size="sm" view="private">
-                {t('workflows.private')}
-              </WorkflowLibraryViewButton>
-              <WorkflowLibraryViewButton size="sm" rightIcon={<PiUsersBold />} view="shared">
-                {t('workflows.shared')}
-                <Spacer />
-              </WorkflowLibraryViewButton>
-            </Flex>
-          </Collapse>
-        )}
       </Flex>
       <Flex h="full" minH={0} overflow="hidden" flexDir="column">
         <BrowseWorkflowsButton />
@@ -107,7 +90,6 @@ BrowseWorkflowsButton.displayName = 'BrowseWorkflowsButton';
 const overlayscrollbarsOptions = getOverlayScrollbarsParams({ visibility: 'visible' }).options;
 
 const DefaultsViewCheckboxesCollapsible = memo(() => {
-  const tagCategoryOptions = useStore($workflowLibraryTagCategoriesOptions);
   const view = useAppSelector(selectWorkflowLibraryView);
 
   return (
@@ -115,7 +97,7 @@ const DefaultsViewCheckboxesCollapsible = memo(() => {
       <Flex flexDir="column" gap={2} pl={4} py={2} overflow="hidden" h="100%" minH={0}>
         <OverlayScrollbarsComponent style={overlayScrollbarsStyles} options={overlayscrollbarsOptions}>
           <Flex flexDir="column" gap={2} overflow="auto">
-            {tagCategoryOptions.map((tagCategory) => (
+            {WORKFLOW_LIBRARY_TAG_CATEGORIES.map((tagCategory) => (
               <TagCategory key={tagCategory.categoryTKey} tagCategory={tagCategory} />
             ))}
           </Flex>
@@ -126,16 +108,12 @@ const DefaultsViewCheckboxesCollapsible = memo(() => {
 });
 DefaultsViewCheckboxesCollapsible.displayName = 'DefaultsViewCheckboxes';
 
+const tagCountQueryArg = {
+  tags: WORKFLOW_LIBRARY_TAGS.map((tag) => tag.label),
+  categories: ['default'],
+} satisfies Parameters<typeof useGetCountsByTagQuery>[0];
+
 const useCountForIndividualTag = (tag: string) => {
-  const allTags = useStore($workflowLibraryTagOptions);
-  const queryArg = useMemo(
-    () =>
-      ({
-        tags: allTags.map((tag) => tag.label),
-        categories: ['default'],
-      }) satisfies Parameters<typeof useGetCountsByTagQuery>[0],
-    [allTags]
-  );
   const queryOptions = useMemo(
     () =>
       ({
@@ -146,21 +124,12 @@ const useCountForIndividualTag = (tag: string) => {
     [tag]
   );
 
-  const { count } = useGetCountsByTagQuery(queryArg, queryOptions);
+  const { count } = useGetCountsByTagQuery(tagCountQueryArg, queryOptions);
 
   return count;
 };
 
 const useCountForTagCategory = (tagCategory: WorkflowTagCategory) => {
-  const allTags = useStore($workflowLibraryTagOptions);
-  const queryArg = useMemo(
-    () =>
-      ({
-        tags: allTags.map((tag) => tag.label),
-        categories: ['default'], // We only allow filtering by tag for default workflows
-      }) satisfies Parameters<typeof useGetCountsByTagQuery>[0],
-    [allTags]
-  );
   const queryOptions = useMemo(
     () =>
       ({
@@ -176,7 +145,7 @@ const useCountForTagCategory = (tagCategory: WorkflowTagCategory) => {
     [tagCategory]
   );
 
-  const { count } = useGetCountsByTagQuery(queryArg, queryOptions);
+  const { count } = useGetCountsByTagQuery(tagCountQueryArg, queryOptions);
 
   return count;
 };

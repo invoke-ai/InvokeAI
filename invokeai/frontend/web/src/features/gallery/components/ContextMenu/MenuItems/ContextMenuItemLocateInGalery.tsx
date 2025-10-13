@@ -25,17 +25,17 @@ export const ContextMenuItemLocateInGalery = memo(() => {
   const onClick = useCallback(() => {
     navigationApi.expandRightPanel();
     galleryPanel.expand();
-      flushSync(() => {
-        dispatch(
-          boardIdSelected({
-            boardId: imageDTO.board_id ?? 'none',
-            select: {
-              selection: [{ type: 'image', id: imageDTO.image_name }],
-              galleryView: IMAGE_CATEGORIES.includes(imageDTO.image_category) ? 'images' : 'assets',
-            },
-          })
-        );
-      });
+    flushSync(() => {
+      dispatch(
+        boardIdSelected({
+          boardId: imageDTO.board_id ?? 'none',
+          select: {
+            selection: [{ type: 'image', id: imageDTO.image_name }],
+            galleryView: IMAGE_CATEGORIES.includes(imageDTO.image_category) ? 'images' : 'assets',
+          },
+        })
+      );
+    });
   }, [dispatch, galleryPanel, imageDTO]);
 
   return (
