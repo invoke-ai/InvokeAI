@@ -313,25 +313,6 @@ const zRegionalGuidanceFLUXReduxConfig = z.object({
 });
 type RegionalGuidanceFLUXReduxConfig = z.infer<typeof zRegionalGuidanceFLUXReduxConfig>;
 
-const zChatGPT4oReferenceImageConfig = z.object({
-  type: z.literal('chatgpt_4o_reference_image'),
-  image: zCroppableImageWithDims.nullable(),
-  /**
-   * TODO(psyche): Technically there is no model for ChatGPT 4o reference images - it's just a field in the API call.
-   * But we use a model drop down to switch between different ref image types, so there needs to be a model here else
-   * there will be no way to switch between ref image types.
-   */
-  model: zModelIdentifierField.nullable(),
-});
-export type ChatGPT4oReferenceImageConfig = z.infer<typeof zChatGPT4oReferenceImageConfig>;
-
-const zGemini2_5ReferenceImageConfig = z.object({
-  type: z.literal('gemini_2_5_reference_image'),
-  image: zCroppableImageWithDims.nullable(),
-  model: zModelIdentifierField.nullable(),
-});
-export type Gemini2_5ReferenceImageConfig = z.infer<typeof zGemini2_5ReferenceImageConfig>;
-
 const zFluxKontextReferenceImageConfig = z.object({
   type: z.literal('flux_kontext_reference_image'),
   image: zCroppableImageWithDims.nullable(),
@@ -349,13 +330,7 @@ const zCanvasEntityBase = z.object({
 export const zRefImageState = z.object({
   id: zId,
   isEnabled: z.boolean().default(true),
-  config: z.discriminatedUnion('type', [
-    zIPAdapterConfig,
-    zFLUXReduxConfig,
-    zChatGPT4oReferenceImageConfig,
-    zFluxKontextReferenceImageConfig,
-    zGemini2_5ReferenceImageConfig,
-  ]),
+  config: z.discriminatedUnion('type', [zIPAdapterConfig, zFLUXReduxConfig, zFluxKontextReferenceImageConfig]),
 });
 export type RefImageState = z.infer<typeof zRefImageState>;
 
@@ -747,12 +722,7 @@ export const getInitialRefImagesState = (): RefImagesState => ({
 
 export const zCanvasReferenceImageState_OLD = zCanvasEntityBase.extend({
   type: z.literal('reference_image'),
-  ipAdapter: z.discriminatedUnion('type', [
-    zIPAdapterConfig,
-    zFLUXReduxConfig,
-    zChatGPT4oReferenceImageConfig,
-    zGemini2_5ReferenceImageConfig,
-  ]),
+  ipAdapter: z.discriminatedUnion('type', [zIPAdapterConfig, zFLUXReduxConfig]),
 });
 
 export const zCanvasMetadata = z.object({

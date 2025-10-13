@@ -24,11 +24,9 @@ import {
 import type {
   CanvasEntityIdentifier,
   CanvasRegionalGuidanceState,
-  ChatGPT4oReferenceImageConfig,
   ControlLoRAConfig,
   ControlNetConfig,
   FluxKontextReferenceImageConfig,
-  Gemini2_5ReferenceImageConfig,
   IPAdapterConfig,
   RegionalGuidanceIPAdapterConfig,
   T2IAdapterConfig,
@@ -76,13 +74,7 @@ export const selectDefaultControlAdapter = createSelector(
   }
 );
 
-export const getDefaultRefImageConfig = (
-  getState: AppGetState
-):
-  | IPAdapterConfig
-  | ChatGPT4oReferenceImageConfig
-  | FluxKontextReferenceImageConfig
-  | Gemini2_5ReferenceImageConfig => {
+export const getDefaultRefImageConfig = (getState: AppGetState): IPAdapterConfig | FluxKontextReferenceImageConfig => {
   const state = getState();
 
   const mainModelConfig = selectMainModelConfig(state);
