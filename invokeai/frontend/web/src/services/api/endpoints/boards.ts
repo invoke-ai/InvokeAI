@@ -100,10 +100,10 @@ export const boardsApi = api.injectEndpoints({
      */
 
     createBoard: build.mutation<BoardDTO, CreateBoardArg>({
-      query: ({ board_name, is_private }) => ({
+      query: ({ board_name }) => ({
         url: buildBoardsUrl(),
         method: 'POST',
-        params: { board_name, is_private },
+        params: { board_name },
       }),
       invalidatesTags: [{ type: 'Board', id: LIST_TAG }],
     }),

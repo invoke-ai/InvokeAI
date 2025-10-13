@@ -31,8 +31,6 @@ export const StylePresetMenu = () => {
         ) => {
           if (preset.type === 'default') {
             acc.defaultPresets.push(preset);
-          } else if (preset.type === 'project') {
-            acc.sharedPresets.push(preset);
           } else {
             acc.presets.push(preset);
           }
