@@ -7,7 +7,7 @@ import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/L
 import InvokeLogo from 'public/assets/images/invoke-symbol-wht-lrg.svg';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiImage, PiUsersBold } from 'react-icons/pi';
+import { PiImage } from 'react-icons/pi';
 import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
 import { DeleteWorkflow } from './WorkflowLibraryListItemActions/DeleteWorkflow';
@@ -92,7 +92,6 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
                   {t('workflows.opened')}
                 </Badge>
               )}
-              {workflow.category === 'project' && <Icon as={PiUsersBold} color="base.200" />}
               {workflow.category === 'default' && (
                 <Image
                   src={InvokeLogo}

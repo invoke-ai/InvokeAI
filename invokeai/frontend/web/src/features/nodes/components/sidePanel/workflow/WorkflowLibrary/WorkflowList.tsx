@@ -29,15 +29,9 @@ const getCategories = (view: WorkflowLibraryView): WorkflowCategory[] => {
     case 'defaults':
       return ['default'];
     case 'recent':
-      return ['user', 'project', 'default'];
+      return ['user', 'default'];
     case 'yours':
-      return ['user', 'project'];
-    case 'private':
       return ['user'];
-    case 'shared':
-      return ['project'];
-    case 'published':
-      return ['user', 'project', 'default'];
     default:
       assert<Equals<typeof view, never>>(false);
   }

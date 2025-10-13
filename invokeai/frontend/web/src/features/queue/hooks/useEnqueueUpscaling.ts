@@ -1,4 +1,3 @@
-import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
@@ -8,14 +7,10 @@ import { buildMultidiffusionUpscaleGraph } from 'features/nodes/util/graph/build
 import { useCallback } from 'react';
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
 
-export const enqueueRequestedUpscaling = createAction('app/enqueueRequestedUpscaling');
-
 const log = logger('generation');
 
 const enqueueUpscaling = async (store: AppStore, prepend: boolean) => {
   const { dispatch, getState } = store;
-
-  dispatch(enqueueRequestedUpscaling());
 
   const state = getState();
 

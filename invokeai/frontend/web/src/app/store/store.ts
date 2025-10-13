@@ -53,7 +53,7 @@ import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { addArchivedOrDeletedBoardListener } from './middleware/listenerMiddleware/listeners/addArchivedOrDeletedBoardListener';
 import { addImageUploadedFulfilledListener } from './middleware/listenerMiddleware/listeners/imageUploaded';
 
-export const listenerMiddleware = createListenerMiddleware();
+const listenerMiddleware = createListenerMiddleware();
 
 const log = logger('system');
 

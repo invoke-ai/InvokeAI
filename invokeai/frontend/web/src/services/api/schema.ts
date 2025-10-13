@@ -24292,7 +24292,7 @@ export type components = {
          * WorkflowCategory
          * @enum {string}
          */
-        WorkflowCategory: "user" | "default" | "project";
+        WorkflowCategory: "user" | "default";
         /** WorkflowMeta */
         WorkflowMeta: {
             /**

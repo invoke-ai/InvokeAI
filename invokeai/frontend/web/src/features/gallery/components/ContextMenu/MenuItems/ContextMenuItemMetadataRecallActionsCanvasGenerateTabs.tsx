@@ -24,12 +24,12 @@ export const ContextMenuItemMetadataRecallActionsCanvasGenerateTabs = memo(() =>
 
   const imageDTO = useImageDTOContext();
 
-  const recallAll = useRecallAll(imageDTO );
-  const recallRemix = useRecallRemix(imageDTO );
-  const recallPrompts = useRecallPrompts(imageDTO );
-  const recallSeed = useRecallSeed(imageDTO );
-  const recallDimensions = useRecallDimensions(imageDTO );
-  const recallCLIPSkip = useRecallCLIPSkip(imageDTO );
+  const recallAll = useRecallAll(imageDTO);
+  const recallRemix = useRecallRemix(imageDTO);
+  const recallPrompts = useRecallPrompts(imageDTO);
+  const recallSeed = useRecallSeed(imageDTO);
+  const recallDimensions = useRecallDimensions(imageDTO);
+  const recallCLIPSkip = useRecallCLIPSkip(imageDTO);
 
   return (
     <MenuItem {...subMenu.parentMenuItemProps} icon={<PiArrowBendUpLeftBold />}>

@@ -11,7 +11,7 @@ export const ContextMenuItemCopy = memo(() => {
   const copyImageToClipboard = useCopyImageToClipboard();
 
   const onClick = useCallback(() => {
-      copyImageToClipboard(imageDTO.image_url);
+    copyImageToClipboard(imageDTO.image_url);
   }, [copyImageToClipboard, imageDTO]);
 
   return (

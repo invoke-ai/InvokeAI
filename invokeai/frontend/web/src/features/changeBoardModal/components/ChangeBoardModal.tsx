@@ -19,11 +19,6 @@ const selectImagesToChange = createSelector(
   (changeBoardModal) => changeBoardModal.image_names
 );
 
-const selectVideosToChange = createSelector(
-  selectChangeBoardModalSlice,
-  (changeBoardModal) => changeBoardModal.video_ids
-);
-
 const selectIsModalOpen = createSelector(
   selectChangeBoardModalSlice,
   (changeBoardModal) => changeBoardModal.isModalOpen
@@ -37,7 +32,6 @@ const ChangeBoardModal = () => {
   const { data: boards, isFetching } = useListAllBoardsQuery({ include_archived: true });
   const isModalOpen = useAppSelector(selectIsModalOpen);
   const imagesToChange = useAppSelector(selectImagesToChange);
-  const videosToChange = useAppSelector(selectVideosToChange);
   const [addImagesToBoard] = useAddImagesToBoardMutation();
   const [removeImagesFromBoard] = useRemoveImagesFromBoardMutation();
   const { t } = useTranslation();
@@ -63,7 +57,7 @@ const ChangeBoardModal = () => {
   }, [dispatch]);
 
   const handleChangeBoard = useCallback(() => {
-    if (!selectedBoardId || (imagesToChange.length === 0 && videosToChange.length === 0)) {
+    if (!selectedBoardId || imagesToChange.length === 0) {
       return;
     }
 
@@ -78,7 +72,7 @@ const ChangeBoardModal = () => {
       }
     }
     dispatch(changeBoardReset());
-  }, [addImagesToBoard, dispatch, imagesToChange, videosToChange, removeImagesFromBoard, selectedBoardId]);
+  }, [addImagesToBoard, dispatch, imagesToChange, removeImagesFromBoard, selectedBoardId]);
 
   const onChange = useCallback<ComboboxOnChange>((v) => {
     if (!v) {
@@ -99,15 +93,9 @@ const ChangeBoardModal = () => {
     >
       <Flex flexDir="column" gap={4}>
         <Text>
-          {imagesToChange.length > 0 &&
-            t('boards.movingImagesToBoard', {
-              count: imagesToChange.length,
-            })}
-          {videosToChange.length > 0 &&
-            t('boards.movingVideosToBoard', {
-              count: videosToChange.length,
-            })}
-          :
+          {t('boards.movingImagesToBoard', {
+            count: imagesToChange.length,
+          })}
         </Text>
         <FormControl isDisabled={isFetching}>
           <Combobox

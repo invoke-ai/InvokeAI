@@ -53,7 +53,7 @@ const zCropBox = z.object({
 // This parsing happens currently in two places:
 // - Recalling metadata.
 // - Loading/rehydrating persisted client state from storage.
-export const zCroppableImageWithDims = z.preprocess(
+const zCroppableImageWithDims = z.preprocess(
   (val) => {
     try {
       const imageWithDims = zImageWithDims.parse(val);
@@ -365,17 +365,9 @@ export const isIPAdapterConfig = (config: RefImageState['config']): config is IP
 export const isFLUXReduxConfig = (config: RefImageState['config']): config is FLUXReduxConfig =>
   config.type === 'flux_redux';
 
-export const isChatGPT4oReferenceImageConfig = (
-  config: RefImageState['config']
-): config is ChatGPT4oReferenceImageConfig => config.type === 'chatgpt_4o_reference_image';
-
 export const isFluxKontextReferenceImageConfig = (
   config: RefImageState['config']
 ): config is FluxKontextReferenceImageConfig => config.type === 'flux_kontext_reference_image';
-
-export const isGemini2_5ReferenceImageConfig = (
-  config: RefImageState['config']
-): config is Gemini2_5ReferenceImageConfig => config.type === 'gemini_2_5_reference_image';
 
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
 export type FillStyle = z.infer<typeof zFillStyle>;
@@ -553,20 +545,6 @@ export const ASPECT_RATIO_MAP: Record<Exclude<AspectRatioID, 'Free'>, { ratio: n
   '2:3': { ratio: 2 / 3, inverseID: '3:2' },
   '9:16': { ratio: 9 / 16, inverseID: '16:9' },
   '9:21': { ratio: 9 / 21, inverseID: '21:9' },
-};
-
-export const zFluxKontextAspectRatioID = z.enum(['21:9', '16:9', '4:3', '1:1', '3:4', '9:16', '9:21']);
-type FluxKontextAspectRatio = z.infer<typeof zFluxKontextAspectRatioID>;
-export const isFluxKontextAspectRatioID = (v: unknown): v is z.infer<typeof zFluxKontextAspectRatioID> =>
-  zFluxKontextAspectRatioID.safeParse(v).success;
-export const FLUX_KONTEXT_ASPECT_RATIOS: Record<FluxKontextAspectRatio, Dimensions> = {
-  '3:4': { width: 880, height: 1184 },
-  '4:3': { width: 1184, height: 880 },
-  '9:16': { width: 752, height: 1392 },
-  '16:9': { width: 1392, height: 752 },
-  '21:9': { width: 1568, height: 672 },
-  '9:21': { width: 672, height: 1568 },
-  '1:1': { width: 1024, height: 1024 },
 };
 
 const zAspectRatioConfig = z.object({
