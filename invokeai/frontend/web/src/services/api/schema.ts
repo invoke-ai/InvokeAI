@@ -2495,11 +2495,6 @@ export type components = {
              */
             archived: boolean;
             /**
-             * Is Private
-             * @description Whether the board is private.
-             */
-            is_private?: boolean | null;
-            /**
              * Image Count
              * @description The number of images in the board.
              */
@@ -2661,8 +2656,6 @@ export type components = {
              * @default false
              */
             prepend?: boolean;
-            /** @description The validation run data to use for this batch. This is only used if this is a validation run. */
-            validation_run_data?: components["schemas"]["ValidationRunData"] | null;
         };
         /** Body_get_images_by_names */
         Body_get_images_by_names: {
@@ -7459,30 +7452,6 @@ export type components = {
              * @description The y coordinate of the bounding box's top side
              */
             y: number;
-        };
-        /** FieldIdentifier */
-        FieldIdentifier: {
-            /**
-             * Kind
-             * @description The kind of field
-             * @enum {string}
-             */
-            kind: "input" | "output";
-            /**
-             * Node Id
-             * @description The ID of the node
-             */
-            node_id: string;
-            /**
-             * Field Name
-             * @description The name of the field
-             */
-            field_name: string;
-            /**
-             * User Label
-             * @description The user label of the field, if any
-             */
-            user_label: string | null;
         };
         /**
          * FieldKind
@@ -12492,18 +12461,6 @@ export type components = {
              * @description The error traceback
              */
             error_traceback: string;
-            /**
-             * User Id
-             * @description The ID of the user who created the invocation
-             * @default null
-             */
-            user_id: string | null;
-            /**
-             * Project Id
-             * @description The ID of the user who created the invocation
-             * @default null
-             */
-            project_id: string | null;
         };
         InvocationOutputMap: {
             add: components["schemas"]["IntegerOutput"];
@@ -19303,7 +19260,7 @@ export type components = {
          * PresetType
          * @enum {string}
          */
-        PresetType: "user" | "default" | "project";
+        PresetType: "user" | "default";
         /**
          * ProgressImage
          * @description The progress image sent intermittently during processing
@@ -24164,24 +24121,6 @@ export type components = {
             /** Error Type */
             type: string;
         };
-        /** ValidationRunData */
-        ValidationRunData: {
-            /**
-             * Workflow Id
-             * @description The id of the workflow being published.
-             */
-            workflow_id: string;
-            /**
-             * Input Fields
-             * @description The input fields for the published workflow
-             */
-            input_fields: components["schemas"]["FieldIdentifier"][];
-            /**
-             * Output Fields
-             * @description The output fields for the published workflow
-             */
-            output_fields: components["schemas"]["FieldIdentifier"][];
-        };
         /** Workflow */
         Workflow: {
             /**
@@ -26401,8 +26340,6 @@ export interface operations {
             query: {
                 /** @description The name of the board to create */
                 board_name: string;
-                /** @description Whether the board is private */
-                is_private?: boolean;
             };
             header?: never;
             path?: never;
