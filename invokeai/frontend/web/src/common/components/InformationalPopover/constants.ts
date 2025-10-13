@@ -1,5 +1,4 @@
 import type { PopoverProps } from '@invoke-ai/ui-library';
-import commercialLicenseBg from 'public/assets/images/commercial-license-bg.png';
 import denoisingStrength from 'public/assets/images/denoising-strength.png';
 
 export type Feature =
@@ -216,10 +215,6 @@ export const POPOVER_DATA: { [key in Feature]?: PopoverData } = {
   },
   seamlessTilingYAxis: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000178161-advanced-settings',
-  },
-  fluxDevLicense: {
-    href: 'https://www.invoke.com/get-a-commercial-license-for-flux',
-    image: commercialLicenseBg,
   },
 } as const;
 
