@@ -10,7 +10,7 @@ import { ToggleProgressButton } from './ToggleProgressButton';
 
 export const ImageViewerToolbar = memo(() => {
   const lastSelectedItem = useAppSelector(selectLastSelectedItem);
-  const imageDTO = useImageDTO(lastSelectedItem?.id);
+  const imageDTO = useImageDTO(lastSelectedItem);
 
   return (
     <Flex w="full" justifyContent="center" h={8}>

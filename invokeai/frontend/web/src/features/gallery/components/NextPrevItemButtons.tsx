@@ -3,7 +3,7 @@ import { Box, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { clamp } from 'es-toolkit/compat';
 import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
-import { itemSelected } from 'features/gallery/store/gallerySlice';
+import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
@@ -17,32 +17,32 @@ const NextPrevItemButtons = ({ inset = 8 }: { inset?: ChakraProps['insetInlineSt
   const { imageNames, isFetching } = useGalleryImageNames();
 
   const isOnFirstItem = useMemo(
-    () => (lastSelectedItem ? imageNames.at(0) === lastSelectedItem.id : false),
+    () => (lastSelectedItem ? imageNames.at(0) === lastSelectedItem : false),
     [imageNames, lastSelectedItem]
   );
   const isOnLastItem = useMemo(
-    () => (lastSelectedItem ? imageNames.at(-1) === lastSelectedItem.id : false),
+    () => (lastSelectedItem ? imageNames.at(-1) === lastSelectedItem : false),
     [imageNames, lastSelectedItem]
   );
 
   const onClickLeftArrow = useCallback(() => {
-    const targetIndex = lastSelectedItem ? imageNames.findIndex((n) => n === lastSelectedItem.id) - 1 : 0;
+    const targetIndex = lastSelectedItem ? imageNames.findIndex((n) => n === lastSelectedItem) - 1 : 0;
     const clampedIndex = clamp(targetIndex, 0, imageNames.length - 1);
     const n = imageNames.at(clampedIndex);
     if (!n) {
       return;
     }
-    dispatch(itemSelected({ type: lastSelectedItem?.type ?? 'image', id: n }));
+    dispatch(imageSelected(n));
   }, [dispatch, imageNames, lastSelectedItem]);
 
   const onClickRightArrow = useCallback(() => {
-    const targetIndex = lastSelectedItem ? imageNames.findIndex((n) => n === lastSelectedItem.id) + 1 : 0;
+    const targetIndex = lastSelectedItem ? imageNames.findIndex((n) => n === lastSelectedItem) + 1 : 0;
     const clampedIndex = clamp(targetIndex, 0, imageNames.length - 1);
     const n = imageNames.at(clampedIndex);
     if (!n) {
       return;
     }
-    dispatch(itemSelected({ type: lastSelectedItem?.type ?? 'image', id: n }));
+    dispatch(imageSelected(n));
   }, [dispatch, imageNames, lastSelectedItem]);
 
   return (

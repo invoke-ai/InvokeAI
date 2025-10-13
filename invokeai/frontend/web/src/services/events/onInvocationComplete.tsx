@@ -8,7 +8,7 @@ import {
   selectListBoardsQueryArgs,
   selectSelectedBoardId,
 } from 'features/gallery/store/gallerySelectors';
-import { boardIdSelected, galleryViewChanged, itemSelected } from 'features/gallery/store/gallerySlice';
+import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { isImageField, isImageFieldCollection } from 'features/nodes/types/common';
 import { zNodeStatus } from 'features/nodes/types/invocation';
@@ -170,7 +170,7 @@ export const buildOnInvocationComplete = (
         boardIdSelected({
           boardId: board_id,
           select: {
-            selection: [{ type: 'image', id: image_name }],
+            selection: [image_name],
             galleryView: 'images',
           },
         })
@@ -182,7 +182,7 @@ export const buildOnInvocationComplete = (
         dispatch(galleryViewChanged('images'));
       }
       // Select the image immediately since we've optimistically updated the cache
-      dispatch(itemSelected({ type: 'image', id: lastImageDTO.image_name }));
+      dispatch(imageSelected(lastImageDTO.image_name));
     }
   };
 

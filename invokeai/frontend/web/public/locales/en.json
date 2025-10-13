@@ -43,8 +43,6 @@
         "move": "Move",
         "movingImagesToBoard_one": "Moving {{count}} image to board:",
         "movingImagesToBoard_other": "Moving {{count}} images to board:",
-        "movingVideosToBoard_one": "Moving {{count}} video to board:",
-        "movingVideosToBoard_other": "Moving {{count}} videos to board:",
         "myBoard": "My Board",
         "noBoards": "No {{boardType}} Boards",
         "noMatching": "No matching Boards",
@@ -61,8 +59,6 @@
         "imagesWithCount_other": "{{count}} images",
         "assetsWithCount_one": "{{count}} asset",
         "assetsWithCount_other": "{{count}} assets",
-        "videosWithCount_one": "{{count}} video",
-        "videosWithCount_other": "{{count}} videos",
         "updateBoardError": "Error updating board"
     },
     "accordions": {
@@ -375,9 +371,6 @@
         "deleteImage_one": "Delete Image",
         "deleteImage_other": "Delete {{count}} Images",
         "deleteImagePermanent": "Deleted images cannot be restored.",
-        "deleteVideo_one": "Delete Video",
-        "deleteVideo_other": "Delete {{count}} Videos",
-        "deleteVideoPermanent": "Deleted videos cannot be restored.",
         "displayBoardSearch": "Board Search",
         "displaySearch": "Image Search",
         "download": "Download",
@@ -397,7 +390,6 @@
         "sortDirection": "Sort Direction",
         "showStarredImagesFirst": "Show Starred Images First",
         "noImageSelected": "No Image Selected",
-        "noVideoSelected": "No Video Selected",
         "noImagesInGallery": "No Images to Display",
         "starImage": "Star",
         "unstarImage": "Unstar",
@@ -429,9 +421,7 @@
         "openViewer": "Open Viewer",
         "closeViewer": "Close Viewer",
         "move": "Move",
-        "useForPromptGeneration": "Use for Prompt Generation",
-        "videos": "Videos",
-        "videosTab": "Videos you've created and saved within Invoke."
+        "useForPromptGeneration": "Use for Prompt Generation"
     },
     "hotkeys": {
         "hotkeys": "Hotkeys",
@@ -476,10 +466,6 @@
                 "title": "Select the Queue Tab",
                 "desc": "Selects the Queue tab."
             },
-            "selectVideoTab": {
-                "title": "Select the Video Tab",
-                "desc": "Selects the Video tab."
-            },
             "focusPrompt": {
                 "title": "Focus Prompt",
                 "desc": "Move cursor focus to the positive prompt."
@@ -513,9 +499,6 @@
                 "desc": "Selects the Generate tab.",
                 "key": "1"
             }
-        },
-        "video": {
-            "title": "Video"
         },
         "canvas": {
             "title": "Canvas",
@@ -823,13 +806,11 @@
         "guidance": "Guidance",
         "height": "Height",
         "imageDetails": "Image Details",
-        "videoDetails": "Video Details",
         "imageDimensions": "Image Dimensions",
         "metadata": "Metadata",
         "model": "Model",
         "negativePrompt": "Negative Prompt",
         "noImageDetails": "No image details found",
-        "noVideoDetails": "No video details found",
         "noMetaData": "No metadata found",
         "noRecallParameters": "No parameters to recall found",
         "parameterSet": "Parameter {{parameter}} set",
@@ -847,11 +828,7 @@
         "vae": "VAE",
         "width": "Width",
         "workflow": "Workflow",
-        "canvasV2Metadata": "Canvas Layers",
-        "videoModel": "Model",
-        "videoDuration": "Duration",
-        "videoAspectRatio": "Aspect Ratio",
-        "videoResolution": "Resolution"
+        "canvasV2Metadata": "Canvas Layers"
     },
     "modelManager": {
         "active": "active",
@@ -1269,13 +1246,9 @@
         "images": "Images",
         "images_withCount_one": "Image",
         "images_withCount_other": "Images",
-        "videos_withCount_one": "Video",
-        "videos_withCount_other": "Videos",
         "infillMethod": "Infill Method",
         "infillColorValue": "Fill Color",
         "info": "Info",
-        "startingFrameImage": "Start Frame",
-        "startingFrameImageAspectRatioWarning": "Image aspect ratio does not match the video aspect ratio ({{videoAspectRatio}}). This could lead to unexpected cropping during video generation.",
         "invoke": {
             "addingImagesTo": "Adding images to",
             "modelDisabledForTrial": "Generating with {{modelName}} is not available on trial accounts. Visit your account settings to upgrade.",
@@ -1322,8 +1295,7 @@
             "noNodesInGraph": "No nodes in graph",
             "systemDisconnected": "System disconnected",
             "promptExpansionPending": "Prompt expansion in progress",
-            "promptExpansionResultPending": "Please accept or discard your prompt expansion result",
-            "videoIsDisabled": "Video generation is not enabled for {{accountType}} accounts."
+            "promptExpansionResultPending": "Please accept or discard your prompt expansion result"
         },
         "maskBlur": "Mask Blur",
         "negativePromptPlaceholder": "Negative Prompt",
@@ -1341,11 +1313,9 @@
         "seamlessXAxis": "Seamless X Axis",
         "seamlessYAxis": "Seamless Y Axis",
         "seed": "Seed",
-        "videoActions": "Video Actions",
         "imageActions": "Image Actions",
         "sendToCanvas": "Send To Canvas",
         "sendToUpscale": "Send To Upscale",
-        "sendToVideo": "Send To Video",
         "showOptionsPanel": "Show Side Panel (O or T)",
         "shuffle": "Shuffle Seed",
         "steps": "Steps",
@@ -1357,7 +1327,6 @@
         "postProcessing": "Post-Processing (Shift + U)",
         "processImage": "Process Image",
         "upscaling": "Upscaling",
-        "video": "Video",
         "useAll": "Use All",
         "useSize": "Use Size",
         "useCpuNoise": "Use CPU Noise",
@@ -2660,30 +2629,19 @@
             "queue": "Queue",
             "upscaling": "Upscaling",
             "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)",
-            "video": "Video",
             "gallery": "Gallery"
         },
         "panels": {
             "launchpad": "Launchpad",
             "workflowEditor": "Workflow Editor",
             "imageViewer": "Viewer",
-            "canvas": "Canvas",
-            "video": "Video"
+            "canvas": "Canvas"
         },
         "launchpad": {
             "workflowsTitle": "Go deep with Workflows.",
             "upscalingTitle": "Upscale and add detail.",
             "canvasTitle": "Edit and refine on Canvas.",
             "generateTitle": "Generate images from text prompts.",
-            "videoTitle": "Generate videos from text prompts.",
-            "video": {
-                "startingFrameCalloutTitle": "Add a Starting Frame",
-                "startingFrameCalloutDesc": "Add an image to control the first frame of your video."
-            },
-            "addStartingFrame": {
-                "title": "Add a Starting Frame",
-                "description": "Add an image to control the first frame of your video."
-            },
             "modelGuideText": "Want to learn what prompts work best for each model?",
             "modelGuideLink": "Check out our Model Guide.",
             "createNewWorkflowFromScratch": "Create a new Workflow from scratch",
@@ -2757,10 +2715,6 @@
                 }
             }
         }
-    },
-    "video": {
-        "noVideoSelected": "No video selected",
-        "selectFromGallery": "Select a video from the gallery to play"
     },
     "system": {
         "enableLogging": "Enable Logging",

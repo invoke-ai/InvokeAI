@@ -1,7 +1,7 @@
 import { useAppDispatch } from 'app/store/storeHooks';
 import { IconMenuItem } from 'common/components/IconMenuItem';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
-import { imageToCompareChanged, itemSelected } from 'features/gallery/store/gallerySlice';
+import { imageSelected, imageToCompareChanged } from 'features/gallery/store/gallerySlice';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import { memo, useCallback } from 'react';
@@ -14,7 +14,7 @@ export const ContextMenuItemOpenInViewer = memo(() => {
   const imageDTO = useImageDTOContext();
   const onClick = useCallback(() => {
     dispatch(imageToCompareChanged(null));
-    dispatch(itemSelected({ type: 'image', id: imageDTO.image_name }));
+    dispatch(imageSelected(imageDTO.image_name));
     navigationApi.focusPanelInActiveTab(VIEWER_PANEL_ID);
   }, [dispatch, imageDTO]);
 

@@ -126,8 +126,8 @@ const useKeyboardNavigation = (
       const imageName = event.altKey
         ? // When the user holds alt, we are changing the image to compare - if no image to compare is currently selected,
           // we start from the last selected image
-          (selectImageToCompare(state) ?? selectLastSelectedItem(state)?.id)
-        : selectLastSelectedItem(state)?.id;
+          (selectImageToCompare(state) ?? selectLastSelectedItem(state))
+        : selectLastSelectedItem(state);
 
       const currentIndex = getItemIndex(imageName ?? null, imageNames);
 
@@ -174,7 +174,7 @@ const useKeyboardNavigation = (
           if (event.altKey) {
             dispatch(imageToCompareChanged(newImageName));
           } else {
-            dispatch(selectionChanged([{ type: 'image', id: newImageName }]));
+            dispatch(selectionChanged([newImageName]));
           }
         }
       }
@@ -261,7 +261,7 @@ const useKeepSelectedImageInView = (
   const selection = useAppSelector(selectSelection);
 
   useEffect(() => {
-    const targetImageName = selection.at(-1)?.id;
+    const targetImageName = selection.at(-1);
     const virtuosoGridHandle = virtuosoRef.current;
     const rootEl = rootRef.current;
     const range = rangeRef.current;
@@ -280,7 +280,7 @@ const useStarImageHotkey = () => {
   const lastSelectedItem = useAppSelector(selectLastSelectedItem);
   const selectionCount = useAppSelector(selectSelectionCount);
   const isGalleryFocused = useIsRegionFocused('gallery');
-  const imageDTO = useImageDTO(lastSelectedItem?.id);
+  const imageDTO = useImageDTO(lastSelectedItem);
   const [starImages] = useStarImagesMutation();
   const [unstarImages] = useUnstarImagesMutation();
 

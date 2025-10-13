@@ -22,24 +22,24 @@ const MultipleSelectionMenuItems = () => {
   const [bulkDownload] = useBulkDownloadImagesMutation();
 
   const handleChangeBoard = useCallback(() => {
-    dispatch(imagesToChangeSelected(selection.map((s) => s.id)));
+    dispatch(imagesToChangeSelected(selection));
     dispatch(isModalOpenChanged(true));
   }, [dispatch, selection]);
 
   const handleDeleteSelection = useCallback(() => {
-    deleteImageModal.delete(selection.map((s) => s.id));
+    deleteImageModal.delete(selection);
   }, [deleteImageModal, selection]);
 
   const handleStarSelection = useCallback(() => {
-    starImages({ image_names: selection.map((s) => s.id) });
+    starImages({ image_names: selection });
   }, [starImages, selection]);
 
   const handleUnstarSelection = useCallback(() => {
-    unstarImages({ image_names: selection.map((s) => s.id) });
+    unstarImages({ image_names: selection });
   }, [unstarImages, selection]);
 
   const handleBulkDownload = useCallback(() => {
-    bulkDownload({ image_names: selection.map((s) => s.id) });
+    bulkDownload({ image_names: selection });
   }, [selection, bulkDownload]);
 
   return (

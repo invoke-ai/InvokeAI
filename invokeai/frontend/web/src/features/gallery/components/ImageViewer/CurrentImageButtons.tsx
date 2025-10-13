@@ -51,7 +51,7 @@ export const CurrentImageButtons = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
         boardIdSelected({
           boardId: imageDTO.board_id ?? 'none',
           select: {
-            selection: [{ type: 'image', id: imageDTO.image_name }],
+            selection: [imageDTO.image_name],
             galleryView: IMAGE_CATEGORIES.includes(imageDTO.image_category) ? 'images' : 'assets',
           },
         })

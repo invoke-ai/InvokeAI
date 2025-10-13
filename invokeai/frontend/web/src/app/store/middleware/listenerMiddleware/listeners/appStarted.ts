@@ -1,7 +1,7 @@
 import { createAction } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/store';
 import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
-import { itemSelected } from 'features/gallery/store/gallerySlice';
+import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { imagesApi } from 'services/api/endpoints/images';
 
 export const appStarted = createAction('app/appStarted');
@@ -23,7 +23,7 @@ export const addAppStartedListener = (startAppListening: AppStartListening) => {
           return;
         }
         if (payload.image_names[0]) {
-          dispatch(itemSelected({ type: 'image', id: payload.image_names[0] }));
+          dispatch(imageSelected(payload.image_names[0]));
         }
       }
     },

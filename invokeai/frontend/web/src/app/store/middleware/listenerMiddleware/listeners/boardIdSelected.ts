@@ -1,7 +1,7 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/store';
 import { selectGetImageNamesQueryArgs, selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
-import { boardIdSelected, galleryViewChanged, itemSelected } from 'features/gallery/store/gallerySlice';
+import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
 import { imagesApi } from 'services/api/endpoints/images';
 
 export const addBoardIdSelectedListener = (startAppListening: AppStartListening) => {
@@ -29,7 +29,7 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
       );
 
       if (!isSuccess) {
-        dispatch(itemSelected(null));
+        dispatch(imageSelected(null));
         return;
       }
 
@@ -38,11 +38,7 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
 
       const imageToSelect = imageNames && imageNames.length > 0 ? imageNames[0] : null;
 
-      if (imageToSelect) {
-        dispatch(itemSelected({ type: 'image', id: imageToSelect }));
-      } else {
-        dispatch(itemSelected(null));
-      }
+      dispatch(imageSelected(imageToSelect ?? null));
     },
   });
 };
