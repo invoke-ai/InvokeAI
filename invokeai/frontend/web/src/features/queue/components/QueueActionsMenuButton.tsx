@@ -6,7 +6,6 @@ import { QueueCountBadge } from 'features/queue/components/QueueCountBadge';
 import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { usePauseProcessor } from 'features/queue/hooks/usePauseProcessor';
 import { useResumeProcessor } from 'features/queue/hooks/useResumeProcessor';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useRef } from 'react';
@@ -18,9 +17,6 @@ import { useClearQueueDialog } from './ClearQueueConfirmationAlertDialog';
 export const QueueActionsMenuButton = memo(() => {
   const ref = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
-  const isPauseEnabled = useFeatureStatus('pauseQueue');
-  const isResumeEnabled = useFeatureStatus('resumeQueue');
-  const isClearAllEnabled = useFeatureStatus('cancelAndClearAll');
   const cancelAllExceptCurrent = useCancelAllExceptCurrentQueueItemDialog();
   const cancelCurrentQueueItem = useCancelCurrentQueueItem();
   const clearQueue = useClearQueueDialog();
@@ -64,37 +60,31 @@ export const QueueActionsMenuButton = memo(() => {
             >
               {t('queue.cancelAllExceptCurrentTooltip')}
             </MenuItem>
-            {isClearAllEnabled && (
-              <MenuItem
-                isDestructive
-                icon={<PiTrashBold />}
-                onClick={clearQueue.openDialog}
-                isLoading={clearQueue.isLoading}
-                isDisabled={clearQueue.isDisabled}
-              >
-                {t('queue.clearTooltip')}
-              </MenuItem>
-            )}
-            {isResumeEnabled && (
-              <MenuItem
-                icon={<PiPlayFill />}
-                onClick={resumeProcessor.trigger}
-                isLoading={resumeProcessor.isLoading}
-                isDisabled={resumeProcessor.isDisabled}
-              >
-                {t('queue.resumeTooltip')}
-              </MenuItem>
-            )}
-            {isPauseEnabled && (
-              <MenuItem
-                icon={<PiPauseFill />}
-                onClick={pauseProcessor.trigger}
-                isLoading={pauseProcessor.isLoading}
-                isDisabled={pauseProcessor.isDisabled}
-              >
-                {t('queue.pauseTooltip')}
-              </MenuItem>
-            )}
+            <MenuItem
+              isDestructive
+              icon={<PiTrashBold />}
+              onClick={clearQueue.openDialog}
+              isLoading={clearQueue.isLoading}
+              isDisabled={clearQueue.isDisabled}
+            >
+              {t('queue.clearTooltip')}
+            </MenuItem>
+            <MenuItem
+              icon={<PiPlayFill />}
+              onClick={resumeProcessor.trigger}
+              isLoading={resumeProcessor.isLoading}
+              isDisabled={resumeProcessor.isDisabled}
+            >
+              {t('queue.resumeTooltip')}
+            </MenuItem>
+            <MenuItem
+              icon={<PiPauseFill />}
+              onClick={pauseProcessor.trigger}
+              isLoading={pauseProcessor.isLoading}
+              isDisabled={pauseProcessor.isDisabled}
+            >
+              {t('queue.pauseTooltip')}
+            </MenuItem>
             <MenuItem icon={<PiQueueBold />} onClick={openQueue}>
               {t('queue.openQueue')}
             </MenuItem>

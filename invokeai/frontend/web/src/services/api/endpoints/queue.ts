@@ -1,4 +1,3 @@
-import { $queueId } from 'app/store/nanostores/queueId';
 import queryString from 'query-string';
 import type { components, paths } from 'services/api/schema';
 import type {
@@ -19,7 +18,7 @@ import { api, buildV1Url, LIST_ALL_TAG, LIST_TAG } from '..';
  * buildQueueUrl('some-path')
  * // '/api/v1/queue/queue_id/some-path'
  */
-const buildQueueUrl = (path: string = '') => buildV1Url(`queue/${$queueId.get()}/${path}`);
+const buildQueueUrl = (path: string = '') => buildV1Url(`queue/default/${path}`);
 
 export type SessionQueueItemStatus = NonNullable<components['schemas']['SessionQueueItem']['status']>;
 

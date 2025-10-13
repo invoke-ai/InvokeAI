@@ -5,7 +5,6 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $boardToDelete } from 'features/gallery/components/Boards/DeleteBoardModal';
 import { selectAutoAddBoardId, selectAutoAssignBoardOnClick } from 'features/gallery/store/gallerySelectors';
 import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -33,7 +32,6 @@ const BoardContextMenu = ({ board, children }: Props) => {
 
   const isSelectedForAutoAdd = useAppSelector(selectIsSelectedForAutoAdd);
   const boardName = useBoardName(board.board_id);
-  const isBulkDownloadEnabled = useFeatureStatus('bulkDownload');
 
   const [bulkDownload] = useBulkDownloadImagesMutation();
 
@@ -79,11 +77,10 @@ const BoardContextMenu = ({ board, children }: Props) => {
               {isSelectedForAutoAdd ? t('boards.selectedForAutoAdd') : t('boards.menuItemAutoAdd')}
             </MenuItem>
           )}
-          {isBulkDownloadEnabled && (
-            <MenuItem icon={<PiDownloadBold />} onClickCapture={handleBulkDownload}>
-              {t('boards.downloadBoard')}
-            </MenuItem>
-          )}
+
+          <MenuItem icon={<PiDownloadBold />} onClickCapture={handleBulkDownload}>
+            {t('boards.downloadBoard')}
+          </MenuItem>
 
           {board.archived && (
             <MenuItem icon={<PiArchiveBold />} onClick={handleUnarchive}>
@@ -109,7 +106,6 @@ const BoardContextMenu = ({ board, children }: Props) => {
       isSelectedForAutoAdd,
       handleSetAutoAdd,
       t,
-      isBulkDownloadEnabled,
       handleBulkDownload,
       board.archived,
       handleUnarchive,

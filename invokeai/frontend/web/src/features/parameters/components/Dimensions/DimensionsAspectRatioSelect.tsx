@@ -4,20 +4,9 @@ import { InformationalPopover } from 'common/components/InformationalPopover/Inf
 import {
   aspectRatioIdChanged,
   selectAspectRatioID,
-  selectIsChatGPT4o,
   selectIsFluxKontext,
-  selectIsGemini2_5,
-  selectIsImagen3,
-  selectIsImagen4,
 } from 'features/controlLayers/store/paramsSlice';
-import {
-  isAspectRatioID,
-  zAspectRatioID,
-  zChatGPT4oAspectRatioID,
-  zFluxKontextAspectRatioID,
-  zGemini2_5AspectRatioID,
-  zImagen3AspectRatioID,
-} from 'features/controlLayers/store/types';
+import { isAspectRatioID, zAspectRatioID, zFluxKontextAspectRatioID } from 'features/controlLayers/store/types';
 import type { ChangeEventHandler } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -27,29 +16,15 @@ export const DimensionsAspectRatioSelect = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const id = useAppSelector(selectAspectRatioID);
-  const isImagen3 = useAppSelector(selectIsImagen3);
-  const isChatGPT4o = useAppSelector(selectIsChatGPT4o);
-  const isImagen4 = useAppSelector(selectIsImagen4);
   const isFluxKontext = useAppSelector(selectIsFluxKontext);
-  const isGemini2_5 = useAppSelector(selectIsGemini2_5);
 
   const options = useMemo(() => {
-    // Imagen3 and ChatGPT4o have different aspect ratio options, and do not support freeform sizes
-    if (isImagen3 || isImagen4) {
-      return zImagen3AspectRatioID.options;
-    }
-    if (isChatGPT4o) {
-      return zChatGPT4oAspectRatioID.options;
-    }
     if (isFluxKontext) {
       return zFluxKontextAspectRatioID.options;
     }
-    if (isGemini2_5) {
-      return zGemini2_5AspectRatioID.options;
-    }
     // All other models
     return zAspectRatioID.options;
-  }, [isImagen3, isChatGPT4o, isImagen4, isFluxKontext, isGemini2_5]);
+  }, [isFluxKontext]);
 
   const onChange = useCallback<ChangeEventHandler<HTMLSelectElement>>(
     (e) => {

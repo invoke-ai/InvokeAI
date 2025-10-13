@@ -19,14 +19,12 @@ import {
   isRegionalGuidanceFLUXReduxConfig,
   isRegionalGuidanceIPAdapterConfig,
 } from 'features/controlLayers/store/types';
-import { zModelIdentifierField } from 'features/nodes/types/common';
 import { modelSelected } from 'features/parameters/store/actions';
 import {
   postProcessingModelChanged,
   tileControlnetModelChanged,
   upscaleModelChanged,
 } from 'features/parameters/store/upscaleSlice';
-import { videoModelChanged } from 'features/parameters/store/videoSlice';
 import {
   zParameterCLIPEmbedModel,
   zParameterSpandrelImageToImageModel,
@@ -49,7 +47,6 @@ import {
   isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
   isT5EncoderModelConfigOrSubmodel,
-  isVideoModelConfig,
 } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
@@ -90,7 +87,6 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
       handleCLIPEmbedModels(models, state, dispatch, log);
       handleFLUXVAEModels(models, state, dispatch, log);
       handleFLUXReduxModels(models, state, dispatch, log);
-      handleVideoModels(models, state, dispatch, log);
     },
   });
 };
@@ -121,19 +117,6 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
   // If the current model is available, we don't need to do anything
   if (allMainModels.some((m) => m.key === selectedMainModel?.key)) {
     return;
-  }
-
-  // If we have a default model, try to use it
-  if (state.config.sd.defaultModel) {
-    const defaultModel = allMainModels.find((m) => m.key === state.config.sd.defaultModel);
-    if (defaultModel) {
-      log.debug(
-        { selectedMainModel, defaultModel },
-        'No selected main model or selected main model is not available, selecting default model'
-      );
-      dispatch(modelSelected(defaultModel));
-      return;
-    }
   }
 
   log.debug(
@@ -201,22 +184,6 @@ const handleLoRAModels: ModelHandler = (models, state, dispatch, log) => {
     log.debug({ model: lora.model }, 'LoRA model is not available, clearing');
     dispatch(loraDeleted({ id: lora.id }));
   });
-};
-
-const handleVideoModels: ModelHandler = (models, state, dispatch, log) => {
-  const videoModels = models.filter(isVideoModelConfig);
-  const selectedVideoModel = state.video.videoModel;
-
-  if (selectedVideoModel && videoModels.some((m) => m.key === selectedVideoModel.key)) {
-    return;
-  }
-
-  const firstModel = videoModels[0] || null;
-  if (firstModel) {
-    log.debug({ firstModel }, 'No video model selected, selecting first available video model');
-    dispatch(videoModelChanged({ videoModel: zModelIdentifierField.parse(firstModel) }));
-    return;
-  }
 };
 
 const handleControlAdapterModels: ModelHandler = (models, state, dispatch, log) => {

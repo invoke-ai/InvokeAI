@@ -2,14 +2,22 @@ import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { selectCanvasCoherenceEdgeSize, setCanvasCoherenceEdgeSize } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasCoherenceEdgeSizeConfig } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+
+const CONSTRAINTS = {
+  initial: 16,
+  sliderMin: 0,
+  sliderMax: 128,
+  numberInputMin: 0,
+  numberInputMax: 1024,
+  fineStep: 8,
+  coarseStep: 16,
+};
 
 const ParamCanvasCoherenceEdgeSize = () => {
   const dispatch = useAppDispatch();
   const canvasCoherenceEdgeSize = useAppSelector(selectCanvasCoherenceEdgeSize);
-  const config = useAppSelector(selectCanvasCoherenceEdgeSizeConfig);
 
   const { t } = useTranslation();
 
@@ -26,22 +34,22 @@ const ParamCanvasCoherenceEdgeSize = () => {
         <FormLabel>{t('parameters.coherenceEdgeSize')}</FormLabel>
       </InformationalPopover>
       <CompositeSlider
-        min={config.sliderMin}
-        max={config.sliderMax}
-        step={config.coarseStep}
-        fineStep={config.fineStep}
+        min={CONSTRAINTS.sliderMin}
+        max={CONSTRAINTS.sliderMax}
+        step={CONSTRAINTS.coarseStep}
+        fineStep={CONSTRAINTS.fineStep}
         value={canvasCoherenceEdgeSize}
-        defaultValue={config.initial}
+        defaultValue={CONSTRAINTS.initial}
         onChange={handleChange}
         marks
       />
       <CompositeNumberInput
-        min={config.numberInputMin}
-        max={config.numberInputMax}
-        step={config.coarseStep}
-        fineStep={config.fineStep}
+        min={CONSTRAINTS.numberInputMin}
+        max={CONSTRAINTS.numberInputMax}
+        step={CONSTRAINTS.coarseStep}
+        fineStep={CONSTRAINTS.fineStep}
         value={canvasCoherenceEdgeSize}
-        defaultValue={config.initial}
+        defaultValue={CONSTRAINTS.initial}
         onChange={handleChange}
       />
     </FormControl>

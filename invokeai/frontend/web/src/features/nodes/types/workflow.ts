@@ -381,7 +381,6 @@ export const zWorkflowV3 = z.object({
   }),
   // Use the validated form schema!
   form: zValidatedBuilderForm,
-  is_published: z.boolean().nullish(),
 });
 export type WorkflowV3 = z.infer<typeof zWorkflowV3>;
 // #endregion

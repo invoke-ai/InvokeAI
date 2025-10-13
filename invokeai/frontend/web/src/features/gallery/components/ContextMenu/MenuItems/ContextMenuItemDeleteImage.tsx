@@ -1,25 +1,22 @@
 import { IconMenuItem } from 'common/components/IconMenuItem';
 import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
-import { useItemDTOContext } from 'features/gallery/contexts/ItemDTOContext';
+import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold } from 'react-icons/pi';
-import { isImageDTO } from 'services/api/types';
 
 export const ContextMenuItemDeleteImage = memo(() => {
   const { t } = useTranslation();
   const deleteImageModal = useDeleteImageModalApi();
-  const itemDTO = useItemDTOContext();
+  const imageDTO = useImageDTOContext();
 
   const onClick = useCallback(async () => {
     try {
-      if (isImageDTO(itemDTO)) {
-        await deleteImageModal.delete([itemDTO.image_name]);
-      }
+        await deleteImageModal.delete([imageDTO.image_name]);
     } catch {
       // noop;
     }
-  }, [deleteImageModal, itemDTO]);
+  }, [deleteImageModal, imageDTO]);
 
   return (
     <IconMenuItem

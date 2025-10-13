@@ -48,21 +48,6 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with FLUX.1 model architecture, including FLUX Dev, Schnell and Fill."""
     CogView4 = "cogview4"
     """Indicates the model is associated with CogView 4 model architecture."""
-    Imagen3 = "imagen3"
-    """Indicates the model is associated with Google Imagen 3 model architecture. This is an external API model."""
-    Imagen4 = "imagen4"
-    """Indicates the model is associated with Google Imagen 4 model architecture. This is an external API model."""
-    Gemini2_5 = "gemini-2.5"
-    """Indicates the model is associated with Google Gemini 2.5 Flash Image model architecture. This is an external API model."""
-    ChatGPT4o = "chatgpt-4o"
-    """Indicates the model is associated with OpenAI ChatGPT 4o Image model architecture. This is an external API model."""
-    FluxKontext = "flux-kontext"
-    """Indicates the model is associated with FLUX Kontext model architecture. This is an external API model; local FLUX
-    Kontext models use the base `Flux`."""
-    Veo3 = "veo3"
-    """Indicates the model is associated with Google Veo 3 video model architecture. This is an external API model."""
-    Runway = "runway"
-    """Indicates the model is associated with Runway video model architecture. This is an external API model."""
     Unknown = "unknown"
     """Indicates the model's base architecture is unknown."""
 
@@ -86,7 +71,6 @@ class ModelType(str, Enum):
     SigLIP = "siglip"
     FluxRedux = "flux_redux"
     LlavaOnevision = "llava_onevision"
-    Video = "video"
     Unknown = "unknown"
 
 
@@ -145,7 +129,6 @@ class ModelFormat(str, Enum):
     BnbQuantizedLlmInt8b = "bnb_quantized_int8b"
     BnbQuantizednf4b = "bnb_quantized_nf4b"
     GGUFQuantized = "gguf_quantized"
-    Api = "api"
     Unknown = "unknown"
 
 

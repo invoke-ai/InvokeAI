@@ -1,4 +1,3 @@
-import { $openAPISchemaUrl } from 'app/store/nanostores/openAPISchemaUrl';
 import type { OpenAPIV3_1 } from 'openapi-types';
 import type { stringify } from 'querystring';
 import type { paths } from 'services/api/schema';
@@ -82,11 +81,7 @@ export const appInfoApi = api.injectEndpoints({
       invalidatesTags: ['InvocationCacheStatus'],
     }),
     getOpenAPISchema: build.query<OpenAPIV3_1.Document, void>({
-      query: () => {
-        const openAPISchemaUrl = $openAPISchemaUrl.get();
-        const url = openAPISchemaUrl ? openAPISchemaUrl : `${window.location.href.replace(/\/$/, '')}/openapi.json`;
-        return url;
-      },
+      query: () => `${window.location.href.replace(/\/$/, '')}/openapi.json`,
       providesTags: ['Schema'],
     }),
   }),

@@ -555,35 +555,6 @@ export const ASPECT_RATIO_MAP: Record<Exclude<AspectRatioID, 'Free'>, { ratio: n
   '9:21': { ratio: 9 / 21, inverseID: '21:9' },
 };
 
-export const zImagen3AspectRatioID = z.enum(['16:9', '4:3', '1:1', '3:4', '9:16']);
-type ImagenAspectRatio = z.infer<typeof zImagen3AspectRatioID>;
-export const isImagenAspectRatioID = (v: unknown): v is ImagenAspectRatio => zImagen3AspectRatioID.safeParse(v).success;
-export const IMAGEN_ASPECT_RATIOS: Record<ImagenAspectRatio, Dimensions> = {
-  '16:9': { width: 1408, height: 768 },
-  '4:3': { width: 1280, height: 896 },
-  '1:1': { width: 1024, height: 1024 },
-  '3:4': { width: 896, height: 1280 },
-  '9:16': { width: 768, height: 1408 },
-};
-
-export const zChatGPT4oAspectRatioID = z.enum(['3:2', '1:1', '2:3']);
-type ChatGPT4oAspectRatio = z.infer<typeof zChatGPT4oAspectRatioID>;
-export const isChatGPT4oAspectRatioID = (v: unknown): v is ChatGPT4oAspectRatio =>
-  zChatGPT4oAspectRatioID.safeParse(v).success;
-export const CHATGPT_ASPECT_RATIOS: Record<ChatGPT4oAspectRatio, Dimensions> = {
-  '3:2': { width: 1536, height: 1024 },
-  '1:1': { width: 1024, height: 1024 },
-  '2:3': { width: 1024, height: 1536 },
-} as const;
-
-export const zGemini2_5AspectRatioID = z.enum(['1:1']);
-type Gemini2_5AspectRatio = z.infer<typeof zGemini2_5AspectRatioID>;
-export const isGemini2_5AspectRatioID = (v: unknown): v is Gemini2_5AspectRatio =>
-  zGemini2_5AspectRatioID.safeParse(v).success;
-export const GEMINI_2_5_ASPECT_RATIOS: Record<Gemini2_5AspectRatio, Dimensions> = {
-  '1:1': { width: 1024, height: 1024 },
-} as const;
-
 export const zFluxKontextAspectRatioID = z.enum(['21:9', '16:9', '4:3', '1:1', '3:4', '9:16', '9:21']);
 type FluxKontextAspectRatio = z.infer<typeof zFluxKontextAspectRatioID>;
 export const isFluxKontextAspectRatioID = (v: unknown): v is z.infer<typeof zFluxKontextAspectRatioID> =>
@@ -598,33 +569,6 @@ export const FLUX_KONTEXT_ASPECT_RATIOS: Record<FluxKontextAspectRatio, Dimensio
   '1:1': { width: 1024, height: 1024 },
 };
 
-export const zVeo3AspectRatioID = z.enum(['16:9']);
-type Veo3AspectRatio = z.infer<typeof zVeo3AspectRatioID>;
-export const isVeo3AspectRatioID = (v: unknown): v is Veo3AspectRatio => zVeo3AspectRatioID.safeParse(v).success;
-
-export const zRunwayAspectRatioID = z.enum(['16:9', '4:3', '1:1', '3:4', '9:16', '21:9']);
-type RunwayAspectRatio = z.infer<typeof zRunwayAspectRatioID>;
-export const isRunwayAspectRatioID = (v: unknown): v is RunwayAspectRatio => zRunwayAspectRatioID.safeParse(v).success;
-
-export const zVideoAspectRatio = z.union([zVeo3AspectRatioID, zRunwayAspectRatioID]);
-export type VideoAspectRatio = z.infer<typeof zVideoAspectRatio>;
-export const isVideoAspectRatio = (v: unknown): v is VideoAspectRatio => zVideoAspectRatio.safeParse(v).success;
-
-export const zVeo3Resolution = z.enum(['720p', '1080p']);
-type Veo3Resolution = z.infer<typeof zVeo3Resolution>;
-export const isVeo3Resolution = (v: unknown): v is Veo3Resolution => zVeo3Resolution.safeParse(v).success;
-export const RESOLUTION_MAP: Record<Veo3Resolution | RunwayResolution, Dimensions> = {
-  '720p': { width: 1280, height: 720 },
-  '1080p': { width: 1920, height: 1080 },
-};
-
-export const zRunwayResolution = z.enum(['720p']);
-type RunwayResolution = z.infer<typeof zRunwayResolution>;
-export const isRunwayResolution = (v: unknown): v is RunwayResolution => zRunwayResolution.safeParse(v).success;
-
-export const zVideoResolution = z.union([zVeo3Resolution, zRunwayResolution]);
-export type VideoResolution = z.infer<typeof zVideoResolution>;
-
 const zAspectRatioConfig = z.object({
   id: zAspectRatioID,
   value: z.number().gt(0),
@@ -637,24 +581,6 @@ export const DEFAULT_ASPECT_RATIO_CONFIG: AspectRatioConfig = {
   value: 1,
   isLocked: false,
 };
-
-const zVeo3DurationID = z.enum(['8']);
-type Veo3Duration = z.infer<typeof zVeo3DurationID>;
-export const isVeo3DurationID = (v: unknown): v is Veo3Duration => zVeo3DurationID.safeParse(v).success;
-export const VEO3_DURATIONS: Record<Veo3Duration, string> = {
-  '8': '8 seconds',
-};
-
-const zRunwayDurationID = z.enum(['5', '10']);
-type RunwayDuration = z.infer<typeof zRunwayDurationID>;
-export const isRunwayDurationID = (v: unknown): v is RunwayDuration => zRunwayDurationID.safeParse(v).success;
-export const RUNWAY_DURATIONS: Record<RunwayDuration, string> = {
-  '5': '5 seconds',
-  '10': '10 seconds',
-};
-
-export const zVideoDuration = z.union([zVeo3DurationID, zRunwayDurationID]);
-export type VideoDuration = z.infer<typeof zVideoDuration>;
 
 const zBboxState = z.object({
   rect: z.object({

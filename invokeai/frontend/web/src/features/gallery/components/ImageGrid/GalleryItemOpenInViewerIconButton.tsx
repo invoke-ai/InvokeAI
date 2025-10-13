@@ -6,26 +6,21 @@ import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsOutBold } from 'react-icons/pi';
-import { type ImageDTO, isImageDTO, type VideoDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
 
 type Props = {
-  itemDTO: ImageDTO | VideoDTO;
+  imageDTO: ImageDTO;
 };
 
-export const GalleryItemOpenInViewerIconButton = memo(({ itemDTO }: Props) => {
+export const GalleryItemOpenInViewerIconButton = memo(({ imageDTO }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
   const onClick = useCallback(() => {
-    if (isImageDTO(itemDTO)) {
-      dispatch(imageToCompareChanged(null));
-      dispatch(itemSelected({ type: 'image', id: itemDTO.image_name }));
-    } else {
-      // dispatch(videoToCompareChanged(null));
-      // dispatch(videoSelected(itemDTO.video_id));
-    }
+    dispatch(imageToCompareChanged(null));
+    dispatch(itemSelected({ type: 'image', id: imageDTO.image_name }));
     navigationApi.focusPanelInActiveTab(VIEWER_PANEL_ID);
-  }, [dispatch, itemDTO]);
+  }, [dispatch, imageDTO]);
 
   return (
     <DndImageIcon

@@ -34,10 +34,8 @@ import type {
   T2IAdapterConfig,
 } from 'features/controlLayers/store/types';
 import {
-  initialChatGPT4oReferenceImage,
   initialControlNet,
   initialFluxKontextReferenceImage,
-  initialGemini2_5ReferenceImage,
   initialIPAdapter,
   initialRegionalGuidanceIPAdapter,
   initialT2IAdapter,
@@ -92,21 +90,8 @@ export const getDefaultRefImageConfig = (
 
   const base = mainModelConfig?.base;
 
-  // For ChatGPT-4o, the ref image model is the model itself.
-  if (base === 'chatgpt-4o') {
-    const config = deepClone(initialChatGPT4oReferenceImage);
-    config.model = zModelIdentifierField.parse(mainModelConfig);
-    return config;
-  }
-
-  if (base === 'flux-kontext' || (base === 'flux' && mainModelConfig?.name?.toLowerCase().includes('kontext'))) {
+  if (base === 'flux' && mainModelConfig?.name?.toLowerCase().includes('kontext')) {
     const config = deepClone(initialFluxKontextReferenceImage);
-    config.model = zModelIdentifierField.parse(mainModelConfig);
-    return config;
-  }
-
-  if (base === 'gemini-2.5') {
-    const config = deepClone(initialGemini2_5ReferenceImage);
     config.model = zModelIdentifierField.parse(mainModelConfig);
     return config;
   }

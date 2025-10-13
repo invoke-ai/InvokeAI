@@ -98,3 +98,12 @@ export const configureLogging = (
 
   ROARR.write = createLogWriter({ styleOutput });
 };
+
+/*
+ * We need to configure logging before anything else happens - useLayoutEffect ensures we set this at the first
+ * possible opportunity.
+ *
+ * Once redux initializes, we will check the user's settings and update the logging config accordingly. See
+ * `useSyncLoggingConfig`.
+ */
+configureLogging(true, 'debug', '*');

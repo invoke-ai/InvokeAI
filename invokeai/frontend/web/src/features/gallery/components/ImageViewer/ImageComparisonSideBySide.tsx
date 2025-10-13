@@ -1,6 +1,4 @@
 import { Flex, Image } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
-import { $crossOrigin } from 'app/store/nanostores/authToken';
 import type { ComparisonProps } from 'features/gallery/components/ImageViewer/common';
 import { ImageComparisonLabel } from 'features/gallery/components/ImageViewer/ImageComparisonLabel';
 import { VerticalResizeHandle } from 'features/ui/components/tabs/ResizeHandle';
@@ -43,8 +41,6 @@ export const ImageComparisonSideBySide = memo(({ firstImage, secondImage }: Comp
 ImageComparisonSideBySide.displayName = 'ImageComparisonSideBySide';
 
 const SideBySideImage = memo(({ imageDTO, type }: { imageDTO: ImageDTO; type: 'first' | 'second' }) => {
-  const crossOrigin = useStore($crossOrigin);
-
   return (
     <Flex position="relative" w="full" h="full" alignItems="center" justifyContent="center">
       <Flex position="absolute" maxW="full" maxH="full" aspectRatio={imageDTO.width / imageDTO.height}>
@@ -56,7 +52,6 @@ const SideBySideImage = memo(({ imageDTO, type }: { imageDTO: ImageDTO; type: 'f
           maxH="full"
           src={imageDTO.image_url}
           fallbackSrc={imageDTO.thumbnail_url}
-          crossOrigin={crossOrigin}
           objectFit="contain"
           borderRadius="base"
         />

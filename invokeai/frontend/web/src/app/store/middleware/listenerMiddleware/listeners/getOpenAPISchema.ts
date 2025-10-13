@@ -13,13 +13,12 @@ const log = logger('system');
 export const addGetOpenAPISchemaListener = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher: appInfoApi.endpoints.getOpenAPISchema.matchFulfilled,
-    effect: (action, { getState }) => {
+    effect: (action) => {
       const schemaJSON = action.payload;
 
       log.debug({ schemaJSON: parseify(schemaJSON) } as JsonObject, 'Received OpenAPI schema');
-      const { nodesAllowlist, nodesDenylist } = getState().config;
 
-      const nodeTemplates = parseSchema(schemaJSON, nodesAllowlist, nodesDenylist);
+      const nodeTemplates = parseSchema(schemaJSON);
 
       log.debug({ nodeTemplates } as JsonObject, `Built ${size(nodeTemplates)} node templates`);
 

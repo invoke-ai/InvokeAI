@@ -1,5 +1,4 @@
 import { Box, Flex, Textarea } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { usePersistedTextAreaSize } from 'common/hooks/usePersistedTextareaSize';
 import {
@@ -8,17 +7,12 @@ import {
   selectPositivePrompt,
   selectPositivePromptHistory,
 } from 'features/controlLayers/store/paramsSlice';
-import { promptGenerationFromImageDndTarget } from 'features/dnd/dnd';
-import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { ShowDynamicPromptsPreviewButton } from 'features/dynamicPrompts/components/ShowDynamicPromptsPreviewButton';
 import { NegativePromptToggleButton } from 'features/parameters/components/Core/NegativePromptToggleButton';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModePrompt';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
-import { PromptExpansionMenu } from 'features/prompt/PromptExpansion/PromptExpansionMenu';
-import { PromptExpansionOverlay } from 'features/prompt/PromptExpansion/PromptExpansionOverlay';
-import { promptExpansionApi } from 'features/prompt/PromptExpansion/state';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
 import {
@@ -26,9 +20,7 @@ import {
   selectStylePresetViewMode,
 } from 'features/stylePresets/store/stylePresetSlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { selectAllowPromptExpansion } from 'features/system/store/configSlice';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import React, { memo, useCallback, useMemo, useRef } from 'react';
+import React, { memo, useCallback, useRef } from 'react';
 import type { HotkeyCallback } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { useClickAway } from 'react-use';
@@ -120,9 +112,6 @@ export const ParamPositivePrompt = memo(() => {
   const viewMode = useAppSelector(selectStylePresetViewMode);
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
   const modelSupportsNegativePrompt = useAppSelector(selectModelSupportsNegativePrompt);
-  const { isPending: isPromptExpansionPending } = useStore(promptExpansionApi.$state);
-  const isPromptExpansionEnabled = useAppSelector(selectAllowPromptExpansion);
-  const activeTab = useAppSelector(selectActiveTab);
 
   const promptHistoryApi = usePromptHistory();
 
@@ -153,7 +142,6 @@ export const ParamPositivePrompt = memo(() => {
     prompt,
     textareaRef: textareaRef,
     onChange: handleChange,
-    isDisabled: isPromptExpansionPending,
   });
 
   // When the user clicks away from the textarea, reset the prompt history state.
@@ -204,8 +192,6 @@ export const ParamPositivePrompt = memo(() => {
     dependencies: [promptHistoryApi.next, isPromptFocused],
   });
 
-  const dndTargetData = useMemo(() => promptGenerationFromImageDndTarget.getData(), []);
-
   return (
     <Box pos="relative">
       <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
@@ -224,17 +210,15 @@ export const ParamPositivePrompt = memo(() => {
             paddingTop={0}
             paddingBottom={3}
             resize="vertical"
-            minH={isPromptExpansionEnabled ? 44 : 32}
-            isDisabled={isPromptExpansionPending}
+            minH={32}
           />
           <PromptOverlayButtonWrapper>
             <Flex flexDir="column" gap={2} justifyContent="flex-start" alignItems="center">
               <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
               <ShowDynamicPromptsPreviewButton />
               <PositivePromptHistoryIconButton />
-              {activeTab !== 'video' && modelSupportsNegativePrompt && <NegativePromptToggleButton />}
+              {modelSupportsNegativePrompt && <NegativePromptToggleButton />}
             </Flex>
-            {isPromptExpansionEnabled && <PromptExpansionMenu />}
           </PromptOverlayButtonWrapper>
           <PromptLabel label="Prompt" />
           {viewMode && (
@@ -244,15 +228,6 @@ export const ParamPositivePrompt = memo(() => {
               label={`${t('parameters.positivePromptPlaceholder')} (${t('stylePresets.preview')})`}
             />
           )}
-          {isPromptExpansionEnabled && (
-            <DndDropTarget
-              dndTarget={promptGenerationFromImageDndTarget}
-              dndTargetData={dndTargetData}
-              label={t('prompt.generateFromImage')}
-              isDisabled={isPromptExpansionPending}
-            />
-          )}
-          <PromptExpansionOverlay />
         </Box>
       </PromptPopover>
     </Box>

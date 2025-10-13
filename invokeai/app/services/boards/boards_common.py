@@ -14,12 +14,10 @@ class BoardDTO(BoardRecord):
     """The number of images in the board."""
     asset_count: int = Field(description="The number of assets in the board.")
     """The number of assets in the board."""
-    video_count: int = Field(description="The number of videos in the board.")
-    """The number of videos in the board."""
 
 
 def board_record_to_dto(
-    board_record: BoardRecord, cover_image_name: Optional[str], image_count: int, asset_count: int, video_count: int
+    board_record: BoardRecord, cover_image_name: Optional[str], image_count: int, asset_count: int
 ) -> BoardDTO:
     """Converts a board record to a board DTO."""
     return BoardDTO(
@@ -27,5 +25,4 @@ def board_record_to_dto(
         cover_image_name=cover_image_name,
         image_count=image_count,
         asset_count=asset_count,
-        video_count=video_count,
     )

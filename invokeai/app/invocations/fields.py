@@ -235,10 +235,6 @@ class ImageField(BaseModel):
     image_name: str = Field(description="The name of the image")
 
 
-class VideoField(BaseModel):
-    """A video primitive field"""
-
-    video_id: str = Field(description="The id of the video")
 
 
 class BoardField(BaseModel):
@@ -549,27 +545,6 @@ def migrate_model_ui_type(ui_type: UIType | str, json_schema_extra: dict[str, An
             ui_model_type = [ModelType.FluxRedux]
         case UIType.LlavaOnevisionModel:
             ui_model_type = [ModelType.LlavaOnevision]
-        case UIType.Imagen3Model:
-            ui_model_base = [BaseModelType.Imagen3]
-            ui_model_type = [ModelType.Main]
-        case UIType.Imagen4Model:
-            ui_model_base = [BaseModelType.Imagen4]
-            ui_model_type = [ModelType.Main]
-        case UIType.ChatGPT4oModel:
-            ui_model_base = [BaseModelType.ChatGPT4o]
-            ui_model_type = [ModelType.Main]
-        case UIType.Gemini2_5Model:
-            ui_model_base = [BaseModelType.Gemini2_5]
-            ui_model_type = [ModelType.Main]
-        case UIType.FluxKontextModel:
-            ui_model_base = [BaseModelType.FluxKontext]
-            ui_model_type = [ModelType.Main]
-        case UIType.Veo3Model:
-            ui_model_base = [BaseModelType.Veo3]
-            ui_model_type = [ModelType.Video]
-        case UIType.RunwayModel:
-            ui_model_base = [BaseModelType.Runway]
-            ui_model_type = [ModelType.Video]
         case _:
             pass
 

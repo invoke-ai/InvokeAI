@@ -6,7 +6,6 @@ import { InformationalPopover } from 'common/components/InformationalPopover/Inf
 import type { GroupStatusMap } from 'common/components/Picker/Picker';
 import { loraAdded, selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
 import { selectBase } from 'features/controlLayers/store/paramsSlice';
-import { API_BASE_MODELS } from 'features/modelManagerV2/models';
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -69,11 +68,8 @@ const LoRASelect = () => {
       return undefined;
     }
 
-    // Determine the group ID for the current base model
-    const groupId = API_BASE_MODELS.includes(currentBaseModel) ? 'api' : currentBaseModel;
-
     // Return a map with only the current base model group enabled
-    return { [groupId]: true } satisfies GroupStatusMap;
+    return { [currentBaseModel]: true } satisfies GroupStatusMap;
   }, [currentBaseModel]);
 
   return (

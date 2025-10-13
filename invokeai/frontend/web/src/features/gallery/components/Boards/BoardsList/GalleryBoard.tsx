@@ -15,7 +15,6 @@ import {
   selectSelectedBoardId,
 } from 'features/gallery/store/gallerySelectors';
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArchiveBold, PiImageSquare } from 'react-icons/pi';
@@ -37,7 +36,6 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const autoAssignBoardOnClick = useAppSelector(selectAutoAssignBoardOnClick);
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
-  const isVideoEnabled = useFeatureStatus('video');
   const onClick = useCallback(() => {
     if (selectedBoardId !== board.board_id) {
       dispatch(boardIdSelected({ boardId: board.board_id }));
@@ -56,7 +54,6 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
     () => ({
       image_count: board.image_count,
       asset_count: board.asset_count,
-      video_count: board.video_count,
     }),
     [board]
   );
@@ -95,8 +92,7 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
               {board.archived && <Icon as={PiArchiveBold} fill="base.300" />}
               <Flex justifyContent="flex-end">
                 <Text variant="subtext">
-                  {board.image_count} | {isVideoEnabled && `${board.video_count} | `}
-                  {board.asset_count}
+                  {board.image_count} | {board.asset_count}
                 </Text>
               </Flex>
             </Flex>

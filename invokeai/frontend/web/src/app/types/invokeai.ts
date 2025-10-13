@@ -60,6 +60,16 @@ const zNumericalParameterConfig = z.object({
 });
 export type NumericalParameterConfig = z.infer<typeof zNumericalParameterConfig>;
 
+const CONSTRAINTS = {
+  initial: 512,
+  sliderMin: 64,
+  sliderMax: 1536,
+  numberInputMin: 64,
+  numberInputMax: 4096,
+  fineStep: 8,
+  coarseStep: 64,
+};
+
 /**
  * Configuration options for the InvokeAI UI.
  * Distinct from system settings which may be changed inside the app.
@@ -143,7 +153,7 @@ export const getDefaultAppConfig = (): AppConfig => ({
   allowPromptExpansion: false,
   allowVideo: false, // used to determine if video is enabled vs upsell
   shouldShowCredits: false,
-  disabledTabs: ['video'], // used to determine if video functionality is visible
+  disabledTabs: [], // used to determine if video functionality is visible
   disabledFeatures: ['lightbox', 'faceRestore', 'batches'] satisfies AppFeature[],
   disabledSDFeatures: ['variation', 'symmetry', 'hires', 'perlinNoise', 'noiseThreshold'] satisfies SDFeature[],
   sd: {

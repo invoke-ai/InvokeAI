@@ -11,7 +11,6 @@ import {
 } from '@invoke-ai/ui-library';
 import AboutModal from 'features/system/components/AboutModal/AboutModal';
 import HotkeysModal from 'features/system/components/HotkeysModal/HotkeysModal';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { discordLink, githubLink } from 'features/system/store/constants';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -33,11 +32,6 @@ const SettingsMenu = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   useGlobalMenuClose(onClose);
 
-  const isBugLinkEnabled = useFeatureStatus('bugLink');
-  const isDiscordLinkEnabled = useFeatureStatus('discordLink');
-  const isGithubLinkEnabled = useFeatureStatus('githubLink');
-  const isAboutModalEnabled = useFeatureStatus('aboutModal');
-
   return (
     <Menu isOpen={isOpen} onOpen={onOpen} onClose={onClose} autoSelect={false}>
       <MenuButton
@@ -55,21 +49,15 @@ const SettingsMenu = () => {
           </MenuGroup>
 
           <MenuGroup title={t('common.communityLabel')}>
-            {isGithubLinkEnabled && (
-              <MenuItem as="a" href={githubLink} target="_blank" icon={<RiGithubFill />}>
-                {t('common.githubLabel')}
-              </MenuItem>
-            )}
-            {isBugLinkEnabled && (
-              <MenuItem as="a" href={`${githubLink}/issues`} target="_blank" icon={<PiBugBeetleBold />}>
-                {t('common.reportBugLabel')}
-              </MenuItem>
-            )}
-            {isDiscordLinkEnabled && (
-              <MenuItem as="a" href={discordLink} target="_blank" icon={<RiDiscordFill />}>
-                {t('common.discordLabel')}
-              </MenuItem>
-            )}
+            <MenuItem as="a" href={githubLink} target="_blank" icon={<RiGithubFill />}>
+              {t('common.githubLabel')}
+            </MenuItem>
+            <MenuItem as="a" href={`${githubLink}/issues`} target="_blank" icon={<PiBugBeetleBold />}>
+              {t('common.reportBugLabel')}
+            </MenuItem>
+            <MenuItem as="a" href={discordLink} target="_blank" icon={<RiDiscordFill />}>
+              {t('common.discordLabel')}
+            </MenuItem>
           </MenuGroup>
 
           <MenuGroup title={t('common.settingsLabel')}>
@@ -85,13 +73,11 @@ const SettingsMenu = () => {
             </SettingsModal>
           </MenuGroup>
           <MenuGroup title={t('accessibility.about')}>
-            {isAboutModalEnabled && (
-              <AboutModal>
-                <MenuItem as="button" icon={<PiInfoBold />}>
-                  {t('accessibility.about')}
-                </MenuItem>
-              </AboutModal>
-            )}
+            <AboutModal>
+              <MenuItem as="button" icon={<PiInfoBold />}>
+                {t('accessibility.about')}
+              </MenuItem>
+            </AboutModal>
           </MenuGroup>
         </MenuList>
       </Portal>

@@ -27,7 +27,6 @@ from invokeai.app.invocations.fields import (
     SD3ConditioningField,
     TensorField,
     UIComponent,
-    VideoField,
 )
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -286,30 +285,6 @@ class ImageCollectionInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> ImageCollectionOutput:
         return ImageCollectionOutput(collection=self.collection)
-
-
-# endregion
-
-# region Video
-
-
-@invocation_output("video_output")
-class VideoOutput(BaseInvocationOutput):
-    """Base class for nodes that output a video"""
-
-    video: VideoField = OutputField(description="The output video")
-    width: int = OutputField(description="The width of the video in pixels")
-    height: int = OutputField(description="The height of the video in pixels")
-    duration_seconds: float = OutputField(description="The duration of the video in seconds")
-
-    @classmethod
-    def build(cls, video_id: str, width: int, height: int, duration_seconds: float) -> "VideoOutput":
-        return cls(
-            video=VideoField(video_id=video_id),
-            width=width,
-            height=height,
-            duration_seconds=duration_seconds,
-        )
 
 
 # endregion

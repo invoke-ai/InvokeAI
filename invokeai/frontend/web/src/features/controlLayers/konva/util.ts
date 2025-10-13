@@ -1,5 +1,4 @@
 import type { Selector, Store } from '@reduxjs/toolkit';
-import { $authToken, $crossOrigin } from 'app/store/nanostores/authToken';
 import { roundDownToMultiple, roundUpToMultiple } from 'common/util/roundDownToMultiple';
 import { clamp } from 'es-toolkit/compat';
 import type {
@@ -364,7 +363,7 @@ export const dataURLToImageData = (dataURL: string, width: number, height: numbe
       reject(e);
     };
 
-    image.crossOrigin = $authToken.get() ? 'use-credentials' : 'anonymous';
+    image.crossOrigin = 'anonymous';
     image.src = dataURL;
   });
 };
@@ -478,23 +477,14 @@ export function getImageDataTransparency(imageData: ImageData): Transparency {
 /**
  * Loads an image from a URL and returns a promise that resolves with the loaded image element.
  * @param src The image source URL
- * @param fetchUrlFirst Whether to fetch the image's URL first, assuming the provided `src` will redirect to a different URL. This addresses an issue where CORS headers are dropped during a redirect.
  * @returns A promise that resolves with the loaded image element
  */
-export async function loadImage(src: string, fetchUrlFirst?: boolean): Promise<HTMLImageElement> {
-  const authToken = $authToken.get();
-  let url = src;
-  if (authToken && fetchUrlFirst) {
-    const response = await fetch(`${src}?url_only=true`, { credentials: 'include' });
-    const data = await response.json();
-    url = data.url;
-  }
-
+export function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const imageElement = new Image();
     imageElement.onload = () => resolve(imageElement);
     imageElement.onerror = (error) => reject(error);
-    imageElement.crossOrigin = $crossOrigin.get();
+    imageElement.crossOrigin = 'anonymous';
     imageElement.src = url;
   });
 }

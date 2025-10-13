@@ -6,13 +6,21 @@ import {
   selectDynamicPromptsCombinatorial,
   selectDynamicPromptsMaxPrompts,
 } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
-import { selectMaxPromptsConfig } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+const CONSTRAINTS = {
+  initial: 100,
+  sliderMin: 1,
+  sliderMax: 1000,
+  numberInputMin: 1,
+  numberInputMax: 10000,
+  fineStep: 1,
+  coarseStep: 10,
+};
+
 const ParamDynamicPromptsMaxPrompts = () => {
   const maxPrompts = useAppSelector(selectDynamicPromptsMaxPrompts);
-  const config = useAppSelector(selectMaxPromptsConfig);
   const combinatorial = useAppSelector(selectDynamicPromptsCombinatorial);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -30,18 +38,18 @@ const ParamDynamicPromptsMaxPrompts = () => {
         <FormLabel>{t('dynamicPrompts.maxPrompts')}</FormLabel>
       </InformationalPopover>
       <CompositeSlider
-        min={config.sliderMin}
-        max={config.sliderMax}
+        min={CONSTRAINTS.sliderMin}
+        max={CONSTRAINTS.sliderMax}
         value={maxPrompts}
-        defaultValue={config.initial}
+        defaultValue={CONSTRAINTS.initial}
         onChange={handleChange}
         marks
       />
       <CompositeNumberInput
-        min={config.numberInputMin}
-        max={config.numberInputMax}
+        min={CONSTRAINTS.numberInputMin}
+        max={CONSTRAINTS.numberInputMax}
         value={maxPrompts}
-        defaultValue={config.initial}
+        defaultValue={CONSTRAINTS.initial}
         onChange={handleChange}
       />
     </FormControl>

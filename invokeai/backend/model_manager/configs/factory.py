@@ -64,15 +64,8 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_SD3_Config,
     Main_Diffusers_SDXL_Config,
     Main_Diffusers_SDXLRefiner_Config,
-    Main_ExternalAPI_ChatGPT4o_Config,
-    Main_ExternalAPI_FluxKontext_Config,
-    Main_ExternalAPI_Gemini2_5_Config,
-    Main_ExternalAPI_Imagen3_Config,
-    Main_ExternalAPI_Imagen4_Config,
     Main_GGUF_FLUX_Config,
     MainModelDefaultSettings,
-    Video_ExternalAPI_Runway_Config,
-    Video_ExternalAPI_Veo3_Config,
 )
 from invokeai.backend.model_manager.configs.siglip import SigLIP_Diffusers_Config
 from invokeai.backend.model_manager.configs.spandrel import Spandrel_Checkpoint_Config
@@ -218,15 +211,6 @@ AnyModelConfig = Annotated[
         Annotated[SigLIP_Diffusers_Config, SigLIP_Diffusers_Config.get_tag()],
         Annotated[FLUXRedux_Checkpoint_Config, FLUXRedux_Checkpoint_Config.get_tag()],
         Annotated[LlavaOnevision_Diffusers_Config, LlavaOnevision_Diffusers_Config.get_tag()],
-        # Main - external API
-        Annotated[Main_ExternalAPI_ChatGPT4o_Config, Main_ExternalAPI_ChatGPT4o_Config.get_tag()],
-        Annotated[Main_ExternalAPI_Gemini2_5_Config, Main_ExternalAPI_Gemini2_5_Config.get_tag()],
-        Annotated[Main_ExternalAPI_Imagen3_Config, Main_ExternalAPI_Imagen3_Config.get_tag()],
-        Annotated[Main_ExternalAPI_Imagen4_Config, Main_ExternalAPI_Imagen4_Config.get_tag()],
-        Annotated[Main_ExternalAPI_FluxKontext_Config, Main_ExternalAPI_FluxKontext_Config.get_tag()],
-        # Video - external API
-        Annotated[Video_ExternalAPI_Veo3_Config, Video_ExternalAPI_Veo3_Config.get_tag()],
-        Annotated[Video_ExternalAPI_Runway_Config, Video_ExternalAPI_Runway_Config.get_tag()],
         # Unknown model (fallback)
         Annotated[Unknown_Config, Unknown_Config.get_tag()],
     ],

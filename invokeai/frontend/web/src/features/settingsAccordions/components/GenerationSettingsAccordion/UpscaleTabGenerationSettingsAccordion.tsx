@@ -4,13 +4,11 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
-import { selectIsApiBaseModel, selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
+import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
-import { API_BASE_MODELS } from 'features/modelManagerV2/models';
 import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
-import { DisabledModelWarning } from 'features/parameters/components/MainModel/DisabledModelWarning';
 import ParamUpscaleCFGScale from 'features/parameters/components/Upscale/ParamUpscaleCFGScale';
 import ParamUpscaleScheduler from 'features/parameters/components/Upscale/ParamUpscaleScheduler';
 import { MainModelPicker } from 'features/settingsAccordions/components/GenerationSettingsAccordion/MainModelPicker';
@@ -30,19 +28,12 @@ export const UpscaleTabGenerationSettingsAccordion = memo(() => {
   const modelConfig = useSelectedModelConfig();
   const isFLUX = useAppSelector(selectIsFLUX);
 
-  const isApiModel = useAppSelector(selectIsApiBaseModel);
-
   const selectBadges = useMemo(
     () =>
       createMemoizedSelector(selectLoRAsSlice, (loras) => {
         const enabledLoRAsCount = loras.loras.filter((l) => l.isEnabled).length;
         const loraTabBadges = enabledLoRAsCount ? [`${enabledLoRAsCount} ${t('models.concepts')}`] : EMPTY_ARRAY;
-        const accordionBadges =
-          modelConfig && API_BASE_MODELS.includes(modelConfig.base)
-            ? [modelConfig.name]
-            : modelConfig
-              ? [modelConfig.name, modelConfig.base]
-              : EMPTY_ARRAY;
+        const accordionBadges = modelConfig ? [modelConfig.name, modelConfig.base] : EMPTY_ARRAY;
         return { loraTabBadges, accordionBadges };
       }),
     [modelConfig, t]
@@ -65,24 +56,21 @@ export const UpscaleTabGenerationSettingsAccordion = memo(() => {
       onToggle={onToggleAccordion}
     >
       <Box px={4} pt={4} data-testid="generation-accordion">
-        <Flex gap={4} flexDir="column" pb={isApiModel ? 4 : 0}>
-          <DisabledModelWarning />
+        <Flex gap={4} flexDir="column" pb={0}>
           <MainModelPicker />
-          {!isApiModel && <LoRASelect />}
-          {!isApiModel && <LoRAList />}
+          <LoRASelect />
+          <LoRAList />
         </Flex>
-        {!isApiModel && (
-          <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
-            <Flex gap={4} flexDir="column" pb={4}>
-              <FormControlGroup formLabelProps={formLabelProps}>
-                <ParamUpscaleScheduler />
-                <ParamSteps />
-                {isFLUX && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}
-                <ParamUpscaleCFGScale />
-              </FormControlGroup>
-            </Flex>
-          </Expander>
-        )}
+        <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
+          <Flex gap={4} flexDir="column" pb={4}>
+            <FormControlGroup formLabelProps={formLabelProps}>
+              <ParamUpscaleScheduler />
+              <ParamSteps />
+              {isFLUX && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}
+              <ParamUpscaleCFGScale />
+            </FormControlGroup>
+          </Flex>
+        </Expander>
       </Box>
     </StandaloneAccordion>
   );
