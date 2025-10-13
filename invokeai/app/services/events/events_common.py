@@ -241,7 +241,6 @@ class QueueItemStatusChangedEvent(QueueItemEventBase):
     batch_status: BatchStatus = Field(description="The status of the batch")
     queue_status: SessionQueueStatus = Field(description="The status of the queue")
     session_id: str = Field(description="The ID of the session (aka graph execution state)")
-    credits: Optional[float] = Field(default=None, description="The total credits used for this queue item")
 
     @classmethod
     def build(
@@ -264,7 +263,6 @@ class QueueItemStatusChangedEvent(QueueItemEventBase):
             completed_at=str(queue_item.completed_at) if queue_item.completed_at else None,
             batch_status=batch_status,
             queue_status=queue_status,
-            credits=queue_item.credits,
         )
 
 

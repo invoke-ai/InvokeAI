@@ -2,7 +2,7 @@ from typing import Optional
 
 from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
@@ -16,7 +16,6 @@ from invokeai.app.services.session_queue.session_queue_common import (
     DeleteAllExceptCurrentResult,
     DeleteByDestinationResult,
     EnqueueBatchResult,
-    FieldIdentifier,
     ItemIdsResult,
     PruneResult,
     RetryItemsResult,
@@ -37,12 +36,6 @@ class SessionQueueAndProcessorStatus(BaseModel):
     processor: SessionProcessorStatus
 
 
-class ValidationRunData(BaseModel):
-    workflow_id: str = Field(description="The id of the workflow being published.")
-    input_fields: list[FieldIdentifier] = Body(description="The input fields for the published workflow")
-    output_fields: list[FieldIdentifier] = Body(description="The output fields for the published workflow")
-
-
 @session_queue_router.post(
     "/{queue_id}/enqueue_batch",
     operation_id="enqueue_batch",
@@ -54,10 +47,6 @@ async def enqueue_batch(
     queue_id: str = Path(description="The queue id to perform this operation on"),
     batch: Batch = Body(description="Batch to process"),
     prepend: bool = Body(default=False, description="Whether or not to prepend this batch in the queue"),
-    validation_run_data: Optional[ValidationRunData] = Body(
-        default=None,
-        description="The validation run data to use for this batch. This is only used if this is a validation run.",
-    ),
 ) -> EnqueueBatchResult:
     """Processes a batch and enqueues the output graphs for execution."""
     try:
