@@ -249,15 +249,6 @@ class SessionQueueItem(BaseModel):
     retried_from_item_id: Optional[int] = Field(
         default=None, description="The item_id of the queue item that this item was retried from"
     )
-    is_api_validation_run: bool = Field(
-        default=False,
-        description="Whether this queue item is an API validation run.",
-    )
-    published_workflow_id: Optional[str] = Field(
-        default=None,
-        description="The ID of the published workflow associated with this queue item",
-    )
-    credits: Optional[float] = Field(default=None, description="The total credits used for this queue item")
     session: GraphExecutionState = Field(description="The fully-populated session to be executed")
     workflow: Optional[WorkflowWithoutID] = Field(
         default=None, description="The workflow associated with this queue item"

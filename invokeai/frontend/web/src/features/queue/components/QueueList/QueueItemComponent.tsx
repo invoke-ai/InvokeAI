@@ -1,5 +1,5 @@
 import type { ChakraProps, CollapseProps, FlexProps } from '@invoke-ai/ui-library';
-import { Badge, ButtonGroup, Collapse, Flex, IconButton, Text } from '@invoke-ai/ui-library';
+import { ButtonGroup, Collapse, Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import QueueStatusBadge from 'features/queue/components/common/QueueStatusBadge';
 import { useDestinationText } from 'features/queue/components/QueueList/useDestinationText';
 import { useOriginText } from 'features/queue/components/QueueList/useOriginText';
@@ -58,7 +58,6 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
 
   const isCanceled = useMemo(() => ['canceled', 'completed', 'failed'].includes(item.status), [item.status]);
   const isFailed = useMemo(() => ['canceled', 'failed'].includes(item.status), [item.status]);
-  const isValidationRun = useMemo(() => item.is_api_validation_run === true, [item.is_api_validation_run]);
   const originText = useOriginText(item.origin);
   const destinationText = useDestinationText(item.destination);
 
@@ -111,10 +110,6 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
                 ))}
             </Flex>
           )}
-        </Flex>
-
-        <Flex alignItems="center" w={COLUMN_WIDTHS.validationRun} flexShrink={0}>
-          {isValidationRun && <Badge>{t('workflows.builder.publishingValidationRun')}</Badge>}
         </Flex>
 
         <Flex alignItems="center" w={COLUMN_WIDTHS.actions} pe={3}>

@@ -19503,12 +19503,6 @@ export type components = {
              * @description The ID of the session (aka graph execution state)
              */
             session_id: string;
-            /**
-             * Credits
-             * @description The total credits used for this queue item
-             * @default null
-             */
-            credits: number | null;
         };
         /**
          * QueueItemsRetriedEvent
@@ -21285,22 +21279,6 @@ export type components = {
              * @description The item_id of the queue item that this item was retried from
              */
             retried_from_item_id?: number | null;
-            /**
-             * Is Api Validation Run
-             * @description Whether this queue item is an API validation run.
-             * @default false
-             */
-            is_api_validation_run?: boolean;
-            /**
-             * Published Workflow Id
-             * @description The ID of the published workflow associated with this queue item
-             */
-            published_workflow_id?: string | null;
-            /**
-             * Credits
-             * @description The total credits used for this queue item
-             */
-            credits?: number | null;
             /** @description The fully-populated session to be executed */
             session: components["schemas"]["GraphExecutionState"];
             /** @description The workflow associated with this queue item */

@@ -118,7 +118,7 @@ const slice = createSlice({
       // When we switch the model, we keep the image the same, but change the other parameters.
 
       if (entity.config.model.base === 'flux' && entity.config.model.name?.toLowerCase().includes('kontext')) {
-        // Switching to flux-kontext ref image
+        // Switching to flux kontext ref image
         entity.config = {
           ...initialFluxKontextReferenceImage,
           image: entity.config.image,

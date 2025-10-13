@@ -86,8 +86,6 @@ export const createMockQueueItem = (overrides: PartialDeep<S['SessionQueueItem']
       completed_at: null,
       field_values: null,
       retried_from_item_id: null,
-      is_api_validation_run: false,
-      published_workflow_id: null,
       session: {
         id: 'test-session',
         graph: {},
