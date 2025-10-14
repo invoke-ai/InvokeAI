@@ -199,6 +199,12 @@ export class CanvasManager extends CanvasModuleBase {
     ];
   };
 
+  invalidateRegionalGuidanceRasterCache = () => {
+    for (const adapter of this.adapters.regionMasks.values()) {
+      adapter.invalidateRasterCache();
+    }
+  };
+
   createAdapter = (entityIdentifier: CanvasEntityIdentifier): CanvasEntityAdapter => {
     if (isRasterLayerEntityIdentifier(entityIdentifier)) {
       const adapter = new CanvasEntityAdapterRasterLayer(entityIdentifier, this);
