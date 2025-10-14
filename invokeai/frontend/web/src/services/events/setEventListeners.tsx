@@ -33,6 +33,10 @@ type SetEventListenersArg = {
 
 const selectModelInstalls = modelsApi.endpoints.listModelInstalls.select();
 
+/**
+ * Sets up event listeners for the socketio client. Some components will set up their own listeners. These are the ones
+ * that have app-wide implications.
+ */
 export const setEventListeners = ({ socket, store, setIsConnected }: SetEventListenersArg) => {
   const { dispatch, getState } = store;
 

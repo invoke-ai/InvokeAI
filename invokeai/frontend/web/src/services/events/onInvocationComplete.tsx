@@ -26,8 +26,18 @@ import type { JsonObject } from 'type-fest';
 
 const log = logger('events');
 
+// These nodes are passthrough nodes. They do not add images to the gallery, so we must skip that handling for them.
 const nodeTypeDenylist = ['load_image', 'image'];
 
+/**
+ * Builds the socket event handler for invocation complete events. Adds output images to the gallery and/or updates
+ * node execution states for the workflow editor.
+ *
+ * @param getState The Redux getState function.
+ * @param dispatch The Redux dispatch function.
+ * @param finishedQueueItemIds A cache of finished queue item IDs to prevent duplicate handling and avoid race
+ * conditions that can happen when a graph finishes very quickly.
+ */
 export const buildOnInvocationComplete = (
   getState: AppGetState,
   dispatch: AppDispatch,
