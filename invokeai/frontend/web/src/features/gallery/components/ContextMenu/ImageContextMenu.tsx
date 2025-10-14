@@ -12,18 +12,6 @@ import { memo, useCallback, useEffect, useRef } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
 /**
- * The context menu is loosely based on https://github.com/lukasbach/chakra-ui-contextmenu.
- *
- * That library creates a component for _every_ instance of a thing that needed a context menu, which caused perf
- * issues. This implementation uses a singleton pattern instead, with a single component that listens for context menu
- * events and opens the menu as needed.
- *
- * Images register themselves with the context menu by mapping their DOM element to their image DTO. When a context
- * menu event is fired, we look up the target element in the map (or its parents) to find the image DTO to show the
- * context menu for.
- */
-
-/**
  * The delay in milliseconds before the context menu opens on long press.
  */
 const LONGPRESS_DELAY_MS = 500;
