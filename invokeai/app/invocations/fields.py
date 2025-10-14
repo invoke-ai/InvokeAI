@@ -235,8 +235,6 @@ class ImageField(BaseModel):
     image_name: str = Field(description="The name of the image")
 
 
-
-
 class BoardField(BaseModel):
     """A board primitive field"""
 
