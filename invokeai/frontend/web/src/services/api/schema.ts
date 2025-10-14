@@ -6827,7 +6827,7 @@ export type components = {
             /**
              * Use Cache
              * @description Whether or not to use the cache
-             * @default true
+             * @default false
              */
             use_cache?: boolean;
             /**
@@ -19475,7 +19475,7 @@ export type components = {
             /**
              * Use Cache
              * @description Whether or not to use the cache
-             * @default true
+             * @default false
              */
             use_cache?: boolean;
             /**
@@ -19522,7 +19522,7 @@ export type components = {
             /**
              * Use Cache
              * @description Whether or not to use the cache
-             * @default true
+             * @default false
              */
             use_cache?: boolean;
             /**
@@ -19563,7 +19563,7 @@ export type components = {
             /**
              * Use Cache
              * @description Whether or not to use the cache
-             * @default true
+             * @default false
              */
             use_cache?: boolean;
             /**
@@ -20641,7 +20641,7 @@ export type components = {
             /**
              * Use Cache
              * @description Whether or not to use the cache
-             * @default true
+             * @default false
              */
             use_cache?: boolean;
             /**
