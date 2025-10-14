@@ -39,6 +39,9 @@ const getHFTokenStatus = async (dispatch: AppDispatch): Promise<S['HFTokenStatus
   }
 };
 
+/**
+ * Handles model install error events by logging the error, displaying appropriate toast notifications.
+ */
 export const buildOnModelInstallError = (getState: AppGetState, dispatch: AppDispatch) => {
   return async (data: S['ModelInstallErrorEvent']) => {
     log.error({ data }, 'Model install error');
