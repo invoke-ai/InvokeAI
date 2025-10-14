@@ -6,8 +6,8 @@ import { InformationalPopover } from 'common/components/InformationalPopover/Inf
 import type { GroupStatusMap } from 'common/components/Picker/Picker';
 import { loraAdded, selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
 import { selectBase } from 'features/controlLayers/store/paramsSlice';
+import { API_BASE_MODELS } from 'features/modelManagerV2/models';
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
-import { API_BASE_MODELS } from 'features/parameters/types/constants';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLoRAModels } from 'services/api/hooks/modelsByType';

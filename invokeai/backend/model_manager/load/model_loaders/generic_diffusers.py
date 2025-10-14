@@ -8,7 +8,8 @@ from typing import Any, Optional
 from diffusers.configuration_utils import ConfigMixin
 from diffusers.models.modeling_utils import ModelMixin
 
-from invokeai.backend.model_manager.config import AnyModelConfig, DiffusersConfigBase, InvalidModelConfigException
+from invokeai.backend.model_manager.configs.base import Diffusers_Config_Base
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import (
@@ -33,7 +34,7 @@ class GenericDiffusersLoader(ModelLoader):
         model_class = self.get_hf_load_class(model_path)
         if submodel_type is not None:
             raise Exception(f"There are no submodels in models of type {model_class}")
-        repo_variant = config.repo_variant if isinstance(config, DiffusersConfigBase) else None
+        repo_variant = config.repo_variant if isinstance(config, Diffusers_Config_Base) else None
         variant = repo_variant.value if repo_variant else None
         try:
             result: AnyModel = model_class.from_pretrained(model_path, torch_dtype=self._torch_dtype, variant=variant)
@@ -56,9 +57,7 @@ class GenericDiffusersLoader(ModelLoader):
                 module, class_name = config[submodel_type.value]
                 result = self._hf_definition_to_type(module=module, class_name=class_name)
             except KeyError as e:
-                raise InvalidModelConfigException(
-                    f'The "{submodel_type}" submodel is not available for this model.'
-                ) from e
+                raise ValueError(f'The "{submodel_type}" submodel is not available for this model.') from e
         else:
             try:
                 config = self._load_diffusers_config(model_path, config_name="config.json")
@@ -67,9 +66,9 @@ class GenericDiffusersLoader(ModelLoader):
                 elif class_name := config.get("architectures"):
                     result = self._hf_definition_to_type(module="transformers", class_name=class_name[0])
                 else:
-                    raise InvalidModelConfigException("Unable to decipher Load Class based on given config.json")
+                    raise RuntimeError("Unable to decipher Load Class based on given config.json")
             except KeyError as e:
-                raise InvalidModelConfigException("An expected config.json file is missing from this model.") from e
+                raise ValueError("An expected config.json file is missing from this model.") from e
         assert result is not None
         return result
 

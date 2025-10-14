@@ -1,12 +1,12 @@
 import { Badge } from '@invoke-ai/ui-library';
+import type { ModelFormat } from 'features/nodes/types/common';
 import { memo } from 'react';
-import type { AnyModelConfig } from 'services/api/types';
 
 type Props = {
-  format: AnyModelConfig['format'];
+  format: ModelFormat;
 };
 
-const FORMAT_NAME_MAP: Record<AnyModelConfig['format'], string> = {
+const FORMAT_NAME_MAP: Record<ModelFormat, string> = {
   diffusers: 'diffusers',
   lycoris: 'lycoris',
   checkpoint: 'checkpoint',
@@ -19,9 +19,12 @@ const FORMAT_NAME_MAP: Record<AnyModelConfig['format'], string> = {
   gguf_quantized: 'gguf',
   api: 'api',
   omi: 'omi',
+  unknown: 'unknown',
+  olive: 'olive',
+  onnx: 'onnx',
 };
 
-const FORMAT_COLOR_MAP: Record<AnyModelConfig['format'], string> = {
+const FORMAT_COLOR_MAP: Record<ModelFormat, string> = {
   diffusers: 'base',
   omi: 'base',
   lycoris: 'base',
@@ -34,6 +37,9 @@ const FORMAT_COLOR_MAP: Record<AnyModelConfig['format'], string> = {
   bnb_quantized_nf4b: 'base',
   gguf_quantized: 'base',
   api: 'base',
+  unknown: 'red',
+  olive: 'base',
+  onnx: 'base',
 };
 
 const ModelFormatBadge = ({ format }: Props) => {

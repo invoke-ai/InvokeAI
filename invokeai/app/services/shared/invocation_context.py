@@ -19,10 +19,8 @@ from invokeai.app.services.model_records.model_records_base import UnknownModelE
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.util.step_callback import diffusion_step_callback
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
-    ModelConfigBase,
-)
+from invokeai.backend.model_manager.configs.base import Config_Base
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
@@ -558,7 +556,7 @@ class ModelsInterface(InvocationContextInterface):
             The absolute path to the model.
         """
 
-        model_path = Path(config_or_path.path) if isinstance(config_or_path, ModelConfigBase) else Path(config_or_path)
+        model_path = Path(config_or_path.path) if isinstance(config_or_path, Config_Base) else Path(config_or_path)
 
         if model_path.is_absolute():
             return model_path.resolve()

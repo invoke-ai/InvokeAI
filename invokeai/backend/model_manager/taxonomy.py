@@ -1,38 +1,70 @@
 from enum import Enum
 from typing import Dict, TypeAlias, Union
 
-import diffusers
 import onnxruntime as ort
 import torch
-from diffusers import ModelMixin
+from diffusers.models.modeling_utils import ModelMixin
+from diffusers.pipelines.pipeline_utils import DiffusionPipeline
+from pydantic import TypeAdapter
 
 from invokeai.backend.raw_model import RawModel
 
 # ModelMixin is the base class for all diffusers and transformers models
 # RawModel is the InvokeAI wrapper class for ip_adapters, loras, textual_inversion and onnx runtime
-AnyModel = Union[
-    ModelMixin, RawModel, torch.nn.Module, Dict[str, torch.Tensor], diffusers.DiffusionPipeline, ort.InferenceSession
+AnyModel: TypeAlias = Union[
+    ModelMixin,
+    RawModel,
+    torch.nn.Module,
+    Dict[str, torch.Tensor],
+    DiffusionPipeline,
+    ort.InferenceSession,
 ]
+"""Type alias for any kind of runtime, in-memory model representation. For example, a torch module or diffusers pipeline."""
 
 
 class BaseModelType(str, Enum):
-    """Base model type."""
+    """An enumeration of base model architectures. For example, Stable Diffusion 1.x, Stable Diffusion 2.x, FLUX, etc.
+
+    Every model config must have a base architecture type.
+
+    Not all models are associated with a base architecture. For example, CLIP models are their own thing, not related
+    to any particular model architecture. To simplify internal APIs and make it easier to work with models, we use a
+    fallback/null value `BaseModelType.Any` for these models, instead of making the model base optional."""
 
     Any = "any"
+    """`Any` is essentially a fallback/null value for models with no base architecture association.
+    For example, CLIP models are not related to Stable Diffusion, FLUX, or any other model arch."""
     StableDiffusion1 = "sd-1"
+    """Indicates the model is associated with the Stable Diffusion 1.x model architecture, including 1.4 and 1.5."""
     StableDiffusion2 = "sd-2"
+    """Indicates the model is associated with the Stable Diffusion 2.x model architecture, including 2.0 and 2.1."""
     StableDiffusion3 = "sd-3"
+    """Indicates the model is associated with the Stable Diffusion 3.5 model architecture."""
     StableDiffusionXL = "sdxl"
+    """Indicates the model is associated with the Stable Diffusion XL model architecture."""
     StableDiffusionXLRefiner = "sdxl-refiner"
+    """Indicates the model is associated with the Stable Diffusion XL Refiner model architecture."""
     Flux = "flux"
+    """Indicates the model is associated with FLUX.1 model architecture, including FLUX Dev, Schnell and Fill."""
     CogView4 = "cogview4"
+    """Indicates the model is associated with CogView 4 model architecture."""
     Imagen3 = "imagen3"
+    """Indicates the model is associated with Google Imagen 3 model architecture. This is an external API model."""
     Imagen4 = "imagen4"
+    """Indicates the model is associated with Google Imagen 4 model architecture. This is an external API model."""
     Gemini2_5 = "gemini-2.5"
+    """Indicates the model is associated with Google Gemini 2.5 Flash Image model architecture. This is an external API model."""
     ChatGPT4o = "chatgpt-4o"
+    """Indicates the model is associated with OpenAI ChatGPT 4o Image model architecture. This is an external API model."""
     FluxKontext = "flux-kontext"
+    """Indicates the model is associated with FLUX Kontext model architecture. This is an external API model; local FLUX
+    Kontext models use the base `Flux`."""
     Veo3 = "veo3"
+    """Indicates the model is associated with Google Veo 3 video model architecture. This is an external API model."""
     Runway = "runway"
+    """Indicates the model is associated with Runway video model architecture. This is an external API model."""
+    Unknown = "unknown"
+    """Indicates the model's base architecture is unknown."""
 
 
 class ModelType(str, Enum):
@@ -55,6 +87,7 @@ class ModelType(str, Enum):
     FluxRedux = "flux_redux"
     LlavaOnevision = "llava_onevision"
     Video = "video"
+    Unknown = "unknown"
 
 
 class SubModelType(str, Enum):
@@ -90,6 +123,12 @@ class ModelVariantType(str, Enum):
     Depth = "depth"
 
 
+class FluxVariantType(str, Enum):
+    Schnell = "schnell"
+    Dev = "dev"
+    DevFill = "dev_fill"
+
+
 class ModelFormat(str, Enum):
     """Storage format of model."""
 
@@ -107,6 +146,7 @@ class ModelFormat(str, Enum):
     BnbQuantizednf4b = "bnb_quantized_nf4b"
     GGUFQuantized = "gguf_quantized"
     Api = "api"
+    Unknown = "unknown"
 
 
 class SchedulerPredictionType(str, Enum):
@@ -146,4 +186,7 @@ class FluxLoRAFormat(str, Enum):
     AIToolkit = "flux.aitoolkit"
 
 
-AnyVariant: TypeAlias = Union[ModelVariantType, ClipVariantType, None]
+AnyVariant: TypeAlias = Union[ModelVariantType, ClipVariantType, FluxVariantType]
+variant_type_adapter = TypeAdapter[ModelVariantType | ClipVariantType | FluxVariantType](
+    ModelVariantType | ClipVariantType | FluxVariantType
+)

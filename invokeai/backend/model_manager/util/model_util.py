@@ -83,14 +83,14 @@ def read_checkpoint_meta(path: Union[str, Path], scan: bool = True) -> Dict[str,
     return checkpoint
 
 
-def lora_token_vector_length(checkpoint: Dict[str, torch.Tensor]) -> Optional[int]:
+def lora_token_vector_length(checkpoint: dict[str | int, torch.Tensor]) -> Optional[int]:
     """
     Given a checkpoint in memory, return the lora token vector length
 
     :param checkpoint: The checkpoint
     """
 
-    def _get_shape_1(key: str, tensor: torch.Tensor, checkpoint: Dict[str, torch.Tensor]) -> Optional[int]:
+    def _get_shape_1(key: str, tensor: torch.Tensor, checkpoint: dict[str | int, torch.Tensor]) -> Optional[int]:
         lora_token_vector_length = None
 
         if "." not in key:
@@ -136,6 +136,8 @@ def lora_token_vector_length(checkpoint: Dict[str, torch.Tensor]) -> Optional[in
     lora_te1_length = None
     lora_te2_length = None
     for key, tensor in checkpoint.items():
+        if isinstance(key, int):
+            continue
         if key.startswith("lora_unet_") and ("_attn2_to_k." in key or "_attn2_to_v." in key):
             lora_token_vector_length = _get_shape_1(key, tensor, checkpoint)
         elif key.startswith("lora_unet_") and (
