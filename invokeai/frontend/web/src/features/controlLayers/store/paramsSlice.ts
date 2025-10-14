@@ -6,7 +6,7 @@ import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
 import { isPlainObject } from 'es-toolkit';
 import { clamp } from 'es-toolkit/compat';
-import type { AspectRatioID, ParamsState, RgbaColor } from 'features/controlLayers/store/types';
+import type { AspectRatioID, InfillMethod, ParamsState, RgbaColor } from 'features/controlLayers/store/types';
 import {
   ASPECT_RATIO_MAP,
   DEFAULT_ASPECT_RATIO_CONFIG,
@@ -219,7 +219,7 @@ const slice = createSlice({
     setRefinerStart: (state, action: PayloadAction<number>) => {
       state.refinerStart = action.payload;
     },
-    setInfillMethod: (state, action: PayloadAction<string>) => {
+    setInfillMethod: (state, action: PayloadAction<InfillMethod>) => {
       state.infillMethod = action.payload;
     },
     setInfillTileSize: (state, action: PayloadAction<number>) => {

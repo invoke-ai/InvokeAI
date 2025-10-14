@@ -562,6 +562,9 @@ const zPositivePromptHistory = z
   .array(zParameterPositivePrompt)
   .transform((arr) => arr.slice(0, MAX_POSITIVE_PROMPT_HISTORY));
 
+export const zInfillMethod = z.enum(['patchmatch', 'lama', 'cv2', 'color', 'tile']);
+export type InfillMethod = z.infer<typeof zInfillMethod>;
+
 export const zParamsState = z.object({
   _version: z.literal(2),
   maskBlur: z.number(),
@@ -569,7 +572,7 @@ export const zParamsState = z.object({
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
   canvasCoherenceMinDenoise: zParameterStrength,
   canvasCoherenceEdgeSize: z.number(),
-  infillMethod: z.string(),
+  infillMethod: zInfillMethod,
   infillTileSize: z.number(),
   infillPatchmatchDownscaleSize: z.number(),
   infillColorValue: zRgbaColor,

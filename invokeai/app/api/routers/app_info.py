@@ -1,7 +1,5 @@
-import typing
 from enum import Enum
 from importlib.metadata import distributions
-from pathlib import Path
 
 import torch
 from fastapi import Body
@@ -9,7 +7,6 @@ from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.invocations.upscale import ESRGAN_MODELS
 from invokeai.app.services.config.config_default import InvokeAIAppConfig, get_config
 from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus
 from invokeai.backend.image_util.infill_methods.patchmatch import PatchMatch
@@ -26,11 +23,6 @@ class LogLevel(int, Enum):
     Critical = logging.CRITICAL
 
 
-class Upscaler(BaseModel):
-    upscaling_method: str = Field(description="Name of upscaling method")
-    upscaling_models: list[str] = Field(description="List of upscaling models for this method")
-
-
 app_router = APIRouter(prefix="/v1/app", tags=["app"])
 
 
@@ -38,15 +30,6 @@ class AppVersion(BaseModel):
     """App Version Response"""
 
     version: str = Field(description="App version")
-
-
-class AppConfig(BaseModel):
-    """App Config Response"""
-
-    infill_methods: list[str] = Field(description="List of available infill methods")
-    upscaling_methods: list[Upscaler] = Field(description="List of upscaling methods")
-    nsfw_methods: list[str] = Field(description="List of NSFW checking methods")
-    watermarking_methods: list[str] = Field(description="List of invisible watermark methods")
 
 
 @app_router.get("/version", operation_id="app_version", status_code=200, response_model=AppVersion)
@@ -69,27 +52,9 @@ async def get_app_deps() -> dict[str, str]:
     return sorted_deps
 
 
-@app_router.get("/config", operation_id="get_config", status_code=200, response_model=AppConfig)
-async def get_config_() -> AppConfig:
-    infill_methods = ["lama", "tile", "cv2", "color"]  # TODO: add mosaic back
-    if PatchMatch.patchmatch_available():
-        infill_methods.append("patchmatch")
-
-    upscaling_models = []
-    for model in typing.get_args(ESRGAN_MODELS):
-        upscaling_models.append(str(Path(model).stem))
-    upscaler = Upscaler(upscaling_method="esrgan", upscaling_models=upscaling_models)
-
-    nsfw_methods = ["nsfw_checker"]
-
-    watermarking_methods = ["invisible_watermark"]
-
-    return AppConfig(
-        infill_methods=infill_methods,
-        upscaling_methods=[upscaler],
-        nsfw_methods=nsfw_methods,
-        watermarking_methods=watermarking_methods,
-    )
+@app_router.get("/patchmatch_status", operation_id="get_patchmatch_status", status_code=200, response_model=bool)
+async def get_patchmatch_status() -> bool:
+    return PatchMatch.patchmatch_available()
 
 
 class InvokeAIAppConfigWithSetFields(BaseModel):

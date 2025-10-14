@@ -43,7 +43,6 @@ export type InvocationJSONSchemaExtra = S['UIConfigBase'];
 
 // App Info
 export type AppVersion = S['AppVersion'];
-export type AppConfig = S['AppConfig'];
 
 const zResourceOrigin = z.enum(['internal', 'external']);
 type ResourceOrigin = z.infer<typeof zResourceOrigin>;
