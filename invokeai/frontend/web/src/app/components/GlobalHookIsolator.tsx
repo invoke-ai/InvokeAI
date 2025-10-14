@@ -1,7 +1,7 @@
 import { useGlobalModifiersInit } from '@invoke-ai/ui-library';
 import { setupListeners } from '@reduxjs/toolkit/query';
+import { useSyncFaviconQueueStatus } from 'app/hooks/useSyncFaviconQueueStatus';
 import { useSyncLangDirection } from 'app/hooks/useSyncLangDirection';
-import { useSyncQueueStatus } from 'app/hooks/useSyncQueueStatus';
 import { useSyncLoggingConfig } from 'app/logging/useSyncLoggingConfig';
 import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -64,7 +64,7 @@ export const GlobalHookIsolator = memo(() => {
   }, [dispatch]);
 
   useStarterModelsToast();
-  useSyncQueueStatus();
+  useSyncFaviconQueueStatus();
   useFocusRegionWatcher();
   useWorkflowBuilderWatcher();
   useDynamicPromptsWatcher();
