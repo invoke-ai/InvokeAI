@@ -14,10 +14,10 @@ import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold, PiCaretUpBold, PiMagnifyingGlassBold } from 'react-icons/pi';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
+import { GalleryImageGrid } from './GalleryImageGrid';
 import { GallerySettingsPopover } from './GallerySettingsPopover/GallerySettingsPopover';
 import { GalleryUploadButton } from './GalleryUploadButton';
 import { GallerySearch } from './ImageGrid/GallerySearch';
-import { ImageGallery } from './NewGallery';
 
 const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0, width: '100%' };
 
@@ -110,7 +110,7 @@ export const GalleryPanel = memo(() => {
       </Collapse>
       <Divider pt={2} />
       <Flex w="full" h="full" pt={2}>
-        <ImageGallery />
+        <GalleryImageGrid />
       </Flex>
     </Flex>
   );
