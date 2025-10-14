@@ -43,24 +43,6 @@ type GridContext = {
 };
 
 /**
- * The gallery uses a windowed list to only render the images that are currently visible in the viewport. It starts by
- * loading a list of all image names for the selected board or view settings. react-virtuoso reports on the currently-
- * visible range of images (plus some "overscan"). We then fetch the full image DTOs only for those images, which are
- * cached by RTK Query. As the user scrolls, the visible range changes and we fetch more image DTOs as needed.
- *
- * This affords a nice UX, where the user can scroll to any part of their gallery. The scrollbar size never changes.
- *
- * We used other approaches in the past:
- * - Infinite scroll: Load an initial chunk of images, then load more as the user scrolls to the bottom. The scrollbar
- * continually shrinks as more images are loaded. This is a poor UX, as the user cannot easily scroll to a specific
- * part of their gallery. It's also pretty complicated to implement within RTK Query, though since we switched, RTK
- * Query now supports infinite queries. It might be easier to do this today.
- * - Traditional pagination: Show a fixed number of images per page, with pagination controls. This is a poor UX,
- * as the user cannot easily scroll to a specific part of their gallery. Gallerys are often very large, and the page
- * size changes depending on the viewport size.
- */
-
-/**
  * Wraps an image - either the placeholder as it is being loaded or the loaded image
  */
 const ImageAtPosition = memo(({ imageName }: { index: number; imageName: string }) => {
