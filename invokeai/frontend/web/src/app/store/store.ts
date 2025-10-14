@@ -4,7 +4,6 @@ import { logger } from 'app/logging/logger';
 import { errorHandler } from 'app/store/enhancers/reduxRemember/errors';
 import { addAdHocPostProcessingRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
 import { addAnyEnqueuedListener } from 'app/store/middleware/listenerMiddleware/listeners/anyEnqueued';
-import { addAppConfigReceivedListener } from 'app/store/middleware/listenerMiddleware/listeners/appConfigReceived';
 import { addAppStartedListener } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
 import { addBatchEnqueuedListener } from 'app/store/middleware/listenerMiddleware/listeners/batchEnqueued';
 import { addDeleteBoardAndImagesFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/boardAndImagesDeleted';
@@ -242,6 +241,7 @@ export type AppStartListening = TypedStartListening<RootState, AppDispatch>;
 
 export const addAppListener = addListener.withTypes<RootState, AppDispatch>();
 
+// To avoid circular dependencies, all listener middleware listeners are added here in the main store setup file.
 const startAppListening = listenerMiddleware.startListening as AppStartListening;
 addImageUploadedFulfilledListener(startAppListening);
 
@@ -273,7 +273,6 @@ addModelSelectedListener(startAppListening);
 // app startup
 addAppStartedListener(startAppListening);
 addModelsLoadedListener(startAppListening);
-addAppConfigReceivedListener(startAppListening);
 
 // Ad-hoc upscale workflwo
 addAdHocPostProcessingRequestedListener(startAppListening);
