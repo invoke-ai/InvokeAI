@@ -333,7 +333,11 @@ class ModelConfigFactory:
             # For directories, do a quick file count check with early exit
             total_files = 0
             # Ignore hidden files and directories
-            paths_to_check = (p for p in path.rglob("*") if not p.name.startswith("."))
+            paths_to_check = (
+                p
+                for p in path.rglob("*")
+                if not p.name.startswith(".") and not any(part.startswith(".") for part in p.parts)
+            )
             for item in paths_to_check:
                 if item.is_file():
                     total_files += 1
