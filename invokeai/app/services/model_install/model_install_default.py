@@ -135,6 +135,8 @@ class ModelInstallService(ModelInstallServiceBase):
             for model in self._scan_for_missing_models():
                 self._logger.warning(f"Missing model file: {model.name} at {model.path}")
 
+            self._write_invoke_managed_models_dir_readme()
+
     def stop(self, invoker: Optional[Invoker] = None) -> None:
         """Stop the installer thread; after this the object can be deleted and garbage collected."""
         if not self._running:
@@ -146,6 +148,14 @@ class ModelInstallService(ModelInstallServiceBase):
         assert self._install_thread is not None
         self._install_thread.join()
         self._running = False
+
+    def _write_invoke_managed_models_dir_readme(self) -> None:
+        """Write a README file to the Invoke-managed models directory warning users to not fiddle with it."""
+        readme_path = self.app_config.models_path / "README.txt"
+        with open(readme_path, "wt", encoding=locale.getpreferredencoding()) as f:
+            f.write(
+                "This directory is managed by Invoke. Do not add, delete or move files in this directory.\n\nTo manage models, use the web interface.\n"
+            )
 
     def _clear_pending_jobs(self) -> None:
         for job in self.list_jobs():
