@@ -13,6 +13,7 @@ import type { AnyModelConfig } from 'services/api/types';
 import { MainModelDefaultSettings } from './MainModelDefaultSettings/MainModelDefaultSettings';
 import { ModelAttrView } from './ModelAttrView';
 import { ModelFooter } from './ModelFooter';
+import { ModelReidentifyButton } from './ModelReidentifyButton';
 import { RelatedModels } from './RelatedModels';
 
 type Props = {
@@ -21,6 +22,7 @@ type Props = {
 
 export const ModelView = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
+
   const withSettings = useMemo(() => {
     if (modelConfig.type === 'main' && modelConfig.base !== 'sdxl-refiner') {
       return true;
@@ -46,6 +48,7 @@ export const ModelView = memo(({ modelConfig }: Props) => {
           <ModelConvertButton modelConfig={modelConfig} />
         )}
         <ModelEditButton />
+        <ModelReidentifyButton modelConfig={modelConfig} />
       </ModelHeader>
       <Divider />
       <Flex flexDir="column" gap={4}>
