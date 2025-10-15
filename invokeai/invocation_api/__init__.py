@@ -75,7 +75,20 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.load.load_base import LoadedModel
+from invokeai.backend.model_manager.taxonomy import (
+    BaseModelType,
+    ClipVariantType,
+    FluxLoRAFormat,
+    FluxVariantType,
+    ModelFormat,
+    ModelSourceType,
+    ModelType,
+    ModelVariantType,
+    SchedulerPredictionType,
+    SubModelType,
+)
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
@@ -184,4 +197,18 @@ __all__ = [
     # invokeai.app.util.misc
     "SEED_MAX",
     "get_random_seed",
+    # invokeai.backend.model_manager.taxonomy
+    "BaseModelType",
+    "ModelType",
+    "ModelSourceType",
+    "ModelFormat",
+    "ModelVariantType",
+    "SchedulerPredictionType",
+    "SubModelType",
+    "ClipVariantType",
+    "FluxLoRAFormat",
+    "FluxVariantType",
+    # invokeai.backend.model_manager.configs.factory
+    "AnyModelConfig",
+    "ModelConfigFactory",
 ]
