@@ -34,6 +34,7 @@ export const GlobalHookIsolator = memo(() => {
   const dispatch = useAppDispatch();
 
   // singleton!
+  useNavigationApi();
   useReadinessWatcher();
   useSocketIO();
   useGlobalModifiersInit();
@@ -41,7 +42,6 @@ export const GlobalHookIsolator = memo(() => {
   useGetOpenAPISchemaQuery();
   useSyncLoggingConfig();
   useCloseChakraTooltipsOnDragFix();
-  useNavigationApi();
   useDndMonitor();
   useSyncNodeErrors();
   useSyncLangDirection();
