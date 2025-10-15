@@ -28,7 +28,7 @@ from invokeai.app.services.model_records import (
     UnknownModelException,
 )
 from invokeai.app.util.suppress_output import SuppressOutput
-from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_SD1_Config,
     Main_Checkpoint_SD2_Config,
@@ -38,6 +38,7 @@ from invokeai.backend.model_manager.configs.main import (
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
 from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.model_manager.starter_models import (
     STARTER_BUNDLES,
@@ -187,6 +188,40 @@ async def get_model_record(
     try:
         config = ApiDependencies.invoker.services.model_manager.store.get_model(key)
         return add_cover_image_to_model_config(config, ApiDependencies)
+    except UnknownModelException as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@model_manager_router.post(
+    "/i/{key}/reidentify",
+    operation_id="reidentify_model",
+    responses={
+        200: {
+            "description": "The model configuration was retrieved successfully",
+            "content": {"application/json": {"example": example_model_config}},
+        },
+        400: {"description": "Bad request"},
+        404: {"description": "The model could not be found"},
+    },
+)
+async def reidentify_model(
+    key: Annotated[str, Path(description="Key of the model to reidentify.")],
+) -> AnyModelConfig:
+    """Attempt to reidentify a model by re-probing its weights file."""
+    try:
+        config = ApiDependencies.invoker.services.model_manager.store.get_model(key)
+        models_path = ApiDependencies.invoker.services.configuration.models_path
+        if pathlib.Path(config.path).is_relative_to(models_path):
+            model_path = pathlib.Path(config.path)
+        else:
+            model_path = models_path / config.path
+        mod = ModelOnDisk(model_path)
+        result = ModelConfigFactory.from_model_on_disk(mod)
+        if result.config is None:
+            raise InvalidModelException("Unable to identify model format")
+        result.config.key = config.key  # retain the same key
+        new_config = ApiDependencies.invoker.services.model_manager.store.replace_model(config.key, result.config)
+        return new_config
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
 

@@ -139,6 +139,18 @@ class ModelRecordServiceBase(ABC):
         pass
 
     @abstractmethod
+    def replace_model(self, key: str, new_config: AnyModelConfig) -> AnyModelConfig:
+        """
+        Replace the model record entirely, returning the new record.
+
+        This is used when we re-identify a model and have a new config object.
+
+        :param key: Unique key for the model to be updated.
+        :param new_config: The new model config to write.
+        """
+        pass
+
+    @abstractmethod
     def get_model(self, key: str) -> AnyModelConfig:
         """
         Retrieve the configuration for the indicated model.

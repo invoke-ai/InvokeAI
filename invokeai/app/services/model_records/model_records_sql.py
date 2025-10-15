@@ -179,6 +179,23 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         return self.get_model(key)
 
+    def replace_model(self, key: str, new_config: AnyModelConfig) -> AnyModelConfig:
+        if key != new_config.key:
+            raise ValueError("key does not match new_config.key")
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                UPDATE models
+                SET
+                    config=?
+                WHERE id=?;
+                """,
+                (new_config.model_dump_json(), key),
+            )
+            if cursor.rowcount == 0:
+                raise UnknownModelException("model not found")
+        return self.get_model(key)
+
     def get_model(self, key: str) -> AnyModelConfig:
         """
         Retrieve the ModelConfigBase instance for the indicated model.
