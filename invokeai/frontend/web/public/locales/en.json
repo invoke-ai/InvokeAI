@@ -2748,9 +2748,8 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "Crop tool for Ref Images",
-            "Improved Model Manager tab UI",
-            "Navigate prompt history with keyboard shortcuts (alt/option + up/down)"
+            "Model Manager: If a model cannot be identified during installation, you can now manually select the model type and architecture.",
+            "Internal: Improved model identification system, making it easier for contributors to add support for new models."
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
