@@ -66,9 +66,13 @@ export const selectActiveCanvasStagingAreaSessionId = (state: RootState) => {
   const session = selectActiveCanvasStagingArea(state);
   return session.canvasSessionId;
 };
+const selectAllQueueItems = createSelector(
+  (state: RootState) => state,
+  (_state: RootState, sessionId: string) => sessionId,
+  (state, sessionId) => queueApi.endpoints.listAllQueueItems.select({ destination: sessionId })(state)
+);
 const selectCanvasQueueItemsBySessionId = createSelector(
-  (state: RootState, sessionId: string) =>
-    queueApi.endpoints.listAllQueueItems.select({ destination: sessionId })(state),
+  selectAllQueueItems,
   (state: RootState, sessionId: string) => selectCanvasStagingAreaBySessionId(state, sessionId),
   ({ data }, session) => {
     if (!data) {
