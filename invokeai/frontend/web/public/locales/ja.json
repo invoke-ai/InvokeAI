@@ -119,7 +119,18 @@
         "clear": "クリア",
         "compactView": "コンパクトビュー",
         "fullView": "フルビュー",
-        "options_withCount_other": "{{count}}個のオプション"
+        "options_withCount_other": "{{count}}個のオプション",
+        "crop": "クロップ",
+        "removeNegativePrompt": "ネガティブプロンプトを削除",
+        "addNegativePrompt": "ネガティブプロンプトを追加",
+        "selectYourModel": "モデルを選択",
+        "goTo": "移動",
+        "imageFailedToLoad": "画像を読み込めません",
+        "localSystem": "ローカルシステム",
+        "notInstalled": "$t(common.installed) ではありません",
+        "prevPage": "前のページ",
+        "nextPage": "次のページ",
+        "resetToDefaults": "デフォルトをリセット"
     },
     "gallery": {
         "galleryImageSize": "画像のサイズ",
@@ -181,7 +192,18 @@
         "assetsTab": "プロジェクトで使用するためにアップロードされたファイル。",
         "imagesTab": "Invoke内で作成および保存された画像。",
         "assets": "アセット",
-        "useForPromptGeneration": "プロンプト生成に使用する"
+        "useForPromptGeneration": "プロンプト生成に使用する",
+        "deleteVideo_other": "{{count}}本の動画を削除",
+        "deleteVideoPermanent": "削除された動画は復元できません。",
+        "jump": "ジャンプ",
+        "noVideoSelected": "動画が選択されていません",
+        "noImagesInGallery": "ディスプレイに画像がありません",
+        "unableToLoad": "ギャラリーを読み込めません",
+        "selectAnImageToCompare": "比較する画像を選択",
+        "openViewer": "ビューアーを開く",
+        "closeViewer": "ビューアーを閉じる",
+        "videos": "動画",
+        "videosTab": "Invokeで作成して保存した動画。"
     },
     "hotkeys": {
         "searchHotkeys": "ホットキーを検索",
@@ -357,6 +379,40 @@
             "toggleNonRasterLayers": {
                 "title": "非ラスターレイヤーの切り替え",
                 "desc": "ラスター以外のレイヤー カテゴリ (コントロール レイヤー、インペイント マスク、地域ガイダンス) を表示または非表示にします。"
+            },
+            "setFillColorsToDefault": {
+                "title": "デフォルトカラーをセット",
+                "desc": "現在のツールの色をデフォルトに設定します。"
+            },
+            "toggleFillColor": {
+                "title": "塗りつぶし色の切り替え",
+                "desc": "現在のツールの塗りつぶし色を切り替えます。"
+            },
+            "invertMask": {
+                "title": "マスクを変換",
+                "desc": "選択したインペイント マスクを反転し、反対の透明度を持つ新しいマスクを作成します。"
+            },
+            "fitBboxToLayers": {
+                "title": "Bboxをレイヤーに合わせる",
+                "desc": "表示レイヤーに合わせて生成境界ボックスを自動的に調整します"
+            },
+            "fitBboxToMasks": {
+                "title": "Bboxをマスクにフィットさせる",
+                "desc": "目に見えるインペイントマスクに合わせて生成境界ボックスを自動的に調整します"
+            },
+            "toggleBbox": {
+                "title": "Bboxの表示/非表示を切り替える",
+                "desc": "生成境界ボックスを非表示または表示する"
+            },
+            "applySegmentAnything": {
+                "title": "何でもセグメント化を適用する",
+                "desc": "現在の「何でもセグメント」マスクを適用します。",
+                "key": "入力"
+            },
+            "cancelSegmentAnything": {
+                "title": "セグメントをキャンセル",
+                "desc": "現在の「何でもセグメント」操作をキャンセルします。",
+                "key": "エスケープ"
             }
         },
         "workflows": {
@@ -451,6 +507,23 @@
             "focusPrompt": {
                 "title": "プロンプトにフォーカス",
                 "desc": "カーソルをポジティブプロンプト欄に移動します。"
+            },
+            "selectVideoTab": {
+                "title": "動画タブを選択",
+                "desc": "ビデオタブを選択。"
+            },
+            "promptHistoryPrev": {
+                "title": "履歴の前のプロンプト",
+                "desc": "プロンプトにフォーカスがある場合は、履歴内の前の（古い）プロンプトに移動します。"
+            },
+            "promptHistoryNext": {
+                "title": "履歴の次のプロンプト",
+                "desc": "プロンプトにフォーカスが当たったら、履歴内の次の（新しい）プロンプトに移動します。"
+            },
+            "selectGenerateTab": {
+                "title": "生成タブを選択",
+                "desc": "生成タブを選択。",
+                "key": "1"
             }
         },
         "hotkeys": "ホットキー",
@@ -499,7 +572,14 @@
             "galleryNavLeft": {
                 "desc": "ギャラリーグリッド内を左に移動し．その画像を選択.行の最初の画像にある場合，前の行に移動.ページの最初の画像にある場合，前のページに移動.",
                 "title": "左へ移動"
+            },
+            "starImage": {
+                "title": "画像にスターを付ける/スターを外す",
+                "desc": "選択した画像にスターを付けたり、スターを外したりします。"
             }
+        },
+        "video": {
+            "title": "動画"
         }
     },
     "modelManager": {
@@ -618,7 +698,7 @@
         "prune": "除去",
         "hfTokenHelperText": "いくつかのモデルにハギングフェイストークンが必要です.ここをクリックしてあなたのトークンを作成してください.",
         "starterBundleHelpText": "メインモデル，コントロールネット，IPアダプターなど，ベースモデルから始めるのに必要なすべてのモデルを簡単にインストールできます.バンドルを選択すると，すでにインストールされているモデルはスキップされます.",
-        "inplaceInstallDesc": "ファイルをコピーせずにモデルをインストールします.このモデルを使ったとき，この場所からロードされます.利用できない場合，モデルファイルはInvoke管理モデルディレクトリにインストールしている間にコピーされます.",
+        "inplaceInstallDesc": "ファイルを移動せずにモデルをインストールします.このモデルを使ったとき、元の場所からロードされます.利用できない場合、モデルファイルはInvoke管理モデルディレクトリにインストールしている間に移動されます。",
         "hfTokenUnableToVerifyErrorMessage": "ハギングフェイストークンを確認できません.ネットワークによるエラーの可能性があります.後ほどトライしてください.",
         "restoreDefaultSettings": "クリックするとモデルのデフォルト設定が使用されます.",
         "hfTokenSaved": "ハギングフェイストークンを保存しました",
@@ -662,8 +742,19 @@
             "recommendedModels": "推奨モデル",
             "exploreStarter": "または、利用可能なすべてのスターターモデルを参照してください",
             "bundleDescription": "各バンドルには各モデルファミリーの必須モデルと、開始するための厳選されたベースモデルが含まれています。",
-            "sdxl": "SDXL"
-        }
+            "sdxl": "SDXL",
+            "quickStart": "クイックスタートバンドル",
+            "browseAll": "または、利用可能なすべてのモデルを参照してください。",
+            "stableDiffusion15": "Stable Diffusion 1.5",
+            "fluxDev": "FLUX.1 dev"
+        },
+        "filterModels": "フィルターモデル",
+        "installBundle": "バンドルをインストール",
+        "installBundleMsg1": "{{bundleName}} バンドルをインストールしてもよろしいですか?",
+        "installBundleMsg2": "このバンドルでは、次の {{count}} モデルがインストールされます:",
+        "ipAdapters": "IPアダプター",
+        "showOnlyRelatedModels": "関連している",
+        "starterModelsInModelManager": "スターターモデルはモデルマネージャーにあります"
     },
     "parameters": {
         "images": "画像",
@@ -724,7 +815,15 @@
             "noT5EncoderModelSelected": "FLUX生成にT5エンコーダモデルが選択されていません",
             "modelDisabledForTrial": "{{modelName}} を使用した生成はトライアルアカウントではご利用いただけません.アカウント設定にアクセスしてアップグレードしてください。",
             "promptExpansionPending": "プロンプト拡張が進行中",
-            "promptExpansionResultPending": "プロンプト拡張結果を受け入れるか破棄してください"
+            "promptExpansionResultPending": "プロンプト拡張結果を受け入れるか破棄してください",
+            "emptyBatches": "空のバッチ",
+            "noStartingFrameImage": "開始フレーム画像がありません",
+            "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)、bboxの幅は{{width}}です",
+            "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)、bboxの高さは{{height}}です",
+            "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)、スケールされたbboxの幅は{{width}}です",
+            "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)、スケールされた bbox の高さは {{height}} です",
+            "incompatibleLoRAs": "互換性のない LoRA が追加されました",
+            "videoIsDisabled": "{{accountType}} アカウントではビデオ生成が有効になっていません。"
         },
         "aspect": "縦横比",
         "lockAspectRatio": "縦横比を固定",
@@ -773,7 +872,19 @@
         "symmetry": "左右対称",
         "seamlessXAxis": "シームレスなX軸",
         "sendToCanvas": "キャンバスに送る",
-        "modelDisabledForTrial": "{{modelName}} を使用した生成はトライアルアカウントではご利用いただけません.アップグレードするには,<LinkComponent>アカウント設定</LinkComponent> にアクセスしてください."
+        "modelDisabledForTrial": "{{modelName}} を使用した生成はトライアルアカウントではご利用いただけません.アップグレードするには,<LinkComponent>アカウント設定</LinkComponent> にアクセスしてください.",
+        "duration": "間隔",
+        "downloadImage": "画像をダウンロード",
+        "images_withCount_other": "画像",
+        "videos_withCount_other": "動画",
+        "startingFrameImage": "フレームをスタート",
+        "startingFrameImageAspectRatioWarning": "画像のアスペクト比が動画のアスペクト比（{{videoAspectRatio}}）と一致していません。そのため、動画生成時に予期せぬ切り取りが発生する可能性があります。",
+        "videoActions": "動画アクション",
+        "sendToVideo": "動画に送信",
+        "showOptionsPanel": "サイドパネルを表示（O または T）",
+        "video": "動画",
+        "useClipSkip": "CLIPスキップを使用する",
+        "resolution": "解像度"
     },
     "settings": {
         "models": "モデル",
@@ -807,7 +918,9 @@
         "intermediatesCleared_other": "{{count}}個の中間物がクリアされました",
         "general": "一般",
         "generation": "生成",
-        "showDetailedInvocationProgress": "進捗状況の詳細を表示"
+        "showDetailedInvocationProgress": "進捗状況の詳細を表示",
+        "modelDescriptionsDisabled": "ドロップダウンのモデル説明が無効になっています",
+        "modelDescriptionsDisabledDesc": "ドロップダウンのモデル説明が無効になっています。設定で有効にしてください。"
     },
     "toast": {
         "uploadFailed": "アップロード失敗",
@@ -838,7 +951,7 @@
         "parametersNotSet": "パラメーターが呼び出されていません",
         "problemCopyingImage": "画像をコピーできません",
         "baseModelChanged": "ベースモデルが変更されました",
-        "baseModelChangedCleared_other": "{{count}} 個の互換性のないサブモデルをクリア，または無効にしました",
+        "baseModelChangedCleared_other": "互換性のないサブモデル {{count}} 個を更新、クリア、または無効化しました",
         "canceled": "処理がキャンセルされました",
         "connected": "サーバーに接続されました",
         "linkCopied": "リンクがコピーされました",
@@ -879,10 +992,32 @@
         "psdExportSuccessDesc": "{{count}} 個のレイヤーを PSD ファイルに正常にエクスポートしました",
         "problemExportingPSD": "PSD のエクスポート中に問題が発生しました",
         "canvasManagerNotAvailable": "キャンバスマネージャーは利用できません",
-        "fluxKontextIncompatibleGenerationMode": "Flux Kontext はテキストから画像への変換のみをサポートしています。画像から画像への変換、インペインティング、アウトペインティングのタスクには他のモデルを使用してください。",
+        "fluxKontextIncompatibleGenerationMode": "FLUX Kontextはキャンバス上に配置された画像からの生成をサポートしていません。参照画像セクションを使用して再試行し、ラスターレイヤーを無効にしてください。",
         "promptGenerationStarted": "プロンプト生成が開始されました",
         "uploadAndPromptGenerationFailed": "画像のアップロードとプロンプトの生成に失敗しました",
-        "promptExpansionFailed": "プロンプト拡張に失敗しました"
+        "promptExpansionFailed": "問題が発生しました。プロンプトの展開をもう一度お試しください。",
+        "imageNotLoadedDesc": "画像を見つけられません",
+        "imageSaved": "画像を保存しました",
+        "imageSavingFailed": "画像の保存に失敗しました",
+        "invalidUpload": "無効なアップロードです",
+        "layerSavedToAssets": "レイヤーがアセットに保存されました",
+        "noRasterLayers": "ラスターレイヤーが見つかりません",
+        "noRasterLayersDesc": "PSDにエクスポートするには、少なくとも1つのラスターレイヤーを作成します",
+        "noActiveRasterLayers": "アクティブなラスターレーヤーがありません",
+        "noActiveRasterLayersDesc": "PSDにエクスポートするには、少なくとも1つのラスターレイヤーを有効にします",
+        "failedToProcessLayers": "レイヤーの処理に失敗しました",
+        "noValidLayerAdapters": "有効なレイヤーアダプタが見つかりません",
+        "setControlImage": "制御画像として設定",
+        "setNodeField": "ノードフィールドとして設定",
+        "uploadFailedInvalidUploadDesc_withCount_other": "最大 {{count}} 個の PNG、JPEG、または WEBP 画像を使用する必要があります。",
+        "maskInverted": "マスク反転",
+        "maskInvertFailed": "マスクの反転に失敗しました",
+        "noVisibleMasks": "マスクが見えません",
+        "noVisibleMasksDesc": "少なくとも1つのインペイントマスクを作成または有効にして反転します",
+        "noInpaintMaskSelected": "インペイントマスクが選択されていません",
+        "noInpaintMaskSelectedDesc": "反転するインペイントマスクを選択",
+        "invalidBbox": "無効な境界ボックス",
+        "invalidBboxDesc": "境界ボックスに有効な寸法がありません"
     },
     "accessibility": {
         "invokeProgressBar": "進捗バー",
@@ -922,14 +1057,23 @@
         "generationMode": "生成モード",
         "vae": "VAE",
         "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)",
-        "canvasV2Metadata": "キャンバス",
+        "canvasV2Metadata": "キャンバス・レイヤー",
         "guidance": "手引き",
         "seamlessXAxis": "シームレスX軸",
         "seamlessYAxis": "シームレスY軸",
         "parameterSet": "パラメーター {{parameter}} が設定されました",
         "noMetaData": "メタデータが見つかりません",
         "noRecallParameters": "呼び出されたパラメーターが見つかりません",
-        "noImageDetails": "画像の詳細が見つかりません"
+        "noImageDetails": "画像の詳細が見つかりません",
+        "clipSkip": "$t(parameters.clipSkip)",
+        "videoDetails": "動画詳細",
+        "noVideoDetails": "動画詳細が見つかりません",
+        "parsingFailed": "解析に失敗しました",
+        "recallParameter": "{{label}} をリコール",
+        "videoModel": "モデル",
+        "videoDuration": "間隔",
+        "videoAspectRatio": "アスペクト比率",
+        "videoResolution": "解像度"
     },
     "queue": {
         "queueEmpty": "キューが空です",
@@ -1005,7 +1149,15 @@
         "retryFailed": "項目のリトライに問題があります",
         "cancelAllExceptCurrentQueueItemAlertDialog": "現在の項目を除くすべてのキュー項目をキャンセルすると、保留中の項目は停止しますが、進行中の項目は完了します。",
         "retrySucceeded": "項目がリトライされました",
-        "credits": "クレジット"
+        "credits": "クレジット",
+        "cancelAllExceptCurrent": "現在選択中のもの以外はすべてキャンセル",
+        "batchFieldValues": "バッチフィールド値",
+        "createdAt": "作成日",
+        "completedAt": "完了日時",
+        "sortColumn": "列の並べ替え",
+        "sortBy": "{{column}}で並べ替え",
+        "sortOrderAscending": "昇順",
+        "sortOrderDescending": "降順"
     },
     "models": {
         "noMatchingModels": "一致するモデルがありません",
@@ -1017,7 +1169,9 @@
         "lora": "LoRA",
         "defaultVAE": "デフォルトVAE",
         "noRefinerModelsInstalled": "インストールされているSDXLリファイナーモデルはありません",
-        "noCompatibleLoRAs": "互換性のあるLoRAはありません"
+        "noCompatibleLoRAs": "互換性のあるLoRAはありません",
+        "noMatchingLoRAs": "一致するLoRAがありません",
+        "noLoRAsInstalled": "LoRAがインストールされていません"
     },
     "nodes": {
         "addNode": "ノードを追加",
@@ -1174,7 +1328,39 @@
         "workflowValidation": "ワークフロー検証エラー",
         "noOutputRecorded": "記録されたアウトプットがありません",
         "nodeOpacity": "ノードの不透明度",
-        "unableToParseFieldType": "フィールドタイプを解析できません"
+        "unableToParseFieldType": "フィールドタイプを解析できません",
+        "generatorLoading": "ローディング",
+        "addLinearView": "リニアビューに追加",
+        "hideLegendNodes": "フィールドタイプの凡例を非表示",
+        "mismatchedVersion": "無効なノード: タイプ {{type}} のノード {{node}} のバージョンが一致しません (更新してみてください)",
+        "noFieldsLinearview": "リニアビューにフィールドが追加されていません",
+        "removeLinearView": "リニアビューから削除",
+        "reorderLinearView": "リニアビューの並べ替え",
+        "showLegendNodes": "フィールドタイプの凡例を表示",
+        "unableToLoadWorkflow": "ワークフローを読み込めません",
+        "unknownTemplate": "不明なテンプレート",
+        "unknownInput": "不明な入力: {{name}}",
+        "loadingTemplates": "{{name}}を読み込んでいます",
+        "versionUnknown": " バージョン不明",
+        "generateValues": "値を生成する",
+        "floatRangeGenerator": "フロート範囲ジェネレータ",
+        "integerRangeGenerator": "整数範囲ジェネレータ",
+        "layout": {
+            "autoLayout": "自動レイアウト",
+            "layeringStrategy": "レイヤリング戦略",
+            "networkSimplex": "ネットワーク・シンプレックス",
+            "longestPath": "最長経路",
+            "nodeSpacing": "ノード間隔",
+            "layerSpacing": "レイヤー間隔",
+            "layoutDirection": "レイアウト方向",
+            "layoutDirectionRight": "右",
+            "layoutDirectionDown": "下",
+            "alignment": "ノードの配置",
+            "alignmentUL": "左上",
+            "alignmentDL": "左下",
+            "alignmentUR": "右上",
+            "alignmentDR": "右下"
+        }
     },
     "boards": {
         "autoAddBoard": "自動追加するボード",
@@ -1213,7 +1399,13 @@
         "deletedPrivateBoardsCannotbeRestored": "削除されたボードと画像は復元できません。「ボードのみ削除」を選択すると、画像は作成者に対して非公開の未分類状態になります。",
         "noBoards": "{{boardType}} ボードがありません",
         "uncategorizedImages": "分類されていない画像",
-        "deleteAllUncategorizedImages": "分類されていないすべての画像を削除"
+        "deleteAllUncategorizedImages": "分類されていないすべての画像を削除",
+        "deletedImagesCannotBeRestored": "削除された画像は復元できません。",
+        "hideBoards": "ボードを隠す",
+        "locateInGalery": "ギャラリーで検索",
+        "movingVideosToBoard_other": "{{count}} 本のビデオをボードに移動しています:",
+        "viewBoards": "ボードを表示",
+        "videosWithCount_other": "{{count}} 本の動画"
     },
     "invocationCache": {
         "invocationCache": "呼び出しキャッシュ",
@@ -1657,6 +1849,20 @@
             "paragraphs": [
                 "FLUX.1 [dev]モデルは、FLUX [dev]非商用ライセンスに基づいてライセンスされています。Invokeでこのモデルタイプを商用目的で使用する場合は、当社のウェブサイトをご覧ください。"
             ]
+        },
+        "tileSize": {
+            "heading": "タイルサイズ",
+            "paragraphs": [
+                "アップスケール処理で使用するタイルのサイズを制御します。タイルのサイズが大きいほどメモリ消費量は多くなりますが、より良い結果が得られる可能性があります。",
+                "SD1.5 モデルのデフォルトは 768 ですが、SDXL モデルのデフォルトは 1024 です。メモリの問題が発生した場合は、タイルのサイズを小さくしてください。"
+            ]
+        },
+        "tileOverlap": {
+            "heading": "タイルオーバーラップ",
+            "paragraphs": [
+                "アップスケーリング時の隣接するタイルの重なり具合を制御します。重なり具合の値を大きくするとタイル間の継ぎ目が見えにくくなりますが、メモリ使用量は増加します。",
+                "デフォルト値の 128 はほとんどの場合に適していますが、特定のニーズやメモリの制約に基づいて調整できます。"
+            ]
         }
     },
     "accordions": {
@@ -1685,7 +1891,9 @@
             "strength": "高解像修復の強度",
             "enabled": "高解像修復が有効"
         },
-        "hrf": "高解像修復"
+        "hrf": "高解像修復",
+        "enableHrf": "高解像度修正を有効にする",
+        "upscaleMethod": "アップスケールメソッド"
     },
     "prompt": {
         "addPromptTrigger": "プロンプトトリガーを追加",
@@ -1696,7 +1904,13 @@
         "uploadImageForPromptGeneration": "プロンプト生成用の画像をアップロードする",
         "expandingPrompt": "プロンプトを展開しています...",
         "replace": "交換する",
-        "discard": "破棄する"
+        "discard": "破棄する",
+        "resultTitle": "プロンプト拡張完了",
+        "resultSubtitle": "拡張プロンプトの処理方法を選択します:",
+        "insert": "挿入",
+        "noPromptHistory": "プロンプト履歴が記録されていません。",
+        "noMatchingPrompts": "履歴にマッチするプロンプトがありません。",
+        "toSwitchBetweenPrompts": "プロンプトを切り替えます。"
     },
     "ui": {
         "tabs": {
@@ -1708,7 +1922,9 @@
             "workflowsTab": "$t(ui.tabs.workflows) $t(common.tab)",
             "modelsTab": "$t(ui.tabs.models) $t(common.tab)",
             "upscaling": "アップスケーリング",
-            "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)"
+            "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)",
+            "generate": "生成",
+            "video": "動画"
         },
         "launchpad": {
             "upscaling": {
@@ -1734,7 +1950,14 @@
                     "title": "アップスケールの準備ができました!",
                     "description": "以下の設定を構成し、「Invoke」ボタンをクリックして画像のアップスケールを開始します。"
                 },
-                "upscaleModel": "アップスケールモデル"
+                "upscaleModel": "アップスケールモデル",
+                "creativityAndStructure": {
+                    "title": "創造性と構造のデフォルト",
+                    "conservative": "保守的",
+                    "balanced": "バランスの取れた",
+                    "creative": "クリエイティブ",
+                    "artistic": "芸術的"
+                }
             },
             "workflowsTitle": "ワークフローを詳しく見てみましょう。",
             "upscalingTitle": "アップスケールして詳細を追加します。",
@@ -1757,7 +1980,45 @@
                     "title": "ファイルからワークフローを読み込む",
                     "description": "既存の設定から開始するためのワークフローをアップロードする"
                 }
+            },
+            "videoTitle": "テキストプロンプトから動画を生成。",
+            "video": {
+                "startingFrameCalloutTitle": "開始フレームを追加",
+                "startingFrameCalloutDesc": "ビデオの開始フレームを制御する画像を追加します。"
+            },
+            "addStartingFrame": {
+                "title": "開始フレームを追加",
+                "description": "ビデオの開始フレームを制御する画像を追加します。"
+            },
+            "createNewWorkflowFromScratch": "新しいワークフローを最初から作成する",
+            "browseAndLoadWorkflows": "既存のワークフローを参照して読み込む",
+            "addStyleRef": {
+                "title": "スタイル参照を追加する",
+                "description": "画像を追加して外観を転送します。"
+            },
+            "editImage": {
+                "title": "画像を編集",
+                "description": "絞り込むために画像を追加します。"
+            },
+            "generateFromText": {
+                "title": "テキストから生成",
+                "description": "プロンプトを入力して呼び出します。"
+            },
+            "useALayoutImage": {
+                "title": "レイアウト画像を使用",
+                "description": "構成を制御するために画像を追加します。"
+            },
+            "generate": {
+                "canvasCalloutTitle": "画像をさらに細かく制御、編集、反復したいですか?",
+                "canvasCalloutLink": "さらなる機能については、Canvas に移動してください。"
             }
+        },
+        "panels": {
+            "launchpad": "ランチパッド",
+            "workflowEditor": "ワークフローエディター",
+            "imageViewer": "ビューアー",
+            "canvas": "キャンバス",
+            "video": "動画"
         }
     },
     "controlLayers": {
@@ -1780,7 +2041,8 @@
             "newInpaintMask": "新規インペイントマスク",
             "copyToClipboard": "クリップボードにコピー",
             "copyCanvasToClipboard": "キャンバスをクリップボードにコピー",
-            "copyBboxToClipboard": "Bボックスをクリップボードにコピー"
+            "copyBboxToClipboard": "Bボックスをクリップボードにコピー",
+            "newResizedControlLayer": "新しくサイズ変更されたコントロールレイヤー"
         },
         "regionalGuidance": "領域ガイダンス",
         "globalReferenceImage": "全域参照画像",
@@ -1848,7 +2110,11 @@
             "isolatedLayerPreview": "分離されたレイヤーのプレビュー",
             "isolatedLayerPreviewDesc": "フィルタリングや変換などの操作を実行するときに、このレイヤーのみを表示するかどうか。",
             "invertBrushSizeScrollDirection": "ブラシサイズのスクロール反転",
-            "pressureSensitivity": "圧力感度"
+            "pressureSensitivity": "圧力感度",
+            "saveAllImagesToGallery": {
+                "label": "ギャラリーに新しい生成を送る",
+                "alert": "キャンバスを経由せず、ギャラリーに新しい生成を送り込む"
+            }
         },
         "filter": {
             "filter": "フィルター",
@@ -2081,9 +2347,9 @@
         "beginEndStepPercentShort": "開始/終了 %",
         "resetCanvasLayers": "キャンバスレイヤーをリセット",
         "resetGenerationSettings": "生成設定をリセット",
-        "controlLayerEmptyState": "<UploadButton>画像をアップロード</UploadButton>、<GalleryButton>ギャラリー</GalleryButton>からこのレイヤーに画像をドラッグ、<PullBboxButton>境界ボックスをこのレイヤーにプル</PullBboxButton>、またはキャンバスに描画して開始します。",
-        "referenceImageEmptyStateWithCanvasOptions": "開始するには、<UploadButton>画像をアップロード</UploadButton>するか、<GalleryButton>ギャラリー</GalleryButton>からこの参照画像に画像をドラッグするか、<PullBboxButton>境界ボックスをこの参照画像にプル</PullBboxButton>します。",
-        "referenceImageEmptyState": "開始するには、<UploadButton>画像をアップロード</UploadButton>するか、<GalleryButton>ギャラリー</GalleryButton>からこの参照画像に画像をドラッグします。",
+        "controlLayerEmptyState": "<UploadButton>画像をアップロード</UploadButton>、ギャラリーからこのレイヤーに画像をドラッグ、<PullBboxButton>境界ボックスをこのレイヤーにプル</PullBboxButton>、またはキャンバスに描画して開始します。",
+        "referenceImageEmptyStateWithCanvasOptions": "開始するには、<UploadButton>画像をアップロード</UploadButton>するか、ギャラリーからこの参照画像に画像をドラッグするか、<PullBboxButton>境界ボックスをこの参照画像に引き込みます</PullBboxButton>。",
+        "referenceImageEmptyState": "開始するには、<UploadButton>画像をアップロード</UploadButton>するか、ギャラリーからこの参照画像に画像をドラッグします。",
         "imageNoise": "画像ノイズ",
         "denoiseLimit": "ノイズ除去制限",
         "warnings": {
@@ -2100,7 +2366,8 @@
             "rgReferenceImagesNotSupported": "選択されたベースモデルでは地域の参照画像はサポートされていません",
             "rgAutoNegativeNotSupported": "選択したベースモデルでは自動否定はサポートされていません",
             "rgNoRegion": "領域が描画されていません",
-            "fluxFillIncompatibleWithControlLoRA": "コントロールLoRAはFLUX Fillと互換性がありません"
+            "fluxFillIncompatibleWithControlLoRA": "コントロールLoRAはFLUX Fillと互換性がありません",
+            "bboxHidden": "境界ボックスは非表示です（Shift+O で切り替えます）"
         },
         "errors": {
             "unableToFindImage": "画像が見つかりません",
@@ -2135,7 +2402,9 @@
             "crosshatch": "クロスハッチ",
             "vertical": "垂直",
             "horizontal": "水平",
-            "diagonal": "対角線"
+            "diagonal": "対角線",
+            "bgFillColor": "背景色",
+            "fgFillColor": "前景色"
         },
         "selectObject": {
             "selectObject": "オブジェクトを選択",
@@ -2151,7 +2420,19 @@
             "process": "プロセス",
             "clickToAdd": "レイヤーをクリックしてポイントを追加します",
             "dragToMove": "ポイントをドラッグして移動します",
-            "clickToRemove": "ポイントをクリックして削除します"
+            "clickToRemove": "ポイントをクリックして削除します",
+            "desc": "対象オブジェクトを1つ選択します。選択が完了したら、<Bold>適用</Bold> をクリックして選択範囲外のすべてを削除するか、選択範囲を新しいレイヤーとして保存します。",
+            "visualModeDesc": "ビジュアル モードでは、ボックスとポイントの入力を使用してオブジェクトを選択します。",
+            "visualMode1": "クリック＆ドラッグして、選択したいオブジェクトの周囲にボックスを描きます。オブジェクトより少し大きいか小さいボックスを描くと、より良い結果が得られる場合があります。",
+            "visualMode2": "クリックして緑の <Bold>include</Bold> ポイントを追加するか、Shift キーを押しながらクリックして赤の <Bold>exclude</Bold> ポイントを追加し、モデルに含める内容と除外する内容を指示します。",
+            "visualMode3": "ポイントは、ボックスの選択を絞り込むために使用することも、独立して使用することもできます。",
+            "promptModeDesc": "プロンプト モードでは、テキスト入力を使用してオブジェクトを選択します。",
+            "promptMode1": "選択するオブジェクトの簡単な説明を入力します。",
+            "promptMode2": "複雑な説明や複数のオブジェクトを避け、簡単な言葉を使用してください。",
+            "model": "モデル",
+            "segmentAnything1": "何でもセグメント1",
+            "segmentAnything2": "何でもセグメント2",
+            "prompt": "プロンプト選択"
         },
         "HUD": {
             "bbox": "Bボックス",
@@ -2174,6 +2455,64 @@
             "saveToGallery": "ギャラリーに保存",
             "showResultsOn": "結果を表示",
             "showResultsOff": "結果を隠す"
+        },
+        "fitBboxToMasks": "Bboxをマスクにフィットさせる",
+        "addAdjustments": "調整を追加",
+        "removeAdjustments": "調整を削除",
+        "adjustments": {
+            "simple": "シンプル",
+            "curves": "曲線",
+            "heading": "調整",
+            "expand": "調整を拡張",
+            "collapse": "折りたたみ調整",
+            "brightness": "輝度",
+            "contrast": "コントラスト",
+            "saturation": "飽和",
+            "temperature": "温度",
+            "tint": "色合い",
+            "sharpness": "シャープネス",
+            "finish": "終了",
+            "reset": "リセット",
+            "master": "マスター"
+        },
+        "deletePrompt": "プロンプトを削除",
+        "addGlobalReferenceImage": "$t(controlLayers.globalReferenceImage) を追加します",
+        "invertMask": "マスクを反転",
+        "referenceImageGlobal": "参考画像（グローバル）",
+        "maxRefImages": "最大参照画像",
+        "useAsReferenceImage": "参照画像として使う",
+        "sendingToCanvas": "キャンバスに生成をステージングする",
+        "sendingToGallery": "生成をギャラリーに送る",
+        "sendToGallery": "ギャラリーに送る",
+        "sendToGalleryDesc": "「Invoke」を押すと固有の画像が生成され、ギャラリーに保存されます。",
+        "newImg2ImgCanvasFromImage": "新しい img2img からの画像",
+        "sendToCanvasDesc": "「Invoke」を押すと、進行中の作業がキャンバス上でステージングされます。",
+        "viewProgressInViewer": "<Btn>画像ビューア</Btn>で進行状況と出力を表示します。",
+        "viewProgressOnCanvas": "<Btn>キャンバス</Btn> で進行状況とステージ出力を表示します。",
+        "globalReferenceImage_withCount_other": "グローバル参照画像",
+        "regionalGuidance_withCount_hidden": "地域ガイダンス（{{count}}件非表示）",
+        "controlLayers_withCount_hidden": "コントロールレイヤー（{{count}} 個非表示）",
+        "rasterLayers_withCount_hidden": "ラスターレイヤー ({{count}} 個非表示)",
+        "globalReferenceImages_withCount_hidden": "グローバル参照画像（{{count}} 枚非表示）",
+        "inpaintMasks_withCount_hidden": "インペイントマスク（{{count}} 個非表示）",
+        "regionalGuidance_withCount_visible": "地域ガイダンス ({{count}})",
+        "controlLayers_withCount_visible": "コントロールレイヤー ({{count}})",
+        "rasterLayers_withCount_visible": "ラスターレイヤー（{{count}}）",
+        "globalReferenceImages_withCount_visible": "グローバル参照画像 ({{count}})",
+        "inpaintMasks_withCount_visible": "インペイントマスク（{{count}}）",
+        "layer_withCount_other": "レイヤー数 ({{count}})",
+        "pastedTo": "{{destination}} に貼り付けました",
+        "stagingOnCanvas": "ステージング画像",
+        "newGallerySession": "新しいギャラリーセッション",
+        "newGallerySessionDesc": "これにより、キャンバスとモデル選択以外のすべての設定がクリアされます。生成された画像はギャラリーに送信されます。",
+        "newCanvasSession": "新しいキャンバスセッション",
+        "newCanvasSessionDesc": "これにより、キャンバスとモデル選択以外のすべての設定がクリアされます。生成はキャンバス上でステージングされます。",
+        "replaceCurrent": "現在のものを置き換える",
+        "uploadOrDragAnImage": "ギャラリーから画像をドラッグするか、<UploadButton>画像をアップロード</UploadButton>します。",
+        "autoSwitch": {
+            "off": "オフ",
+            "switchOnStart": "開始時",
+            "switchOnFinish": "終了時"
         }
     },
     "stylePresets": {
@@ -2241,7 +2580,10 @@
         "missingUpscaleModel": "アップスケールモデルがありません",
         "missingTileControlNetModel": "有効なタイル コントロールネットモデルがインストールされていません",
         "incompatibleBaseModel": "アップスケーリングにサポートされていないメインモデルアーキテクチャです",
-        "incompatibleBaseModelDesc": "アップスケーリングはSD1.5およびSDXLアーキテクチャモデルでのみサポートされています。アップスケーリングを有効にするには、メインモデルを変更してください。"
+        "incompatibleBaseModelDesc": "アップスケーリングはSD1.5およびSDXLアーキテクチャモデルでのみサポートされています。アップスケーリングを有効にするには、メインモデルを変更してください。",
+        "tileControl": "タイルコントロール",
+        "tileSize": "タイルサイズ",
+        "tileOverlap": "タイルオーバーラップ"
     },
     "sdxl": {
         "denoisingStrength": "ノイズ除去強度",
@@ -2255,7 +2597,11 @@
         "refinerSteps": "リファイナーステップ",
         "refinerStart": "リファイナースタート",
         "refinermodel": "リファイナーモデル",
-        "negAestheticScore": "ネガティブ美的スコア"
+        "negAestheticScore": "ネガティブ美的スコア",
+        "concatPromptStyle": "プロンプトとスタイルのリンク",
+        "freePromptStyle": "手動スタイルプロンプト",
+        "negStylePrompt": "ネガティブスタイルのプロンプト",
+        "posStylePrompt": "ポジティブスタイルのプロンプト"
     },
     "modelCache": {
         "clear": "モデルキャッシュを消去",
@@ -2335,7 +2681,12 @@
             "publishingValidationRunInProgress": "公開検証の実行が進行中です。",
             "publishedWorkflowsLocked": "公開済みのワークフローはロックされており、編集または実行できません。このワークフローを編集または実行するには、ワークフローを非公開にするか、コピーを保存してください。",
             "selectingOutputNode": "出力ノードの選択",
-            "selectingOutputNodeDesc": "ノードをクリックして、ワークフローの出力ノードとして選択します。"
+            "selectingOutputNodeDesc": "ノードをクリックして、ワークフローの出力ノードとして選択します。",
+            "removeFromForm": "フォームから削除",
+            "showShuffle": "シャッフルを表示",
+            "shuffle": "シャッフル",
+            "emptyRootPlaceholderViewMode": "このワークフローのフォームの作成を開始するには、[編集] をクリックします。",
+            "workflowBuilderAlphaWarning": "ワークフロービルダーは現在アルファ版です。安定版リリースまでに互換性に影響する変更が発生する可能性があります。"
         },
         "chooseWorkflowFromLibrary": "ライブラリからワークフローを選択",
         "unnamedWorkflow": "名前のないワークフロー",
@@ -2378,7 +2729,19 @@
         "loadFromGraph": "グラフからワークフローをロード",
         "workflowName": "ワークフロー名",
         "loading": "ワークフローをロードしています",
-        "uploadWorkflow": "ファイルからロードする"
+        "uploadWorkflow": "ファイルからロードする",
+        "defaultWorkflows": "デフォルトワークフロー",
+        "userWorkflows": "ユーザーワークフロー",
+        "projectWorkflows": "プロジェクトワークフロー",
+        "allLoaded": "すべてのワークフローが読み込まれました",
+        "filterByTags": "タグでフィルター",
+        "noRecentWorkflows": "最近のワークフローはありません",
+        "openWorkflow": "ワークフローを開く",
+        "problemLoading": "ワークフローの読み込み中に問題が発生しました",
+        "noDescription": "説明なし",
+        "searchWorkflows": "ワークフローを検索",
+        "clearWorkflowSearchFilter": "ワークフロー検索フィルターをクリア",
+        "openLibrary": "ライブラリを開く"
     },
     "system": {
         "logNamespaces": {
@@ -2418,7 +2781,8 @@
         "showDynamicPrompts": "ダイナミックプロンプトを表示する",
         "dynamicPrompts": "ダイナミックプロンプト",
         "loading": "ダイナミックプロンプトを生成...",
-        "maxPrompts": "最大プロンプト"
+        "maxPrompts": "最大プロンプト",
+        "promptsToGenerate": "生成するプロンプト"
     },
     "upsell": {
         "inviteTeammates": "チームメートを招待",
@@ -2437,15 +2801,35 @@
     "whatsNew": {
         "whatsNewInInvoke": "Invokeの新機能",
         "items": [
-            "インペインティング: マスクごとのノイズ レベルとノイズ除去の制限。",
-            "キャンバス: SDXL のアスペクト比がスマートになり、スクロールによるズームが改善されました。"
+            "オブジェクトの選択 v2: ポイントおよびボックス入力またはテキスト プロンプトによるオブジェクト選択が改善されました。",
+            "ラスター レイヤーの調整: レイヤーの明るさ、コントラスト、彩度、曲線などを簡単に調整できます。",
+            "プロンプト履歴: 過去 100 件のプロンプトを確認して、すぐに呼び出すことができます。"
         ],
         "readReleaseNotes": "リリースノートを読む",
-        "watchRecentReleaseVideos": "最近のリリースビデオを見る"
+        "watchRecentReleaseVideos": "最近のリリースビデオを見る",
+        "watchUiUpdatesOverview": "Watch UI アップデートの概要"
     },
     "supportVideos": {
         "supportVideos": "サポートビデオ",
         "gettingStarted": "はじめる",
-        "watch": "ウォッチ"
+        "watch": "ウォッチ",
+        "studioSessionsDesc": "<DiscordLink /> に参加してライブセッションに参加したり、質問したりしてください。セッションは翌週にプレイリストにアップロードされます。",
+        "videos": {
+            "gettingStarted": {
+                "title": "Invokeを使い始める",
+                "description": "最初のイメージの作成から高度なテクニックまで、Invoke を使い始めるために知っておく必要のあるすべての内容を網羅した完全なビデオ シリーズです。"
+            },
+            "studioSessions": {
+                "title": "スタジオセッション",
+                "description": "高度な Invoke 機能、クリエイティブなワークフロー、コミュニティのディスカッションについて詳しく説明するセッションです。"
+            }
+        }
+    },
+    "lora": {
+        "weight": "重み"
+    },
+    "video": {
+        "noVideoSelected": "動画が選択されていません",
+        "selectFromGallery": "ギャラリーから再生するビデオを選択してください"
     }
 }
