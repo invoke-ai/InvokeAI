@@ -197,14 +197,7 @@
         "assets": "Risorse",
         "images": "Immagini",
         "useForPromptGeneration": "Usa per generare il prompt",
-        "deleteVideo_one": "Elimina video",
-        "deleteVideo_many": "Elimina {{count}} video",
-        "deleteVideo_other": "Elimina {{count}} video",
-        "deleteVideoPermanent": "I video eliminati non possono essere ripristinati.",
-        "videos": "Video",
-        "videosTab": "Video creati e salvati in Invoke.",
         "jump": "Salta",
-        "noVideoSelected": "Nessun video selezionato",
         "noImagesInGallery": "Nessuna immagine da visualizzare",
         "unableToLoad": "Impossibile caricare la Galleria",
         "selectAnImageToCompare": "Seleziona un'immagine da confrontare",
@@ -275,10 +268,6 @@
             "selectGenerateTab": {
                 "title": "Seleziona la scheda Genera",
                 "desc": "Seleziona la scheda Genera."
-            },
-            "selectVideoTab": {
-                "title": "Seleziona la scheda Video",
-                "desc": "Seleziona la scheda Video."
             },
             "promptHistoryPrev": {
                 "title": "Prompt precedente nella cronologia",
@@ -579,9 +568,6 @@
                 "desc": "Aggiungi/Rimuovi contrassegno all'immagine selezionata.",
                 "title": "Aggiungi / Rimuovi contrassegno immagine"
             }
-        },
-        "video": {
-            "title": "Video"
         }
     },
     "modelManager": {
@@ -840,7 +826,6 @@
             "promptExpansionResultPending": "Accetta o ignora il risultato dell'espansione del prompt",
             "promptExpansionPending": "Espansione del prompt in corso",
             "noStartingFrameImage": "Nessuna immagine del fotogramma iniziale",
-            "videoIsDisabled": "La generazione di video non è abilitata per gli account {{accountType}}.",
             "incompatibleLoRAs": "Aggiunti LoRA incompatibili",
             "emptyBatches": "lotti vuoti",
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), la larghezza del riquadro è {{width}}",
@@ -880,17 +865,9 @@
         "images_withCount_one": "Immagine",
         "images_withCount_many": "Immagini",
         "images_withCount_other": "Immagini",
-        "videos_withCount_one": "Video",
-        "videos_withCount_many": "Video",
-        "videos_withCount_other": "Video",
-        "startingFrameImage": "Fotogramma iniziale",
-        "videoActions": "Azioni video",
-        "sendToVideo": "Invia al Video",
-        "video": "Video",
         "resolution": "Risoluzione",
         "downloadImage": "Scarica l'immagine",
-        "showOptionsPanel": "Mostra pannello laterale (O o T)",
-        "startingFrameImageAspectRatioWarning": "Le proporzioni dell'immagine non corrispondono alle proporzioni del video ({{videoAspectRatio}}). Ciò potrebbe causare ritagli imprevisti durante la generazione del video."
+        "showOptionsPanel": "Mostra pannello laterale (O o T)"
     },
     "settings": {
         "models": "Modelli",
@@ -1288,12 +1265,6 @@
         "uncategorizedImages": "Immagini non categorizzate",
         "deleteAllUncategorizedImages": "Elimina tutte le immagini non categorizzate",
         "locateInGalery": "Trova nella Galleria",
-        "movingVideosToBoard_one": "Spostamento di {{count}} video sulla bacheca:",
-        "movingVideosToBoard_many": "Spostamento di {{count}} video sulla bacheca:",
-        "movingVideosToBoard_other": "Spostamento di {{count}} video sulla bacheca:",
-        "videosWithCount_one": "{{count}} video",
-        "videosWithCount_many": "{{count}} video",
-        "videosWithCount_other": "{{count}} video",
         "deletedImagesCannotBeRestored": "Le immagini eliminate non possono essere ripristinate.",
         "hideBoards": "Nascondi bacheche",
         "viewBoards": "Visualizza le bacheche"
@@ -1924,12 +1895,6 @@
         "seamlessXAxis": "Asse X senza giunte",
         "seamlessYAxis": "Asse Y senza giunte",
         "vae": "VAE",
-        "videoDetails": "Dettagli video",
-        "noVideoDetails": "Nessun dettaglio video trovato",
-        "videoModel": "Modello",
-        "videoDuration": "Durata",
-        "videoAspectRatio": "Proporzioni",
-        "videoResolution": "Risoluzione",
         "parsingFailed": "Analisi non riuscita",
         "recallParameter": "Richiama {{label}}"
     },
@@ -2623,8 +2588,7 @@
             "upscaling": "Amplia",
             "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)",
             "gallery": "Galleria",
-            "generate": "Genera",
-            "video": "Video"
+            "generate": "Genera"
         },
         "launchpad": {
             "workflowsTitle": "Approfondisci i flussi di lavoro.",
@@ -2702,23 +2666,13 @@
             "generate": {
                 "canvasCalloutTitle": "Vuoi avere più controllo, modificare e affinare le tue immagini?",
                 "canvasCalloutLink": "Per ulteriori funzionalità, vai su Tela."
-            },
-            "videoTitle": "Genera video da prompt testuale.",
-            "addStartingFrame": {
-                "title": "Aggiungi un fotogramma iniziale",
-                "description": "Aggiungi un'immagine per controllare il primo fotogramma del tuo video."
-            },
-            "video": {
-                "startingFrameCalloutTitle": "Aggiungi un fotogramma iniziale",
-                "startingFrameCalloutDesc": "Aggiungi un'immagine per controllare il primo fotogramma del tuo video."
             }
         },
         "panels": {
             "launchpad": "Rampa di lancio",
             "workflowEditor": "Editor del flusso di lavoro",
             "imageViewer": "Visualizzatore",
-            "canvas": "Tela",
-            "video": "Video"
+            "canvas": "Tela"
         }
     },
     "upscaling": {
@@ -2743,12 +2697,6 @@
         "tileControl": "Controllo del riquadro",
         "tileSize": "Dimensione del riquadro",
         "tileOverlap": "Sovrapposizione riquadro"
-    },
-    "upsell": {
-        "inviteTeammates": "Invita collaboratori",
-        "shareAccess": "Condividi l'accesso",
-        "professional": "Professionale",
-        "professionalUpsell": "Disponibile nell'edizione Professional di Invoke. Fai clic qui o visita invoke.com/pricing per ulteriori dettagli."
     },
     "stylePresets": {
         "active": "Attivo",
@@ -2809,8 +2757,7 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "items": [
             "Strumento di ritaglio per immagini di riferimento",
-            "Interfaccia utente migliorata della scheda Gestione modelli",
-            "Esplora la cronologia dei prompt con le scorciatoie da tastiera (alt/opzione + su/giù)"
+            "Interfaccia utente migliorata della scheda Gestione modelli"
         ],
         "watchUiUpdatesOverview": "Guarda la panoramica degli aggiornamenti dell'interfaccia utente"
     },
@@ -2863,9 +2810,5 @@
     },
     "lora": {
         "weight": "Peso"
-    },
-    "video": {
-        "noVideoSelected": "Nessun video selezionato",
-        "selectFromGallery": "Seleziona un video dalla galleria per riprodurlo"
     }
 }

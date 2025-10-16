@@ -1709,12 +1709,6 @@
         "exceedsMaxSizeDetails": "最大放大限制是 {{maxUpscaleDimension}}x{{maxUpscaleDimension}} 像素.请尝试一个较小的图像或减少您的缩放选择.",
         "upscale": "放大"
     },
-    "upsell": {
-        "inviteTeammates": "邀请团队成员",
-        "professional": "专业",
-        "professionalUpsell": "可在 Invoke 的专业版中使用.点击此处或访问 invoke.com/pricing 了解更多详情.",
-        "shareAccess": "共享访问权限"
-    },
     "stylePresets": {
         "positivePrompt": "正向提示词",
         "preview": "预览",
