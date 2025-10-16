@@ -743,7 +743,12 @@
         "unidentifiedModelMessage": "Non siamo riusciti a identificare il tipo, la base e/o il formato del modello installato. Prova a modificare il modello e a selezionare le impostazioni appropriate.",
         "unidentifiedModelMessage2": "Se non vedi le impostazioni corrette o il modello non funziona dopo averle modificate, chiedi aiuto su <DiscordLink /> o crea un problema su <GitHubIssuesLink />.",
         "modelFormat": "Formato del modello",
-        "modelSettingsWarning": "Queste impostazioni indicano a Invoke di che tipo di modello si tratta e come caricarlo. Se Invoke non le ha rilevate correttamente durante l'installazione del modello, o se il modello è classificato come Sconosciuto, potrebbe essere necessario modificarle manualmente."
+        "modelSettingsWarning": "Queste impostazioni indicano a Invoke di che tipo di modello si tratta e come caricarlo. Se Invoke non le ha rilevate correttamente durante l'installazione del modello, o se il modello è classificato come Sconosciuto, potrebbe essere necessario modificarle manualmente.",
+        "reidentify": "Reidentificare",
+        "reidentifyTooltip": "Se un modello non è stato installato correttamente (ad esempio, ha il tipo sbagliato o non funziona), puoi provare a identificarlo nuovamente. Questo reimposterà tutte le impostazioni personalizzate che potresti aver applicato.",
+        "reidentifySuccess": "Modello reidentificato con successo",
+        "reidentifyUnknown": "Impossibile identificare il modello",
+        "reidentifyError": "Errore durante la reidentificazione del modello"
     },
     "parameters": {
         "images": "Immagini",
@@ -2756,8 +2761,8 @@
         "readReleaseNotes": "Leggi le note di rilascio",
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "items": [
-            "Strumento di ritaglio per immagini di riferimento",
-            "Interfaccia utente migliorata della scheda Gestione modelli"
+            "Gestione modelli: se non è possibile identificare un modello durante l'installazione, ora è possibile selezionare manualmente il tipo di modello e l'architettura.",
+            "Interno: sistema di identificazione dei modelli migliorato, che semplifica per i collaboratori l'aggiunta del supporto per nuovi modelli."
         ],
         "watchUiUpdatesOverview": "Guarda la panoramica degli aggiornamenti dell'interfaccia utente"
     },
