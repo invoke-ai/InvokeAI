@@ -2764,8 +2764,7 @@
             "Gestione modelli: se non è possibile identificare un modello durante l'installazione, ora è possibile selezionare manualmente il tipo di modello e l'architettura.",
             "Interno: sistema di identificazione dei modelli migliorato, che semplifica per i collaboratori l'aggiunta del supporto per nuovi modelli."
             "Strumento di ritaglio per immagini di riferimento",
-            "Interfaccia utente migliorata della scheda Gestione modelli",
-            "Esplora la cronologia dei prompt con le scorciatoie da tastiera (alt/opzione + su/giù)"
+            "Interfaccia utente migliorata della scheda Gestione modelli"
         ],
         "watchUiUpdatesOverview": "Guarda la panoramica degli aggiornamenti dell'interfaccia utente"
     },
