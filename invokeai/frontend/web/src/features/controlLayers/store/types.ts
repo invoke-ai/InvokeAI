@@ -1,3 +1,4 @@
+import { zStateWithHistory } from 'app/store/types';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import { zMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
@@ -874,16 +875,6 @@ const zCanvasStagingAreaState = z.object({
 });
 export type CanvasStagingAreaState = z.infer<typeof zCanvasStagingAreaState>;
 
-const zStateWithHistory = <T extends z.ZodTypeAny>(stateSchema: T) =>
-  z.object({
-    past: z.array(stateSchema),
-    present: stateSchema,
-    future: z.array(stateSchema),
-    _latestUnfiltered: stateSchema.optional(),
-    group: z.string().optional(),
-    index: z.number().optional(),
-    limit: z.number().optional(),
-  });
 const zCanvasEntity = z.object({
   selectedEntityIdentifier: zCanvasEntityIdentifer.nullable(),
   bookmarkedEntityIdentifier: zCanvasEntityIdentifer.nullable(),
@@ -916,9 +907,9 @@ const zCanvasState = <T extends z.ZodTypeAny>(canvasInstanceSchema: T) =>
     activeCanvasId: zId,
     canvases: z.record(zId, canvasInstanceSchema),
   });
-export const zCanvasStateWithoutHistory = zCanvasState(zCanvasInstanceStateWithoutHistory);
+const _zCanvasStateWithoutHistory = zCanvasState(zCanvasInstanceStateWithoutHistory);
 export const zCanvasStateWithHistory = zCanvasState(zCanvasInstanceStateWithHistory);
-export type CanvasState = z.infer<typeof zCanvasStateWithoutHistory>;
+export type CanvasState = z.infer<typeof _zCanvasStateWithoutHistory>;
 export type CanvasStateWithHistory = z.infer<typeof zCanvasStateWithHistory>;
 
 export const zCanvasReferenceImageState_OLD = zCanvasEntityBase.extend({

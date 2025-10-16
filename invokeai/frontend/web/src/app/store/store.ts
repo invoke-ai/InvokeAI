@@ -106,12 +106,13 @@ const unserialize: UnserializeFunction = (data, key) => {
     throw new Error(`No persist config for slice "${key}"`);
   }
   const { getInitialState, persistConfig } = sliceConfig;
-  let state;
+
   try {
     const parsedState = JSON.parse(data);
+    const stateToMigrate = persistConfig.deserialize ? persistConfig.deserialize(parsedState) : parsedState;
 
     // Run migrations to bring old state up to date with the current version.
-    const migrated = persistConfig.migrate(parsedState);
+    const migrated = persistConfig.migrate(stateToMigrate);
 
     log.debug(
       {
@@ -121,16 +122,17 @@ const unserialize: UnserializeFunction = (data, key) => {
       },
       `Rehydrated slice "${key}"`
     );
-    state = migrated;
+
+    return migrated;
   } catch (err) {
     log.warn(
       { error: serializeError(err as Error) },
       `Error rehydrating slice "${key}", falling back to default initial state`
     );
-    state = getInitialState();
-  }
+    const initialState = getInitialState();
 
-  return persistConfig.deserialize ? persistConfig.deserialize(state) : state;
+    return persistConfig.deserialize ? persistConfig.deserialize(initialState) : initialState;
+  }
 };
 
 const serialize: SerializeFunction = (data, key) => {

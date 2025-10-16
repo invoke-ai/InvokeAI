@@ -101,7 +101,6 @@ import {
   isRegionalGuidanceFLUXReduxConfig,
   isRegionalGuidanceIPAdapterConfig,
   zCanvasStateWithHistory,
-  zCanvasStateWithoutHistory,
 } from './types';
 import {
   converters,
@@ -2102,7 +2101,7 @@ export const canvasSliceConfig: SliceConfig<typeof canvasSlice, CanvasStateWithH
           },
         };
       }
-      return zCanvasStateWithoutHistory.parse(state);
+      return zCanvasStateWithHistory.parse(state);
     },
     serialize: (state) => {
       return {

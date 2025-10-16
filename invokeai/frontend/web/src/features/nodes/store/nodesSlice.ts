@@ -19,7 +19,7 @@ import {
   removeElement,
   reparentElement,
 } from 'features/nodes/components/sidePanel/builder/form-manipulation';
-import { type NodesState, zNodesState } from 'features/nodes/store/types';
+import { type NodesState, zNodesState, zNodesStateWithHistory } from 'features/nodes/store/types';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
   BoardFieldValue,
@@ -85,12 +85,12 @@ import {
 } from 'features/nodes/types/workflow';
 import { atom, computed } from 'nanostores';
 import type { MouseEvent } from 'react';
-import type { StateWithHistory, UndoableOptions } from 'redux-undo';
+import type { UndoableOptions } from 'redux-undo';
 import undoable, { newHistory } from 'redux-undo';
 import { assert } from 'tsafe';
 import type { z } from 'zod';
 
-import type { PendingConnection, Templates } from './types';
+import type { NodesStateWithHistory, PendingConnection, Templates } from './types';
 
 export const getInitialWorkflow = (): Omit<NodesState, 'mode' | 'formFieldInitialValues' | '_version'> => {
   return {
@@ -807,7 +807,7 @@ const reduxUndoOptions: UndoableOptions<NodesState, UnknownAction> = {
 
 export const undoableNodesSliceReducer = undoable(slice.reducer, reduxUndoOptions);
 
-export const nodesSliceConfig: SliceConfig<typeof slice, StateWithHistory<NodesState>, NodesState> = {
+export const nodesSliceConfig: SliceConfig<typeof slice, NodesStateWithHistory, NodesState> = {
   slice,
   schema: zNodesState,
   getInitialState,
@@ -817,7 +817,7 @@ export const nodesSliceConfig: SliceConfig<typeof slice, StateWithHistory<NodesS
       if (!('_version' in state)) {
         state._version = 1;
       }
-      return zNodesState.parse(state);
+      return zNodesStateWithHistory.parse(state);
     },
     serialize: (state) => state.present,
     deserialize: (state) => {

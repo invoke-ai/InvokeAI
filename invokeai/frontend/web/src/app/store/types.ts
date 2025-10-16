@@ -1,5 +1,6 @@
 import type { Slice } from '@reduxjs/toolkit';
 import type { ZodType } from 'zod';
+import { z } from 'zod';
 
 type StateFromSlice<T extends Slice> = T extends Slice<infer U> ? U : never;
 export type SerializedStateFromDenyList<S, T extends readonly (keyof S)[]> = Omit<S, T[number]>;
@@ -28,7 +29,7 @@ export type SliceConfig<T extends Slice, TInternalState = StateFromSlice<T>, TSe
      * @param state The rehydrated state.
      * @returns A correctly-shaped state.
      */
-    migrate: (state: unknown) => TSerializedState;
+    migrate: (state: unknown) => TInternalState;
     /**
      * Serializes the state
      *
@@ -45,3 +46,14 @@ export type SliceConfig<T extends Slice, TInternalState = StateFromSlice<T>, TSe
     deserialize?: (state: unknown) => TInternalState;
   };
 };
+
+export const zStateWithHistory = <T extends z.ZodTypeAny>(stateSchema: T) =>
+  z.object({
+    past: z.array(stateSchema),
+    present: stateSchema,
+    future: z.array(stateSchema),
+    _latestUnfiltered: stateSchema.optional(),
+    group: z.unknown().optional(),
+    index: z.number().optional(),
+    limit: z.number().optional(),
+  });
