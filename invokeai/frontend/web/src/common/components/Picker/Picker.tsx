@@ -15,6 +15,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { typedMemo } from 'common/util/typedMemo';
+import { selectActiveCanvasId, selectActiveTab } from 'features/controlLayers/store/selectors';
 import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import { selectPickerCompactViewStates } from 'features/ui/store/uiSelectors';
 import { pickerCompactViewStateChanged } from 'features/ui/store/uiSlice';
@@ -893,7 +894,10 @@ GroupToggleButtons.displayName = 'GroupToggleButtons';
 const CompactViewToggleButton = typedMemo(<T extends object>() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const { isCompactView, pickerId } = usePickerContext<T>();
+  const { isCompactView, pickerId: id } = usePickerContext<T>();
+  const activeTab = useAppSelector(selectActiveTab);
+  const activeCanvasId = useAppSelector(selectActiveCanvasId);
+  const pickerId = activeTab === 'canvas' ? `${activeCanvasId}-${id}` : `${activeTab}-${id}`;
 
   const onClick = useCallback(() => {
     if (pickerId) {

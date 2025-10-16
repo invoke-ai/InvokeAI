@@ -79,7 +79,7 @@ export const AdvancedSettingsAccordion = memo(() => {
   const badges = useAppSelector(selectBadges);
   const { t } = useTranslation();
   const { isOpen, onToggle } = useStandaloneAccordionToggle({
-    id: `'advanced-settings-generate`,
+    id: 'advanced-settings-generate',
     defaultIsOpen: false,
   });
 

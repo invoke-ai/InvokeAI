@@ -69,7 +69,7 @@ export const UpscaleTabAdvancedSettingsAccordion = memo(() => {
   const badges = useAppSelector(selectBadges);
   const { t } = useTranslation();
   const { isOpen, onToggle } = useStandaloneAccordionToggle({
-    id: `'advanced-settings-upscaling`,
+    id: 'advanced-settings-upscaling',
     defaultIsOpen: false,
   });
 

@@ -19,7 +19,7 @@ export const getInitialTabInstanceParamsState = (): TabInstanceParamsState => ({
 });
 
 const getInitialTabState = (): TabState => ({
-  activeTab: 'generate' as const,
+  activeTab: 'canvas' as const,
   generate: getInitialTabInstanceParamsState(),
   upscaling: getInitialTabInstanceParamsState(),
   video: getInitialTabInstanceParamsState(),

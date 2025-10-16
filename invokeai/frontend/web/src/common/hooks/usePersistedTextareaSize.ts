@@ -1,5 +1,6 @@
-import { useAppStore } from 'app/store/storeHooks';
+import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { debounce } from 'es-toolkit/compat';
+import { selectActiveCanvasId, selectActiveTab } from 'features/controlLayers/store/selectors';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import { selectUiSlice, textAreaSizesStateChanged } from 'features/ui/store/uiSlice';
 import { type RefObject, useCallback, useEffect, useMemo } from 'react';
@@ -22,12 +23,15 @@ type Options = {
  */
 export const usePersistedTextAreaSize = (id: string, ref: RefObject<HTMLTextAreaElement>, options: Options) => {
   const { dispatch, getState } = useAppStore();
+  const activeTab = useAppSelector(selectActiveTab);
+  const activeCanvasId = useAppSelector(selectActiveCanvasId);
+  const textAreaSizesId = activeTab === 'canvas' ? `${activeCanvasId}-${id}` : `${activeTab}-${id}`;
 
   const onResize = useCallback(
     (size: Partial<Dimensions>) => {
-      dispatch(textAreaSizesStateChanged({ id, size }));
+      dispatch(textAreaSizesStateChanged({ id: textAreaSizesId, size }));
     },
-    [dispatch, id]
+    [dispatch, textAreaSizesId]
   );
 
   const debouncedOnResize = useMemo(() => debounce(onResize, 300), [onResize]);
