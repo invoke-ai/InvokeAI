@@ -194,11 +194,17 @@
         "assets": "アセット",
         "useForPromptGeneration": "プロンプト生成に使用する",
         "jump": "ジャンプ",
+        "deleteVideo_other": "{{count}}本の動画を削除",
+        "deleteVideoPermanent": "削除された動画は復元できません。",
+        "jump": "ジャンプ",
+        "noVideoSelected": "動画が選択されていません",
         "noImagesInGallery": "ディスプレイに画像がありません",
         "unableToLoad": "ギャラリーを読み込めません",
         "selectAnImageToCompare": "比較する画像を選択",
         "openViewer": "ビューアーを開く",
-        "closeViewer": "ビューアーを閉じる"
+        "closeViewer": "ビューアーを閉じる",
+        "videos": "動画",
+        "videosTab": "Invokeで作成して保存した動画。"
     },
     "hotkeys": {
         "searchHotkeys": "ホットキーを検索",
@@ -503,6 +509,10 @@
                 "title": "プロンプトにフォーカス",
                 "desc": "カーソルをポジティブプロンプト欄に移動します。"
             },
+            "selectVideoTab": {
+                "title": "動画タブを選択",
+                "desc": "ビデオタブを選択。"
+            },
             "promptHistoryPrev": {
                 "title": "履歴の前のプロンプト",
                 "desc": "プロンプトにフォーカスがある場合は、履歴内の前の（古い）プロンプトに移動します。"
@@ -568,6 +578,9 @@
                 "title": "画像にスターを付ける/スターを外す",
                 "desc": "選択した画像にスターを付けたり、スターを外したりします。"
             }
+        },
+        "video": {
+            "title": "動画"
         }
     },
     "modelManager": {
@@ -810,7 +823,8 @@
             "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)、bboxの高さは{{height}}です",
             "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)、スケールされたbboxの幅は{{width}}です",
             "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)、スケールされた bbox の高さは {{height}} です",
-            "incompatibleLoRAs": "互換性のない LoRA が追加されました"
+            "incompatibleLoRAs": "互換性のない LoRA が追加されました",
+            "videoIsDisabled": "{{accountType}} アカウントではビデオ生成が有効になっていません。"
         },
         "aspect": "縦横比",
         "lockAspectRatio": "縦横比を固定",
@@ -864,6 +878,13 @@
         "downloadImage": "画像をダウンロード",
         "images_withCount_other": "画像",
         "showOptionsPanel": "サイドパネルを表示（O または T）",
+        "videos_withCount_other": "動画",
+        "startingFrameImage": "フレームをスタート",
+        "startingFrameImageAspectRatioWarning": "画像のアスペクト比が動画のアスペクト比（{{videoAspectRatio}}）と一致していません。そのため、動画生成時に予期せぬ切り取りが発生する可能性があります。",
+        "videoActions": "動画アクション",
+        "sendToVideo": "動画に送信",
+        "showOptionsPanel": "サイドパネルを表示（O または T）",
+        "video": "動画",
         "useClipSkip": "CLIPスキップを使用する",
         "resolution": "解像度"
     },
@@ -1048,7 +1069,15 @@
         "noImageDetails": "画像の詳細が見つかりません",
         "clipSkip": "$t(parameters.clipSkip)",
         "parsingFailed": "解析に失敗しました",
-        "recallParameter": "{{label}} をリコール"
+        "recallParameter": "{{label}} をリコール",
+        "videoDetails": "動画詳細",
+        "noVideoDetails": "動画詳細が見つかりません",
+        "parsingFailed": "解析に失敗しました",
+        "recallParameter": "{{label}} をリコール",
+        "videoModel": "モデル",
+        "videoDuration": "間隔",
+        "videoAspectRatio": "アスペクト比率",
+        "videoResolution": "解像度"
     },
     "queue": {
         "queueEmpty": "キューが空です",
@@ -1378,7 +1407,10 @@
         "deletedImagesCannotBeRestored": "削除された画像は復元できません。",
         "hideBoards": "ボードを隠す",
         "locateInGalery": "ギャラリーで検索",
-        "viewBoards": "ボードを表示"
+        "viewBoards": "ボードを表示",
+        "movingVideosToBoard_other": "{{count}} 本のビデオをボードに移動しています:",
+        "viewBoards": "ボードを表示",
+        "videosWithCount_other": "{{count}} 本の動画"
     },
     "invocationCache": {
         "invocationCache": "呼び出しキャッシュ",
@@ -1896,7 +1928,8 @@
             "modelsTab": "$t(ui.tabs.models) $t(common.tab)",
             "upscaling": "アップスケーリング",
             "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)",
-            "generate": "生成"
+            "generate": "生成",
+            "video": "動画"
         },
         "launchpad": {
             "upscaling": {
@@ -1953,6 +1986,15 @@
                     "description": "既存の設定から開始するためのワークフローをアップロードする"
                 }
             },
+            "videoTitle": "テキストプロンプトから動画を生成。",
+            "video": {
+                "startingFrameCalloutTitle": "開始フレームを追加",
+                "startingFrameCalloutDesc": "ビデオの開始フレームを制御する画像を追加します。"
+            },
+            "addStartingFrame": {
+                "title": "開始フレームを追加",
+                "description": "ビデオの開始フレームを制御する画像を追加します。"
+            },
             "createNewWorkflowFromScratch": "新しいワークフローを最初から作成する",
             "browseAndLoadWorkflows": "既存のワークフローを参照して読み込む",
             "addStyleRef": {
@@ -1980,7 +2022,8 @@
             "launchpad": "ランチパッド",
             "workflowEditor": "ワークフローエディター",
             "imageViewer": "ビューアー",
-            "canvas": "キャンバス"
+            "canvas": "キャンバス",
+            "video": "動画"
         }
     },
     "controlLayers": {
@@ -2782,5 +2825,9 @@
     },
     "lora": {
         "weight": "重み"
+    },
+    "video": {
+        "noVideoSelected": "動画が選択されていません",
+        "selectFromGallery": "ギャラリーから再生するビデオを選択してください"
     }
 }
