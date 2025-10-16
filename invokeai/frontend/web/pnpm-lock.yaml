@@ -27,8 +27,8 @@ importers:
         specifier: ^5.2.6
         version: 5.2.6
       '@invoke-ai/ui-library':
-        specifier: ^0.0.47
-        version: 0.0.47(@chakra-ui/system@2.6.2(@emotion/react@11.14.0(@types/react@18.3.23)(react@18.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@18.3.23)(react@18.3.1))(@types/react@18.3.23)(react@18.3.1))(react@18.3.1))(@fontsource-variable/inter@5.2.6)(@types/react@18.3.23)(i18next@25.3.2(typescript@5.8.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.8.3)
+        specifier: github:invoke-ai/ui-library#v0.0.48
+        version: https://codeload.github.com/invoke-ai/ui-library/tar.gz/c8a1d9a6867cd05ac831b074876c8dca3b0b670d(@chakra-ui/system@2.6.2(@emotion/react@11.14.0(@types/react@18.3.23)(react@18.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@18.3.23)(react@18.3.1))(@types/react@18.3.23)(react@18.3.1))(react@18.3.1))(@fontsource-variable/inter@5.2.6)(@types/react@18.3.23)(i18next@25.3.2(typescript@5.8.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.8.3)
       '@nanostores/react':
         specifier: ^1.0.0
         version: 1.0.0(nanostores@1.0.1)(react@18.3.1)
@@ -872,8 +872,9 @@ packages:
     resolution: {integrity: sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ==}
     engines: {node: '>=18.18'}
 
-  '@invoke-ai/ui-library@0.0.47':
-    resolution: {integrity: sha512-zmO2bAkkqT2yhkHjrsDnYio3YNKYyBSJXDZFmTSxWdK58UM2+Zq3h7cpVbDgS7Dzo4RXdF7p+DdlYPm2iIey5A==}
+  '@invoke-ai/ui-library@https://codeload.github.com/invoke-ai/ui-library/tar.gz/c8a1d9a6867cd05ac831b074876c8dca3b0b670d':
+    resolution: {tarball: https://codeload.github.com/invoke-ai/ui-library/tar.gz/c8a1d9a6867cd05ac831b074876c8dca3b0b670d}
+    version: 0.0.48
     peerDependencies:
       '@fontsource-variable/inter': ^5.0.16
       react: ^18.2.0
@@ -4930,7 +4931,7 @@ snapshots:
 
   '@humanwhocodes/retry@0.4.3': {}
 
-  '@invoke-ai/ui-library@0.0.47(@chakra-ui/system@2.6.2(@emotion/react@11.14.0(@types/react@18.3.23)(react@18.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@18.3.23)(react@18.3.1))(@types/react@18.3.23)(react@18.3.1))(react@18.3.1))(@fontsource-variable/inter@5.2.6)(@types/react@18.3.23)(i18next@25.3.2(typescript@5.8.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.8.3)':
+  '@invoke-ai/ui-library@https://codeload.github.com/invoke-ai/ui-library/tar.gz/c8a1d9a6867cd05ac831b074876c8dca3b0b670d(@chakra-ui/system@2.6.2(@emotion/react@11.14.0(@types/react@18.3.23)(react@18.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@18.3.23)(react@18.3.1))(@types/react@18.3.23)(react@18.3.1))(react@18.3.1))(@fontsource-variable/inter@5.2.6)(@types/react@18.3.23)(i18next@25.3.2(typescript@5.8.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.8.3)':
     dependencies:
       '@chakra-ui/anatomy': 2.3.4
       '@chakra-ui/icons': 2.2.4(@chakra-ui/react@2.10.9(@emotion/react@11.14.0(@types/react@18.3.23)(react@18.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@18.3.23)(react@18.3.1))(@types/react@18.3.23)(react@18.3.1))(@types/react@18.3.23)(framer-motion@10.18.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
