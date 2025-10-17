@@ -213,6 +213,27 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    */
   setGenerationBbox = (rect: Rect) => {
     this.store.dispatch(bboxChangedFromCanvas(rect));
+    this.manager.invalidateRegionalGuidanceRasterCache();
+  };
+
+  waitForRasterizationToFinish = async () => {
+    if (!this.$rasterizingAdapter.get()) {
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      const unsubscribe = this.$rasterizingAdapter.listen((adapter) => {
+        if (!adapter) {
+          unsubscribe();
+          resolve();
+        }
+      });
+
+      if (!this.$rasterizingAdapter.get()) {
+        unsubscribe();
+        resolve();
+      }
+    });
   };
 
   /**
