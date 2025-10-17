@@ -1909,12 +1909,6 @@
         "shared": "Общий",
         "promptTemplateCleared": "Шаблон запроса создан"
     },
-    "upsell": {
-        "inviteTeammates": "Пригласите членов команды",
-        "professional": "Профессионал",
-        "professionalUpsell": "Доступно в профессиональной версии Invoke. Нажмите здесь или посетите invoke.com/pricing для получения более подробной информации.",
-        "shareAccess": "Поделиться доступом"
-    },
     "system": {
         "logNamespaces": {
             "canvas": "Холст",

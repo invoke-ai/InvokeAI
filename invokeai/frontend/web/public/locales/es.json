@@ -466,11 +466,6 @@
         "prompts_other": "Prompts",
         "prune": "Eliminar"
     },
-    "upsell": {
-        "inviteTeammates": "Invitar compañeros de equipo",
-        "shareAccess": "Compartir acceso",
-        "professionalUpsell": "Disponible en la edición profesional de Invoke. Haga clic aquí o visite invoke.com/pricing para obtener más detalles."
-    },
     "controlLayers": {
         "layer_one": "Capa",
         "layer_many": "Capas",
