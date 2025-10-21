@@ -48,6 +48,8 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with FLUX.1 model architecture, including FLUX Dev, Schnell and Fill."""
     CogView4 = "cogview4"
     """Indicates the model is associated with CogView 4 model architecture."""
+    CloudAPI = "cloud-api"
+    """Indicates the model is a cloud-based API service (e.g., Google Gemini, OpenAI DALL-E)."""
     Unknown = "unknown"
     """Indicates the model's base architecture is unknown."""
 
@@ -129,6 +131,7 @@ class ModelFormat(str, Enum):
     BnbQuantizedLlmInt8b = "bnb_quantized_int8b"
     BnbQuantizednf4b = "bnb_quantized_nf4b"
     GGUFQuantized = "gguf_quantized"
+    CloudREST = "cloud_rest"
     Unknown = "unknown"
 
 
@@ -157,6 +160,17 @@ class ModelSourceType(str, Enum):
     Path = "path"
     Url = "url"
     HFRepoID = "hf_repo_id"
+
+
+class CloudProviderType(str, Enum):
+    """Cloud model provider types."""
+
+    GoogleGemini = "google-gemini"
+    """Google Gemini 2.5 Flash Image generation."""
+    GoogleImagen = "google-imagen"
+    """Google Imagen 4 Ultra generation."""
+    OpenAI = "openai"
+    """OpenAI DALL-E / GPT Image generation."""
 
 
 class FluxLoRAFormat(str, Enum):

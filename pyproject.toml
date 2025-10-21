@@ -77,6 +77,11 @@ dependencies = [
   "requests",
   "semver~=3.0.1",
   "PyWavelets",
+
+  # Cloud provider dependencies
+  "httpx>=0.27.0",                        # Async HTTP client for cloud API calls
+  "google-auth>=2.29.0",                  # Google Cloud authentication (for Imagen)
+  "python-dotenv>=1.0.0",                 # .env file support for API keys
 ]
 
 [project.optional-dependencies]

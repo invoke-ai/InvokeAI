@@ -14,6 +14,11 @@ from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.clip_embed import CLIPEmbed_Diffusers_G_Config, CLIPEmbed_Diffusers_L_Config
 from invokeai.backend.model_manager.configs.clip_vision import CLIPVision_Diffusers_Config
+from invokeai.backend.model_manager.configs.cloud_models import (
+    GeminiFlashImageConfig,
+    ImagenUltraConfig,
+    OpenAIImageConfig,
+)
 from invokeai.backend.model_manager.configs.controlnet import (
     ControlAdapterDefaultSettings,
     ControlNet_Checkpoint_FLUX_Config,
@@ -211,6 +216,10 @@ AnyModelConfig = Annotated[
         Annotated[SigLIP_Diffusers_Config, SigLIP_Diffusers_Config.get_tag()],
         Annotated[FLUXRedux_Checkpoint_Config, FLUXRedux_Checkpoint_Config.get_tag()],
         Annotated[LlavaOnevision_Diffusers_Config, LlavaOnevision_Diffusers_Config.get_tag()],
+        # Cloud models
+        Annotated[GeminiFlashImageConfig, GeminiFlashImageConfig.get_tag()],
+        Annotated[ImagenUltraConfig, ImagenUltraConfig.get_tag()],
+        Annotated[OpenAIImageConfig, OpenAIImageConfig.get_tag()],
         # Unknown model (fallback)
         Annotated[Unknown_Config, Unknown_Config.get_tag()],
     ],
