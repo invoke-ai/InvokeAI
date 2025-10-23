@@ -12,8 +12,8 @@ import type { AnyModelConfig } from 'services/api/types';
 
 import { MainModelDefaultSettings } from './MainModelDefaultSettings/MainModelDefaultSettings';
 import { ModelAttrView } from './ModelAttrView';
-import { ModelFooter } from './ModelFooter';
 import { ModelReidentifyButton } from './ModelReidentifyButton';
+import { ModelDeleteButton } from './ModelDeleteButton';
 import { RelatedModels } from './RelatedModels';
 
 type Props = {
@@ -47,6 +47,7 @@ export const ModelView = memo(({ modelConfig }: Props) => {
         {modelConfig.format === 'checkpoint' && modelConfig.type === 'main' && (
           <ModelConvertButton modelConfig={modelConfig} />
         )}
+        <ModelDeleteButton modelConfig={modelConfig} />
         <ModelEditButton />
         <ModelReidentifyButton modelConfig={modelConfig} />
       </ModelHeader>
@@ -103,7 +104,6 @@ export const ModelView = memo(({ modelConfig }: Props) => {
           <RelatedModels modelConfig={modelConfig} />
         </Box>
       </Flex>
-      <ModelFooter modelConfig={modelConfig} isEditing={false} />
     </Flex>
   );
 });
