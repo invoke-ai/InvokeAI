@@ -12,8 +12,8 @@ import type { AnyModelConfig } from 'services/api/types';
 
 import { MainModelDefaultSettings } from './MainModelDefaultSettings/MainModelDefaultSettings';
 import { ModelAttrView } from './ModelAttrView';
-import { ModelReidentifyButton } from './ModelReidentifyButton';
 import { ModelDeleteButton } from './ModelDeleteButton';
+import { ModelReidentifyButton } from './ModelReidentifyButton';
 import { RelatedModels } from './RelatedModels';
 
 type Props = {
