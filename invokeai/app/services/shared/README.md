@@ -1,7 +1,6 @@
-# InvokeAI Graph Engine - Design Overview
+# InvokeAI Graph - Design Overview
 
-High-level design for the workflow graph module. Focuses on responsibilities, data flow, and how traversal works.
-Details match the current code.
+High-level design for the graph module. Focuses on responsibilities, data flow, and how traversal works.
 
 ## 1) Purpose
 
