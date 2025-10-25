@@ -31,12 +31,12 @@ from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_sd15_sdxl
 
 """
-SDXL VAE color compensation values determined experimentally to reduce color drift by a factor of ~1/5.
-If more precise values are found in the future (e.g. individual color channels), they can be updated.
+SDXL VAE color compensation values determined experimentally to reduce color drift.
+If more reliable values are found in the future (e.g. individual color channels), they can be updated.
 SD1.5, TAESD, TAESDXL VAEs distort in less predictable ways, so no compensation is offered at this time.
 """
 COMPENSATION_OPTIONS = Literal["None", "SDXL"]
-COLOR_COMPENSATION_MAP = {"None": [1, 0], "SDXL": [1.02, -0.002]}
+COLOR_COMPENSATION_MAP = {"None": [1, 0], "SDXL": [1.015, -0.002]}
 
 
 @invocation(
