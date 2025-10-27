@@ -152,6 +152,29 @@ def test_graph_state_prepares_eagerly():
 
 def test_graph_executes_depth_first():
     """Tests that the graph executes depth-first, executing a branch as far as possible before moving to the next branch"""
+
+    def assert_topo_order_and_all_executed(state: GraphExecutionState, order: list[str]):
+        """
+        Validates:
+          1) Every materialized exec node executed exactly once.
+          2) Execution order respects all exec-graph dependencies (u→v ⇒ u before v).
+        """
+        # order must be EXEC node ids in run order
+        exec_nodes = set(state.execution_graph.nodes.keys())
+
+        # 1) coverage: all exec nodes ran, and no duplicates
+        pos = {nid: i for i, nid in enumerate(order)}
+        assert set(pos.keys()) == exec_nodes, (
+            f"Executed {len(pos)} of {len(exec_nodes)} nodes. Missing: {sorted(exec_nodes - set(pos))[:10]}"
+        )
+        assert len(pos) == len(order), "Duplicate execution detected"
+
+        # 2) topo order: parents before children
+        for e in state.execution_graph.edges:
+            u = e.source.node_id
+            v = e.destination.node_id
+            assert pos[u] < pos[v], f"child {v} ran before parent {u}"
+
     graph = Graph()
 
     test_prompts = ["Banana sushi", "Cat sushi"]
@@ -164,36 +187,17 @@ def test_graph_executes_depth_first():
     graph.add_edge(create_edge("prompt_iterated", "prompt", "prompt_successor", "prompt"))
 
     g = GraphExecutionState(graph=graph)
-    _ = invoke_next(g)
-    _ = invoke_next(g)
-    _ = invoke_next(g)
-    _ = invoke_next(g)
+    order: list[str] = []
 
-    # Because ordering is not guaranteed, we cannot compare results directly.
-    # Instead, we must count the number of results.
-    def get_completed_count(g: GraphExecutionState, id: str):
-        ids = list(g.source_prepared_mapping[id])
-        completed_ids = [i for i in g.executed if i in ids]
-        return len(completed_ids)
+    while True:
+        n = g.next()
+        if n is None:
+            break
+        o = n.invoke(Mock(InvocationContext))
+        g.complete(n.id, o)
+        order.append(n.id)
 
-    # Check at each step that the number of executed nodes matches the expectation for depth-first execution
-    assert get_completed_count(g, "prompt_iterated") == 1
-    assert get_completed_count(g, "prompt_successor") == 0
-
-    _ = invoke_next(g)
-
-    assert get_completed_count(g, "prompt_iterated") == 1
-    assert get_completed_count(g, "prompt_successor") == 1
-
-    _ = invoke_next(g)
-
-    assert get_completed_count(g, "prompt_iterated") == 2
-    assert get_completed_count(g, "prompt_successor") == 1
-
-    _ = invoke_next(g)
-
-    assert get_completed_count(g, "prompt_iterated") == 2
-    assert get_completed_count(g, "prompt_successor") == 2
+    assert_topo_order_and_all_executed(g, order)
 
 
 # Because this tests deterministic ordering, we run it multiple times
