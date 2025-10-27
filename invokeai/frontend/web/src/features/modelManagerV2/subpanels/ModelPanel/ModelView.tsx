@@ -44,12 +44,12 @@ export const ModelView = memo(({ modelConfig }: Props) => {
   return (
     <Flex flexDir="column" gap={4} h="full">
       <ModelHeader modelConfig={modelConfig}>
+        <ModelReidentifyButton modelConfig={modelConfig} />
         {modelConfig.format === 'checkpoint' && modelConfig.type === 'main' && (
           <ModelConvertButton modelConfig={modelConfig} />
         )}
-        <ModelDeleteButton modelConfig={modelConfig} />
         <ModelEditButton />
-        <ModelReidentifyButton modelConfig={modelConfig} />
+        <ModelDeleteButton modelConfig={modelConfig} />
       </ModelHeader>
       <Divider />
       <Flex flexDir="column" gap={4}>
