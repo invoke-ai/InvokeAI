@@ -88,7 +88,9 @@ class ControlNet_Diffusers_Config_Base(Diffusers_Config_Base):
 
         cls._validate_base(mod)
 
-        return cls(**override_fields)
+        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant_or_raise(mod)
+
+        return cls(**override_fields, repo_variant=repo_variant)
 
     @classmethod
     def _validate_base(cls, mod: ModelOnDisk) -> None:
