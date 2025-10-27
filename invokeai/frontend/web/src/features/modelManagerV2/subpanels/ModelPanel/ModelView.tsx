@@ -12,7 +12,7 @@ import type { AnyModelConfig } from 'services/api/types';
 
 import { MainModelDefaultSettings } from './MainModelDefaultSettings/MainModelDefaultSettings';
 import { ModelAttrView } from './ModelAttrView';
-import { ModelFooter } from './ModelFooter';
+import { ModelDeleteButton } from './ModelDeleteButton';
 import { ModelReidentifyButton } from './ModelReidentifyButton';
 import { RelatedModels } from './RelatedModels';
 
@@ -44,11 +44,12 @@ export const ModelView = memo(({ modelConfig }: Props) => {
   return (
     <Flex flexDir="column" gap={4} h="full">
       <ModelHeader modelConfig={modelConfig}>
+        <ModelReidentifyButton modelConfig={modelConfig} />
         {modelConfig.format === 'checkpoint' && modelConfig.type === 'main' && (
           <ModelConvertButton modelConfig={modelConfig} />
         )}
         <ModelEditButton />
-        <ModelReidentifyButton modelConfig={modelConfig} />
+        <ModelDeleteButton modelConfig={modelConfig} />
       </ModelHeader>
       <Divider />
       <Flex flexDir="column" gap={4}>
@@ -103,7 +104,6 @@ export const ModelView = memo(({ modelConfig }: Props) => {
           <RelatedModels modelConfig={modelConfig} />
         </Box>
       </Flex>
-      <ModelFooter modelConfig={modelConfig} isEditing={false} />
     </Flex>
   );
 });

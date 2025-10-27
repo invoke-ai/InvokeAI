@@ -273,9 +273,10 @@ async def scan_for_models(
             found_model = FoundModel(path=path, is_installed=is_installed)
             scan_results.append(found_model)
     except Exception as e:
+        error_type = type(e).__name__
         raise HTTPException(
             status_code=500,
-            detail=f"An error occurred while searching the directory: {e}",
+            detail=f"An error occurred while searching the directory: {error_type}",
         )
     return scan_results
 
