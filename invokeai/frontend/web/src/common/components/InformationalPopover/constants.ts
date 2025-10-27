@@ -62,6 +62,7 @@ export type Feature =
   | 'scaleBeforeProcessing'
   | 'seamlessTilingXAxis'
   | 'seamlessTilingYAxis'
+  | 'colorCompensation'
   | 'upscaleModel'
   | 'scale'
   | 'creativity'
