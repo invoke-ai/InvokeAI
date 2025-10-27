@@ -2,7 +2,8 @@
 
 import copy
 import itertools
-from typing import Any, Optional, TypeVar, Union, get_args, get_origin
+from collections import deque
+from typing import Any, Deque, Iterable, Optional, Type, TypeVar, Union, get_args, get_origin
 
 import networkx as nx
 from pydantic import (
@@ -10,6 +11,7 @@ from pydantic import (
     ConfigDict,
     GetCoreSchemaHandler,
     GetJsonSchemaHandler,
+    PrivateAttr,
     ValidationError,
     field_validator,
 )
@@ -32,6 +34,10 @@ from invokeai.app.util.misc import uuid_string
 
 # in 3.10 this would be "from types import NoneType"
 NoneType = type(None)
+
+# Port name constants
+ITEM_FIELD = "item"
+COLLECTION_FIELD = "collection"
 
 
 class EdgeConnection(BaseModel):
@@ -395,7 +401,7 @@ class Graph(BaseModel):
 
         try:
             self.edges.remove(edge)
-        except KeyError:
+        except ValueError:
             pass
 
     def validate_self(self) -> None:
@@ -414,7 +420,8 @@ class Graph(BaseModel):
 
         # Validate that all node ids are unique
         node_ids = [n.id for n in self.nodes.values()]
-        duplicate_node_ids = {node_id for node_id in node_ids if node_ids.count(node_id) >= 2}
+        seen = set()
+        duplicate_node_ids = {nid for nid in node_ids if (nid in seen) or (seen.add(nid) or False)}
         if duplicate_node_ids:
             raise DuplicateNodeIdError(f"Node ids must be unique, found duplicates {duplicate_node_ids}")
 
@@ -529,19 +536,19 @@ class Graph(BaseModel):
             raise InvalidEdgeError(f"Field types are incompatible ({edge})")
 
         # Validate if iterator output type matches iterator input type (if this edge results in both being set)
-        if isinstance(to_node, IterateInvocation) and edge.destination.field == "collection":
+        if isinstance(to_node, IterateInvocation) and edge.destination.field == COLLECTION_FIELD:
             err = self._is_iterator_connection_valid(edge.destination.node_id, new_input=edge.source)
             if err is not None:
                 raise InvalidEdgeError(f"Iterator input type does not match iterator output type ({edge}): {err}")
 
         # Validate if iterator input type matches output type (if this edge results in both being set)
-        if isinstance(from_node, IterateInvocation) and edge.source.field == "item":
+        if isinstance(from_node, IterateInvocation) and edge.source.field == ITEM_FIELD:
             err = self._is_iterator_connection_valid(edge.source.node_id, new_output=edge.destination)
             if err is not None:
                 raise InvalidEdgeError(f"Iterator output type does not match iterator input type ({edge}): {err}")
 
         # Validate if collector input type matches output type (if this edge results in both being set)
-        if isinstance(to_node, CollectInvocation) and edge.destination.field == "item":
+        if isinstance(to_node, CollectInvocation) and edge.destination.field == ITEM_FIELD:
             err = self._is_collector_connection_valid(edge.destination.node_id, new_input=edge.source)
             if err is not None:
                 raise InvalidEdgeError(f"Collector output type does not match collector input type ({edge}): {err}")
@@ -549,7 +556,7 @@ class Graph(BaseModel):
         # Validate if collector output type matches input type (if this edge results in both being set) - skip if the destination field is not Any or list[Any]
         if (
             isinstance(from_node, CollectInvocation)
-            and edge.source.field == "collection"
+            and edge.source.field == COLLECTION_FIELD
             and not self._is_destination_field_list_of_Any(edge)
             and not self._is_destination_field_Any(edge)
         ):
@@ -639,8 +646,8 @@ class Graph(BaseModel):
         new_input: Optional[EdgeConnection] = None,
         new_output: Optional[EdgeConnection] = None,
     ) -> str | None:
-        inputs = [e.source for e in self._get_input_edges(node_id, "collection")]
-        outputs = [e.destination for e in self._get_output_edges(node_id, "item")]
+        inputs = [e.source for e in self._get_input_edges(node_id, COLLECTION_FIELD)]
+        outputs = [e.destination for e in self._get_output_edges(node_id, ITEM_FIELD)]
 
         if new_input is not None:
             inputs.append(new_input)
@@ -670,7 +677,7 @@ class Graph(BaseModel):
         if isinstance(input_node, CollectInvocation):
             # Traverse the graph to find the first collector input edge. Collectors validate that their collection
             # inputs are all of the same type, so we can use the first input edge to determine the collector's type
-            first_collector_input_edge = self._get_input_edges(input_node.id, "item")[0]
+            first_collector_input_edge = self._get_input_edges(input_node.id, ITEM_FIELD)[0]
             first_collector_input_type = get_output_field_type(
                 self.get_node(first_collector_input_edge.source.node_id), first_collector_input_edge.source.field
             )
@@ -690,8 +697,8 @@ class Graph(BaseModel):
         new_input: Optional[EdgeConnection] = None,
         new_output: Optional[EdgeConnection] = None,
     ) -> str | None:
-        inputs = [e.source for e in self._get_input_edges(node_id, "item")]
-        outputs = [e.destination for e in self._get_output_edges(node_id, "collection")]
+        inputs = [e.source for e in self._get_input_edges(node_id, ITEM_FIELD)]
+        outputs = [e.destination for e in self._get_output_edges(node_id, COLLECTION_FIELD)]
 
         if new_input is not None:
             inputs.append(new_input)
@@ -761,7 +768,7 @@ class Graph(BaseModel):
         # TODO: figure out if iteration nodes need to be expanded
 
         unique_edges = {(e.source.node_id, e.destination.node_id) for e in self.edges}
-        g.add_edges_from([(e[0], e[1]) for e in unique_edges])
+        g.add_edges_from(unique_edges)
         return g
 
 
@@ -802,6 +809,36 @@ class GraphExecutionState(BaseModel):
         description="The map of original graph nodes to prepared nodes",
         default_factory=dict,
     )
+    # Ready queues grouped by node class name (internal only)
+    _ready_queues: dict[str, Deque[str]] = PrivateAttr(default_factory=dict)
+    # Current class being drained; stays until its queue empties
+    _active_class: Optional[str] = PrivateAttr(default=None)
+    # Optional priority; others follow in name order
+    ready_order: list[str] = Field(default_factory=list)
+    indegree: dict[str, int] = Field(default_factory=dict, description="Remaining unmet input count for exec nodes")
+
+    def _type_key(self, node_obj: BaseInvocation) -> str:
+        return node_obj.__class__.__name__
+
+    def _queue_for(self, cls_name: str) -> Deque[str]:
+        q = self._ready_queues.get(cls_name)
+        if q is None:
+            q = deque()
+            self._ready_queues[cls_name] = q
+        return q
+
+    def set_ready_order(self, order: Iterable[Type[BaseInvocation] | str]) -> None:
+        names: list[str] = []
+        for x in order:
+            names.append(x.__name__ if hasattr(x, "__name__") else str(x))
+        self.ready_order = names
+
+    def _enqueue_if_ready(self, nid: str) -> None:
+        """Push nid to its class queue if unmet inputs == 0."""
+        if self.indegree.get(nid, 1) != 0 or nid in self.executed:
+            return
+        node_obj = self.execution_graph.nodes[nid]
+        self._queue_for(self._type_key(node_obj)).append(nid)
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -834,12 +871,14 @@ class GraphExecutionState(BaseModel):
         # If there are no prepared nodes, prepare some nodes
         next_node = self._get_next_node()
         if next_node is None:
-            prepared_id = self._prepare()
+            base_g = self.graph.nx_graph_flat()
+            prepared_id = self._prepare(base_g)
 
             # Prepare as many nodes as we can
             while prepared_id is not None:
-                prepared_id = self._prepare()
-                next_node = self._get_next_node()
+                prepared_id = self._prepare(base_g)
+                if next_node is None:
+                    next_node = self._get_next_node()
 
         # Get values from edges
         if next_node is not None:
@@ -869,6 +908,13 @@ class GraphExecutionState(BaseModel):
             self.executed.add(source_node)
             self.executed_history.append(source_node)
 
+        # Decrement children indegree and enqueue when ready
+        for e in self.execution_graph._get_output_edges(node_id):
+            child = e.destination.node_id
+            if child in self.indegree:
+                self.indegree[child] = max(0, self.indegree[child] - 1)
+                self._enqueue_if_ready(child)
+
     def set_node_error(self, node_id: str, error: str):
         """Marks a node as errored"""
         self.errors[node_id] = error
@@ -892,7 +938,7 @@ class GraphExecutionState(BaseModel):
         # If this is an iterator node, we must create a copy for each iteration
         if isinstance(node, IterateInvocation):
             # Get input collection edge (should error if there are no inputs)
-            input_collection_edge = next(iter(self.graph._get_input_edges(node_id, "collection")))
+            input_collection_edge = next(iter(self.graph._get_input_edges(node_id, COLLECTION_FIELD)))
             input_collection_prepared_node_id = next(
                 n[1] for n in iteration_node_map if n[0] == input_collection_edge.source.node_id
             )
@@ -922,7 +968,7 @@ class GraphExecutionState(BaseModel):
         # Create a new node (or one for each iteration of this iterator)
         for i in range(self_iteration_count) if self_iteration_count > 0 else [-1]:
             # Create a new node
-            new_node = copy.deepcopy(node)
+            new_node = node.model_copy(deep=True)
 
             # Create the node id (use a random uuid)
             new_node.id = uuid_string()
@@ -946,53 +992,55 @@ class GraphExecutionState(BaseModel):
                 )
                 self.execution_graph.add_edge(new_edge)
 
+            # Initialize indegree as unmet inputs only and enqueue if ready
+            inputs = self.execution_graph._get_input_edges(new_node.id)
+            unmet = sum(1 for e in inputs if e.source.node_id not in self.executed)
+            self.indegree[new_node.id] = unmet
+            self._enqueue_if_ready(new_node.id)
+
             new_nodes.append(new_node.id)
 
         return new_nodes
 
-    def _iterator_graph(self) -> nx.DiGraph:
+    def _iterator_graph(self, base: Optional[nx.DiGraph] = None) -> nx.DiGraph:
         """Gets a DiGraph with edges to collectors removed so an ancestor search produces all active iterators for any node"""
-        g = self.graph.nx_graph_flat()
+        g = base.copy() if base is not None else self.graph.nx_graph_flat()
         collectors = (n for n in self.graph.nodes if isinstance(self.graph.get_node(n), CollectInvocation))
         for c in collectors:
             g.remove_edges_from(list(g.in_edges(c)))
         return g
 
-    def _get_node_iterators(self, node_id: str) -> list[str]:
+    def _get_node_iterators(self, node_id: str, it_graph: Optional[nx.DiGraph] = None) -> list[str]:
         """Gets iterators for a node"""
-        g = self._iterator_graph()
-        iterators = [n for n in nx.ancestors(g, node_id) if isinstance(self.graph.get_node(n), IterateInvocation)]
-        return iterators
+        g = it_graph or self._iterator_graph()
+        return [n for n in nx.ancestors(g, node_id) if isinstance(self.graph.get_node(n), IterateInvocation)]
 
-    def _prepare(self) -> Optional[str]:
+    def _prepare(self, base_g: Optional[nx.DiGraph] = None) -> Optional[str]:
         # Get flattened source graph
-        g = self.graph.nx_graph_flat()
+        g = base_g or self.graph.nx_graph_flat()
 
         # Find next node that:
         # - was not already prepared
         # - is not an iterate node whose inputs have not been executed
         # - does not have an unexecuted iterate ancestor
         sorted_nodes = nx.topological_sort(g)
+
+        def unprepared(n: str) -> bool:
+            return n not in self.source_prepared_mapping
+
+        def iter_inputs_ready(n: str) -> bool:
+            if not isinstance(self.graph.get_node(n), IterateInvocation):
+                return True
+            return all(u in self.executed for u, _ in g.in_edges(n))
+
+        def no_unexecuted_iter_ancestors(n: str) -> bool:
+            return not any(
+                isinstance(self.graph.get_node(a), IterateInvocation) and a not in self.executed
+                for a in nx.ancestors(g, n)
+            )
+
         next_node_id = next(
-            (
-                n
-                for n in sorted_nodes
-                # exclude nodes that have already been prepared
-                if n not in self.source_prepared_mapping
-                # exclude iterate nodes whose inputs have not been executed
-                and not (
-                    isinstance(self.graph.get_node(n), IterateInvocation)  # `n` is an iterate node...
-                    and not all((e[0] in self.executed for e in g.in_edges(n)))  # ...that has unexecuted inputs
-                )
-                # exclude nodes who have unexecuted iterate ancestors
-                and not any(
-                    (
-                        isinstance(self.graph.get_node(a), IterateInvocation)  # `a` is an iterate ancestor of `n`...
-                        and a not in self.executed  # ...that is not executed
-                        for a in nx.ancestors(g, n)  # for all ancestors `a` of node `n`
-                    )
-                )
-            ),
+            (n for n in sorted_nodes if unprepared(n) and iter_inputs_ready(n) and no_unexecuted_iter_ancestors(n)),
             None,
         )
 
@@ -1000,7 +1048,7 @@ class GraphExecutionState(BaseModel):
             return None
 
         # Get all parents of the next node
-        next_node_parents = [e[0] for e in g.in_edges(next_node_id)]
+        next_node_parents = [u for u, _ in g.in_edges(next_node_id)]
 
         # Create execution nodes
         next_node = self.graph.get_node(next_node_id)
@@ -1018,7 +1066,8 @@ class GraphExecutionState(BaseModel):
         else:  # Iterators or normal nodes
             # Get all iterator combinations for this node
             # Will produce a list of lists of prepared iterator nodes, from which results can be iterated
-            iterator_nodes = self._get_node_iterators(next_node_id)
+            it_g = self._iterator_graph(g)
+            iterator_nodes = self._get_node_iterators(next_node_id, it_g)
             iterator_nodes_prepared = [list(self.source_prepared_mapping[n]) for n in iterator_nodes]
             iterator_node_prepared_combinations = list(itertools.product(*iterator_nodes_prepared))
 
@@ -1066,45 +1115,41 @@ class GraphExecutionState(BaseModel):
         )
 
     def _get_next_node(self) -> Optional[BaseInvocation]:
-        """Gets the deepest node that is ready to be executed"""
-        g = self.execution_graph.nx_graph()
+        """Gets the next ready node: FIFO within class, drain class before switching."""
+        # 1) Continue draining the active class
+        if self._active_class:
+            q = self._ready_queues.get(self._active_class)
+            while q:
+                nid = q.popleft()
+                if nid not in self.executed:
+                    return self.execution_graph.nodes[nid]
+            # emptied: release active class
+            self._active_class = None
 
-        # Perform a topological sort using depth-first search
-        topo_order = list(nx.dfs_postorder_nodes(g))
-
-        # Get all IterateInvocation nodes
-        iterate_nodes = [n for n in topo_order if isinstance(self.execution_graph.nodes[n], IterateInvocation)]
-
-        # Sort the IterateInvocation nodes based on their index attribute
-        iterate_nodes.sort(key=lambda x: self.execution_graph.nodes[x].index)
-
-        # Prioritize IterateInvocation nodes and their children
-        for iterate_node in iterate_nodes:
-            if iterate_node not in self.executed and all((e[0] in self.executed for e in g.in_edges(iterate_node))):
-                return self.execution_graph.nodes[iterate_node]
-
-            # Check the children of the IterateInvocation node
-            for child_node in nx.dfs_postorder_nodes(g, iterate_node):
-                if child_node not in self.executed and all((e[0] in self.executed for e in g.in_edges(child_node))):
-                    return self.execution_graph.nodes[child_node]
-
-        # If no IterateInvocation node or its children are ready, return the first ready node in the topological order
-        for node in topo_order:
-            if node not in self.executed and all((e[0] in self.executed for e in g.in_edges(node))):
-                return self.execution_graph.nodes[node]
-
-        # If no node is found, return None
+        # 2) Pick next class by priority, then by class name
+        seen = set(self.ready_order)
+        for cls_name in self.ready_order:
+            q = self._ready_queues.get(cls_name)
+            if q:
+                self._active_class = cls_name
+                # recurse to drain newly set active class
+                return self._get_next_node()
+        for cls_name in sorted(k for k in self._ready_queues.keys() if k not in seen):
+            q = self._ready_queues[cls_name]
+            if q:
+                self._active_class = cls_name
+                return self._get_next_node()
         return None
 
     def _prepare_inputs(self, node: BaseInvocation):
-        input_edges = [e for e in self.execution_graph.edges if e.destination.node_id == node.id]
+        input_edges = self.execution_graph._get_input_edges(node.id)
         # Inputs must be deep-copied, else if a node mutates the object, other nodes that get the same input
         # will see the mutation.
         if isinstance(node, CollectInvocation):
             output_collection = [
                 copydeep(getattr(self.results[edge.source.node_id], edge.source.field))
                 for edge in input_edges
-                if edge.destination.field == "item"
+                if edge.destination.field == ITEM_FIELD
             ]
             node.collection = output_collection
         else:

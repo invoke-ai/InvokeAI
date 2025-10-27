@@ -9281,6 +9281,15 @@ export type components = {
             source_prepared_mapping: {
                 [key: string]: string[];
             };
+            /** Ready Order */
+            ready_order?: string[];
+            /**
+             * Indegree
+             * @description Remaining unmet input count for exec nodes
+             */
+            indegree?: {
+                [key: string]: number;
+            };
         };
         /**
          * Grounding DINO (Text Prompt Object Detection)
