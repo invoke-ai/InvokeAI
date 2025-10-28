@@ -14,6 +14,7 @@ import { CanvasHUD } from 'features/controlLayers/components/HUD/CanvasHUD';
 import { InvokeCanvasComponent } from 'features/controlLayers/components/InvokeCanvasComponent';
 import { SelectObject } from 'features/controlLayers/components/SelectObject/SelectObject';
 import { StagingAreaContextProvider } from 'features/controlLayers/components/StagingArea/context';
+import { PinnedFillColorPickerOverlay } from 'features/controlLayers/components/Tool/PinnedFillColorPickerOverlay';
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
@@ -88,6 +89,7 @@ export const CanvasWorkspacePanel = memo(() => {
                   gap={2}
                   alignItems="flex-start"
                 >
+                  <PinnedFillColorPickerOverlay />
                   {showHUD && <CanvasHUD />}
                   <CanvasAlertsSaveAllImagesToGallery />
                   <CanvasAlertsSelectedEntityStatus />
