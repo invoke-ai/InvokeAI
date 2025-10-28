@@ -2,7 +2,7 @@ from typing import TypeVar
 
 import torch
 
-from invokeai.backend.flux.modules.layers import RMSNorm
+from invokeai.backend.flux.modules.layers import MLPEmbedder, RMSNorm
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_conv1d import (
     CustomConv1d,
 )
@@ -11,6 +11,9 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_embedding import (
     CustomEmbedding,
+)
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_flux_mlp_embedder import (
+    CustomFluxMLPEmbedder,
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_flux_rms_norm import (
     CustomFluxRMSNorm,
@@ -32,6 +35,7 @@ AUTOCAST_MODULE_TYPE_MAPPING: dict[type[torch.nn.Module], type[torch.nn.Module]]
     torch.nn.GroupNorm: CustomGroupNorm,
     torch.nn.Embedding: CustomEmbedding,
     RMSNorm: CustomFluxRMSNorm,
+    MLPEmbedder: CustomFluxMLPEmbedder,
 }
 
 try:
@@ -66,6 +70,10 @@ def wrap_custom_layer(module_to_wrap: torch.nn.Module, custom_layer_type: type[T
     # TODO(ryand): In the future, we may want to do a shallow copy of the __dict__.
     custom_layer.__dict__ = module_to_wrap.__dict__
 
+    # Explicitly re-register parameters to ensure named_parameters() works correctly.
+    for name, param in module_to_wrap.named_parameters(recurse=False):
+        custom_layer.register_parameter(name, param)
+
     # Initialize the CustomModuleMixin fields.
     CustomModuleMixin.__init__(custom_layer)  # type: ignore
     return custom_layer
@@ -91,6 +99,8 @@ def apply_custom_layers_to_model(module: torch.nn.Module, device_autocasting_ena
             # TODO(ryand): In the future, we should manage this flag on a per-module basis.
             custom_layer.set_device_autocasting_enabled(device_autocasting_enabled)
             setattr(module, name, custom_layer)
+            # Recursively apply to the newly wrapped custom layer's children
+            apply_custom_layers_to_model(custom_layer, device_autocasting_enabled)
         else:
             # Recursively apply to submodules
             apply_custom_layers_to_model(submodule, device_autocasting_enabled)
