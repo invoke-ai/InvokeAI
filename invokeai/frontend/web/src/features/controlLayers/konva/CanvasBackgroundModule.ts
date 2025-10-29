@@ -96,6 +96,13 @@ export class CanvasBackgroundModule extends CanvasModuleBase {
     };
     this.checkboardPattern.src = 'anonymous';
     this.checkboardPattern.src = this.config.CHECKERBOARD_PATTERN_DATAURL;
+
+    // Isolate background to prevent blend modes affecting it
+    const backgroundCanvas = this.konva.layer.getCanvas()._canvas as HTMLCanvasElement | undefined;
+    if (backgroundCanvas) {
+      backgroundCanvas.style.isolation = 'isolate';
+    }
+
     this.render();
   };
 

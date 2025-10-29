@@ -60,10 +60,45 @@ export class CanvasEntityAdapterRasterLayer extends CanvasEntityAdapterBase<
     if (!prevState || this.state.opacity !== prevState.opacity) {
       this.syncOpacity();
     }
+    if (!prevState || this.state.globalCompositeOperation !== prevState.globalCompositeOperation) {
+      this.syncGlobalCompositeOperation();
+    }
 
     // Apply per-layer adjustments as a Konva filter
     if (!prevState || this.haveAdjustmentsChanged(prevState, this.state)) {
       this.syncAdjustmentsFilter();
+    }
+  };
+
+  private syncGlobalCompositeOperation = () => {
+    this.log.trace('Syncing globalCompositeOperation');
+    const operation = this.state.globalCompositeOperation ?? 'source-over';
+
+    // Map globalCompositeOperation to CSS mix-blend-mode for live preview
+    const mixBlendModeMap: Record<string, string> = {
+      'source-over': 'normal',
+      multiply: 'multiply',
+      screen: 'screen',
+      overlay: 'overlay',
+      darken: 'darken',
+      lighten: 'lighten',
+      'color-dodge': 'color-dodge',
+      'color-burn': 'color-burn',
+      'hard-light': 'hard-light',
+      'soft-light': 'soft-light',
+      difference: 'difference',
+      exclusion: 'exclusion',
+      hue: 'hue',
+      saturation: 'saturation',
+      color: 'color',
+      luminosity: 'luminosity',
+    };
+
+    const mixBlendMode = mixBlendModeMap[operation] || 'normal';
+
+    const canvasElement = this.konva.layer.getCanvas()._canvas as HTMLCanvasElement | undefined;
+    if (canvasElement) {
+      canvasElement.style.mixBlendMode = mixBlendMode;
     }
   };
 

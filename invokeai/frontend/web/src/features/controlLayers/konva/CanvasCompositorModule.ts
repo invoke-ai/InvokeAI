@@ -226,12 +226,16 @@ export class CanvasCompositorModule extends CanvasModuleBase {
 
     ctx.imageSmoothingEnabled = false;
 
-    if (compositingOptions?.globalCompositeOperation) {
-      ctx.globalCompositeOperation = compositingOptions.globalCompositeOperation;
-    }
-
     for (const adapter of adapters) {
       this.log.debug({ entityIdentifier: adapter.entityIdentifier }, 'Drawing entity to composite canvas');
+      // Set composite operation for this specific layer
+      // Priority: 1) Per-layer setting, 2) Global compositing option, 3) Default 'source-over'
+      const layerCompositeOp =
+        adapter.state.type === 'raster_layer' || adapter.state.type === 'control_layer'
+          ? (adapter.state as any).globalCompositeOperation
+          : undefined;
+      ctx.globalCompositeOperation = layerCompositeOp || compositingOptions?.globalCompositeOperation || 'source-over';
+
       const adapterCanvas = adapter.getCanvas(rect);
       ctx.drawImage(adapterCanvas, 0, 0);
     }

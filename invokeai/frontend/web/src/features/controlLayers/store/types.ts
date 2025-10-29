@@ -1,5 +1,6 @@
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
+import { COMPOSITE_OPERATIONS } from 'features/controlLayers/store/compositeOperations';
 import { zMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
 import {
   zParameterCanvasCoherenceMode,
@@ -462,6 +463,8 @@ const zCanvasRasterLayerState = zCanvasEntityBase.extend({
   objects: z.array(zCanvasObjectState),
   // Optional per-layer color adjustments (simple + curves). When undefined, no adjustments are applied.
   adjustments: zRasterLayerAdjustments.optional(),
+  // Optional per-layer composite operation. When undefined, defaults to 'source-over'.
+  globalCompositeOperation: z.enum(COMPOSITE_OPERATIONS).optional(),
 });
 export type CanvasRasterLayerState = z.infer<typeof zCanvasRasterLayerState>;
 
