@@ -1,4 +1,5 @@
 import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
@@ -7,7 +8,6 @@ import { useEntityIdentifierBelowThisOne } from 'features/controlLayers/hooks/us
 import { rasterLayerGlobalCompositeOperationChanged } from 'features/controlLayers/store/canvasSlice';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
-import { useAppDispatch } from 'app/store/storeHooks';
 import { useTranslation } from 'react-i18next';
 
 export const RasterLayerMenuItemsBooleanSubMenu = memo(() => {
@@ -21,13 +21,12 @@ export const RasterLayerMenuItemsBooleanSubMenu = memo(() => {
 
   const perform = useCallback(
     async (op: GlobalCompositeOperation) => {
-      if (!entityIdentifierBelowThisOne) return;
+      if (!entityIdentifierBelowThisOne) {
+        return;
+      }
       dispatch(rasterLayerGlobalCompositeOperationChanged({ entityIdentifier, globalCompositeOperation: op }));
       try {
-        await canvasManager.compositor.mergeByEntityIdentifiers(
-          [entityIdentifierBelowThisOne, entityIdentifier],
-          true
-        );
+        await canvasManager.compositor.mergeByEntityIdentifiers([entityIdentifierBelowThisOne, entityIdentifier], true);
       } finally {
         dispatch(rasterLayerGlobalCompositeOperationChanged({ entityIdentifier, globalCompositeOperation: undefined }));
       }

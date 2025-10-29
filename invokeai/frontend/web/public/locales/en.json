@@ -2078,16 +2078,16 @@
         "addAdjustments": "Add Adjustments",
         "removeAdjustments": "Remove Adjustments",
         "compositeOperation": {
-          "label": "Blend Mode",
-          "add": "Add Blend Mode",
-          "remove": "Remove Blend Mode"
+            "label": "Blend Mode",
+            "add": "Add Blend Mode",
+            "remove": "Remove Blend Mode"
         },
         "booleanOps": {
-          "label": "Boolean Operations",
-          "intersection": "Intersection",
-          "cutout": "Cutout",
-          "cutAway": "Cut Away",
-          "exclude": "Exclude"
+            "label": "Boolean Operations",
+            "intersection": "Intersection",
+            "cutout": "Cutout",
+            "cutAway": "Cut Away",
+            "exclude": "Exclude"
         },
         "adjustments": {
             "simple": "Simple",

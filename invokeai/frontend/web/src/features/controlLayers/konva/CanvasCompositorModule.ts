@@ -232,7 +232,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
       // Priority: 1) Per-layer setting, 2) Global compositing option, 3) Default 'source-over'
       const layerCompositeOp =
         adapter.state.type === 'raster_layer' || adapter.state.type === 'control_layer'
-          ? (adapter.state as any).globalCompositeOperation
+          ? adapter.state.globalCompositeOperation
           : undefined;
       ctx.globalCompositeOperation = layerCompositeOp || compositingOptions?.globalCompositeOperation || 'source-over';
 

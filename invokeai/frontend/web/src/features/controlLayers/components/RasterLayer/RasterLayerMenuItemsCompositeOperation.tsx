@@ -21,9 +21,7 @@ export const RasterLayerMenuItemsCompositeOperation = memo(() => {
       dispatch(rasterLayerGlobalCompositeOperationChanged({ entityIdentifier, globalCompositeOperation: undefined }));
     } else {
       // default to multiply when enabling blend modes
-      dispatch(
-        rasterLayerGlobalCompositeOperationChanged({ entityIdentifier, globalCompositeOperation: 'multiply' })
-      );
+      dispatch(rasterLayerGlobalCompositeOperationChanged({ entityIdentifier, globalCompositeOperation: 'multiply' }));
     }
   }, [dispatch, entityIdentifier, hasCompositeOperation]);
 

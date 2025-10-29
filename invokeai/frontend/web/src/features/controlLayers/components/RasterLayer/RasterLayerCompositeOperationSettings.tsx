@@ -2,7 +2,7 @@ import { Flex, FormControl, FormLabel, Select } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { rasterLayerGlobalCompositeOperationChanged } from 'features/controlLayers/store/canvasSlice';
-import { COMPOSITE_OPERATIONS, type CompositeOperation } from 'features/controlLayers/store/compositeOperations';
+import type { CompositeOperation } from 'features/controlLayers/store/compositeOperations';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
