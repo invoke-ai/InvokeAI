@@ -1,4 +1,4 @@
-import { MenuItem } from '@invoke-ai/ui-library';
+import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
@@ -11,31 +11,25 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { useTranslation } from 'react-i18next';
 
 export const RasterLayerMenuItemsBooleanSubMenu = memo(() => {
+  const { t } = useTranslation();
   const subMenu = useSubMenu();
   const canvasManager = useCanvasManager();
   const isBusy = useCanvasIsBusy();
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext<'raster_layer'>();
   const entityIdentifierBelowThisOne = useEntityIdentifierBelowThisOne(entityIdentifier as CanvasEntityIdentifier);
-  const { t } = useTranslation();
 
   const perform = useCallback(
     async (op: GlobalCompositeOperation) => {
       if (!entityIdentifierBelowThisOne) return;
-      // Temporarily set composite op on the selected layer to drive the merge algorithm
-      dispatch(
-        rasterLayerGlobalCompositeOperationChanged({ entityIdentifier, globalCompositeOperation: op })
-      );
+      dispatch(rasterLayerGlobalCompositeOperationChanged({ entityIdentifier, globalCompositeOperation: op }));
       try {
         await canvasManager.compositor.mergeByEntityIdentifiers(
           [entityIdentifierBelowThisOne, entityIdentifier],
           true
         );
       } finally {
-        // No need to reset - layers are deleted on success; but in case of failure, clear the op
-        dispatch(
-          rasterLayerGlobalCompositeOperationChanged({ entityIdentifier, globalCompositeOperation: undefined })
-        );
+        dispatch(rasterLayerGlobalCompositeOperationChanged({ entityIdentifier, globalCompositeOperation: undefined }));
       }
     },
     [canvasManager.compositor, dispatch, entityIdentifier, entityIdentifierBelowThisOne]
@@ -46,28 +40,30 @@ export const RasterLayerMenuItemsBooleanSubMenu = memo(() => {
   const onCutAway = useCallback(() => perform('source-out'), [perform]);
   const onExclude = useCallback(() => perform('xor'), [perform]);
 
+  const disabled = isBusy || !entityIdentifierBelowThisOne;
+
   return (
-    <>
-      <MenuItem onMouseEnter={subMenu.onOpen} onMouseLeave={subMenu.onClose} isDisabled={isBusy || !entityIdentifierBelowThisOne}>
-        <SubMenuButtonContent label={t('controlLayers.booleanOps.label')} />
-      </MenuItem>
-      {subMenu.isOpen && (
-        <>
-          <MenuItem onClick={onIntersection} isDisabled={isBusy}>
+    <MenuItem {...subMenu.parentMenuItemProps} isDisabled={disabled}>
+      <Menu {...subMenu.menuProps}>
+        <MenuButton {...subMenu.menuButtonProps}>
+          <SubMenuButtonContent label={t('controlLayers.booleanOps.label')} />
+        </MenuButton>
+        <MenuList {...subMenu.menuListProps}>
+          <MenuItem onClick={onIntersection} isDisabled={disabled}>
             {t('controlLayers.booleanOps.intersection')}
           </MenuItem>
-          <MenuItem onClick={onCutout} isDisabled={isBusy}>
+          <MenuItem onClick={onCutout} isDisabled={disabled}>
             {t('controlLayers.booleanOps.cutout')}
           </MenuItem>
-          <MenuItem onClick={onCutAway} isDisabled={isBusy}>
+          <MenuItem onClick={onCutAway} isDisabled={disabled}>
             {t('controlLayers.booleanOps.cutAway')}
           </MenuItem>
-          <MenuItem onClick={onExclude} isDisabled={isBusy}>
+          <MenuItem onClick={onExclude} isDisabled={disabled}>
             {t('controlLayers.booleanOps.exclude')}
           </MenuItem>
-        </>
-      )}
-    </>
+        </MenuList>
+      </Menu>
+    </MenuItem>
   );
 });
 
