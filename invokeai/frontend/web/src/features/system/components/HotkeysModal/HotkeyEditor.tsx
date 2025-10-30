@@ -1,7 +1,8 @@
-import { Button, Flex, IconButton, Input, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Flex, IconButton, Input, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import type { Hotkey } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { hotkeyChanged, hotkeyReset } from 'features/system/store/hotkeysSlice';
+import type { ChangeEvent, KeyboardEvent } from 'react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiCheckBold, PiPencilBold, PiXBold } from 'react-icons/pi';
@@ -55,8 +56,12 @@ export const HotkeyEditor = memo(({ hotkey }: HotkeyEditorProps) => {
     dispatch(hotkeyReset(hotkeyId));
   }, [dispatch, hotkey.category, hotkey.id]);
 
+  const handleInputChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setEditValue(e.target.value);
+  }, []);
+
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
+    (e: KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Enter') {
         e.preventDefault();
         handleSave();
@@ -81,7 +86,7 @@ export const HotkeyEditor = memo(({ hotkey }: HotkeyEditorProps) => {
         <Input
           ref={inputRef}
           value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
+          onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           placeholder={t('hotkeys.enterHotkeys')}
           size="sm"
