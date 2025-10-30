@@ -46,5 +46,5 @@ export const hotkeysSliceConfig: SliceConfig<typeof slice> = {
   },
 };
 
-export const selectHotkeysSlice = (state: RootState) => state.hotkeys;
+const selectHotkeysSlice = (state: RootState) => state.hotkeys;
 export const selectCustomHotkeys = createSelector(selectHotkeysSlice, (hotkeys) => hotkeys.customHotkeys);
