@@ -436,6 +436,12 @@
         "enterHotkeys": "Enter hotkey(s), separated by commas",
         "save": "Save",
         "cancel": "Cancel",
+        "modifiers": "Modifiers",
+        "syntaxHelp": "Syntax Help",
+        "combineWith": "Combine with +",
+        "multipleHotkeys": "Multiple hotkeys with comma",
+        "validKeys": "Valid keys",
+        "help": "Help",
         "app": {
             "title": "App",
             "invoke": {
