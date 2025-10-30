@@ -9,6 +9,7 @@ import { rasterLayerGlobalCompositeOperationChanged } from 'features/controlLaye
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { CgPathBack, CgPathCrop, CgPathExclude, CgPathFront, CgPathIntersect } from 'react-icons/cg';
 
 export const RasterLayerMenuItemsBooleanSubMenu = memo(() => {
   const { t } = useTranslation();
@@ -42,22 +43,22 @@ export const RasterLayerMenuItemsBooleanSubMenu = memo(() => {
   const disabled = isBusy || !entityIdentifierBelowThisOne;
 
   return (
-    <MenuItem {...subMenu.parentMenuItemProps} isDisabled={disabled}>
+    <MenuItem {...subMenu.parentMenuItemProps} isDisabled={disabled} icon={<CgPathCrop size={18} />}>
       <Menu {...subMenu.menuProps}>
         <MenuButton {...subMenu.menuButtonProps}>
           <SubMenuButtonContent label={t('controlLayers.booleanOps.label')} />
         </MenuButton>
         <MenuList {...subMenu.menuListProps}>
-          <MenuItem onClick={onIntersection} isDisabled={disabled}>
+          <MenuItem onClick={onIntersection} isDisabled={disabled} icon={<CgPathIntersect size={18} />}>
             {t('controlLayers.booleanOps.intersection')}
           </MenuItem>
-          <MenuItem onClick={onCutout} isDisabled={disabled}>
+          <MenuItem onClick={onCutout} isDisabled={disabled} icon={<CgPathBack size={18} />}>
             {t('controlLayers.booleanOps.cutout')}
           </MenuItem>
-          <MenuItem onClick={onCutAway} isDisabled={disabled}>
+          <MenuItem onClick={onCutAway} isDisabled={disabled} icon={<CgPathFront size={18} />}>
             {t('controlLayers.booleanOps.cutAway')}
           </MenuItem>
-          <MenuItem onClick={onExclude} isDisabled={disabled}>
+          <MenuItem onClick={onExclude} isDisabled={disabled} icon={<CgPathExclude size={18} />}>
             {t('controlLayers.booleanOps.exclude')}
           </MenuItem>
         </MenuList>

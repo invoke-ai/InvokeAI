@@ -2085,7 +2085,7 @@
         "booleanOps": {
             "label": "Boolean Operations",
             "intersection": "Intersection",
-            "cutout": "Cutout",
+            "cutout": "Cut Out",
             "cutAway": "Cut Away",
             "exclude": "Exclude"
         },

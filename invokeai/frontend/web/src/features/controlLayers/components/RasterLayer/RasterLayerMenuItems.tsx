@@ -29,9 +29,9 @@ export const RasterLayerMenuItems = memo(() => {
       <CanvasEntityMenuItemsSelectObject />
       <RasterLayerMenuItemsAdjustments />
       <RasterLayerMenuItemsCompositeOperation />
-      <RasterLayerMenuItemsBooleanSubMenu />
       <MenuDivider />
       <CanvasEntityMenuItemsMergeDown />
+      <RasterLayerMenuItemsBooleanSubMenu />
       <RasterLayerMenuItemsCopyToSubMenu />
       <RasterLayerMenuItemsConvertToSubMenu />
       <CanvasEntityMenuItemsCropToBbox />
