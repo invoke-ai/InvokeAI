@@ -428,6 +428,14 @@
         "searchHotkeys": "Search Hotkeys",
         "clearSearch": "Clear Search",
         "noHotkeysFound": "No Hotkeys Found",
+        "editMode": "Edit Mode",
+        "viewMode": "View Mode",
+        "editHotkey": "Edit Hotkey",
+        "resetToDefault": "Reset to Default",
+        "resetAll": "Reset All to Default",
+        "enterHotkeys": "Enter hotkey(s), separated by commas",
+        "save": "Save",
+        "cancel": "Cancel",
         "app": {
             "title": "App",
             "invoke": {

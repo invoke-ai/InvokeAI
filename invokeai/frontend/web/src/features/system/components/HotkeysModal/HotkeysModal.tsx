@@ -1,4 +1,5 @@
 import {
+  Button,
   Divider,
   Flex,
   IconButton,
@@ -14,11 +15,13 @@ import {
   ModalOverlay,
   useDisclosure,
 } from '@invoke-ai/ui-library';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import type { Hotkey } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useHotkeyData } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
+import { allHotkeysReset } from 'features/system/store/hotkeysSlice';
 import type { ChangeEventHandler, ReactElement } from 'react';
 import { cloneElement, Fragment, memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -39,10 +42,16 @@ type TransformedHotkeysCategoryData = {
 const HotkeysModal = ({ children }: HotkeysModalProps) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { t } = useTranslation();
+  const dispatch = useAppDispatch();
   const [hotkeyFilter, setHotkeyFilter] = useState('');
+  const [isEditMode, setIsEditMode] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const clearHotkeyFilter = useCallback(() => setHotkeyFilter(''), []);
   const onChange = useCallback<ChangeEventHandler<HTMLInputElement>>((e) => setHotkeyFilter(e.target.value), []);
+  const toggleEditMode = useCallback(() => setIsEditMode((prev) => !prev), []);
+  const handleResetAll = useCallback(() => {
+    dispatch(allHotkeysReset());
+  }, [dispatch]);
   const hotkeysData = useHotkeyData();
   const filteredHotkeys = useMemo<TransformedHotkeysCategoryData[]>(() => {
     const trimmedHotkeyFilter = hotkeyFilter.trim().toLowerCase();
@@ -110,7 +119,7 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
                   <StickyScrollable key={category.title} title={category.title}>
                     {category.hotkeys.map((hotkey, i) => (
                       <Fragment key={hotkey.id}>
-                        <HotkeyListItem hotkey={hotkey} />
+                        <HotkeyListItem hotkey={hotkey} showEditor={isEditMode} />
                         {i < category.hotkeys.length - 1 && <Divider />}
                       </Fragment>
                     ))}
@@ -120,7 +129,18 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
               </Flex>
             </ScrollableContent>
           </ModalBody>
-          <ModalFooter />
+          <ModalFooter>
+            <Flex gap={2} w="full" justifyContent="space-between">
+              <Button onClick={toggleEditMode} size="sm">
+                {isEditMode ? t('hotkeys.viewMode') : t('hotkeys.editMode')}
+              </Button>
+              {isEditMode && (
+                <Button onClick={handleResetAll} size="sm" colorScheme="error">
+                  {t('hotkeys.resetAll')}
+                </Button>
+              )}
+            </Flex>
+          </ModalFooter>
         </ModalContent>
       </Modal>
     </>
