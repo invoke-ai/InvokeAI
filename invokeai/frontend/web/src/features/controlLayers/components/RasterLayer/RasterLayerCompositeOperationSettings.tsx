@@ -1,5 +1,6 @@
 import { Flex, FormControl, FormLabel, Select } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InpaintMaskDeleteModifierButton } from 'features/controlLayers/components/InpaintMask/InpaintMaskDeleteModifierButton';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { rasterLayerGlobalCompositeOperationChanged } from 'features/controlLayers/store/canvasSlice';
 import type { CompositeOperation } from 'features/controlLayers/store/compositeOperations';
@@ -33,11 +34,19 @@ export const RasterLayerCompositeOperationSettings = memo(() => {
     [dispatch, entityIdentifier]
   );
 
+  const onDelete = useCallback(() => {
+    dispatch(
+      rasterLayerGlobalCompositeOperationChanged({
+        entityIdentifier,
+        globalCompositeOperation: undefined,
+      })
+    );
+  }, [dispatch, entityIdentifier]);
+
   if (!showSettings) {
     return null;
   }
 
-  // Only expose the requested color blend modes in the UI
   const COLOR_BLEND_MODES: CompositeOperation[] = [
     'multiply',
     'screen',
@@ -57,14 +66,17 @@ export const RasterLayerCompositeOperationSettings = memo(() => {
   return (
     <Flex px={2} pb={2}>
       <FormControl>
-        <FormLabel>{t('controlLayers.compositeOperation.label')}</FormLabel>
-        <Select value={currentOperation} onChange={onChange} size="sm">
-          {COLOR_BLEND_MODES.map((op) => (
-            <option key={op} value={op}>
-              {op}
-            </option>
-          ))}
-        </Select>
+        <FormLabel m={0}>{t('controlLayers.compositeOperation.label')}</FormLabel>
+        <Flex alignItems="center" mb={1}>
+          <Select value={currentOperation} onChange={onChange} size="sm" flex={1} mr={2}>
+            {COLOR_BLEND_MODES.map((op) => (
+              <option key={op} value={op}>
+                {op}
+              </option>
+            ))}
+          </Select>
+          <InpaintMaskDeleteModifierButton onDelete={onDelete} />
+        </Flex>
       </FormControl>
     </Flex>
   );
