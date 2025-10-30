@@ -1,4 +1,4 @@
-import { allHotkeysReset, hotkeyChanged, hotkeyReset } from 'features/system/store/hotkeysSlice';
+import { allHotkeysReset, hotkeyChanged, hotkeyReset, hotkeysSliceConfig } from 'features/system/store/hotkeysSlice';
 import { describe, expect, it } from 'vitest';
 
 import type { HotkeysState } from './hotkeysTypes';
@@ -9,16 +9,13 @@ describe('Hotkeys Slice', () => {
     customHotkeys: {},
   });
 
+  const { reducer } = hotkeysSliceConfig.slice;
+
   describe('hotkeyChanged', () => {
     it('should add a custom hotkey', () => {
       const state = getInitialState();
       const action = hotkeyChanged({ id: 'app.invoke', hotkeys: ['ctrl+shift+enter'] });
-      const result = {
-        ...state,
-        customHotkeys: {
-          'app.invoke': ['ctrl+shift+enter'],
-        },
-      };
+      const result = reducer(state, action);
       expect(result).toEqual({
         _version: 1,
         customHotkeys: {
@@ -35,12 +32,7 @@ describe('Hotkeys Slice', () => {
         },
       };
       const action = hotkeyChanged({ id: 'app.invoke', hotkeys: ['ctrl+shift+enter'] });
-      const result = {
-        ...state,
-        customHotkeys: {
-          'app.invoke': ['ctrl+shift+enter'],
-        },
-      };
+      const result = reducer(state, action);
       expect(result).toEqual({
         _version: 1,
         customHotkeys: {
@@ -60,12 +52,7 @@ describe('Hotkeys Slice', () => {
         },
       };
       const action = hotkeyReset('app.invoke');
-      const result = {
-        ...state,
-        customHotkeys: {
-          'app.cancelQueueItem': ['shift+x'],
-        },
-      };
+      const result = reducer(state, action);
       expect(result.customHotkeys).toEqual({
         'app.cancelQueueItem': ['shift+x'],
       });
@@ -82,10 +69,7 @@ describe('Hotkeys Slice', () => {
         },
       };
       const action = allHotkeysReset();
-      const result = {
-        ...state,
-        customHotkeys: {},
-      };
+      const result = reducer(state, action);
       expect(result).toEqual({
         _version: 1,
         customHotkeys: {},
