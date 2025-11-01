@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { parseTokens, serialize, tokenize } from './promptAST';
 
 describe('promptAST', () => {
@@ -71,11 +72,7 @@ describe('promptAST', () => {
 
     it('should tokenize embeddings', () => {
       const tokens = tokenize('<embedding_name>');
-      expect(tokens).toEqual([
-        { type: 'lembed' },
-        { type: 'word', value: 'embedding_name' },
-        { type: 'rembed' },
-      ]);
+      expect(tokens).toEqual([{ type: 'lembed' }, { type: 'word', value: 'embedding_name' }, { type: 'rembed' }]);
     });
   });
 
