@@ -19,14 +19,16 @@ export type Token =
   | { type: 'rparen' }
   | { type: 'weight'; value: Attention }
   | { type: 'lembed' }
-  | { type: 'rembed' };
+  | { type: 'rembed' }
+  | { type: 'escaped_paren'; value: '(' | ')' };
 
 export type ASTNode =
   | { type: 'word'; text: Word; attention?: Attention }
   | { type: 'group'; children: ASTNode[]; attention?: Attention }
   | { type: 'embedding'; value: Embedding }
   | { type: 'whitespace'; value: Whitespace }
-  | { type: 'punct'; value: Punct };
+  | { type: 'punct'; value: Punct }
+  | { type: 'escaped_paren'; value: '(' | ')' };
 
 /**
  * Convert a prompt string into an AST.
@@ -52,6 +54,16 @@ export function tokenize(prompt: string): Token[] {
       tokens.push({ type: 'whitespace', value: char });
       i++;
       continue;
+    }
+
+    // Escaped parentheses (e.g., \( or \))
+    if (char === '\\' && i + 1 < prompt.length) {
+      const nextChar = prompt[i + 1];
+      if (nextChar === '(' || nextChar === ')') {
+        tokens.push({ type: 'escaped_paren', value: nextChar });
+        i += 2;
+        continue;
+      }
     }
 
     // Parentheses
@@ -210,6 +222,11 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
           nodes.push({ type: 'punct', value: punctToken.value });
           break;
         }
+        case 'escaped_paren': {
+          const escapedToken = consume() as Token & { type: 'escaped_paren' };
+          nodes.push({ type: 'escaped_paren', value: escapedToken.value });
+          break;
+        }
         default: {
           consume();
         }
@@ -235,6 +252,10 @@ export function serialize(ast: ASTNode[]): string {
       case 'punct':
       case 'whitespace': {
         prompt += node.value;
+        break;
+      }
+      case 'escaped_paren': {
+        prompt += `\\${node.value}`;
         break;
       }
       case 'word': {
