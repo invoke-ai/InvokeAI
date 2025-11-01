@@ -6,6 +6,7 @@ import { useEntityIdentifierContext } from 'features/controlLayers/contexts/Enti
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityIdentifierBelowThisOne } from 'features/controlLayers/hooks/useNextRenderableEntityIdentifier';
 import { rasterLayerGlobalCompositeOperationChanged } from 'features/controlLayers/store/canvasSlice';
+import type { CompositeOperation } from 'features/controlLayers/store/compositeOperations';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,7 +22,7 @@ export const RasterLayerMenuItemsBooleanSubMenu = memo(() => {
   const entityIdentifierBelowThisOne = useEntityIdentifierBelowThisOne(entityIdentifier as CanvasEntityIdentifier);
 
   const perform = useCallback(
-    async (op: GlobalCompositeOperation) => {
+    async (op: CompositeOperation) => {
       if (!entityIdentifierBelowThisOne) {
         return;
       }

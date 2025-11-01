@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InpaintMaskDeleteModifierButton } from 'features/controlLayers/components/InpaintMask/InpaintMaskDeleteModifierButton';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { rasterLayerGlobalCompositeOperationChanged } from 'features/controlLayers/store/canvasSlice';
-import type { CompositeOperation } from 'features/controlLayers/store/compositeOperations';
+import { COLOR_BLEND_MODES, type CompositeOperation } from 'features/controlLayers/store/compositeOperations';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
@@ -46,22 +46,6 @@ export const RasterLayerCompositeOperationSettings = memo(() => {
   if (!showSettings) {
     return null;
   }
-
-  const COLOR_BLEND_MODES: CompositeOperation[] = [
-    'multiply',
-    'screen',
-    'darken',
-    'lighten',
-    'color-dodge',
-    'color-burn',
-    'hard-light',
-    'soft-light',
-    'difference',
-    'hue',
-    'saturation',
-    'color',
-    'luminosity',
-  ];
 
   return (
     <Flex px={2} pb={2}>

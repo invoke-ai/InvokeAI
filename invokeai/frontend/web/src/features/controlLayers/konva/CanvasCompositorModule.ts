@@ -29,6 +29,7 @@ import type {
 } from 'features/controlLayers/store/types';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
+import type { CompositeOperation } from 'features/controlLayers/store/compositeOperations';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { atom, computed } from 'nanostores';
@@ -46,7 +47,7 @@ type CompositingOptions = {
    * The global composite operation to use when compositing each entity.
    * See: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/globalCompositeOperation
    */
-  globalCompositeOperation?: GlobalCompositeOperation;
+  globalCompositeOperation?: CompositeOperation;
 };
 
 /**

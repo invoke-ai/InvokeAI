@@ -1,6 +1,7 @@
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import { COMPOSITE_OPERATIONS } from 'features/controlLayers/store/compositeOperations';
+export type { CompositeOperation } from 'features/controlLayers/store/compositeOperations';
 import { zMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
 import {
   zParameterCanvasCoherenceMode,
