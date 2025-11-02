@@ -36,18 +36,18 @@ export type CompositeOperation = (typeof COMPOSITE_OPERATIONS)[number];
 
 // Subset of color blend modes for UI selection
 export const COLOR_BLEND_MODES: CompositeOperation[] = [
-  'multiply',
-  'screen',
+  'color',
+  'hue',
   'overlay',
+  'soft-light',
+  'hard-light',
+  'screen',
+  'color-burn',
+  'color-dodge',
+  'multiply',
   'darken',
   'lighten',
-  'color-dodge',
-  'color-burn',
-  'hard-light',
-  'soft-light',
   'difference',
-  'hue',
-  'saturation',
-  'color',
   'luminosity',
+  'saturation',
 ];
