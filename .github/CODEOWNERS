@@ -1,12 +1,12 @@
 # continuous integration
-/.github/workflows/  @lstein @blessedcoolant @jazzhaiku 
+/.github/workflows/  @lstein @blessedcoolant  
 
 # documentation
 /docs/ @lstein @blessedcoolant  
 /mkdocs.yml @lstein @blessedcoolant  
 
 # nodes
-/invokeai/app/ @blessedcoolant @lstein @jazzhaiku
+/invokeai/app/ @blessedcoolant @lstein 
 
 # installation and configuration
 /pyproject.toml  @lstein @blessedcoolant  
@@ -21,7 +21,7 @@
 /invokeai/frontend @blessedcoolant  @lstein  
 
 # generation, model management, postprocessing
-/invokeai/backend  @lstein @blessedcoolant  @jazzhaiku   
+/invokeai/backend  @lstein @blessedcoolant     
 
 # front ends
 /invokeai/frontend/CLI @lstein  
