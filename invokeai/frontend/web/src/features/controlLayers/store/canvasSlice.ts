@@ -7,6 +7,7 @@ import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMul
 import { merge } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasReset } from 'features/controlLayers/store/actions';
+import type { CompositeOperation } from 'features/controlLayers/store/compositeOperations';
 import { modelChanged } from 'features/controlLayers/store/paramsSlice';
 import {
   selectAllEntities,
@@ -70,7 +71,6 @@ import type {
   IPMethodV2,
   T2IAdapterConfig,
 } from './types';
-import type { CompositeOperation } from 'features/controlLayers/store/compositeOperations';
 import {
   ASPECT_RATIO_MAP,
   DEFAULT_ASPECT_RATIO_CONFIG,
@@ -194,9 +194,7 @@ const slice = createSlice({
     },
     rasterLayerGlobalCompositeOperationChanged: (
       state,
-      action: PayloadAction<
-        EntityIdentifierPayload<{ globalCompositeOperation?: CompositeOperation }, 'raster_layer'>
-      >
+      action: PayloadAction<EntityIdentifierPayload<{ globalCompositeOperation?: CompositeOperation }, 'raster_layer'>>
     ) => {
       const { entityIdentifier, globalCompositeOperation } = action.payload;
       const layer = selectEntity(state, entityIdentifier);

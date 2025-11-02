@@ -14,6 +14,7 @@ import {
   mapId,
   previewBlob,
 } from 'features/controlLayers/konva/util';
+import type { CompositeOperation } from 'features/controlLayers/store/compositeOperations';
 import {
   selectActiveControlLayerEntities,
   selectActiveInpaintMaskEntities,
@@ -29,7 +30,6 @@ import type {
 } from 'features/controlLayers/store/types';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
-import type { CompositeOperation } from 'features/controlLayers/store/compositeOperations';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { atom, computed } from 'nanostores';
