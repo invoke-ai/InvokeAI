@@ -30,6 +30,11 @@ export type ASTNode =
   | { type: 'punct'; value: Punct }
   | { type: 'escaped_paren'; value: '(' | ')' };
 
+const WEIGHT_PATTERN = /^[+-]?(\d+(\.\d+)?|[+-]+)/;
+const WHITESPACE_PATTERN = /^\s+/;
+const PUNCTUATION_PATTERN = /^[.,]/;
+const OTHER_PATTERN = /\s/;
+
 /**
  * Convert a prompt string into an AST.
  * @param prompt string
@@ -40,106 +45,172 @@ export function tokenize(prompt: string): Token[] {
     return [];
   }
 
-  let i = 0;
+  const len = prompt.length;
   let tokens: Token[] = [];
+  let i = 0;
 
-  while (i < prompt.length) {
+  while (i < len) {
     const char = prompt[i];
     if (!char) {
       break;
     }
 
-    // Whitespace (including newlines)
-    if (/\s/.test(char)) {
-      tokens.push({ type: 'whitespace', value: char });
-      i++;
-      continue;
-    }
+    const result =
+      tokenizeWhitespace(char, i) ||
+      tokenizeEscapedParen(prompt, i) ||
+      tokenizeLeftParen(char, i) ||
+      tokenizeRightParen(prompt, i) ||
+      tokenizeEmbedding(char, i) ||
+      tokenizeWord(prompt, i) ||
+      tokenizePunctuation(char, i) ||
+      tokenizeOther(char, i);
 
-    // Escaped parentheses (e.g., \( or \))
-    if (char === '\\' && i + 1 < prompt.length) {
-      const nextChar = prompt[i + 1];
-      if (nextChar === '(' || nextChar === ')') {
-        tokens.push({ type: 'escaped_paren', value: nextChar });
-        i += 2;
-        continue;
+    if (result) {
+      if (result.token) {
+        tokens.push(result.token);
       }
-    }
-
-    // Parentheses
-    if (char === '(') {
-      tokens.push({ type: 'lparen' });
-      i++;
-      continue;
-    }
-
-    if (char === ')') {
-      // Look ahead for weight like ')1.1' or ')-0.9' or ')+' or ')-'
-      const weightMatch = prompt.slice(i + 1).match(/^[+-]?(\d+(\.\d+)?|[+-]+)/);
-      if (weightMatch && weightMatch[0]) {
-        let weight: Attention = weightMatch[0];
-        if (!isNaN(Number(weight))) {
-          weight = Number(weight);
-        }
-        tokens.push({ type: 'rparen' });
-        tokens.push({ type: 'weight', value: weight });
-        i += 1 + weightMatch[0].length;
-        continue;
+      if (result.extraToken) {
+        tokens.push(result.extraToken);
       }
-      tokens.push({ type: 'rparen' });
+      i = result.nextIndex;
+    } else {
       i++;
-      continue;
     }
-
-    // Handle punctuation (comma, period, etc.)
-    if (/[,.]/.test(char)) {
-      tokens.push({ type: 'punct', value: char });
-      i++;
-      continue;
-    }
-
-    // Read a word (letters, digits, underscores)
-    if (/[a-zA-Z0-9_]/.test(char)) {
-      let j = i;
-      while (j < prompt.length && /[a-zA-Z0-9_]/.test(prompt[j]!)) {
-        j++;
-      }
-      const word = prompt.slice(i, j);
-      tokens.push({ type: 'word', value: word });
-
-      // Check for weight immediately after word (e.g., "Lorem+", "consectetur-")
-      const weightMatch = prompt.slice(j).match(/^[+-]?(\d+(\.\d+)?|[+-]+)/);
-      if (weightMatch && weightMatch[0]) {
-        tokens.push({ type: 'weight', value: weightMatch[0] });
-        i = j + weightMatch[0].length;
-      } else {
-        i = j;
-      }
-      continue;
-    }
-
-    // Embeddings
-    if (char === '<') {
-      tokens.push({ type: 'lembed' });
-      i++;
-      continue;
-    }
-
-    if (char === '>') {
-      tokens.push({ type: 'rembed' });
-      i++;
-      continue;
-    }
-
-    // Any other single character punctuation
-    if (!/\s/.test(char)) {
-      tokens.push({ type: 'punct', value: char });
-    }
-
-    i++;
   }
 
   return tokens;
+}
+
+type TokenizeResult = {
+  token?: Token;
+  extraToken?: Token;
+  nextIndex: number;
+} | null;
+
+function tokenizeWhitespace(char: string, i: number): TokenizeResult {
+  if (WHITESPACE_PATTERN.test(char)) {
+    return {
+      token: { type: 'whitespace', value: char },
+      nextIndex: i + 1,
+    };
+  }
+  return null;
+}
+
+function tokenizeEscapedParen(prompt: string, i: number): TokenizeResult {
+  const char = prompt[i];
+  if (char === '\\' && i + 1 < prompt.length) {
+    const nextChar = prompt[i + 1];
+    if (nextChar === '(' || nextChar === ')') {
+      return {
+        token: { type: 'escaped_paren', value: nextChar },
+        nextIndex: i + 2,
+      };
+    }
+  }
+  return null;
+}
+
+function tokenizeLeftParen(char: string, i: number): TokenizeResult {
+  if (char === '(') {
+    return {
+      token: { type: 'lparen' },
+      nextIndex: i + 1,
+    };
+  }
+  return null;
+}
+
+function tokenizeRightParen(prompt: string, i: number): TokenizeResult {
+  const char = prompt[i];
+  if (char === ')') {
+    // Look ahead for weight like ')1.1' or ')-0.9' or ')+' or ')-'
+    const weightMatch = prompt.slice(i + 1).match(WEIGHT_PATTERN);
+    if (weightMatch && weightMatch[0]) {
+      let weight: Attention = weightMatch[0];
+      if (!isNaN(Number(weight))) {
+        weight = Number(weight);
+      }
+      return {
+        token: { type: 'rparen' },
+        extraToken: { type: 'weight', value: weight },
+        nextIndex: i + 1 + weightMatch[0].length,
+      };
+    }
+    return {
+      token: { type: 'rparen' },
+      nextIndex: i + 1,
+    };
+  }
+  return null;
+}
+
+function tokenizePunctuation(char: string, i: number): TokenizeResult {
+  if (PUNCTUATION_PATTERN.test(char)) {
+    return {
+      token: { type: 'punct', value: char },
+      nextIndex: i + 1,
+    };
+  }
+  return null;
+}
+
+function tokenizeWord(prompt: string, i: number): TokenizeResult {
+  const char = prompt[i];
+  if (!char) {
+    return null;
+  }
+
+  if (/[a-zA-Z0-9_]/.test(char)) {
+    let j = i;
+    while (j < prompt.length && /[a-zA-Z0-9_]/.test(prompt[j]!)) {
+      j++;
+    }
+    const word = prompt.slice(i, j);
+
+    // Check for weight immediately after word (e.g., "Lorem+", "consectetur-")
+    const weightMatch = prompt.slice(j).match(/^[+-]?(\d+(\.\d+)?|[+-]+)/);
+    if (weightMatch && weightMatch[0]) {
+      return {
+        token: { type: 'word', value: word },
+        extraToken: { type: 'weight', value: weightMatch[0] },
+        nextIndex: j + weightMatch[0].length,
+      };
+    }
+
+    return {
+      token: { type: 'word', value: word },
+      nextIndex: j,
+    };
+  }
+  return null;
+}
+
+function tokenizeEmbedding(char: string, i: number): TokenizeResult {
+  if (char === '<') {
+    return {
+      token: { type: 'lembed' },
+      nextIndex: i + 1,
+    };
+  }
+  if (char === '>') {
+    return {
+      token: { type: 'rembed' },
+      nextIndex: i + 1,
+    };
+  }
+  return null;
+}
+
+function tokenizeOther(char: string, i: number): TokenizeResult {
+  // Any other single character punctuation
+  if (OTHER_PATTERN.test(char)) {
+    return {
+      token: { type: 'punct', value: char },
+      nextIndex: i + 1,
+    };
+  }
+  return null;
 }
 
 /**
