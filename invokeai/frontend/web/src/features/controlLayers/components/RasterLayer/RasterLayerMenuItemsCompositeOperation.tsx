@@ -20,8 +20,8 @@ export const RasterLayerMenuItemsCompositeOperation = memo(() => {
     if (hasCompositeOperation) {
       dispatch(rasterLayerGlobalCompositeOperationChanged({ entityIdentifier, globalCompositeOperation: undefined }));
     } else {
-      // default to multiply when enabling blend modes
-      dispatch(rasterLayerGlobalCompositeOperationChanged({ entityIdentifier, globalCompositeOperation: 'multiply' }));
+      // default to color when enabling blend modes
+      dispatch(rasterLayerGlobalCompositeOperationChanged({ entityIdentifier, globalCompositeOperation: 'color' }));
     }
   }, [dispatch, entityIdentifier, hasCompositeOperation]);
 
