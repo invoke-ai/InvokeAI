@@ -1,31 +1,32 @@
 # continuous integration
-/.github/workflows/  @lstein @blessedcoolant @hipsterusername @ebr @jazzhaiku @psychedelicious
+/.github/workflows/  @lstein @blessedcoolant @jazzhaiku 
 
 # documentation
-/docs/ @lstein @blessedcoolant @hipsterusername @psychedelicious
-/mkdocs.yml @lstein @blessedcoolant @hipsterusername @psychedelicious
+/docs/ @lstein @blessedcoolant  
+/mkdocs.yml @lstein @blessedcoolant  
 
 # nodes
-/invokeai/app/ @blessedcoolant @psychedelicious @hipsterusername @jazzhaiku
+/invokeai/app/ @blessedcoolant @lstein @jazzhaiku
 
 # installation and configuration
-/pyproject.toml  @lstein @blessedcoolant @psychedelicious @hipsterusername
-/docker/  @lstein @blessedcoolant @psychedelicious @hipsterusername @ebr
-/scripts/ @ebr @lstein @psychedelicious @hipsterusername
-/installer/ @lstein @ebr @psychedelicious @hipsterusername
-/invokeai/assets @lstein @ebr @psychedelicious @hipsterusername
-/invokeai/configs @lstein @psychedelicious @hipsterusername
-/invokeai/version @lstein @blessedcoolant @psychedelicious @hipsterusername
+/pyproject.toml  @lstein @blessedcoolant  
+/docker/  @lstein @blessedcoolant
+/scripts/  @lstein  
+/installer/ @lstein   
+/invokeai/assets @lstein   
+/invokeai/configs @lstein  
+/invokeai/version @lstein @blessedcoolant  
 
 # web ui
-/invokeai/frontend @blessedcoolant @psychedelicious @lstein @maryhipp @hipsterusername
+/invokeai/frontend @blessedcoolant  @lstein  
 
 # generation, model management, postprocessing
-/invokeai/backend  @lstein @blessedcoolant @hipsterusername @jazzhaiku @psychedelicious @maryhipp 
+/invokeai/backend  @lstein @blessedcoolant  @jazzhaiku   
 
 # front ends
-/invokeai/frontend/CLI @lstein @psychedelicious @hipsterusername
-/invokeai/frontend/install @lstein @ebr @psychedelicious @hipsterusername
-/invokeai/frontend/merge @lstein @blessedcoolant @psychedelicious @hipsterusername
-/invokeai/frontend/training @lstein @blessedcoolant @psychedelicious @hipsterusername
-/invokeai/frontend/web @psychedelicious @blessedcoolant @maryhipp @hipsterusername
+/invokeai/frontend/CLI @lstein  
+/invokeai/frontend/install @lstein   
+/invokeai/frontend/merge @lstein @blessedcoolant  
+/invokeai/frontend/training @lstein @blessedcoolant  
+/invokeai/frontend/web  @blessedcoolant  @lstein
+
