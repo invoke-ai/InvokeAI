@@ -2082,6 +2082,24 @@
             "add": "Add Blend Mode",
             "remove": "Remove Blend Mode"
         },
+        "compositeOperations": {
+            "blendModes": {
+                "color": "Color",
+                "hue": "Hue",
+                "overlay": "Overlay",
+                "soft-light": "Soft Light",
+                "hard-light": "Hard Light",
+                "screen": "Screen",
+                "color-burn": "Color Burn",
+                "color-dodge": "Color Dodge",
+                "multiply": "Multiply",
+                "darken": "Darken",
+                "lighten": "Lighten",
+                "difference": "Difference",
+                "luminosity": "Luminosity",
+                "saturation": "Saturation"
+            }
+        },
         "booleanOps": {
             "label": "Boolean Operations",
             "intersection": "Intersection",
