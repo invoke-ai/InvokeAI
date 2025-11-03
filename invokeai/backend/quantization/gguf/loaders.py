@@ -4,25 +4,25 @@ from pathlib import Path
 import gguf
 import torch
 
-from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.utils import TORCH_COMPATIBLE_QTYPES
+from invokeai.backend.util.logging import InvokeAILogger
 
 logger = InvokeAILogger.get_logger()
 
 class WrappedGGUFReader:
     """Wrapper around GGUFReader that adds a close() method."""
-    
+
     def __init__(self, path: Path):
         self.reader = gguf.GGUFReader(path)
-    
+
     def __enter__(self):
         return self.reader
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
         return False
-    
+
     def close(self):
         """Explicitly close the memory-mapped file."""
         if hasattr(self.reader, 'data') and hasattr(self.reader.data, '_mmap'):
