@@ -55,7 +55,7 @@ export const RasterLayerCompositeOperationSettings = memo(() => {
           <Select value={currentOperation} onChange={onChange} size="sm" flex={1} mr={2}>
             {COLOR_BLEND_MODES.map((op) => (
               <option key={op} value={op}>
-                {op}
+                {t(`controlLayers.compositeOperation.blendModes.${op}`)}
               </option>
             ))}
           </Select>

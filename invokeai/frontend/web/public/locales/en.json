@@ -2080,9 +2080,7 @@
         "compositeOperation": {
             "label": "Blend Mode",
             "add": "Add Blend Mode",
-            "remove": "Remove Blend Mode"
-        },
-        "compositeOperations": {
+            "remove": "Remove Blend Mode",
             "blendModes": {
                 "color": "Color",
                 "hue": "Hue",
