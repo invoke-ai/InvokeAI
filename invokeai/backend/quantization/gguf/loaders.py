@@ -3,12 +3,12 @@ from pathlib import Path
 
 import gguf
 import torch
-
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.utils import TORCH_COMPATIBLE_QTYPES
 from invokeai.backend.util.logging import InvokeAILogger
 
 logger = InvokeAILogger.get_logger()
+
 
 class WrappedGGUFReader:
     """Wrapper around GGUFReader that adds a close() method."""
@@ -25,7 +25,7 @@ class WrappedGGUFReader:
 
     def close(self):
         """Explicitly close the memory-mapped file."""
-        if hasattr(self.reader, 'data') and hasattr(self.reader.data, '_mmap'):
+        if hasattr(self.reader, "data") and hasattr(self.reader.data, "_mmap"):
             try:
                 self.reader.data._mmap.close()
             except (AttributeError, OSError, ValueError) as e:
@@ -43,6 +43,9 @@ def gguf_sd_loader(path: Path, compute_dtype: torch.dtype) -> dict[str, GGMLTens
             if tensor.tensor_type in TORCH_COMPATIBLE_QTYPES:
                 torch_tensor = torch_tensor.view(*shape)
             sd[tensor.name] = GGMLTensor(
-                torch_tensor, ggml_quantization_type=tensor.tensor_type, tensor_shape=shape, compute_dtype=compute_dtype
+                torch_tensor,
+                ggml_quantization_type=tensor.tensor_type,
+                tensor_shape=shape,
+                compute_dtype=compute_dtype,
             )
         return sd
