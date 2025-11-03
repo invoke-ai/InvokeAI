@@ -88,7 +88,7 @@ class ControlNet_Diffusers_Config_Base(Diffusers_Config_Base):
 
         cls._validate_base(mod)
 
-        repo_variant = {'repo_variant': override_fields.get("repo_variant", cls._get_repo_variant_or_raise(mod))}
+        repo_variant = {"repo_variant": override_fields.get("repo_variant", cls._get_repo_variant_or_raise(mod))}
         args = override_fields | repo_variant
         return cls(**args)
 
