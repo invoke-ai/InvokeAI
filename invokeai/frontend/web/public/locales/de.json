@@ -1630,12 +1630,6 @@
         "showNonRasterLayers": "Nicht-Rasterebenen anzeigen (Umschalt+H)",
         "hideNonRasterLayers": "Nicht-Rasterebenen ausblenden (Umschalt+H)"
     },
-    "upsell": {
-        "shareAccess": "Zugang teilen",
-        "professional": "Professionell",
-        "inviteTeammates": "Teamkollegen einladen",
-        "professionalUpsell": "Verfügbar in der Professional Edition von Invoke. Klicken Sie hier oder besuchen Sie invoke.com/pricing für weitere Details."
-    },
     "upscaling": {
         "creativity": "Kreativität",
         "structure": "Struktur",
