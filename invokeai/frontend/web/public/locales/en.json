@@ -442,6 +442,15 @@
         "multipleHotkeys": "Multiple hotkeys with comma",
         "validKeys": "Valid keys",
         "help": "Help",
+        "noHotkeysRecorded": "No hotkeys recorded yet",
+        "pressKeys": "Press keys...",
+        "setHotkey": "SET",
+        "setAnother": "SET ANOTHER",
+        "removeLastHotkey": "Remove last hotkey",
+        "clearAll": "Clear All",
+        "duplicateWarning": "This hotkey is already recorded",
+        "conflictWarning": "is already used by \"{{hotkeyTitle}}\"",
+        "thisHotkey": "this hotkey",
         "app": {
             "title": "App",
             "invoke": {

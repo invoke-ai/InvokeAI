@@ -1,11 +1,11 @@
-import { Button, Flex, IconButton, Input, Kbd, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Button, Flex, IconButton, Kbd, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import type { Hotkey } from 'features/system/components/HotkeysModal/useHotkeyData';
+import { useHotkeyData } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { hotkeyChanged, hotkeyReset } from 'features/system/store/hotkeysSlice';
-import type { ChangeEvent, KeyboardEvent } from 'react';
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowCounterClockwiseBold, PiCheckBold, PiInfoBold, PiPencilBold, PiXBold } from 'react-icons/pi';
+import { PiArrowCounterClockwiseBold, PiCheckBold, PiPencilBold, PiTrashBold, PiXBold } from 'react-icons/pi';
 
 type HotkeyEditorProps = {
   hotkey: Hotkey;
@@ -15,218 +15,331 @@ const formatHotkeyForDisplay = (keys: string[]): string => {
   return keys.join(', ');
 };
 
-const parseHotkeyInput = (input: string): string[] => {
-  return input
-    .split(',')
-    .map((k) => k.trim())
-    .filter((k) => k.length > 0);
+// Normalize key names for consistent storage
+const normalizeKey = (key: string): string => {
+  const keyMap: Record<string, string> = {
+    Control: 'ctrl',
+    Meta: 'mod',
+    Command: 'mod',
+    Alt: 'alt',
+    Shift: 'shift',
+    ' ': 'space',
+  };
+  return keyMap[key] || key.toLowerCase();
 };
 
-const validateHotkey = (hotkey: string): boolean => {
-  // Basic validation: check if hotkey has valid format
-  const parts = hotkey.split('+').map((p) => p.trim());
-  if (parts.length === 0) {
-    return false;
+// Order of modifiers for consistent output
+const MODIFIER_ORDER = ['mod', 'ctrl', 'shift', 'alt'];
+
+const isModifierKey = (key: string): boolean => {
+  return ['mod', 'ctrl', 'shift', 'alt', 'control', 'meta', 'command'].includes(key.toLowerCase());
+};
+
+// Build hotkey string from pressed keys
+const buildHotkeyString = (keys: Set<string>): string | null => {
+  const normalizedKeys = Array.from(keys).map(normalizeKey);
+  const modifiers = normalizedKeys.filter((k) => MODIFIER_ORDER.includes(k));
+  const regularKeys = normalizedKeys.filter((k) => !MODIFIER_ORDER.includes(k));
+
+  // Must have at least one non-modifier key
+  if (regularKeys.length === 0) {
+    return null;
   }
-  // Last part should be a key, not a modifier
-  const lastPart = parts[parts.length - 1];
-  if (!lastPart) {
-    return false;
-  }
-  return lastPart.length > 0 && !['mod', 'ctrl', 'shift', 'alt', 'meta'].includes(lastPart.toLowerCase());
+
+  // Sort modifiers in consistent order
+  const sortedModifiers = modifiers.sort((a, b) => MODIFIER_ORDER.indexOf(a) - MODIFIER_ORDER.indexOf(b));
+
+  // Combine modifiers + regular key (only use first regular key)
+  return [...sortedModifiers, regularKeys[0]].join('+');
 };
 
 export const HotkeyEditor = memo(({ hotkey }: HotkeyEditorProps) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const allHotkeysData = useHotkeyData();
   const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordedHotkeys, setRecordedHotkeys] = useState<string[]>([]);
+  const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
+  const [duplicateWarning, setDuplicateWarning] = useState<{ hotkeyString: string; conflictTitle: string } | null>(
+    null
+  );
 
   const isCustomized = hotkey.hotkeys.join(',') !== hotkey.defaultHotkeys.join(',');
 
+  // Build a flat map of all hotkeys for conflict detection
+  const allHotkeysMap = useMemo(() => {
+    const map = new Map<string, { category: string; id: string; title: string }>();
+    Object.entries(allHotkeysData).forEach(([category, categoryData]) => {
+      Object.entries(categoryData.hotkeys).forEach(([id, hotkeyData]) => {
+        hotkeyData.hotkeys.forEach((hotkeyString) => {
+          map.set(hotkeyString, { category, id, title: hotkeyData.title });
+        });
+      });
+    });
+    return map;
+  }, [allHotkeysData]);
+
+  // Check if a hotkey conflicts with another hotkey (not the current one)
+  const findConflict = useCallback(
+    (hotkeyString: string): { title: string } | null => {
+      const conflict = allHotkeysMap.get(hotkeyString);
+      if (!conflict) {
+        return null;
+      }
+      // Check if it's the same hotkey we're editing
+      const currentHotkeyId = `${hotkey.category}.${hotkey.id}`;
+      const conflictId = `${conflict.category}.${conflict.id}`;
+      if (currentHotkeyId === conflictId) {
+        // It's the same hotkey, check if it's already in recordedHotkeys
+        return null;
+      }
+      return { title: conflict.title };
+    },
+    [allHotkeysMap, hotkey.category, hotkey.id]
+  );
+
   const handleEdit = useCallback(() => {
-    setEditValue(formatHotkeyForDisplay(hotkey.hotkeys));
+    setRecordedHotkeys([...hotkey.hotkeys]);
     setIsEditing(true);
+    setIsRecording(false);
   }, [hotkey.hotkeys]);
 
   const handleCancel = useCallback(() => {
     setIsEditing(false);
-    setEditValue('');
+    setIsRecording(false);
+    setRecordedHotkeys([]);
+    setPressedKeys(new Set());
   }, []);
 
-  const isValid = useMemo(() => {
-    const keys = parseHotkeyInput(editValue);
-    return keys.length > 0 && keys.every((k) => validateHotkey(k));
-  }, [editValue]);
-
-  const previewKeys = useMemo(() => {
-    return parseHotkeyInput(editValue);
-  }, [editValue]);
-
   const handleSave = useCallback(() => {
-    const newKeys = parseHotkeyInput(editValue);
-    if (newKeys.length > 0 && newKeys.every((k) => validateHotkey(k))) {
+    if (recordedHotkeys.length > 0) {
       const hotkeyId = `${hotkey.category}.${hotkey.id}`;
-      dispatch(hotkeyChanged({ id: hotkeyId, hotkeys: newKeys }));
+      dispatch(hotkeyChanged({ id: hotkeyId, hotkeys: recordedHotkeys }));
       setIsEditing(false);
-      setEditValue('');
+      setIsRecording(false);
+      setRecordedHotkeys([]);
+      setPressedKeys(new Set());
     }
-  }, [dispatch, editValue, hotkey.category, hotkey.id]);
+  }, [dispatch, recordedHotkeys, hotkey.category, hotkey.id]);
 
   const handleReset = useCallback(() => {
     const hotkeyId = `${hotkey.category}.${hotkey.id}`;
     dispatch(hotkeyReset(hotkeyId));
   }, [dispatch, hotkey.category, hotkey.id]);
 
-  const handleInputChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    setEditValue(e.target.value);
+  const startRecording = useCallback(() => {
+    setIsRecording(true);
+    setPressedKeys(new Set());
+    setDuplicateWarning(null);
   }, []);
 
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        handleSave();
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        handleCancel();
-      }
-    },
-    [handleSave, handleCancel]
-  );
+  const clearLastRecorded = useCallback(() => {
+    setRecordedHotkeys((prev) => prev.slice(0, -1));
+  }, []);
 
-  // Insert modifier at cursor position
-  const insertModifier = useCallback(
-    (modifier: string) => {
-      if (!inputRef.current) {
+  const clearAllRecorded = useCallback(() => {
+    setRecordedHotkeys([]);
+  }, []);
+
+  // Handle keyboard events during recording
+  useEffect(() => {
+    if (!isRecording) {
+      return;
+    }
+
+    const handleKeyDown = (e: globalThis.KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Ignore pure modifier keys being pressed
+      if (isModifierKey(e.key)) {
+        setPressedKeys((prev) => new Set(prev).add(e.key));
         return;
       }
 
-      const input = inputRef.current;
-      const start = input.selectionStart ?? editValue.length;
-      const end = input.selectionEnd ?? editValue.length;
-      const before = editValue.slice(0, start);
-      const after = editValue.slice(end);
+      // Build the complete key combination
+      const keys = new Set<string>();
+      if (e.ctrlKey) {
+        keys.add('Control');
+      }
+      if (e.shiftKey) {
+        keys.add('Shift');
+      }
+      if (e.altKey) {
+        keys.add('Alt');
+      }
+      if (e.metaKey) {
+        keys.add('Meta');
+      }
+      keys.add(e.key);
 
-      // Smart insertion: add + if not at start and previous char is not a separator
-      const needsPrefix = start > 0 && before.slice(-1) !== '+' && before.slice(-1) !== ',' && before.slice(-1) !== ' ';
-      const prefix = needsPrefix ? '+' : '';
+      setPressedKeys(keys);
 
-      const newValue = `${before + prefix + modifier}+${after}`;
-      setEditValue(newValue);
+      // Build hotkey string
+      const hotkeyString = buildHotkeyString(keys);
+      if (hotkeyString) {
+        // Check for duplicates in current recorded hotkeys
+        setRecordedHotkeys((prev) => {
+          if (prev.includes(hotkeyString)) {
+            setDuplicateWarning({ hotkeyString, conflictTitle: t('hotkeys.thisHotkey') });
+            setIsRecording(false);
+            setPressedKeys(new Set());
+            return prev;
+          }
 
-      // Move cursor after the inserted modifier and +
-      setTimeout(() => {
-        const newPosition = start + prefix.length + modifier.length + 1;
-        input.setSelectionRange(newPosition, newPosition);
-        input.focus();
-      }, 0);
-    },
-    [editValue]
-  );
+          // Check for conflicts with other hotkeys in the system
+          const conflict = findConflict(hotkeyString);
+          if (conflict) {
+            setDuplicateWarning({ hotkeyString, conflictTitle: conflict.title });
+            setIsRecording(false);
+            setPressedKeys(new Set());
+            return prev;
+          }
 
-  const insertMod = useCallback(() => insertModifier('mod'), [insertModifier]);
-  const insertCtrl = useCallback(() => insertModifier('ctrl'), [insertModifier]);
-  const insertShift = useCallback(() => insertModifier('shift'), [insertModifier]);
-  const insertAlt = useCallback(() => insertModifier('alt'), [insertModifier]);
+          setDuplicateWarning(null);
+          setIsRecording(false);
+          setPressedKeys(new Set());
+          return [...prev, hotkeyString];
+        });
+      }
+    };
 
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [isEditing]);
+    const handleKeyUp = (e: globalThis.KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keyup', handleKeyUp, true);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('keyup', handleKeyUp, true);
+    };
+  }, [isRecording, findConflict, t]);
 
   if (isEditing) {
     return (
-      <Flex direction="column" gap={2} w="full">
-        <Flex gap={2} alignItems="center">
-          <Input
-            ref={inputRef}
-            value={editValue}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            placeholder={t('hotkeys.enterHotkeys')}
-            size="sm"
-            flex={1}
-            borderColor={editValue && !isValid ? 'error.500' : undefined}
-          />
-          <IconButton
-            aria-label={t('hotkeys.save')}
-            icon={<PiCheckBold />}
-            onClick={handleSave}
-            size="sm"
-            colorScheme="invokeBlue"
-            isDisabled={!isValid}
-          />
-          <IconButton aria-label={t('hotkeys.cancel')} icon={<PiXBold />} onClick={handleCancel} size="sm" />
-        </Flex>
-        <Flex gap={2} alignItems="center" flexWrap="wrap">
-          <Text fontSize="xs" color="base.300">
-            {t('hotkeys.modifiers')}:
-          </Text>
-          <Button size="xs" onClick={insertMod} variant="outline">
-            Mod
-          </Button>
-          <Button size="xs" onClick={insertCtrl} variant="outline">
-            Ctrl
-          </Button>
-          <Button size="xs" onClick={insertShift} variant="outline">
-            Shift
-          </Button>
-          <Button size="xs" onClick={insertAlt} variant="outline">
-            Alt
-          </Button>
-          <Tooltip
-            label={
-              <Flex direction="column" gap={1} fontSize="xs">
-                <Text fontWeight="semibold">{t('hotkeys.syntaxHelp')}</Text>
-                <Text>• mod = Ctrl (Win/Linux) / Cmd (Mac)</Text>
-                <Text>• {t('hotkeys.combineWith')}: mod+shift+a</Text>
-                <Text>• {t('hotkeys.multipleHotkeys')}: mod+a, ctrl+b</Text>
-                <Text>• {t('hotkeys.validKeys')}: a-z, 0-9, f1-f12, enter, space, etc.</Text>
-              </Flex>
-            }
-            placement="bottom-start"
-          >
-            <IconButton
-              aria-label={t('hotkeys.help')}
-              icon={<PiInfoBold />}
-              size="xs"
-              variant="ghost"
-              colorScheme="base"
-            />
-          </Tooltip>
-        </Flex>
-        {previewKeys.length > 0 && (
-          <Flex gap={2} alignItems="center" flexWrap="wrap" opacity={isValid ? 1 : 0.5}>
-            <Text fontSize="xs" color="base.300">
-              Preview:
-            </Text>
-            {previewKeys.map((key, i) => (
-              <Fragment key={i}>
-                {key.split('+').map((part, j) => (
-                  <Fragment key={j}>
-                    <Kbd fontSize="xs" textTransform="lowercase">
-                      {part}
-                    </Kbd>
-                    {j !== key.split('+').length - 1 && (
-                      <Text as="span" fontSize="xs" fontWeight="semibold">
-                        +
+      <Flex direction="column" gap={3} w="full">
+        {/* Recorded hotkeys display */}
+        <Flex direction="column" gap={2}>
+          <Flex gap={2} alignItems="center" flexWrap="wrap" minH={8}>
+            {recordedHotkeys.length > 0 ? (
+              <>
+                {recordedHotkeys.map((key, i) => (
+                  <Fragment key={i}>
+                    <Flex gap={1} alignItems="center">
+                      {key.split('+').map((part, j) => (
+                        <Fragment key={j}>
+                          <Kbd fontSize="xs" textTransform="lowercase">
+                            {part}
+                          </Kbd>
+                          {j !== key.split('+').length - 1 && (
+                            <Text as="span" fontSize="xs" fontWeight="semibold">
+                              +
+                            </Text>
+                          )}
+                        </Fragment>
+                      ))}
+                    </Flex>
+                    {i !== recordedHotkeys.length - 1 && (
+                      <Text as="span" fontSize="xs" px={1} variant="subtext">
+                        {t('common.or')}
                       </Text>
                     )}
                   </Fragment>
                 ))}
-                {i !== previewKeys.length - 1 && (
-                  <Text as="span" fontSize="xs" px={1} variant="subtext">
-                    {t('common.or')}
-                  </Text>
-                )}
-              </Fragment>
-            ))}
+              </>
+            ) : (
+              <Text fontSize="sm" color="base.400">
+                {t('hotkeys.noHotkeysRecorded')}
+              </Text>
+            )}
+          </Flex>
+        </Flex>
+
+        {/* Recording indicator */}
+        {isRecording && (
+          <Flex
+            gap={2}
+            alignItems="center"
+            p={3}
+            bg="invokeBlue.500"
+            borderRadius="md"
+            borderWidth={2}
+            borderColor="invokeBlue.300"
+          >
+            <Text fontSize="sm" fontWeight="bold" color="white">
+              {t('hotkeys.pressKeys')}
+            </Text>
+            {pressedKeys.size > 0 && (
+              <Flex gap={1}>
+                {Array.from(pressedKeys).map((key) => (
+                  <Kbd key={key} fontSize="xs" bg="white" color="black">
+                    {normalizeKey(key)}
+                  </Kbd>
+                ))}
+              </Flex>
+            )}
           </Flex>
         )}
+
+        {/* Duplicate/Conflict warning */}
+        {duplicateWarning && (
+          <Flex gap={2} alignItems="center" p={2} bg="error.500" borderRadius="md" opacity={0.9}>
+            <Text fontSize="xs" color="white">
+              <Kbd fontSize="xs" bg="white" color="black">
+                {duplicateWarning.hotkeyString}
+              </Kbd>{' '}
+              {t('hotkeys.conflictWarning', { hotkeyTitle: duplicateWarning.conflictTitle })}
+            </Text>
+          </Flex>
+        )}
+
+        {/* Action buttons */}
+        <Flex gap={2} flexWrap="wrap">
+          {!isRecording && (
+            <>
+              <Button size="sm" onClick={startRecording} colorScheme="invokeBlue">
+                {recordedHotkeys.length > 0 ? t('hotkeys.setAnother') : t('hotkeys.setHotkey')}
+              </Button>
+              {recordedHotkeys.length > 0 && (
+                <>
+                  <Tooltip label={t('hotkeys.removeLastHotkey')}>
+                    <IconButton
+                      aria-label={t('hotkeys.removeLastHotkey')}
+                      icon={<PiTrashBold />}
+                      onClick={clearLastRecorded}
+                      size="sm"
+                      variant="ghost"
+                    />
+                  </Tooltip>
+                  <Button size="sm" onClick={clearAllRecorded} variant="ghost">
+                    {t('hotkeys.clearAll')}
+                  </Button>
+                </>
+              )}
+            </>
+          )}
+        </Flex>
+
+        {/* Save/Cancel buttons */}
+        <Flex gap={2}>
+          <Button
+            size="sm"
+            onClick={handleSave}
+            colorScheme="invokeBlue"
+            leftIcon={<PiCheckBold />}
+            isDisabled={recordedHotkeys.length === 0 || isRecording}
+            flex={1}
+          >
+            {t('hotkeys.save')}
+          </Button>
+          <Button size="sm" onClick={handleCancel} variant="ghost" leftIcon={<PiXBold />}>
+            {t('hotkeys.cancel')}
+          </Button>
+        </Flex>
       </Flex>
     );
   }
