@@ -5,16 +5,16 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from typing_extensions import Self
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
-from invokeai.app.invocations.fields import FieldDescriptions, InputField, OutputField, TensorField, UIType
+from invokeai.app.invocations.fields import FieldDescriptions, InputField, OutputField, TensorField
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
-    IPAdapterCheckpointConfig,
-    IPAdapterInvokeAIConfig,
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.configs.ip_adapter import (
+    IPAdapter_Checkpoint_Config_Base,
+    IPAdapter_InvokeAI_Config_Base,
 )
 from invokeai.backend.model_manager.starter_models import (
     StarterModel,
@@ -85,7 +85,8 @@ class IPAdapterInvocation(BaseInvocation):
         description="The IP-Adapter model.",
         title="IP-Adapter Model",
         ui_order=-1,
-        ui_type=UIType.IPAdapterModel,
+        ui_model_base=[BaseModelType.StableDiffusion1, BaseModelType.StableDiffusionXL],
+        ui_model_type=ModelType.IPAdapter,
     )
     clip_vision_model: Literal["ViT-H", "ViT-G", "ViT-L"] = InputField(
         description="CLIP Vision model to use. Overrides model settings. Mandatory for checkpoint models.",
@@ -122,9 +123,9 @@ class IPAdapterInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> IPAdapterOutput:
         # Lookup the CLIP Vision encoder that is intended to be used with the IP-Adapter model.
         ip_adapter_info = context.models.get_config(self.ip_adapter_model.key)
-        assert isinstance(ip_adapter_info, (IPAdapterInvokeAIConfig, IPAdapterCheckpointConfig))
+        assert isinstance(ip_adapter_info, (IPAdapter_InvokeAI_Config_Base, IPAdapter_Checkpoint_Config_Base))
 
-        if isinstance(ip_adapter_info, IPAdapterInvokeAIConfig):
+        if isinstance(ip_adapter_info, IPAdapter_InvokeAI_Config_Base):
             image_encoder_model_id = ip_adapter_info.image_encoder_model_id
             image_encoder_model_name = image_encoder_model_id.split("/")[-1].strip()
         else:

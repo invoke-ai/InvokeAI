@@ -207,15 +207,24 @@ class IPAdapterPlusXL(IPAdapterPlus):
 
 
 def load_ip_adapter_tensors(ip_adapter_ckpt_path: pathlib.Path, device: str) -> IPAdapterStateDict:
-    state_dict: IPAdapterStateDict = {"ip_adapter": {}, "image_proj": {}}
+    state_dict: IPAdapterStateDict = {
+        "ip_adapter": {},
+        "image_proj": {},
+        "adapter_modules": {},  # added for noobai-mark-ipa
+        "image_proj_model": {},  # added for noobai-mark-ipa
+    }
 
     if ip_adapter_ckpt_path.suffix == ".safetensors":
         model = safetensors.torch.load_file(ip_adapter_ckpt_path, device=device)
         for key in model.keys():
-            if key.startswith("image_proj."):
-                state_dict["image_proj"][key.replace("image_proj.", "")] = model[key]
-            elif key.startswith("ip_adapter."):
+            if key.startswith("ip_adapter."):
                 state_dict["ip_adapter"][key.replace("ip_adapter.", "")] = model[key]
+            elif key.startswith("image_proj_model."):
+                state_dict["image_proj_model"][key.replace("image_proj_model.", "")] = model[key]
+            elif key.startswith("image_proj."):
+                state_dict["image_proj"][key.replace("image_proj.", "")] = model[key]
+            elif key.startswith("adapter_modules."):
+                state_dict["adapter_modules"][key.replace("adapter_modules.", "")] = model[key]
             else:
                 raise RuntimeError(f"Encountered unexpected IP Adapter state dict key: '{key}'.")
     else:

@@ -12,7 +12,7 @@ import type { FieldComponentProps } from './types';
 type Props = FieldComponentProps<ModelIdentifierFieldInputInstance, ModelIdentifierFieldInputTemplate>;
 
 const ModelIdentifierFieldInputComponent = (props: Props) => {
-  const { nodeId, field } = props;
+  const { nodeId, field, fieldTemplate } = props;
   const dispatch = useAppDispatch();
   const { data, isLoading } = useGetModelConfigsQuery();
   const onChange = useCallback(
@@ -36,8 +36,31 @@ const ModelIdentifierFieldInputComponent = (props: Props) => {
       return EMPTY_ARRAY;
     }
 
-    return modelConfigsAdapterSelectors.selectAll(data);
-  }, [data]);
+    if (!fieldTemplate.ui_model_base && !fieldTemplate.ui_model_type) {
+      return modelConfigsAdapterSelectors.selectAll(data);
+    }
+
+    return modelConfigsAdapterSelectors.selectAll(data).filter((config) => {
+      if (fieldTemplate.ui_model_base && !fieldTemplate.ui_model_base.includes(config.base)) {
+        return false;
+      }
+      if (fieldTemplate.ui_model_type && !fieldTemplate.ui_model_type.includes(config.type)) {
+        return false;
+      }
+      if (
+        fieldTemplate.ui_model_variant &&
+        'variant' in config &&
+        config.variant &&
+        !fieldTemplate.ui_model_variant.includes(config.variant)
+      ) {
+        return false;
+      }
+      if (fieldTemplate.ui_model_format && !fieldTemplate.ui_model_format.includes(config.format)) {
+        return false;
+      }
+      return true;
+    });
+  }, [data, fieldTemplate]);
 
   return (
     <ModelFieldCombobox

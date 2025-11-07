@@ -26,8 +26,6 @@ class BoardRecord(BaseModelExcludeNull):
     """The name of the cover image of the board."""
     archived: bool = Field(description="Whether or not the board is archived.")
     """Whether or not the board is archived."""
-    is_private: Optional[bool] = Field(default=None, description="Whether the board is private.")
-    """Whether the board is private."""
 
 
 def deserialize_board_record(board_dict: dict) -> BoardRecord:
@@ -42,7 +40,6 @@ def deserialize_board_record(board_dict: dict) -> BoardRecord:
     updated_at = board_dict.get("updated_at", get_iso_timestamp())
     deleted_at = board_dict.get("deleted_at", get_iso_timestamp())
     archived = board_dict.get("archived", False)
-    is_private = board_dict.get("is_private", False)
 
     return BoardRecord(
         board_id=board_id,
@@ -52,7 +49,6 @@ def deserialize_board_record(board_dict: dict) -> BoardRecord:
         updated_at=updated_at,
         deleted_at=deleted_at,
         archived=archived,
-        is_private=is_private,
     )
 
 

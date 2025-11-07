@@ -236,7 +236,7 @@ export const getDenoisingStartAndEnd = (state: RootState): { denoising_start: nu
       };
     }
     case 'flux': {
-      if (model.variant === 'inpaint') {
+      if (model.variant === 'dev_fill') {
         // This is a FLUX Fill model - we always denoise fully
         return {
           denoising_start: 0,

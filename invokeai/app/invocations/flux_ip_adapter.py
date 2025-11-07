@@ -5,7 +5,7 @@ from pydantic import field_validator, model_validator
 from typing_extensions import Self
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
-from invokeai.app.invocations.fields import InputField, UIType
+from invokeai.app.invocations.fields import InputField
 from invokeai.app.invocations.ip_adapter import (
     CLIP_VISION_MODEL_MAP,
     IPAdapterField,
@@ -16,10 +16,8 @@ from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.config import (
-    IPAdapterCheckpointConfig,
-    IPAdapterInvokeAIConfig,
-)
+from invokeai.backend.model_manager.configs.ip_adapter import IPAdapter_Checkpoint_FLUX_Config
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
 
 @invocation(
@@ -36,7 +34,10 @@ class FluxIPAdapterInvocation(BaseInvocation):
 
     image: ImageField = InputField(description="The IP-Adapter image prompt(s).")
     ip_adapter_model: ModelIdentifierField = InputField(
-        description="The IP-Adapter model.", title="IP-Adapter Model", ui_type=UIType.IPAdapterModel
+        description="The IP-Adapter model.",
+        title="IP-Adapter Model",
+        ui_model_base=BaseModelType.Flux,
+        ui_model_type=ModelType.IPAdapter,
     )
     # Currently, the only known ViT model used by FLUX IP-Adapters is ViT-L.
     clip_vision_model: Literal["ViT-L"] = InputField(description="CLIP Vision model to use.", default="ViT-L")
@@ -64,7 +65,7 @@ class FluxIPAdapterInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> IPAdapterOutput:
         # Lookup the CLIP Vision encoder that is intended to be used with the IP-Adapter model.
         ip_adapter_info = context.models.get_config(self.ip_adapter_model.key)
-        assert isinstance(ip_adapter_info, (IPAdapterInvokeAIConfig, IPAdapterCheckpointConfig))
+        assert isinstance(ip_adapter_info, IPAdapter_Checkpoint_FLUX_Config)
 
         # Note: There is a IPAdapterInvokeAIConfig.image_encoder_model_id field, but it isn't trustworthy.
         image_encoder_starter_model = CLIP_VISION_MODEL_MAP[self.clip_vision_model]

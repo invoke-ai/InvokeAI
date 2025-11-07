@@ -1,6 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, Icon, IconButton, Image, Skeleton, Text, Tooltip } from '@invoke-ai/ui-library';
-import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { round } from 'es-toolkit/compat';
 import { useRefImageEntity } from 'features/controlLayers/components/RefImage/useRefImageEntity';
@@ -15,7 +14,7 @@ import { isIPAdapterConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { PiExclamationMarkBold, PiEyeSlashBold, PiImageBold } from 'react-icons/pi';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { useImageDTOFromCroppableImage } from 'services/api/endpoints/images';
 
 import { RefImageWarningTooltipContent } from './RefImageWarningTooltipContent';
 
@@ -72,7 +71,8 @@ export const RefImagePreview = memo(() => {
   const selectedEntityId = useAppSelector(selectSelectedRefEntityId);
   const isPanelOpen = useAppSelector(selectIsRefImagePanelOpen);
   const [showWeightDisplay, setShowWeightDisplay] = useState(false);
-  const { data: imageDTO } = useGetImageDTOQuery(entity.config.image?.image_name ?? skipToken);
+
+  const imageDTO = useImageDTOFromCroppableImage(entity.config.image);
 
   const sx = useMemo(() => {
     if (!isIPAdapterConfig(entity.config)) {
@@ -145,7 +145,7 @@ export const RefImagePreview = memo(() => {
         overflow="hidden"
       >
         <Image
-          src={imageDTO?.thumbnail_url}
+          src={imageDTO?.image_url}
           objectFit="contain"
           aspectRatio="1/1"
           height={imageDTO?.height}

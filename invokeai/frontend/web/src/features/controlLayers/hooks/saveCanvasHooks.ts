@@ -32,7 +32,12 @@ import type {
   RefImageState,
   RegionalGuidanceRefImageState,
 } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject, imageDTOToImageWithDims, initialControlNet } from 'features/controlLayers/store/util';
+import {
+  imageDTOToCroppableImage,
+  imageDTOToImageObject,
+  imageDTOToImageWithDims,
+  initialControlNet,
+} from 'features/controlLayers/store/util';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import type { BoardId } from 'features/gallery/store/types';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
@@ -209,7 +214,7 @@ export const useNewGlobalReferenceImageFromBbox = () => {
       const overrides: Partial<RefImageState> = {
         config: {
           ...getDefaultRefImageConfig(getState),
-          image: imageDTOToImageWithDims(imageDTO),
+          image: imageDTOToCroppableImage(imageDTO),
         },
       };
       dispatch(refImageAdded({ overrides }));
@@ -312,7 +317,7 @@ export const usePullBboxIntoGlobalReferenceImage = (id: string) => {
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO, _: Rect) => {
-      dispatch(refImageImageChanged({ id, imageDTO }));
+      dispatch(refImageImageChanged({ id, croppableImage: imageDTOToCroppableImage(imageDTO) }));
     };
 
     return {

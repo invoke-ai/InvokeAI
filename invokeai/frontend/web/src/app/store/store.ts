@@ -4,7 +4,6 @@ import { logger } from 'app/logging/logger';
 import { errorHandler } from 'app/store/enhancers/reduxRemember/errors';
 import { addAdHocPostProcessingRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
 import { addAnyEnqueuedListener } from 'app/store/middleware/listenerMiddleware/listeners/anyEnqueued';
-import { addAppConfigReceivedListener } from 'app/store/middleware/listenerMiddleware/listeners/appConfigReceived';
 import { addAppStartedListener } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
 import { addBatchEnqueuedListener } from 'app/store/middleware/listenerMiddleware/listeners/batchEnqueued';
 import { addDeleteBoardAndImagesFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/boardAndImagesDeleted';
@@ -34,20 +33,16 @@ import { nodesSliceConfig } from 'features/nodes/store/nodesSlice';
 import { workflowLibrarySliceConfig } from 'features/nodes/store/workflowLibrarySlice';
 import { workflowSettingsSliceConfig } from 'features/nodes/store/workflowSettingsSlice';
 import { upscaleSliceConfig } from 'features/parameters/store/upscaleSlice';
-import { videoSliceConfig } from 'features/parameters/store/videoSlice';
 import { queueSliceConfig } from 'features/queue/store/queueSlice';
 import { stylePresetSliceConfig } from 'features/stylePresets/store/stylePresetSlice';
-import { configSliceConfig } from 'features/system/store/configSlice';
 import { systemSliceConfig } from 'features/system/store/systemSlice';
 import { uiSliceConfig } from 'features/ui/store/uiSlice';
 import { diff } from 'jsondiffpatch';
-import dynamicMiddlewares from 'redux-dynamic-middlewares';
 import type { SerializeFunction, UnserializeFunction } from 'redux-remember';
 import { REMEMBER_REHYDRATED, rememberEnhancer, rememberReducer } from 'redux-remember';
 import undoable, { newHistory } from 'redux-undo';
 import { serializeError } from 'serialize-error';
 import { api } from 'services/api';
-import { authToastMiddleware } from 'services/api/authToastMiddleware';
 import type { JsonObject } from 'type-fest';
 
 import { reduxRememberDriver } from './enhancers/reduxRemember/driver';
@@ -57,7 +52,7 @@ import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { addArchivedOrDeletedBoardListener } from './middleware/listenerMiddleware/listeners/addArchivedOrDeletedBoardListener';
 import { addImageUploadedFulfilledListener } from './middleware/listenerMiddleware/listeners/imageUploaded';
 
-export const listenerMiddleware = createListenerMiddleware();
+const listenerMiddleware = createListenerMiddleware();
 
 const log = logger('system');
 
@@ -67,7 +62,6 @@ const SLICE_CONFIGS = {
   [canvasSettingsSliceConfig.slice.reducerPath]: canvasSettingsSliceConfig,
   [canvasSliceConfig.slice.reducerPath]: canvasSliceConfig,
   [changeBoardModalSliceConfig.slice.reducerPath]: changeBoardModalSliceConfig,
-  [configSliceConfig.slice.reducerPath]: configSliceConfig,
   [dynamicPromptsSliceConfig.slice.reducerPath]: dynamicPromptsSliceConfig,
   [gallerySliceConfig.slice.reducerPath]: gallerySliceConfig,
   [lorasSliceConfig.slice.reducerPath]: lorasSliceConfig,
@@ -80,7 +74,6 @@ const SLICE_CONFIGS = {
   [systemSliceConfig.slice.reducerPath]: systemSliceConfig,
   [uiSliceConfig.slice.reducerPath]: uiSliceConfig,
   [upscaleSliceConfig.slice.reducerPath]: upscaleSliceConfig,
-  [videoSliceConfig.slice.reducerPath]: videoSliceConfig,
   [workflowLibrarySliceConfig.slice.reducerPath]: workflowLibrarySliceConfig,
   [workflowSettingsSliceConfig.slice.reducerPath]: workflowSettingsSliceConfig,
 };
@@ -97,7 +90,6 @@ const ALL_REDUCERS = {
     canvasSliceConfig.undoableConfig?.reduxUndoOptions
   ),
   [changeBoardModalSliceConfig.slice.reducerPath]: changeBoardModalSliceConfig.slice.reducer,
-  [configSliceConfig.slice.reducerPath]: configSliceConfig.slice.reducer,
   [dynamicPromptsSliceConfig.slice.reducerPath]: dynamicPromptsSliceConfig.slice.reducer,
   [gallerySliceConfig.slice.reducerPath]: gallerySliceConfig.slice.reducer,
   [lorasSliceConfig.slice.reducerPath]: lorasSliceConfig.slice.reducer,
@@ -114,7 +106,6 @@ const ALL_REDUCERS = {
   [systemSliceConfig.slice.reducerPath]: systemSliceConfig.slice.reducer,
   [uiSliceConfig.slice.reducerPath]: uiSliceConfig.slice.reducer,
   [upscaleSliceConfig.slice.reducerPath]: upscaleSliceConfig.slice.reducer,
-  [videoSliceConfig.slice.reducerPath]: videoSliceConfig.slice.reducer,
   [workflowLibrarySliceConfig.slice.reducerPath]: workflowLibrarySliceConfig.slice.reducer,
   [workflowSettingsSliceConfig.slice.reducerPath]: workflowSettingsSliceConfig.slice.reducer,
 };
@@ -197,8 +188,6 @@ export const createStore = (options?: { persist?: boolean; persistDebounce?: num
         immutableCheck: import.meta.env.MODE === 'development',
       })
         .concat(api.middleware)
-        .concat(dynamicMiddlewares)
-        .concat(authToastMiddleware)
         // .concat(getDebugLoggerMiddleware({ withDiff: true, withNextState: true }))
         .prepend(listenerMiddleware.middleware),
     enhancers: (getDefaultEnhancers) => {
@@ -252,6 +241,7 @@ export type AppStartListening = TypedStartListening<RootState, AppDispatch>;
 
 export const addAppListener = addListener.withTypes<RootState, AppDispatch>();
 
+// To avoid circular dependencies, all listener middleware listeners are added here in the main store setup file.
 const startAppListening = listenerMiddleware.startListening as AppStartListening;
 addImageUploadedFulfilledListener(startAppListening);
 
@@ -283,7 +273,6 @@ addModelSelectedListener(startAppListening);
 // app startup
 addAppStartedListener(startAppListening);
 addModelsLoadedListener(startAppListening);
-addAppConfigReceivedListener(startAppListening);
 
 // Ad-hoc upscale workflwo
 addAdHocPostProcessingRequestedListener(startAppListening);

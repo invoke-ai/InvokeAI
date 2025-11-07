@@ -10,6 +10,7 @@ import {
   Input,
   InputGroup,
   InputRightElement,
+  Tooltip,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
@@ -82,10 +83,12 @@ export const ScanModelsResults = memo(({ results }: ScanModelResultsProps) => {
         <Flex justifyContent="space-between" alignItems="center">
           <Heading size="sm">{t('modelManager.scanResults')}</Heading>
           <Flex alignItems="center" gap={3}>
-            <FormControl w="min-content">
-              <FormLabel m={0}>{t('modelManager.inplaceInstall')}</FormLabel>
-              <Checkbox isChecked={inplace} onChange={onChangeInplace} size="md" />
-            </FormControl>
+            <Tooltip label={t('modelManager.inplaceInstallDesc')} hasArrow>
+              <FormControl w="min-content">
+                <FormLabel m={0}>{t('modelManager.inplaceInstall')}</FormLabel>
+                <Checkbox isChecked={inplace} onChange={onChangeInplace} size="md" />
+              </FormControl>
+            </Tooltip>
             <Button size="sm" onClick={handleAddAll} isDisabled={filteredResults.length === 0}>
               {t('modelManager.installAll')}
             </Button>
@@ -113,9 +116,9 @@ export const ScanModelsResults = memo(({ results }: ScanModelResultsProps) => {
             </InputGroup>
           </Flex>
         </Flex>
-        <Flex height="100%" layerStyle="third" borderRadius="base" p={3}>
+        <Flex height="100%" layerStyle="second" borderRadius="base" px={2}>
           <ScrollableContent>
-            <Flex flexDir="column" gap={3}>
+            <Flex flexDir="column">
               {filteredResults.map((result) => (
                 <ScanModelResultItem key={result.path} result={result} installModel={handleInstallOne} />
               ))}

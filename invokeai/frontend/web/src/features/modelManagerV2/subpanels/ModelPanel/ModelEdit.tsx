@@ -8,6 +8,7 @@ import {
   Heading,
   Input,
   SimpleGrid,
+  Text,
   Textarea,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
@@ -22,8 +23,11 @@ import { type UpdateModelArg, useUpdateModelMutation } from 'services/api/endpoi
 import type { AnyModelConfig } from 'services/api/types';
 
 import BaseModelSelect from './Fields/BaseModelSelect';
+import ModelFormatSelect from './Fields/ModelFormatSelect';
+import ModelTypeSelect from './Fields/ModelTypeSelect';
 import ModelVariantSelect from './Fields/ModelVariantSelect';
 import PredictionTypeSelect from './Fields/PredictionTypeSelect';
+import { ModelFooter } from './ModelFooter';
 
 type Props = {
   modelConfig: AnyModelConfig;
@@ -120,44 +124,46 @@ export const ModelEdit = memo(({ modelConfig }: Props) => {
                 <Textarea {...form.register('description')} minH={32} />
               </FormControl>
             </Flex>
-            {modelConfig.type !== 'clip_vision' && (
-              <Heading as="h3" fontSize="md" mt="4">
-                {t('modelManager.modelSettings')}
-              </Heading>
-            )}
+            <Heading as="h3" fontSize="md" mt="4">
+              {t('modelManager.modelSettings')}
+            </Heading>
+            <Text variant="subtext" color="warning.300">
+              {t('modelManager.modelSettingsWarning')}
+            </Text>
             <SimpleGrid columns={2} gap={4}>
-              {modelConfig.type !== 'clip_vision' && (
-                <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                  <FormLabel>{t('modelManager.baseModel')}</FormLabel>
-                  <BaseModelSelect control={form.control} />
-                </FormControl>
-              )}
-              {modelConfig.type === 'main' && (
-                <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                  <FormLabel>{t('modelManager.variant')}</FormLabel>
-                  <ModelVariantSelect control={form.control} />
-                </FormControl>
-              )}
-              {modelConfig.type === 'main' && modelConfig.format === 'checkpoint' && (
-                <>
-                  <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                    <FormLabel>{t('modelManager.pathToConfig')}</FormLabel>
-                    <Input {...form.register('config_path', stringFieldOptions)} />
-                  </FormControl>
-                  <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                    <FormLabel>{t('modelManager.predictionType')}</FormLabel>
-                    <PredictionTypeSelect control={form.control} />
-                  </FormControl>
-                  <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                    <FormLabel>{t('modelManager.upcastAttention')}</FormLabel>
-                    <Checkbox {...form.register('upcast_attention')} />
-                  </FormControl>
-                </>
-              )}
+              <FormControl flexDir="column" alignItems="flex-start" gap={1}>
+                <FormLabel>{t('modelManager.modelType')}</FormLabel>
+                <ModelTypeSelect control={form.control} />
+              </FormControl>
+              <FormControl flexDir="column" alignItems="flex-start" gap={1}>
+                <FormLabel>{t('modelManager.modelFormat')}</FormLabel>
+                <ModelFormatSelect control={form.control} />
+              </FormControl>
+              <FormControl flexDir="column" alignItems="flex-start" gap={1}>
+                <FormLabel>{t('modelManager.baseModel')}</FormLabel>
+                <BaseModelSelect control={form.control} />
+              </FormControl>
+              <FormControl flexDir="column" alignItems="flex-start" gap={1}>
+                <FormLabel>{t('modelManager.variant')}</FormLabel>
+                <ModelVariantSelect control={form.control} />
+              </FormControl>
+              <FormControl flexDir="column" alignItems="flex-start" gap={1}>
+                <FormLabel>{t('modelManager.pathToConfig')}</FormLabel>
+                <Input {...form.register('config_path')} />
+              </FormControl>
+              <FormControl flexDir="column" alignItems="flex-start" gap={1}>
+                <FormLabel>{t('modelManager.predictionType')}</FormLabel>
+                <PredictionTypeSelect control={form.control} />
+              </FormControl>
+              <FormControl flexDir="column" alignItems="flex-start" gap={1}>
+                <FormLabel>{t('modelManager.upcastAttention')}</FormLabel>
+                <Checkbox {...form.register('upcast_attention')} />
+              </FormControl>
             </SimpleGrid>
           </Flex>
         </form>
       </Flex>
+      <ModelFooter modelConfig={modelConfig} isEditing={true} />
     </Flex>
   );
 });

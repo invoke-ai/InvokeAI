@@ -1,7 +1,6 @@
 import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
-import type { NumericalParameterConfig } from 'app/types/invokeai';
 import { paramsReset } from 'features/controlLayers/store/paramsSlice';
 import { type LoRA, zLoRA } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
@@ -9,7 +8,7 @@ import type { LoRAModelConfig } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
 import z from 'zod';
 
-export const DEFAULT_LORA_WEIGHT_CONFIG: NumericalParameterConfig = {
+export const DEFAULT_LORA_WEIGHT_CONFIG = {
   initial: 0.75,
   sliderMin: -1,
   sliderMax: 2,

@@ -2,7 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
-import type { GetImageNamesArgs, GetVideoIdsArgs, ListBoardsArgs } from 'services/api/types';
+import type { GetImageNamesArgs, ListBoardsArgs } from 'services/api/types';
 
 export const selectFirstSelectedItem = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(0));
 export const selectLastSelectedItem = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(-1));
@@ -24,9 +24,6 @@ const selectGalleryQueryCategories = createSelector(selectGalleryView, (galleryV
   if (galleryView === 'images') {
     return IMAGE_CATEGORIES;
   }
-  if (galleryView === 'videos') {
-    return [];
-  }
   return ASSETS_CATEGORIES;
 });
 const selectGallerySearchTerm = createSelector(selectGallerySlice, (gallery) => gallery.searchTerm);
@@ -44,17 +41,6 @@ export const selectGetImageNamesQueryArgs = createMemoizedSelector(
   (board_id, categories, search_term, order_dir, starred_first): GetImageNamesArgs => ({
     board_id,
     categories,
-    search_term,
-    order_dir,
-    starred_first,
-    is_intermediate: false,
-  })
-);
-
-export const selectGetVideoIdsQueryArgs = createMemoizedSelector(
-  [selectSelectedBoardId, selectGallerySearchTerm, selectGalleryOrderDir, selectGalleryStarredFirst],
-  (board_id, search_term, order_dir, starred_first): GetVideoIdsArgs => ({
-    board_id,
     search_term,
     order_dir,
     starred_first,

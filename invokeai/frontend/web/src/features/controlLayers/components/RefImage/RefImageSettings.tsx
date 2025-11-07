@@ -30,6 +30,7 @@ import {
 } from 'features/controlLayers/store/refImagesSlice';
 import type {
   CLIPVisionModelV2,
+  CroppableImageWithDims,
   FLUXReduxImageInfluence as FLUXReduxImageInfluenceType,
   IPMethodV2,
 } from 'features/controlLayers/store/types';
@@ -42,7 +43,6 @@ import type {
   ChatGPT4oModelConfig,
   FLUXKontextModelConfig,
   FLUXReduxModelConfig,
-  ImageDTO,
   IPAdapterModelConfig,
 } from 'services/api/types';
 
@@ -104,15 +104,19 @@ const RefImageSettingsContent = memo(() => {
   );
 
   const onChangeImage = useCallback(
-    (imageDTO: ImageDTO | null) => {
-      dispatch(refImageImageChanged({ id, imageDTO }));
+    (croppableImage: CroppableImageWithDims | null) => {
+      dispatch(refImageImageChanged({ id, croppableImage }));
     },
     [dispatch, id]
   );
 
   const dndTargetData = useMemo<SetGlobalReferenceImageDndTargetData>(
-    () => setGlobalReferenceImageDndTarget.getData({ id }, config.image?.image_name),
-    [id, config.image?.image_name]
+    () =>
+      setGlobalReferenceImageDndTarget.getData(
+        { id },
+        config.image?.crop?.image.image_name ?? config.image?.original.image.image_name
+      ),
+    [id, config.image?.crop?.image.image_name, config.image?.original.image.image_name]
   );
 
   const isFLUX = useAppSelector(selectIsFLUX);

@@ -7,20 +7,19 @@ import type {
   CanvasInpaintMaskState,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
-  ChatGPT4oReferenceImageConfig,
   ControlLoRAConfig,
   ControlNetConfig,
+  CroppableImageWithDims,
   FluxKontextReferenceImageConfig,
   FLUXReduxConfig,
-  Gemini2_5ReferenceImageConfig,
   ImageWithDims,
   IPAdapterConfig,
   RasterLayerAdjustments,
   RefImageState,
+  RegionalGuidanceIPAdapterConfig,
   RgbColor,
   T2IAdapterConfig,
 } from 'features/controlLayers/store/types';
-import type { ImageField } from 'features/nodes/types/common';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 import type { PartialDeep } from 'type-fest';
@@ -45,7 +44,20 @@ export const imageDTOToImageWithDims = ({ image_name, width, height }: ImageDTO)
   height,
 });
 
-export const imageDTOToImageField = ({ image_name }: ImageDTO): ImageField => ({ image_name });
+export const imageDTOToCroppableImage = (
+  originalImageDTO: ImageDTO,
+  crop?: CroppableImageWithDims['crop']
+): CroppableImageWithDims => {
+  const { image_name, width, height } = originalImageDTO;
+  const val: CroppableImageWithDims = {
+    original: { image: { image_name, width, height } },
+  };
+  if (crop) {
+    val.crop = deepClone(crop);
+  }
+
+  return val;
+};
 
 const DEFAULT_RG_MASK_FILL_COLORS: RgbColor[] = [
   { r: 121, g: 157, b: 219 }, // rgb(121, 157, 219)
@@ -79,21 +91,20 @@ export const initialIPAdapter: IPAdapterConfig = {
   clipVisionModel: 'ViT-H',
   weight: 1,
 };
+export const initialRegionalGuidanceIPAdapter: RegionalGuidanceIPAdapterConfig = {
+  type: 'ip_adapter',
+  image: null,
+  model: null,
+  beginEndStepPct: [0, 1],
+  method: 'full',
+  clipVisionModel: 'ViT-H',
+  weight: 1,
+};
 export const initialFLUXRedux: FLUXReduxConfig = {
   type: 'flux_redux',
   image: null,
   model: null,
   imageInfluence: 'highest',
-};
-export const initialChatGPT4oReferenceImage: ChatGPT4oReferenceImageConfig = {
-  type: 'chatgpt_4o_reference_image',
-  image: null,
-  model: null,
-};
-export const initialGemini2_5ReferenceImage: Gemini2_5ReferenceImageConfig = {
-  type: 'gemini_2_5_reference_image',
-  image: null,
-  model: null,
 };
 export const initialFluxKontextReferenceImage: FluxKontextReferenceImageConfig = {
   type: 'flux_kontext_reference_image',

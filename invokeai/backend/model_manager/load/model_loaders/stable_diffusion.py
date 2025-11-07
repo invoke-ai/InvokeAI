@@ -4,18 +4,24 @@
 from pathlib import Path
 from typing import Optional
 
-from diffusers import (
-    StableDiffusionInpaintPipeline,
-    StableDiffusionPipeline,
+from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
+from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_inpaint import StableDiffusionInpaintPipeline
+from diffusers.pipelines.stable_diffusion_xl.pipeline_stable_diffusion_xl import StableDiffusionXLPipeline
+from diffusers.pipelines.stable_diffusion_xl.pipeline_stable_diffusion_xl_inpaint import (
     StableDiffusionXLInpaintPipeline,
-    StableDiffusionXLPipeline,
 )
 
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
-    CheckpointConfigBase,
-    DiffusersConfigBase,
-    MainCheckpointConfig,
+from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Diffusers_Config_Base
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.configs.main import (
+    Main_Checkpoint_SD1_Config,
+    Main_Checkpoint_SD2_Config,
+    Main_Checkpoint_SDXL_Config,
+    Main_Checkpoint_SDXLRefiner_Config,
+    Main_Diffusers_SD1_Config,
+    Main_Diffusers_SD2_Config,
+    Main_Diffusers_SDXL_Config,
+    Main_Diffusers_SDXLRefiner_Config,
 )
 from invokeai.backend.model_manager.load.model_cache.model_cache import get_model_cache_key
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
@@ -58,7 +64,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if isinstance(config, CheckpointConfigBase):
+        if isinstance(config, Checkpoint_Config_Base):
             return self._load_from_singlefile(config, submodel_type)
 
         if submodel_type is None:
@@ -66,7 +72,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
 
         model_path = Path(config.path)
         load_class = self.get_hf_load_class(model_path, submodel_type)
-        repo_variant = config.repo_variant if isinstance(config, DiffusersConfigBase) else None
+        repo_variant = config.repo_variant if isinstance(config, Diffusers_Config_Base) else None
         variant = repo_variant.value if repo_variant else None
         model_path = model_path / submodel_type.value
         try:
@@ -107,7 +113,19 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
                 ModelVariantType.Normal: StableDiffusionXLPipeline,
             },
         }
-        assert isinstance(config, MainCheckpointConfig)
+        assert isinstance(
+            config,
+            (
+                Main_Diffusers_SD1_Config,
+                Main_Diffusers_SD2_Config,
+                Main_Diffusers_SDXL_Config,
+                Main_Diffusers_SDXLRefiner_Config,
+                Main_Checkpoint_SD1_Config,
+                Main_Checkpoint_SD2_Config,
+                Main_Checkpoint_SDXL_Config,
+                Main_Checkpoint_SDXLRefiner_Config,
+            ),
+        )
         try:
             load_class = load_classes[config.base][config.variant]
         except KeyError as e:

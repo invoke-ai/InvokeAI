@@ -13,7 +13,7 @@ import {
   selectRefImageEntityIds,
   selectSelectedRefEntityId,
 } from 'features/controlLayers/store/refImagesSlice';
-import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
+import { imageDTOToCroppableImage } from 'features/controlLayers/store/util';
 import { addGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -92,7 +92,7 @@ const AddRefImageDropTargetAndButton = memo(() => {
       ({
         onUpload: (imageDTO: ImageDTO) => {
           const config = getDefaultRefImageConfig(getState);
-          config.image = imageDTOToImageWithDims(imageDTO);
+          config.image = imageDTOToCroppableImage(imageDTO);
           dispatch(refImageAdded({ overrides: { config } }));
         },
         allowMultiple: false,

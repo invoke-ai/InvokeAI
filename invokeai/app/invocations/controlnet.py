@@ -16,7 +16,6 @@ from invokeai.app.invocations.fields import (
     ImageField,
     InputField,
     OutputField,
-    UIType,
 )
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageOutput
@@ -28,6 +27,7 @@ from invokeai.app.util.controlnet_utils import (
     heuristic_resize_fast,
 )
 from invokeai.backend.image_util.util import np_to_pil, pil_to_np
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
 
 class ControlField(BaseModel):
@@ -63,13 +63,17 @@ class ControlOutput(BaseInvocationOutput):
     control: ControlField = OutputField(description=FieldDescriptions.control)
 
 
-@invocation("controlnet", title="ControlNet - SD1.5, SDXL", tags=["controlnet"], category="controlnet", version="1.1.3")
+@invocation(
+    "controlnet", title="ControlNet - SD1.5, SD2, SDXL", tags=["controlnet"], category="controlnet", version="1.1.3"
+)
 class ControlNetInvocation(BaseInvocation):
     """Collects ControlNet info to pass to other nodes"""
 
     image: ImageField = InputField(description="The control image")
     control_model: ModelIdentifierField = InputField(
-        description=FieldDescriptions.controlnet_model, ui_type=UIType.ControlNetModel
+        description=FieldDescriptions.controlnet_model,
+        ui_model_base=[BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2, BaseModelType.StableDiffusionXL],
+        ui_model_type=ModelType.ControlNet,
     )
     control_weight: Union[float, List[float]] = InputField(
         default=1.0, ge=-1, le=2, description="The weight given to the ControlNet"

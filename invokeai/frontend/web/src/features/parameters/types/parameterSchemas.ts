@@ -133,6 +133,15 @@ export type ParameterSpandrelImageToImageModel = z.infer<typeof zParameterSpandr
 // #region Strength (l2l strength)
 export const [zParameterStrength, isParameterStrength] = buildParameter(z.number().min(0).max(1));
 export type ParameterStrength = z.infer<typeof zParameterStrength>;
+export const PARAMETER_STRENGTH_CONSTRAINTS = {
+  initial: 0.7,
+  sliderMin: 0,
+  sliderMax: 1,
+  numberInputMin: 0,
+  numberInputMax: 1,
+  fineStep: 0.01,
+  coarseStep: 0.05,
+};
 // #endregion
 
 // #region SeamlessX

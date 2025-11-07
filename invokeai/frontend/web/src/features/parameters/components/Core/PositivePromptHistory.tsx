@@ -4,6 +4,7 @@ import {
   Flex,
   IconButton,
   Input,
+  Kbd,
   Popover,
   PopoverBody,
   PopoverContent,
@@ -22,6 +23,7 @@ import {
 } from 'features/controlLayers/store/paramsSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiArrowArcLeftBold, PiClockCounterClockwise, PiTrashBold, PiTrashSimpleBold } from 'react-icons/pi';
 
 export const PositivePromptHistoryIconButton = memo(() => {
@@ -50,6 +52,7 @@ export const PositivePromptHistoryIconButton = memo(() => {
 PositivePromptHistoryIconButton.displayName = 'PositivePromptHistoryIconButton';
 
 const PromptHistoryContent = memo(() => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const positivePromptHistory = useAppSelector(selectPositivePromptHistory);
   const [searchTerm, setSearchTerm] = useState('');
@@ -96,25 +99,32 @@ const PromptHistoryContent = memo(() => {
         </Button>
       </Flex>
       <Divider />
-      {positivePromptHistory.length === 0 && (
-        <Flex w="full" h="full" alignItems="center" justifyContent="center">
-          <Text color="base.300">No prompt history recorded.</Text>
-        </Flex>
-      )}
-      {positivePromptHistory.length !== 0 && filteredPrompts.length === 0 && (
-        <Flex w="full" h="full" alignItems="center" justifyContent="center">
-          <Text color="base.300">No matching prompts in history.</Text>{' '}
-        </Flex>
-      )}
-      {filteredPrompts.length > 0 && (
-        <ScrollableContent>
-          <Flex flexDir="column">
-            {filteredPrompts.map((prompt, index) => (
-              <PromptItem key={`${prompt}-${index}`} prompt={prompt} />
-            ))}
+      <Flex flexDir="column" flexGrow={1} minH={0}>
+        {positivePromptHistory.length === 0 && (
+          <Flex w="full" h="full" alignItems="center" justifyContent="center">
+            <Text color="base.300">{t('prompt.noPromptHistory')}</Text>
           </Flex>
-        </ScrollableContent>
-      )}
+        )}
+        {positivePromptHistory.length !== 0 && filteredPrompts.length === 0 && (
+          <Flex w="full" h="full" alignItems="center" justifyContent="center">
+            <Text color="base.300">{t('prompt.noMatchingPrompts')}</Text>{' '}
+          </Flex>
+        )}
+        {filteredPrompts.length > 0 && (
+          <ScrollableContent>
+            <Flex flexDir="column">
+              {filteredPrompts.map((prompt, index) => (
+                <PromptItem key={`${prompt}-${index}`} prompt={prompt} />
+              ))}
+            </Flex>
+          </ScrollableContent>
+        )}
+      </Flex>
+      <Flex alignItems="center" justifyContent="center" pt={1}>
+        <Text color="base.300" textAlign="center">
+          <Kbd textTransform="lowercase">alt+up/down</Kbd> {t('prompt.toSwitchBetweenPrompts')}
+        </Text>
+      </Flex>
     </Flex>
   );
 });

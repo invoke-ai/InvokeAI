@@ -1,14 +1,22 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectInfillMethod, selectInfillTileSize, setInfillTileSize } from 'features/controlLayers/store/paramsSlice';
-import { selectInfillTileSizeConfig } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+
+const CONSTRAINTS = {
+  initial: 32,
+  sliderMin: 16,
+  sliderMax: 64,
+  numberInputMin: 16,
+  numberInputMax: 256,
+  fineStep: 1,
+  coarseStep: 1,
+};
 
 const ParamInfillTileSize = () => {
   const dispatch = useAppDispatch();
   const infillTileSize = useAppSelector(selectInfillTileSize);
-  const config = useAppSelector(selectInfillTileSizeConfig);
   const infillMethod = useAppSelector(selectInfillMethod);
 
   const { t } = useTranslation();
@@ -26,21 +34,21 @@ const ParamInfillTileSize = () => {
       <CompositeSlider
         value={infillTileSize}
         onChange={handleChange}
-        defaultValue={config.initial}
-        min={config.sliderMin}
-        max={config.sliderMax}
-        step={config.coarseStep}
-        fineStep={config.fineStep}
+        defaultValue={CONSTRAINTS.initial}
+        min={CONSTRAINTS.sliderMin}
+        max={CONSTRAINTS.sliderMax}
+        step={CONSTRAINTS.coarseStep}
+        fineStep={CONSTRAINTS.fineStep}
         marks
       />
       <CompositeNumberInput
         value={infillTileSize}
         onChange={handleChange}
-        defaultValue={config.initial}
-        min={config.numberInputMin}
-        max={config.numberInputMax}
-        step={config.coarseStep}
-        fineStep={config.fineStep}
+        defaultValue={CONSTRAINTS.initial}
+        min={CONSTRAINTS.numberInputMin}
+        max={CONSTRAINTS.numberInputMax}
+        step={CONSTRAINTS.coarseStep}
+        fineStep={CONSTRAINTS.fineStep}
       />
     </FormControl>
   );

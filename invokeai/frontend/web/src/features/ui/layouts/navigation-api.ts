@@ -113,12 +113,19 @@ export class NavigationApi {
   _app: NavigationAppApi | null = null;
 
   /**
+   * A flag indicating if the application is currently connected to the navigation API.
+   */
+  private _$isConnected = atom(false);
+  $isConnected: Atom<boolean> = this._$isConnected;
+
+  /**
    * Connect to the application to manage tab switching.
    * @param api - The application API that provides methods to set and get the current app tab and manage panel
    *    state storage.
    */
   connectToApp = (api: NavigationAppApi): void => {
     this._app = api;
+    this._$isConnected.set(true);
   };
 
   /**
@@ -126,6 +133,7 @@ export class NavigationApi {
    */
   disconnectFromApp = (): void => {
     this._app = null;
+    this._$isConnected.set(false);
   };
 
   /**

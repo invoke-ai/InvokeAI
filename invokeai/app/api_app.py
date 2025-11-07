@@ -18,7 +18,6 @@ from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
 from invokeai.app.api.routers import (
     app_info,
     board_images,
-    board_videos,
     boards,
     client_state,
     download_queue,
@@ -28,7 +27,6 @@ from invokeai.app.api.routers import (
     session_queue,
     style_presets,
     utilities,
-    videos,
     workflows,
 )
 from invokeai.app.api.sockets import SocketIO
@@ -127,10 +125,8 @@ app.include_router(utilities.utilities_router, prefix="/api")
 app.include_router(model_manager.model_manager_router, prefix="/api")
 app.include_router(download_queue.download_queue_router, prefix="/api")
 app.include_router(images.images_router, prefix="/api")
-app.include_router(videos.videos_router, prefix="/api")
 app.include_router(boards.boards_router, prefix="/api")
 app.include_router(board_images.board_images_router, prefix="/api")
-app.include_router(board_videos.board_videos_router, prefix="/api")
 app.include_router(model_relationships.model_relationships_router, prefix="/api")
 app.include_router(app_info.app_router, prefix="/api")
 app.include_router(session_queue.session_queue_router, prefix="/api")

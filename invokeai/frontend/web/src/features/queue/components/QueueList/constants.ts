@@ -9,6 +9,5 @@ export const COLUMN_WIDTHS = {
   fieldValues: 'auto',
   createdAt: '9.5rem',
   completedAt: '9.5rem',
-  validationRun: 'auto',
   actions: 'auto',
 } as const;

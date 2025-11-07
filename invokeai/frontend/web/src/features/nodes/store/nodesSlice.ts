@@ -24,90 +24,44 @@ import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
   BoardFieldValue,
   BooleanFieldValue,
-  ChatGPT4oModelFieldValue,
-  CLIPEmbedModelFieldValue,
-  CLIPGEmbedModelFieldValue,
-  CLIPLEmbedModelFieldValue,
   ColorFieldValue,
-  ControlLoRAModelFieldValue,
-  ControlNetModelFieldValue,
   EnumFieldValue,
   FieldValue,
   FloatFieldValue,
   FloatGeneratorFieldValue,
-  FluxKontextModelFieldValue,
-  FluxReduxModelFieldValue,
-  FluxVAEModelFieldValue,
   ImageFieldCollectionValue,
   ImageFieldValue,
   ImageGeneratorFieldValue,
-  Imagen3ModelFieldValue,
-  Imagen4ModelFieldValue,
   IntegerFieldCollectionValue,
   IntegerFieldValue,
   IntegerGeneratorFieldValue,
-  IPAdapterModelFieldValue,
-  LLaVAModelFieldValue,
-  LoRAModelFieldValue,
-  MainModelFieldValue,
   ModelIdentifierFieldValue,
-  RunwayModelFieldValue,
   SchedulerFieldValue,
-  SDXLRefinerModelFieldValue,
-  SigLipModelFieldValue,
-  SpandrelImageToImageModelFieldValue,
   StatefulFieldValue,
   StringFieldCollectionValue,
   StringFieldValue,
   StringGeneratorFieldValue,
-  T2IAdapterModelFieldValue,
-  T5EncoderModelFieldValue,
-  VAEModelFieldValue,
-  Veo3ModelFieldValue,
 } from 'features/nodes/types/field';
 import {
   zBoardFieldValue,
   zBooleanFieldValue,
-  zChatGPT4oModelFieldValue,
-  zCLIPEmbedModelFieldValue,
-  zCLIPGEmbedModelFieldValue,
-  zCLIPLEmbedModelFieldValue,
   zColorFieldValue,
-  zControlLoRAModelFieldValue,
-  zControlNetModelFieldValue,
   zEnumFieldValue,
   zFloatFieldCollectionValue,
   zFloatFieldValue,
   zFloatGeneratorFieldValue,
-  zFluxKontextModelFieldValue,
-  zFluxReduxModelFieldValue,
-  zFluxVAEModelFieldValue,
   zImageFieldCollectionValue,
   zImageFieldValue,
   zImageGeneratorFieldValue,
-  zImagen3ModelFieldValue,
-  zImagen4ModelFieldValue,
   zIntegerFieldCollectionValue,
   zIntegerFieldValue,
   zIntegerGeneratorFieldValue,
-  zIPAdapterModelFieldValue,
-  zLLaVAModelFieldValue,
-  zLoRAModelFieldValue,
-  zMainModelFieldValue,
   zModelIdentifierFieldValue,
-  zRunwayModelFieldValue,
   zSchedulerFieldValue,
-  zSDXLRefinerModelFieldValue,
-  zSigLipModelFieldValue,
-  zSpandrelImageToImageModelFieldValue,
   zStatefulFieldValue,
   zStringFieldCollectionValue,
   zStringFieldValue,
   zStringGeneratorFieldValue,
-  zT2IAdapterModelFieldValue,
-  zT5EncoderModelFieldValue,
-  zVAEModelFieldValue,
-  zVeo3ModelFieldValue,
 } from 'features/nodes/types/field';
 import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
 import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
@@ -493,80 +447,8 @@ const slice = createSlice({
     fieldColorValueChanged: (state, action: FieldValueAction<ColorFieldValue>) => {
       fieldValueReducer(state, action, zColorFieldValue);
     },
-    fieldMainModelValueChanged: (state, action: FieldValueAction<MainModelFieldValue>) => {
-      fieldValueReducer(state, action, zMainModelFieldValue);
-    },
     fieldModelIdentifierValueChanged: (state, action: FieldValueAction<ModelIdentifierFieldValue>) => {
       fieldValueReducer(state, action, zModelIdentifierFieldValue);
-    },
-    fieldRefinerModelValueChanged: (state, action: FieldValueAction<SDXLRefinerModelFieldValue>) => {
-      fieldValueReducer(state, action, zSDXLRefinerModelFieldValue);
-    },
-    fieldVaeModelValueChanged: (state, action: FieldValueAction<VAEModelFieldValue>) => {
-      fieldValueReducer(state, action, zVAEModelFieldValue);
-    },
-    fieldLoRAModelValueChanged: (state, action: FieldValueAction<LoRAModelFieldValue>) => {
-      fieldValueReducer(state, action, zLoRAModelFieldValue);
-    },
-    fieldLLaVAModelValueChanged: (state, action: FieldValueAction<LLaVAModelFieldValue>) => {
-      fieldValueReducer(state, action, zLLaVAModelFieldValue);
-    },
-    fieldControlNetModelValueChanged: (state, action: FieldValueAction<ControlNetModelFieldValue>) => {
-      fieldValueReducer(state, action, zControlNetModelFieldValue);
-    },
-    fieldIPAdapterModelValueChanged: (state, action: FieldValueAction<IPAdapterModelFieldValue>) => {
-      fieldValueReducer(state, action, zIPAdapterModelFieldValue);
-    },
-    fieldT2IAdapterModelValueChanged: (state, action: FieldValueAction<T2IAdapterModelFieldValue>) => {
-      fieldValueReducer(state, action, zT2IAdapterModelFieldValue);
-    },
-    fieldSpandrelImageToImageModelValueChanged: (
-      state,
-      action: FieldValueAction<SpandrelImageToImageModelFieldValue>
-    ) => {
-      fieldValueReducer(state, action, zSpandrelImageToImageModelFieldValue);
-    },
-    fieldT5EncoderValueChanged: (state, action: FieldValueAction<T5EncoderModelFieldValue>) => {
-      fieldValueReducer(state, action, zT5EncoderModelFieldValue);
-    },
-    fieldCLIPEmbedValueChanged: (state, action: FieldValueAction<CLIPEmbedModelFieldValue>) => {
-      fieldValueReducer(state, action, zCLIPEmbedModelFieldValue);
-    },
-    fieldCLIPLEmbedValueChanged: (state, action: FieldValueAction<CLIPLEmbedModelFieldValue>) => {
-      fieldValueReducer(state, action, zCLIPLEmbedModelFieldValue);
-    },
-    fieldCLIPGEmbedValueChanged: (state, action: FieldValueAction<CLIPGEmbedModelFieldValue>) => {
-      fieldValueReducer(state, action, zCLIPGEmbedModelFieldValue);
-    },
-    fieldControlLoRAModelValueChanged: (state, action: FieldValueAction<ControlLoRAModelFieldValue>) => {
-      fieldValueReducer(state, action, zControlLoRAModelFieldValue);
-    },
-    fieldFluxVAEModelValueChanged: (state, action: FieldValueAction<FluxVAEModelFieldValue>) => {
-      fieldValueReducer(state, action, zFluxVAEModelFieldValue);
-    },
-    fieldSigLipModelValueChanged: (state, action: FieldValueAction<SigLipModelFieldValue>) => {
-      fieldValueReducer(state, action, zSigLipModelFieldValue);
-    },
-    fieldFluxReduxModelValueChanged: (state, action: FieldValueAction<FluxReduxModelFieldValue>) => {
-      fieldValueReducer(state, action, zFluxReduxModelFieldValue);
-    },
-    fieldImagen3ModelValueChanged: (state, action: FieldValueAction<Imagen3ModelFieldValue>) => {
-      fieldValueReducer(state, action, zImagen3ModelFieldValue);
-    },
-    fieldImagen4ModelValueChanged: (state, action: FieldValueAction<Imagen4ModelFieldValue>) => {
-      fieldValueReducer(state, action, zImagen4ModelFieldValue);
-    },
-    fieldChatGPT4oModelValueChanged: (state, action: FieldValueAction<ChatGPT4oModelFieldValue>) => {
-      fieldValueReducer(state, action, zChatGPT4oModelFieldValue);
-    },
-    fieldVeo3ModelValueChanged: (state, action: FieldValueAction<Veo3ModelFieldValue>) => {
-      fieldValueReducer(state, action, zVeo3ModelFieldValue);
-    },
-    fieldRunwayModelValueChanged: (state, action: FieldValueAction<RunwayModelFieldValue>) => {
-      fieldValueReducer(state, action, zRunwayModelFieldValue);
-    },
-    fieldFluxKontextModelValueChanged: (state, action: FieldValueAction<FluxKontextModelFieldValue>) => {
-      fieldValueReducer(state, action, zFluxKontextModelFieldValue);
     },
     fieldEnumModelValueChanged: (state, action: FieldValueAction<EnumFieldValue>) => {
       fieldValueReducer(state, action, zEnumFieldValue);
@@ -683,7 +565,7 @@ const slice = createSlice({
       state.formFieldInitialValues = formFieldInitialValues;
     },
     workflowLoaded: (state, action: PayloadAction<WorkflowV3>) => {
-      const { nodes, edges, is_published: _is_published, ...workflowExtra } = action.payload;
+      const { nodes, edges, ...workflowExtra } = action.payload;
 
       const formFieldInitialValues = getFormFieldInitialValues(workflowExtra.form, nodes);
 
@@ -706,45 +588,22 @@ export const {
   fieldBoardValueChanged,
   fieldBooleanValueChanged,
   fieldColorValueChanged,
-  fieldControlNetModelValueChanged,
   fieldEnumModelValueChanged,
   fieldImageValueChanged,
   fieldImageCollectionValueChanged,
-  fieldIPAdapterModelValueChanged,
-  fieldT2IAdapterModelValueChanged,
-  fieldSpandrelImageToImageModelValueChanged,
   fieldLabelChanged,
-  fieldLoRAModelValueChanged,
-  fieldLLaVAModelValueChanged,
   fieldModelIdentifierValueChanged,
-  fieldMainModelValueChanged,
   fieldIntegerValueChanged,
   fieldFloatValueChanged,
   fieldFloatCollectionValueChanged,
   fieldIntegerCollectionValueChanged,
-  fieldRefinerModelValueChanged,
   fieldSchedulerValueChanged,
   fieldStringValueChanged,
   fieldStringCollectionValueChanged,
-  fieldVaeModelValueChanged,
-  fieldT5EncoderValueChanged,
-  fieldCLIPEmbedValueChanged,
-  fieldCLIPLEmbedValueChanged,
-  fieldCLIPGEmbedValueChanged,
-  fieldControlLoRAModelValueChanged,
-  fieldFluxVAEModelValueChanged,
-  fieldSigLipModelValueChanged,
-  fieldFluxReduxModelValueChanged,
-  fieldImagen3ModelValueChanged,
-  fieldImagen4ModelValueChanged,
-  fieldChatGPT4oModelValueChanged,
-  fieldFluxKontextModelValueChanged,
   fieldFloatGeneratorValueChanged,
   fieldIntegerGeneratorValueChanged,
   fieldStringGeneratorValueChanged,
   fieldImageGeneratorValueChanged,
-  fieldVeo3ModelValueChanged,
-  fieldRunwayModelValueChanged,
   fieldDescriptionChanged,
   nodeEditorReset,
   nodeIsIntermediateChanged,

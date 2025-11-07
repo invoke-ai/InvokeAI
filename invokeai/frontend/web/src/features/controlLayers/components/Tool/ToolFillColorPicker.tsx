@@ -6,6 +6,7 @@ import {
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
+  Portal,
   Tooltip,
 } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
@@ -102,12 +103,14 @@ export const ToolFillColorPicker = memo(() => {
           </Tooltip>
         </Flex>
       </PopoverTrigger>
-      <PopoverContent>
-        <PopoverArrow />
-        <PopoverBody minH={64}>
-          <RgbaColorPicker color={activeColor} onChange={onColorChange} withNumberInput withSwatches />
-        </PopoverBody>
-      </PopoverContent>
+      <Portal>
+        <PopoverContent>
+          <PopoverArrow />
+          <PopoverBody minH={64}>
+            <RgbaColorPicker color={activeColor} onChange={onColorChange} withNumberInput withSwatches />
+          </PopoverBody>
+        </PopoverContent>
+      </Portal>
     </Popover>
   );
 });

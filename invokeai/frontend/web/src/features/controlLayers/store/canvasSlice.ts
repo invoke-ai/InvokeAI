@@ -36,7 +36,6 @@ import {
 } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { simplifyFlatNumbersArray } from 'features/controlLayers/util/simplify';
 import { isMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
-import { API_BASE_MODELS } from 'features/parameters/types/constants';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
 import type { UndoableOptions } from 'redux-undo';
@@ -73,19 +72,11 @@ import type {
 } from './types';
 import {
   ASPECT_RATIO_MAP,
-  CHATGPT_ASPECT_RATIOS,
   DEFAULT_ASPECT_RATIO_CONFIG,
-  FLUX_KONTEXT_ASPECT_RATIOS,
-  GEMINI_2_5_ASPECT_RATIOS,
   getEntityIdentifier,
   getInitialCanvasState,
-  IMAGEN_ASPECT_RATIOS,
-  isChatGPT4oAspectRatioID,
-  isFluxKontextAspectRatioID,
-  isFLUXReduxConfig,
-  isGemini2_5AspectRatioID,
-  isImagenAspectRatioID,
-  isIPAdapterConfig,
+  isRegionalGuidanceFLUXReduxConfig,
+  isRegionalGuidanceIPAdapterConfig,
   zCanvasState,
 } from './types';
 import {
@@ -99,6 +90,7 @@ import {
   initialControlNet,
   initialFLUXRedux,
   initialIPAdapter,
+  initialRegionalGuidanceIPAdapter,
   initialT2IAdapter,
   makeDefaultRasterLayerAdjustments,
 } from './util';
@@ -804,7 +796,7 @@ const slice = createSlice({
         if (!entity) {
           return;
         }
-        const config = { id: referenceImageId, config: deepClone(initialIPAdapter) };
+        const config = { id: referenceImageId, config: deepClone(initialRegionalGuidanceIPAdapter) };
         merge(config, overrides);
         entity.referenceImages.push(config);
       },
@@ -847,7 +839,7 @@ const slice = createSlice({
       if (!referenceImage) {
         return;
       }
-      if (!isIPAdapterConfig(referenceImage.config)) {
+      if (!isRegionalGuidanceIPAdapterConfig(referenceImage.config)) {
         return;
       }
 
@@ -864,7 +856,7 @@ const slice = createSlice({
       if (!referenceImage) {
         return;
       }
-      if (!isIPAdapterConfig(referenceImage.config)) {
+      if (!isRegionalGuidanceIPAdapterConfig(referenceImage.config)) {
         return;
       }
       referenceImage.config.beginEndStepPct = beginEndStepPct;
@@ -880,7 +872,7 @@ const slice = createSlice({
       if (!referenceImage) {
         return;
       }
-      if (!isIPAdapterConfig(referenceImage.config)) {
+      if (!isRegionalGuidanceIPAdapterConfig(referenceImage.config)) {
         return;
       }
       referenceImage.config.method = method;
@@ -899,7 +891,7 @@ const slice = createSlice({
       if (!referenceImage) {
         return;
       }
-      if (!isFLUXReduxConfig(referenceImage.config)) {
+      if (!isRegionalGuidanceFLUXReduxConfig(referenceImage.config)) {
         return;
       }
 
@@ -928,7 +920,7 @@ const slice = createSlice({
         return;
       }
 
-      if (isIPAdapterConfig(referenceImage.config) && isFluxReduxModelConfig(modelConfig)) {
+      if (isRegionalGuidanceIPAdapterConfig(referenceImage.config) && isFluxReduxModelConfig(modelConfig)) {
         // Switching from ip_adapter to flux_redux
         referenceImage.config = {
           ...initialFLUXRedux,
@@ -938,7 +930,7 @@ const slice = createSlice({
         return;
       }
 
-      if (isFLUXReduxConfig(referenceImage.config) && isIPAdapterModelConfig(modelConfig)) {
+      if (isRegionalGuidanceFLUXReduxConfig(referenceImage.config) && isIPAdapterModelConfig(modelConfig)) {
         // Switching from flux_redux to ip_adapter
         referenceImage.config = {
           ...initialIPAdapter,
@@ -948,7 +940,7 @@ const slice = createSlice({
         return;
       }
 
-      if (isIPAdapterConfig(referenceImage.config)) {
+      if (isRegionalGuidanceIPAdapterConfig(referenceImage.config)) {
         referenceImage.config.model = zModelIdentifierField.parse(modelConfig);
 
         // Ensure that the IP Adapter model is compatible with the CLIP Vision model
@@ -971,7 +963,7 @@ const slice = createSlice({
       if (!referenceImage) {
         return;
       }
-      if (!isIPAdapterConfig(referenceImage.config)) {
+      if (!isRegionalGuidanceIPAdapterConfig(referenceImage.config)) {
         return;
       }
       referenceImage.config.clipVisionModel = clipVisionModel;
@@ -1226,33 +1218,6 @@ const slice = createSlice({
       state.bbox.aspectRatio.id = id;
       if (id === 'Free') {
         state.bbox.aspectRatio.isLocked = false;
-      } else if (
-        (state.bbox.modelBase === 'imagen3' || state.bbox.modelBase === 'imagen4') &&
-        isImagenAspectRatioID(id)
-      ) {
-        const { width, height } = IMAGEN_ASPECT_RATIOS[id];
-        state.bbox.rect.width = width;
-        state.bbox.rect.height = height;
-        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
-        state.bbox.aspectRatio.isLocked = true;
-      } else if (state.bbox.modelBase === 'chatgpt-4o' && isChatGPT4oAspectRatioID(id)) {
-        const { width, height } = CHATGPT_ASPECT_RATIOS[id];
-        state.bbox.rect.width = width;
-        state.bbox.rect.height = height;
-        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
-        state.bbox.aspectRatio.isLocked = true;
-      } else if (state.bbox.modelBase === 'gemini-2.5' && isGemini2_5AspectRatioID(id)) {
-        const { width, height } = GEMINI_2_5_ASPECT_RATIOS[id];
-        state.bbox.rect.width = width;
-        state.bbox.rect.height = height;
-        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
-        state.bbox.aspectRatio.isLocked = true;
-      } else if (state.bbox.modelBase === 'flux-kontext' && isFluxKontextAspectRatioID(id)) {
-        const { width, height } = FLUX_KONTEXT_ASPECT_RATIOS[id];
-        state.bbox.rect.width = width;
-        state.bbox.rect.height = height;
-        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
-        state.bbox.aspectRatio.isLocked = true;
       } else {
         state.bbox.aspectRatio.isLocked = true;
         state.bbox.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
@@ -1699,14 +1664,6 @@ const slice = createSlice({
       const base = model?.base;
       if (isMainModelBase(base) && state.bbox.modelBase !== base) {
         state.bbox.modelBase = base;
-        if (API_BASE_MODELS.includes(base)) {
-          state.bbox.aspectRatio.isLocked = true;
-          state.bbox.aspectRatio.value = 1;
-          state.bbox.aspectRatio.id = '1:1';
-          state.bbox.rect.width = 1024;
-          state.bbox.rect.height = 1024;
-        }
-
         syncScaledSize(state);
       }
     });
@@ -1831,10 +1788,6 @@ export const {
 } = slice.actions;
 
 const syncScaledSize = (state: CanvasState) => {
-  if (API_BASE_MODELS.includes(state.bbox.modelBase)) {
-    // Imagen3 has fixed sizes. Scaled bbox is not supported.
-    return;
-  }
   if (state.bbox.scaleMethod === 'auto') {
     // Sync both aspect ratio and size
     const { width, height } = state.bbox.rect;

@@ -5,8 +5,8 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   type CanvasRegionalGuidanceState,
-  isFLUXReduxConfig,
-  isIPAdapterConfig,
+  isRegionalGuidanceFLUXReduxConfig,
+  isRegionalGuidanceIPAdapterConfig,
   type Rect,
 } from 'features/controlLayers/store/types';
 import { getRegionalGuidanceWarnings } from 'features/controlLayers/store/validators';
@@ -279,7 +279,7 @@ export const addRegions = async ({
     }
 
     for (const { id, config } of region.referenceImages) {
-      if (isIPAdapterConfig(config)) {
+      if (isRegionalGuidanceIPAdapterConfig(config)) {
         assert(!isFLUX, 'Regional IP adapters are not supported for FLUX.');
 
         result.addedIPAdapters++;
@@ -304,7 +304,7 @@ export const addRegions = async ({
         // Connect the mask to the conditioning
         g.addEdge(maskToTensor, 'mask', ipAdapterNode, 'mask');
         g.addEdge(ipAdapterNode, 'ip_adapter', ipAdapterCollect, 'item');
-      } else if (isFLUXReduxConfig(config)) {
+      } else if (isRegionalGuidanceFLUXReduxConfig(config)) {
         assert(isFLUX, 'Regional FLUX Redux requires FLUX.');
         assert(fluxReduxCollect !== null, 'FLUX Redux collector is required.');
         result.addedFLUXReduxes++;

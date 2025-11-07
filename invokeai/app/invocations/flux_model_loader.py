@@ -6,18 +6,16 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
+from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField
 from invokeai.app.invocations.model import CLIPField, ModelIdentifierField, T5EncoderField, TransformerField, VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.t5_model_identifier import (
     preprocess_t5_encoder_model_identifier,
     preprocess_t5_tokenizer_model_identifier,
 )
-from invokeai.backend.flux.util import max_seq_lengths
-from invokeai.backend.model_manager.config import (
-    CheckpointConfigBase,
-)
-from invokeai.backend.model_manager.taxonomy import SubModelType
+from invokeai.backend.flux.util import get_flux_max_seq_length
+from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
 
 
 @invocation_output("flux_model_loader_output")
@@ -46,23 +44,30 @@ class FluxModelLoaderInvocation(BaseInvocation):
 
     model: ModelIdentifierField = InputField(
         description=FieldDescriptions.flux_model,
-        ui_type=UIType.FluxMainModel,
         input=Input.Direct,
+        ui_model_base=BaseModelType.Flux,
+        ui_model_type=ModelType.Main,
     )
 
     t5_encoder_model: ModelIdentifierField = InputField(
-        description=FieldDescriptions.t5_encoder, ui_type=UIType.T5EncoderModel, input=Input.Direct, title="T5 Encoder"
+        description=FieldDescriptions.t5_encoder,
+        input=Input.Direct,
+        title="T5 Encoder",
+        ui_model_type=ModelType.T5Encoder,
     )
 
     clip_embed_model: ModelIdentifierField = InputField(
         description=FieldDescriptions.clip_embed_model,
-        ui_type=UIType.CLIPEmbedModel,
         input=Input.Direct,
         title="CLIP Embed",
+        ui_model_type=ModelType.CLIPEmbed,
     )
 
     vae_model: ModelIdentifierField = InputField(
-        description=FieldDescriptions.vae_model, ui_type=UIType.FluxVAEModel, title="VAE"
+        description=FieldDescriptions.vae_model,
+        title="VAE",
+        ui_model_base=BaseModelType.Flux,
+        ui_model_type=ModelType.VAE,
     )
 
     def invoke(self, context: InvocationContext) -> FluxModelLoaderOutput:
@@ -80,12 +85,12 @@ class FluxModelLoaderInvocation(BaseInvocation):
         t5_encoder = preprocess_t5_encoder_model_identifier(self.t5_encoder_model)
 
         transformer_config = context.models.get_config(transformer)
-        assert isinstance(transformer_config, CheckpointConfigBase)
+        assert isinstance(transformer_config, Checkpoint_Config_Base)
 
         return FluxModelLoaderOutput(
             transformer=TransformerField(transformer=transformer, loras=[]),
             clip=CLIPField(tokenizer=tokenizer, text_encoder=clip_encoder, loras=[], skipped_layers=0),
             t5_encoder=T5EncoderField(tokenizer=tokenizer2, text_encoder=t5_encoder, loras=[]),
             vae=VAEField(vae=vae),
-            max_seq_len=max_seq_lengths[transformer_config.config_path],
+            max_seq_len=get_flux_max_seq_length(transformer_config.variant),
         )

@@ -131,7 +131,8 @@
         "notInstalled": "Non $t(common.installed)",
         "prevPage": "Pagina precedente",
         "nextPage": "Pagina successiva",
-        "resetToDefaults": "Ripristina impostazioni predefinite"
+        "resetToDefaults": "Ripristina impostazioni predefinite",
+        "crop": "Ritaglia"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -196,14 +197,7 @@
         "assets": "Risorse",
         "images": "Immagini",
         "useForPromptGeneration": "Usa per generare il prompt",
-        "deleteVideo_one": "Elimina video",
-        "deleteVideo_many": "Elimina {{count}} video",
-        "deleteVideo_other": "Elimina {{count}} video",
-        "deleteVideoPermanent": "I video eliminati non possono essere ripristinati.",
-        "videos": "Video",
-        "videosTab": "Video creati e salvati in Invoke.",
         "jump": "Salta",
-        "noVideoSelected": "Nessun video selezionato",
         "noImagesInGallery": "Nessuna immagine da visualizzare",
         "unableToLoad": "Impossibile caricare la Galleria",
         "selectAnImageToCompare": "Seleziona un'immagine da confrontare",
@@ -275,9 +269,13 @@
                 "title": "Seleziona la scheda Genera",
                 "desc": "Seleziona la scheda Genera."
             },
-            "selectVideoTab": {
-                "title": "Seleziona la scheda Video",
-                "desc": "Seleziona la scheda Video."
+            "promptHistoryPrev": {
+                "title": "Prompt precedente nella cronologia",
+                "desc": "Quando il prompt è attivo, passa al prompt precedente (più vecchio) nella cronologia."
+            },
+            "promptHistoryNext": {
+                "title": "Prossimo prompt nella cronologia",
+                "desc": "Quando il prompt è attivo, passa al prompt successivo (più recente) nella cronologia."
             }
         },
         "hotkeys": "Tasti di scelta rapida",
@@ -570,9 +568,6 @@
                 "desc": "Aggiungi/Rimuovi contrassegno all'immagine selezionata.",
                 "title": "Aggiungi / Rimuovi contrassegno immagine"
             }
-        },
-        "video": {
-            "title": "Video"
         }
     },
     "modelManager": {
@@ -655,7 +650,7 @@
         "loraTriggerPhrases": "Frasi Trigger LoRA",
         "mainModelTriggerPhrases": "Frasi Trigger del modello principale",
         "inplaceInstall": "Installazione sul posto",
-        "inplaceInstallDesc": "Installa i modelli senza copiare i file. Quando si utilizza il modello, verrà caricato da questa posizione. Se disabilitato, i file del modello verranno copiati nella directory dei modelli gestiti da Invoke durante l'installazione.",
+        "inplaceInstallDesc": "Installa i modelli senza spostare i file. Quando si utilizza il modello, verrà caricato dalla posizione originale. Se disabilitato, i file del modello verranno spostati nella directory dei modelli gestiti da Invoke durante l'installazione.",
         "installQueue": "Coda di installazione",
         "install": "Installa",
         "installRepo": "Installa Repository",
@@ -743,7 +738,17 @@
         "filterModels": "Filtra i modelli",
         "ipAdapters": "Adattatori IP",
         "showOnlyRelatedModels": "Correlati",
-        "starterModelsInModelManager": "I modelli di avvio possono essere trovati in Gestione Modelli"
+        "starterModelsInModelManager": "I modelli di avvio possono essere trovati in Gestione Modelli",
+        "unidentifiedModelTitle": "Impossibile identificare il modello",
+        "unidentifiedModelMessage": "Non siamo riusciti a identificare il tipo, la base e/o il formato del modello installato. Prova a modificare il modello e a selezionare le impostazioni appropriate.",
+        "unidentifiedModelMessage2": "Se non vedi le impostazioni corrette o il modello non funziona dopo averle modificate, chiedi aiuto su <DiscordLink /> o crea un problema su <GitHubIssuesLink />.",
+        "modelFormat": "Formato del modello",
+        "modelSettingsWarning": "Queste impostazioni indicano a Invoke di che tipo di modello si tratta e come caricarlo. Se Invoke non le ha rilevate correttamente durante l'installazione del modello, o se il modello è classificato come Sconosciuto, potrebbe essere necessario modificarle manualmente.",
+        "reidentify": "Reidentificare",
+        "reidentifyTooltip": "Se un modello non è stato installato correttamente (ad esempio, ha il tipo sbagliato o non funziona), puoi provare a identificarlo nuovamente. Questo reimposterà tutte le impostazioni personalizzate che potresti aver applicato.",
+        "reidentifySuccess": "Modello reidentificato con successo",
+        "reidentifyUnknown": "Impossibile identificare il modello",
+        "reidentifyError": "Errore durante la reidentificazione del modello"
     },
     "parameters": {
         "images": "Immagini",
@@ -826,7 +831,6 @@
             "promptExpansionResultPending": "Accetta o ignora il risultato dell'espansione del prompt",
             "promptExpansionPending": "Espansione del prompt in corso",
             "noStartingFrameImage": "Nessuna immagine del fotogramma iniziale",
-            "videoIsDisabled": "La generazione di video non è abilitata per gli account {{accountType}}.",
             "incompatibleLoRAs": "Aggiunti LoRA incompatibili",
             "emptyBatches": "lotti vuoti",
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), la larghezza del riquadro è {{width}}",
@@ -866,13 +870,6 @@
         "images_withCount_one": "Immagine",
         "images_withCount_many": "Immagini",
         "images_withCount_other": "Immagini",
-        "videos_withCount_one": "Video",
-        "videos_withCount_many": "Video",
-        "videos_withCount_other": "Video",
-        "startingFrameImage": "Fotogramma iniziale",
-        "videoActions": "Azioni video",
-        "sendToVideo": "Invia al Video",
-        "video": "Video",
         "resolution": "Risoluzione",
         "downloadImage": "Scarica l'immagine",
         "showOptionsPanel": "Mostra pannello laterale (O o T)"
@@ -1273,12 +1270,6 @@
         "uncategorizedImages": "Immagini non categorizzate",
         "deleteAllUncategorizedImages": "Elimina tutte le immagini non categorizzate",
         "locateInGalery": "Trova nella Galleria",
-        "movingVideosToBoard_one": "Spostamento di {{count}} video sulla bacheca:",
-        "movingVideosToBoard_many": "Spostamento di {{count}} video sulla bacheca:",
-        "movingVideosToBoard_other": "Spostamento di {{count}} video sulla bacheca:",
-        "videosWithCount_one": "{{count}} video",
-        "videosWithCount_many": "{{count}} video",
-        "videosWithCount_other": "{{count}} video",
         "deletedImagesCannotBeRestored": "Le immagini eliminate non possono essere ripristinate.",
         "hideBoards": "Nascondi bacheche",
         "viewBoards": "Visualizza le bacheche"
@@ -1350,7 +1341,7 @@
         "generations_many": "Generazioni",
         "generations_other": "Generazioni",
         "origin": "Origine",
-        "destination": "Destinazione",
+        "destination": "Dest",
         "upscaling": "Ampliamento",
         "canvas": "Tela",
         "workflows": "Flussi di lavoro",
@@ -1372,7 +1363,8 @@
         "sortOrderAscending": "Ascendente",
         "sortOrderDescending": "Discendente",
         "createdAt": "Creato",
-        "completedAt": "Completato"
+        "completedAt": "Completato",
+        "batchFieldValues": "Valori del campo Lotto"
     },
     "models": {
         "noMatchingModels": "Nessun modello corrispondente",
@@ -1908,12 +1900,6 @@
         "seamlessXAxis": "Asse X senza giunte",
         "seamlessYAxis": "Asse Y senza giunte",
         "vae": "VAE",
-        "videoDetails": "Dettagli video",
-        "noVideoDetails": "Nessun dettaglio video trovato",
-        "videoModel": "Modello",
-        "videoDuration": "Durata",
-        "videoAspectRatio": "Proporzioni",
-        "videoResolution": "Risoluzione",
         "parsingFailed": "Analisi non riuscita",
         "recallParameter": "Richiama {{label}}"
     },
@@ -2031,7 +2017,9 @@
             "errorWorkflowHasUnpublishableNodes": "Il flusso di lavoro ha nodi di estrazione lotto, generatore o metadati",
             "showShuffle": "Mostra Mescola",
             "shuffle": "Mescola",
-            "removeFromForm": "Rimuovi dal modulo"
+            "removeFromForm": "Rimuovi dal modulo",
+            "emptyRootPlaceholderViewMode": "Fare clic su Modifica per iniziare a creare un modulo per questo flusso di lavoro.",
+            "workflowBuilderAlphaWarning": "Il generatore di flussi di lavoro è attualmente in versione alpha. Potrebbero esserci modifiche sostanziali prima della versione stabile."
         },
         "loadMore": "Carica altro",
         "searchPlaceholder": "Cerca per nome, descrizione o etichetta",
@@ -2051,7 +2039,14 @@
         "userWorkflows": "Flussi di lavoro dell'utente",
         "projectWorkflows": "Flussi di lavoro del progetto",
         "allLoaded": "Tutti i flussi di lavoro caricati",
-        "filterByTags": "Filtra per etichetta"
+        "filterByTags": "Filtra per etichetta",
+        "noRecentWorkflows": "Nessun flusso di lavoro recente",
+        "openWorkflow": "Apri flusso di lavoro",
+        "problemLoading": "Problema nel caricamento dei flussi di lavoro",
+        "noDescription": "Nessuna descrizione",
+        "searchWorkflows": "Ricerca flussi di lavoro",
+        "clearWorkflowSearchFilter": "Cancella filtro di ricerca del flusso di lavoro",
+        "openLibrary": "Apri libreria"
     },
     "accordions": {
         "compositing": {
@@ -2085,7 +2080,10 @@
         "generateFromImage": "Genera prompt dall'immagine",
         "resultTitle": "Espansione del prompt completata",
         "resultSubtitle": "Scegli come gestire il prompt espanso:",
-        "insert": "Inserisci"
+        "insert": "Inserisci",
+        "noPromptHistory": "Nessuna cronologia di prompt registrata.",
+        "noMatchingPrompts": "Nessun prompt corrispondente nella cronologia.",
+        "toSwitchBetweenPrompts": "per passare da un prompt all'altro."
     },
     "controlLayers": {
         "addLayer": "Aggiungi Livello",
@@ -2442,7 +2440,17 @@
             "include": "Includi",
             "neutral": "Neutro",
             "saveAs": "Salva come",
-            "process": "Elabora"
+            "process": "Elabora",
+            "desc": "Seleziona un singolo oggetto di destinazione. Una volta completata la selezione, fai clic su <Bold>Applica</Bold> per eliminare tutto ciò che si trova al di fuori dell'area selezionata, oppure salva la selezione come nuovo livello.",
+            "visualModeDesc": "La modalità visiva utilizza input di tipo riquadro e punto per selezionare un oggetto.",
+            "visualMode1": "Fai clic e trascina per disegnare un riquadro attorno all'oggetto che desideri selezionare. Puoi ottenere risultati migliori disegnando il riquadro un po' più grande o più piccolo dell'oggetto.",
+            "visualMode2": "Fare clic per aggiungere un punto di <Bold>iinclusione</Bold>i verde oppure fare clic tenendo premuto Maiusc per aggiungere un punto di <Bold>iesclusione</Bold>i rosso per indicare al modello cosa includere o escludere.",
+            "visualMode3": "I punti possono essere utilizzati per perfezionare una selezione di caselle oppure in modo indipendente.",
+            "promptModeDesc": "La modalità Prompt utilizza l'input di testo per selezionare un oggetto.",
+            "promptMode1": "Digitare una breve descrizione dell'oggetto che si desidera selezionare.",
+            "promptMode2": "Utilizzare un linguaggio semplice, evitando descrizioni complesse o oggetti multipli.",
+            "model": "Modello",
+            "prompt": "Prompt di selezione"
         },
         "convertControlLayerTo": "Converti $t(controlLayers.controlLayer) in",
         "newRasterLayer": "Nuovo $t(controlLayers.rasterLayer)",
@@ -2514,7 +2522,9 @@
         "hideNonRasterLayers": "Nascondi livelli non raster (Shift+H)",
         "referenceImageEmptyStateWithCanvasOptions": "<UploadButton>Carica un'immagine</UploadButton>, trascina un'immagine dalla galleria su questa immagine di riferimento o <PullBboxButton>trascina il riquadro di delimitazione in questa immagine di riferimento</PullBboxButton> per iniziare.",
         "autoSwitch": {
-            "off": "Spento"
+            "off": "Spento",
+            "switchOnStart": "All'inizio",
+            "switchOnFinish": "Alla fine"
         },
         "invertMask": "Inverti maschera",
         "fitBboxToMasks": "Adatta il riquadro di delimitazione alle maschere",
@@ -2525,7 +2535,52 @@
         "globalReferenceImage_withCount_other": "Immagini di riferimento globali",
         "layer_withCount_one": "Livello ({{count}})",
         "layer_withCount_many": "Livelli ({{count}})",
-        "layer_withCount_other": "Livelli ({{count}})"
+        "layer_withCount_other": "Livelli ({{count}})",
+        "addAdjustments": "Aggiungi regolazioni",
+        "removeAdjustments": "Rimuovi regolazioni",
+        "adjustments": {
+            "simple": "Semplice",
+            "curves": "Curve",
+            "heading": "Regolazioni",
+            "expand": "Espandi regolazioni",
+            "collapse": "Comprimi regolazioni",
+            "brightness": "Luminosità",
+            "contrast": "Contrasto",
+            "saturation": "Saturazione",
+            "temperature": "Temperatura",
+            "tint": "Tinta",
+            "sharpness": "Nitidezza",
+            "reset": "Reimposta"
+        },
+        "deletePrompt": "Elimina prompt",
+        "addGlobalReferenceImage": "Aggiungi $t(controlLayers.globalReferenceImage)",
+        "referenceImageGlobal": "Immagine di riferimento (globale)",
+        "sendingToGallery": "Invia generazioni alla Galleria",
+        "sendToGallery": "Invia alla Galleria",
+        "sendToGalleryDesc": "Premendo Invoke viene generata e salvata un'immagine unica nella tua galleria.",
+        "newImg2ImgCanvasFromImage": "Nuovo immagine-a-immagine da Immagine",
+        "sendToCanvasDesc": "Premendo Invoke il lavoro in corso viene visualizzato sulla tela.",
+        "viewProgressOnCanvas": "Visualizza i progressi e gli output nel <Btn>Visualizzatore immagini</Btn>.",
+        "regionalGuidance_withCount_hidden": "Guida regionale ({{count}} nascosti)",
+        "controlLayers_withCount_hidden": "Livelli di controllo ({{count}} nascosti)",
+        "rasterLayers_withCount_hidden": "Livelli raster ({{count}} nascosti)",
+        "globalReferenceImages_withCount_hidden": "Immagini di riferimento globali ({{count}} nascoste)",
+        "inpaintMasks_withCount_hidden": "Maschere Inpaint ({{count}} nascoste)",
+        "regionalGuidance_withCount_visible": "Guida regionale ({{count}})",
+        "controlLayers_withCount_visible": "Livelli di controllo ({{count}})",
+        "rasterLayers_withCount_visible": "Livelli raster ({{count}})",
+        "globalReferenceImages_withCount_visible": "Immagini di riferimento globali ({{count}})",
+        "inpaintMasks_withCount_visible": "Maschere Inpaint ({{count}})",
+        "pastedTo": "Incollato su {{destination}}",
+        "stagingOnCanvas": "Predisponi le immagini su",
+        "newGallerySession": "Nuova sessione della Galleria",
+        "newGallerySessionDesc": "Questo cancellerà la tela e tutte le impostazioni, ad eccezione della selezione del modello. Le generazioni verranno inviate alla galleria.",
+        "newCanvasSession": "Nuova sessione Tela",
+        "newCanvasSessionDesc": "Questo cancellerà la tela e tutte le impostazioni, ad eccezione della selezione del modello. Le generazioni verranno predisposte sulla tela.",
+        "replaceCurrent": "Sostituisci l'attuale",
+        "uploadOrDragAnImage": "Trascina un'immagine dalla galleria o <UploadButton>carica un'immagine</UploadButton>.",
+        "sendingToCanvas": "Predisponi le generazioni sulla Tela",
+        "viewProgressInViewer": "Visualizza i progressi e gli output nel <Btn>Visualizzatore immagini</Btn>."
     },
     "ui": {
         "tabs": {
@@ -2538,8 +2593,7 @@
             "upscaling": "Amplia",
             "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)",
             "gallery": "Galleria",
-            "generate": "Genera",
-            "video": "Video"
+            "generate": "Genera"
         },
         "launchpad": {
             "workflowsTitle": "Approfondisci i flussi di lavoro.",
@@ -2617,19 +2671,13 @@
             "generate": {
                 "canvasCalloutTitle": "Vuoi avere più controllo, modificare e affinare le tue immagini?",
                 "canvasCalloutLink": "Per ulteriori funzionalità, vai su Tela."
-            },
-            "videoTitle": "Genera video da prompt testuale.",
-            "addStartingFrame": {
-                "title": "Aggiungi un fotogramma iniziale",
-                "description": "Aggiungi un'immagine per controllare il primo fotogramma del tuo video."
             }
         },
         "panels": {
             "launchpad": "Rampa di lancio",
             "workflowEditor": "Editor del flusso di lavoro",
             "imageViewer": "Visualizzatore",
-            "canvas": "Tela",
-            "video": "Video"
+            "canvas": "Tela"
         }
     },
     "upscaling": {
@@ -2654,12 +2702,6 @@
         "tileControl": "Controllo del riquadro",
         "tileSize": "Dimensione del riquadro",
         "tileOverlap": "Sovrapposizione riquadro"
-    },
-    "upsell": {
-        "inviteTeammates": "Invita collaboratori",
-        "shareAccess": "Condividi l'accesso",
-        "professional": "Professionale",
-        "professionalUpsell": "Disponibile nell'edizione Professional di Invoke. Fai clic qui o visita invoke.com/pricing per ulteriori dettagli."
     },
     "stylePresets": {
         "active": "Attivo",
@@ -2719,9 +2761,10 @@
         "readReleaseNotes": "Leggi le note di rilascio",
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "items": [
-            "Tela: separa i colori di primo piano e di sfondo - attiva con 'x', ripristina in bianco e nero con 'd'",
-            "LoRA: imposta i pesi predefiniti per i singoli LoRA nella scheda Gestione modelli"
-        ]
+            "Gestione modelli: se non è possibile identificare un modello durante l'installazione, ora è possibile selezionare manualmente il tipo di modello e l'architettura.",
+            "Interno: sistema di identificazione dei modelli migliorato, che semplifica per i collaboratori l'aggiunta del supporto per nuovi modelli."
+        ],
+        "watchUiUpdatesOverview": "Guarda la panoramica degli aggiornamenti dell'interfaccia utente"
     },
     "system": {
         "logLevel": {

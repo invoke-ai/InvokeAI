@@ -1,8 +1,7 @@
-import { $openAPISchemaUrl } from 'app/store/nanostores/openAPISchemaUrl';
 import type { OpenAPIV3_1 } from 'openapi-types';
 import type { stringify } from 'querystring';
 import type { paths } from 'services/api/schema';
-import type { AppConfig, AppVersion } from 'services/api/types';
+import type { AppVersion } from 'services/api/types';
 
 import { api, buildV1Url } from '..';
 
@@ -34,9 +33,12 @@ export const appInfoApi = api.injectEndpoints({
       }),
       providesTags: ['FetchOnReconnect'],
     }),
-    getAppConfig: build.query<AppConfig, void>({
+    getPatchmatchStatus: build.query<
+      paths['/api/v1/app/patchmatch_status']['get']['responses']['200']['content']['application/json'],
+      void
+    >({
       query: () => ({
-        url: buildAppInfoUrl('config'),
+        url: buildAppInfoUrl('patchmatch_status'),
         method: 'GET',
       }),
       providesTags: ['FetchOnReconnect'],
@@ -82,11 +84,7 @@ export const appInfoApi = api.injectEndpoints({
       invalidatesTags: ['InvocationCacheStatus'],
     }),
     getOpenAPISchema: build.query<OpenAPIV3_1.Document, void>({
-      query: () => {
-        const openAPISchemaUrl = $openAPISchemaUrl.get();
-        const url = openAPISchemaUrl ? openAPISchemaUrl : `${window.location.href.replace(/\/$/, '')}/openapi.json`;
-        return url;
-      },
+      query: () => `${window.location.href.replace(/\/$/, '')}/openapi.json`,
       providesTags: ['Schema'],
     }),
   }),
@@ -95,7 +93,7 @@ export const appInfoApi = api.injectEndpoints({
 export const {
   useGetAppVersionQuery,
   useGetAppDepsQuery,
-  useGetAppConfigQuery,
+  useGetPatchmatchStatusQuery,
   useGetRuntimeConfigQuery,
   useClearInvocationCacheMutation,
   useDisableInvocationCacheMutation,

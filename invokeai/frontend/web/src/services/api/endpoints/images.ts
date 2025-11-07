@@ -1,6 +1,6 @@
 import { skipToken } from '@reduxjs/toolkit/query';
-import { $authToken } from 'app/store/nanostores/authToken';
 import { getStore } from 'app/store/nanostores/store';
+import type { CroppableImageWithDims } from 'features/controlLayers/store/types';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import type { components, paths } from 'services/api/schema';
 import type {
@@ -475,7 +475,6 @@ export const {
   useGetImageWorkflowQuery,
   useLazyGetImageWorkflowQuery,
   useUploadImageMutation,
-  useCreateImageUploadEntryMutation,
   useClearIntermediatesMutation,
   useAddImagesToBoardMutation,
   useRemoveImagesFromBoardMutation,
@@ -529,25 +528,6 @@ export const getImageDTO = (
   return req.unwrap();
 };
 
-/**
- * Imperative RTKQ helper to fetch an image's metadata.
- * @param image_name The name of the image
- * @param options The options for the query. By default, the query will not subscribe to the store.
- * @raises Error if the image metadata is not found or there is an error fetching the image metadata. Images without
- * metadata will return undefined.
- */
-export const getImageMetadata = (
-  image_name: string,
-  options?: Parameters<typeof imagesApi.endpoints.getImageMetadata.initiate>[1]
-): Promise<JsonObject | undefined> => {
-  const _options = {
-    subscribe: false,
-    ...options,
-  };
-  const req = getStore().dispatch(imagesApi.endpoints.getImageMetadata.initiate(image_name, _options));
-  return req.unwrap();
-};
-
 export const uploadImage = (arg: UploadImageArg): Promise<ImageDTO> => {
   const { dispatch } = getStore();
   const req = dispatch(imagesApi.endpoints.uploadImage.initiate(arg, { track: false }));
@@ -578,10 +558,6 @@ export const uploadImages = async (args: UploadImageArg[]): Promise<ImageDTO[]> 
  */
 export const imageDTOToFile = async (imageDTO: ImageDTO): Promise<File> => {
   const init: RequestInit = {};
-  const authToken = $authToken.get();
-  if (authToken) {
-    init.headers = { Authorization: `Bearer ${authToken}` };
-  }
   const res = await fetch(imageDTO.image_url, init);
   const blob = await res.blob();
   // Create a new file with the same name, which we will upload
@@ -591,5 +567,12 @@ export const imageDTOToFile = async (imageDTO: ImageDTO): Promise<File> => {
 
 export const useImageDTO = (imageName: string | null | undefined) => {
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName ?? skipToken);
+  return imageDTO ?? null;
+};
+
+export const useImageDTOFromCroppableImage = (croppableImage: CroppableImageWithDims | null) => {
+  const { currentData: imageDTO } = useGetImageDTOQuery(
+    croppableImage?.crop?.image.image_name ?? croppableImage?.original.image.image_name ?? skipToken
+  );
   return imageDTO ?? null;
 };

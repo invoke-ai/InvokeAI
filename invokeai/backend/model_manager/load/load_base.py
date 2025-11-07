@@ -12,9 +12,7 @@ from typing import Any, Dict, Generator, Optional, Tuple
 import torch
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
-)
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
@@ -89,14 +87,6 @@ class LoadedModel(LoadedModelWithoutConfig):
     def __init__(self, config: Optional[AnyModelConfig], cache_record: CacheRecord, cache: ModelCache):
         super().__init__(cache_record=cache_record, cache=cache)
         self.config = config
-
-
-# TODO(MM2):
-# Some "intermediary" subclasses in the ModelLoaderBase class hierarchy define methods that their subclasses don't
-# know about. I think the problem may be related to this class being an ABC.
-#
-# For example, GenericDiffusersLoader defines `get_hf_load_class()`, and StableDiffusionDiffusersModel attempts to
-# call it. However, the method is not defined in the ABC, so it is not guaranteed to be implemented.
 
 
 class ModelLoaderBase(ABC):

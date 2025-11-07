@@ -19,7 +19,7 @@ import { $lastProgressEvent } from 'services/events/stores';
 const CurrentImageNode = (props: NodeProps) => {
   const lastSelectedItem = useAppSelector(selectLastSelectedItem);
   const lastProgressEvent = useStore($lastProgressEvent);
-  const imageDTO = useImageDTO(lastSelectedItem?.id);
+  const imageDTO = useImageDTO(lastSelectedItem);
 
   if (lastProgressEvent?.image) {
     return (

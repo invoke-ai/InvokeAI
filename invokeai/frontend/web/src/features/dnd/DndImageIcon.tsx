@@ -3,7 +3,7 @@ import { IconButton } from '@invoke-ai/ui-library';
 import type { MouseEvent } from 'react';
 import { memo } from 'react';
 
-const sx: SystemStyleObject = {
+const imageButtonSx: SystemStyleObject = {
   minW: 0,
   svg: {
     transitionProperty: 'common',
@@ -31,7 +31,7 @@ export const DndImageIcon = memo((props: Props) => {
       aria-label={tooltip}
       icon={icon}
       variant="link"
-      sx={sx}
+      sx={imageButtonSx}
       data-testid={tooltip}
       {...rest}
     />

@@ -8,7 +8,8 @@ from typing import Any, Dict, Optional, Set, Tuple
 from PIL import Image
 
 from invokeai.app.util.thumbnails import make_thumbnail
-from invokeai.backend.model_manager.config import AnyModelConfig, ModelType
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.taxonomy import ModelType
 
 logger = logging.getLogger(__name__)
 

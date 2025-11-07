@@ -6,29 +6,19 @@ import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import { clamp } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type { FLUXReduxImageInfluence, RefImagesState } from 'features/controlLayers/store/types';
-import { zModelIdentifierField } from 'features/nodes/types/common';
 import type {
-  ChatGPT4oModelConfig,
-  FLUXKontextModelConfig,
-  FLUXReduxModelConfig,
-  ImageDTO,
-  IPAdapterModelConfig,
-} from 'services/api/types';
+  CroppableImageWithDims,
+  FLUXReduxImageInfluence,
+  RefImagesState,
+} from 'features/controlLayers/store/types';
+import { zModelIdentifierField } from 'features/nodes/types/common';
+import type { FLUXKontextModelConfig, FLUXReduxModelConfig, IPAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import type { PartialDeep } from 'type-fest';
 
 import type { CLIPVisionModelV2, IPMethodV2, RefImageState } from './types';
 import { getInitialRefImagesState, isFLUXReduxConfig, isIPAdapterConfig, zRefImagesState } from './types';
-import {
-  getReferenceImageState,
-  imageDTOToImageWithDims,
-  initialChatGPT4oReferenceImage,
-  initialFluxKontextReferenceImage,
-  initialFLUXRedux,
-  initialGemini2_5ReferenceImage,
-  initialIPAdapter,
-} from './util';
+import { getReferenceImageState, initialFluxKontextReferenceImage, initialFLUXRedux, initialIPAdapter } from './util';
 
 type PayloadActionWithId<T = void> = T extends void
   ? PayloadAction<{ id: string }>
@@ -65,13 +55,13 @@ const slice = createSlice({
         state.entities.push(...entities);
       }
     },
-    refImageImageChanged: (state, action: PayloadActionWithId<{ imageDTO: ImageDTO | null }>) => {
-      const { id, imageDTO } = action.payload;
+    refImageImageChanged: (state, action: PayloadActionWithId<{ croppableImage: CroppableImageWithDims | null }>) => {
+      const { id, croppableImage } = action.payload;
       const entity = selectRefImageEntity(state, id);
       if (!entity) {
         return;
       }
-      entity.config.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
+      entity.config.image = croppableImage;
     },
     refImageIPAdapterMethodChanged: (state, action: PayloadActionWithId<{ method: IPMethodV2 }>) => {
       const { id, method } = action.payload;
@@ -101,7 +91,7 @@ const slice = createSlice({
     refImageModelChanged: (
       state,
       action: PayloadActionWithId<{
-        modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | ChatGPT4oModelConfig | FLUXKontextModelConfig | null;
+        modelConfig: IPAdapterModelConfig | FLUXKontextModelConfig | FLUXReduxModelConfig | null;
       }>
     ) => {
       const { id, modelConfig } = action.payload;
@@ -127,31 +117,8 @@ const slice = createSlice({
       // The type of ref image depends on the model. When the user switches the model, we rebuild the ref image.
       // When we switch the model, we keep the image the same, but change the other parameters.
 
-      if (entity.config.model.base === 'chatgpt-4o') {
-        // Switching to chatgpt-4o ref image
-        entity.config = {
-          ...initialChatGPT4oReferenceImage,
-          image: entity.config.image,
-          model: entity.config.model,
-        };
-        return;
-      }
-
-      if (entity.config.model.base === 'gemini-2.5') {
-        // Switching to Gemini 2.5 Flash Preview (nano banana) ref image
-        entity.config = {
-          ...initialGemini2_5ReferenceImage,
-          image: entity.config.image,
-          model: entity.config.model,
-        };
-        return;
-      }
-
-      if (
-        entity.config.model.base === 'flux-kontext' ||
-        (entity.config.model.base === 'flux' && entity.config.model.name?.toLowerCase().includes('kontext'))
-      ) {
-        // Switching to flux-kontext ref image
+      if (entity.config.model.base === 'flux' && entity.config.model.name?.toLowerCase().includes('kontext')) {
+        // Switching to flux kontext ref image
         entity.config = {
           ...initialFluxKontextReferenceImage,
           image: entity.config.image,
