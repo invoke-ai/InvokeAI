@@ -28,7 +28,8 @@ class WrappedGGUFReader:
         """Explicitly close the memory-mapped file."""
         if hasattr(self.reader, "data") and hasattr(self.reader.data, "_mmap"):
             try:
-                self.reader.data._mmap.close()
+                self.reader.data.flush()
+                del self.reader.data
             except (AttributeError, OSError, ValueError) as e:
                 logger.warning(f"Wasn't able to close GGUF memory map: {e}")
         del self.reader
