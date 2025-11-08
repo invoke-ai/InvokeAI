@@ -421,7 +421,7 @@ class Graph(BaseModel):
         # Validate that all node ids are unique
         node_ids = [n.id for n in self.nodes.values()]
         seen = set()
-        duplicate_node_ids = {nid for nid in node_ids if (nid in seen) or (seen.add(nid) or False)}
+        duplicate_node_ids = {nid for nid in node_ids if (nid in seen) or seen.add(nid)}
         if duplicate_node_ids:
             raise DuplicateNodeIdError(f"Node ids must be unique, found duplicates {duplicate_node_ids}")
 
