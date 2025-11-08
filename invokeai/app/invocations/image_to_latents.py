@@ -75,7 +75,7 @@ class ImageToLatentsInvocation(BaseInvocation):
         image_tensor: torch.Tensor,
         tile_size: int = 0,
     ) -> torch.Tensor:
-        assert isinstance(vae_info.model, (AutoencoderKL, AutoencoderTiny))
+        assert isinstance(vae_info.model, (AutoencoderKL, AutoencoderTiny)), "VAE must be of type SD-1.5 or SDXL"
         estimated_working_memory = estimate_vae_working_memory_sd15_sdxl(
             operation="encode",
             image_tensor=image_tensor,
@@ -84,7 +84,7 @@ class ImageToLatentsInvocation(BaseInvocation):
             fp32=upcast,
         )
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
-            assert isinstance(vae, (AutoencoderKL, AutoencoderTiny))
+            assert isinstance(vae, (AutoencoderKL, AutoencoderTiny)), "VAE must be of type SD-1.5 or SDXL"
             orig_dtype = vae.dtype
             if upcast:
                 vae.to(dtype=torch.float32)
@@ -140,7 +140,7 @@ class ImageToLatentsInvocation(BaseInvocation):
         image = context.images.get_pil(self.image.image_name)
 
         vae_info = context.models.load(self.vae.vae)
-        assert isinstance(vae_info.model, (AutoencoderKL, AutoencoderTiny))
+        assert isinstance(vae_info.model, (AutoencoderKL, AutoencoderTiny)), "VAE must be of type SD-1.5 or SDXL"
 
         image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
 
