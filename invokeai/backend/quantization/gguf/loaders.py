@@ -26,7 +26,7 @@ class WrappedGGUFReader:
 
     def close(self):
         """Explicitly close the memory-mapped file."""
-        if hasattr(self.reader, "data") and hasattr(self.reader.data, "_mmap"):
+        if hasattr(self.reader, "data"):
             try:
                 self.reader.data.flush()
                 del self.reader.data
