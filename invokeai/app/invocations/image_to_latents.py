@@ -144,7 +144,7 @@ class ImageToLatentsInvocation(BaseInvocation):
 
         image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
 
-        if self.color_compensation != "None":
+        if self.color_compensation != "None" and vae_info.config.base == BaseModelType.StableDiffusionXL:
             scale, bias = COLOR_COMPENSATION_MAP[self.color_compensation]
             image_tensor = image_tensor * scale + bias
 
