@@ -835,7 +835,12 @@ class GraphExecutionState(BaseModel):
 
     def _enqueue_if_ready(self, nid: str) -> None:
         """Push nid to its class queue if unmet inputs == 0."""
-        if self.indegree.get(nid, 1) != 0 or nid in self.executed:
+        # Invariants: exec node exists and has an indegree entry
+        if nid not in self.execution_graph.nodes:
+            raise KeyError(f"exec node {nid} missing from execution_graph")
+        if nid not in self.indegree:
+            raise KeyError(f"indegree missing for exec node {nid}")
+        if self.indegree[nid] != 0 or nid in self.executed:
             return
         node_obj = self.execution_graph.nodes[nid]
         self._queue_for(self._type_key(node_obj)).append(nid)
@@ -911,8 +916,13 @@ class GraphExecutionState(BaseModel):
         # Decrement children indegree and enqueue when ready
         for e in self.execution_graph._get_output_edges(node_id):
             child = e.destination.node_id
-            if child in self.indegree:
-                self.indegree[child] = max(0, self.indegree[child] - 1)
+            if child not in self.indegree:
+                raise KeyError(f"indegree missing for exec node {child}")
+            # Only decrement if there's something to satisfy
+            if self.indegree[child] == 0:
+                raise RuntimeError(f"indegree underflow for {child} from parent {node_id}")
+            self.indegree[child] -= 1
+            if self.indegree[child] == 0:
                 self._enqueue_if_ready(child)
 
     def set_node_error(self, node_id: str, error: str):
