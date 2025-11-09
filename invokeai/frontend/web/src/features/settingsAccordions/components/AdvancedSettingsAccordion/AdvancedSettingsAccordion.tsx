@@ -12,6 +12,7 @@ import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
 import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
 import ParamSeamlessYAxis from 'features/parameters/components/Seamless/ParamSeamlessYAxis';
+import ParamColorCompensation from 'features/parameters/components/VAEModel/ParamColorCompensation';
 import ParamFLUXVAEModelSelect from 'features/parameters/components/VAEModel/ParamFLUXVAEModelSelect';
 import ParamVAEModelSelect from 'features/parameters/components/VAEModel/ParamVAEModelSelect';
 import ParamVAEPrecision from 'features/parameters/components/VAEModel/ParamVAEPrecision';
@@ -97,6 +98,9 @@ export const AdvancedSettingsAccordion = memo(() => {
                 <ParamSeamlessYAxis />
               </FormControlGroup>
             </Flex>
+            <FormControlGroup formLabelProps={formLabelProps}>
+              <ParamColorCompensation />
+            </FormControlGroup>
           </>
         )}
         {isFLUX && (

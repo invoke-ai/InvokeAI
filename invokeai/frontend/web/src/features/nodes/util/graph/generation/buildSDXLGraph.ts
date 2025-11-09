@@ -45,12 +45,14 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     scheduler,
     steps,
     shouldUseCpuNoise,
+    colorCompensation,
     vaePrecision,
     vae,
     refinerModel,
   } = params;
 
   const fp32 = vaePrecision === 'fp32';
+  const compensation = colorCompensation ? 'SDXL' : 'None';
   const prompts = selectPresetModifiedPrompts(state);
 
   const g = new Graph(getPrefixedId('sdxl_graph'));
@@ -178,6 +180,7 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       type: 'i2l',
       id: getPrefixedId('i2l'),
       fp32,
+      color_compensation: compensation,
     });
     canvasOutput = await addImageToImage({
       g,
@@ -196,6 +199,7 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       type: 'i2l',
       id: getPrefixedId('i2l'),
       fp32,
+      color_compensation: compensation,
     });
     canvasOutput = await addInpaint({
       g,
@@ -216,6 +220,7 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       type: 'i2l',
       id: getPrefixedId('i2l'),
       fp32,
+      color_compensation: compensation,
     });
     canvasOutput = await addOutpaint({
       g,
