@@ -21,7 +21,7 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
 )
-from invokeai.app.invocations.model import VAEField, BaseModelType
+from invokeai.app.invocations.model import BaseModelType, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.load_base import LoadedModel
