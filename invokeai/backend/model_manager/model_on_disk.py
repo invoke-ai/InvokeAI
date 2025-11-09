@@ -84,6 +84,9 @@ class ModelOnDisk:
 
         path = self.resolve_weight_file(path)
 
+        if path in self._state_dict_cache:
+            return self._state_dict_cache[path]
+
         with SilenceWarnings():
             if path.suffix.endswith((".ckpt", ".pt", ".pth", ".bin")):
                 scan_result = scan_file_path(path)
