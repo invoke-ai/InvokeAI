@@ -1,7 +1,7 @@
 import { createAction } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/store';
 import { noop } from 'es-toolkit';
-import { setInfillMethod } from 'features/controlLayers/store/paramsSlice';
+import { selectInfillMethod, setInfillMethod } from 'features/controlLayers/store/paramsSlice';
 import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { appInfoApi } from 'services/api/endpoints/appInfo';
@@ -36,7 +36,7 @@ export const addAppStartedListener = (startAppListening: AppStartListening) => {
       dispatch(appInfoApi.endpoints.getPatchmatchStatus.initiate())
         .unwrap()
         .then((isPatchmatchAvailable) => {
-          const infillMethod = getState().params.infillMethod;
+          const infillMethod = selectInfillMethod(getState());
 
           if (!isPatchmatchAvailable && infillMethod === 'patchmatch') {
             dispatch(setInfillMethod('lama'));

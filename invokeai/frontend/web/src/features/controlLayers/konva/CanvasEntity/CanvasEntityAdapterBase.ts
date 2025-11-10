@@ -19,8 +19,8 @@ import {
 import {
   buildSelectIsSelected,
   getSelectIsTypeHidden,
+  selectActiveCanvas,
   selectBboxRect,
-  selectCanvasSlice,
   selectEntity,
 } from 'features/controlLayers/store/selectors';
 import type {
@@ -316,7 +316,7 @@ export abstract class CanvasEntityAdapterBase<T extends CanvasEntityState, U ext
    * A redux selector that selects the entity's state from the canvas slice.
    */
   selectState = createSelector(
-    selectCanvasSlice,
+    selectActiveCanvas,
     (canvas) => selectEntity(canvas, this.entityIdentifier) as T | undefined
   );
 

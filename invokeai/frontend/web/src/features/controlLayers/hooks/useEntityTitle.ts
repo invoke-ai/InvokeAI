@@ -1,13 +1,13 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas, selectEntity } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { assert } from 'tsafe';
 
 const createSelectName = (entityIdentifier: CanvasEntityIdentifier) =>
-  createSelector(selectCanvasSlice, (canvas) => {
+  createSelector(selectActiveCanvas, (canvas) => {
     const entity = selectEntity(canvas, entityIdentifier);
     if (!entity) {
       return null;

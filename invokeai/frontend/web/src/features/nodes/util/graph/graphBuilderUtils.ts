@@ -2,22 +2,21 @@ import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectSaveAllImagesToGallery } from 'features/controlLayers/store/canvasSettingsSlice';
-import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { selectCanvasStagingAreaByCanvasId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
+  selectActiveTabParams,
   selectImg2imgStrength,
   selectMainModelConfig,
   selectOptimizedDenoisingEnabled,
-  selectParamsSlice,
   selectRefinerModel,
   selectRefinerStart,
 } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas, selectActiveTab } from 'features/controlLayers/store/selectors';
 import type { ParamsState } from 'features/controlLayers/store/types';
 import type { BoardField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { buildPresetModifiedPrompt } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
 import { selectStylePresetSlice } from 'features/stylePresets/store/stylePresetSlice';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { selectListStylePresetsRequestState } from 'services/api/endpoints/stylePresets';
 import type { Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -63,7 +62,7 @@ export const selectCanvasOutputFields = (state: RootState) => {
  * Select the destination to use for canvas queue items.
  *
  */
-export const selectCanvasDestination = (state: RootState) => {
+export const selectCanvasDestination = (state: RootState, canvasId: string) => {
   // The canvas will stage images that have its session ID as the destination. When the user has enabled saving all
   // images to gallery, we want to bypass the staging area. So we use 'canvas' as a generic destination. Images will
   // go directly to the gallery.
@@ -73,14 +72,17 @@ export const selectCanvasDestination = (state: RootState) => {
   if (saveAllImagesToGallery) {
     return 'canvas';
   }
-  return selectCanvasSessionId(state);
+
+  const session = selectCanvasStagingAreaByCanvasId(state, canvasId);
+
+  return session.canvasSessionId;
 };
 
 /**
  * Gets the prompts, modified for the active style preset.
  */
 export const selectPresetModifiedPrompts = createSelector(
-  selectParamsSlice,
+  selectActiveTabParams,
   selectStylePresetSlice,
   selectListStylePresetsRequestState,
   (params, stylePresetSlice, listStylePresetsRequestState) => {
@@ -120,10 +122,10 @@ export const selectPresetModifiedPrompts = createSelector(
 
 export const getOriginalAndScaledSizesForTextToImage = (state: RootState) => {
   const tab = selectActiveTab(state);
-  const params = selectParamsSlice(state);
-  const canvas = selectCanvasSlice(state);
+  const params = selectActiveTabParams(state);
 
   if (tab === 'canvas') {
+    const canvas = selectActiveCanvas(state);
     const { rect, aspectRatio } = canvas.bbox;
     const { width, height } = rect;
     const originalSize = { width, height };
@@ -143,10 +145,10 @@ export const getOriginalAndScaledSizesForTextToImage = (state: RootState) => {
 
 export const getOriginalAndScaledSizesForOtherModes = (state: RootState) => {
   const tab = selectActiveTab(state);
-  const canvas = selectCanvasSlice(state);
 
   assert(tab === 'canvas', `Cannot get sizes for tab ${tab} - this function is only for the Canvas tab`);
 
+  const canvas = selectActiveCanvas(state);
   const { rect, aspectRatio } = canvas.bbox;
   const { width, height } = rect;
   const originalSize = { width, height };

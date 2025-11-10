@@ -5,7 +5,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { RegionalGuidanceDeletePromptButton } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceDeletePromptButton';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { rgPositivePromptChanged } from 'features/controlLayers/store/canvasSlice';
-import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
@@ -21,7 +21,7 @@ export const RegionalGuidancePositivePrompt = memo(() => {
   const selectPrompt = useMemo(
     () =>
       createSelector(
-        selectCanvasSlice,
+        selectActiveCanvas,
         (canvas) => selectEntityOrThrow(canvas, entityIdentifier, 'RegionalGuidancePositivePrompt').positivePrompt ?? ''
       ),
     [entityIdentifier]

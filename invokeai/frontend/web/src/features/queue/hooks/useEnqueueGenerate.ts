@@ -4,7 +4,11 @@ import type { AppStore } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
 import { extractMessageFromAssertionError } from 'common/util/extractMessageFromAssertionError';
 import { withResult, withResultAsync } from 'common/util/result';
-import { positivePromptAddedToHistory, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
+import {
+  positivePromptAddedToHistory,
+  selectActiveTabParams,
+  selectPositivePrompt,
+} from 'features/controlLayers/store/paramsSlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
@@ -25,8 +29,9 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
   const { dispatch, getState } = store;
 
   const state = getState();
+  const params = selectActiveTabParams(state);
 
-  const model = state.params.model;
+  const model = params.model;
   if (!model) {
     log.error('No model found in state');
     return;

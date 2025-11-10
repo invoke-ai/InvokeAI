@@ -31,6 +31,7 @@ export const ActiveStylePreset = () => {
   });
 
   const dispatch = useAppDispatch();
+
   const { t } = useTranslation();
 
   const { presetModifiedPositivePrompt, presetModifiedNegativePrompt } = usePresetModifiedPrompts();

@@ -48,7 +48,7 @@
     "@invoke-ai/ui-library": "github:invoke-ai/ui-library#v0.0.48",
     "@nanostores/react": "^1.0.0",
     "@observ33r/object-equals": "^1.1.5",
-    "@reduxjs/toolkit": "2.8.2",
+    "@reduxjs/toolkit": "2.9.0",
     "@roarr/browser-log-writer": "^1.3.0",
     "@xyflow/react": "^12.8.2",
     "ag-psd": "^28.2.2",

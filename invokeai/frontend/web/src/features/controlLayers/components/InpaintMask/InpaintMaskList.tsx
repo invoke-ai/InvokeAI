@@ -3,11 +3,11 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasEntityGroupList } from 'features/controlLayers/components/CanvasEntityList/CanvasEntityGroupList';
 import { InpaintMask } from 'features/controlLayers/components/InpaintMask/InpaintMask';
-import { selectCanvasSlice, selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas, selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo } from 'react';
 
-const selectEntityIdentifiers = createMemoizedSelector(selectCanvasSlice, (canvas) => {
+const selectEntityIdentifiers = createMemoizedSelector(selectActiveCanvas, (canvas) => {
   return canvas.inpaintMasks.entities.map(getEntityIdentifier).toReversed();
 });
 

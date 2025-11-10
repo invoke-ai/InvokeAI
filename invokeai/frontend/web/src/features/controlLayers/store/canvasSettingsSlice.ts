@@ -1,102 +1,11 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
-import { createSelector, createSlice } from '@reduxjs/toolkit';
+import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import type { SliceConfig } from 'app/store/types';
-import type { RgbaColor } from 'features/controlLayers/store/types';
-import { RGBA_BLACK, RGBA_WHITE, zRgbaColor } from 'features/controlLayers/store/types';
-import { z } from 'zod';
+import type { CanvasSettingsState, RgbaColor } from 'features/controlLayers/store/types';
+import { RGBA_BLACK, RGBA_WHITE } from 'features/controlLayers/store/types';
+import { assert } from 'tsafe';
 
-const zAutoSwitchMode = z.enum(['off', 'switch_on_start', 'switch_on_finish']);
-export type AutoSwitchMode = z.infer<typeof zAutoSwitchMode>;
-
-const zCanvasSettingsState = z.object({
-  /**
-   * Whether to show HUD (Heads-Up Display) on the canvas.
-   */
-  showHUD: z.boolean(),
-  /**
-   * Whether to clip lines and shapes to the generation bounding box. If disabled, lines and shapes will be clipped to
-   * the canvas bounds.
-   */
-  clipToBbox: z.boolean(),
-  /**
-   * Whether to show a dynamic grid on the canvas. If disabled, a checkerboard pattern will be shown instead.
-   */
-  dynamicGrid: z.boolean(),
-  /**
-   * Whether to invert the scroll direction when adjusting the brush or eraser width with the scroll wheel.
-   */
-  invertScrollForToolWidth: z.boolean(),
-  /**
-   * The width of the brush tool.
-   */
-  brushWidth: z.int().gt(0),
-  /**
-   * The width of the eraser tool.
-   */
-  eraserWidth: z.int().gt(0),
-  /**
-   * The colors to use when drawing lines or filling shapes.
-   */
-  activeColor: z.enum(['bgColor', 'fgColor']),
-  bgColor: zRgbaColor,
-  fgColor: zRgbaColor,
-  /**
-   * Whether to composite inpainted/outpainted regions back onto the source image when saving canvas generations.
-   *
-   * If disabled, inpainted/outpainted regions will be saved with a transparent background.
-   *
-   * When `sendToCanvas` is disabled, this setting is ignored, masked regions will always be composited.
-   */
-  outputOnlyMaskedRegions: z.boolean(),
-  /**
-   * Whether to automatically process the operations like filtering and auto-masking.
-   */
-  autoProcess: z.boolean(),
-  /**
-   * The snap-to-grid setting for the canvas.
-   */
-  snapToGrid: z.boolean(),
-  /**
-   * Whether to show progress on the canvas when generating images.
-   */
-  showProgressOnCanvas: z.boolean(),
-  /**
-   * Whether to show the bounding box overlay on the canvas.
-   */
-  bboxOverlay: z.boolean(),
-  /**
-   * Whether to preserve the masked region instead of inpainting it.
-   */
-  preserveMask: z.boolean(),
-  /**
-   * Whether to show only raster layers while staging.
-   */
-  isolatedStagingPreview: z.boolean(),
-  /**
-   * Whether to show only the selected layer while filtering, transforming, or doing other operations.
-   */
-  isolatedLayerPreview: z.boolean(),
-  /**
-   * Whether to use pressure sensitivity for the brush and eraser tool when a pen device is used.
-   */
-  pressureSensitivity: z.boolean(),
-  /**
-   * Whether to show the rule of thirds composition guide overlay on the canvas.
-   */
-  ruleOfThirds: z.boolean(),
-  /**
-   * Whether to save all staging images to the gallery instead of keeping them as intermediate images.
-   */
-  saveAllImagesToGallery: z.boolean(),
-  /**
-   * The auto-switch mode for the canvas staging area.
-   */
-  stagingAreaAutoSwitch: zAutoSwitchMode,
-});
-
-type CanvasSettingsState = z.infer<typeof zCanvasSettingsState>;
-const getInitialState = (): CanvasSettingsState => ({
+export const getInitialCanvasSettings = (): CanvasSettingsState => ({
   showHUD: true,
   clipToBbox: false,
   dynamicGrid: false,
@@ -120,9 +29,9 @@ const getInitialState = (): CanvasSettingsState => ({
   stagingAreaAutoSwitch: 'switch_on_start',
 });
 
-const slice = createSlice({
+export const canvasSettingsState = createSlice({
   name: 'canvasSettings',
-  initialState: getInitialState(),
+  initialState: {} as CanvasSettingsState,
   reducers: {
     settingsClipToBboxChanged: (state, action: PayloadAction<CanvasSettingsState['clipToBbox']>) => {
       state.clipToBbox = action.payload;
@@ -200,6 +109,8 @@ const slice = createSlice({
   },
 });
 
+export const isCanvasSettingsStateAction = isAnyOf(...Object.values(canvasSettingsState.actions));
+
 export const {
   settingsClipToBboxChanged,
   settingsDynamicGridToggled,
@@ -223,36 +134,44 @@ export const {
   settingsRuleOfThirdsToggled,
   settingsSaveAllImagesToGalleryToggled,
   settingsStagingAreaAutoSwitchChanged,
-} = slice.actions;
+} = canvasSettingsState.actions;
 
-export const canvasSettingsSliceConfig: SliceConfig<typeof slice> = {
-  slice,
-  schema: zCanvasSettingsState,
-  getInitialState,
-  persistConfig: {
-    migrate: (state) => zCanvasSettingsState.parse(state),
-  },
+export const selectCanvasSettingsByCanvasId = (state: RootState, canvasId: string) => {
+  const instance = state.canvas.canvases[canvasId];
+  assert(instance, 'Canvas does not exist');
+  return instance.settings;
+};
+const selectActiveCanvasSettings = (state: RootState) => {
+  return state.canvas.canvases[state.canvas.activeCanvasId]!.settings;
 };
 
-export const selectCanvasSettingsSlice = (s: RootState) => s.canvasSettings;
-const createCanvasSettingsSelector = <T>(selector: Selector<CanvasSettingsState, T>) =>
-  createSelector(selectCanvasSettingsSlice, selector);
+const buildActiveCanvasSettingsSelector =
+  <T>(selector: Selector<CanvasSettingsState, T>) =>
+  (state: RootState) =>
+    selector(selectActiveCanvasSettings(state));
 
-export const selectPreserveMask = createCanvasSettingsSelector((settings) => settings.preserveMask);
-export const selectOutputOnlyMaskedRegions = createCanvasSettingsSelector(
-  (settings) => settings.outputOnlyMaskedRegions
+export const selectPreserveMask = buildActiveCanvasSettingsSelector((state) => state.preserveMask);
+export const selectOutputOnlyMaskedRegions = buildActiveCanvasSettingsSelector(
+  (state) => state.outputOnlyMaskedRegions
 );
-export const selectDynamicGrid = createCanvasSettingsSelector((settings) => settings.dynamicGrid);
-export const selectBboxOverlay = createCanvasSettingsSelector((settings) => settings.bboxOverlay);
-export const selectShowHUD = createCanvasSettingsSelector((settings) => settings.showHUD);
-export const selectAutoProcess = createCanvasSettingsSelector((settings) => settings.autoProcess);
-export const selectSnapToGrid = createCanvasSettingsSelector((settings) => settings.snapToGrid);
-export const selectShowProgressOnCanvas = createCanvasSettingsSelector(
-  (canvasSettings) => canvasSettings.showProgressOnCanvas
+export const selectDynamicGrid = buildActiveCanvasSettingsSelector((state) => state.dynamicGrid);
+export const selectInvertScrollForToolWidth = buildActiveCanvasSettingsSelector(
+  (state) => state.invertScrollForToolWidth
 );
-export const selectIsolatedStagingPreview = createCanvasSettingsSelector((settings) => settings.isolatedStagingPreview);
-export const selectIsolatedLayerPreview = createCanvasSettingsSelector((settings) => settings.isolatedLayerPreview);
-export const selectPressureSensitivity = createCanvasSettingsSelector((settings) => settings.pressureSensitivity);
-export const selectRuleOfThirds = createCanvasSettingsSelector((settings) => settings.ruleOfThirds);
-export const selectSaveAllImagesToGallery = createCanvasSettingsSelector((settings) => settings.saveAllImagesToGallery);
-export const selectStagingAreaAutoSwitch = createCanvasSettingsSelector((settings) => settings.stagingAreaAutoSwitch);
+export const selectBboxOverlay = buildActiveCanvasSettingsSelector((state) => state.bboxOverlay);
+export const selectShowHUD = buildActiveCanvasSettingsSelector((state) => state.showHUD);
+export const selectClipToBbox = buildActiveCanvasSettingsSelector((state) => state.clipToBbox);
+export const selectAutoProcess = buildActiveCanvasSettingsSelector((state) => state.autoProcess);
+export const selectSnapToGrid = buildActiveCanvasSettingsSelector((state) => state.snapToGrid);
+export const selectShowProgressOnCanvas = buildActiveCanvasSettingsSelector((state) => state.showProgressOnCanvas);
+export const selectIsolatedStagingPreview = buildActiveCanvasSettingsSelector((state) => state.isolatedStagingPreview);
+export const selectIsolatedLayerPreview = buildActiveCanvasSettingsSelector((state) => state.isolatedLayerPreview);
+export const selectPressureSensitivity = buildActiveCanvasSettingsSelector((state) => state.pressureSensitivity);
+export const selectRuleOfThirds = buildActiveCanvasSettingsSelector((state) => state.ruleOfThirds);
+export const selectSaveAllImagesToGallery = buildActiveCanvasSettingsSelector((state) => state.saveAllImagesToGallery);
+export const selectStagingAreaAutoSwitch = buildActiveCanvasSettingsSelector((state) => state.stagingAreaAutoSwitch);
+export const selectActiveColor = buildActiveCanvasSettingsSelector((state) => state.activeColor);
+export const selectBgColor = buildActiveCanvasSettingsSelector((state) => state.bgColor);
+export const selectFgColor = buildActiveCanvasSettingsSelector((state) => state.fgColor);
+export const selectBrushWidth = buildActiveCanvasSettingsSelector((state) => state.brushWidth);
+export const selectEraserWidth = buildActiveCanvasSettingsSelector((state) => state.eraserWidth);

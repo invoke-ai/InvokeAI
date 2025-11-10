@@ -17,7 +17,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { some } from 'es-toolkit/compat';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectCanvases } from 'features/controlLayers/store/selectors';
 import ImageUsageMessage from 'features/deleteImageModal/components/ImageUsageMessage';
 import { getImageUsage } from 'features/deleteImageModal/store/state';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
@@ -56,10 +56,10 @@ const DeleteBoardModal = () => {
   const selectImageUsageSummary = useMemo(
     () =>
       createMemoizedSelector(
-        [selectNodesSlice, selectCanvasSlice, selectUpscaleSlice, selectRefImagesSlice],
-        (nodes, canvas, upscale, refImages) => {
+        [selectNodesSlice, selectCanvases, selectUpscaleSlice, selectRefImagesSlice],
+        (nodes, canvases, upscale, refImages) => {
           const allImageUsage = (boardImageNames ?? []).map((imageName) =>
-            getImageUsage(nodes, canvas, upscale, refImages, imageName)
+            getImageUsage(nodes, canvases, upscale, refImages, imageName)
           );
 
           const imageUsageSummary: ImageUsage = {

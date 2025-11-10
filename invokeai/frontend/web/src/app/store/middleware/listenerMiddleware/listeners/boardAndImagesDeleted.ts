@@ -1,6 +1,6 @@
 import type { AppStartListening } from 'app/store/store';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectCanvases } from 'features/controlLayers/store/selectors';
 import { getImageUsage } from 'features/deleteImageModal/store/state';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
@@ -19,12 +19,12 @@ export const addDeleteBoardAndImagesFulfilledListener = (startAppListening: AppS
 
       const state = getState();
       const nodes = selectNodesSlice(state);
-      const canvas = selectCanvasSlice(state);
+      const canvases = selectCanvases(state);
       const upscale = selectUpscaleSlice(state);
       const refImages = selectRefImagesSlice(state);
 
       deleted_images.forEach((image_name) => {
-        const imageUsage = getImageUsage(nodes, canvas, upscale, refImages, image_name);
+        const imageUsage = getImageUsage(nodes, canvases, upscale, refImages, image_name);
 
         if (imageUsage.isNodesImage && !wasNodeEditorReset) {
           dispatch(nodeEditorReset());

@@ -1,12 +1,12 @@
-import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, isAnyOf, type PayloadAction } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import type { SliceConfig } from 'app/store/types';
 import { paramsReset } from 'features/controlLayers/store/paramsSlice';
-import { type LoRA, zLoRA } from 'features/controlLayers/store/types';
+import type { LoRA, LoRAsState } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { LoRAModelConfig } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
-import z from 'zod';
+
+import { selectActiveCanvasId, selectActiveTab } from './selectors';
 
 export const DEFAULT_LORA_WEIGHT_CONFIG = {
   initial: 0.75,
@@ -18,20 +18,13 @@ export const DEFAULT_LORA_WEIGHT_CONFIG = {
   coarseStep: 0.05,
 };
 
-const zLoRAsState = z.object({
-  loras: z.array(zLoRA),
-});
-type LoRAsState = z.infer<typeof zLoRAsState>;
-
-const getInitialState = (): LoRAsState => ({
+export const getInitialLoRAsState = (): LoRAsState => ({
   loras: [],
 });
 
-const selectLoRA = (state: LoRAsState, id: string) => state.loras.find((lora) => lora.id === id);
-
-const slice = createSlice({
+export const lorasSlice = createSlice({
   name: 'loras',
-  initialState: getInitialState(),
+  initialState: {} as LoRAsState,
   reducers: {
     loraAdded: {
       reducer: (state, action: PayloadAction<{ model: LoRAModelConfig; id: string }>) => {
@@ -56,7 +49,7 @@ const slice = createSlice({
     },
     loraWeightChanged: (state, action: PayloadAction<{ id: string; weight: number }>) => {
       const { id, weight } = action.payload;
-      const lora = selectLoRA(state, id);
+      const lora = findLoRA(state, id);
       if (!lora) {
         return;
       }
@@ -64,7 +57,7 @@ const slice = createSlice({
     },
     loraIsEnabledChanged: (state, action: PayloadAction<{ id: string; isEnabled: boolean }>) => {
       const { id, isEnabled } = action.payload;
-      const lora = selectLoRA(state, id);
+      const lora = findLoRA(state, id);
       if (!lora) {
         return;
       }
@@ -77,26 +70,40 @@ const slice = createSlice({
   extraReducers(builder) {
     builder.addCase(paramsReset, () => {
       // When a new session is requested, clear all LoRAs
-      return getInitialState();
+      return getInitialLoRAsState();
     });
   },
 });
 
-export const { loraAdded, loraRecalled, loraDeleted, loraWeightChanged, loraIsEnabledChanged, loraAllDeleted } =
-  slice.actions;
+export const isLoRAsStateAction = isAnyOf(...Object.values(lorasSlice.actions), paramsReset);
 
-export const lorasSliceConfig: SliceConfig<typeof slice> = {
-  slice,
-  schema: zLoRAsState,
-  getInitialState,
-  persistConfig: {
-    migrate: (state) => zLoRAsState.parse(state),
-  },
+export const { loraAdded, loraRecalled, loraDeleted, loraWeightChanged, loraIsEnabledChanged, loraAllDeleted } =
+  lorasSlice.actions;
+
+const initialLoRAsState = getInitialLoRAsState();
+
+const selectActiveTabLoRAs = (state: RootState) => {
+  const tab = selectActiveTab(state);
+  const canvasId = selectActiveCanvasId(state);
+
+  switch (tab) {
+    case 'generate':
+      return state.tab.generate.loras;
+    case 'canvas':
+      return state.canvas.canvases[canvasId]!.params.loras;
+    case 'upscaling':
+      return state.tab.upscaling.loras;
+    default:
+      // Fallback for global controls in other tabs
+      return initialLoRAsState;
+  }
 };
 
-export const selectLoRAsSlice = (state: RootState) => state.loras;
-export const selectAddedLoRAs = createSelector(selectLoRAsSlice, (loras) => loras.loras);
-export const buildSelectLoRA = (id: string) =>
-  createSelector([selectLoRAsSlice], (loras) => {
-    return selectLoRA(loras, id);
-  });
+const findLoRA = (state: LoRAsState, id: string) => state.loras.find((lora) => lora.id === id);
+
+export const selectLoRAsSlice = (state: RootState) => selectActiveTabLoRAs(state);
+export const selectAddedLoRAs = (state: RootState) => selectActiveTabLoRAs(state).loras;
+export const selectLoRA = (state: RootState, id: string) => {
+  const loras = selectLoRAsSlice(state);
+  return findLoRA(loras, id);
+};

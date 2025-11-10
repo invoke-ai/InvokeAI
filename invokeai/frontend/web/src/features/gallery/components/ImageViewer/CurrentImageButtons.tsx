@@ -1,5 +1,6 @@
 import { Button, Divider, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import SingleSelectionMenuItems from 'features/gallery/components/ContextMenu/SingleSelectionMenuItems';
 import { useDeleteImage } from 'features/gallery/hooks/useDeleteImage';
@@ -15,7 +16,6 @@ import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { PostProcessingPopover } from 'features/parameters/components/PostProcessing/PostProcessingPopover';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { useGalleryPanel } from 'features/ui/layouts/use-gallery-panel';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';

@@ -2,7 +2,7 @@ import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { useAppStore } from 'app/store/storeHooks';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
-import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { createNewCanvasEntityFromImage } from 'features/imageActions/actions';
 import { toast } from 'features/toast/toast';
@@ -17,7 +17,7 @@ export const ContextMenuItemNewLayerFromImageSubMenu = memo(() => {
   const subMenu = useSubMenu();
   const store = useAppStore();
   const imageDTO = useImageDTOContext();
-  const isBusy = useCanvasIsBusySafe();
+  const isBusy = useCanvasIsBusy();
 
   const onClickNewRasterLayerFromImage = useCallback(async () => {
     const { dispatch, getState } = store;

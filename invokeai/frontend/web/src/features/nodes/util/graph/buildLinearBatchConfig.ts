@@ -1,6 +1,7 @@
 import type { RootState } from 'app/store/store';
 import { generateSeeds } from 'common/util/generateSeeds';
 import { range } from 'es-toolkit/compat';
+import { selectActiveTabParams } from 'features/controlLayers/store/paramsSlice';
 import type { SeedBehaviour } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import type { BaseModelType } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
@@ -31,7 +32,7 @@ export const prepareLinearUIBatch = (arg: {
   destination: string;
 }): EnqueueBatchArg => {
   const { state, g, base, prepend, positivePromptNode, seedNode, origin, destination } = arg;
-  const { iterations, shouldRandomizeSeed, seed } = state.params;
+  const { iterations, shouldRandomizeSeed, seed } = selectActiveTabParams(state);
   const { prompts, seedBehaviour } = state.dynamicPrompts;
 
   const data: Batch['data'] = [];

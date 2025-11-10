@@ -18,10 +18,10 @@ import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasT
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
-import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { memo, useCallback } from 'react';
 import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
 
+import { CanvasTabs } from './CanvasTabs';
 import { StagingArea } from './StagingArea';
 
 const MenuContent = memo(() => {
@@ -48,32 +48,17 @@ const canvasBgSx = {
   },
 };
 
-export const CanvasWorkspacePanel = memo(() => {
-  const dynamicGrid = useAppSelector(selectDynamicGrid);
-  const showHUD = useAppSelector(selectShowHUD);
-  const sessionId = useAppSelector(selectCanvasSessionId);
+const ActiveCanvas = memo(() => {
+  const dynamicGrid = useAppSelector((state) => selectDynamicGrid(state));
+  const showHUD = useAppSelector((state) => selectShowHUD(state));
 
   const renderMenu = useCallback(() => {
     return <MenuContent />;
   }, []);
 
   return (
-    <StagingAreaContextProvider sessionId={sessionId}>
-      <Flex
-        borderRadius="base"
-        position="relative"
-        flexDirection="column"
-        height="full"
-        width="full"
-        gap={2}
-        alignItems="center"
-        justifyContent="center"
-        overflow="hidden"
-      >
-        <CanvasManagerProviderGate>
-          <CanvasToolbar />
-        </CanvasManagerProviderGate>
-        <Divider />
+    <Flex w="full" h="full">
+      <StagingAreaContextProvider>
         <ContextMenu<HTMLDivElement> renderMenu={renderMenu} withLongPress={false}>
           {(ref) => (
             <Flex ref={ref} sx={canvasBgSx} data-dynamic-grid={dynamicGrid}>
@@ -119,8 +104,32 @@ export const CanvasWorkspacePanel = memo(() => {
         <CanvasManagerProviderGate>
           <CanvasDropArea />
         </CanvasManagerProviderGate>
-      </Flex>
-    </StagingAreaContextProvider>
+      </StagingAreaContextProvider>
+    </Flex>
+  );
+});
+ActiveCanvas.displayName = 'ActiveCanvas';
+
+export const CanvasWorkspacePanel = memo(() => {
+  return (
+    <Flex
+      borderRadius="base"
+      position="relative"
+      flexDirection="column"
+      height="full"
+      width="full"
+      gap={2}
+      alignItems="center"
+      justifyContent="center"
+      overflow="hidden"
+    >
+      <CanvasManagerProviderGate>
+        <CanvasToolbar />
+      </CanvasManagerProviderGate>
+      <Divider />
+      <CanvasTabs />
+      <ActiveCanvas />
+    </Flex>
   );
 });
 CanvasWorkspacePanel.displayName = 'CanvasWorkspacePanel';

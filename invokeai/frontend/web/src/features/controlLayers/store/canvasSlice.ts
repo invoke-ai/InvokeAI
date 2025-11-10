@@ -1,13 +1,14 @@
 import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { SliceConfig } from 'app/store/types';
+import { extractTabActionContext } from 'app/store/util';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
+import { isPlainObject } from 'es-toolkit';
 import { merge } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { canvasReset } from 'features/controlLayers/store/actions';
-import { modelChanged } from 'features/controlLayers/store/paramsSlice';
+import { canvasReset, modelChanged } from 'features/controlLayers/store/actions';
 import {
   selectAllEntities,
   selectAllEntitiesOfType,
@@ -15,10 +16,15 @@ import {
   selectRegionalGuidanceReferenceImage,
 } from 'features/controlLayers/store/selectors';
 import type {
+  CanvasEntity,
   CanvasEntityStateFromType,
   CanvasEntityType,
   CanvasInpaintMaskState,
+  CanvasInstanceStateBase,
+  CanvasInstanceStateWithHistory,
   CanvasMetadata,
+  CanvasState,
+  CanvasStateWithHistory,
   ChannelName,
   ChannelPoints,
   ControlLoRAConfig,
@@ -39,6 +45,7 @@ import { isMainModelBase, zModelIdentifierField } from 'features/nodes/types/com
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
 import type { UndoableOptions } from 'redux-undo';
+import undoable, { newHistory } from 'redux-undo';
 import {
   type ControlLoRAModelConfig,
   type ControlNetModelConfig,
@@ -49,15 +56,23 @@ import {
   isIPAdapterModelConfig,
   type T2IAdapterModelConfig,
 } from 'services/api/types';
+import { assert } from 'tsafe';
 
+import { canvasSettingsState, getInitialCanvasSettings, isCanvasSettingsStateAction } from './canvasSettingsSlice';
+import {
+  canvasStagingAreaState,
+  getInitialCanvasStagingAreaState,
+  isCanvasStagingAreaStateAction,
+} from './canvasStagingAreaSlice';
+import { getInitialTabInstanceParamsState, isTabInstanceParamsAction, tabInstanceParamsSlice } from './tabSlice';
 import type {
   AspectRatioID,
   BoundingBoxScaleMethod,
   CanvasControlLayerState,
   CanvasEntityIdentifier,
+  CanvasInstanceState,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
-  CanvasState,
   CLIPVisionModelV2,
   ControlModeV2,
   ControlNetConfig,
@@ -74,10 +89,9 @@ import {
   ASPECT_RATIO_MAP,
   DEFAULT_ASPECT_RATIO_CONFIG,
   getEntityIdentifier,
-  getInitialCanvasState,
   isRegionalGuidanceFLUXReduxConfig,
   isRegionalGuidanceIPAdapterConfig,
-  zCanvasState,
+  zCanvasStateWithHistory,
 } from './types';
 import {
   converters,
@@ -95,11 +109,178 @@ import {
   makeDefaultRasterLayerAdjustments,
 } from './util';
 
-const slice = createSlice({
+const getInitialCanvasEntity = (): CanvasEntity => ({
+  selectedEntityIdentifier: null,
+  bookmarkedEntityIdentifier: null,
+  inpaintMasks: { isHidden: false, entities: [] },
+  rasterLayers: { isHidden: false, entities: [] },
+  controlLayers: { isHidden: false, entities: [] },
+  regionalGuidance: { isHidden: false, entities: [] },
+  bbox: {
+    rect: { x: 0, y: 0, width: 512, height: 512 },
+    aspectRatio: deepClone(DEFAULT_ASPECT_RATIO_CONFIG),
+    scaleMethod: 'auto',
+    scaledSize: { width: 512, height: 512 },
+    modelBase: 'sd-1',
+  },
+});
+
+const getInitialCanvasInstanceState = (id: string, name: string): CanvasInstanceState => ({
+  id,
+  name,
+  canvas: getInitialCanvasEntity(),
+  params: getInitialTabInstanceParamsState(),
+  settings: getInitialCanvasSettings(),
+  staging: getInitialCanvasStagingAreaState(),
+});
+
+const getInitialCanvasInstanceHistoryState = (id: string, name: string): CanvasInstanceStateWithHistory => {
+  const instance = getInitialCanvasInstanceState(id, name);
+
+  return {
+    ...instance,
+    canvas: newHistory([], instance.canvas, []),
+  };
+};
+
+const getInitialCanvasState = (): CanvasState => {
+  const canvasId = getPrefixedId('canvas');
+  const canvasName = getNextCanvasName([]);
+  const canvas = getInitialCanvasInstanceState(canvasId, canvasName);
+
+  return {
+    _version: 4,
+    activeCanvasId: canvasId,
+    canvases: { [canvasId]: canvas },
+  };
+};
+
+const getInitialCanvasHistoryState = (): CanvasStateWithHistory => {
+  const state = getInitialCanvasState();
+
+  return {
+    ...state,
+    canvases: Object.fromEntries(
+      Object.entries(state.canvases).map(([canvasId, instance]) => [
+        canvasId,
+        { ...instance, canvas: newHistory([], instance.canvas, []) },
+      ])
+    ),
+  };
+};
+
+const getNextCanvasName = (canvases: CanvasInstanceStateBase[]): string => {
+  for (let i = 1; ; i++) {
+    const name = `Canvas-${i}`;
+    if (!canvases.some((c) => c.name === name)) {
+      return name;
+    }
+  }
+};
+
+const canvasSlice = createSlice({
   name: 'canvas',
-  initialState: getInitialCanvasState(),
+  initialState: getInitialCanvasHistoryState(),
   reducers: {
-    // undoable canvas state
+    canvasAdded: {
+      reducer: (state, action: PayloadAction<{ canvasId: string; isSelected?: boolean }>) => {
+        const { canvasId, isSelected } = action.payload;
+
+        const name = getNextCanvasName(Object.values(state.canvases));
+        const canvas = getInitialCanvasInstanceHistoryState(canvasId, name);
+
+        state.canvases[canvasId] = canvas;
+
+        if (isSelected) {
+          state.activeCanvasId = canvasId;
+        }
+      },
+      prepare: (payload: { isSelected?: boolean }) => {
+        return {
+          payload: { ...payload, canvasId: getPrefixedId('canvas') },
+        };
+      },
+    },
+    canvasActivated: (state, action: PayloadAction<{ canvasId: string }>) => {
+      const { canvasId } = action.payload;
+
+      const canvas = state.canvases[canvasId];
+      if (!canvas) {
+        return;
+      }
+
+      state.activeCanvasId = canvas.id;
+    },
+    canvasDeleted: (state, action: PayloadAction<{ canvasId: string }>) => {
+      const { canvasId } = action.payload;
+      const canvasIds = Object.keys(state.canvases);
+
+      const canvas = state.canvases[canvasId];
+      if (!canvas) {
+        return;
+      }
+
+      if (canvasIds.length === 1) {
+        throw new Error('Last canvas cannot be deleted');
+      }
+
+      const index = canvasIds.indexOf(canvas.id);
+      const nextIndex = index > 0 ? index - 1 : index + 1;
+
+      state.activeCanvasId = canvasIds[nextIndex]!;
+      delete state.canvases[canvas.id];
+    },
+  },
+  extraReducers(builder) {
+    builder.addMatcher(isCanvasInstanceAction, (state, action) => {
+      const context = extractTabActionContext(action);
+
+      if (!context || context.tab !== 'canvas' || !context.canvasId) {
+        return;
+      }
+
+      const canvasInstance = state.canvases[context.canvasId];
+      if (!canvasInstance) {
+        return;
+      }
+
+      state.canvases[context.canvasId] = canvasInstanceState.reducer(canvasInstance, action);
+    });
+  },
+});
+
+const canvasInstanceState = createSlice({
+  name: 'canvasInstance',
+  initialState: {} as CanvasInstanceStateWithHistory,
+  reducers: {
+    canvasNameChanged: (state, action: PayloadAction<{ name: string }>) => {
+      const { name } = action.payload;
+
+      state.name = name;
+    },
+  },
+  extraReducers(builder) {
+    builder.addDefaultCase((state, action) => {
+      if (isCanvasEntityStateAction(action)) {
+        state.canvas = undoableCanvasEntityReducer(state.canvas, action);
+      }
+      if (isTabInstanceParamsAction(action)) {
+        state.params = tabInstanceParamsSlice.reducer(state.params, action);
+      }
+      if (isCanvasSettingsStateAction(action)) {
+        state.settings = canvasSettingsState.reducer(state.settings, action);
+      }
+      if (isCanvasStagingAreaStateAction(action)) {
+        state.staging = canvasStagingAreaState.reducer(state.staging, action);
+      }
+    });
+  },
+});
+
+const canvasEntityState = createSlice({
+  name: 'canvasEntity',
+  initialState: {} as CanvasEntity,
+  reducers: {
     //#region Raster layers
     rasterLayerAdjustmentsSet: (
       state,
@@ -1485,7 +1666,7 @@ const slice = createSlice({
     entityDeleted: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
 
-      let selectedEntityIdentifier: CanvasState['selectedEntityIdentifier'] = null;
+      let selectedEntityIdentifier: CanvasEntity['selectedEntityIdentifier'] = null;
       const allEntities = selectAllEntities(state);
       const index = allEntities.findIndex((entity) => entity.id === entityIdentifier.id);
       const nextIndex = allEntities.length > 1 ? (index + 1) % allEntities.length : -1;
@@ -1548,7 +1729,7 @@ const slice = createSlice({
       moveToStart(selectAllEntitiesOfType(state, entity.type), entity);
     },
     entitiesReordered: <T extends CanvasEntityType>(
-      state: CanvasState,
+      state: CanvasEntity,
       action: PayloadAction<{ type: T; entityIdentifiers: CanvasEntityIdentifier<T>[] }>
     ) => {
       const { type, entityIdentifiers } = action.payload;
@@ -1619,7 +1800,7 @@ const slice = createSlice({
     },
     allEntitiesDeleted: (state) => {
       // Deleting all entities is equivalent to resetting the state for each entity type
-      const initialState = getInitialCanvasState();
+      const initialState = getInitialCanvasEntity();
       state.rasterLayers = initialState.rasterLayers;
       state.controlLayers = initialState.controlLayers;
       state.inpaintMasks = initialState.inpaintMasks;
@@ -1639,7 +1820,7 @@ const slice = createSlice({
   },
   extraReducers(builder) {
     builder.addCase(canvasReset, (state) => {
-      return resetState(state);
+      return resetCanvasState(state);
     });
     builder.addCase(modelChanged, (state, action) => {
       const { model } = action.payload;
@@ -1670,8 +1851,8 @@ const slice = createSlice({
   },
 });
 
-const resetState = (state: CanvasState) => {
-  const newState = getInitialCanvasState();
+const resetCanvasState = (state: CanvasEntity) => {
+  const newState = getInitialCanvasEntity();
 
   // We need to retain the optimal dimension across resets, as it is changed only when the model changes. Copy it
   // from the old state, then recalculate the bbox size & scaled size.
@@ -1684,10 +1865,45 @@ const resetState = (state: CanvasState) => {
   );
   newState.bbox.rect.width = rect.width;
   newState.bbox.rect.height = rect.height;
-  syncScaledSize(newState);
 
-  return newState;
+  syncScaledSize(newState);
 };
+
+const syncScaledSize = (state: CanvasEntity) => {
+  if (state.bbox.scaleMethod === 'auto') {
+    // Sync both aspect ratio and size
+    const { width, height } = state.bbox.rect;
+    state.bbox.scaledSize = getScaledBoundingBoxDimensions({ width, height }, state.bbox.modelBase);
+  } else if (state.bbox.scaleMethod === 'manual' && state.bbox.aspectRatio.isLocked) {
+    // Only sync the aspect ratio if manual & locked
+    state.bbox.scaledSize = calculateNewSize(
+      state.bbox.aspectRatio.value,
+      state.bbox.scaledSize.width * state.bbox.scaledSize.height,
+      state.bbox.modelBase
+    );
+  }
+};
+
+export const isCanvasInstanceAction = (action: UnknownAction) =>
+  isCanvasInstanceStateAction(action) ||
+  isCanvasEntityStateAction(action) ||
+  isTabInstanceParamsAction(action) ||
+  isCanvasSettingsStateAction(action) ||
+  isCanvasStagingAreaStateAction(action);
+const isCanvasInstanceStateAction = isAnyOf(...Object.values(canvasInstanceState.actions));
+const isCanvasEntityStateAction = isAnyOf(...Object.values(canvasEntityState.actions), modelChanged, canvasReset);
+
+export const {
+  // Canvas
+  canvasAdded,
+  canvasDeleted,
+  canvasActivated,
+} = canvasSlice.actions;
+
+export const {
+  canvasNameChanged,
+  // inpaintMaskRecalled,
+} = canvasInstanceState.actions;
 
 export const {
   canvasMetadataRecalled,
@@ -1785,33 +2001,18 @@ export const {
   inpaintMaskDenoiseLimitChanged,
   inpaintMaskDenoiseLimitDeleted,
   // inpaintMaskRecalled,
-} = slice.actions;
-
-const syncScaledSize = (state: CanvasState) => {
-  if (state.bbox.scaleMethod === 'auto') {
-    // Sync both aspect ratio and size
-    const { width, height } = state.bbox.rect;
-    state.bbox.scaledSize = getScaledBoundingBoxDimensions({ width, height }, state.bbox.modelBase);
-  } else if (state.bbox.scaleMethod === 'manual' && state.bbox.aspectRatio.isLocked) {
-    // Only sync the aspect ratio if manual & locked
-    state.bbox.scaledSize = calculateNewSize(
-      state.bbox.aspectRatio.value,
-      state.bbox.scaledSize.width * state.bbox.scaledSize.height,
-      state.bbox.modelBase
-    );
-  }
-};
+} = canvasEntityState.actions;
 
 let filter = true;
 
-const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
+const canvasEntityUndoableConfig: UndoableOptions<CanvasEntity, UnknownAction> = {
   limit: 64,
   undoType: canvasUndo.type,
   redoType: canvasRedo.type,
   clearHistoryType: canvasClearHistory.type,
   filter: (action, _state, _history) => {
-    // Ignore all actions from other slices
-    if (!action.type.startsWith(slice.name)) {
+    // Ignore both all actions from other slices and canvas management actions
+    if (!action.type.startsWith(canvasEntityState.name)) {
       return false;
     }
     // Throttle rapid actions of the same type
@@ -1822,15 +2023,70 @@ const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
   // debug: import.meta.env.MODE === 'development',
 };
 
-export const canvasSliceConfig: SliceConfig<typeof slice> = {
-  slice,
+const undoableCanvasEntityReducer = undoable(canvasEntityState.reducer, canvasEntityUndoableConfig);
+
+export const canvasSliceConfig: SliceConfig<typeof canvasSlice, CanvasStateWithHistory, CanvasState> = {
+  slice: canvasSlice,
   getInitialState: getInitialCanvasState,
-  schema: zCanvasState,
+  schema: zCanvasStateWithHistory,
   persistConfig: {
-    migrate: (state) => zCanvasState.parse(state),
-  },
-  undoableConfig: {
-    reduxUndoOptions: canvasUndoableConfig,
+    migrate: (state) => {
+      assert(isPlainObject(state));
+      if (state._version === 3) {
+        // Migrate from v3 to v4: slice represented a canvas instance -> slice represents multiple canvas instances
+        const canvasId = getPrefixedId('canvas');
+        const canvasName = getNextCanvasName([]);
+
+        const canvas = {
+          id: canvasId,
+          name: canvasName,
+          canvas: { ...state },
+          settings: getInitialCanvasSettings(),
+        } as CanvasInstanceState;
+
+        state = {
+          _version: 4,
+          activeCanvasId: canvas.id,
+          canvases: { [canvasId]: canvas },
+          migration: {
+            isMultiCanvasMigrationPending: true,
+          },
+        };
+      }
+      return zCanvasStateWithHistory.parse(state);
+    },
+    serialize: (state) => {
+      return {
+        _version: state._version,
+        activeCanvasId: state.activeCanvasId,
+        canvases: Object.fromEntries(
+          Object.entries(state.canvases).map(([canvasId, instance]) => [
+            canvasId,
+            {
+              ...instance,
+              canvas: instance.canvas.present,
+            },
+          ])
+        ),
+      };
+    },
+    deserialize: (state) => {
+      const canvasState = state as CanvasState;
+
+      return {
+        _version: canvasState._version,
+        activeCanvasId: canvasState.activeCanvasId,
+        canvases: Object.fromEntries(
+          Object.entries(canvasState.canvases).map(([canvasId, instance]) => [
+            canvasId,
+            {
+              ...instance,
+              canvas: newHistory([], instance.canvas, []),
+            },
+          ])
+        ),
+      };
+    },
   },
 };
 

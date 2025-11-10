@@ -1,9 +1,6 @@
 import { isPlainObject } from 'es-toolkit';
 import { z } from 'zod';
 
-const zTabName = z.enum(['generate', 'canvas', 'upscaling', 'workflows', 'models', 'queue']);
-export type TabName = z.infer<typeof zTabName>;
-
 const zPartialDimensions = z.object({
   width: z.number().optional(),
   height: z.number().optional(),
@@ -14,7 +11,6 @@ export type Serializable = z.infer<typeof zSerializable>;
 
 export const zUIState = z.object({
   _version: z.literal(4),
-  activeTab: zTabName,
   shouldShowItemDetails: z.boolean(),
   shouldShowProgressInViewer: z.boolean(),
   accordions: z.record(z.string(), z.boolean()),
@@ -27,7 +23,6 @@ export const zUIState = z.object({
 export type UIState = z.infer<typeof zUIState>;
 export const getInitialUIState = (): UIState => ({
   _version: 4 as const,
-  activeTab: 'generate' as const,
   shouldShowItemDetails: false,
   shouldShowProgressInViewer: true,
   accordions: {},

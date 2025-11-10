@@ -17,8 +17,8 @@ export const CONSTRAINTS = {
 
 const ParamCFGRescaleMultiplier = () => {
   const cfgRescaleMultiplier = useAppSelector(selectCFGRescaleMultiplier);
-
   const dispatch = useAppDispatch();
+
   const { t } = useTranslation();
 
   const handleChange = useCallback((v: number) => dispatch(setCfgRescaleMultiplier(v)), [dispatch]);

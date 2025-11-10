@@ -58,6 +58,7 @@ const [useSettingsModal] = buildUseBoolean(false);
 
 const SettingsModal = (props: { children: ReactElement }) => {
   const dispatch = useAppDispatch();
+
   const { t } = useTranslation();
 
   const {

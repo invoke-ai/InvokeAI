@@ -3,7 +3,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { rgAutoNegativeToggled } from 'features/controlLayers/store/canvasSlice';
-import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiSelectionInverseBold } from 'react-icons/pi';
@@ -15,7 +15,7 @@ export const RegionalGuidanceMenuItemsAutoNegative = memo(() => {
   const selectAutoNegative = useMemo(
     () =>
       createSelector(
-        selectCanvasSlice,
+        selectActiveCanvas,
         (canvas) => selectEntityOrThrow(canvas, entityIdentifier, 'RegionalGuidanceMenuItemsAutoNegative').autoNegative
       ),
     [entityIdentifier]

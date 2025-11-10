@@ -12,22 +12,21 @@ import {
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import {
-  buildSelectLoRA,
   DEFAULT_LORA_WEIGHT_CONFIG,
   loraDeleted,
   loraIsEnabledChanged,
   loraWeightChanged,
+  selectLoRA,
 } from 'features/controlLayers/store/lorasSlice';
 import type { LoRA } from 'features/controlLayers/store/types';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback } from 'react';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
 
 const MARKS = [-1, 0, 1, 2];
 
 export const LoRACard = memo((props: { id: string }) => {
-  const selectLoRA = useMemo(() => buildSelectLoRA(props.id), [props.id]);
-  const lora = useAppSelector(selectLoRA);
+  const lora = useAppSelector((state) => selectLoRA(state, props.id));
 
   if (!lora) {
     return null;

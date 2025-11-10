@@ -17,7 +17,7 @@ import {
 } from 'features/controlLayers/store/canvasSlice';
 import { selectBase, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import {
-  selectCanvasSlice,
+  selectActiveCanvas,
   selectEntity,
   selectSelectedEntityIdentifier,
 } from 'features/controlLayers/store/selectors';
@@ -247,7 +247,7 @@ export const useAddInpaintMaskDenoiseLimit = (entityIdentifier: CanvasEntityIden
 export const buildSelectValidRegionalGuidanceActions = (
   entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>
 ) => {
-  return createMemoizedSelector(selectCanvasSlice, (canvas) => {
+  return createMemoizedSelector(selectActiveCanvas, (canvas) => {
     const entity = selectEntity(canvas, entityIdentifier);
     return {
       canAddPositivePrompt: entity?.positivePrompt === null,

@@ -16,20 +16,13 @@ import { addModelSelectedListener } from 'app/store/middleware/listenerMiddlewar
 import { addModelsLoadedListener } from 'app/store/middleware/listenerMiddleware/listeners/modelsLoaded';
 import { addSetDefaultSettingsListener } from 'app/store/middleware/listenerMiddleware/listeners/setDefaultSettings';
 import { addSocketConnectedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
-import { deepClone } from 'common/util/deepClone';
-import { merge } from 'es-toolkit';
-import { omit, pick } from 'es-toolkit/compat';
 import { changeBoardModalSliceConfig } from 'features/changeBoardModal/store/slice';
-import { canvasSettingsSliceConfig } from 'features/controlLayers/store/canvasSettingsSlice';
 import { canvasSliceConfig } from 'features/controlLayers/store/canvasSlice';
-import { canvasSessionSliceConfig } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { lorasSliceConfig } from 'features/controlLayers/store/lorasSlice';
-import { paramsSliceConfig } from 'features/controlLayers/store/paramsSlice';
-import { refImagesSliceConfig } from 'features/controlLayers/store/refImagesSlice';
+import { tabSliceConfig } from 'features/controlLayers/store/tabSlice';
 import { dynamicPromptsSliceConfig } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { gallerySliceConfig } from 'features/gallery/store/gallerySlice';
 import { modelManagerSliceConfig } from 'features/modelManagerV2/store/modelManagerV2Slice';
-import { nodesSliceConfig } from 'features/nodes/store/nodesSlice';
+import { nodesSliceConfig, undoableNodesSliceReducer } from 'features/nodes/store/nodesSlice';
 import { workflowLibrarySliceConfig } from 'features/nodes/store/workflowLibrarySlice';
 import { workflowSettingsSliceConfig } from 'features/nodes/store/workflowSettingsSlice';
 import { upscaleSliceConfig } from 'features/parameters/store/upscaleSlice';
@@ -40,12 +33,12 @@ import { uiSliceConfig } from 'features/ui/store/uiSlice';
 import { diff } from 'jsondiffpatch';
 import type { SerializeFunction, UnserializeFunction } from 'redux-remember';
 import { REMEMBER_REHYDRATED, rememberEnhancer, rememberReducer } from 'redux-remember';
-import undoable, { newHistory } from 'redux-undo';
 import { serializeError } from 'serialize-error';
 import { api } from 'services/api';
 import type { JsonObject } from 'type-fest';
 
 import { reduxRememberDriver } from './enhancers/reduxRemember/driver';
+import { actionContextMiddleware } from './middleware/actionContextMiddleware';
 import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
@@ -58,18 +51,14 @@ const log = logger('system');
 
 // When adding a slice, add the config to the SLICE_CONFIGS object below, then add the reducer to ALL_REDUCERS.
 const SLICE_CONFIGS = {
-  [canvasSessionSliceConfig.slice.reducerPath]: canvasSessionSliceConfig,
-  [canvasSettingsSliceConfig.slice.reducerPath]: canvasSettingsSliceConfig,
   [canvasSliceConfig.slice.reducerPath]: canvasSliceConfig,
   [changeBoardModalSliceConfig.slice.reducerPath]: changeBoardModalSliceConfig,
   [dynamicPromptsSliceConfig.slice.reducerPath]: dynamicPromptsSliceConfig,
   [gallerySliceConfig.slice.reducerPath]: gallerySliceConfig,
-  [lorasSliceConfig.slice.reducerPath]: lorasSliceConfig,
+  [tabSliceConfig.slice.reducerPath]: tabSliceConfig,
   [modelManagerSliceConfig.slice.reducerPath]: modelManagerSliceConfig,
   [nodesSliceConfig.slice.reducerPath]: nodesSliceConfig,
-  [paramsSliceConfig.slice.reducerPath]: paramsSliceConfig,
   [queueSliceConfig.slice.reducerPath]: queueSliceConfig,
-  [refImagesSliceConfig.slice.reducerPath]: refImagesSliceConfig,
   [stylePresetSliceConfig.slice.reducerPath]: stylePresetSliceConfig,
   [systemSliceConfig.slice.reducerPath]: systemSliceConfig,
   [uiSliceConfig.slice.reducerPath]: uiSliceConfig,
@@ -82,26 +71,14 @@ const SLICE_CONFIGS = {
 // Remember to wrap undoable reducers in `undoable()`!
 const ALL_REDUCERS = {
   [api.reducerPath]: api.reducer,
-  [canvasSessionSliceConfig.slice.reducerPath]: canvasSessionSliceConfig.slice.reducer,
-  [canvasSettingsSliceConfig.slice.reducerPath]: canvasSettingsSliceConfig.slice.reducer,
-  // Undoable!
-  [canvasSliceConfig.slice.reducerPath]: undoable(
-    canvasSliceConfig.slice.reducer,
-    canvasSliceConfig.undoableConfig?.reduxUndoOptions
-  ),
+  [canvasSliceConfig.slice.reducerPath]: canvasSliceConfig.slice.reducer,
   [changeBoardModalSliceConfig.slice.reducerPath]: changeBoardModalSliceConfig.slice.reducer,
   [dynamicPromptsSliceConfig.slice.reducerPath]: dynamicPromptsSliceConfig.slice.reducer,
   [gallerySliceConfig.slice.reducerPath]: gallerySliceConfig.slice.reducer,
-  [lorasSliceConfig.slice.reducerPath]: lorasSliceConfig.slice.reducer,
+  [tabSliceConfig.slice.reducerPath]: tabSliceConfig.slice.reducer,
   [modelManagerSliceConfig.slice.reducerPath]: modelManagerSliceConfig.slice.reducer,
-  // Undoable!
-  [nodesSliceConfig.slice.reducerPath]: undoable(
-    nodesSliceConfig.slice.reducer,
-    nodesSliceConfig.undoableConfig?.reduxUndoOptions
-  ),
-  [paramsSliceConfig.slice.reducerPath]: paramsSliceConfig.slice.reducer,
+  [nodesSliceConfig.slice.reducerPath]: undoableNodesSliceReducer,
   [queueSliceConfig.slice.reducerPath]: queueSliceConfig.slice.reducer,
-  [refImagesSliceConfig.slice.reducerPath]: refImagesSliceConfig.slice.reducer,
   [stylePresetSliceConfig.slice.reducerPath]: stylePresetSliceConfig.slice.reducer,
   [systemSliceConfig.slice.reducerPath]: systemSliceConfig.slice.reducer,
   [uiSliceConfig.slice.reducerPath]: uiSliceConfig.slice.reducer,
@@ -119,43 +96,33 @@ const unserialize: UnserializeFunction = (data, key) => {
   if (!sliceConfig?.persistConfig) {
     throw new Error(`No persist config for slice "${key}"`);
   }
-  const { getInitialState, persistConfig, undoableConfig } = sliceConfig;
-  let state;
-  try {
-    const initialState = getInitialState();
-    const parsed = JSON.parse(data);
+  const { getInitialState, persistConfig } = sliceConfig;
 
-    // We need to inject non-persisted values from initial state into the rehydrated state. These values always are
-    // required to be in the state, but won't be in the persisted data. Build an object that consists of only these
-    // values, then merge it with the rehydrated state.
-    const nonPersistedSubsetOfState = pick(initialState, persistConfig.persistDenylist ?? []);
-    const stateToMigrate = merge(deepClone(parsed), nonPersistedSubsetOfState);
+  try {
+    const parsedState = JSON.parse(data);
+    const stateToMigrate = persistConfig.deserialize ? persistConfig.deserialize(parsedState) : parsedState;
 
     // Run migrations to bring old state up to date with the current version.
     const migrated = persistConfig.migrate(stateToMigrate);
 
     log.debug(
       {
-        persistedData: parsed as JsonObject,
+        persistedData: parsedState as JsonObject,
         rehydratedData: migrated as JsonObject,
         diff: diff(data, migrated) as JsonObject,
       },
       `Rehydrated slice "${key}"`
     );
-    state = migrated;
+
+    return migrated;
   } catch (err) {
     log.warn(
       { error: serializeError(err as Error) },
       `Error rehydrating slice "${key}", falling back to default initial state`
     );
-    state = getInitialState();
-  }
+    const initialState = getInitialState();
 
-  // Undoable slices must be wrapped in a history!
-  if (undoableConfig) {
-    return newHistory([], state, []);
-  } else {
-    return state;
+    return persistConfig.deserialize ? persistConfig.deserialize(initialState) : initialState;
   }
 };
 
@@ -165,12 +132,9 @@ const serialize: SerializeFunction = (data, key) => {
     throw new Error(`No persist config for slice "${key}"`);
   }
 
-  const result = omit(
-    sliceConfig.undoableConfig ? data.present : data,
-    sliceConfig.persistConfig.persistDenylist ?? []
-  );
+  const state = sliceConfig.persistConfig.serialize ? sliceConfig.persistConfig.serialize(data) : data;
 
-  return JSON.stringify(result);
+  return JSON.stringify(state);
 };
 
 const PERSISTED_KEYS = Object.values(SLICE_CONFIGS)
@@ -188,6 +152,7 @@ export const createStore = (options?: { persist?: boolean; persistDebounce?: num
         immutableCheck: import.meta.env.MODE === 'development',
       })
         .concat(api.middleware)
+        .concat(actionContextMiddleware)
         // .concat(getDebugLoggerMiddleware({ withDiff: true, withNextState: true }))
         .prepend(listenerMiddleware.middleware),
     enhancers: (getDefaultEnhancers) => {

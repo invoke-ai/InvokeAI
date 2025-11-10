@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
+import { selectActiveTabParams, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTab, selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
@@ -12,7 +12,6 @@ import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermar
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import type { Equals } from 'tsafe';
@@ -29,7 +28,7 @@ export const buildCogView4Graph = async (arg: GraphBuilderArg): Promise<GraphBui
   assert(model, 'No model selected');
   assert(model.base === 'cogview4', 'Selected model is not a CogView4 model');
 
-  const params = selectParamsSlice(state);
+  const params = selectActiveTabParams(state);
 
   const { cfgScale: cfg_scale, steps } = params;
 

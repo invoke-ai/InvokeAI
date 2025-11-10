@@ -1,9 +1,8 @@
-import type { Selector } from '@reduxjs/toolkit';
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import type {
   CanvasControlLayerState,
+  CanvasEntity,
   CanvasEntityIdentifier,
   CanvasEntityState,
   CanvasEntityType,
@@ -11,18 +10,49 @@ import type {
   CanvasMetadata,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
-  CanvasState,
 } from 'features/controlLayers/store/types';
-import { getGridSize, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 /**
+ * Selects the active tab
+ */
+export const selectActiveTab = (state: RootState) => state.tab.activeTab;
+
+/**
  * Selects the canvas slice from the root state
  */
-export const selectCanvasSlice = (state: RootState) => state.canvas.present;
+const selectCanvasSlice = (state: RootState) => state.canvas;
 
-const createCanvasSelector = <T>(selector: Selector<CanvasState, T>) => createSelector(selectCanvasSlice, selector);
+/**
+ * Selects the canvases
+ */
+export const selectCanvases = createSelector(selectCanvasSlice, (state) =>
+  Object.values(state.canvases).map((instance) => ({
+    id: instance.id,
+    name: instance.name,
+    ...instance.canvas.present,
+    isActive: instance.id === state.activeCanvasId,
+    canDelete: Object.keys(state.canvases).length > 1,
+  }))
+);
+
+/**
+ * Selects the active canvas with history
+ */
+const selectActiveCanvasWithHistory = createSelector(
+  selectCanvasSlice,
+  (state) => state.canvases[state.activeCanvasId]!.canvas
+);
+
+export const selectActiveCanvas = createSelector(selectActiveCanvasWithHistory, (canvas) => canvas.present);
+export const selectActiveCanvasId = createSelector(selectCanvasSlice, (state) => state.activeCanvasId);
+
+export const selectCanvasByCanvasId = (state: RootState, canvasId: string) => {
+  const instance = selectCanvasSlice(state).canvases[canvasId];
+  assert(instance, 'Canvas does not exist');
+  return instance.canvas.present;
+};
 
 /**
  * Selects the total canvas entity count:
@@ -34,7 +64,7 @@ const createCanvasSelector = <T>(selector: Selector<CanvasState, T>) => createSe
  *
  * All entities are counted, regardless of their state.
  */
-const selectEntityCountAll = createCanvasSelector((canvas) => {
+const selectEntityCountAll = createSelector(selectActiveCanvas, (canvas) => {
   return (
     canvas.regionalGuidance.entities.length +
     canvas.rasterLayers.entities.length +
@@ -45,22 +75,25 @@ const selectEntityCountAll = createCanvasSelector((canvas) => {
 
 const isVisibleEntity = (entity: CanvasEntityState) => entity.isEnabled && entity.objects.length > 0;
 
-export const selectRasterLayerEntities = createCanvasSelector((canvas) => canvas.rasterLayers.entities);
+export const selectRasterLayerEntities = createSelector(selectActiveCanvas, (canvas) => canvas.rasterLayers.entities);
 export const selectActiveRasterLayerEntities = createSelector(selectRasterLayerEntities, (entities) =>
   entities.filter(isVisibleEntity)
 );
 
-export const selectControlLayerEntities = createCanvasSelector((canvas) => canvas.controlLayers.entities);
+export const selectControlLayerEntities = createSelector(selectActiveCanvas, (canvas) => canvas.controlLayers.entities);
 export const selectActiveControlLayerEntities = createSelector(selectControlLayerEntities, (entities) =>
   entities.filter(isVisibleEntity)
 );
 
-export const selectInpaintMaskEntities = createCanvasSelector((canvas) => canvas.inpaintMasks.entities);
+export const selectInpaintMaskEntities = createSelector(selectActiveCanvas, (canvas) => canvas.inpaintMasks.entities);
 export const selectActiveInpaintMaskEntities = createSelector(selectInpaintMaskEntities, (entities) =>
   entities.filter(isVisibleEntity)
 );
 
-export const selectRegionalGuidanceEntities = createCanvasSelector((canvas) => canvas.regionalGuidance.entities);
+export const selectRegionalGuidanceEntities = createSelector(
+  selectActiveCanvas,
+  (canvas) => canvas.regionalGuidance.entities
+);
 export const selectActiveRegionalGuidanceEntities = createSelector(selectRegionalGuidanceEntities, (entities) =>
   entities.filter(isVisibleEntity)
 );
@@ -71,27 +104,11 @@ export const selectActiveRegionalGuidanceEntities = createSelector(selectRegiona
 export const selectHasEntities = createSelector(selectEntityCountAll, (count) => count > 0);
 
 /**
- * Selects the optimal dimension for the canvas based on the currently-selected model
- */
-export const selectOptimalDimension = createSelector(selectParamsSlice, (params): number => {
-  const modelBase = params.model?.base;
-  return getOptimalDimension(modelBase ?? null);
-});
-
-/**
- * Selects the grid size for the canvas based on the currently-selected model
- */
-export const selectGridSize = createSelector(selectParamsSlice, (params): number => {
-  const modelBase = params.model?.base;
-  return getGridSize(modelBase ?? null);
-});
-
-/**
  * Selects a single entity from the canvas slice. If the entity identifier is narrowed to a specific type, the
  * return type will be narrowed as well.
  */
 export function selectEntity<T extends CanvasEntityIdentifier>(
-  state: CanvasState,
+  state: CanvasEntity,
   entityIdentifier: T
 ): Extract<CanvasEntityState, T> | undefined {
   const { id, type } = entityIdentifier;
@@ -121,7 +138,7 @@ export function selectEntity<T extends CanvasEntityIdentifier>(
  * Selects the entity identifier for the entity that is below the given entity in terms of draw order.
  */
 export function selectEntityIdentifierBelowThisOne<T extends CanvasEntityIdentifier>(
-  state: CanvasState,
+  state: CanvasEntity,
   entityIdentifier: T
 ): Extract<CanvasEntityState, T> | undefined {
   const { id, type } = entityIdentifier;
@@ -164,7 +181,7 @@ export function selectEntityIdentifierBelowThisOne<T extends CanvasEntityIdentif
  * Wrapper around {@link selectEntity}.
  */
 export function selectEntityOrThrow<T extends CanvasEntityIdentifier>(
-  state: CanvasState,
+  state: CanvasEntity,
   entityIdentifier: T,
   caller: string
 ): Extract<CanvasEntityState, T> {
@@ -174,14 +191,14 @@ export function selectEntityOrThrow<T extends CanvasEntityIdentifier>(
 }
 
 export const selectEntityExists = <T extends CanvasEntityIdentifier>(entityIdentifier: T) => {
-  return createCanvasSelector((canvas) => Boolean(selectEntity(canvas, entityIdentifier)));
+  return createSelector(selectActiveCanvas, (canvas) => Boolean(selectEntity(canvas, entityIdentifier)));
 };
 
 /**
  * Selects all entities of the given type.
  */
 export function selectAllEntitiesOfType<T extends CanvasEntityState['type']>(
-  state: CanvasState,
+  state: CanvasEntity,
   type: T
 ): Extract<CanvasEntityState, { type: T }>[] {
   let entities: CanvasEntityState[] = [];
@@ -208,7 +225,7 @@ export function selectAllEntitiesOfType<T extends CanvasEntityState['type']>(
 /**
  * Selects all entities, in the order they are displayed in the list.
  */
-export function selectAllEntities(state: CanvasState): CanvasEntityState[] {
+export function selectAllEntities(state: CanvasEntity): CanvasEntityState[] {
   // These are in the same order as they are displayed in the list!
   return [
     ...state.inpaintMasks.entities.toReversed(),
@@ -226,7 +243,7 @@ export function selectAllEntities(state: CanvasState): CanvasEntityState[] {
  * - Regional guidance
  */
 export function selectAllRenderableEntities(
-  state: CanvasState
+  state: CanvasEntity
 ): (CanvasRasterLayerState | CanvasControlLayerState | CanvasInpaintMaskState | CanvasRegionalGuidanceState)[] {
   return [
     ...state.rasterLayers.entities,
@@ -240,7 +257,7 @@ export function selectAllRenderableEntities(
  * Selects the IP adapter for the specific Regional Guidance layer.
  */
 export function selectRegionalGuidanceReferenceImage(
-  state: CanvasState,
+  state: CanvasEntity,
   entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>,
   referenceImageId: string
 ) {
@@ -251,22 +268,22 @@ export function selectRegionalGuidanceReferenceImage(
   return entity.referenceImages.find(({ id }) => id === referenceImageId);
 }
 
-export const selectBbox = createCanvasSelector((canvas) => canvas.bbox);
+export const selectBbox = createSelector(selectActiveCanvas, (canvas) => canvas.bbox);
 
 export const selectSelectedEntityIdentifier = createSelector(
-  selectCanvasSlice,
+  selectActiveCanvas,
   (canvas) => canvas.selectedEntityIdentifier
 );
 
 export const selectBookmarkedEntityIdentifier = createSelector(
-  selectCanvasSlice,
+  selectActiveCanvas,
   (canvas) => canvas.bookmarkedEntityIdentifier
 );
 
-export const selectCanvasMayUndo = (state: RootState) => state.canvas.past.length > 0;
-export const selectCanvasMayRedo = (state: RootState) => state.canvas.future.length > 0;
+export const selectCanvasMayUndo = createSelector(selectActiveCanvasWithHistory, (canvas) => canvas.past.length > 0);
+export const selectCanvasMayRedo = createSelector(selectActiveCanvasWithHistory, (canvas) => canvas.future.length > 0);
 export const selectSelectedEntityFill = createSelector(
-  selectCanvasSlice,
+  selectActiveCanvas,
   selectSelectedEntityIdentifier,
   (canvas, selectedEntityIdentifier) => {
     if (!selectedEntityIdentifier) {
@@ -283,10 +300,10 @@ export const selectSelectedEntityFill = createSelector(
   }
 );
 
-const selectRasterLayersIsHidden = createCanvasSelector((canvas) => canvas.rasterLayers.isHidden);
-const selectControlLayersIsHidden = createCanvasSelector((canvas) => canvas.controlLayers.isHidden);
-const selectInpaintMasksIsHidden = createCanvasSelector((canvas) => canvas.inpaintMasks.isHidden);
-const selectRegionalGuidanceIsHidden = createCanvasSelector((canvas) => canvas.regionalGuidance.isHidden);
+const selectRasterLayersIsHidden = createSelector(selectActiveCanvas, (canvas) => canvas.rasterLayers.isHidden);
+const selectControlLayersIsHidden = createSelector(selectActiveCanvas, (canvas) => canvas.controlLayers.isHidden);
+const selectInpaintMasksIsHidden = createSelector(selectActiveCanvas, (canvas) => canvas.inpaintMasks.isHidden);
+const selectRegionalGuidanceIsHidden = createSelector(selectActiveCanvas, (canvas) => canvas.regionalGuidance.isHidden);
 
 /**
  * Returns the hidden selector for the given entity type.
@@ -324,7 +341,7 @@ export const buildSelectIsSelected = (entityIdentifier: CanvasEntityIdentifier) 
  * Other entities are considered empty if they have no objects.
  */
 export const buildSelectHasObjects = (entityIdentifier: CanvasEntityIdentifier) => {
-  return createCanvasSelector((canvas) => {
+  return createSelector(selectActiveCanvas, (canvas) => {
     const entity = selectEntity(canvas, entityIdentifier);
 
     if (!entity) {
@@ -334,17 +351,17 @@ export const buildSelectHasObjects = (entityIdentifier: CanvasEntityIdentifier) 
   });
 };
 
-export const selectWidth = createCanvasSelector((canvas) => canvas.bbox.rect.width);
-export const selectHeight = createCanvasSelector((canvas) => canvas.bbox.rect.height);
-export const selectAspectRatioID = createCanvasSelector((canvas) => canvas.bbox.aspectRatio.id);
-export const selectAspectRatioValue = createCanvasSelector((canvas) => canvas.bbox.aspectRatio.value);
+export const selectWidth = createSelector(selectActiveCanvas, (canvas) => canvas.bbox.rect.width);
+export const selectHeight = createSelector(selectActiveCanvas, (canvas) => canvas.bbox.rect.height);
+export const selectAspectRatioID = createSelector(selectActiveCanvas, (canvas) => canvas.bbox.aspectRatio.id);
+export const selectAspectRatioValue = createSelector(selectActiveCanvas, (canvas) => canvas.bbox.aspectRatio.value);
 export const selectScaledSize = createSelector(selectBbox, (bbox) => bbox.scaledSize);
 export const selectScaleMethod = createSelector(selectBbox, (bbox) => bbox.scaleMethod);
 export const selectBboxRect = createSelector(selectBbox, (bbox) => bbox.rect);
 export const selectBboxModelBase = createSelector(selectBbox, (bbox) => bbox.modelBase);
 
 export const selectCanvasMetadata = createSelector(
-  selectCanvasSlice,
+  selectActiveCanvas,
   (canvas): { canvas_v2_metadata: CanvasMetadata } => {
     const canvas_v2_metadata: CanvasMetadata = {
       controlLayers: selectAllEntitiesOfType(canvas, 'control_layer'),
@@ -360,6 +377,6 @@ export const selectCanvasMetadata = createSelector(
  * Selects whether all non-raster layer categories (control layers, inpaint masks, regional guidance) are hidden.
  * This is used to determine the state of the toggle button that shows/hides all non-raster layers.
  */
-export const selectNonRasterLayersIsHidden = createSelector(selectCanvasSlice, (canvas) => {
+export const selectNonRasterLayersIsHidden = createSelector(selectActiveCanvas, (canvas) => {
   return canvas.controlLayers.isHidden && canvas.inpaintMasks.isHidden && canvas.regionalGuidance.isHidden;
 });

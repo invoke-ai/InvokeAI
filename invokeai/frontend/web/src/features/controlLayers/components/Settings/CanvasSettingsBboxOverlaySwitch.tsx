@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 export const CanvasSettingsBboxOverlaySwitch = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const bboxOverlay = useAppSelector(selectBboxOverlay);
+  const bboxOverlay = useAppSelector((state) => selectBboxOverlay(state));
   const onChange = useCallback(() => {
     dispatch(settingsBboxOverlayToggled());
   }, [dispatch]);

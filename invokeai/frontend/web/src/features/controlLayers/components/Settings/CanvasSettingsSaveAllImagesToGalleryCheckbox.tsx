@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 export const CanvasSettingsSaveAllImagesToGalleryCheckbox = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const saveAllImagesToGallery = useAppSelector(selectSaveAllImagesToGallery);
+  const saveAllImagesToGallery = useAppSelector((state) => selectSaveAllImagesToGallery(state));
   const onChange = useCallback(() => {
     dispatch(settingsSaveAllImagesToGalleryToggled());
   }, [dispatch]);

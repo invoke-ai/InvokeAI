@@ -21,7 +21,7 @@ import { useDisclosure } from 'common/hooks/useBoolean';
 import { typedMemo } from 'common/util/typedMemo';
 import { uniq } from 'es-toolkit/compat';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
-import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectActiveTabParams } from 'features/controlLayers/store/paramsSlice';
 import { MODEL_BASE_TO_COLOR, MODEL_BASE_TO_LONG_NAME, MODEL_BASE_TO_SHORT_NAME } from 'features/modelManagerV2/models';
 import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
 import ModelImage from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelImage';
@@ -35,7 +35,7 @@ import { PiCaretDownBold, PiLinkSimple } from 'react-icons/pi';
 import { useGetRelatedModelIdsBatchQuery } from 'services/api/endpoints/modelRelationships';
 import type { AnyModelConfig } from 'services/api/types';
 
-const selectSelectedModelKeys = createMemoizedSelector(selectParamsSlice, selectLoRAsSlice, (params, loras) => {
+const selectSelectedModelKeys = createMemoizedSelector(selectActiveTabParams, selectLoRAsSlice, (params, loras) => {
   const keys: string[] = [];
   const main = params.model;
   const vae = params.vae;

@@ -3,9 +3,9 @@ import { deepClone } from 'common/util/deepClone';
 import { getDefaultRegionalGuidanceRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityTransformer';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { canvasReset } from 'features/controlLayers/store/actions';
 import {
   bboxChangedFromCanvas,
+  canvasAdded,
   canvasClearHistory,
   controlLayerAdded,
   entityRasterized,
@@ -154,7 +154,6 @@ export const createNewCanvasEntityFromImage = async (arg: {
 
 /**
  * Creates a new canvas with the given image as the only layer:
- * - Reset the canvas
  * - Resize the bbox to the image's aspect ratio at the optimal size for the selected model
  * - Add the image as a layer of the given type
  * - If `withResize`: Resizes the layer to fit the bbox using the 'fill' strategy
@@ -213,7 +212,7 @@ export const newCanvasFromImage = async (arg: {
         objects: [imageObject],
       } satisfies Partial<CanvasRasterLayerState>;
       addFitOnLayerInitCallback(overrides.id);
-      dispatch(canvasReset());
+      dispatch(canvasAdded({ isSelected: true }));
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
       dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
       dispatch(rasterLayerAdded({ overrides, isSelected: true }));
@@ -230,7 +229,7 @@ export const newCanvasFromImage = async (arg: {
         controlAdapter: deepClone(initialControlNet),
       } satisfies Partial<CanvasControlLayerState>;
       addFitOnLayerInitCallback(overrides.id);
-      dispatch(canvasReset());
+      dispatch(canvasAdded({ isSelected: true }));
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
       dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
       dispatch(controlLayerAdded({ overrides, isSelected: true }));
@@ -246,7 +245,7 @@ export const newCanvasFromImage = async (arg: {
         objects: [imageObject],
       } satisfies Partial<CanvasInpaintMaskState>;
       addFitOnLayerInitCallback(overrides.id);
-      dispatch(canvasReset());
+      dispatch(canvasAdded({ isSelected: true }));
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
       dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
       dispatch(inpaintMaskAdded({ overrides, isSelected: true }));
@@ -262,7 +261,7 @@ export const newCanvasFromImage = async (arg: {
         objects: [imageObject],
       } satisfies Partial<CanvasRegionalGuidanceState>;
       addFitOnLayerInitCallback(overrides.id);
-      dispatch(canvasReset());
+      dispatch(canvasAdded({ isSelected: true }));
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
       dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
       dispatch(rgAdded({ overrides, isSelected: true }));
@@ -276,7 +275,7 @@ export const newCanvasFromImage = async (arg: {
       const config = getDefaultRegionalGuidanceRefImageConfig(getState);
       config.image = imageDTOToImageWithDims(imageDTO);
       const referenceImages = [{ id: getPrefixedId('regional_guidance_reference_image'), config }];
-      dispatch(canvasReset());
+      dispatch(canvasAdded({ isSelected: true }));
       dispatch(rgAdded({ overrides: { referenceImages }, isSelected: true }));
       if (withInpaintMask) {
         dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));

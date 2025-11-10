@@ -1,6 +1,6 @@
 import { merge } from 'es-toolkit';
 import type { StagingAreaAppApi } from 'features/controlLayers/components/StagingArea/state';
-import type { AutoSwitchMode } from 'features/controlLayers/store/canvasSettingsSlice';
+import type { AutoSwitchMode } from 'features/controlLayers/store/types';
 import type { ImageDTO, S } from 'services/api/types';
 import type { PartialDeep } from 'type-fest';
 import { vi } from 'vitest';

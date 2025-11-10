@@ -4,18 +4,18 @@ import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/c
 import { InpaintMaskDenoiseLimitSlider } from 'features/controlLayers/components/InpaintMask/InpaintMaskDenoiseLimitSlider';
 import { InpaintMaskNoiseSlider } from 'features/controlLayers/components/InpaintMask/InpaintMaskNoiseSlider';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
 
 const buildSelectHasDenoiseLimit = (entityIdentifier: CanvasEntityIdentifier<'inpaint_mask'>) =>
-  createSelector(selectCanvasSlice, (canvas) => {
+  createSelector(selectActiveCanvas, (canvas) => {
     const entity = selectEntityOrThrow(canvas, entityIdentifier, 'InpaintMaskSettings');
     return entity.denoiseLimit !== undefined;
   });
 
 const buildSelectHasNoiseLevel = (entityIdentifier: CanvasEntityIdentifier<'inpaint_mask'>) =>
-  createSelector(selectCanvasSlice, (canvas) => {
+  createSelector(selectActiveCanvas, (canvas) => {
     const entity = selectEntityOrThrow(canvas, entityIdentifier, 'InpaintMaskSettings');
     return entity.noiseLevel !== undefined;
   });

@@ -1,8 +1,12 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { heightChanged, selectHeight } from 'features/controlLayers/store/paramsSlice';
-import { selectGridSize, selectOptimalDimension } from 'features/controlLayers/store/selectors';
+import {
+  heightChanged,
+  selectGridSize,
+  selectHeight,
+  selectOptimalDimension,
+} from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 

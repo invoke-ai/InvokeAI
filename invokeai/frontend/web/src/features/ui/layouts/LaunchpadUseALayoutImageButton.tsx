@@ -1,7 +1,7 @@
 import { Flex, Heading, Icon, Text } from '@invoke-ai/ui-library';
 import { useAppStore } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
-import { useCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { useActiveCanvasIsStaging } from 'features/controlLayers/hooks/useCanvasIsStaging';
 import { newCanvasFromImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { newCanvasFromImage } from 'features/imageActions/actions';
@@ -19,7 +19,7 @@ const dndTargetData = newCanvasFromImageDndTarget.getData(NEW_CANVAS_OPTIONS);
 export const LaunchpadUseALayoutImageButton = memo((props: { extraAction?: () => void }) => {
   const { t } = useTranslation();
   const { getState, dispatch } = useAppStore();
-  const isStaging = useCanvasIsStaging();
+  const isStaging = useActiveCanvasIsStaging();
 
   const onUpload = useCallback(
     (imageDTO: ImageDTO) => {
