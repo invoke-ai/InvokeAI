@@ -34,9 +34,7 @@ export const StagingAreaContextProvider = memo(({ children }: PropsWithChildren)
 
   const stagingAreaAppApi = useMemo<StagingAreaAppApi>(() => {
     const _stagingAreaAppApi: StagingAreaAppApi = {
-      getAutoSwitch: () => {
-        return selectStagingAreaAutoSwitch(store.getState());
-      },
+      getAutoSwitch: () => selectStagingAreaAutoSwitch(store.getState()),
       getImageDTO: (imageName: string) => getImageDTOSafe(imageName),
       onInvocationProgress: (handler) => {
         socket?.on('invocation_progress', handler);
@@ -68,6 +66,7 @@ export const StagingAreaContextProvider = memo(({ children }: PropsWithChildren)
       },
       onDiscardAll: () => {
         store.dispatch(canvasSessionReset());
+
         if (sessionId) {
           store.dispatch(
             queueApi.endpoints.cancelQueueItemsByDestination.initiate({ destination: sessionId }, { track: false })
@@ -86,6 +85,7 @@ export const StagingAreaContextProvider = memo(({ children }: PropsWithChildren)
 
         store.dispatch(rasterLayerAdded({ overrides, isSelected: selectedEntityIdentifier?.type === 'raster_layer' }));
         store.dispatch(canvasSessionReset());
+
         if (sessionId) {
           store.dispatch(
             queueApi.endpoints.cancelQueueItemsByDestination.initiate({ destination: sessionId }, { track: false })
