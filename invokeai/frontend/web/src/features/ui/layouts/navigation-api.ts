@@ -4,7 +4,8 @@ import { parseify } from 'common/util/serialize';
 import type { GridviewApi, IDockviewPanel, IGridviewPanel } from 'dockview';
 import { DockviewApi, GridviewPanel } from 'dockview';
 import { debounce } from 'es-toolkit';
-import type { Serializable, TabName } from 'features/ui/store/uiTypes';
+import type { TabName } from 'features/controlLayers/store/types';
+import type { Serializable } from 'features/ui/store/uiTypes';
 import type { Atom } from 'nanostores';
 import { atom } from 'nanostores';
 

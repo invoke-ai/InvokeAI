@@ -3,7 +3,7 @@ import { logger } from 'app/logging/logger';
 import { useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { $canvasManager } from 'features/controlLayers/store/ephemeral';
+import { $canvasManagers } from 'features/controlLayers/store/ephemeral';
 import Konva from 'konva';
 import { useLayoutEffect, useState } from 'react';
 import { $socket } from 'services/events/stores';
@@ -14,8 +14,8 @@ const log = logger('canvas');
 // This will log warnings when layers > 5
 Konva.showWarnings = import.meta.env.MODE === 'development';
 
-const useKonvaPixelRatioWatcher = () => {
-  useAssertSingleton('useKonvaPixelRatioWatcher');
+const useKonvaPixelRatioWatcher = (canvasId: string) => {
+  useAssertSingleton(`useKonvaPixelRatioWatcher-${canvasId}`);
 
   const dpr = useDevicePixelRatio({ round: false });
 
@@ -24,12 +24,13 @@ const useKonvaPixelRatioWatcher = () => {
   }, [dpr]);
 };
 
-export const useInvokeCanvas = (): ((el: HTMLDivElement | null) => void) => {
-  useAssertSingleton('useInvokeCanvas');
-  useKonvaPixelRatioWatcher();
+export const useInvokeCanvas = (canvasId: string): ((el: HTMLDivElement | null) => void) => {
+  useAssertSingleton(`useInvokeCanvas-${canvasId}`);
+  useKonvaPixelRatioWatcher(canvasId);
   const store = useAppStore();
   const socket = useStore($socket);
   const [container, containerRef] = useState<HTMLDivElement | null>(null);
+  const currentManager = $canvasManagers.get()[canvasId];
 
   useLayoutEffect(() => {
     log.debug('Initializing renderer');
@@ -44,20 +45,18 @@ export const useInvokeCanvas = (): ((el: HTMLDivElement | null) => void) => {
       return () => {};
     }
 
-    const currentManager = $canvasManager.get();
     if (currentManager) {
       currentManager.stage.setContainer(container);
       return;
     }
 
-    const manager = new CanvasManager(container, store, socket);
+    const manager = new CanvasManager(canvasId, container, store, socket);
     manager.initialize();
 
     return () => {
       manager.destroy();
-      $canvasManager.set(null);
     };
-  }, [container, socket, store]);
+  }, [canvasId, container, socket, store, currentManager]);
 
   return containerRef;
 };

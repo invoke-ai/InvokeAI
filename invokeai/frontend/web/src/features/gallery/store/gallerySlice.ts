@@ -1,8 +1,9 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import type { SliceConfig } from 'app/store/types';
+import type { SerializedStateFromDenyList, SliceConfig } from 'app/store/types';
 import { isPlainObject, uniq } from 'es-toolkit';
+import { merge, omit } from 'es-toolkit/compat';
 import type { BoardRecordOrderBy } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -170,7 +171,10 @@ export const {
 
 export const selectGallerySlice = (state: RootState) => state.gallery;
 
-export const gallerySliceConfig: SliceConfig<typeof slice> = {
+const denyList = ['selection', 'selectedBoardId', 'galleryView', 'imageToCompare'] as const;
+type SerializedGalleryState = SerializedStateFromDenyList<GalleryState, typeof denyList>;
+
+export const gallerySliceConfig: SliceConfig<typeof slice, GalleryState, SerializedGalleryState> = {
   slice,
   schema: zGalleryState,
   getInitialState,
@@ -182,6 +186,14 @@ export const gallerySliceConfig: SliceConfig<typeof slice> = {
       }
       return zGalleryState.parse(state);
     },
-    persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'imageToCompare'],
+    serialize: (state) => {
+      const a = omit(state, denyList);
+      return a;
+    },
+    deserialize: (state) => {
+      const galleryState = state as SerializedGalleryState;
+
+      return merge(galleryState, getInitialState());
+    },
   },
 };

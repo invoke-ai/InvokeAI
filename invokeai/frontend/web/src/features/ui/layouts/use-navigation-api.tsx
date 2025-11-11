@@ -1,12 +1,22 @@
+import type { AppStore } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import { dockviewStorageKeyChanged, setActiveTab } from 'features/ui/store/uiSlice';
-import type { TabName } from 'features/ui/store/uiTypes';
+import { selectActiveCanvasId, selectActiveTab } from 'features/controlLayers/store/selectors';
+import { setActiveTab } from 'features/controlLayers/store/tabSlice';
+import type { TabName } from 'features/controlLayers/store/types';
+import { dockviewStorageKeyChanged } from 'features/ui/store/uiSlice';
 import { useEffect, useMemo } from 'react';
 import type { JsonObject } from 'type-fest';
 
 import { navigationApi } from './navigation-api';
+
+const createStorageId = (store: AppStore, id: string) => {
+  const state = store.getState();
+  const activeTab = selectActiveTab(state);
+  const activeCanvasId = selectActiveCanvasId(state);
+
+  return activeTab === 'canvas' ? `${activeCanvasId}-${id}` : `${activeTab}-${id}`;
+};
 
 /**
  * Hook that initializes the global navigation API with callbacks to access and modify the active tab and handle
@@ -28,13 +38,16 @@ export const useNavigationApi = () => {
       },
       storage: {
         get: (id: string) => {
-          return store.getState().ui.panels[id];
+          const storageId = createStorageId(store, id);
+          return store.getState().ui.panels[storageId];
         },
         set: (id: string, state: JsonObject) => {
-          store.dispatch(dockviewStorageKeyChanged({ id, state }));
+          const storageId = createStorageId(store, id);
+          store.dispatch(dockviewStorageKeyChanged({ id: storageId, state }));
         },
         delete: (id: string) => {
-          store.dispatch(dockviewStorageKeyChanged({ id, state: undefined }));
+          const storageId = createStorageId(store, id);
+          store.dispatch(dockviewStorageKeyChanged({ id: storageId, state: undefined }));
         },
       },
     }),

@@ -1,9 +1,10 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import type { SliceConfig } from 'app/store/types';
+import type { SerializedStateFromDenyList, SliceConfig } from 'app/store/types';
 import { buildZodTypeGuard } from 'common/util/zodUtils';
 import { isPlainObject } from 'es-toolkit';
+import { merge, omit } from 'es-toolkit/compat';
 import { assert } from 'tsafe';
 import { z } from 'zod';
 
@@ -69,21 +70,30 @@ export const {
   seedBehaviourChanged,
 } = slice.actions;
 
-export const dynamicPromptsSliceConfig: SliceConfig<typeof slice> = {
-  slice,
-  schema: zDynamicPromptsState,
-  getInitialState,
-  persistConfig: {
-    migrate: (state) => {
-      assert(isPlainObject(state));
-      if (!('_version' in state)) {
-        state._version = 1;
-      }
-      return zDynamicPromptsState.parse(state);
+const denyList = ['prompts', 'parsingError', 'isError', 'isLoading'] as const;
+type SerializedDynamicPromptsState = SerializedStateFromDenyList<DynamicPromptsState, typeof denyList>;
+
+export const dynamicPromptsSliceConfig: SliceConfig<typeof slice, DynamicPromptsState, SerializedDynamicPromptsState> =
+  {
+    slice,
+    schema: zDynamicPromptsState,
+    getInitialState,
+    persistConfig: {
+      migrate: (state) => {
+        assert(isPlainObject(state));
+        if (!('_version' in state)) {
+          state._version = 1;
+        }
+        return zDynamicPromptsState.parse(state);
+      },
+      serialize: (state) => omit(state, denyList),
+      deserialize: (state) => {
+        const dynamicPromptsState = state as SerializedDynamicPromptsState;
+
+        return merge(dynamicPromptsState, getInitialState());
+      },
     },
-    persistDenylist: ['prompts', 'parsingError', 'isError', 'isLoading'],
-  },
-};
+  };
 
 export const selectDynamicPromptsSlice = (state: RootState) => state.dynamicPrompts;
 const createDynamicPromptsSelector = <T>(selector: Selector<DynamicPromptsState, T>) =>

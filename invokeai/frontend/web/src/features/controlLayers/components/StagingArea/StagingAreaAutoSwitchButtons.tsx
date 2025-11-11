@@ -12,8 +12,7 @@ import { PiCaretLineRightBold, PiCaretRightBold, PiMoonBold } from 'react-icons/
 export const StagingAreaAutoSwitchButtons = memo(() => {
   const canvasManager = useCanvasManager();
   const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
-
-  const autoSwitch = useAppSelector(selectStagingAreaAutoSwitch);
+  const autoSwitch = useAppSelector((state) => selectStagingAreaAutoSwitch(state));
   const dispatch = useAppDispatch();
 
   const onClickOff = useCallback(() => {

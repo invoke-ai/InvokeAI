@@ -5,8 +5,9 @@ import { selectIterations, setIterations } from 'features/controlLayers/store/pa
 import { memo, useCallback } from 'react';
 
 export const QueueIterationsNumberInput = memo(() => {
-  const iterations = useAppSelector(selectIterations);
   const dispatch = useAppDispatch();
+  const iterations = useAppSelector(selectIterations);
+
   const handleChange = useCallback(
     (v: number) => {
       dispatch(setIterations(v));

@@ -3,11 +3,11 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasEntityGroupList } from 'features/controlLayers/components/CanvasEntityList/CanvasEntityGroupList';
 import { RasterLayer } from 'features/controlLayers/components/RasterLayer/RasterLayer';
-import { selectCanvasSlice, selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas, selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo } from 'react';
 
-const selectEntityIdentifiers = createMemoizedSelector(selectCanvasSlice, (canvas) => {
+const selectEntityIdentifiers = createMemoizedSelector(selectActiveCanvas, (canvas) => {
   return canvas.rasterLayers.entities.map(getEntityIdentifier).toReversed();
 });
 const selectIsSelected = createSelector(selectSelectedEntityIdentifier, (selectedEntityIdentifier) => {

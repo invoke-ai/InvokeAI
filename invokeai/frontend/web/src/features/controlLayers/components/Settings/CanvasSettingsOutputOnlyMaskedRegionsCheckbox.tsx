@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 export const CanvasSettingsOutputOnlyMaskedRegionsCheckbox = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const outputOnlyMaskedRegions = useAppSelector(selectOutputOnlyMaskedRegions);
+  const outputOnlyMaskedRegions = useAppSelector((state) => selectOutputOnlyMaskedRegions(state));
   const onChange = useCallback(() => {
     dispatch(settingsOutputOnlyMaskedRegionsToggled());
   }, [dispatch]);

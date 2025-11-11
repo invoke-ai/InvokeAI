@@ -1,6 +1,6 @@
-import { useCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { useActiveCanvasIsStaging } from 'features/controlLayers/hooks/useCanvasIsStaging';
 
 export const useIsBboxSizeLocked = () => {
-  const isStaging = useCanvasIsStaging();
+  const isStaging = useActiveCanvasIsStaging();
   return isStaging;
 };

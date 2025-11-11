@@ -1,10 +1,11 @@
 import type { Slice } from '@reduxjs/toolkit';
-import type { UndoableOptions } from 'redux-undo';
 import type { ZodType } from 'zod';
+import { z } from 'zod';
 
 type StateFromSlice<T extends Slice> = T extends Slice<infer U> ? U : never;
+export type SerializedStateFromDenyList<S, T extends readonly (keyof S)[]> = Omit<S, T[number]>;
 
-export type SliceConfig<T extends Slice> = {
+export type SliceConfig<T extends Slice, TInternalState = StateFromSlice<T>, TSerializedState = StateFromSlice<T>> = {
   /**
    * The redux slice (return of createSlice).
    */
@@ -16,7 +17,7 @@ export type SliceConfig<T extends Slice> = {
   /**
    * A function that returns the initial state of the slice.
    */
-  getInitialState: () => StateFromSlice<T>;
+  getInitialState: () => TSerializedState;
   /**
    * The optional persist configuration for this slice. If omitted, the slice will not be persisted.
    */
@@ -28,19 +29,31 @@ export type SliceConfig<T extends Slice> = {
      * @param state The rehydrated state.
      * @returns A correctly-shaped state.
      */
-    migrate: (state: unknown) => StateFromSlice<T>;
+    migrate: (state: unknown) => TInternalState;
     /**
-     * Keys to omit from the persisted state.
+     * Serializes the state
+     *
+     * @param state The internal state
+     * @returns The serialized state
      */
-    persistDenylist?: (keyof StateFromSlice<T>)[];
-  };
-  /**
-   * The optional undoable configuration for this slice. If omitted, the slice will not be undoable.
-   */
-  undoableConfig?: {
+    serialize?: (state: TInternalState) => TSerializedState;
     /**
-     * The options to be passed into redux-undo.
+     * Deserializes the state
+     *
+     * @param state The serialized state
+     * @returns The internal state
      */
-    reduxUndoOptions: UndoableOptions<StateFromSlice<T>>;
+    deserialize?: (state: unknown) => TInternalState;
   };
 };
+
+export const zStateWithHistory = <T extends z.ZodTypeAny>(stateSchema: T) =>
+  z.object({
+    past: z.array(stateSchema),
+    present: stateSchema,
+    future: z.array(stateSchema),
+    _latestUnfiltered: stateSchema.optional(),
+    group: z.unknown().optional(),
+    index: z.number().optional(),
+    limit: z.number().optional(),
+  });

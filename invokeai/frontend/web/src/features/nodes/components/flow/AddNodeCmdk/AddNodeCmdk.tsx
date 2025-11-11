@@ -18,6 +18,7 @@ import { CommandEmpty, CommandItem, CommandList, CommandRoot } from 'cmdk';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { memoize } from 'es-toolkit/compat';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
 import { useBuildNode } from 'features/nodes/hooks/useBuildNode';
 import {
   $addNodeCmdk,
@@ -37,7 +38,6 @@ import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { toast } from 'features/toast/toast';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { computed } from 'nanostores';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';

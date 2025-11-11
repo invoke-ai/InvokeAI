@@ -8,6 +8,7 @@ import { PiArrowsDownUpBold } from 'react-icons/pi';
 export const DimensionsSwapButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+
   const onClick = useCallback(() => {
     dispatch(dimensionsSwapped());
   }, [dispatch]);

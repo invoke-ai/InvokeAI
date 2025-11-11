@@ -4,7 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/common/CanvasEntitySettingsWrapper';
 import { RegionalGuidanceAddPromptsIPAdapterButtons } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceAddPromptsIPAdapterButtons';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
 
@@ -13,7 +13,7 @@ import { RegionalGuidanceNegativePrompt } from './RegionalGuidanceNegativePrompt
 import { RegionalGuidancePositivePrompt } from './RegionalGuidancePositivePrompt';
 
 const buildSelectFlags = (entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>) =>
-  createMemoizedSelector(selectCanvasSlice, (canvas) => {
+  createMemoizedSelector(selectActiveCanvas, (canvas) => {
     const entity = selectEntityOrThrow(canvas, entityIdentifier, 'RegionalGuidanceSettings');
     return {
       hasPositivePrompt: entity.positivePrompt !== null,

@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 export const CanvasSettingsDynamicGridSwitch = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const dynamicGrid = useAppSelector(selectDynamicGrid);
+  const dynamicGrid = useAppSelector((state) => selectDynamicGrid(state));
   const onChange = useCallback(() => {
     dispatch(settingsDynamicGridToggled());
   }, [dispatch]);

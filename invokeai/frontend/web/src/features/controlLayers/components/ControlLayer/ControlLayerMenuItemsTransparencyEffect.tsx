@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useEntityIsLocked } from 'features/controlLayers/hooks/useEntityIsLocked';
 import { controlLayerWithTransparencyEffectToggled } from 'features/controlLayers/store/canvasSlice';
-import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
+import { selectActiveCanvas, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,7 +12,7 @@ import { PiDropHalfBold } from 'react-icons/pi';
 
 const buildSelectWithTransparencyEffect = (entityIdentifier: CanvasEntityIdentifier<'control_layer'>) =>
   createSelector(
-    selectCanvasSlice,
+    selectActiveCanvas,
     (canvas) =>
       selectEntityOrThrow(canvas, entityIdentifier, 'ControlLayerMenuItemsTransparencyEffect').withTransparencyEffect
   );

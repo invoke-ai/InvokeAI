@@ -9,10 +9,8 @@ import { useTranslation } from 'react-i18next';
 export const ParamSeedNumberInput = memo(() => {
   const seed = useAppSelector(selectSeed);
   const shouldRandomizeSeed = useAppSelector(selectShouldRandomizeSeed);
-
-  const { t } = useTranslation();
-
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const handleChangeSeed = useCallback((v: number) => dispatch(setSeed(v)), [dispatch]);
 

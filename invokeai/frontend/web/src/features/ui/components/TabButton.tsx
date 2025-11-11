@@ -2,9 +2,9 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { IconButton, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useCallbackOnDragEnter } from 'common/hooks/useCallbackOnDragEnter';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
+import type { TabName } from 'features/controlLayers/store/types';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import type { TabName } from 'features/ui/store/uiTypes';
 import type { ReactElement } from 'react';
 import { memo, useCallback, useRef } from 'react';
 

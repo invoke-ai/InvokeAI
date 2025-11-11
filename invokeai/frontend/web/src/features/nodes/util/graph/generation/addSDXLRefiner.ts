@@ -1,5 +1,6 @@
 import type { RootState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { selectActiveTabParams } from 'features/controlLayers/store/paramsSlice';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { Invocation } from 'services/api/types';
@@ -23,7 +24,7 @@ export const addSDXLRefiner = async (
     refinerScheduler,
     refinerCFGScale,
     refinerStart,
-  } = state.params;
+  } = selectActiveTabParams(state);
 
   assert(refinerModel, 'No refiner model found in state');
 

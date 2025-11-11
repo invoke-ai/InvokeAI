@@ -2,7 +2,8 @@ import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { bboxWidthChanged } from 'features/controlLayers/store/canvasSlice';
-import { selectGridSize, selectOptimalDimension, selectWidth } from 'features/controlLayers/store/selectors';
+import { selectGridSize, selectOptimalDimension } from 'features/controlLayers/store/paramsSlice';
+import { selectWidth } from 'features/controlLayers/store/selectors';
 import { useIsBboxSizeLocked } from 'features/parameters/components/Bbox/use-is-bbox-size-locked';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

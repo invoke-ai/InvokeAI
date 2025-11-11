@@ -1,5 +1,6 @@
 import type { RootState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { Invocation, S } from 'services/api/types';
@@ -13,7 +14,7 @@ export const addSDXLLoRAs = (
   posCond: Invocation<'sdxl_compel_prompt'>,
   negCond: Invocation<'sdxl_compel_prompt'>
 ): void => {
-  const enabledLoRAs = state.loras.loras.filter((l) => l.isEnabled && l.model.base === 'sdxl');
+  const enabledLoRAs = selectAddedLoRAs(state).filter((l) => l.isEnabled && l.model.base === 'sdxl');
   const loraCount = enabledLoRAs.length;
 
   if (loraCount === 0) {

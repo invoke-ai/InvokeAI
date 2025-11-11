@@ -1,4 +1,5 @@
 import type { HandleType } from '@xyflow/react';
+import { zStateWithHistory } from 'app/store/types';
 import { type FieldInputTemplate, type FieldOutputTemplate, zStatefulFieldValue } from 'features/nodes/types/field';
 import { type InvocationTemplate, type NodeExecutionState, zAnyEdge, zAnyNode } from 'features/nodes/types/invocation';
 import { zWorkflowV3 } from 'features/nodes/types/workflow';
@@ -23,4 +24,6 @@ export const zNodesState = z.object({
   formFieldInitialValues: z.record(z.string(), zStatefulFieldValue),
   ...zWorkflowV3.omit({ nodes: true, edges: true }).shape,
 });
+export const zNodesStateWithHistory = zStateWithHistory(zNodesState);
 export type NodesState = z.infer<typeof zNodesState>;
+export type NodesStateWithHistory = z.infer<typeof zNodesStateWithHistory>;

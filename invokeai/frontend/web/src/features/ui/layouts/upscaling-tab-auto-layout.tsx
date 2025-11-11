@@ -1,5 +1,6 @@
 import type { DockviewApi, GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
 import { DockviewReact, GridviewReact, LayoutPriority, Orientation } from 'dockview';
+import type { TabName } from 'features/controlLayers/store/types';
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
 import { GalleryPanel } from 'features/gallery/components/GalleryPanel';
 import { ImageViewerPanel } from 'features/gallery/components/ImageViewer/ImageViewerPanel';
@@ -14,7 +15,6 @@ import type {
 } from 'features/ui/layouts/auto-layout-context';
 import { AutoLayoutProvider, useAutoLayoutContext, withPanelContainer } from 'features/ui/layouts/auto-layout-context';
 import { DockviewTab } from 'features/ui/layouts/DockviewTab';
-import type { TabName } from 'features/ui/store/uiTypes';
 import { dockviewTheme } from 'features/ui/styles/theme';
 import { t } from 'i18next';
 import { memo, useCallback, useEffect } from 'react';

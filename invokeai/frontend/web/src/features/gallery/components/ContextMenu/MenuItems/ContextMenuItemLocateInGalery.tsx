@@ -1,11 +1,11 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { useGalleryPanel } from 'features/ui/layouts/use-gallery-panel';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';

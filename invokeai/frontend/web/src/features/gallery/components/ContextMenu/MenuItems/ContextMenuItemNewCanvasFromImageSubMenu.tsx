@@ -1,8 +1,6 @@
 import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { useAppStore } from 'app/store/storeHooks';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
-import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';
-import { useCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { newCanvasFromImage } from 'features/imageActions/actions';
 import { toast } from 'features/toast/toast';
@@ -17,8 +15,6 @@ export const ContextMenuItemNewCanvasFromImageSubMenu = memo(() => {
   const subMenu = useSubMenu();
   const store = useAppStore();
   const imageDTO = useImageDTOContext();
-  const isBusy = useCanvasIsBusySafe();
-  const isStaging = useCanvasIsStaging();
 
   const onClickNewCanvasWithRasterLayerFromImage = useCallback(async () => {
     const { dispatch, getState } = store;
@@ -99,32 +95,16 @@ export const ContextMenuItemNewCanvasFromImageSubMenu = memo(() => {
           <SubMenuButtonContent label={t('controlLayers.newCanvasFromImage')} />
         </MenuButton>
         <MenuList {...subMenu.menuListProps}>
-          <MenuItem
-            icon={<PiFileBold />}
-            onClickCapture={onClickNewCanvasWithRasterLayerFromImage}
-            isDisabled={isStaging || isBusy}
-          >
+          <MenuItem icon={<PiFileBold />} onClickCapture={onClickNewCanvasWithRasterLayerFromImage}>
             {t('controlLayers.asRasterLayer')}
           </MenuItem>
-          <MenuItem
-            icon={<PiFileBold />}
-            onClickCapture={onClickNewCanvasWithRasterLayerFromImageWithResize}
-            isDisabled={isStaging || isBusy}
-          >
+          <MenuItem icon={<PiFileBold />} onClickCapture={onClickNewCanvasWithRasterLayerFromImageWithResize}>
             {t('controlLayers.asRasterLayerResize')}
           </MenuItem>
-          <MenuItem
-            icon={<PiFileBold />}
-            onClickCapture={onClickNewCanvasWithControlLayerFromImage}
-            isDisabled={isStaging || isBusy}
-          >
+          <MenuItem icon={<PiFileBold />} onClickCapture={onClickNewCanvasWithControlLayerFromImage}>
             {t('controlLayers.asControlLayer')}
           </MenuItem>
-          <MenuItem
-            icon={<PiFileBold />}
-            onClickCapture={onClickNewCanvasWithControlLayerFromImageWithResize}
-            isDisabled={isStaging || isBusy}
-          >
+          <MenuItem icon={<PiFileBold />} onClickCapture={onClickNewCanvasWithControlLayerFromImageWithResize}>
             {t('controlLayers.asControlLayerResize')}
           </MenuItem>
         </MenuList>

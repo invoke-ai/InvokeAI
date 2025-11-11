@@ -1,7 +1,11 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectHeight, selectWidth, sizeOptimized } from 'features/controlLayers/store/paramsSlice';
-import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
+import {
+  selectHeight,
+  selectOptimalDimension,
+  selectWidth,
+  sizeOptimized,
+} from 'features/controlLayers/store/paramsSlice';
 import { getIsSizeTooLarge, getIsSizeTooSmall } from 'features/parameters/util/optimalDimension';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

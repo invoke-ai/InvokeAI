@@ -33,6 +33,7 @@ import {
   widthChanged,
 } from 'features/controlLayers/store/paramsSlice';
 import { refImagesRecalled } from 'features/controlLayers/store/refImagesSlice';
+import { selectActiveTab } from 'features/controlLayers/store/selectors';
 import type { CanvasMetadata, LoRA, RefImageState } from 'features/controlLayers/store/types';
 import { zCanvasMetadata, zCanvasReferenceImageState_OLD, zRefImageState } from 'features/controlLayers/store/types';
 import type { ModelIdentifierField, ModelType } from 'features/nodes/types/common';
@@ -81,7 +82,6 @@ import {
   zParameterStrength,
 } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
 import type { ComponentType } from 'react';
 import { useCallback, useEffect, useState } from 'react';
@@ -276,7 +276,7 @@ const NegativePrompt: SingleMetadataHandler<ParameterNegativePrompt> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(negativePromptChanged(value || null));
+    store.dispatch(negativePromptChanged(value));
   },
   i18nKey: 'metadata.negativePrompt',
   LabelComponent: MetadataLabel,

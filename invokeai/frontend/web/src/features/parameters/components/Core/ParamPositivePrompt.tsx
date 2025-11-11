@@ -36,6 +36,7 @@ const persistOptions: Parameters<typeof usePersistedTextAreaSize>[2] = {
 
 const usePromptHistory = () => {
   const store = useAppStore();
+  const dispatch = useAppDispatch();
   const history = useAppSelector(selectPositivePromptHistory);
 
   /**
@@ -71,8 +72,8 @@ const usePromptHistory = () => {
       // Shouldn't happen
       return;
     }
-    store.dispatch(positivePromptChanged(newPrompt));
-  }, [history, store]);
+    dispatch(positivePromptChanged(newPrompt));
+  }, [dispatch, history, store]);
   const next = useCallback(() => {
     if (history.length === 0) {
       // No history, nothing to do
@@ -86,7 +87,7 @@ const usePromptHistory = () => {
     state.historyIdx = state.historyIdx - 1;
     if (state.historyIdx < 0) {
       // Overshot to the "current" stashed prompt
-      store.dispatch(positivePromptChanged(state.stashedPrompt));
+      dispatch(positivePromptChanged(state.stashedPrompt));
       // Clear state bc we're back to current prompt
       stateRef.current = null;
       return;
@@ -97,8 +98,8 @@ const usePromptHistory = () => {
       // Shouldn't happen
       return;
     }
-    store.dispatch(positivePromptChanged(newPrompt));
-  }, [history, store]);
+    dispatch(positivePromptChanged(newPrompt));
+  }, [dispatch, history]);
   const reset = useCallback(() => {
     // Clear stashed state - used when user clicks away or types in the prompt box
     stateRef.current = null;

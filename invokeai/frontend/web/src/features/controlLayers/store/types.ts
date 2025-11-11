@@ -1,3 +1,4 @@
+import { zStateWithHistory } from 'app/store/types';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import { zMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
@@ -116,7 +117,7 @@ const zRgbColor = z.object({
   b: z.number().int().min(0).max(255),
 });
 export type RgbColor = z.infer<typeof zRgbColor>;
-export const zRgbaColor = zRgbColor.extend({
+const zRgbaColor = zRgbColor.extend({
   a: z.number().min(0).max(1),
 });
 export type RgbaColor = z.infer<typeof zRgbaColor>;
@@ -499,13 +500,17 @@ export const zCanvasEntityIdentifer = z.object({
 });
 export type CanvasEntityIdentifier<T extends CanvasEntityType = CanvasEntityType> = { id: string; type: T };
 
-export const zLoRA = z.object({
+const zLoRA = z.object({
   id: z.string(),
   isEnabled: z.boolean(),
   model: zModelIdentifierField,
   weight: z.number().gte(-10).lte(10),
 });
 export type LoRA = z.infer<typeof zLoRA>;
+const zLoRAsState = z.object({
+  loras: z.array(zLoRA),
+});
+export type LoRAsState = z.infer<typeof zLoRAsState>;
 
 export const zAspectRatioID = z.enum(['Free', '21:9', '16:9', '3:2', '4:3', '1:1', '3:4', '2:3', '9:16', '9:21']);
 export type AspectRatioID = z.infer<typeof zAspectRatioID>;
@@ -562,11 +567,20 @@ const zPositivePromptHistory = z
   .array(zParameterPositivePrompt)
   .transform((arr) => arr.slice(0, MAX_POSITIVE_PROMPT_HISTORY));
 
+const zRefImagesState = z.object({
+  selectedEntityId: z.string().nullable(),
+  isPanelOpen: z.boolean(),
+  entities: z.array(zRefImageState),
+});
+export type RefImagesState = z.infer<typeof zRefImagesState>;
+
+const zTabName = z.enum(['generate', 'canvas', 'upscaling', 'workflows', 'models', 'queue']);
+export type TabName = z.infer<typeof zTabName>;
+
 export const zInfillMethod = z.enum(['patchmatch', 'lama', 'cv2', 'color', 'tile']);
 export type InfillMethod = z.infer<typeof zInfillMethod>;
 
 export const zParamsState = z.object({
-  _version: z.literal(2),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -614,58 +628,19 @@ export const zParamsState = z.object({
   dimensions: zDimensionsState,
 });
 export type ParamsState = z.infer<typeof zParamsState>;
-export const getInitialParamsState = (): ParamsState => ({
-  _version: 2,
-  maskBlur: 16,
-  maskBlurMethod: 'box',
-  canvasCoherenceMode: 'Gaussian Blur',
-  canvasCoherenceMinDenoise: 0,
-  canvasCoherenceEdgeSize: 16,
-  infillMethod: 'lama',
-  infillTileSize: 32,
-  infillPatchmatchDownscaleSize: 1,
-  infillColorValue: { r: 0, g: 0, b: 0, a: 1 },
-  cfgScale: 7.5,
-  cfgRescaleMultiplier: 0,
-  guidance: 4,
-  img2imgStrength: 0.75,
-  optimizedDenoisingEnabled: true,
-  iterations: 1,
-  scheduler: 'dpmpp_3m_k',
-  upscaleScheduler: 'kdpm_2',
-  upscaleCfgScale: 2,
-  seed: 0,
-  shouldRandomizeSeed: true,
-  steps: 30,
-  model: null,
-  vae: null,
-  vaePrecision: 'fp32',
-  fluxVAE: null,
-  seamlessXAxis: false,
-  seamlessYAxis: false,
-  clipSkip: 0,
-  shouldUseCpuNoise: true,
-  positivePrompt: '',
-  positivePromptHistory: [],
-  negativePrompt: null,
-  refinerModel: null,
-  refinerSteps: 20,
-  refinerCFGScale: 7.5,
-  refinerScheduler: 'euler',
-  refinerPositiveAestheticScore: 6,
-  refinerNegativeAestheticScore: 2.5,
-  refinerStart: 0.8,
-  t5EncoderModel: null,
-  clipEmbedModel: null,
-  clipLEmbedModel: null,
-  clipGEmbedModel: null,
-  controlLora: null,
-  dimensions: {
-    width: 512,
-    height: 512,
-    aspectRatio: deepClone(DEFAULT_ASPECT_RATIO_CONFIG),
-  },
+
+const zTabInstanceParamsState = z.object({
+  loras: zLoRAsState,
+  params: zParamsState,
+  refImages: zRefImagesState,
 });
+export type TabInstanceState = z.infer<typeof zTabInstanceParamsState>;
+export const zTabState = z.object({
+  activeTab: zTabName,
+  generate: zTabInstanceParamsState,
+  upscaling: zTabInstanceParamsState,
+});
+export type TabState = z.infer<typeof zTabState>;
 
 const zInpaintMasks = z.object({
   isHidden: z.boolean(),
@@ -683,8 +658,105 @@ const zRegionalGuidance = z.object({
   isHidden: z.boolean(),
   entities: z.array(zCanvasRegionalGuidanceState),
 });
-export const zCanvasState = z.object({
-  _version: z.literal(3),
+
+const zAutoSwitchMode = z.enum(['off', 'switch_on_start', 'switch_on_finish']);
+export type AutoSwitchMode = z.infer<typeof zAutoSwitchMode>;
+
+const zCanvasSettingsState = z.object({
+  /**
+   * Whether to show HUD (Heads-Up Display) on the canvas.
+   */
+  showHUD: z.boolean(),
+  /**
+   * Whether to clip lines and shapes to the generation bounding box. If disabled, lines and shapes will be clipped to
+   * the canvas bounds.
+   */
+  clipToBbox: z.boolean(),
+  /**
+   * Whether to show a dynamic grid on the canvas. If disabled, a checkerboard pattern will be shown instead.
+   */
+  dynamicGrid: z.boolean(),
+  /**
+   * Whether to invert the scroll direction when adjusting the brush or eraser width with the scroll wheel.
+   */
+  invertScrollForToolWidth: z.boolean(),
+  /**
+   * The width of the brush tool.
+   */
+  brushWidth: z.int().gt(0),
+  /**
+   * The width of the eraser tool.
+   */
+  eraserWidth: z.int().gt(0),
+  /**
+   * The colors to use when drawing lines or filling shapes.
+   */
+  activeColor: z.enum(['bgColor', 'fgColor']),
+  bgColor: zRgbaColor,
+  fgColor: zRgbaColor,
+  /**
+   * Whether to composite inpainted/outpainted regions back onto the source image when saving canvas generations.
+   *
+   * If disabled, inpainted/outpainted regions will be saved with a transparent background.
+   *
+   * When `sendToCanvas` is disabled, this setting is ignored, masked regions will always be composited.
+   */
+  outputOnlyMaskedRegions: z.boolean(),
+  /**
+   * Whether to automatically process the operations like filtering and auto-masking.
+   */
+  autoProcess: z.boolean(),
+  /**
+   * The snap-to-grid setting for the canvas.
+   */
+  snapToGrid: z.boolean(),
+  /**
+   * Whether to show progress on the canvas when generating images.
+   */
+  showProgressOnCanvas: z.boolean(),
+  /**
+   * Whether to show the bounding box overlay on the canvas.
+   */
+  bboxOverlay: z.boolean(),
+  /**
+   * Whether to preserve the masked region instead of inpainting it.
+   */
+  preserveMask: z.boolean(),
+  /**
+   * Whether to show only raster layers while staging.
+   */
+  isolatedStagingPreview: z.boolean(),
+  /**
+   * Whether to show only the selected layer while filtering, transforming, or doing other operations.
+   */
+  isolatedLayerPreview: z.boolean(),
+  /**
+   * Whether to use pressure sensitivity for the brush and eraser tool when a pen device is used.
+   */
+  pressureSensitivity: z.boolean(),
+  /**
+   * Whether to show the rule of thirds composition guide overlay on the canvas.
+   */
+  ruleOfThirds: z.boolean(),
+  /**
+   * Whether to save all staging images to the gallery instead of keeping them as intermediate images.
+   */
+  saveAllImagesToGallery: z.boolean(),
+  /**
+   * The auto-switch mode for the canvas staging area.
+   */
+  stagingAreaAutoSwitch: zAutoSwitchMode,
+});
+export type CanvasSettingsState = z.infer<typeof zCanvasSettingsState>;
+
+const zCanvasStagingAreaState = z.object({
+  _version: z.literal(1),
+  canvasSessionId: z.string(),
+  canvasDiscardedQueueItems: z.array(z.number().int()),
+});
+export type CanvasStagingAreaState = z.infer<typeof zCanvasStagingAreaState>;
+
+const zCanvasEntity = z.object({
   selectedEntityIdentifier: zCanvasEntityIdentifer.nullable(),
   bookmarkedEntityIdentifier: zCanvasEntityIdentifer.nullable(),
   inpaintMasks: zInpaintMasks,
@@ -693,35 +765,33 @@ export const zCanvasState = z.object({
   regionalGuidance: zRegionalGuidance,
   bbox: zBboxState,
 });
-export type CanvasState = z.infer<typeof zCanvasState>;
-export const getInitialCanvasState = (): CanvasState => ({
-  _version: 3,
-  selectedEntityIdentifier: null,
-  bookmarkedEntityIdentifier: null,
-  inpaintMasks: { isHidden: false, entities: [] },
-  rasterLayers: { isHidden: false, entities: [] },
-  controlLayers: { isHidden: false, entities: [] },
-  regionalGuidance: { isHidden: false, entities: [] },
-  bbox: {
-    rect: { x: 0, y: 0, width: 512, height: 512 },
-    aspectRatio: deepClone(DEFAULT_ASPECT_RATIO_CONFIG),
-    scaleMethod: 'auto',
-    scaledSize: { width: 512, height: 512 },
-    modelBase: 'sd-1',
-  },
+export type CanvasEntity = z.infer<typeof zCanvasEntity>;
+const zCanvasInstanceStateBase = z.object({
+  id: zId,
+  name: z.string().min(1),
 });
-
-export const zRefImagesState = z.object({
-  selectedEntityId: z.string().nullable(),
-  isPanelOpen: z.boolean(),
-  entities: z.array(zRefImageState),
-});
-export type RefImagesState = z.infer<typeof zRefImagesState>;
-export const getInitialRefImagesState = (): RefImagesState => ({
-  selectedEntityId: null,
-  isPanelOpen: false,
-  entities: [],
-});
+const zCanvasInstanceState = <T extends z.ZodTypeAny>(canvasEntitySchema: T) =>
+  zCanvasInstanceStateBase.extend({
+    canvas: canvasEntitySchema,
+    params: zTabInstanceParamsState,
+    settings: zCanvasSettingsState,
+    staging: zCanvasStagingAreaState,
+  });
+const zCanvasInstanceStateWithoutHistory = zCanvasInstanceState(zCanvasEntity);
+const zCanvasInstanceStateWithHistory = zCanvasInstanceState(zStateWithHistory(zCanvasEntity));
+export type CanvasInstanceStateBase = z.infer<typeof zCanvasInstanceStateBase>;
+export type CanvasInstanceState = z.infer<typeof zCanvasInstanceStateWithoutHistory>;
+export type CanvasInstanceStateWithHistory = z.infer<typeof zCanvasInstanceStateWithHistory>;
+const zCanvasState = <T extends z.ZodTypeAny>(canvasInstanceSchema: T) =>
+  z.object({
+    _version: z.literal(4),
+    activeCanvasId: zId,
+    canvases: z.record(zId, canvasInstanceSchema),
+  });
+const _zCanvasStateWithoutHistory = zCanvasState(zCanvasInstanceStateWithoutHistory);
+export const zCanvasStateWithHistory = zCanvasState(zCanvasInstanceStateWithHistory);
+export type CanvasState = z.infer<typeof _zCanvasStateWithoutHistory>;
+export type CanvasStateWithHistory = z.infer<typeof zCanvasStateWithHistory>;
 
 export const zCanvasReferenceImageState_OLD = zCanvasEntityBase.extend({
   type: z.literal('reference_image'),

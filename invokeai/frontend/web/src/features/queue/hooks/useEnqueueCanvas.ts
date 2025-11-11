@@ -6,7 +6,11 @@ import { extractMessageFromAssertionError } from 'common/util/extractMessageFrom
 import { withResult, withResultAsync } from 'common/util/result';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { positivePromptAddedToHistory, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
+import {
+  positivePromptAddedToHistory,
+  selectActiveTabParams,
+  selectPositivePrompt,
+} from 'features/controlLayers/store/paramsSlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
@@ -28,10 +32,10 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
   const { dispatch, getState } = store;
 
   const state = getState();
+  const destination = selectCanvasDestination(state, canvasManager.canvasId);
+  const params = selectActiveTabParams(state);
 
-  const destination = selectCanvasDestination(state);
-
-  const model = state.params.model;
+  const model = params.model;
   if (!model) {
     log.error('No model found in state');
     return;

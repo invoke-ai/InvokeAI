@@ -1,6 +1,7 @@
 import type { AppDispatch, AppStore, RootState } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
 import { groupBy } from 'es-toolkit/compat';
+import { selectActiveTabParams } from 'features/controlLayers/store/paramsSlice';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { Templates } from 'features/nodes/store/types';
@@ -77,13 +78,14 @@ const enqueueWorkflows = async (store: AppStore, templates: Templates, prepend: 
   const nodesState = selectNodesSlice(state);
   const graph = buildNodesGraph(state, templates);
   const workflow = buildWorkflowWithValidation(nodesState);
+  const params = selectActiveTabParams(state);
 
   if (workflow) {
     // embedded workflows don't have an id
     delete workflow.id;
   }
 
-  const runs = state.params.iterations;
+  const runs = params.iterations;
   const data = await getBatchDataForWorkflowGeneration(state, dispatch);
 
   const batchConfig: EnqueueBatchArg = {

@@ -17,8 +17,8 @@ const CONSTRAINTS = {
 const ParamClipSkip = () => {
   const clipSkip = useAppSelector(selectCLIPSkip);
   const model = useAppSelector(selectModel);
-
   const dispatch = useAppDispatch();
+
   const { t } = useTranslation();
 
   const handleClipSkipChange = useCallback(
