@@ -2,7 +2,6 @@ import { Flex, Text, useDisclosure, useToast } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { serializeError } from 'serialize-error';
 import { MODEL_CATEGORIES_AS_LIST } from 'features/modelManagerV2/models';
 import {
   clearModelSelection,
@@ -14,6 +13,7 @@ import {
 } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { serializeError } from 'serialize-error';
 import {
   modelConfigsAdapterSelectors,
   useBulkDeleteModelsMutation,
@@ -116,7 +116,7 @@ const ModelList = () => {
 
       log.info(`Bulk delete completed: ${result.deleted.length} deleted, ${result.failed.length} failed`);
     } catch (err) {
-      log.error({ error: serializeError(err) }, 'Bulk delete error');
+      log.error({ error: serializeError(err as Error) }, 'Bulk delete error');
       toast({
         id: 'BULK_DELETE_ERROR',
         title: t('modelManager.modelsDeleteError', {
@@ -127,7 +127,7 @@ const ModelList = () => {
     } finally {
       setIsDeleting(false);
     }
-  }, [bulkDeleteModels, selectedModelKeys, dispatch, onClose, toast, t, log]);
+  }, [bulkDeleteModels, selectedModelKeys, dispatch, onClose, toast, t]);
 
   return (
     <>

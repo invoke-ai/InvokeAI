@@ -95,6 +95,10 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
     dispatch(toggleModelSelection(model.key));
   }, [model.key, dispatch]);
 
+  const handleCheckboxClick = useCallback((e: MouseEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+  }, []);
+
   return (
     <Flex
       sx={sx}
@@ -112,7 +116,7 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
           onChange={handleCheckboxChange}
           mt={1}
           pointerEvents="auto"
-          onClick={(e) => e.stopPropagation()}
+          onClick={handleCheckboxClick}
         />
       )}
       <Flex gap={2} w="full" h="full" minW={0}>
