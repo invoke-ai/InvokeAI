@@ -43,6 +43,14 @@ type DeleteModelArg = {
 type DeleteModelResponse = void;
 type DeleteModelImageResponse = void;
 
+type BulkDeleteModelsArg = {
+  keys: string[];
+};
+type BulkDeleteModelsResponse = {
+  deleted: string[];
+  failed: string[];
+};
+
 type ConvertMainModelResponse =
   paths['/api/v2/models/convert/{key}']['put']['responses']['200']['content']['application/json'];
 
@@ -147,6 +155,16 @@ export const modelsApi = api.injectEndpoints({
         return {
           url: buildModelsUrl(`i/${key}`),
           method: 'DELETE',
+        };
+      },
+      invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
+    }),
+    bulkDeleteModels: build.mutation<BulkDeleteModelsResponse, BulkDeleteModelsArg>({
+      query: ({ keys }) => {
+        return {
+          url: buildModelsUrl(`i/bulk_delete`),
+          method: 'POST',
+          body: { keys },
         };
       },
       invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
@@ -340,6 +358,7 @@ export const {
   useGetModelConfigsQuery,
   useGetModelConfigQuery,
   useDeleteModelsMutation,
+  useBulkDeleteModelsMutation,
   useDeleteModelImageMutation,
   useUpdateModelMutation,
   useUpdateModelImageMutation,

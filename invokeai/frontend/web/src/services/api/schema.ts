@@ -167,6 +167,30 @@ export type paths = {
         patch: operations["update_model_image"];
         trace?: never;
     };
+    "/api/v2/models/i/bulk_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Delete Models
+         * @description Delete multiple model records from database.
+         *
+         *     The configuration records will be removed. The corresponding weights files will be
+         *     deleted as well if they reside within the InvokeAI "models" directory.
+         *     Returns a list of successfully deleted keys and failed deletions with error messages.
+         */
+        post: operations["bulk_delete_models"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/models/install": {
         parameters: {
             query?: never;
@@ -3005,6 +3029,35 @@ export type components = {
              * @constant
              */
             type: "bounding_box_output";
+        };
+        /**
+         * BulkDeleteModelsRequest
+         * @description Request body for bulk model deletion.
+         */
+        BulkDeleteModelsRequest: {
+            /**
+             * Keys
+             * @description List of model keys to delete
+             */
+            keys: string[];
+        };
+        /**
+         * BulkDeleteModelsResponse
+         * @description Response body for bulk model deletion.
+         */
+        BulkDeleteModelsResponse: {
+            /**
+             * Deleted
+             * @description List of successfully deleted model keys
+             */
+            deleted: string[];
+            /**
+             * Failed
+             * @description List of failed deletions with error messages
+             */
+            failed: {
+                [key: string]: unknown;
+            }[];
         };
         /**
          * BulkDownloadCompleteEvent
@@ -12940,14 +12993,14 @@ export type components = {
              * Convert Cache Dir
              * Format: path
              * @description Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).
-             * @default models/.convert_cache
+             * @default models\.convert_cache
              */
             convert_cache_dir?: string;
             /**
              * Download Cache Dir
              * Format: path
              * @description Path to the directory that contains dynamically downloaded models.
-             * @default models/.download_cache
+             * @default models\.download_cache
              */
             download_cache_dir?: string;
             /**
@@ -24931,6 +24984,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_delete_models: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkDeleteModelsRequest"];
+            };
+        };
+        responses: {
+            /** @description Models deleted (possibly with some failures) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkDeleteModelsResponse"];
+                };
             };
             /** @description Validation Error */
             422: {
