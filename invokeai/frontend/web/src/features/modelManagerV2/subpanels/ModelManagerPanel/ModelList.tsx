@@ -130,20 +130,22 @@ const ModelList = () => {
 
   return (
     <>
-      <ScrollableContent>
-        <Flex flexDirection="column" w="full" h="full" gap={4}>
-          <ModelListHeader onBulkDelete={handleBulkDelete} />
-          {isLoading && <FetchingModelsLoader loadingMessage="Loading..." />}
-          {models.byCategory.map(({ i18nKey, configs }) => (
-            <ModelListWrapper key={i18nKey} title={t(i18nKey)} modelList={configs} />
-          ))}
-          {!isLoading && models.total === 0 && (
-            <Flex w="full" h="full" alignItems="center" justifyContent="center">
-              <Text>{t('modelManager.noMatchingModels')}</Text>
-            </Flex>
-          )}
-        </Flex>
-      </ScrollableContent>
+      <Flex flexDirection="column" w="full" h="full">
+        <ModelListHeader onBulkDelete={handleBulkDelete} />
+        <ScrollableContent>
+          <Flex flexDirection="column" w="full" h="full" gap={4}>
+            {isLoading && <FetchingModelsLoader loadingMessage="Loading..." />}
+            {models.byCategory.map(({ i18nKey, configs }) => (
+              <ModelListWrapper key={i18nKey} title={t(i18nKey)} modelList={configs} />
+            ))}
+            {!isLoading && models.total === 0 && (
+              <Flex w="full" h="full" alignItems="center" justifyContent="center">
+                <Text>{t('modelManager.noMatchingModels')}</Text>
+              </Flex>
+            )}
+          </Flex>
+        </ScrollableContent>
+      </Flex>
       <BulkDeleteModelsModal
         isOpen={isOpen}
         onClose={onClose}
