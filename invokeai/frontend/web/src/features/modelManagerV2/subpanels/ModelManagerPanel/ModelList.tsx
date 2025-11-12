@@ -2,6 +2,7 @@ import { Flex, Text, useDisclosure, useToast } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
+import { serializeError } from 'serialize-error';
 import { MODEL_CATEGORIES_AS_LIST } from 'features/modelManagerV2/models';
 import {
   clearModelSelection,
@@ -114,8 +115,8 @@ const ModelList = () => {
       }
 
       log.info(`Bulk delete completed: ${result.deleted.length} deleted, ${result.failed.length} failed`);
-    } catch (error) {
-      log.error('Bulk delete error:', error);
+    } catch (err) {
+      log.error({ error: serializeError(err) }, 'Bulk delete error');
       toast({
         id: 'BULK_DELETE_ERROR',
         title: t('modelManager.modelsDeleteError', {

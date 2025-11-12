@@ -46,8 +46,10 @@ type DeleteModelImageResponse = void;
 type BulkDeleteModelsArg = {
   keys: string[];
 };
-type BulkDeleteModelsResponse =
-  paths['/api/v2/models/i/bulk_delete']['post']['responses']['200']['content']['application/json'];
+type BulkDeleteModelsResponse = {
+  deleted: string[];
+  failed: string[];
+};
 
 type ConvertMainModelResponse =
   paths['/api/v2/models/convert/{key}']['put']['responses']['200']['content']['application/json'];
