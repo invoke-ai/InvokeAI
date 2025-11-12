@@ -43,13 +43,7 @@ export const ModelListHeader = memo(({ onBulkDelete }: ModelListHeaderProps) => 
         </TagLabel>
         <TagCloseButton onClick={handleClearSelection} />
       </Tag>
-      <Button
-        size="sm"
-        colorScheme="error"
-        leftIcon={<PiTrashSimpleBold />}
-        onClick={onBulkDelete}
-        flexShrink={0}
-      >
+      <Button size="sm" colorScheme="error" leftIcon={<PiTrashSimpleBold />} onClick={onBulkDelete} flexShrink={0}>
         {t('modelManager.deleteModels', { count: selectionCount })}
       </Button>
     </Flex>
