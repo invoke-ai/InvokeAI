@@ -7,7 +7,6 @@ import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMul
 import { merge } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasReset } from 'features/controlLayers/store/actions';
-import type { CompositeOperation } from 'features/controlLayers/store/compositeOperations';
 import { modelChanged } from 'features/controlLayers/store/paramsSlice';
 import {
   selectAllEntities,
@@ -22,6 +21,7 @@ import type {
   CanvasMetadata,
   ChannelName,
   ChannelPoints,
+  CompositeOperation,
   ControlLoRAConfig,
   EntityMovedByPayload,
   FillStyle,

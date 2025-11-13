@@ -14,7 +14,6 @@ import {
   mapId,
   previewBlob,
 } from 'features/controlLayers/konva/util';
-import type { CompositeOperation } from 'features/controlLayers/store/compositeOperations';
 import {
   selectActiveControlLayerEntities,
   selectActiveInpaintMaskEntities,
@@ -25,6 +24,7 @@ import type {
   CanvasEntityIdentifier,
   CanvasEntityState,
   CanvasEntityType,
+  CompositeOperation,
   GenerationMode,
   Rect,
 } from 'features/controlLayers/store/types';

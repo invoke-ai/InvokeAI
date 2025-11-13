@@ -6,8 +6,7 @@ import { useEntityIdentifierContext } from 'features/controlLayers/contexts/Enti
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityIdentifierBelowThisOne } from 'features/controlLayers/hooks/useNextRenderableEntityIdentifier';
 import { rasterLayerGlobalCompositeOperationChanged } from 'features/controlLayers/store/canvasSlice';
-import type { CompositeOperation } from 'features/controlLayers/store/compositeOperations';
-import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
+import type { CanvasEntityIdentifier, CompositeOperation } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CgPathBack, CgPathCrop, CgPathExclude, CgPathFront, CgPathIntersect } from 'react-icons/cg';
