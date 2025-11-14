@@ -70,38 +70,6 @@ export class CanvasEntityAdapterRasterLayer extends CanvasEntityAdapterBase<
     }
   };
 
-  private syncGlobalCompositeOperation = () => {
-    this.log.trace('Syncing globalCompositeOperation');
-    const operation = this.state.globalCompositeOperation ?? 'source-over';
-
-    // Map globalCompositeOperation to CSS mix-blend-mode for live preview
-    const mixBlendModeMap: Record<string, string> = {
-      'source-over': 'normal',
-      multiply: 'multiply',
-      screen: 'screen',
-      overlay: 'overlay',
-      darken: 'darken',
-      lighten: 'lighten',
-      'color-dodge': 'color-dodge',
-      'color-burn': 'color-burn',
-      'hard-light': 'hard-light',
-      'soft-light': 'soft-light',
-      difference: 'difference',
-      exclusion: 'exclusion',
-      hue: 'hue',
-      saturation: 'saturation',
-      color: 'color',
-      luminosity: 'luminosity',
-    };
-
-    const mixBlendMode = mixBlendModeMap[operation] || 'normal';
-
-    const canvasElement = this.konva.layer.getCanvas()._canvas as HTMLCanvasElement | undefined;
-    if (canvasElement) {
-      canvasElement.style.mixBlendMode = mixBlendMode;
-    }
-  };
-
   getCanvas = (rect?: Rect): HTMLCanvasElement => {
     this.log.trace({ rect }, 'Getting canvas');
     // The opacity may have been changed in response to user selecting a different entity category, so we must restore
@@ -182,12 +150,44 @@ export class CanvasEntityAdapterRasterLayer extends CanvasEntityAdapterBase<
     ) {
       return true;
     }
-    // curves reference (UI not implemented yet) - if arrays differ by ref, consider changed
+    // curves params
     const pc = pa.curves;
     const cc = ca.curves;
     if (pc !== cc) {
       return true;
     }
     return false;
+  };
+
+  private syncGlobalCompositeOperation = () => {
+    this.log.trace('Syncing globalCompositeOperation');
+    const operation = this.state.globalCompositeOperation ?? 'source-over';
+
+    // Map globalCompositeOperation to CSS mix-blend-mode for live preview
+    const mixBlendModeMap: Record<string, string> = {
+      'source-over': 'normal', // this one is why we need the map
+      multiply: 'multiply',
+      screen: 'screen',
+      overlay: 'overlay',
+      darken: 'darken',
+      lighten: 'lighten',
+      'color-dodge': 'color-dodge',
+      'color-burn': 'color-burn',
+      'hard-light': 'hard-light',
+      'soft-light': 'soft-light',
+      difference: 'difference',
+      exclusion: 'exclusion',
+      hue: 'hue',
+      saturation: 'saturation',
+      color: 'color',
+      luminosity: 'luminosity',
+    };
+
+    const mixBlendMode = mixBlendModeMap[operation] || 'normal';
+
+    const canvasElement = this.konva.layer.getCanvas()._canvas as HTMLCanvasElement | undefined;
+    if (canvasElement) {
+      canvasElement.style.mixBlendMode = mixBlendMode;
+    }
   };
 }

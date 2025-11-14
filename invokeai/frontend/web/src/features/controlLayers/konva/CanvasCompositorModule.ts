@@ -46,6 +46,7 @@ type CompositingOptions = {
   /**
    * The global composite operation to use when compositing each entity.
    * See: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/globalCompositeOperation
+   * Invoke supports a subset of these modes for raster and control layer combinations.
    */
   globalCompositeOperation?: CompositeOperation;
 };
