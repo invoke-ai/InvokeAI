@@ -2100,9 +2100,9 @@
         },
         "booleanOps": {
             "label": "Boolean Operations",
-            "intersection": "Intersection",
+            "intersect": "Intersect",
             "cutout": "Cut Out",
-            "cutAway": "Cut Away",
+            "cutaway": "Cut Away",
             "exclude": "Exclude"
         },
         "adjustments": {

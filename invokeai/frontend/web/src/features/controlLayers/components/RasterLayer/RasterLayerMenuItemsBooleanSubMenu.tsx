@@ -35,8 +35,8 @@ export const RasterLayerMenuItemsBooleanSubMenu = memo(() => {
     [canvasManager.compositor, dispatch, entityIdentifier, entityIdentifierBelowThisOne]
   );
 
-  const onIntersection = useCallback(() => perform('source-in'), [perform]);
-  const onCutout = useCallback(() => perform('destination-in'), [perform]);
+  const onIntersect = useCallback(() => perform('source-in'), [perform]);
+  const onCutOut = useCallback(() => perform('destination-in'), [perform]);
   const onCutAway = useCallback(() => perform('source-out'), [perform]);
   const onExclude = useCallback(() => perform('xor'), [perform]);
 
@@ -49,14 +49,14 @@ export const RasterLayerMenuItemsBooleanSubMenu = memo(() => {
           <SubMenuButtonContent label={t('controlLayers.booleanOps.label')} />
         </MenuButton>
         <MenuList {...subMenu.menuListProps}>
-          <MenuItem onClick={onIntersection} isDisabled={disabled} icon={<CgPathIntersect size={18} />}>
-            {t('controlLayers.booleanOps.intersection')}
+          <MenuItem onClick={onIntersect} isDisabled={disabled} icon={<CgPathIntersect size={18} />}>
+            {t('controlLayers.booleanOps.intersect')}
           </MenuItem>
-          <MenuItem onClick={onCutout} isDisabled={disabled} icon={<CgPathBack size={18} />}>
+          <MenuItem onClick={onCutOut} isDisabled={disabled} icon={<CgPathBack size={18} />}>
             {t('controlLayers.booleanOps.cutout')}
           </MenuItem>
           <MenuItem onClick={onCutAway} isDisabled={disabled} icon={<CgPathFront size={18} />}>
-            {t('controlLayers.booleanOps.cutAway')}
+            {t('controlLayers.booleanOps.cutaway')}
           </MenuItem>
           <MenuItem onClick={onExclude} isDisabled={disabled} icon={<CgPathExclude size={18} />}>
             {t('controlLayers.booleanOps.exclude')}
