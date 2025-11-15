@@ -19,6 +19,7 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
   const isBusy = useCanvasIsBusy();
 
   const onExtract = useCallback(async () => {
+    // The active inpaint mask layer is required to build the mask used for extraction.
     const maskAdapter = canvasManager.getAdapter(entityIdentifier);
     if (!maskAdapter) {
       log.error({ entityIdentifier }, 'Inpaint mask adapter not found when extracting masked area');
@@ -27,6 +28,7 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
     }
 
     try {
+      // Get the canvas bounding box so the raster extraction respects the visible canvas bounds.
       const bbox = canvasManager.stateApi.getBbox();
       const rect: Rect = {
         x: Math.floor(bbox.rect.x),
@@ -35,21 +37,26 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
         height: Math.floor(bbox.rect.height),
       };
 
+      // Abort when the canvas is effectively empty—no pixels to extract.
       if (rect.width <= 0 || rect.height <= 0) {
         toast({ status: 'warning', title: 'Canvas is empty' });
         return;
       }
 
+      // Gather the visible raster layer adapters so we can composite them into a single bitmap.
       const rasterAdapters = canvasManager.compositor.getVisibleAdaptersOfType('raster_layer');
 
       let compositeImageData: ImageData;
       if (rasterAdapters.length === 0) {
+        // No visible raster layers—create a transparent buffer that matches the canvas bounds.
         compositeImageData = new ImageData(rect.width, rect.height);
       } else {
+        // Render the visible raster layers into an offscreen canvas restricted to the canvas bounds.
         const compositeCanvas = canvasManager.compositor.getCompositeCanvas(rasterAdapters, rect);
         compositeImageData = canvasToImageData(compositeCanvas);
       }
 
+      // Render the inpaint mask layer into a canvas so we have the alpha data that defines the mask.
       const maskCanvas = maskAdapter.getCanvas(rect);
       const maskImageData = canvasToImageData(maskCanvas);
 
@@ -57,6 +64,7 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
         maskImageData.width !== compositeImageData.width ||
         maskImageData.height !== compositeImageData.height
       ) {
+        // Bail out if the mask and composite buffers disagree on dimensions.
         log.error(
           {
             maskDimensions: { width: maskImageData.width, height: maskImageData.height },
@@ -72,6 +80,7 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
       const compositeArray = compositeImageData.data;
       const maskArray = maskImageData.data;
 
+      // Apply the mask alpha channel to each pixel in the composite, keeping RGB but zeroing alpha outside the mask.
       for (let i = 0; i < compositeArray.length; i += 4) {
         const maskAlpha = maskArray[i + 3] / 255;
 
@@ -81,6 +90,7 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
         outputArray[i + 3] = Math.round(compositeArray[i + 3] * maskAlpha);
       }
 
+      // Package the masked pixels into an ImageData and draw them to an offscreen canvas.
       const outputImageData = new ImageData(outputArray, rect.width, rect.height);
       const outputCanvas = document.createElement('canvas');
       outputCanvas.width = rect.width;
@@ -93,6 +103,7 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
 
       outputContext.putImageData(outputImageData, 0, 0);
 
+      // Convert the offscreen canvas into an Invoke canvas image state for insertion into the layer stack.
       const imageState: CanvasImageState = {
         id: getPrefixedId('image'),
         type: 'image',
@@ -103,6 +114,7 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
         },
       };
 
+      // Insert the new raster layer just after the last existing raster layer so it appears above the mask.
       const addAfter = canvasManager.stateApi.getRasterLayersState().entities.at(-1)?.id;
 
       canvasManager.stateApi.addRasterLayer({
