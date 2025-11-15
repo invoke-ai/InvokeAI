@@ -11,6 +11,26 @@ import type { CanvasEntityIdentifier, CanvasRasterLayerState, Rect } from 'featu
 import type { GroupConfig } from 'konva/lib/Group';
 import type { JsonObject } from 'type-fest';
 
+// Map globalCompositeOperation to CSS mix-blend-mode for live preview
+const mixBlendModeMap: Record<string, string> = {
+  'source-over': 'normal', // this one is why we need the map
+  multiply: 'multiply',
+  screen: 'screen',
+  overlay: 'overlay',
+  darken: 'darken',
+  lighten: 'lighten',
+  'color-dodge': 'color-dodge',
+  'color-burn': 'color-burn',
+  'hard-light': 'hard-light',
+  'soft-light': 'soft-light',
+  difference: 'difference',
+  exclusion: 'exclusion',
+  hue: 'hue',
+  saturation: 'saturation',
+  color: 'color',
+  luminosity: 'luminosity',
+};
+
 export class CanvasEntityAdapterRasterLayer extends CanvasEntityAdapterBase<
   CanvasRasterLayerState,
   'raster_layer_adapter'
@@ -162,29 +182,7 @@ export class CanvasEntityAdapterRasterLayer extends CanvasEntityAdapterBase<
   private syncGlobalCompositeOperation = () => {
     this.log.trace('Syncing globalCompositeOperation');
     const operation = this.state.globalCompositeOperation ?? 'source-over';
-
-    // Map globalCompositeOperation to CSS mix-blend-mode for live preview
-    const mixBlendModeMap: Record<string, string> = {
-      'source-over': 'normal', // this one is why we need the map
-      multiply: 'multiply',
-      screen: 'screen',
-      overlay: 'overlay',
-      darken: 'darken',
-      lighten: 'lighten',
-      'color-dodge': 'color-dodge',
-      'color-burn': 'color-burn',
-      'hard-light': 'hard-light',
-      'soft-light': 'soft-light',
-      difference: 'difference',
-      exclusion: 'exclusion',
-      hue: 'hue',
-      saturation: 'saturation',
-      color: 'color',
-      luminosity: 'luminosity',
-    };
-
     const mixBlendMode = mixBlendModeMap[operation] || 'normal';
-
     const canvasElement = this.konva.layer.getCanvas()._canvas as HTMLCanvasElement | undefined;
     if (canvasElement) {
       canvasElement.style.mixBlendMode = mixBlendMode;
