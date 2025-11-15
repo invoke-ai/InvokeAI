@@ -59,36 +59,54 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
       const maskCanvas = maskAdapter.getCanvas(rect);
       const maskImageData = canvasToImageData(maskCanvas);
 
-      if (maskImageData.width !== compositeImageData.width || maskImageData.height !== compositeImageData.height) {
-        // Bail out if the mask and composite buffers disagree on dimensions.
+      // Ensure both composite and mask image data exist and agree on dimensions.
+      if (
+        !compositeImageData ||
+        !maskImageData ||
+        maskImageData.width !== compositeImageData.width ||
+        maskImageData.height !== compositeImageData.height
+      ) {
         log.error(
           {
-            maskDimensions: { width: maskImageData.width, height: maskImageData.height },
-            compositeDimensions: { width: compositeImageData.width, height: compositeImageData.height },
+            hasComposite: !!compositeImageData,
+            hasMask: !!maskImageData,
+            maskDimensions: maskImageData ? { width: maskImageData.width, height: maskImageData.height } : null,
+            compositeDimensions: compositeImageData
+              ? { width: compositeImageData.width, height: compositeImageData.height }
+              : null,
           },
-          'Mask and composite dimensions did not match when extracting masked area'
+          'Mask and composite dimensions did not match or image data missing when extracting masked area'
         );
         toast({ status: 'error', title: 'Unable to extract masked area' });
         return;
       }
 
+      // At this point both image buffers are guaranteed to be valid and dimensionally aligned.
       const compositeArray = compositeImageData.data;
       const maskArray = maskImageData.data;
 
-      if (!compositeArray || !maskArray) {
-        toast({ status: 'error', title: 'Cannot extract: image or mask data is missing.' });
-        return;
-      }
-
+      // Prepare output pixel buffer.
       const outputArray = new Uint8ClampedArray(compositeArray.length);
 
-      // Apply the mask alpha channel to each pixel in the composite, keeping RGB but zeroing alpha outside the mask.
+      // Apply the mask alpha only to the alpha channel.
+      // Do NOT multiply RGB by maskAlpha to avoid dark fringe artifacts around mask edges.
       for (let i = 0; i < compositeArray.length; i += 4) {
-        const maskAlpha = maskArray[i + 3] ? maskArray[i + 3]! / 255 : 0;
-        outputArray[i] = Math.round(compositeArray[i]! * maskAlpha);
-        outputArray[i + 1] = Math.round(compositeArray[i + 1]! * maskAlpha);
-        outputArray[i + 2] = Math.round(compositeArray[i + 2]! * maskAlpha);
-        outputArray[i + 3] = Math.round(compositeArray[i + 3]! * maskAlpha);
+        // Read original composite pixel, defaulting to 0 to satisfy strict indexed access rules.
+        const r = compositeArray[i] ?? 0;
+        const g = compositeArray[i + 1] ?? 0;
+        const b = compositeArray[i + 2] ?? 0;
+        const a = compositeArray[i + 3] ?? 0;
+
+        // Extract mask alpha (0..255 → 0..1).
+        const maskAlpha = (maskArray[i + 3] ?? 0) / 255;
+
+        // Preserve original RGB values.
+        outputArray[i] = r;
+        outputArray[i + 1] = g;
+        outputArray[i + 2] = b;
+
+        // Mask only the alpha channel to avoid halo artifacts.
+        outputArray[i + 3] = Math.round(a * maskAlpha);
       }
 
       // Package the masked pixels into an ImageData and draw them to an offscreen canvas.
