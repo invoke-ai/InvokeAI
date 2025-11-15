@@ -5,11 +5,10 @@ import { useEntityIdentifierContext } from 'features/controlLayers/contexts/Enti
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { canvasToImageData, getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasImageState, Rect } from 'features/controlLayers/store/types';
+import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
 import { PiSelectionBackgroundBold } from 'react-icons/pi';
 import { serializeError } from 'serialize-error';
-
-import { toast } from 'features/toast/toast';
 
 const log = logger('canvas');
 
@@ -60,10 +59,7 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
       const maskCanvas = maskAdapter.getCanvas(rect);
       const maskImageData = canvasToImageData(maskCanvas);
 
-      if (
-        maskImageData.width !== compositeImageData.width ||
-        maskImageData.height !== compositeImageData.height
-      ) {
+      if (maskImageData.width !== compositeImageData.width || maskImageData.height !== compositeImageData.height) {
         // Bail out if the mask and composite buffers disagree on dimensions.
         log.error(
           {
@@ -137,15 +133,10 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
   }, [canvasManager, entityIdentifier]);
 
   return (
-    <MenuItem
-      onClick={onExtract}
-      icon={<PiSelectionBackgroundBold />}
-      isDisabled={isBusy}
-    >
+    <MenuItem onClick={onExtract} icon={<PiSelectionBackgroundBold />} isDisabled={isBusy}>
       Extract masked area to new layer
     </MenuItem>
   );
 });
 
 InpaintMaskMenuItemsExtractMaskedArea.displayName = 'InpaintMaskMenuItemsExtractMaskedArea';
-
