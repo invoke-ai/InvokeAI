@@ -18,7 +18,7 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
   const entityIdentifier = useEntityIdentifierContext('inpaint_mask');
   const isBusy = useCanvasIsBusy();
 
-  const onExtract = useCallback(async () => {
+  const onExtract = useCallback(() => {
     // The active inpaint mask layer is required to build the mask used for extraction.
     const maskAdapter = canvasManager.getAdapter(entityIdentifier);
     if (!maskAdapter) {
@@ -76,7 +76,6 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
         return;
       }
 
-      const outputArray = new Uint8ClampedArray(compositeImageData.data.length);
       const compositeArray = compositeImageData.data;
       const maskArray = maskImageData.data;
 
@@ -85,13 +84,15 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
         return;
       }
 
+      const outputArray = new Uint8ClampedArray(compositeArray.length);
+
       // Apply the mask alpha channel to each pixel in the composite, keeping RGB but zeroing alpha outside the mask.
       for (let i = 0; i < compositeArray.length; i += 4) {
-        const maskAlpha = (maskArray[i + 3] ?? 0) / 255;
-        outputArray[i] = Math.round((compositeArray[i] ?? 0) * maskAlpha);
-        outputArray[i + 1] = Math.round((compositeArray[i + 1] ?? 0) * maskAlpha);
-        outputArray[i + 2] = Math.round((compositeArray[i + 2] ?? 0) * maskAlpha);
-        outputArray[i + 3] = Math.round((compositeArray[i + 3] ?? 0) * maskAlpha);
+        const maskAlpha = maskArray[i + 3] ? maskArray[i + 3]! / 255 : 0;
+        outputArray[i] = Math.round(compositeArray[i]! * maskAlpha);
+        outputArray[i + 1] = Math.round(compositeArray[i + 1]! * maskAlpha);
+        outputArray[i + 2] = Math.round(compositeArray[i + 2]! * maskAlpha);
+        outputArray[i + 3] = Math.round(compositeArray[i + 3]! * maskAlpha);
       }
 
       // Package the masked pixels into an ImageData and draw them to an offscreen canvas.
