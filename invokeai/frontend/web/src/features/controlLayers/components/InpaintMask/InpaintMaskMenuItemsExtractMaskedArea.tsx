@@ -77,13 +77,17 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
       }
 
       const outputArray = new Uint8ClampedArray(compositeImageData.data.length);
-      const compositeArray = compositeImageData.data;
-      const maskArray = maskImageData.data;
+      const compositeArray = compositeImageData.data!;
+      const maskArray = maskImageData.data!;
+
+      if (!compositeArray || !maskArray) {
+        toast({ status: 'error', title: 'Cannot extract: image or mask data is missing.' });
+        return;
+      }
 
       // Apply the mask alpha channel to each pixel in the composite, keeping RGB but zeroing alpha outside the mask.
       for (let i = 0; i < compositeArray.length; i += 4) {
-        const maskAlpha = maskArray[i + 3] / 255;
-
+        const maskAlpha = maskArray[i + 3] ? maskArray[i + 3] / 255 : 0;
         outputArray[i] = Math.round(compositeArray[i] * maskAlpha);
         outputArray[i + 1] = Math.round(compositeArray[i + 1] * maskAlpha);
         outputArray[i + 2] = Math.round(compositeArray[i + 2] * maskAlpha);
