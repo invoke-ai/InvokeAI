@@ -11686,6 +11686,13 @@ export type components = {
              */
             fp32?: boolean;
             /**
+             * Color Compensation
+             * @description Apply VAE scaling compensation when encoding images (reduces color drift).
+             * @default None
+             * @enum {string}
+             */
+            color_compensation?: "None" | "SDXL";
+            /**
              * type
              * @default i2l
              * @constant

@@ -170,6 +170,9 @@ const slice = createSlice({
     shouldUseCpuNoiseChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldUseCpuNoise = action.payload;
     },
+    setColorCompensation: (state, action: PayloadAction<boolean>) => {
+      state.colorCompensation = action.payload;
+    },
     positivePromptChanged: (state, action: PayloadAction<ParameterPositivePrompt>) => {
       state.positivePrompt = action.payload;
     },
@@ -436,6 +439,7 @@ export const {
   clipGEmbedModelSelected,
   setClipSkip,
   shouldUseCpuNoiseChanged,
+  setColorCompensation,
   positivePromptChanged,
   positivePromptAddedToHistory,
   promptRemovedFromHistory,
@@ -557,6 +561,7 @@ export const selectShouldRandomizeSeed = createParamsSelector((params) => params
 export const selectVAEPrecision = createParamsSelector((params) => params.vaePrecision);
 export const selectIterations = createParamsSelector((params) => params.iterations);
 export const selectShouldUseCPUNoise = createParamsSelector((params) => params.shouldUseCpuNoise);
+export const selectColorCompensation = createParamsSelector((params) => params.colorCompensation);
 
 export const selectUpscaleScheduler = createParamsSelector((params) => params.upscaleScheduler);
 export const selectUpscaleCfgScale = createParamsSelector((params) => params.upscaleCfgScale);
