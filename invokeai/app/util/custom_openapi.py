@@ -12,6 +12,7 @@ from invokeai.app.invocations.fields import InputFieldJSONSchemaExtra, OutputFie
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.events.events_common import EventBase
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
+from invokeai.backend.model_manager.configs.factory import AnyModelConfigValidator
 from invokeai.backend.util.logging import InvokeAILogger
 
 logger = InvokeAILogger.get_logger()
@@ -114,6 +115,13 @@ def get_openapi_func(
         )
         # additional_schemas[1] is a dict of $defs that we need to add to the top level of the schema
         move_defs_to_top_level(openapi_schema, additional_schemas[1])
+
+        any_model_config_schema = AnyModelConfigValidator.json_schema(
+            mode="serialization",
+            ref_template="#/components/schemas/{model}",
+        )
+        move_defs_to_top_level(openapi_schema, any_model_config_schema)
+        openapi_schema["components"]["schemas"]["AnyModelConfig"] = any_model_config_schema
 
         if post_transform is not None:
             openapi_schema = post_transform(openapi_schema)

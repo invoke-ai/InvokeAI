@@ -1,309 +1,33 @@
 import 'i18n';
 
-import type { InvokeAIUIProps } from 'app/components/types';
-import { $didStudioInit } from 'app/hooks/useStudioInitAction';
-import { $loggingOverrides, configureLogging } from 'app/logging/logger';
+import { configureLogging } from 'app/logging/logger';
 import { addStorageListeners } from 'app/store/enhancers/reduxRemember/driver';
-import { $accountSettingsLink } from 'app/store/nanostores/accountSettingsLink';
-import { $accountTypeText } from 'app/store/nanostores/accountTypeText';
-import { $authToken } from 'app/store/nanostores/authToken';
-import { $baseUrl } from 'app/store/nanostores/baseUrl';
-import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
-import { $customStarUI } from 'app/store/nanostores/customStarUI';
-import { $isDebugging } from 'app/store/nanostores/isDebugging';
-import { $logo } from 'app/store/nanostores/logo';
-import { $onClickGoToModelManager } from 'app/store/nanostores/onClickGoToModelManager';
-import { $openAPISchemaUrl } from 'app/store/nanostores/openAPISchemaUrl';
-import { $projectId, $projectName, $projectUrl } from 'app/store/nanostores/projectId';
-import { $queueId, DEFAULT_QUEUE_ID } from 'app/store/nanostores/queueId';
 import { $store } from 'app/store/nanostores/store';
-import { $toastMap } from 'app/store/nanostores/toastMap';
-import { $videoUpsellComponent } from 'app/store/nanostores/videoUpsellComponent';
-import { $whatsNew } from 'app/store/nanostores/whatsNew';
 import { createStore } from 'app/store/store';
 import Loading from 'common/components/Loading/Loading';
-import {
-  $workflowLibraryCategoriesOptions,
-  $workflowLibrarySortOptions,
-  $workflowLibraryTagCategoriesOptions,
-  DEFAULT_WORKFLOW_LIBRARY_CATEGORIES,
-  DEFAULT_WORKFLOW_LIBRARY_SORT_OPTIONS,
-  DEFAULT_WORKFLOW_LIBRARY_TAG_CATEGORIES,
-} from 'features/nodes/store/workflowLibrarySlice';
-import React, { lazy, memo, useEffect, useLayoutEffect, useState } from 'react';
+import React, { lazy, memo, useEffect, useState } from 'react';
 import { Provider } from 'react-redux';
-import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
-import { $socketOptions } from 'services/events/stores';
+
+/*
+ * We need to configure logging before anything else happens - useLayoutEffect ensures we set this at the first
+ * possible opportunity.
+ *
+ * Once redux initializes, we will check the user's settings and update the logging config accordingly. See
+ * `useSyncLoggingConfig`.
+ */
+configureLogging(true, 'debug', '*');
 
 const App = lazy(() => import('./App'));
 
-const InvokeAIUI = ({
-  apiUrl,
-  openAPISchemaUrl,
-  token,
-  config,
-  customNavComponent,
-  accountSettingsLink,
-  middleware,
-  projectId,
-  projectName,
-  projectUrl,
-  queueId,
-  studioInitAction,
-  customStarUi,
-  socketOptions,
-  isDebugging = false,
-  logo,
-  toastMap,
-  accountTypeText,
-  videoUpsellComponent,
-  workflowCategories,
-  workflowTagCategories,
-  workflowSortOptions,
-  loggingOverrides,
-  onClickGoToModelManager,
-  whatsNew,
-  storagePersistDebounce = 300,
-}: InvokeAIUIProps) => {
+const InvokeAIUI = () => {
   const [store, setStore] = useState<ReturnType<typeof createStore> | undefined>(undefined);
   const [didRehydrate, setDidRehydrate] = useState(false);
-
-  useLayoutEffect(() => {
-    /*
-     * We need to configure logging before anything else happens - useLayoutEffect ensures we set this at the first
-     * possible opportunity.
-     *
-     * Once redux initializes, we will check the user's settings and update the logging config accordingly. See
-     * `useSyncLoggingConfig`.
-     */
-    $loggingOverrides.set(loggingOverrides);
-
-    // Until we get the user's settings, we will use the overrides OR default values.
-    configureLogging(
-      loggingOverrides?.logIsEnabled ?? true,
-      loggingOverrides?.logLevel ?? 'debug',
-      loggingOverrides?.logNamespaces ?? '*'
-    );
-  }, [loggingOverrides]);
-
-  useLayoutEffect(() => {
-    if (studioInitAction) {
-      $didStudioInit.set(false);
-    }
-  }, [studioInitAction]);
-
-  useEffect(() => {
-    // configure API client token
-    if (token) {
-      $authToken.set(token);
-    }
-
-    // configure API client base url
-    if (apiUrl) {
-      $baseUrl.set(apiUrl);
-    }
-
-    // configure API client project header
-    if (projectId) {
-      $projectId.set(projectId);
-    }
-
-    // configure API client project header
-    if (queueId) {
-      $queueId.set(queueId);
-    }
-
-    // reset dynamically added middlewares
-    resetMiddlewares();
-
-    // TODO: at this point, after resetting the middleware, we really ought to clean up the socket
-    // stuff by calling `dispatch(socketReset())`. but we cannot dispatch from here as we are
-    // outside the provider. it's not needed until there is the possibility that we will change
-    // the `apiUrl`/`token` dynamically.
-
-    // rebuild socket middleware with token and apiUrl
-    if (middleware && middleware.length > 0) {
-      addMiddleware(...middleware);
-    }
-
-    return () => {
-      // Reset the API client token and base url on unmount
-      $baseUrl.set(undefined);
-      $authToken.set(undefined);
-      $projectId.set(undefined);
-      $queueId.set(DEFAULT_QUEUE_ID);
-    };
-  }, [apiUrl, token, middleware, projectId, queueId, projectName, projectUrl]);
-
-  useEffect(() => {
-    if (customStarUi) {
-      $customStarUI.set(customStarUi);
-    }
-
-    return () => {
-      $customStarUI.set(undefined);
-    };
-  }, [customStarUi]);
-
-  useEffect(() => {
-    if (accountTypeText) {
-      $accountTypeText.set(accountTypeText);
-    }
-
-    return () => {
-      $accountTypeText.set('');
-    };
-  }, [accountTypeText]);
-
-  useEffect(() => {
-    if (videoUpsellComponent) {
-      $videoUpsellComponent.set(videoUpsellComponent);
-    }
-
-    return () => {
-      $videoUpsellComponent.set(undefined);
-    };
-  }, [videoUpsellComponent]);
-
-  useEffect(() => {
-    if (customNavComponent) {
-      $customNavComponent.set(customNavComponent);
-    }
-
-    return () => {
-      $customNavComponent.set(undefined);
-    };
-  }, [customNavComponent]);
-
-  useEffect(() => {
-    if (accountSettingsLink) {
-      $accountSettingsLink.set(accountSettingsLink);
-    }
-
-    return () => {
-      $accountSettingsLink.set(undefined);
-    };
-  }, [accountSettingsLink]);
-
-  useEffect(() => {
-    if (openAPISchemaUrl) {
-      $openAPISchemaUrl.set(openAPISchemaUrl);
-    }
-
-    return () => {
-      $openAPISchemaUrl.set(undefined);
-    };
-  }, [openAPISchemaUrl]);
-
-  useEffect(() => {
-    $projectName.set(projectName);
-
-    return () => {
-      $projectName.set(undefined);
-    };
-  }, [projectName]);
-
-  useEffect(() => {
-    $projectUrl.set(projectUrl);
-
-    return () => {
-      $projectUrl.set(undefined);
-    };
-  }, [projectUrl]);
-
-  useEffect(() => {
-    if (logo) {
-      $logo.set(logo);
-    }
-
-    return () => {
-      $logo.set(undefined);
-    };
-  }, [logo]);
-
-  useEffect(() => {
-    if (toastMap) {
-      $toastMap.set(toastMap);
-    }
-
-    return () => {
-      $toastMap.set(undefined);
-    };
-  }, [toastMap]);
-
-  useEffect(() => {
-    if (whatsNew) {
-      $whatsNew.set(whatsNew);
-    }
-
-    return () => {
-      $whatsNew.set(undefined);
-    };
-  }, [whatsNew]);
-
-  useEffect(() => {
-    if (onClickGoToModelManager) {
-      $onClickGoToModelManager.set(onClickGoToModelManager);
-    }
-
-    return () => {
-      $onClickGoToModelManager.set(undefined);
-    };
-  }, [onClickGoToModelManager]);
-
-  useEffect(() => {
-    if (workflowCategories) {
-      $workflowLibraryCategoriesOptions.set(workflowCategories);
-    }
-
-    return () => {
-      $workflowLibraryCategoriesOptions.set(DEFAULT_WORKFLOW_LIBRARY_CATEGORIES);
-    };
-  }, [workflowCategories]);
-
-  useEffect(() => {
-    if (workflowTagCategories) {
-      $workflowLibraryTagCategoriesOptions.set(workflowTagCategories);
-    }
-
-    return () => {
-      $workflowLibraryTagCategoriesOptions.set(DEFAULT_WORKFLOW_LIBRARY_TAG_CATEGORIES);
-    };
-  }, [workflowTagCategories]);
-
-  useEffect(() => {
-    if (workflowSortOptions) {
-      $workflowLibrarySortOptions.set(workflowSortOptions);
-    }
-
-    return () => {
-      $workflowLibrarySortOptions.set(DEFAULT_WORKFLOW_LIBRARY_SORT_OPTIONS);
-    };
-  }, [workflowSortOptions]);
-
-  useEffect(() => {
-    if (socketOptions) {
-      $socketOptions.set(socketOptions);
-    }
-    return () => {
-      $socketOptions.set({});
-    };
-  }, [socketOptions]);
-
-  useEffect(() => {
-    if (isDebugging) {
-      $isDebugging.set(isDebugging);
-    }
-    return () => {
-      $isDebugging.set(false);
-    };
-  }, [isDebugging]);
 
   useEffect(() => {
     const onRehydrated = () => {
       setDidRehydrate(true);
     };
-    const store = createStore({ persist: true, persistDebounce: storagePersistDebounce, onRehydrated });
+    const store = createStore({ persist: true, persistDebounce: 300, onRehydrated });
     setStore(store);
     $store.set(store);
     if (import.meta.env.MODE === 'development') {
@@ -318,7 +42,7 @@ const InvokeAIUI = ({
         window.$store = undefined;
       }
     };
-  }, [storagePersistDebounce]);
+  }, []);
 
   if (!store || !didRehydrate) {
     return <Loading />;
@@ -328,7 +52,7 @@ const InvokeAIUI = ({
     <React.StrictMode>
       <Provider store={store}>
         <React.Suspense fallback={<Loading />}>
-          <App config={config} studioInitAction={studioInitAction} />
+          <App />
         </React.Suspense>
       </Provider>
     </React.StrictMode>

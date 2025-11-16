@@ -126,7 +126,7 @@ export class CanvasObjectImage extends CanvasModuleBase {
       return;
     }
 
-    const imageElementResult = await withResultAsync(() => loadImage(imageDTO.image_url, true));
+    const imageElementResult = await withResultAsync(() => loadImage(imageDTO.image_url));
     if (imageElementResult.isErr()) {
       // Image loading failed (e.g. the URL to the "physical" image is invalid)
       this.onFailedToLoadImage(
@@ -152,7 +152,7 @@ export class CanvasObjectImage extends CanvasModuleBase {
       this.konva.placeholder.text.text(t('common.loadingImage', 'Loading Image'));
     }
 
-    const imageElementResult = await withResultAsync(() => loadImage(dataURL, false));
+    const imageElementResult = await withResultAsync(() => loadImage(dataURL));
     if (imageElementResult.isErr()) {
       // Image loading failed (e.g. the URL to the "physical" image is invalid)
       this.onFailedToLoadImage(

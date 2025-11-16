@@ -58,10 +58,7 @@ from invokeai.app.services.model_records.model_records_base import (
 )
 from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
-    ModelConfigFactory,
-)
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 
 
@@ -137,15 +134,36 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             if cursor.rowcount == 0:
                 raise UnknownModelException("model not found")
 
-    def update_model(self, key: str, changes: ModelRecordChanges) -> AnyModelConfig:
+    def update_model(self, key: str, changes: ModelRecordChanges, allow_class_change: bool = False) -> AnyModelConfig:
         with self._db.transaction() as cursor:
             record = self.get_model(key)
 
-            # Model configs use pydantic's `validate_assignment`, so each change is validated by pydantic.
-            for field_name in changes.model_fields_set:
-                setattr(record, field_name, getattr(changes, field_name))
+            if allow_class_change:
+                # The changes may cause the model config class to change. To handle this, we need to construct the new
+                # class from scratch rather than trying to modify the existing instance in place.
+                #
+                # 1. Convert the existing record to a dict
+                # 2. Apply the changes to the dict
+                # 3. Attempt to create a new model config from the updated dict
 
-            json_serialized = record.model_dump_json()
+                # 1. Convert the existing record to a dict
+                record_as_dict = record.model_dump()
+
+                # 2. Apply the changes to the dict
+                for field_name in changes.model_fields_set:
+                    record_as_dict[field_name] = getattr(changes, field_name)
+
+                # 3. Attempt to create a new model config from the updated dict
+                record = ModelConfigFactory.from_dict(record_as_dict)
+
+                # If we get this far, the updated model config is valid, so we can save it to the database.
+                json_serialized = record.model_dump_json()
+            else:
+                # We are not allowing the model config class to change, so we can just update the existing instance in
+                # place. If the changes are invalid for the existing class, an exception will be raised by pydantic.
+                for field_name in changes.model_fields_set:
+                    setattr(record, field_name, getattr(changes, field_name))
+                json_serialized = record.model_dump_json()
 
             cursor.execute(
                 """--sql
@@ -161,6 +179,23 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         return self.get_model(key)
 
+    def replace_model(self, key: str, new_config: AnyModelConfig) -> AnyModelConfig:
+        if key != new_config.key:
+            raise ValueError("key does not match new_config.key")
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                UPDATE models
+                SET
+                    config=?
+                WHERE id=?;
+                """,
+                (new_config.model_dump_json(), key),
+            )
+            if cursor.rowcount == 0:
+                raise UnknownModelException("model not found")
+        return self.get_model(key)
+
     def get_model(self, key: str) -> AnyModelConfig:
         """
         Retrieve the ModelConfigBase instance for the indicated model.
@@ -172,7 +207,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
-                SELECT config, strftime('%s',updated_at) FROM models
+                SELECT config FROM models
                 WHERE id=?;
                 """,
                 (key,),
@@ -180,14 +215,14 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             rows = cursor.fetchone()
         if not rows:
             raise UnknownModelException("model not found")
-        model = ModelConfigFactory.make_config(json.loads(rows[0]), timestamp=rows[1])
+        model = ModelConfigFactory.from_dict(json.loads(rows[0]))
         return model
 
     def get_model_by_hash(self, hash: str) -> AnyModelConfig:
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
-                SELECT config, strftime('%s',updated_at) FROM models
+                SELECT config FROM models
                 WHERE hash=?;
                 """,
                 (hash,),
@@ -195,7 +230,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             rows = cursor.fetchone()
         if not rows:
             raise UnknownModelException("model not found")
-        model = ModelConfigFactory.make_config(json.loads(rows[0]), timestamp=rows[1])
+        model = ModelConfigFactory.from_dict(json.loads(rows[0]))
         return model
 
     def exists(self, key: str) -> bool:
@@ -263,7 +298,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
             cursor.execute(
                 f"""--sql
-                SELECT config, strftime('%s',updated_at)
+                SELECT config
                 FROM models
                 {where}
                 ORDER BY {ordering[order_by]} -- using ? to bind doesn't work here for some reason;
@@ -276,15 +311,20 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         results: list[AnyModelConfig] = []
         for row in result:
             try:
-                model_config = ModelConfigFactory.make_config(json.loads(row[0]), timestamp=row[1])
-            except pydantic.ValidationError:
+                model_config = ModelConfigFactory.from_dict(json.loads(row[0]))
+            except pydantic.ValidationError as e:
                 # We catch this error so that the app can still run if there are invalid model configs in the database.
                 # One reason that an invalid model config might be in the database is if someone had to rollback from a
                 # newer version of the app that added a new model type.
                 row_data = f"{row[0][:64]}..." if len(row[0]) > 64 else row[0]
+                try:
+                    name = json.loads(row[0]).get("name", "<unknown>")
+                except Exception:
+                    name = "<unknown>"
                 self._logger.warning(
-                    f"Found an invalid model config in the database. Ignoring this model. ({row_data})"
+                    f"Skipping invalid model config in the database with name {name}. Ignoring this model. ({row_data})"
                 )
+                self._logger.warning(f"Validation error: {e}")
             else:
                 results.append(model_config)
 
@@ -295,12 +335,12 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
-                SELECT config, strftime('%s',updated_at) FROM models
+                SELECT config FROM models
                 WHERE path=?;
                 """,
                 (str(path),),
             )
-            results = [ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in cursor.fetchall()]
+            results = [ModelConfigFactory.from_dict(json.loads(x[0])) for x in cursor.fetchall()]
         return results
 
     def search_by_hash(self, hash: str) -> List[AnyModelConfig]:
@@ -308,12 +348,12 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
-                SELECT config, strftime('%s',updated_at) FROM models
+                SELECT config FROM models
                 WHERE hash=?;
                 """,
                 (hash,),
             )
-            results = [ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in cursor.fetchall()]
+            results = [ModelConfigFactory.from_dict(json.loads(x[0])) for x in cursor.fetchall()]
         return results
 
     def list_models(

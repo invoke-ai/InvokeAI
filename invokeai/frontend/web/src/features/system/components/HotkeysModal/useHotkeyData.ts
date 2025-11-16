@@ -1,4 +1,5 @@
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { useAppSelector } from 'app/store/storeHooks';
+import { selectCustomHotkeys } from 'features/system/store/hotkeysSlice';
 import { useMemo } from 'react';
 import { type HotkeyCallback, type Options, useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -12,6 +13,7 @@ export type Hotkey = {
   title: string;
   desc: string;
   hotkeys: string[];
+  defaultHotkeys: string[];
   platformKeys: string[][];
   isEnabled: boolean;
 };
@@ -32,8 +34,7 @@ const formatKeysForPlatform = (keys: string[], isMacOS: boolean): string[][] => 
 
 export const useHotkeyData = (): HotkeysData => {
   const { t } = useTranslation();
-  const isModelManagerEnabled = useFeatureStatus('modelManager');
-  const isVideoEnabled = useFeatureStatus('video');
+  const customHotkeys = useAppSelector(selectCustomHotkeys);
   const isMacOS = useMemo(() => {
     return navigator.userAgent.toLowerCase().includes('mac');
   }, []);
@@ -63,13 +64,16 @@ export const useHotkeyData = (): HotkeysData => {
     };
 
     const addHotkey = (category: HotkeyCategory, id: string, keys: string[], isEnabled: boolean = true) => {
+      const hotkeyId = `${category}.${id}`;
+      const effectiveKeys = customHotkeys[hotkeyId] ?? keys;
       data[category].hotkeys[id] = {
         id,
         category,
         title: t(`hotkeys.${category}.${id}.title`),
         desc: t(`hotkeys.${category}.${id}.desc`),
-        hotkeys: keys,
-        platformKeys: formatKeysForPlatform(keys, isMacOS),
+        hotkeys: effectiveKeys,
+        defaultHotkeys: keys,
+        platformKeys: formatKeysForPlatform(effectiveKeys, isMacOS),
         isEnabled,
       };
     };
@@ -81,31 +85,14 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('app', 'selectGenerateTab', ['1']);
     addHotkey('app', 'selectCanvasTab', ['2']);
     addHotkey('app', 'selectUpscalingTab', ['3']);
+    addHotkey('app', 'selectWorkflowsTab', ['4']);
+    addHotkey('app', 'selectModelsTab', ['5']);
+    addHotkey('app', 'selectQueueTab', ['6']);
+
     // Prompt/history navigation (when prompt textarea is focused)
     addHotkey('app', 'promptHistoryPrev', ['alt+up']);
     addHotkey('app', 'promptHistoryNext', ['alt+down']);
 
-    if (isVideoEnabled) {
-      addHotkey('app', 'selectVideoTab', ['4']);
-      addHotkey('app', 'selectWorkflowsTab', ['5']);
-      if (isModelManagerEnabled) {
-        addHotkey('app', 'selectModelsTab', ['6']);
-        addHotkey('app', 'selectQueueTab', ['7']);
-      } else {
-        addHotkey('app', 'selectModelsTab', ['DISABLED'], false);
-        addHotkey('app', 'selectQueueTab', ['6']);
-      }
-    } else {
-      addHotkey('app', 'selectVideoTab', ['DISABLED'], false);
-      addHotkey('app', 'selectWorkflowsTab', ['4']);
-      if (isModelManagerEnabled) {
-        addHotkey('app', 'selectModelsTab', ['5']);
-        addHotkey('app', 'selectQueueTab', ['6']);
-      } else {
-        addHotkey('app', 'selectModelsTab', ['DISABLED'], false);
-        addHotkey('app', 'selectQueueTab', ['5']);
-      }
-    }
     addHotkey('app', 'focusPrompt', ['alt+a']);
     addHotkey('app', 'toggleLeftPanel', ['t', 'o']);
     addHotkey('app', 'toggleRightPanel', ['g']);
@@ -188,7 +175,7 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('gallery', 'starImage', ['.']);
 
     return data;
-  }, [isMacOS, isVideoEnabled, isModelManagerEnabled, t]);
+  }, [customHotkeys, isMacOS, t]);
 
   return hotkeysData;
 };

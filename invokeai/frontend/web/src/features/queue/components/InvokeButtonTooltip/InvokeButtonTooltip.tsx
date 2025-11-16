@@ -6,7 +6,6 @@ import { debounce } from 'es-toolkit/compat';
 import { selectIterations } from 'features/controlLayers/store/paramsSlice';
 import { selectDynamicPromptsIsLoading } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
-import { $isInPublishFlow, useIsWorkflowPublished } from 'features/nodes/components/sidePanel/workflow/publish';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState } from 'features/nodes/store/types';
 import type { BatchSizeResult } from 'features/nodes/util/node/resolveBatchValue';
@@ -47,34 +46,9 @@ const TooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
     return <UpscaleTabTooltipContent prepend={prepend} />;
   }
 
-  if (activeTab === 'video') {
-    return <VideoTabTooltipContent prepend={prepend} />;
-  }
-
   return null;
 });
 TooltipContent.displayName = 'TooltipContent';
-
-const VideoTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
-  const isReady = useStore($isReadyToEnqueue);
-  const reasons = useStore($reasonsWhyCannotEnqueue);
-
-  return (
-    <Flex flexDir="column" gap={1}>
-      <IsReadyText isReady={isReady} prepend={prepend} />
-      <QueueCountPredictionCanvasOrUpscaleTab />
-      {reasons.length > 0 && (
-        <>
-          <StyledDivider />
-          <ReasonsList reasons={reasons} />
-        </>
-      )}
-      <StyledDivider />
-      <AddingToText />
-    </Flex>
-  );
-});
-VideoTabTooltipContent.displayName = 'VideoTabTooltipContent';
 
 const CanvasTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
   const isReady = useStore($isReadyToEnqueue);
@@ -200,8 +174,6 @@ const IsReadyText = memo(({ isReady, prepend }: { isReady: boolean; prepend: boo
   const { t } = useTranslation();
   const isLoadingDynamicPrompts = useAppSelector(selectDynamicPromptsIsLoading);
   const [_, enqueueMutation] = useEnqueueBatchMutation(enqueueMutationFixedCacheKeyOptions);
-  const isInPublishFlow = useStore($isInPublishFlow);
-  const isPublished = useIsWorkflowPublished();
 
   const text = useMemo(() => {
     if (enqueueMutation.isLoading) {
@@ -210,12 +182,6 @@ const IsReadyText = memo(({ isReady, prepend }: { isReady: boolean; prepend: boo
     if (isLoadingDynamicPrompts) {
       return t('dynamicPrompts.loading');
     }
-    if (isInPublishFlow) {
-      return t('workflows.builder.publishInProgress');
-    }
-    if (isPublished) {
-      return t('workflows.builder.publishedWorkflowIsLocked');
-    }
     if (isReady) {
       if (prepend) {
         return t('queue.queueFront');
@@ -223,7 +189,7 @@ const IsReadyText = memo(({ isReady, prepend }: { isReady: boolean; prepend: boo
       return t('queue.queueBack');
     }
     return t('queue.notReady');
-  }, [enqueueMutation.isLoading, isLoadingDynamicPrompts, isInPublishFlow, isPublished, isReady, t, prepend]);
+  }, [enqueueMutation.isLoading, isLoadingDynamicPrompts, isReady, t, prepend]);
 
   return <Text fontWeight="semibold">{text}</Text>;
 });

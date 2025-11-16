@@ -26,7 +26,6 @@ export const zLogNamespace = z.enum([
   'system',
   'queue',
   'workflows',
-  'video',
 ]);
 export type LogNamespace = z.infer<typeof zLogNamespace>;
 
@@ -35,20 +34,6 @@ export const logger = (namespace: LogNamespace) => $logger.get().child({ namespa
 export const zLogLevel = z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']);
 export type LogLevel = z.infer<typeof zLogLevel>;
 export const isLogLevel = (v: unknown): v is LogLevel => zLogLevel.safeParse(v).success;
-
-/**
- * Override logging settings.
- * @property logIsEnabled Override the enabled log state. Omit to use the user's settings.
- * @property logNamespaces Override the enabled log namespaces. Use `"*"` for all namespaces. Omit to use the user's settings.
- * @property logLevel Override the log level. Omit to use the user's settings.
- */
-export type LoggingOverrides = {
-  logIsEnabled?: boolean;
-  logNamespaces?: LogNamespace[] | '*';
-  logLevel?: LogLevel;
-};
-
-export const $loggingOverrides = atom<LoggingOverrides | undefined>();
 
 // Translate human-readable log levels to numbers, used for log filtering
 const LOG_LEVEL_MAP: Record<LogLevel, number> = {

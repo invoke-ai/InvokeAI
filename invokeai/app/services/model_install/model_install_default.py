@@ -5,6 +5,7 @@ import os
 import re
 import threading
 import time
+from copy import deepcopy
 from pathlib import Path
 from queue import Empty, Queue
 from shutil import move, rmtree
@@ -26,6 +27,7 @@ from invokeai.app.services.model_install.model_install_common import (
     MODEL_SOURCE_TO_TYPE_MAP,
     HFModelSource,
     InstallStatus,
+    InvalidModelConfigException,
     LocalModelSource,
     ModelInstallJob,
     ModelSource,
@@ -34,13 +36,12 @@ from invokeai.app.services.model_install.model_install_common import (
 )
 from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
-from invokeai.backend.model_manager.config import (
+from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
+from invokeai.backend.model_manager.configs.factory import (
     AnyModelConfig,
-    CheckpointConfigBase,
-    InvalidModelConfigException,
-    ModelConfigBase,
+    ModelConfigFactory,
 )
-from invokeai.backend.model_manager.legacy_probe import ModelProbe
+from invokeai.backend.model_manager.configs.unknown import Unknown_Config
 from invokeai.backend.model_manager.metadata import (
     AnyModelRepoMetadata,
     HuggingFaceMetadataFetch,
@@ -134,6 +135,8 @@ class ModelInstallService(ModelInstallServiceBase):
             for model in self._scan_for_missing_models():
                 self._logger.warning(f"Missing model file: {model.name} at {model.path}")
 
+            self._write_invoke_managed_models_dir_readme()
+
     def stop(self, invoker: Optional[Invoker] = None) -> None:
         """Stop the installer thread; after this the object can be deleted and garbage collected."""
         if not self._running:
@@ -145,6 +148,14 @@ class ModelInstallService(ModelInstallServiceBase):
         assert self._install_thread is not None
         self._install_thread.join()
         self._running = False
+
+    def _write_invoke_managed_models_dir_readme(self) -> None:
+        """Write a README file to the Invoke-managed models directory warning users to not fiddle with it."""
+        readme_path = self.app_config.models_path / "README.txt"
+        with open(readme_path, "wt", encoding=locale.getpreferredencoding()) as f:
+            f.write(
+                "This directory is managed by Invoke. Do not add, delete or move files in this directory.\n\nTo manage models, use the web interface.\n"
+            )
 
     def _clear_pending_jobs(self) -> None:
         for job in self.list_jobs():
@@ -180,28 +191,32 @@ class ModelInstallService(ModelInstallServiceBase):
         self,
         model_path: Union[Path, str],
         config: Optional[ModelRecordChanges] = None,
-    ) -> str:  # noqa D102
+    ) -> str:
         model_path = Path(model_path)
         config = config or ModelRecordChanges()
         info: AnyModelConfig = self._probe(Path(model_path), config)  # type: ignore
 
-        if preferred_name := config.name:
-            if Path(model_path).is_file():
-                # Careful! Don't use pathlib.Path(...).with_suffix - it can will strip everything after the first dot.
-                preferred_name = f"{preferred_name}{model_path.suffix}"
-
-        dest_path = (
-            self.app_config.models_path / info.base.value / info.type.value / (preferred_name or model_path.name)
-        )
+        dest_dir = self.app_config.models_path / info.key
         try:
-            new_path = self._move_model(model_path, dest_path)
-        except FileExistsError as excp:
+            if dest_dir.exists():
+                raise FileExistsError(
+                    f"Cannot install model {model_path.name} to {dest_dir}: destination already exists"
+                )
+            dest_dir.mkdir(parents=True)
+            dest_path = dest_dir / model_path.name if model_path.is_file() else dest_dir
+            if model_path.is_file():
+                move(model_path, dest_path)
+            elif model_path.is_dir():
+                # Move the contents of the directory, not the directory itself
+                for item in model_path.iterdir():
+                    move(item, dest_dir / item.name)
+        except FileExistsError as e:
             raise DuplicateModelException(
-                f"A model named {model_path.name} is already installed at {dest_path.as_posix()}"
-            ) from excp
+                f"A model named {model_path.name} is already installed at {dest_dir.as_posix()}"
+            ) from e
 
         return self._register(
-            new_path,
+            dest_path,
             config,
             info,
         )
@@ -364,9 +379,18 @@ class ModelInstallService(ModelInstallServiceBase):
     def unconditionally_delete(self, key: str) -> None:  # noqa D102
         model = self.record_store.get_model(key)
         model_path = self.app_config.models_path / model.path
+        # Models are stored in a directory named by their key. To delete the model on disk, we delete the entire
+        # directory. However, the path we store in the model record may be either a file within the key directory,
+        # or the directory itself. So we have to handle both cases.
         if model_path.is_file() or model_path.is_symlink():
-            model_path.unlink()
+            # Sanity check - file models should be in their own directory under the models dir. The parent of the
+            # file should be the model's directory, not the Invoke models dir!
+            assert model_path.parent != self.app_config.models_path
+            rmtree(model_path.parent)
         elif model_path.is_dir():
+            # Sanity check - folder models should be in their own directory under the models dir. The path should
+            # not be the Invoke models dir itself!
+            assert model_path != self.app_config.models_path
             rmtree(model_path)
         self.unregister(key)
 
@@ -526,7 +550,7 @@ class ModelInstallService(ModelInstallServiceBase):
             x.content_type is not None and "text/html" in x.content_type for x in multifile_download_job.download_parts
         ):
             install_job.set_error(
-                InvalidModelConfigException(
+                ValueError(
                     f"At least one file in {install_job.local_path} is an HTML page, not a model. This can happen when an access token is required to download."
                 )
             )
@@ -589,66 +613,25 @@ class ModelInstallService(ModelInstallServiceBase):
         found_models = search.search(self._app_config.models_path)
         self._logger.info(f"{len(found_models)} new models registered")
 
-    def sync_model_path(self, key: str) -> AnyModelConfig:
-        """
-        Move model into the location indicated by its basetype, type and name.
-
-        Call this after updating a model's attributes in order to move
-        the model's path into the location indicated by its basetype, type and
-        name. Applies only to models whose paths are within the root `models_dir`
-        directory.
-
-        May raise an UnknownModelException.
-        """
-        model = self.record_store.get_model(key)
-        models_dir = self.app_config.models_path
-        old_path = self.app_config.models_path / model.path
-
-        if not old_path.is_relative_to(models_dir):
-            # The model is not in the models directory - we don't need to move it.
-            return model
-
-        new_path = models_dir / model.base.value / model.type.value / old_path.name
-
-        if old_path == new_path or new_path.exists() and old_path == new_path.resolve():
-            return model
-
-        self._logger.info(f"Moving {model.name} to {new_path}.")
-        new_path = self._move_model(old_path, new_path)
-        model.path = new_path.relative_to(models_dir).as_posix()
-        self.record_store.update_model(key, ModelRecordChanges(path=model.path))
-        return model
-
-    def _move_model(self, old_path: Path, new_path: Path) -> Path:
-        if old_path == new_path:
-            return old_path
-
-        if new_path.exists():
-            raise FileExistsError(f"Cannot move {old_path} to {new_path}: destination already exists")
-
-        new_path.parent.mkdir(parents=True, exist_ok=True)
-
-        move(old_path, new_path)
-
-        return new_path
-
     def _probe(self, model_path: Path, config: Optional[ModelRecordChanges] = None):
         config = config or ModelRecordChanges()
         hash_algo = self._app_config.hashing_algorithm
         fields = config.model_dump()
 
-        # WARNING!
-        # The legacy probe relies on the implicit order of tests to determine model classification.
-        # This can lead to regressions between the legacy and new probes.
-        # Do NOT change the order of `probe` and `classify` without implementing one of the following fixes:
-        # Short-term fix: `classify` tests `matches` in the same order as the legacy probe.
-        # Long-term fix: Improve `matches` to be more specific so that only one config matches
-        #   any given model - eliminating ambiguity and removing reliance on order.
-        # After implementing either of these fixes, remove @pytest.mark.xfail from `test_regression_against_model_probe`
-        try:
-            return ModelProbe.probe(model_path=model_path, fields=fields, hash_algo=hash_algo)  # type: ignore
-        except InvalidModelConfigException:
-            return ModelConfigBase.classify(model_path, hash_algo, **fields)
+        result = ModelConfigFactory.from_model_on_disk(
+            mod=model_path,
+            override_fields=deepcopy(fields),
+            hash_algo=hash_algo,
+            allow_unknown=self.app_config.allow_unknown_models,
+        )
+
+        if result.config is None:
+            self._logger.error(f"Could not identify model for {model_path}, detailed results: {result.details}")
+            raise InvalidModelConfigException(f"Could not identify model for {model_path}")
+        elif isinstance(result.config, Unknown_Config):
+            self._logger.error(f"Could not identify model for {model_path}, detailed results: {result.details}")
+
+        return result.config
 
     def _register(
         self, model_path: Path, config: Optional[ModelRecordChanges] = None, info: Optional[AnyModelConfig] = None
@@ -669,7 +652,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
         info.path = model_path.as_posix()
 
-        if isinstance(info, CheckpointConfigBase):
+        if isinstance(info, Checkpoint_Config_Base) and info.config_path is not None:
             # Checkpoints have a config file needed for conversion. Same handling as the model weights - if it's in the
             # invoke-managed legacy config dir, we use a relative path.
             legacy_config_path = self.app_config.legacy_conf_path / info.config_path

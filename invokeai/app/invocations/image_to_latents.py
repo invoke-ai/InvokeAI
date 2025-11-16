@@ -1,5 +1,6 @@
 from contextlib import nullcontext
 from functools import singledispatchmethod
+from typing import Literal
 
 import einops
 import torch
@@ -20,14 +21,22 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
 )
-from invokeai.app.invocations.model import VAEField
+from invokeai.app.invocations.model import BaseModelType, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager import LoadedModel
+from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.backend.stable_diffusion.vae_tiling import patch_vae_tiling_params
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_sd15_sdxl
+
+"""
+SDXL VAE color compensation values determined experimentally to reduce color drift.
+If more reliable values are found in the future (e.g. individual color channels), they can be updated.
+SD1.5, TAESD, TAESDXL VAEs distort in less predictable ways, so no compensation is offered at this time.
+"""
+COMPENSATION_OPTIONS = Literal["None", "SDXL"]
+COLOR_COMPENSATION_MAP = {"None": [1, 0], "SDXL": [1.015, -0.002]}
 
 
 @invocation(
@@ -35,7 +44,7 @@ from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory
     title="Image to Latents - SD1.5, SDXL",
     tags=["latents", "image", "vae", "i2l"],
     category="latents",
-    version="1.1.1",
+    version="1.2.0",
 )
 class ImageToLatentsInvocation(BaseInvocation):
     """Encodes an image into latents."""
@@ -52,6 +61,10 @@ class ImageToLatentsInvocation(BaseInvocation):
     # offer a way to directly set None values.
     tile_size: int = InputField(default=0, multiple_of=8, description=FieldDescriptions.vae_tile_size)
     fp32: bool = InputField(default=False, description=FieldDescriptions.fp32)
+    color_compensation: COMPENSATION_OPTIONS = InputField(
+        default="None",
+        description="Apply VAE scaling compensation when encoding images (reduces color drift).",
+    )
 
     @classmethod
     def vae_encode(
@@ -62,7 +75,7 @@ class ImageToLatentsInvocation(BaseInvocation):
         image_tensor: torch.Tensor,
         tile_size: int = 0,
     ) -> torch.Tensor:
-        assert isinstance(vae_info.model, (AutoencoderKL, AutoencoderTiny))
+        assert isinstance(vae_info.model, (AutoencoderKL, AutoencoderTiny)), "VAE must be of type SD-1.5 or SDXL"
         estimated_working_memory = estimate_vae_working_memory_sd15_sdxl(
             operation="encode",
             image_tensor=image_tensor,
@@ -71,7 +84,7 @@ class ImageToLatentsInvocation(BaseInvocation):
             fp32=upcast,
         )
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
-            assert isinstance(vae, (AutoencoderKL, AutoencoderTiny))
+            assert isinstance(vae, (AutoencoderKL, AutoencoderTiny)), "VAE must be of type SD-1.5 or SDXL"
             orig_dtype = vae.dtype
             if upcast:
                 vae.to(dtype=torch.float32)
@@ -127,9 +140,14 @@ class ImageToLatentsInvocation(BaseInvocation):
         image = context.images.get_pil(self.image.image_name)
 
         vae_info = context.models.load(self.vae.vae)
-        assert isinstance(vae_info.model, (AutoencoderKL, AutoencoderTiny))
+        assert isinstance(vae_info.model, (AutoencoderKL, AutoencoderTiny)), "VAE must be of type SD-1.5 or SDXL"
 
         image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
+
+        if self.color_compensation != "None" and vae_info.config.base == BaseModelType.StableDiffusionXL:
+            scale, bias = COLOR_COMPENSATION_MAP[self.color_compensation]
+            image_tensor = image_tensor * scale + bias
+
         if image_tensor.dim() == 3:
             image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
 

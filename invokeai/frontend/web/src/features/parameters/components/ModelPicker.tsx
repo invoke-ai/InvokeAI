@@ -12,10 +12,8 @@ import {
   Spacer,
   Text,
 } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { $onClickGoToModelManager } from 'app/store/nanostores/onClickGoToModelManager';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { Group, PickerContextState } from 'common/components/Picker/Picker';
 import { buildGroup, getRegex, isGroup, Picker, usePickerContext } from 'common/components/Picker/Picker';
@@ -24,20 +22,18 @@ import { typedMemo } from 'common/util/typedMemo';
 import { uniq } from 'es-toolkit/compat';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { MODEL_BASE_TO_COLOR, MODEL_BASE_TO_LONG_NAME, MODEL_BASE_TO_SHORT_NAME } from 'features/modelManagerV2/models';
 import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
-import { BASE_COLOR_MAP } from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
 import ModelImage from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelImage';
+import type { BaseModelType } from 'features/nodes/types/common';
 import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
-import { API_BASE_MODELS, MODEL_TYPE_MAP, MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { selectIsModelsTabDisabled } from 'features/system/store/configSlice';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { filesize } from 'filesize';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiCaretDownBold, PiLinkSimple } from 'react-icons/pi';
 import { useGetRelatedModelIdsBatchQuery } from 'services/api/endpoints/modelRelationships';
-import type { AnyModelConfig, BaseModelType } from 'services/api/types';
+import type { AnyModelConfig } from 'services/api/types';
 
 const selectSelectedModelKeys = createMemoizedSelector(selectParamsSlice, selectLoRAsSlice, (params, loras) => {
   const keys: string[] = [];
@@ -71,22 +67,12 @@ type WithStarred<T> = T & { starred?: boolean };
 const getOptionId = <T extends AnyModelConfig>(modelConfig: WithStarred<T>) => modelConfig.key;
 
 const ModelManagerLink = memo((props: ButtonProps) => {
-  const onClickGoToModelManager = useStore($onClickGoToModelManager);
   const onClick = useCallback(() => {
     navigationApi.switchToTab('models');
     setInstallModelsTabByName('launchpad');
   }, []);
 
-  return (
-    <Button
-      size="sm"
-      flexGrow={0}
-      variant="link"
-      color="base.200"
-      onClick={onClickGoToModelManager ?? onClick}
-      {...props}
-    />
-  );
+  return <Button size="sm" flexGrow={0} variant="link" color="base.200" onClick={onClick} {...props} />;
 });
 ModelManagerLink.displayName = 'ModelManagerLink';
 
@@ -96,48 +82,32 @@ const components = {
 
 const NoOptionsFallback = memo(({ noOptionsText }: { noOptionsText?: string }) => {
   const { t } = useTranslation();
-  const isModelsTabDisabled = useAppSelector(selectIsModelsTabDisabled);
-  const onClickGoToModelManager = useStore($onClickGoToModelManager);
 
   return (
     <Flex flexDir="column" gap={4} alignItems="center">
       <Text color="base.200">{noOptionsText ?? t('modelManager.modelPickerFallbackNoModelsInstalled')}</Text>
-      {(!isModelsTabDisabled || onClickGoToModelManager) && (
-        <Text color="base.200">
-          <Trans i18nKey="modelManager.modelPickerFallbackNoModelsInstalled2" components={components} />
-        </Text>
-      )}
+      <Text color="base.200">
+        <Trans i18nKey="modelManager.modelPickerFallbackNoModelsInstalled2" components={components} />
+      </Text>
     </Flex>
   );
 });
 NoOptionsFallback.displayName = 'NoOptionsFallback';
 
 const getGroupIDFromModelConfig = (modelConfig: AnyModelConfig): string => {
-  if (API_BASE_MODELS.includes(modelConfig.base)) {
-    return 'api';
-  }
   return modelConfig.base;
 };
 
 const getGroupNameFromModelConfig = (modelConfig: AnyModelConfig): string => {
-  if (API_BASE_MODELS.includes(modelConfig.base)) {
-    return 'External API';
-  }
-  return MODEL_TYPE_MAP[modelConfig.base];
+  return MODEL_BASE_TO_LONG_NAME[modelConfig.base];
 };
 
 const getGroupShortNameFromModelConfig = (modelConfig: AnyModelConfig): string => {
-  if (API_BASE_MODELS.includes(modelConfig.base)) {
-    return 'api';
-  }
-  return MODEL_TYPE_SHORT_MAP[modelConfig.base];
+  return MODEL_BASE_TO_SHORT_NAME[modelConfig.base];
 };
 
 const getGroupColorSchemeFromModelConfig = (modelConfig: AnyModelConfig): string => {
-  if (API_BASE_MODELS.includes(modelConfig.base)) {
-    return 'pink';
-  }
-  return BASE_COLOR_MAP[modelConfig.base];
+  return MODEL_BASE_TO_COLOR[modelConfig.base];
 };
 
 const relatedModelKeysQueryOptions = {
@@ -194,11 +164,9 @@ export const ModelPicker = typedMemo(
   }) => {
     const { t } = useTranslation();
     const selectedKeys = useAppSelector(selectSelectedModelKeys);
-    const isModelRelationshipsEnabled = useFeatureStatus('modelRelationships');
 
     const { relatedModelKeys } = useGetRelatedModelIdsBatchQuery(selectedKeys, {
       ...relatedModelKeysQueryOptions,
-      skip: !isModelRelationshipsEnabled,
     });
 
     const options = useMemo<WithStarred<T>[] | Group<WithStarred<T>>[]>(() => {
@@ -440,18 +408,6 @@ const PickerOptionComponent = typedMemo(
                 overflow="visible"
               >
                 {filesize(option.file_size)}
-              </Text>
-            )}
-            {option.usage_info && (
-              <Text
-                className="extra-info"
-                variant="subtext"
-                fontStyle="italic"
-                noOfLines={1}
-                flexShrink={0}
-                overflow="visible"
-              >
-                {option.usage_info}
               </Text>
             )}
           </Flex>

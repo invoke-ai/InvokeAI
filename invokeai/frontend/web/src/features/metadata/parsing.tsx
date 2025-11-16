@@ -33,32 +33,12 @@ import {
   widthChanged,
 } from 'features/controlLayers/store/paramsSlice';
 import { refImagesRecalled } from 'features/controlLayers/store/refImagesSlice';
-import type {
-  CanvasMetadata,
-  LoRA,
-  RefImageState,
-  VideoAspectRatio as ParameterVideoAspectRatio,
-  VideoDuration as ParameterVideoDuration,
-  VideoResolution as ParameterVideoResolution,
-} from 'features/controlLayers/store/types';
-import {
-  zCanvasMetadata,
-  zCanvasReferenceImageState_OLD,
-  zRefImageState,
-  zVideoAspectRatio,
-  zVideoDuration,
-  zVideoResolution,
-} from 'features/controlLayers/store/types';
-import type { ModelIdentifierField } from 'features/nodes/types/common';
+import type { CanvasMetadata, LoRA, RefImageState } from 'features/controlLayers/store/types';
+import { zCanvasMetadata, zCanvasReferenceImageState_OLD, zRefImageState } from 'features/controlLayers/store/types';
+import type { ModelIdentifierField, ModelType } from 'features/nodes/types/common';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { zModelIdentifier } from 'features/nodes/types/v2/common';
 import { modelSelected } from 'features/parameters/store/actions';
-import {
-  videoAspectRatioChanged,
-  videoDurationChanged,
-  videoModelChanged,
-  videoResolutionChanged,
-} from 'features/parameters/store/videoSlice';
 import type {
   ParameterCFGRescaleMultiplier,
   ParameterCFGScale,
@@ -108,7 +88,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
-import type { AnyModelConfig, ModelType } from 'services/api/types';
+import type { AnyModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import z from 'zod';
 
@@ -714,87 +694,6 @@ const VAEModel: SingleMetadataHandler<ParameterVAEModel> = {
 };
 //#endregion VAEModel
 
-//#region VideoModel
-const VideoModel: SingleMetadataHandler<ModelIdentifierField> = {
-  [SingleMetadataKey]: true,
-  type: 'VideoModel',
-  parse: async (metadata, store) => {
-    const raw = getProperty(metadata, 'model');
-    const parsed = await parseModelIdentifier(raw, store, 'video');
-    assert(parsed.type === 'video');
-    return Promise.resolve(parsed);
-  },
-  recall: (value, store) => {
-    store.dispatch(videoModelChanged({ videoModel: value }));
-  },
-  i18nKey: 'metadata.videoModel',
-  LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
-    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
-  ),
-};
-//#endregion VideoModel
-
-//#region VideoDuration
-const VideoDuration: SingleMetadataHandler<ParameterVideoDuration> = {
-  [SingleMetadataKey]: true,
-  type: 'VideoDuration',
-  parse: (metadata) => {
-    const raw = getProperty(metadata, 'duration');
-    const parsed = zVideoDuration.parse(raw);
-    return Promise.resolve(parsed);
-  },
-  recall: (value, store) => {
-    store.dispatch(videoDurationChanged(value));
-  },
-  i18nKey: 'metadata.videoDuration',
-  LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<ParameterVideoDuration>) => (
-    <MetadataPrimitiveValue value={value} />
-  ),
-};
-//#endregion VideoDuration
-
-//#region VideoResolution
-const VideoResolution: SingleMetadataHandler<ParameterVideoResolution> = {
-  [SingleMetadataKey]: true,
-  type: 'VideoResolution',
-  parse: (metadata) => {
-    const raw = getProperty(metadata, 'resolution');
-    const parsed = zVideoResolution.parse(raw);
-    return Promise.resolve(parsed);
-  },
-  recall: (value, store) => {
-    store.dispatch(videoResolutionChanged(value));
-  },
-  i18nKey: 'metadata.videoResolution',
-  LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<ParameterVideoResolution>) => (
-    <MetadataPrimitiveValue value={value} />
-  ),
-};
-//#endregion VideoResolution
-
-//#region VideoAspectRatio
-const VideoAspectRatio: SingleMetadataHandler<ParameterVideoAspectRatio> = {
-  [SingleMetadataKey]: true,
-  type: 'VideoAspectRatio',
-  parse: (metadata) => {
-    const raw = getProperty(metadata, 'aspect_ratio');
-    const parsed = zVideoAspectRatio.parse(raw);
-    return Promise.resolve(parsed);
-  },
-  recall: (value, store) => {
-    store.dispatch(videoAspectRatioChanged(value));
-  },
-  i18nKey: 'metadata.videoAspectRatio',
-  LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<ParameterVideoAspectRatio>) => (
-    <MetadataPrimitiveValue value={value} />
-  ),
-};
-//#endregion VideoAspectRatio
-
 //#region LoRAs
 const LoRAs: CollectionMetadataHandler<LoRA[]> = {
   [CollectionMetadataKey]: true,
@@ -1043,17 +942,6 @@ export const ImageMetadataHandlers = {
   // t2iAdapterToControlAdapterLayer: parseT2IAdapterToControlAdapterLayer,
   // ipAdapterToIPAdapterLayer: parseIPAdapterToIPAdapterLayer,
 } as const;
-
-export const VideoMetadataHandlers = {
-  CreatedBy,
-  GenerationMode,
-  PositivePrompt,
-  VideoModel,
-  Seed,
-  VideoAspectRatio,
-  VideoDuration,
-  VideoResolution,
-};
 
 const successToast = (parameter: string) => {
   toast({

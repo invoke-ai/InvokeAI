@@ -25,6 +25,9 @@ const contentSx = {
 
 export const ModelListWrapper = memo((props: ModelListWrapperProps) => {
   const { title, modelList } = props;
+  if (modelList.length === 0) {
+    return null;
+  }
   return (
     <StickyScrollable title={title} contentSx={contentSx} headingSx={headingSx}>
       {modelList.map((model) => (

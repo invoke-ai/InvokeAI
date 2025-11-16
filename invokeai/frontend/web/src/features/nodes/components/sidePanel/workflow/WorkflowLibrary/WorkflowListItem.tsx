@@ -1,15 +1,13 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Badge, Flex, Icon, Image, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { LockedWorkflowIcon } from 'features/nodes/components/sidePanel/workflow/WorkflowLibrary/WorkflowLibraryListItemActions/LockedWorkflowIcon';
-import { ShareWorkflowButton } from 'features/nodes/components/sidePanel/workflow/WorkflowLibrary/WorkflowLibraryListItemActions/ShareWorkflow';
 import { selectWorkflowId } from 'features/nodes/store/selectors';
 import { workflowModeChanged } from 'features/nodes/store/workflowLibrarySlice';
 import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import InvokeLogo from 'public/assets/images/invoke-symbol-wht-lrg.svg';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiImage, PiUsersBold } from 'react-icons/pi';
+import { PiImage } from 'react-icons/pi';
 import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
 import { DeleteWorkflow } from './WorkflowLibraryListItemActions/DeleteWorkflow';
@@ -82,7 +80,7 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
           <Flex gap={2} alignItems="flex-start" justifyContent="space-between" w="full">
             <Text noOfLines={2}>{workflow.name}</Text>
             <Flex gap={2} alignItems="center">
-              {isActive && !workflow.is_published && (
+              {isActive && (
                 <Badge
                   color="invokeBlue.400"
                   borderColor="invokeBlue.700"
@@ -94,19 +92,6 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
                   {t('workflows.opened')}
                 </Badge>
               )}
-              {workflow.is_published && (
-                <Badge
-                  color="invokeGreen.400"
-                  borderColor="invokeGreen.700"
-                  borderWidth={1}
-                  bg="transparent"
-                  flexShrink={0}
-                  variant="subtle"
-                >
-                  {t('workflows.builder.published')}
-                </Badge>
-              )}
-              {workflow.category === 'project' && <Icon as={PiUsersBold} color="base.200" />}
               {workflow.category === 'default' && (
                 <Image
                   src={InvokeLogo}
@@ -132,18 +117,14 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
             </Text>
           )}
           <Spacer />
-          {workflow.category === 'default' && !workflow.is_published && (
-            <ViewWorkflow workflowId={workflow.workflow_id} />
-          )}
-          {workflow.category !== 'default' && !workflow.is_published && (
+          {workflow.category === 'default' && <ViewWorkflow workflowId={workflow.workflow_id} />}
+          {workflow.category !== 'default' && (
             <>
               <EditWorkflow workflowId={workflow.workflow_id} />
               <DownloadWorkflow workflowId={workflow.workflow_id} />
               <DeleteWorkflow workflowId={workflow.workflow_id} />
             </>
           )}
-          {workflow.category === 'project' && <ShareWorkflowButton workflow={workflow} />}
-          {workflow.is_published && <LockedWorkflowIcon />}
         </Flex>
       </Flex>
     </Flex>

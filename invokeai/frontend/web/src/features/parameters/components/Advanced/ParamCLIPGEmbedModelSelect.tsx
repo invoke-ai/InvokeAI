@@ -7,7 +7,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCLIPEmbedModels } from 'services/api/hooks/modelsByType';
 import type { CLIPGEmbedModelConfig } from 'services/api/types';
-import { isCLIPGEmbedModelConfig } from 'services/api/types';
+import { isCLIPGEmbedModelConfigOrSubmodel } from 'services/api/types';
 
 const ParamCLIPEmbedModelSelect = () => {
   const dispatch = useAppDispatch();
@@ -25,7 +25,7 @@ const ParamCLIPEmbedModelSelect = () => {
   );
 
   const { options, value, onChange, noOptionsMessage } = useModelCombobox({
-    modelConfigs: modelConfigs.filter((config) => isCLIPGEmbedModelConfig(config)),
+    modelConfigs: modelConfigs.filter((config) => isCLIPGEmbedModelConfigOrSubmodel(config)),
     onChange: _onChange,
     selectedModel: clipEmbedModel,
     isLoading,

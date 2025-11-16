@@ -565,7 +565,7 @@ const slice = createSlice({
       state.formFieldInitialValues = formFieldInitialValues;
     },
     workflowLoaded: (state, action: PayloadAction<WorkflowV3>) => {
-      const { nodes, edges, is_published: _is_published, ...workflowExtra } = action.payload;
+      const { nodes, edges, ...workflowExtra } = action.payload;
 
       const formFieldInitialValues = getFormFieldInitialValues(workflowExtra.form, nodes);
 

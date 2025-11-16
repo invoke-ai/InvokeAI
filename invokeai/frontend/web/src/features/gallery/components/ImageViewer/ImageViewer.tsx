@@ -16,7 +16,7 @@ export const ImageViewer = memo(() => {
   const { t } = useTranslation();
 
   const lastSelectedItem = useAppSelector(selectLastSelectedItem);
-  const lastSelectedImageDTO = useImageDTO(lastSelectedItem?.type === 'image' ? lastSelectedItem.id : null);
+  const lastSelectedImageDTO = useImageDTO(lastSelectedItem ?? null);
   return (
     <Flex flexDir="column" w="full" h="full" overflow="hidden" gap={2} position="relative">
       <ImageViewerToolbar />

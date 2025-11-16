@@ -16,8 +16,8 @@ from invokeai.app.services.session_queue.session_queue_common import (
 )
 from invokeai.app.services.shared.graph import AnyInvocation, AnyInvocationOutput
 from invokeai.app.util.misc import get_timestamp
-from invokeai.backend.model_manager import SubModelType
-from invokeai.backend.model_manager.config import AnyModelConfig
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.taxonomy import SubModelType
 
 if TYPE_CHECKING:
     from invokeai.app.services.download.download_base import DownloadJob
@@ -195,8 +195,6 @@ class InvocationErrorEvent(InvocationEventBase):
     error_type: str = Field(description="The error type")
     error_message: str = Field(description="The error message")
     error_traceback: str = Field(description="The error traceback")
-    user_id: Optional[str] = Field(default=None, description="The ID of the user who created the invocation")
-    project_id: Optional[str] = Field(default=None, description="The ID of the user who created the invocation")
 
     @classmethod
     def build(
@@ -219,8 +217,6 @@ class InvocationErrorEvent(InvocationEventBase):
             error_type=error_type,
             error_message=error_message,
             error_traceback=error_traceback,
-            user_id=getattr(queue_item, "user_id", None),
-            project_id=getattr(queue_item, "project_id", None),
         )
 
 
@@ -241,7 +237,6 @@ class QueueItemStatusChangedEvent(QueueItemEventBase):
     batch_status: BatchStatus = Field(description="The status of the batch")
     queue_status: SessionQueueStatus = Field(description="The status of the queue")
     session_id: str = Field(description="The ID of the session (aka graph execution state)")
-    credits: Optional[float] = Field(default=None, description="The total credits used for this queue item")
 
     @classmethod
     def build(
@@ -264,7 +259,6 @@ class QueueItemStatusChangedEvent(QueueItemEventBase):
             completed_at=str(queue_item.completed_at) if queue_item.completed_at else None,
             batch_status=batch_status,
             queue_status=queue_status,
-            credits=queue_item.credits,
         )
 
 
@@ -546,11 +540,18 @@ class ModelInstallCompleteEvent(ModelEventBase):
     source: ModelSource = Field(description="Source of the model; local path, repo_id or url")
     key: str = Field(description="Model config record key")
     total_bytes: Optional[int] = Field(description="Size of the model (may be None for installation of a local path)")
+    config: AnyModelConfig = Field(description="The installed model's config")
 
     @classmethod
     def build(cls, job: "ModelInstallJob") -> "ModelInstallCompleteEvent":
         assert job.config_out is not None
-        return cls(id=job.id, source=job.source, key=(job.config_out.key), total_bytes=job.total_bytes)
+        return cls(
+            id=job.id,
+            source=job.source,
+            key=(job.config_out.key),
+            total_bytes=job.total_bytes,
+            config=job.config_out,
+        )
 
 
 @payload_schema.register

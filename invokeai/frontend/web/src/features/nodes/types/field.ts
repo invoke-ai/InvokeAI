@@ -10,15 +10,14 @@ import { z } from 'zod';
 
 import type { ImageField } from './common';
 import {
+  zAnyModelVariant,
   zBaseModelType,
   zBoardField,
-  zClipVariantType,
   zColorField,
   zImageField,
   zModelFormat,
   zModelIdentifierField,
   zModelType,
-  zModelVariantType,
   zSchedulerField,
 } from './common';
 
@@ -73,7 +72,7 @@ const zFieldInputTemplateBase = zFieldTemplateBase.extend({
   ui_choice_labels: z.record(z.string(), z.string()).nullish(),
   ui_model_base: z.array(zBaseModelType).nullish(),
   ui_model_type: z.array(zModelType).nullish(),
-  ui_model_variant: z.array(zModelVariantType.or(zClipVariantType)).nullish(),
+  ui_model_variant: z.array(zAnyModelVariant).nullish(),
   ui_model_format: z.array(zModelFormat).nullish(),
 });
 const zFieldOutputTemplateBase = zFieldTemplateBase.extend({
@@ -169,8 +168,6 @@ const zBoardFieldType = zFieldTypeBase.extend({
   name: z.literal('BoardField'),
   originalType: zStatelessFieldType.optional(),
 });
-export const isBoardFieldType = (fieldType: FieldType): fieldType is z.infer<typeof zBoardFieldType> =>
-  fieldType.name === zBoardFieldType.shape.name.value;
 
 const zColorFieldType = zFieldTypeBase.extend({
   name: z.literal('ColorField'),

@@ -6,33 +6,21 @@ import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
 import { isPlainObject } from 'es-toolkit';
 import { clamp } from 'es-toolkit/compat';
-import type { AspectRatioID, ParamsState, RgbaColor } from 'features/controlLayers/store/types';
+import type { AspectRatioID, InfillMethod, ParamsState, RgbaColor } from 'features/controlLayers/store/types';
 import {
   ASPECT_RATIO_MAP,
-  CHATGPT_ASPECT_RATIOS,
   DEFAULT_ASPECT_RATIO_CONFIG,
-  FLUX_KONTEXT_ASPECT_RATIOS,
-  GEMINI_2_5_ASPECT_RATIOS,
   getInitialParamsState,
-  IMAGEN_ASPECT_RATIOS,
-  isChatGPT4oAspectRatioID,
-  isFluxKontextAspectRatioID,
-  isGemini2_5AspectRatioID,
-  isImagenAspectRatioID,
   MAX_POSITIVE_PROMPT_HISTORY,
   zParamsState,
 } from 'features/controlLayers/store/types';
 import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import {
-  API_BASE_MODELS,
-  CLIP_SKIP_MAP,
-  SUPPORTS_ASPECT_RATIO_BASE_MODELS,
   SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS,
   SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS,
-  SUPPORTS_PIXEL_DIMENSIONS_BASE_MODELS,
   SUPPORTS_REF_IMAGES_BASE_MODELS,
-  SUPPORTS_SEED_BASE_MODELS,
-} from 'features/parameters/types/constants';
+} from 'features/modelManagerV2/models';
+import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import type {
   ParameterCanvasCoherenceMode,
   ParameterCFGRescaleMultiplier,
@@ -121,14 +109,6 @@ const slice = createSlice({
         return;
       }
 
-      if (API_BASE_MODELS.includes(model.base)) {
-        state.dimensions.aspectRatio.isLocked = true;
-        state.dimensions.aspectRatio.value = 1;
-        state.dimensions.aspectRatio.id = '1:1';
-        state.dimensions.width = 1024;
-        state.dimensions.height = 1024;
-      }
-
       applyClipSkip(state, model, state.clipSkip);
     },
     vaeSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
@@ -190,6 +170,9 @@ const slice = createSlice({
     shouldUseCpuNoiseChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldUseCpuNoise = action.payload;
     },
+    setColorCompensation: (state, action: PayloadAction<boolean>) => {
+      state.colorCompensation = action.payload;
+    },
     positivePromptChanged: (state, action: PayloadAction<ParameterPositivePrompt>) => {
       state.positivePrompt = action.payload;
     },
@@ -239,7 +222,7 @@ const slice = createSlice({
     setRefinerStart: (state, action: PayloadAction<number>) => {
       state.refinerStart = action.payload;
     },
-    setInfillMethod: (state, action: PayloadAction<string>) => {
+    setInfillMethod: (state, action: PayloadAction<InfillMethod>) => {
       state.infillMethod = action.payload;
     },
     setInfillTileSize: (state, action: PayloadAction<number>) => {
@@ -318,30 +301,6 @@ const slice = createSlice({
       state.dimensions.aspectRatio.id = id;
       if (id === 'Free') {
         state.dimensions.aspectRatio.isLocked = false;
-      } else if ((state.model?.base === 'imagen3' || state.model?.base === 'imagen4') && isImagenAspectRatioID(id)) {
-        const { width, height } = IMAGEN_ASPECT_RATIOS[id];
-        state.dimensions.width = width;
-        state.dimensions.height = height;
-        state.dimensions.aspectRatio.value = state.dimensions.width / state.dimensions.height;
-        state.dimensions.aspectRatio.isLocked = true;
-      } else if (state.model?.base === 'chatgpt-4o' && isChatGPT4oAspectRatioID(id)) {
-        const { width, height } = CHATGPT_ASPECT_RATIOS[id];
-        state.dimensions.width = width;
-        state.dimensions.height = height;
-        state.dimensions.aspectRatio.value = state.dimensions.width / state.dimensions.height;
-        state.dimensions.aspectRatio.isLocked = true;
-      } else if (state.model?.base === 'gemini-2.5' && isGemini2_5AspectRatioID(id)) {
-        const { width, height } = GEMINI_2_5_ASPECT_RATIOS[id];
-        state.dimensions.width = width;
-        state.dimensions.height = height;
-        state.dimensions.aspectRatio.value = state.dimensions.width / state.dimensions.height;
-        state.dimensions.aspectRatio.isLocked = true;
-      } else if (state.model?.base === 'flux-kontext' && isFluxKontextAspectRatioID(id)) {
-        const { width, height } = FLUX_KONTEXT_ASPECT_RATIOS[id];
-        state.dimensions.width = width;
-        state.dimensions.height = height;
-        state.dimensions.aspectRatio.value = state.dimensions.width / state.dimensions.height;
-        state.dimensions.aspectRatio.isLocked = true;
       } else {
         state.dimensions.aspectRatio.isLocked = true;
         state.dimensions.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
@@ -480,6 +439,7 @@ export const {
   clipGEmbedModelSelected,
   setClipSkip,
   shouldUseCpuNoiseChanged,
+  setColorCompensation,
   positivePromptChanged,
   positivePromptAddedToHistory,
   promptRemovedFromHistory,
@@ -541,19 +501,12 @@ export const selectIsSDXL = createParamsSelector((params) => params.model?.base 
 export const selectIsFLUX = createParamsSelector((params) => params.model?.base === 'flux');
 export const selectIsSD3 = createParamsSelector((params) => params.model?.base === 'sd-3');
 export const selectIsCogView4 = createParamsSelector((params) => params.model?.base === 'cogview4');
-export const selectIsImagen3 = createParamsSelector((params) => params.model?.base === 'imagen3');
-export const selectIsImagen4 = createParamsSelector((params) => params.model?.base === 'imagen4');
 export const selectIsFluxKontext = createParamsSelector((params) => {
-  if (params.model?.base === 'flux-kontext') {
-    return true;
-  }
   if (params.model?.base === 'flux' && params.model?.name.toLowerCase().includes('kontext')) {
     return true;
   }
   return false;
 });
-export const selectIsChatGPT4o = createParamsSelector((params) => params.model?.base === 'chatgpt-4o');
-export const selectIsGemini2_5 = createParamsSelector((params) => params.model?.base === 'gemini-2.5');
 
 export const selectModel = createParamsSelector((params) => params.model);
 export const selectModelKey = createParamsSelector((params) => params.model?.key);
@@ -592,25 +545,9 @@ export const selectModelSupportsNegativePrompt = createSelector(
   selectModel,
   (model) => !!model && SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS.includes(model.base)
 );
-export const selectModelSupportsSeed = createSelector(
-  selectModel,
-  (model) => !!model && SUPPORTS_SEED_BASE_MODELS.includes(model.base)
-);
 export const selectModelSupportsRefImages = createSelector(
   selectModel,
   (model) => !!model && SUPPORTS_REF_IMAGES_BASE_MODELS.includes(model.base)
-);
-export const selectModelSupportsAspectRatio = createSelector(
-  selectModel,
-  (model) => !!model && SUPPORTS_ASPECT_RATIO_BASE_MODELS.includes(model.base)
-);
-export const selectModelSupportsPixelDimensions = createSelector(
-  selectModel,
-  (model) => !!model && SUPPORTS_PIXEL_DIMENSIONS_BASE_MODELS.includes(model.base)
-);
-export const selectIsApiBaseModel = createSelector(
-  selectModel,
-  (model) => !!model && API_BASE_MODELS.includes(model.base)
 );
 export const selectModelSupportsOptimizedDenoising = createSelector(
   selectModel,
@@ -624,6 +561,7 @@ export const selectShouldRandomizeSeed = createParamsSelector((params) => params
 export const selectVAEPrecision = createParamsSelector((params) => params.vaePrecision);
 export const selectIterations = createParamsSelector((params) => params.iterations);
 export const selectShouldUseCPUNoise = createParamsSelector((params) => params.shouldUseCpuNoise);
+export const selectColorCompensation = createParamsSelector((params) => params.colorCompensation);
 
 export const selectUpscaleScheduler = createParamsSelector((params) => params.upscaleScheduler);
 export const selectUpscaleCfgScale = createParamsSelector((params) => params.upscaleCfgScale);

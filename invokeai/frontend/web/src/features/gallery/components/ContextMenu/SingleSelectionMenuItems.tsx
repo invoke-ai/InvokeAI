@@ -13,13 +13,10 @@ import { ContextMenuItemOpenInNewTab } from 'features/gallery/components/Context
 import { ContextMenuItemOpenInViewer } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemOpenInViewer';
 import { ContextMenuItemSelectForCompare } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemSelectForCompare';
 import { ContextMenuItemSendToUpscale } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemSendToUpscale';
-import { ContextMenuItemSendToVideo } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemSendToVideo';
 import { ContextMenuItemStarUnstar } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemStarUnstar';
 import { ContextMenuItemUseAsPromptTemplate } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemUseAsPromptTemplate';
 import { ContextMenuItemUseAsRefImage } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemUseAsRefImage';
-import { ContextMenuItemUseForPromptGeneration } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemUseForPromptGeneration';
-import { ItemDTOContextProvider } from 'features/gallery/contexts/ItemDTOContext';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { ImageDTOContextProvider } from 'features/gallery/contexts/ImageDTOContext';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { ImageDTO } from 'services/api/types';
 
@@ -32,10 +29,9 @@ type SingleSelectionMenuItemsProps = {
 
 const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) => {
   const tab = useAppSelector(selectActiveTab);
-  const isVideoEnabled = useFeatureStatus('video');
 
   return (
-    <ItemDTOContextProvider value={imageDTO}>
+    <ImageDTOContextProvider value={imageDTO}>
       <IconMenuItemGroup>
         <ContextMenuItemOpenInNewTab />
         <ContextMenuItemCopy />
@@ -50,8 +46,6 @@ const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) =
       {tab === 'upscaling' && <ContextMenuItemMetadataRecallActionsUpscaleTab />}
       <MenuDivider />
       <ContextMenuItemSendToUpscale />
-      {isVideoEnabled && <ContextMenuItemSendToVideo />}
-      <ContextMenuItemUseForPromptGeneration />
       {(tab === 'canvas' || tab === 'generate') && <ContextMenuItemUseAsRefImage />}
       <ContextMenuItemUseAsPromptTemplate />
       <ContextMenuItemNewCanvasFromImageSubMenu />
@@ -64,7 +58,7 @@ const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) =
           // Only render this button on tabs with a gallery.
           <ContextMenuItemLocateInGalery />
         )}
-    </ItemDTOContextProvider>
+    </ImageDTOContextProvider>
   );
 };
 

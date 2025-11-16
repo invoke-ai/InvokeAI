@@ -185,9 +185,33 @@
         "imagesSettings": "Galeriebildereinstellungen"
     },
     "hotkeys": {
+        "hotkeys": "Tastenkombinationen",
         "noHotkeysFound": "Kein Hotkey gefunden",
         "searchHotkeys": "Hotkeys durchsuchen",
         "clearSearch": "Suche leeren",
+        "editMode": "Bearbeitungsmodus",
+        "viewMode": "Ansichtsmodus",
+        "editHotkey": "Hotkey bearbeiten",
+        "resetToDefault": "Auf Standard zurücksetzen",
+        "resetAll": "Alle auf Standard zurücksetzen",
+        "enterHotkeys": "Tastenkombination(en) eingeben, mit Komma getrennt",
+        "save": "Speichern",
+        "cancel": "Abbrechen",
+        "modifiers": "Modifikatoren",
+        "syntaxHelp": "Syntax-Hilfe",
+        "combineWith": "Kombinieren mit +",
+        "multipleHotkeys": "Mehrere Hotkeys mit Komma",
+        "validKeys": "Gültige Tasten",
+        "help": "Hilfe",
+        "noHotkeysRecorded": "Noch keine Hotkeys aufgenommen",
+        "pressKeys": "Tasten drücken...",
+        "setHotkey": "SETZEN",
+        "setAnother": "WEITEREN SETZEN",
+        "removeLastHotkey": "Letzten Hotkey entfernen",
+        "clearAll": "Alle löschen",
+        "duplicateWarning": "Dieser Hotkey wurde bereits aufgenommen",
+        "conflictWarning": "wird bereits von \"{{hotkeyTitle}}\" verwendet",
+        "thisHotkey": "diesem Hotkey",
         "canvas": {
             "fitBboxToCanvas": {
                 "desc": "Skalierung und Positionierung der Ansicht auf Bbox-Größe.",
@@ -1629,12 +1653,6 @@
         "newRasterLayer": "Neue $t(controlLayers.rasterLayer)",
         "showNonRasterLayers": "Nicht-Rasterebenen anzeigen (Umschalt+H)",
         "hideNonRasterLayers": "Nicht-Rasterebenen ausblenden (Umschalt+H)"
-    },
-    "upsell": {
-        "shareAccess": "Zugang teilen",
-        "professional": "Professionell",
-        "inviteTeammates": "Teamkollegen einladen",
-        "professionalUpsell": "Verfügbar in der Professional Edition von Invoke. Klicken Sie hier oder besuchen Sie invoke.com/pricing für weitere Details."
     },
     "upscaling": {
         "creativity": "Kreativität",

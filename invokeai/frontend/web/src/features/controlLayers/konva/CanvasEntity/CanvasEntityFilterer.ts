@@ -17,7 +17,7 @@ import Konva from 'konva';
 import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import { serializeError } from 'serialize-error';
-import { buildSelectModelConfig } from 'services/api/hooks/modelsByType';
+import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import { isControlLayerModelConfig } from 'services/api/types';
 import stableHash from 'stable-hash';
 import type { Equals } from 'tsafe';
@@ -202,11 +202,19 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
   createInitialFilterConfig = (): FilterConfig => {
     if (this.parent.type === 'control_layer_adapter' && this.parent.state.controlAdapter.model) {
       // If the parent is a control layer adapter, we should check if the model has a default filter and set it if so
-      const selectModelConfig = buildSelectModelConfig(
-        this.parent.state.controlAdapter.model.key,
-        isControlLayerModelConfig
-      );
-      const modelConfig = this.manager.stateApi.runSelector(selectModelConfig);
+      const key = this.parent.state.controlAdapter.model.key;
+      const modelConfig = this.manager.stateApi.runSelector((state) => {
+        const { data } = selectModelConfigsQuery(state);
+        if (!data) {
+          return null;
+        }
+        return (
+          modelConfigsAdapterSelectors
+            .selectAll(data)
+            .filter(isControlLayerModelConfig)
+            .find((m) => m.key === key) ?? null
+        );
+      });
       // This always returns a filter
       const filter = getFilterForModel(modelConfig) ?? IMAGE_FILTERS.canny_edge_detection;
       return filter.buildDefaults();

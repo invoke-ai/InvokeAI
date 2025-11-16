@@ -138,8 +138,7 @@ export const isGeneratorNodeType = (type: string) =>
   ['image_generator', 'string_generator', 'integer_generator', 'float_generator'].includes(type);
 
 export const isBatchNode = (node: InvocationNode) => isBatchNodeType(node.data.type);
-
-export const isGeneratorNode = (node: InvocationNode) => isGeneratorNodeType(node.data.type);
+const isGeneratorNode = (node: InvocationNode) => isGeneratorNodeType(node.data.type);
 
 export const isExecutableNode = (node: InvocationNode) => {
   return !isBatchNode(node) && !isGeneratorNode(node);

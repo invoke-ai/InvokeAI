@@ -3,7 +3,6 @@ import { logger } from 'app/logging/logger';
 import { useAppSelector } from 'app/store/storeHooks';
 import { withResultAsync } from 'common/util/result';
 import { selectSaveAllImagesToGallery } from 'features/controlLayers/store/canvasSettingsSlice';
-import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { useEnqueueWorkflows } from 'features/queue/hooks/useEnqueueWorkflows';
 import { $isReadyToEnqueue } from 'features/queue/store/readiness';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -16,19 +15,16 @@ import { enqueueMutationFixedCacheKeyOptions, useEnqueueBatchMutation } from 'se
 import { useEnqueueCanvas } from './useEnqueueCanvas';
 import { useEnqueueGenerate } from './useEnqueueGenerate';
 import { useEnqueueUpscaling } from './useEnqueueUpscaling';
-import { useEnqueueVideo } from './useEnqueueVideo';
 
 const log = logger('generation');
 
 export const useInvoke = () => {
   const tabName = useAppSelector(selectActiveTab);
   const isReady = useStore($isReadyToEnqueue);
-  const isLocked = useIsWorkflowEditorLocked();
   const enqueueWorkflows = useEnqueueWorkflows();
   const enqueueCanvas = useEnqueueCanvas();
   const enqueueGenerate = useEnqueueGenerate();
   const enqueueUpscaling = useEnqueueUpscaling();
-  const enqueueVideo = useEnqueueVideo();
   const saveAllImagesToGallery = useAppSelector(selectSaveAllImagesToGallery);
 
   const [_, { isLoading }] = useEnqueueBatchMutation({
@@ -37,7 +33,7 @@ export const useInvoke = () => {
   });
 
   const enqueue = useCallback(
-    async (prepend: boolean, isApiValidationRun: boolean) => {
+    async (prepend: boolean) => {
       if (!isReady) {
         return;
       }
@@ -45,15 +41,13 @@ export const useInvoke = () => {
       const result = await withResultAsync(async () => {
         switch (tabName) {
           case 'workflows':
-            return await enqueueWorkflows(prepend, isApiValidationRun);
+            return await enqueueWorkflows(prepend);
           case 'canvas':
             return await enqueueCanvas(prepend);
           case 'generate':
             return await enqueueGenerate(prepend);
           case 'upscaling':
             return await enqueueUpscaling(prepend);
-          case 'video':
-            return await enqueueVideo(prepend);
           default:
             throw new Error(`No enqueue handler for tab: ${tabName}`);
         }
@@ -63,11 +57,11 @@ export const useInvoke = () => {
         log.error({ error: serializeError(result.error) }, 'Failed to enqueue batch');
       }
     },
-    [enqueueCanvas, enqueueGenerate, enqueueUpscaling, enqueueVideo, enqueueWorkflows, isReady, tabName]
+    [enqueueCanvas, enqueueGenerate, enqueueUpscaling, enqueueWorkflows, isReady, tabName]
   );
 
   const enqueueBack = useCallback(() => {
-    enqueue(false, false);
+    enqueue(false);
     if (tabName === 'generate' || tabName === 'upscaling' || (tabName === 'canvas' && saveAllImagesToGallery)) {
       navigationApi.focusPanel(tabName, VIEWER_PANEL_ID);
     } else if (tabName === 'workflows') {
@@ -82,7 +76,7 @@ export const useInvoke = () => {
   }, [enqueue, saveAllImagesToGallery, tabName]);
 
   const enqueueFront = useCallback(() => {
-    enqueue(true, false);
+    enqueue(true);
     if (tabName === 'generate' || tabName === 'upscaling' || (tabName === 'canvas' && saveAllImagesToGallery)) {
       navigationApi.focusPanel(tabName, VIEWER_PANEL_ID);
     } else if (tabName === 'workflows') {
@@ -96,5 +90,5 @@ export const useInvoke = () => {
     }
   }, [enqueue, saveAllImagesToGallery, tabName]);
 
-  return { enqueueBack, enqueueFront, isLoading, isDisabled: !isReady || isLocked, enqueue };
+  return { enqueueBack, enqueueFront, isLoading, isDisabled: !isReady, enqueue };
 };

@@ -43,8 +43,6 @@
         "move": "Move",
         "movingImagesToBoard_one": "Moving {{count}} image to board:",
         "movingImagesToBoard_other": "Moving {{count}} images to board:",
-        "movingVideosToBoard_one": "Moving {{count}} video to board:",
-        "movingVideosToBoard_other": "Moving {{count}} videos to board:",
         "myBoard": "My Board",
         "noBoards": "No {{boardType}} Boards",
         "noMatching": "No matching Boards",
@@ -61,8 +59,6 @@
         "imagesWithCount_other": "{{count}} images",
         "assetsWithCount_one": "{{count}} asset",
         "assetsWithCount_other": "{{count}} assets",
-        "videosWithCount_one": "{{count}} video",
-        "videosWithCount_other": "{{count}} videos",
         "updateBoardError": "Error updating board"
     },
     "accordions": {
@@ -375,9 +371,6 @@
         "deleteImage_one": "Delete Image",
         "deleteImage_other": "Delete {{count}} Images",
         "deleteImagePermanent": "Deleted images cannot be restored.",
-        "deleteVideo_one": "Delete Video",
-        "deleteVideo_other": "Delete {{count}} Videos",
-        "deleteVideoPermanent": "Deleted videos cannot be restored.",
         "displayBoardSearch": "Board Search",
         "displaySearch": "Image Search",
         "download": "Download",
@@ -397,7 +390,6 @@
         "sortDirection": "Sort Direction",
         "showStarredImagesFirst": "Show Starred Images First",
         "noImageSelected": "No Image Selected",
-        "noVideoSelected": "No Video Selected",
         "noImagesInGallery": "No Images to Display",
         "starImage": "Star",
         "unstarImage": "Unstar",
@@ -429,15 +421,36 @@
         "openViewer": "Open Viewer",
         "closeViewer": "Close Viewer",
         "move": "Move",
-        "useForPromptGeneration": "Use for Prompt Generation",
-        "videos": "Videos",
-        "videosTab": "Videos you've created and saved within Invoke."
+        "useForPromptGeneration": "Use for Prompt Generation"
     },
     "hotkeys": {
         "hotkeys": "Hotkeys",
         "searchHotkeys": "Search Hotkeys",
         "clearSearch": "Clear Search",
         "noHotkeysFound": "No Hotkeys Found",
+        "editMode": "Edit Mode",
+        "viewMode": "View Mode",
+        "editHotkey": "Edit Hotkey",
+        "resetToDefault": "Reset to Default",
+        "resetAll": "Reset All to Default",
+        "enterHotkeys": "Enter hotkey(s), separated by commas",
+        "save": "Save",
+        "cancel": "Cancel",
+        "modifiers": "Modifiers",
+        "syntaxHelp": "Syntax Help",
+        "combineWith": "Combine with +",
+        "multipleHotkeys": "Multiple hotkeys with comma",
+        "validKeys": "Valid keys",
+        "help": "Help",
+        "noHotkeysRecorded": "No hotkeys recorded yet",
+        "pressKeys": "Press keys...",
+        "setHotkey": "SET",
+        "setAnother": "SET ANOTHER",
+        "removeLastHotkey": "Remove last hotkey",
+        "clearAll": "Clear All",
+        "duplicateWarning": "This hotkey is already recorded",
+        "conflictWarning": "is already used by \"{{hotkeyTitle}}\"",
+        "thisHotkey": "this hotkey",
         "app": {
             "title": "App",
             "invoke": {
@@ -476,10 +489,6 @@
                 "title": "Select the Queue Tab",
                 "desc": "Selects the Queue tab."
             },
-            "selectVideoTab": {
-                "title": "Select the Video Tab",
-                "desc": "Selects the Video tab."
-            },
             "focusPrompt": {
                 "title": "Focus Prompt",
                 "desc": "Move cursor focus to the positive prompt."
@@ -513,9 +522,6 @@
                 "desc": "Selects the Generate tab.",
                 "key": "1"
             }
-        },
-        "video": {
-            "title": "Video"
         },
         "canvas": {
             "title": "Canvas",
@@ -823,13 +829,11 @@
         "guidance": "Guidance",
         "height": "Height",
         "imageDetails": "Image Details",
-        "videoDetails": "Video Details",
         "imageDimensions": "Image Dimensions",
         "metadata": "Metadata",
         "model": "Model",
         "negativePrompt": "Negative Prompt",
         "noImageDetails": "No image details found",
-        "noVideoDetails": "No video details found",
         "noMetaData": "No metadata found",
         "noRecallParameters": "No parameters to recall found",
         "parameterSet": "Parameter {{parameter}} set",
@@ -847,11 +851,7 @@
         "vae": "VAE",
         "width": "Width",
         "workflow": "Workflow",
-        "canvasV2Metadata": "Canvas Layers",
-        "videoModel": "Model",
-        "videoDuration": "Duration",
-        "videoAspectRatio": "Aspect Ratio",
-        "videoResolution": "Resolution"
+        "canvasV2Metadata": "Canvas Layers"
     },
     "modelManager": {
         "active": "active",
@@ -867,6 +867,11 @@
         "clipLEmbed": "CLIP-L Embed",
         "clipGEmbed": "CLIP-G Embed",
         "config": "Config",
+        "reidentify": "Reidentify",
+        "reidentifyTooltip": "If a model didn't install correctly (e.g. it has the wrong type or doesn't work), you can try reidentifying it. This will reset any custom settings you may have applied.",
+        "reidentifySuccess": "Model reidentified successfully",
+        "reidentifyUnknown": "Unable to identify model",
+        "reidentifyError": "Error reidentifying model",
         "convert": "Convert",
         "convertingModelBegin": "Converting Model. Please wait.",
         "convertToDiffusers": "Convert To Diffusers",
@@ -914,6 +919,9 @@
         "hfTokenReset": "HF Token Reset",
         "urlUnauthorizedErrorMessage": "You may need to configure an API token to access this model.",
         "urlUnauthorizedErrorMessage2": "Learn how here.",
+        "unidentifiedModelTitle": "Unable to identify model",
+        "unidentifiedModelMessage": "We were unable to identify the type, base and/or format of the installed model. Try editing the model and selecting the appropriate settings for the model.",
+        "unidentifiedModelMessage2": "If you don't see the correct settings, or the model doesn't work after changing them, ask for help on <DiscordLink /> or create an issue on <GitHubIssuesLink />.",
         "imageEncoderModelId": "Image Encoder Model ID",
         "installedModelsCount": "{{installed}} of {{total}} models installed.",
         "includesNModels": "Includes {{n}} models and their dependencies.",
@@ -922,7 +930,7 @@
         "nAlreadyInstalled": "{{count}} already installed",
         "installQueue": "Install Queue",
         "inplaceInstall": "In-place install",
-        "inplaceInstallDesc": "Install models without copying the files. When using the model, it will be loaded from its this location. If disabled, the model file(s) will be copied into the Invoke-managed models directory during installation.",
+        "inplaceInstallDesc": "Install models without moving the files. When using the model, it will be loaded from its original location. If disabled, the model file(s) will be moved into the Invoke-managed models directory during installation.",
         "install": "Install",
         "installAll": "Install All",
         "installRepo": "Install Repo",
@@ -942,6 +950,7 @@
         "modelConverted": "Model Converted",
         "modelDeleted": "Model Deleted",
         "modelDeleteFailed": "Failed to delete model",
+        "modelFormat": "Model Format",
         "modelImageDeleted": "Model Image Deleted",
         "modelImageDeleteFailed": "Model Image Delete Failed",
         "modelImageUpdated": "Model Image Updated",
@@ -949,6 +958,7 @@
         "modelManager": "Model Manager",
         "modelName": "Model Name",
         "modelSettings": "Model Settings",
+        "modelSettingsWarning": "These settings tell Invoke what kind of model this is and how to load it. If Invoke didn't detect these correctly when you installed the model, or if the model is classified as Unknown, you may need to edit them manually.",
         "modelType": "Model Type",
         "modelUpdated": "Model Updated",
         "modelUpdateFailed": "Model Update Failed",
@@ -1264,13 +1274,9 @@
         "images": "Images",
         "images_withCount_one": "Image",
         "images_withCount_other": "Images",
-        "videos_withCount_one": "Video",
-        "videos_withCount_other": "Videos",
         "infillMethod": "Infill Method",
         "infillColorValue": "Fill Color",
         "info": "Info",
-        "startingFrameImage": "Start Frame",
-        "startingFrameImageAspectRatioWarning": "Image aspect ratio does not match the video aspect ratio ({{videoAspectRatio}}). This could lead to unexpected cropping during video generation.",
         "invoke": {
             "addingImagesTo": "Adding images to",
             "modelDisabledForTrial": "Generating with {{modelName}} is not available on trial accounts. Visit your account settings to upgrade.",
@@ -1317,8 +1323,7 @@
             "noNodesInGraph": "No nodes in graph",
             "systemDisconnected": "System disconnected",
             "promptExpansionPending": "Prompt expansion in progress",
-            "promptExpansionResultPending": "Please accept or discard your prompt expansion result",
-            "videoIsDisabled": "Video generation is not enabled for {{accountType}} accounts."
+            "promptExpansionResultPending": "Please accept or discard your prompt expansion result"
         },
         "maskBlur": "Mask Blur",
         "negativePromptPlaceholder": "Negative Prompt",
@@ -1335,12 +1340,11 @@
         "scheduler": "Scheduler",
         "seamlessXAxis": "Seamless X Axis",
         "seamlessYAxis": "Seamless Y Axis",
+        "colorCompensation": "Color Compensation",
         "seed": "Seed",
-        "videoActions": "Video Actions",
         "imageActions": "Image Actions",
         "sendToCanvas": "Send To Canvas",
         "sendToUpscale": "Send To Upscale",
-        "sendToVideo": "Send To Video",
         "showOptionsPanel": "Show Side Panel (O or T)",
         "shuffle": "Shuffle Seed",
         "steps": "Steps",
@@ -1352,7 +1356,6 @@
         "postProcessing": "Post-Processing (Shift + U)",
         "processImage": "Process Image",
         "upscaling": "Upscaling",
-        "video": "Video",
         "useAll": "Use All",
         "useSize": "Use Size",
         "useCpuNoise": "Use CPU Noise",
@@ -1880,6 +1883,10 @@
         "seamlessTilingYAxis": {
             "heading": "Seamless Tiling Y Axis",
             "paragraphs": ["Seamlessly tile an image along the vertical axis."]
+        },
+        "colorCompensation": {
+            "heading": "Color Compensation",
+            "paragraphs": ["Adjust the input image to reduce color shifts during inpainting or img2img (SDXL Only)."]
         },
         "upscaleModel": {
             "heading": "Upscale Model",
@@ -2638,12 +2645,7 @@
         "viewModeTooltip": "This is how your prompt will look with your currently selected template. To edit your prompt, click anywhere in the text box.",
         "togglePromptPreviews": "Toggle Prompt Previews"
     },
-    "upsell": {
-        "inviteTeammates": "Invite Teammates",
-        "professional": "Professional",
-        "professionalUpsell": "Available in Invoke's Professional Edition. Click here or visit invoke.com/pricing for more details.",
-        "shareAccess": "Share Access"
-    },
+
     "ui": {
         "tabs": {
             "generate": "Generate",
@@ -2655,30 +2657,19 @@
             "queue": "Queue",
             "upscaling": "Upscaling",
             "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)",
-            "video": "Video",
             "gallery": "Gallery"
         },
         "panels": {
             "launchpad": "Launchpad",
             "workflowEditor": "Workflow Editor",
             "imageViewer": "Viewer",
-            "canvas": "Canvas",
-            "video": "Video"
+            "canvas": "Canvas"
         },
         "launchpad": {
             "workflowsTitle": "Go deep with Workflows.",
             "upscalingTitle": "Upscale and add detail.",
             "canvasTitle": "Edit and refine on Canvas.",
             "generateTitle": "Generate images from text prompts.",
-            "videoTitle": "Generate videos from text prompts.",
-            "video": {
-                "startingFrameCalloutTitle": "Add a Starting Frame",
-                "startingFrameCalloutDesc": "Add an image to control the first frame of your video."
-            },
-            "addStartingFrame": {
-                "title": "Add a Starting Frame",
-                "description": "Add an image to control the first frame of your video."
-            },
             "modelGuideText": "Want to learn what prompts work best for each model?",
             "modelGuideLink": "Check out our Model Guide.",
             "createNewWorkflowFromScratch": "Create a new Workflow from scratch",
@@ -2753,10 +2744,6 @@
             }
         }
     },
-    "video": {
-        "noVideoSelected": "No video selected",
-        "selectFromGallery": "Select a video from the gallery to play"
-    },
     "system": {
         "enableLogging": "Enable Logging",
         "logLevel": {
@@ -2794,9 +2781,8 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "Select Object v2: Improved object selection with point and box inputs or text prompts.",
-            "Raster Layer Adjustments: Easily adjust layer brightness, contrast, saturation, curves and more.",
-            "Prompt History: Review and quickly recall your last 100 prompts."
+            "Model Manager: If a model cannot be identified during installation, you can now manually select the model type and architecture.",
+            "Internal: Improved model identification system, making it easier for contributors to add support for new models."
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",

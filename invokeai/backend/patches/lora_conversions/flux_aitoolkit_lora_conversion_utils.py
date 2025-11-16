@@ -12,7 +12,10 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.util import InvokeAILogger
 
 
-def is_state_dict_likely_in_flux_aitoolkit_format(state_dict: dict[str, Any], metadata: dict[str, Any] = None) -> bool:
+def is_state_dict_likely_in_flux_aitoolkit_format(
+    state_dict: dict[str | int, Any],
+    metadata: dict[str, Any] | None = None,
+) -> bool:
     if metadata:
         try:
             software = json.loads(metadata.get("software", "{}"))
@@ -20,7 +23,7 @@ def is_state_dict_likely_in_flux_aitoolkit_format(state_dict: dict[str, Any], me
             return False
         return software.get("name") == "ai-toolkit"
     # metadata got lost somewhere
-    return any("diffusion_model" == k.split(".", 1)[0] for k in state_dict.keys())
+    return any("diffusion_model" == k.split(".", 1)[0] for k in state_dict.keys() if isinstance(k, str))
 
 
 @dataclass

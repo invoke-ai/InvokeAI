@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "InvokeAI"
 description = "An implementation of Stable Diffusion which provides various new features and options to aid the image generation process"
-requires-python = ">=3.10, <3.13"
+requires-python = ">=3.11, <3.13"
 readme = { content-type = "text/markdown", file = "README.md" }
 keywords = ["stable-diffusion", "AI"]
 dynamic = ["version"]
@@ -53,7 +53,10 @@ dependencies = [
 
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events",
-  "fastapi",
+  # FastAPI 0.119.0 breaks OpenAPI schema generation for the AnyInvocation class. It's not clear if this is an Invoke,
+  # FastAPI or pydantic bug. Probably Invoke's, because we are doing something unusual with AnyInvocation. 0.118.3 is
+  # the last known-good version.
+  "fastapi== 0.118.3",
   "huggingface-hub",
   "pydantic-settings",
   "pydantic",

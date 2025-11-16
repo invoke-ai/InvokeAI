@@ -1,6 +1,3 @@
-import type { S } from 'services/api/types';
-import type { Equals } from 'tsafe';
-import { assert } from 'tsafe';
 import { z } from 'zod';
 
 // #region Field data schemas
@@ -13,13 +10,6 @@ const zImageFieldCollection = z.array(zImageField);
 type ImageFieldCollection = z.infer<typeof zImageFieldCollection>;
 export const isImageFieldCollection = (field: unknown): field is ImageFieldCollection =>
   zImageFieldCollection.safeParse(field).success;
-
-const zVideoField = z.object({
-  video_id: z.string().trim().min(1),
-});
-type VideoField = z.infer<typeof zVideoField>;
-export const isVideoField = (field: unknown): field is VideoField => zVideoField.safeParse(field).success;
-assert<Equals<VideoField, S['VideoField']>>();
 
 export const zBoardField = z.object({
   board_id: z.string().trim().min(1),
@@ -82,30 +72,10 @@ export const zBaseModelType = z.enum([
   'sdxl-refiner',
   'flux',
   'cogview4',
-  'imagen3',
-  'imagen4',
-  'chatgpt-4o',
-  'flux-kontext',
-  'gemini-2.5',
-  'veo3',
-  'runway',
+  'unknown',
 ]);
 export type BaseModelType = z.infer<typeof zBaseModelType>;
-export const zMainModelBase = z.enum([
-  'sd-1',
-  'sd-2',
-  'sd-3',
-  'sdxl',
-  'flux',
-  'cogview4',
-  'imagen3',
-  'imagen4',
-  'chatgpt-4o',
-  'flux-kontext',
-  'gemini-2.5',
-  'veo3',
-  'runway',
-]);
+export const zMainModelBase = z.enum(['sd-1', 'sd-2', 'sd-3', 'sdxl', 'flux', 'cogview4']);
 type MainModelBase = z.infer<typeof zMainModelBase>;
 export const isMainModelBase = (base: unknown): base is MainModelBase => zMainModelBase.safeParse(base).success;
 export const zModelType = z.enum([
@@ -125,9 +95,10 @@ export const zModelType = z.enum([
   'clip_embed',
   'siglip',
   'flux_redux',
-  'video',
+  'unknown',
 ]);
-const zSubModelType = z.enum([
+export type ModelType = z.infer<typeof zModelType>;
+export const zSubModelType = z.enum([
   'unet',
   'transformer',
   'text_encoder',
@@ -142,10 +113,12 @@ const zSubModelType = z.enum([
   'scheduler',
   'safety_checker',
 ]);
-export type SubModelType = z.infer<typeof zSubModelType>;
 
 export const zClipVariantType = z.enum(['large', 'gigantic']);
 export const zModelVariantType = z.enum(['normal', 'inpaint', 'depth']);
+export const zFluxVariantType = z.enum(['dev', 'dev_fill', 'schnell']);
+export const zAnyModelVariant = z.union([zModelVariantType, zClipVariantType, zFluxVariantType]);
+export type AnyModelVariant = z.infer<typeof zAnyModelVariant>;
 export const zModelFormat = z.enum([
   'omi',
   'diffusers',
@@ -160,8 +133,9 @@ export const zModelFormat = z.enum([
   'bnb_quantized_int8b',
   'bnb_quantized_nf4b',
   'gguf_quantized',
-  'api',
+  'unknown',
 ]);
+export type ModelFormat = z.infer<typeof zModelFormat>;
 
 export const zModelIdentifierField = z.object({
   key: z.string().min(1),

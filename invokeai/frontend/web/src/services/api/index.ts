@@ -7,9 +7,6 @@ import type {
   TagDescription,
 } from '@reduxjs/toolkit/query/react';
 import { buildCreateApi, coreModule, fetchBaseQuery, reactHooksModule } from '@reduxjs/toolkit/query/react';
-import { $authToken } from 'app/store/nanostores/authToken';
-import { $baseUrl } from 'app/store/nanostores/baseUrl';
-import { $projectId } from 'app/store/nanostores/projectId';
 import queryString from 'query-string';
 import stableHash from 'stable-hash';
 
@@ -19,7 +16,6 @@ const tagTypes = [
   'Board',
   'BoardImagesTotal',
   'BoardAssetsTotal',
-  'BoardVideosTotal',
   'HFTokenStatus',
   'Image',
   'ImageNameList',
@@ -56,12 +52,6 @@ const tagTypes = [
   'StylePreset',
   'Schema',
   'QueueCountsByDestination',
-  'Video',
-  'VideoMetadata',
-  'VideoList',
-  'VideoIdList',
-  'VideoCollectionCounts',
-  'VideoCollection',
   // This is invalidated on reconnect. It should be used for queries that have changing data,
   // especially related to the queue and generation.
   'FetchOnReconnect',
@@ -72,13 +62,10 @@ export const LIST_TAG = 'LIST';
 export const LIST_ALL_TAG = 'LIST_ALL';
 
 export const getBaseUrl = (): string => {
-  const baseUrl = $baseUrl.get();
-  return baseUrl || window.location.href.replace(/\/$/, '');
+  return window.location.href.replace(/\/$/, '');
 };
 
 const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = (args, api, extraOptions) => {
-  const authToken = $authToken.get();
-  const projectId = $projectId.get();
   const isOpenAPIRequest =
     (args instanceof Object && args.url.includes('openapi.json')) ||
     (typeof args === 'string' && args.includes('openapi.json'));
@@ -90,20 +77,6 @@ const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryE
   // When fetching the openapi.json, we need to remove circular references from the JSON.
   if (isOpenAPIRequest) {
     fetchBaseQueryArgs.jsonReplacer = getCircularReplacer();
-  }
-
-  // openapi.json isn't protected by authorization, but all other requests need to include the auth token and project id.
-  if (!isOpenAPIRequest) {
-    fetchBaseQueryArgs.prepareHeaders = (headers) => {
-      if (authToken) {
-        headers.set('Authorization', `Bearer ${authToken}`);
-      }
-      if (projectId) {
-        headers.set('project-id', projectId);
-      }
-
-      return headers;
-    };
   }
 
   const rawBaseQuery = fetchBaseQuery(fetchBaseQueryArgs);

@@ -56,12 +56,6 @@ export const containerSx: SystemStyleObject = {
     display: 'block',
     shadow: '0 0 0 2px var(--border-color-selected)',
   },
-  '&[data-is-editor-locked="true"]': {
-    '& *': {
-      cursor: 'not-allowed',
-      pointerEvents: 'none',
-    },
-  },
 };
 
 export const shadowsSx: SystemStyleObject = {

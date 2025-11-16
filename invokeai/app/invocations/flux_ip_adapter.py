@@ -16,10 +16,7 @@ from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.config import (
-    IPAdapterCheckpointConfig,
-    IPAdapterInvokeAIConfig,
-)
+from invokeai.backend.model_manager.configs.ip_adapter import IPAdapter_Checkpoint_FLUX_Config
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
 
@@ -68,7 +65,7 @@ class FluxIPAdapterInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> IPAdapterOutput:
         # Lookup the CLIP Vision encoder that is intended to be used with the IP-Adapter model.
         ip_adapter_info = context.models.get_config(self.ip_adapter_model.key)
-        assert isinstance(ip_adapter_info, (IPAdapterInvokeAIConfig, IPAdapterCheckpointConfig))
+        assert isinstance(ip_adapter_info, IPAdapter_Checkpoint_FLUX_Config)
 
         # Note: There is a IPAdapterInvokeAIConfig.image_encoder_model_id field, but it isn't trustworthy.
         image_encoder_starter_model = CLIP_VISION_MODEL_MAP[self.clip_vision_model]

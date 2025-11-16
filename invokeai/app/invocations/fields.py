@@ -54,6 +54,7 @@ class UIType(str, Enum, metaclass=MetaEnum):
     # region Internal Field Types
     _Collection = "CollectionField"
     _CollectionItem = "CollectionItemField"
+    _IsIntermediate = "IsIntermediate"
     # endregion
 
     # region DEPRECATED
@@ -91,7 +92,6 @@ class UIType(str, Enum, metaclass=MetaEnum):
     CollectionItem = "DEPRECATED_CollectionItem"
     Enum = "DEPRECATED_Enum"
     WorkflowField = "DEPRECATED_WorkflowField"
-    IsIntermediate = "DEPRECATED_IsIntermediate"
     BoardField = "DEPRECATED_BoardField"
     MetadataItem = "DEPRECATED_MetadataItem"
     MetadataItemCollection = "DEPRECATED_MetadataItemCollection"
@@ -233,12 +233,6 @@ class ImageField(BaseModel):
     """An image primitive field"""
 
     image_name: str = Field(description="The name of the image")
-
-
-class VideoField(BaseModel):
-    """A video primitive field"""
-
-    video_id: str = Field(description="The id of the video")
 
 
 class BoardField(BaseModel):
@@ -423,6 +417,7 @@ class InputFieldJSONSchemaExtra(BaseModel):
     model_config = ConfigDict(
         validate_assignment=True,
         json_schema_serialization_defaults_required=True,
+        use_enum_values=True,
     )
 
 
@@ -482,7 +477,91 @@ class OutputFieldJSONSchemaExtra(BaseModel):
     model_config = ConfigDict(
         validate_assignment=True,
         json_schema_serialization_defaults_required=True,
+        use_enum_values=True,
     )
+
+
+def migrate_model_ui_type(ui_type: UIType | str, json_schema_extra: dict[str, Any]) -> bool:
+    """Migrate deprecated model-specifier ui_type values to new-style ui_model_[base|type|variant|format] in json_schema_extra."""
+    if not isinstance(ui_type, UIType):
+        ui_type = UIType(ui_type)
+
+    ui_model_type: list[ModelType] | None = None
+    ui_model_base: list[BaseModelType] | None = None
+    ui_model_format: list[ModelFormat] | None = None
+    ui_model_variant: list[ClipVariantType | ModelVariantType] | None = None
+
+    match ui_type:
+        case UIType.MainModel:
+            ui_model_base = [BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2]
+            ui_model_type = [ModelType.Main]
+        case UIType.CogView4MainModel:
+            ui_model_base = [BaseModelType.CogView4]
+            ui_model_type = [ModelType.Main]
+        case UIType.FluxMainModel:
+            ui_model_base = [BaseModelType.Flux]
+            ui_model_type = [ModelType.Main]
+        case UIType.SD3MainModel:
+            ui_model_base = [BaseModelType.StableDiffusion3]
+            ui_model_type = [ModelType.Main]
+        case UIType.SDXLMainModel:
+            ui_model_base = [BaseModelType.StableDiffusionXL]
+            ui_model_type = [ModelType.Main]
+        case UIType.SDXLRefinerModel:
+            ui_model_base = [BaseModelType.StableDiffusionXLRefiner]
+            ui_model_type = [ModelType.Main]
+        case UIType.VAEModel:
+            ui_model_type = [ModelType.VAE]
+        case UIType.FluxVAEModel:
+            ui_model_base = [BaseModelType.Flux]
+            ui_model_type = [ModelType.VAE]
+        case UIType.LoRAModel:
+            ui_model_type = [ModelType.LoRA]
+        case UIType.ControlNetModel:
+            ui_model_type = [ModelType.ControlNet]
+        case UIType.IPAdapterModel:
+            ui_model_type = [ModelType.IPAdapter]
+        case UIType.T2IAdapterModel:
+            ui_model_type = [ModelType.T2IAdapter]
+        case UIType.T5EncoderModel:
+            ui_model_type = [ModelType.T5Encoder]
+        case UIType.CLIPEmbedModel:
+            ui_model_type = [ModelType.CLIPEmbed]
+        case UIType.CLIPLEmbedModel:
+            ui_model_type = [ModelType.CLIPEmbed]
+            ui_model_variant = [ClipVariantType.L]
+        case UIType.CLIPGEmbedModel:
+            ui_model_type = [ModelType.CLIPEmbed]
+            ui_model_variant = [ClipVariantType.G]
+        case UIType.SpandrelImageToImageModel:
+            ui_model_type = [ModelType.SpandrelImageToImage]
+        case UIType.ControlLoRAModel:
+            ui_model_type = [ModelType.ControlLoRa]
+        case UIType.SigLipModel:
+            ui_model_type = [ModelType.SigLIP]
+        case UIType.FluxReduxModel:
+            ui_model_type = [ModelType.FluxRedux]
+        case UIType.LlavaOnevisionModel:
+            ui_model_type = [ModelType.LlavaOnevision]
+        case _:
+            pass
+
+    did_migrate = False
+
+    if ui_model_type is not None:
+        json_schema_extra["ui_model_type"] = [m.value for m in ui_model_type]
+        did_migrate = True
+    if ui_model_base is not None:
+        json_schema_extra["ui_model_base"] = [m.value for m in ui_model_base]
+        did_migrate = True
+    if ui_model_format is not None:
+        json_schema_extra["ui_model_format"] = [m.value for m in ui_model_format]
+        did_migrate = True
+    if ui_model_variant is not None:
+        json_schema_extra["ui_model_variant"] = [m.value for m in ui_model_variant]
+        did_migrate = True
+
+    return did_migrate
 
 
 def InputField(
@@ -575,93 +654,6 @@ def InputField(
         field_kind=FieldKind.Input,
     )
 
-    if ui_type is not None:
-        if (
-            ui_model_base is not None
-            or ui_model_type is not None
-            or ui_model_variant is not None
-            or ui_model_format is not None
-        ):
-            logger.warning("InputField: Use either ui_type or ui_model_[base|type|variant|format]. Ignoring ui_type.")
-        # Map old-style UIType to new-style ui_model_[base|type|variant|format]
-        elif ui_type is UIType.MainModel:
-            json_schema_extra_.ui_model_type = [ModelType.Main]
-        elif ui_type is UIType.CogView4MainModel:
-            json_schema_extra_.ui_model_base = [BaseModelType.CogView4]
-            json_schema_extra_.ui_model_type = [ModelType.Main]
-        elif ui_type is UIType.FluxMainModel:
-            json_schema_extra_.ui_model_base = [BaseModelType.Flux]
-            json_schema_extra_.ui_model_type = [ModelType.Main]
-        elif ui_type is UIType.SD3MainModel:
-            json_schema_extra_.ui_model_base = [BaseModelType.StableDiffusion3]
-            json_schema_extra_.ui_model_type = [ModelType.Main]
-        elif ui_type is UIType.SDXLMainModel:
-            json_schema_extra_.ui_model_base = [BaseModelType.StableDiffusionXL]
-            json_schema_extra_.ui_model_type = [ModelType.Main]
-        elif ui_type is UIType.SDXLRefinerModel:
-            json_schema_extra_.ui_model_base = [BaseModelType.StableDiffusionXLRefiner]
-            json_schema_extra_.ui_model_type = [ModelType.Main]
-        # Think this UIType is unused...?
-        # elif ui_type is UIType.ONNXModel:
-        #     json_schema_extra_.ui_model_base =
-        #     json_schema_extra_.ui_model_type =
-        elif ui_type is UIType.VAEModel:
-            json_schema_extra_.ui_model_type = [ModelType.VAE]
-        elif ui_type is UIType.FluxVAEModel:
-            json_schema_extra_.ui_model_base = [BaseModelType.Flux]
-            json_schema_extra_.ui_model_type = [ModelType.VAE]
-        elif ui_type is UIType.LoRAModel:
-            json_schema_extra_.ui_model_type = [ModelType.LoRA]
-        elif ui_type is UIType.ControlNetModel:
-            json_schema_extra_.ui_model_type = [ModelType.ControlNet]
-        elif ui_type is UIType.IPAdapterModel:
-            json_schema_extra_.ui_model_type = [ModelType.IPAdapter]
-        elif ui_type is UIType.T2IAdapterModel:
-            json_schema_extra_.ui_model_type = [ModelType.T2IAdapter]
-        elif ui_type is UIType.T5EncoderModel:
-            json_schema_extra_.ui_model_type = [ModelType.T5Encoder]
-        elif ui_type is UIType.CLIPEmbedModel:
-            json_schema_extra_.ui_model_type = [ModelType.CLIPEmbed]
-        elif ui_type is UIType.CLIPLEmbedModel:
-            json_schema_extra_.ui_model_type = [ModelType.CLIPEmbed]
-            json_schema_extra_.ui_model_variant = [ClipVariantType.L]
-        elif ui_type is UIType.CLIPGEmbedModel:
-            json_schema_extra_.ui_model_type = [ModelType.CLIPEmbed]
-            json_schema_extra_.ui_model_variant = [ClipVariantType.G]
-        elif ui_type is UIType.SpandrelImageToImageModel:
-            json_schema_extra_.ui_model_type = [ModelType.SpandrelImageToImage]
-        elif ui_type is UIType.ControlLoRAModel:
-            json_schema_extra_.ui_model_type = [ModelType.ControlLoRa]
-        elif ui_type is UIType.SigLipModel:
-            json_schema_extra_.ui_model_type = [ModelType.SigLIP]
-        elif ui_type is UIType.FluxReduxModel:
-            json_schema_extra_.ui_model_type = [ModelType.FluxRedux]
-        elif ui_type is UIType.LlavaOnevisionModel:
-            json_schema_extra_.ui_model_type = [ModelType.LlavaOnevision]
-        elif ui_type is UIType.Imagen3Model:
-            json_schema_extra_.ui_model_base = [BaseModelType.Imagen3]
-            json_schema_extra_.ui_model_type = [ModelType.Main]
-        elif ui_type is UIType.Imagen4Model:
-            json_schema_extra_.ui_model_base = [BaseModelType.Imagen4]
-            json_schema_extra_.ui_model_type = [ModelType.Main]
-        elif ui_type is UIType.ChatGPT4oModel:
-            json_schema_extra_.ui_model_base = [BaseModelType.ChatGPT4o]
-            json_schema_extra_.ui_model_type = [ModelType.Main]
-        elif ui_type is UIType.Gemini2_5Model:
-            json_schema_extra_.ui_model_base = [BaseModelType.Gemini2_5]
-            json_schema_extra_.ui_model_type = [ModelType.Main]
-        elif ui_type is UIType.FluxKontextModel:
-            json_schema_extra_.ui_model_base = [BaseModelType.FluxKontext]
-            json_schema_extra_.ui_model_type = [ModelType.Main]
-        elif ui_type is UIType.Veo3Model:
-            json_schema_extra_.ui_model_base = [BaseModelType.Veo3]
-            json_schema_extra_.ui_model_type = [ModelType.Video]
-        elif ui_type is UIType.RunwayModel:
-            json_schema_extra_.ui_model_base = [BaseModelType.Runway]
-            json_schema_extra_.ui_model_type = [ModelType.Video]
-        else:
-            json_schema_extra_.ui_type = ui_type
-
     if ui_component is not None:
         json_schema_extra_.ui_component = ui_component
     if ui_hidden is not None:
@@ -690,6 +682,8 @@ def InputField(
             json_schema_extra_.ui_model_format = ui_model_format
         else:
             json_schema_extra_.ui_model_format = [ui_model_format]
+    if ui_type is not None:
+        json_schema_extra_.ui_type = ui_type
 
     """
     There is a conflict between the typing of invocation definitions and the typing of an invocation's

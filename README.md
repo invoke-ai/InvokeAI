@@ -4,38 +4,27 @@
 
 # Invoke - Professional Creative AI Tools for Visual Media
 
-#### To learn more about Invoke, or implement our Business solutions, visit [invoke.com]
-
 [![discord badge]][discord link] [![latest release badge]][latest release link] [![github stars badge]][github stars link] [![github forks badge]][github forks link] [![CI checks on main badge]][CI checks on main link] [![latest commit to main badge]][latest commit to main link] [![github open issues badge]][github open issues link] [![github open prs badge]][github open prs link] [![translation status badge]][translation status link]
 
 </div>
 
 Invoke is a leading creative engine built to empower professionals and enthusiasts alike. Generate and create stunning visual media using the latest AI-driven technologies. Invoke offers an industry leading web-based UI, and serves as the foundation for multiple commercial products.
 
-Invoke is available in two editions:
-
-| **Community Edition**                                                                                                      | **Professional Edition**                                                                            |
-|----------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
-| **For users looking for a locally installed, self-hosted and self-managed service**                                         | **For users or teams looking for a cloud-hosted, fully managed service**                            |
-| - Free to use under a commercially-friendly license                                                                         | - Monthly subscription fee with three different plan levels                                         |
-| - Download and install on compatible hardware                                                                               | - Offers additional benefits, including multi-user support, improved model training, and more                          |
-| - Includes all core studio features: generate, refine, iterate on images, and build workflows                               | - Hosted in the cloud for easy, secure model access and scalability                                               |
-| Quick Start -> [Installation and Updates][installation docs]                                                                     | More Information -> [www.invoke.com/pricing](https://www.invoke.com/pricing)                        |
-
+- Free to use under a commercially-friendly license
+- Download and install on compatible hardware
+- Generate, refine, iterate on images, and build workflows
 
 ![Highlighted Features - Canvas and Workflows](https://github.com/invoke-ai/InvokeAI/assets/31807370/708f7a82-084f-4860-bfbe-e2588c53548d)
 
 # Documentation
-| **Quick Links**                                                                                                      | 
-|----------------------------------------------------------------------------------------------------------------------------|
-|  [Installation and Updates][installation docs] - [Documentation and Tutorials][docs home] - [Bug Reports][github issues] - [Contributing][contributing docs]  | 
+
+| **Quick Links**                                                                                                                                             |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Installation and Updates][installation docs] - [Documentation and Tutorials][docs home] - [Bug Reports][github issues] - [Contributing][contributing docs] |
 
 # Installation
 
-To get started with Invoke, [Download the Installer](https://www.invoke.com/downloads).
-
-For detailed step by step instructions, or for instructions on manual/docker installations, visit our documentation on [Installation and Updates][installation docs]
-
+To get started with Invoke, [Download the Launcher](https://github.com/invoke-ai/launcher/releases/latest).
 
 ## Troubleshooting, FAQ and Support
 
@@ -90,7 +79,6 @@ Original portions of the software are Copyright © 2024 by respective contributo
 [features docs]: https://invoke-ai.github.io/InvokeAI/features/database/
 [faq]: https://invoke-ai.github.io/InvokeAI/faq/
 [contributors]: https://invoke-ai.github.io/InvokeAI/contributing/contributors/
-[invoke.com]: https://www.invoke.com/about
 [github issues]: https://github.com/invoke-ai/InvokeAI/issues
 [docs home]: https://invoke-ai.github.io/InvokeAI
 [installation docs]: https://invoke-ai.github.io/InvokeAI/installation/

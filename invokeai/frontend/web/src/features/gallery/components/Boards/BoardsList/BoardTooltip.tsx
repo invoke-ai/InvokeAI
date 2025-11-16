@@ -1,6 +1,5 @@
 import { Flex, Image, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useTranslation } from 'react-i18next';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { BoardDTO } from 'services/api/types';
@@ -10,13 +9,11 @@ type Props = {
   boardCounts: {
     image_count: number;
     asset_count: number;
-    video_count: number;
   };
 };
 
 export const BoardTooltip = ({ board, boardCounts }: Props) => {
   const { t } = useTranslation();
-  const isVideoEnabled = useFeatureStatus('video');
 
   const { currentData: coverImage } = useGetImageDTOQuery(board?.cover_image_name ?? skipToken);
 
@@ -39,7 +36,6 @@ export const BoardTooltip = ({ board, boardCounts }: Props) => {
           {t('boards.imagesWithCount', { count: boardCounts.image_count })},{' '}
           {t('boards.assetsWithCount', { count: boardCounts.asset_count })}
         </Text>
-        {isVideoEnabled && <Text noOfLines={1}>{t('boards.videosWithCount', { count: boardCounts.video_count })}</Text>}
         {board?.archived && <Text>({t('boards.archived')})</Text>}
       </Flex>
     </Flex>

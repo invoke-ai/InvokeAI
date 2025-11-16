@@ -15,7 +15,6 @@ import {
   PiFrameCornersBold,
   PiQueueBold,
   PiTextAaBold,
-  PiVideoBold,
 } from 'react-icons/pi';
 
 import type { DockviewPanelParameters } from './auto-layout-context';
@@ -27,7 +26,6 @@ const TAB_ICONS: Record<TabName, IconType> = {
   workflows: PiFlowArrowBold,
   models: PiCubeBold,
   queue: PiQueueBold,
-  video: PiVideoBold,
 };
 
 export const DockviewTabLaunchpad = memo((props: IDockviewPanelHeaderProps<DockviewPanelParameters>) => {
