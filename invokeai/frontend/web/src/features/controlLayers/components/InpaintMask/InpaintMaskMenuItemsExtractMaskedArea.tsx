@@ -133,7 +133,7 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
         },
       };
 
-      // Insert the new raster layer just after the last existing raster layer so it appears above the mask.
+      // Insert the new raster layer at the top of the raster layer stack.
       const addAfter = canvasManager.stateApi.getRasterLayersState().entities.at(-1)?.id;
 
       canvasManager.stateApi.addRasterLayer({
