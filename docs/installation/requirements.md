@@ -41,7 +41,7 @@ The requirements below are rough guidelines for best performance. GPUs with less
 
     You don't need to do this if you are installing with the [Invoke Launcher](./quick_start.md).
 
-Invoke requires python 3.10 through 3.12. If you don't already have one of these versions installed, we suggest installing 3.12, as it will be supported for longer.
+Invoke requires python 3.11 through 3.12. If you don't already have one of these versions installed, we suggest installing 3.12, as it will be supported for longer.
 
 Check that your system has an up-to-date Python installed by running `python3 --version` in the terminal (Linux, macOS) or cmd/powershell (Windows).
 
@@ -56,7 +56,7 @@ Check that your system has an up-to-date Python installed by running `python3 --
     === "macOS"
 
         - Install python with [an official installer].
-        - If model installs fail with a certificate error, you may need to run this command (changing the python version to match what you have installed): `/Applications/Python\ 3.10/Install\ Certificates.command`
+        - If model installs fail with a certificate error, you may need to run this command (changing the python version to match what you have installed): `/Applications/Python\ 3.11/Install\ Certificates.command`
         - If you haven't already, you will need to install the XCode CLI Tools by running `xcode-select --install` in a terminal.
 
     === "Linux"
