@@ -9281,6 +9281,15 @@ export type components = {
             source_prepared_mapping: {
                 [key: string]: string[];
             };
+            /** Ready Order */
+            ready_order?: string[];
+            /**
+             * Indegree
+             * @description Remaining unmet input count for exec nodes
+             */
+            indegree?: {
+                [key: string]: number;
+            };
         };
         /**
          * Grounding DINO (Text Prompt Object Detection)
@@ -11676,6 +11685,13 @@ export type components = {
              * @default false
              */
             fp32?: boolean;
+            /**
+             * Color Compensation
+             * @description Apply VAE scaling compensation when encoding images (reduces color drift).
+             * @default None
+             * @enum {string}
+             */
+            color_compensation?: "None" | "SDXL";
             /**
              * type
              * @default i2l
