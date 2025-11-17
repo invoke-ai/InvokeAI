@@ -9,7 +9,6 @@ from typing import Any, Generator, Optional
 import pytest
 from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
-from requests_testadapter import TestAdapter
 
 from invokeai.app.services.config import get_config
 from invokeai.app.services.config.config_default import URLRegexTokenPair
@@ -23,9 +22,6 @@ from invokeai.app.services.events.events_common import (
 )
 from invokeai.backend.model_manager.metadata import HuggingFaceMetadataFetch, ModelMetadataWithFiles, RemoteModelFile
 from tests.test_nodes import TestEventService
-
-# Prevent pytest deprecation warnings
-TestAdapter.__test__ = False
 
 
 @pytest.mark.timeout(timeout=10, method="thread")
