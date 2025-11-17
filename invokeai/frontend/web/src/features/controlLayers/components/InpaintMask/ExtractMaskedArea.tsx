@@ -14,7 +14,7 @@ import { toast } from 'features/toast/toast';
 
 const log = logger('canvas');
 
-export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
+export const ExtractMaskedArea = memo(() => {
   const canvasManager = useCanvasManager();
   const entityIdentifier = useEntityIdentifierContext('inpaint_mask');
   const isBusy = useCanvasIsBusy();
@@ -149,5 +149,5 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
   );
 });
 
-InpaintMaskMenuItemsExtractMaskedArea.displayName = 'InpaintMaskMenuItemsExtractMaskedArea';
+ExtractMaskedArea.displayName = 'ExtractMaskedArea';
 
