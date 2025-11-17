@@ -30,13 +30,14 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
     }
 
     try {
-      // Use the full stage dimensions so the mask extraction covers the entire canvas.
-      const { width, height } = canvasManager.stage.getSize();
+      // Use the mask's bounding box in stage coordinates to constrain the extraction region.
+      const maskPixelRect = maskAdapter.transformer.$pixelRect.get();
+      const maskPosition = maskAdapter.state.position;
       const rect: Rect = {
-        x: 0,
-        y: 0,
-        width: Math.floor(width),
-        height: Math.floor(height),
+        x: Math.floor(maskPosition.x + maskPixelRect.x),
+        y: Math.floor(maskPosition.y + maskPixelRect.y),
+        width: Math.floor(maskPixelRect.width),
+        height: Math.floor(maskPixelRect.height),
       };
 
       // Abort when the canvas is effectively empty—no pixels to extract.
