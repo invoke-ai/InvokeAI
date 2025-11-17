@@ -15,16 +15,19 @@ const zCanvasWorkflowIntegrationState = z.object({
     })
     .nullable(),
   fieldValues: z.record(z.string(), z.any()).nullable(),
+  // Which ImageField to use for canvas image (format: "nodeId.fieldName")
+  selectedImageFieldKey: z.string().nullable(),
   isProcessing: z.boolean(),
 });
 
-export type CanvasWorkflowIntegrationState = z.infer<typeof zCanvasWorkflowIntegrationState>;
+type CanvasWorkflowIntegrationState = z.infer<typeof zCanvasWorkflowIntegrationState>;
 
 const getInitialState = (): CanvasWorkflowIntegrationState => ({
   isOpen: false,
   selectedWorkflowId: null,
   sourceEntityIdentifier: null,
   fieldValues: null,
+  selectedImageFieldKey: null,
   isProcessing: false,
 });
 
@@ -46,12 +49,17 @@ const slice = createSlice({
       state.selectedWorkflowId = null;
       state.sourceEntityIdentifier = null;
       state.fieldValues = null;
+      state.selectedImageFieldKey = null;
       state.isProcessing = false;
     },
     canvasWorkflowIntegrationWorkflowSelected: (state, action: PayloadAction<{ workflowId: string | null }>) => {
       state.selectedWorkflowId = action.payload.workflowId;
       // Reset field values when switching workflows
       state.fieldValues = null;
+      state.selectedImageFieldKey = null;
+    },
+    canvasWorkflowIntegrationImageFieldSelected: (state, action: PayloadAction<{ fieldKey: string | null }>) => {
+      state.selectedImageFieldKey = action.payload.fieldKey;
     },
     canvasWorkflowIntegrationFieldValueChanged: (
       state,
@@ -78,8 +86,8 @@ export const {
   canvasWorkflowIntegrationOpened,
   canvasWorkflowIntegrationClosed,
   canvasWorkflowIntegrationWorkflowSelected,
+  canvasWorkflowIntegrationImageFieldSelected,
   canvasWorkflowIntegrationFieldValueChanged,
-  canvasWorkflowIntegrationFieldValuesReset,
   canvasWorkflowIntegrationProcessingStarted,
   canvasWorkflowIntegrationProcessingCompleted,
 } = slice.actions;
@@ -103,6 +111,9 @@ export const selectCanvasWorkflowIntegrationSourceEntityIdentifier = createCanva
 );
 export const selectCanvasWorkflowIntegrationFieldValues = createCanvasWorkflowIntegrationSelector(
   (state) => state.fieldValues
+);
+export const selectCanvasWorkflowIntegrationSelectedImageFieldKey = createCanvasWorkflowIntegrationSelector(
+  (state) => state.selectedImageFieldKey
 );
 export const selectCanvasWorkflowIntegrationIsProcessing = createCanvasWorkflowIntegrationSelector(
   (state) => state.isProcessing

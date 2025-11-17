@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
+import { canvasWorkflowIntegrationProcessingCompleted } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
 import {
   selectAutoSwitch,
   selectGalleryView,
@@ -13,8 +14,10 @@ import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks
 import { isImageField, isImageFieldCollection } from 'features/nodes/types/common';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import type { LRUCache } from 'lru-cache';
+import { LIST_ALL_TAG } from 'services/api';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
+import { queueApi } from 'services/api/endpoints/queue';
 import type { ImageDTO, S } from 'services/api/types';
 import { getCategories } from 'services/api/util';
 import { insertImageIntoNamesResult } from 'services/api/util/optimisticUpdates';
@@ -217,6 +220,27 @@ export const buildOnInvocationComplete = (
     return imageDTOs;
   };
 
+  const clearCanvasWorkflowIntegrationProcessing = (data: S['InvocationCompleteEvent']) => {
+    // Check if this is a canvas workflow integration result
+    // Results go to staging area automatically via destination = canvasSessionId
+    if (data.origin !== 'canvas_workflow_integration') {
+      return;
+    }
+    // Clear processing state so the modal loading spinner stops
+    dispatch(canvasWorkflowIntegrationProcessingCompleted());
+
+    // Check if this invocation produced an image output
+    const hasImageOutput = objectEntries(data.result).some(([_name, value]) => {
+      return isImageField(value) || isImageFieldCollection(value);
+    });
+
+    // Only invalidate if this invocation produced an image - this ensures the staging area
+    // gets updated immediately when output images are available, without invalidating on every invocation
+    if (hasImageOutput) {
+      dispatch(queueApi.util.invalidateTags([{ type: 'SessionQueueItem', id: LIST_ALL_TAG }]));
+    }
+  };
+
   return async (data: S['InvocationCompleteEvent']) => {
     if (finishedQueueItemIds.has(data.item_id)) {
       log.trace({ data } as JsonObject, `Received event for already-finished queue item ${data.item_id}`);
@@ -236,6 +260,10 @@ export const buildOnInvocationComplete = (
       upsertExecutionState(_nodeExecutionState.nodeId, _nodeExecutionState);
     }
 
+    // Clear canvas workflow integration processing state if needed
+    clearCanvasWorkflowIntegrationProcessing(data);
+
+    // Add images to gallery (canvas workflow integration results go to staging area automatically)
     await addImagesToGallery(data);
 
     $lastProgressEvent.set(null);
