@@ -14,7 +14,7 @@ import { toast } from 'features/toast/toast';
 
 const log = logger('canvas');
 
-export const ExtractMaskedArea = memo(() => {
+export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
   const canvasManager = useCanvasManager();
   const entityIdentifier = useEntityIdentifierContext('inpaint_mask');
   const isBusy = useCanvasIsBusy();
@@ -139,15 +139,11 @@ export const ExtractMaskedArea = memo(() => {
   }, [canvasManager, entityIdentifier, t]);
 
   return (
-    <MenuItem
-      onClick={onExtract}
-      icon={<PiSelectionBackgroundBold />}
-      isDisabled={isBusy}
-    >
+    <MenuItem onClick={onExtract} icon={<PiSelectionBackgroundBold />} isDisabled={isBusy}>
       {t('controlLayers.extractRegion')}
     </MenuItem>
   );
 });
 
-ExtractMaskedArea.displayName = 'ExtractMaskedArea';
+InpaintMaskMenuItemsExtractMaskedArea.displayName = 'InpaintMaskMenuItemsExtractMaskedArea';
 

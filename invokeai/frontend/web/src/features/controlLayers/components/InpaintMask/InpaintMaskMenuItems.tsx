@@ -10,7 +10,7 @@ import { CanvasEntityMenuItemsTransform } from 'features/controlLayers/component
 import { InpaintMaskMenuItemsAddModifiers } from 'features/controlLayers/components/InpaintMask/InpaintMaskMenuItemsAddModifiers';
 import { InpaintMaskMenuItemsConvertToSubMenu } from 'features/controlLayers/components/InpaintMask/InpaintMaskMenuItemsConvertToSubMenu';
 import { InpaintMaskMenuItemsCopyToSubMenu } from 'features/controlLayers/components/InpaintMask/InpaintMaskMenuItemsCopyToSubMenu';
-import { ExtractMaskedArea } from 'features/controlLayers/components/InpaintMask/ExtractMaskedArea';
+import { InpaintMaskMenuItemsExtractMaskedArea } from 'features/controlLayers/components/InpaintMask/InpaintMaskMenuItemsExtractMaskedArea';
 import { memo } from 'react';
 
 export const InpaintMaskMenuItems = memo(() => {
@@ -25,7 +25,7 @@ export const InpaintMaskMenuItems = memo(() => {
       <InpaintMaskMenuItemsAddModifiers />
       <MenuDivider />
       <CanvasEntityMenuItemsTransform />
-      <ExtractMaskedArea />
+      <InpaintMaskMenuItemsExtractMaskedArea />
       <MenuDivider />
       <CanvasEntityMenuItemsMergeDown />
       <InpaintMaskMenuItemsCopyToSubMenu />
