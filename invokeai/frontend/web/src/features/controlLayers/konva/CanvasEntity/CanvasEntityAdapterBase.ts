@@ -546,6 +546,10 @@ export abstract class CanvasEntityAdapterBase<T extends CanvasEntityState, U ext
     this.renderer.syncKonvaCache();
   };
 
+  invalidateRasterCache = () => {
+    this.renderer.invalidateRasterCache();
+  };
+
   /**
    * Synchronizes the entity's locked state with the canvas.
    */
