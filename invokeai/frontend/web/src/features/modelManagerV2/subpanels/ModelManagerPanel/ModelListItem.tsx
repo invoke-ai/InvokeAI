@@ -70,7 +70,6 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
   const isSelected = useAppSelector(selectIsSelected);
   const selectedModelKeys = useAppSelector(selectSelectedModelKeys);
   const isChecked = selectedModelKeys.includes(model.key);
-  const hasSelection = selectedModelKeys.length > 0;
 
   const handleSelectModel = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
@@ -80,11 +79,11 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
         return;
       }
 
-      // Multi-select with Ctrl/Cmd+Click
+      // Clicking the row opens detail view (single select)
+      // Ctrl/Cmd+Click still works as a power user feature for multi-select
       if (e.ctrlKey || e.metaKey) {
         dispatch(toggleModelSelection(model.key));
       } else {
-        // Single select - normal behavior
         dispatch(setSelectedModelKey(model.key));
       }
     },
@@ -110,15 +109,13 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
       cursor="pointer"
       onClick={handleSelectModel}
     >
-      {hasSelection && (
-        <Checkbox
-          isChecked={isChecked}
-          onChange={handleCheckboxChange}
-          mt={1}
-          pointerEvents="auto"
-          onClick={handleCheckboxClick}
-        />
-      )}
+      <Checkbox
+        isChecked={isChecked}
+        onChange={handleCheckboxChange}
+        mt={1}
+        pointerEvents="auto"
+        onClick={handleCheckboxClick}
+      />
       <Flex gap={2} w="full" h="full" minW={0}>
         <ModelImage image_url={model.cover_image} />
         <Flex alignItems="flex-start" flexDir="column" w="full" minW={0}>

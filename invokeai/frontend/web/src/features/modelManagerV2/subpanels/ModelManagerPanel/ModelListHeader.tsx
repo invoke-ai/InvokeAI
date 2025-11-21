@@ -1,9 +1,19 @@
-import { Button, Flex, Tag, TagCloseButton, TagLabel } from '@invoke-ai/ui-library';
+import {
+  Button,
+  Flex,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuList,
+  Tag,
+  TagCloseButton,
+  TagLabel,
+} from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { clearModelSelection, selectSelectedModelKeys } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiTrashSimpleBold } from 'react-icons/pi';
+import { PiCaretDownBold, PiTrashSimpleBold } from 'react-icons/pi';
 
 type ModelListHeaderProps = {
   onBulkDelete: () => void;
@@ -43,9 +53,16 @@ export const ModelListHeader = memo(({ onBulkDelete }: ModelListHeaderProps) => 
         </TagLabel>
         <TagCloseButton onClick={handleClearSelection} />
       </Tag>
-      <Button size="sm" colorScheme="error" leftIcon={<PiTrashSimpleBold />} onClick={onBulkDelete} flexShrink={0}>
-        {t('modelManager.deleteModels', { count: selectionCount })}
-      </Button>
+      <Menu>
+        <MenuButton as={Button} size="sm" rightIcon={<PiCaretDownBold />} flexShrink={0}>
+          {t('modelManager.actions')}
+        </MenuButton>
+        <MenuList>
+          <MenuItem icon={<PiTrashSimpleBold />} onClick={onBulkDelete} color="error.300">
+            {t('modelManager.deleteModels', { count: selectionCount })}
+          </MenuItem>
+        </MenuList>
+      </Menu>
     </Flex>
   );
 });
