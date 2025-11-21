@@ -428,6 +428,29 @@
         "searchHotkeys": "Search Hotkeys",
         "clearSearch": "Clear Search",
         "noHotkeysFound": "No Hotkeys Found",
+        "editMode": "Edit Mode",
+        "viewMode": "View Mode",
+        "editHotkey": "Edit Hotkey",
+        "resetToDefault": "Reset to Default",
+        "resetAll": "Reset All to Default",
+        "enterHotkeys": "Enter hotkey(s), separated by commas",
+        "save": "Save",
+        "cancel": "Cancel",
+        "modifiers": "Modifiers",
+        "syntaxHelp": "Syntax Help",
+        "combineWith": "Combine with +",
+        "multipleHotkeys": "Multiple hotkeys with comma",
+        "validKeys": "Valid keys",
+        "help": "Help",
+        "noHotkeysRecorded": "No hotkeys recorded yet",
+        "pressKeys": "Press keys...",
+        "setHotkey": "SET",
+        "setAnother": "SET ANOTHER",
+        "removeLastHotkey": "Remove last hotkey",
+        "clearAll": "Clear All",
+        "duplicateWarning": "This hotkey is already recorded",
+        "conflictWarning": "is already used by \"{{hotkeyTitle}}\"",
+        "thisHotkey": "this hotkey",
         "app": {
             "title": "App",
             "invoke": {
@@ -1317,6 +1340,7 @@
         "scheduler": "Scheduler",
         "seamlessXAxis": "Seamless X Axis",
         "seamlessYAxis": "Seamless Y Axis",
+        "colorCompensation": "Color Compensation",
         "seed": "Seed",
         "imageActions": "Image Actions",
         "sendToCanvas": "Send To Canvas",
@@ -1859,6 +1883,10 @@
         "seamlessTilingYAxis": {
             "heading": "Seamless Tiling Y Axis",
             "paragraphs": ["Seamlessly tile an image along the vertical axis."]
+        },
+        "colorCompensation": {
+            "heading": "Color Compensation",
+            "paragraphs": ["Adjust the input image to reduce color shifts during inpainting or img2img (SDXL Only)."]
         },
         "upscaleModel": {
             "heading": "Upscale Model",
