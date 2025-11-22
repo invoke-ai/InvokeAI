@@ -16,6 +16,7 @@ const $logger = atom<Logger>(Roarr.child(BASE_CONTEXT));
 
 export const zLogNamespace = z.enum([
   'canvas',
+  'canvas-workflow-integration',
   'config',
   'dnd',
   'events',
