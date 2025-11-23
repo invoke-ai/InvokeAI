@@ -2,8 +2,8 @@ import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
-import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { isPlainObject } from 'es-toolkit';
+import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { assert } from 'tsafe';
 import z from 'zod';
 
