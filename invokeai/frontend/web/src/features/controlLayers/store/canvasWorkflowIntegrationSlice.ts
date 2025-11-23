@@ -3,9 +3,12 @@ import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
+import { isPlainObject } from 'es-toolkit';
+import { assert } from 'tsafe';
 import z from 'zod';
 
 const zCanvasWorkflowIntegrationState = z.object({
+  _version: z.literal(1),
   isOpen: z.boolean(),
   selectedWorkflowId: z.string().nullable(),
   sourceEntityIdentifier: z
@@ -23,6 +26,7 @@ const zCanvasWorkflowIntegrationState = z.object({
 type CanvasWorkflowIntegrationState = z.infer<typeof zCanvasWorkflowIntegrationState>;
 
 const getInitialState = (): CanvasWorkflowIntegrationState => ({
+  _version: 1,
   isOpen: false,
   selectedWorkflowId: null,
   sourceEntityIdentifier: null,
@@ -96,6 +100,16 @@ export const canvasWorkflowIntegrationSliceConfig: SliceConfig<typeof slice> = {
   slice,
   schema: zCanvasWorkflowIntegrationState,
   getInitialState,
+  persistConfig: {
+    migrate: (state) => {
+      assert(isPlainObject(state));
+      if (!('_version' in state)) {
+        state._version = 1;
+      }
+      return zCanvasWorkflowIntegrationState.parse(state);
+    },
+    persistDenylist: ['isOpen', 'isProcessing', 'sourceEntityIdentifier'],
+  },
 };
 
 const selectCanvasWorkflowIntegrationSlice = (state: RootState) => state.canvasWorkflowIntegration;
