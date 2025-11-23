@@ -14,7 +14,6 @@ import { CANVAS_OUTPUT_PREFIX, getPrefixedId } from 'features/nodes/util/graph/g
 import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LIST_ALL_TAG } from 'services/api';
 import { queueApi } from 'services/api/endpoints/queue';
 import { useLazyGetWorkflowQuery } from 'services/api/endpoints/workflows';
 
@@ -128,7 +127,7 @@ export const useCanvasWorkflowIntegrationExecute = () => {
       }
 
       if (!imageFieldIdentifier) {
-        throw new Error('Workflow does not have an image input field');
+        throw new Error('Workflow does not have an image input field in the Form Builder');
       }
 
       // Update the workflow nodes with our values

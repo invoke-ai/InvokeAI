@@ -9,6 +9,8 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListWorkflowsInfiniteInfiniteQuery } from 'services/api/endpoints/workflows';
 
+import { useFilteredWorkflows } from './useFilteredWorkflows';
+
 export const CanvasWorkflowIntegrationWorkflowSelector = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
@@ -35,6 +37,9 @@ export const CanvasWorkflowIntegrationWorkflowSelector = memo(() => {
     return workflowsData.pages.flatMap((page) => page.items);
   }, [workflowsData]);
 
+  // Filter workflows to only show those with ImageFields
+  const { filteredWorkflows, isFiltering } = useFilteredWorkflows(workflows);
+
   const onChange = useCallback(
     (e: ChangeEvent<HTMLSelectElement>) => {
       const workflowId = e.target.value || null;
@@ -43,19 +48,28 @@ export const CanvasWorkflowIntegrationWorkflowSelector = memo(() => {
     [dispatch]
   );
 
-  if (isLoading) {
+  if (isLoading || isFiltering) {
     return (
       <Flex alignItems="center" gap={2}>
         <Spinner size="sm" />
-        <Text>{t('controlLayers.workflowIntegration.loadingWorkflows', 'Loading workflows...')}</Text>
+        <Text>
+          {isFiltering
+            ? t('controlLayers.workflowIntegration.filteringWorkflows', 'Filtering workflows...')
+            : t('controlLayers.workflowIntegration.loadingWorkflows', 'Loading workflows...')}
+        </Text>
       </Flex>
     );
   }
 
-  if (workflows.length === 0) {
+  if (filteredWorkflows.length === 0) {
     return (
       <Text color="warning.400" fontSize="sm">
-        {t('controlLayers.workflowIntegration.noWorkflowsFound', 'No workflows found.')}
+        {workflows.length === 0
+          ? t('controlLayers.workflowIntegration.noWorkflowsFound', 'No workflows found.')
+          : t(
+              'controlLayers.workflowIntegration.noWorkflowsWithImageField',
+              'No workflows with Form Builder and image input fields found. Create a workflow with the Form Builder and add an image field.'
+            )}
       </Text>
     );
   }
@@ -68,7 +82,7 @@ export const CanvasWorkflowIntegrationWorkflowSelector = memo(() => {
         value={selectedWorkflowId || ''}
         onChange={onChange}
       >
-        {workflows.map((workflow) => (
+        {filteredWorkflows.map((workflow) => (
           <option key={workflow.workflow_id} value={workflow.workflow_id}>
             {workflow.name || t('controlLayers.workflowIntegration.unnamedWorkflow', 'Unnamed Workflow')}
           </option>

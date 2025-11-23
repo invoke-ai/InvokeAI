@@ -62,7 +62,7 @@ export const CanvasWorkflowIntegrationModal = memo(() => {
             <Text fontSize="sm" color="base.400">
               {t(
                 'controlLayers.workflowIntegration.description',
-                'Select a workflow with an image parameter to run on the current canvas layer. The workflow result will be added back to the canvas.'
+                'Select a workflow with Form Builder and an image parameter to run on the current canvas layer. You can adjust parameters before executing. The result will be added back to the canvas.'
               )}
             </Text>
 

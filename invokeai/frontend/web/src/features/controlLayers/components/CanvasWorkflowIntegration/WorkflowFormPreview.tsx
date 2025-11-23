@@ -106,8 +106,21 @@ export const WorkflowFormPreview = memo(() => {
     );
   }
 
-  if (!workflow || Object.keys(elements).length === 0 || !rootElementId) {
+  if (!workflow) {
     return null;
+  }
+
+  // If workflow has no form builder, it should have been filtered out
+  // This is a fallback in case something went wrong
+  if (Object.keys(elements).length === 0 || !rootElementId) {
+    return (
+      <Text fontSize="sm" color="error.400">
+        {t(
+          'controlLayers.workflowIntegration.noFormBuilderError',
+          'This workflow has no form builder and cannot be used. Please select a different workflow.'
+        )}
+      </Text>
+    );
   }
 
   const rootElement = elements[rootElementId];
