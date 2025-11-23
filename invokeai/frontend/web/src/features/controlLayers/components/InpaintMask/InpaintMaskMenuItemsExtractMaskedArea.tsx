@@ -65,10 +65,7 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
         const maskCanvas = maskAdapter.getCanvas(rect);
         const maskImageData = canvasToImageData(maskCanvas);
 
-        if (
-          maskImageData.width !== compositeImageData.width ||
-          maskImageData.height !== compositeImageData.height
-        ) {
+        if (maskImageData.width !== compositeImageData.width || maskImageData.height !== compositeImageData.height) {
           // Bail out if the mask and composite buffers disagree on dimensions.
           log.error(
             {
@@ -93,7 +90,7 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
 
         // Apply the mask alpha channel to each pixel in the composite, keeping RGB untouched and only masking alpha.
         for (let i = 0; i < compositeArray.length; i += 4) {
-          const maskAlpha = ((maskArray[i + 3] ?? 0) / 255) || 0;
+          const maskAlpha = (maskArray[i + 3] ?? 0) / 255 || 0;
           outputArray[i] = compositeArray[i] ?? 0;
           outputArray[i + 1] = compositeArray[i + 1] ?? 0;
           outputArray[i + 2] = compositeArray[i + 2] ?? 0;
@@ -153,4 +150,3 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
 });
 
 InpaintMaskMenuItemsExtractMaskedArea.displayName = 'InpaintMaskMenuItemsExtractMaskedArea';
-
