@@ -124,7 +124,7 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
         // Convert the uploaded image DTO into the canvas image state to avoid serializing the PNG in client state.
         const imageState: CanvasImageState = imageDTOToImageObject(imageDTO);
 
-        // Insert the new raster layer just after the last existing raster layer so it appears above the mask.
+        // Insert the new raster layer so it appears at the top of raster layer goup.
         const addAfter = canvasManager.stateApi.getRasterLayersState().entities.at(-1)?.id;
 
         canvasManager.stateApi.addRasterLayer({
