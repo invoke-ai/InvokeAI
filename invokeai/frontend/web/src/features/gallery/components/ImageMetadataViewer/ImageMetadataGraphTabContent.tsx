@@ -29,7 +29,12 @@ const ImageMetadataGraphTabContent = ({ image }: Props) => {
   }
 
   return (
-    <DataViewer fileName={`${image.image_name.replace('.png', '')}_graph`} data={graph} label={t('nodes.graph')} />
+    <DataViewer
+      fileName={`${image.image_name.replace('.png', '')}_graph`}
+      data={graph}
+      label={t('nodes.graph')}
+      withSearch
+    />
   );
 };
 

@@ -66,6 +66,7 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
                 fileName={`${image.image_name.replace('.png', '')}_metadata`}
                 data={metadata}
                 label={t('metadata.metadata')}
+                withSearch
               />
             ) : (
               <IAINoContentFallback label={t('metadata.noMetaData')} />
@@ -77,6 +78,7 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
                 fileName={`${image.image_name.replace('.png', '')}_details`}
                 data={image}
                 label={t('metadata.imageDetails')}
+                withSearch
               />
             ) : (
               <IAINoContentFallback label={t('metadata.noImageDetails')} />

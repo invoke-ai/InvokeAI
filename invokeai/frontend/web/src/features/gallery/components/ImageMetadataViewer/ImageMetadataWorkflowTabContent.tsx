@@ -33,6 +33,7 @@ const ImageMetadataWorkflowTabContent = ({ image }: Props) => {
       fileName={`${image.image_name.replace('.png', '')}_workflow`}
       data={workflow}
       label={t('metadata.workflow')}
+      withSearch
     />
   );
 };
