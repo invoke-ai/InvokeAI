@@ -5,12 +5,11 @@ import { useEntityIdentifierContext } from 'features/controlLayers/contexts/Enti
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { canvasToImageData, getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasImageState, Rect } from 'features/controlLayers/store/types';
+import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiSelectionBackgroundBold } from 'react-icons/pi';
 import { serializeError } from 'serialize-error';
-import { useTranslation } from 'react-i18next';
-
-import { toast } from 'features/toast/toast';
 
 const log = logger('canvas');
 
