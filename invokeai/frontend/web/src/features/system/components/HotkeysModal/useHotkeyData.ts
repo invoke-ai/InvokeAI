@@ -85,6 +85,8 @@ export const useHotkeyData = (): HotkeysData => {
     // Prompt/history navigation (when prompt textarea is focused)
     addHotkey('app', 'promptHistoryPrev', ['alt+up']);
     addHotkey('app', 'promptHistoryNext', ['alt+down']);
+    addHotkey('app', 'promptWeightUp', ['ctrl+up']);
+    addHotkey('app', 'promptWeightDown', ['ctrl+down']);
 
     addHotkey('app', 'focusPrompt', ['alt+a']);
     addHotkey('app', 'toggleLeftPanel', ['t', 'o']);

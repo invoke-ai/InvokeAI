@@ -1,6 +1,7 @@
 import { Box, Flex, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { usePersistedTextAreaSize } from 'common/hooks/usePersistedTextareaSize';
+import { adjustPromptAttention } from 'common/util/promptAttention';
 import {
   positivePromptChanged,
   selectModelSupportsNegativePrompt,
@@ -192,6 +193,58 @@ export const ParamPositivePrompt = memo(() => {
     dependencies: [promptHistoryApi.next, isPromptFocused],
   });
 
+  // Adjust prompt attention up
+  useRegisteredHotkeys({
+    id: 'promptWeightUp',
+    category: 'app',
+    callback: (e) => {
+      if (isPromptFocused() && textareaRef.current) {
+        e.preventDefault();
+        const textarea = textareaRef.current;
+        const result = adjustPromptAttention(textarea.value, textarea.selectionStart, textarea.selectionEnd, 'up');
+
+        // Update the prompt
+        dispatch(positivePromptChanged(result.prompt));
+
+        // Update selection after React re-renders
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.setSelectionRange(result.selectionStart, result.selectionEnd);
+            textareaRef.current.focus();
+          }
+        }, 0);
+      }
+    },
+    options: { preventDefault: true, enableOnFormTags: ['TEXTAREA'] },
+    dependencies: [dispatch, isPromptFocused],
+  });
+
+  // Adjust prompt attention down
+  useRegisteredHotkeys({
+    id: 'promptWeightDown',
+    category: 'app',
+    callback: (e) => {
+      if (isPromptFocused() && textareaRef.current) {
+        e.preventDefault();
+        const textarea = textareaRef.current;
+        const result = adjustPromptAttention(textarea.value, textarea.selectionStart, textarea.selectionEnd, 'down');
+
+        // Update the prompt
+        dispatch(positivePromptChanged(result.prompt));
+
+        // Update selection after React re-renders
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.setSelectionRange(result.selectionStart, result.selectionEnd);
+            textareaRef.current.focus();
+          }
+        }, 0);
+      }
+    },
+    options: { preventDefault: true, enableOnFormTags: ['TEXTAREA'] },
+    dependencies: [dispatch, isPromptFocused],
+  });
+
   return (
     <Box pos="relative">
       <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
@@ -211,6 +264,8 @@ export const ParamPositivePrompt = memo(() => {
             paddingBottom={3}
             resize="vertical"
             minH={32}
+            fontFamily="mono"
+            fontSize="sm"
           />
           <PromptOverlayButtonWrapper>
             <Flex flexDir="column" gap={2} justifyContent="flex-start" alignItems="center">
