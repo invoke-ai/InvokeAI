@@ -1,3 +1,5 @@
+import { useAppSelector } from 'app/store/storeHooks';
+import { selectCustomHotkeys } from 'features/system/store/hotkeysSlice';
 import { useMemo } from 'react';
 import { type HotkeyCallback, type Options, useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +13,7 @@ export type Hotkey = {
   title: string;
   desc: string;
   hotkeys: string[];
+  defaultHotkeys: string[];
   platformKeys: string[][];
   isEnabled: boolean;
 };
@@ -31,6 +34,7 @@ const formatKeysForPlatform = (keys: string[], isMacOS: boolean): string[][] => 
 
 export const useHotkeyData = (): HotkeysData => {
   const { t } = useTranslation();
+  const customHotkeys = useAppSelector(selectCustomHotkeys);
   const isMacOS = useMemo(() => {
     return navigator.userAgent.toLowerCase().includes('mac');
   }, []);
@@ -60,13 +64,16 @@ export const useHotkeyData = (): HotkeysData => {
     };
 
     const addHotkey = (category: HotkeyCategory, id: string, keys: string[], isEnabled: boolean = true) => {
+      const hotkeyId = `${category}.${id}`;
+      const effectiveKeys = customHotkeys[hotkeyId] ?? keys;
       data[category].hotkeys[id] = {
         id,
         category,
         title: t(`hotkeys.${category}.${id}.title`),
         desc: t(`hotkeys.${category}.${id}.desc`),
-        hotkeys: keys,
-        platformKeys: formatKeysForPlatform(keys, isMacOS),
+        hotkeys: effectiveKeys,
+        defaultHotkeys: keys,
+        platformKeys: formatKeysForPlatform(effectiveKeys, isMacOS),
         isEnabled,
       };
     };
@@ -170,7 +177,7 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('gallery', 'starImage', ['.']);
 
     return data;
-  }, [isMacOS, t]);
+  }, [customHotkeys, isMacOS, t]);
 
   return hotkeysData;
 };
