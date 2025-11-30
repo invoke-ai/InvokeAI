@@ -39,7 +39,8 @@ export type ParameterSteps = z.infer<typeof zParameterSteps>;
 // #endregion
 
 // #region CFG scale parameter
-export const [zParameterCFGScale, isParameterCFGScale] = buildParameter(z.number().min(1));
+// Z-Image-Turbo uses guidance_scale=0.0 (no CFG), so we allow 0
+export const [zParameterCFGScale, isParameterCFGScale] = buildParameter(z.number().min(0));
 export type ParameterCFGScale = z.infer<typeof zParameterCFGScale>;
 // #endregion
 

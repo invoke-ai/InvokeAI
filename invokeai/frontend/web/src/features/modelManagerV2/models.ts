@@ -135,6 +135,7 @@ export const MODEL_BASE_TO_COLOR: Record<BaseModelType, string> = {
   'sdxl-refiner': 'invokeBlue',
   flux: 'gold',
   cogview4: 'red',
+  'z-image': 'cyan',
   unknown: 'red',
 };
 
@@ -173,6 +174,7 @@ export const MODEL_BASE_TO_LONG_NAME: Record<BaseModelType, string> = {
   'sdxl-refiner': 'Stable Diffusion XL Refiner',
   flux: 'FLUX',
   cogview4: 'CogView4',
+  'z-image': 'Z-Image',
   unknown: 'Unknown',
 };
 
@@ -188,6 +190,7 @@ export const MODEL_BASE_TO_SHORT_NAME: Record<BaseModelType, string> = {
   'sdxl-refiner': 'SDXLR',
   flux: 'FLUX',
   cogview4: 'CogView4',
+  'z-image': 'Z-Image',
   unknown: 'Unknown',
 };
 
@@ -219,8 +222,15 @@ export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {
   unknown: 'Unknown',
 };
 
-export const SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS: BaseModelType[] = ['flux', 'sd-3'];
+export const SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS: BaseModelType[] = ['flux', 'sd-3', 'z-image'];
 
 export const SUPPORTS_REF_IMAGES_BASE_MODELS: BaseModelType[] = ['sd-1', 'sdxl', 'flux'];
 
-export const SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS: BaseModelType[] = ['sd-1', 'sd-2', 'sdxl', 'cogview4', 'sd-3'];
+export const SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS: BaseModelType[] = [
+  'sd-1',
+  'sd-2',
+  'sdxl',
+  'cogview4',
+  'sd-3',
+  'z-image',
+];

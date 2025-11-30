@@ -36,7 +36,7 @@ dependencies = [
   "accelerate",
   "bitsandbytes; sys_platform!='darwin'",
   "compel==2.1.1",
-  "diffusers[torch]==0.33.0",
+  "diffusers[torch] @ git+https://github.com/huggingface/diffusers.git",  # Z-Image support requires git version until 0.34.0
   "gguf",
   "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
   "numpy<2.0.0",

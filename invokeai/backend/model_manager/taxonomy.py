@@ -48,6 +48,8 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with FLUX.1 model architecture, including FLUX Dev, Schnell and Fill."""
     CogView4 = "cogview4"
     """Indicates the model is associated with CogView 4 model architecture."""
+    ZImage = "z-image"
+    """Indicates the model is associated with Z-Image model architecture, including Z-Image-Turbo."""
     Unknown = "unknown"
     """Indicates the model's base architecture is unknown."""
 
