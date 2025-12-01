@@ -86,7 +86,8 @@ class LayerPatcher:
         # submodules. If the layer keys do not contain a dot, then they are flattened, meaning that all '.' have been
         # replaced with '_'. Non-flattened keys are preferred, because they allow submodules to be accessed directly
         # without searching, but some legacy code still uses flattened keys.
-        layer_keys_are_flattened = "." not in next(iter(patch.layers.keys()))
+        first_key = next(iter(patch.layers.keys()))
+        layer_keys_are_flattened = "." not in first_key
 
         prefix_len = len(prefix)
 
@@ -174,9 +175,15 @@ class LayerPatcher:
 
         # TODO(ryand): Using torch.autocast(...) over explicit casting may offer a speed benefit on CUDA
         # devices here. Experimentally, it was found to be very slow on CPU. More investigation needed.
-        for param_name, param_weight in patch.get_parameters(
+        params_dict = patch.get_parameters(
             dict(module_to_patch.named_parameters(recurse=False)), weight=patch_weight
-        ).items():
+        )
+        if not params_dict:
+            logger = InvokeAILogger.get_logger(LayerPatcher.__name__)
+            logger.warning(f"LoRA patch returned no parameters for module: {module_to_patch_key}")
+            return
+
+        for param_name, param_weight in params_dict.items():
             param_key = module_to_patch_key + "." + param_name
             module_param = module_to_patch.get_parameter(param_name)
 
@@ -195,7 +202,9 @@ class LayerPatcher:
                 )
                 module_param = expanded_weight
 
-            module_param += param_weight.to(dtype=dtype)
+            # Convert param_weight to the correct dtype and apply to model weights
+            param_weight_converted = param_weight.to(dtype=dtype)
+            module_param.data.copy_(module_param.data + param_weight_converted)
 
         patch.to(device=TorchDevice.CPU_DEVICE)
 

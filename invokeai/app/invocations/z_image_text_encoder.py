@@ -1,3 +1,6 @@
+from contextlib import ExitStack
+from typing import Iterator, Tuple
+
 import torch
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 
@@ -6,6 +9,9 @@ from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField
 from invokeai.app.invocations.model import Qwen3EncoderField
 from invokeai.app.invocations.primitives import ZImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.lora_conversions.z_image_lora_constants import Z_IMAGE_LORA_QWEN3_PREFIX
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
     ZImageConditioningInfo,
@@ -47,11 +53,25 @@ class ZImageTextEncoderInvocation(BaseInvocation):
         Based on the ZImagePipeline._encode_prompt method from diffusers.
         """
         prompt = self.prompt
+        device = TorchDevice.choose_torch_device()
 
-        with (
-            context.models.load(self.qwen3_encoder.text_encoder).model_on_device() as (_, text_encoder),
-            context.models.load(self.qwen3_encoder.tokenizer).model_on_device() as (_, tokenizer),
-        ):
+        text_encoder_info = context.models.load(self.qwen3_encoder.text_encoder)
+        tokenizer_info = context.models.load(self.qwen3_encoder.tokenizer)
+
+        with ExitStack() as exit_stack:
+            (_, text_encoder) = exit_stack.enter_context(text_encoder_info.model_on_device())
+            (_, tokenizer) = exit_stack.enter_context(tokenizer_info.model_on_device())
+
+            # Apply LoRA models to the text encoder
+            exit_stack.enter_context(
+                LayerPatcher.apply_smart_model_patches(
+                    model=text_encoder,
+                    patches=self._lora_iterator(context),
+                    prefix=Z_IMAGE_LORA_QWEN3_PREFIX,
+                    dtype=torch.bfloat16,
+                )
+            )
+
             context.util.signal_progress("Running Qwen3 text encoder")
             assert isinstance(text_encoder, PreTrainedModel)
             assert isinstance(tokenizer, PreTrainedTokenizerBase)
@@ -91,8 +111,6 @@ class ZImageTextEncoderInvocation(BaseInvocation):
                     f"{max_seq_len} tokens: {removed_text}"
                 )
 
-            device = TorchDevice.choose_torch_device()
-
             # Get hidden states from the text encoder
             # Use the second-to-last hidden state like diffusers does
             prompt_mask = attention_mask.to(device).bool()
@@ -111,3 +129,11 @@ class ZImageTextEncoderInvocation(BaseInvocation):
 
         assert isinstance(prompt_embeds, torch.Tensor)
         return prompt_embeds
+
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
+        """Iterate over LoRA models to apply to the Qwen3 text encoder."""
+        for lora in self.qwen3_encoder.loras:
+            lora_info = context.models.load(lora.lora)
+            assert isinstance(lora_info.model, ModelPatchRaw)
+            yield (lora_info.model, lora.weight)
+            del lora_info

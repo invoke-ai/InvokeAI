@@ -43,10 +43,12 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_Diffusers_SD1_Config,
     LoRA_Diffusers_SD2_Config,
     LoRA_Diffusers_SDXL_Config,
+    LoRA_Diffusers_ZImage_Config,
     LoRA_LyCORIS_FLUX_Config,
     LoRA_LyCORIS_SD1_Config,
     LoRA_LyCORIS_SD2_Config,
     LoRA_LyCORIS_SDXL_Config,
+    LoRA_LyCORIS_ZImage_Config,
     LoRA_OMI_FLUX_Config,
     LoRA_OMI_SDXL_Config,
     LoraModelDefaultSettings,
@@ -172,6 +174,7 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_LyCORIS_SD2_Config, LoRA_LyCORIS_SD2_Config.get_tag()],
         Annotated[LoRA_LyCORIS_SDXL_Config, LoRA_LyCORIS_SDXL_Config.get_tag()],
         Annotated[LoRA_LyCORIS_FLUX_Config, LoRA_LyCORIS_FLUX_Config.get_tag()],
+        Annotated[LoRA_LyCORIS_ZImage_Config, LoRA_LyCORIS_ZImage_Config.get_tag()],
         # LoRA - OMI format
         Annotated[LoRA_OMI_SDXL_Config, LoRA_OMI_SDXL_Config.get_tag()],
         Annotated[LoRA_OMI_FLUX_Config, LoRA_OMI_FLUX_Config.get_tag()],
@@ -180,6 +183,7 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_Diffusers_SD2_Config, LoRA_Diffusers_SD2_Config.get_tag()],
         Annotated[LoRA_Diffusers_SDXL_Config, LoRA_Diffusers_SDXL_Config.get_tag()],
         Annotated[LoRA_Diffusers_FLUX_Config, LoRA_Diffusers_FLUX_Config.get_tag()],
+        Annotated[LoRA_Diffusers_ZImage_Config, LoRA_Diffusers_ZImage_Config.get_tag()],
         # ControlLoRA - diffusers format
         Annotated[ControlLoRA_LyCORIS_FLUX_Config, ControlLoRA_LyCORIS_FLUX_Config.get_tag()],
         # T5 Encoder - all formats

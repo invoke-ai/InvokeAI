@@ -1,4 +1,5 @@
-from typing import Callable, Optional
+from contextlib import ExitStack
+from typing import Callable, Iterator, Optional, Tuple
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -17,10 +18,13 @@ from invokeai.app.invocations.fields import (
     WithMetadata,
     ZImageConditioningField,
 )
-from invokeai.app.invocations.model import TransformerField
+from invokeai.app.invocations.model import LoRAField, TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType
+from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.lora_conversions.z_image_lora_constants import Z_IMAGE_LORA_TRANSFORMER_PREFIX
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ZImageConditioningInfo
@@ -278,7 +282,20 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             ),
         )
 
-        with transformer_info.model_on_device() as (_, transformer):
+        with ExitStack() as exit_stack:
+            # Load transformer and apply LoRA patches
+            (_, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
+
+            # Apply LoRA models to the transformer
+            exit_stack.enter_context(
+                LayerPatcher.apply_smart_model_patches(
+                    model=transformer,
+                    patches=self._lora_iterator(context),
+                    prefix=Z_IMAGE_LORA_TRANSFORMER_PREFIX,
+                    dtype=inference_dtype,
+                )
+            )
+
             # Denoising loop
             for step_idx in tqdm(range(total_steps)):
                 sigma_curr = sigmas[step_idx]
@@ -349,3 +366,11 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             context.util.sd_step_callback(state, BaseModelType.ZImage)
 
         return step_callback
+
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
+        """Iterate over LoRA models to apply to the transformer."""
+        for lora in self.transformer.loras:
+            lora_info = context.models.load(lora.lora)
+            assert isinstance(lora_info.model, ModelPatchRaw)
+            yield (lora_info.model, lora.weight)
+            del lora_info

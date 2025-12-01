@@ -22,8 +22,13 @@ def is_state_dict_likely_in_flux_aitoolkit_format(
         except json.JSONDecodeError:
             return False
         return software.get("name") == "ai-toolkit"
-    # metadata got lost somewhere
-    return any("diffusion_model" == k.split(".", 1)[0] for k in state_dict.keys() if isinstance(k, str))
+    # metadata got lost somewhere - check for Flux-specific layer patterns
+    # Flux models use double_blocks and single_blocks, while other models (like Z-Image) use different patterns
+    return any(
+        k.startswith("diffusion_model.double_blocks.") or k.startswith("diffusion_model.single_blocks.")
+        for k in state_dict.keys()
+        if isinstance(k, str)
+    )
 
 
 @dataclass

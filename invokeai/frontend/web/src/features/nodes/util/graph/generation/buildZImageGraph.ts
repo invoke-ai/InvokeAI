@@ -9,6 +9,7 @@ import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChec
 import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
+import { addZImageLoRAs } from 'features/nodes/util/graph/generation/addZImageLoRAs';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
@@ -90,6 +91,9 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
 
   g.addEdge(seed, 'value', denoise, 'seed');
   g.addEdge(denoise, 'latents', l2i, 'latents');
+
+  // Add Z-Image LoRAs if any are enabled
+  addZImageLoRAs(state, g, denoise, modelLoader, posCond, negCond);
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
   assert(modelConfig.base === 'z-image');
