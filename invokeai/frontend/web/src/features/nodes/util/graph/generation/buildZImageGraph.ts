@@ -1,6 +1,12 @@
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import {
+  selectMainModelConfig,
+  selectParamsSlice,
+  selectZImageQwen3EncoderModel,
+  selectZImageQwen3SourceModel,
+  selectZImageVaeModel,
+} from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
@@ -30,6 +36,17 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
   assert(model, 'No model selected');
   assert(model.base === 'z-image', 'Selected model is not a Z-Image model');
 
+  // Get Z-Image component models
+  const zImageVaeModel = selectZImageVaeModel(state);
+  const zImageQwen3EncoderModel = selectZImageQwen3EncoderModel(state);
+  const zImageQwen3SourceModel = selectZImageQwen3SourceModel(state);
+
+  // Validate that we have the required models
+  const hasVaeSource = zImageVaeModel !== null || zImageQwen3SourceModel !== null;
+  const hasQwen3Source = zImageQwen3EncoderModel !== null || zImageQwen3SourceModel !== null;
+  assert(hasVaeSource, 'No VAE source: Set either VAE or Qwen3 Source model');
+  assert(hasQwen3Source, 'No Qwen3 Encoder source: Set either Qwen3 Encoder or Qwen3 Source model');
+
   const params = selectParamsSlice(state);
 
   // Z-Image-Turbo uses guidance_scale (stored as cfgScale), defaults to 0.0 for no CFG
@@ -43,6 +60,9 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
     type: 'z_image_model_loader',
     id: getPrefixedId('z_image_model_loader'),
     model,
+    vae_model: zImageVaeModel ?? undefined,
+    qwen3_encoder_model: zImageQwen3EncoderModel ?? undefined,
+    qwen3_source_model: zImageQwen3SourceModel ?? undefined,
   });
 
   const positivePrompt = g.addNode({

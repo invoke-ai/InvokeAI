@@ -190,17 +190,28 @@ class LayerPatcher:
             # Save original weight
             original_weights.save(param_key, module_param)
 
-            # HACK(ryand): This condition is only necessary to handle layers in FLUX control LoRAs that change the
-            # shape of the original layer.
+            # Handle layers that change the shape of the original layer.
+            # FLUX control LoRAs intentionally expand certain layers - we pad the original weight with zeros.
+            # For other LoRAs (e.g., Z-Image with architecture mismatch), skip incompatible layers with a warning.
             if module_param.nelement() != param_weight.nelement():
-                assert isinstance(patch, FluxControlLoRALayer)
-                expanded_weight = pad_with_zeros(module_param, param_weight.shape)
-                setattr(
-                    module_to_patch,
-                    param_name,
-                    torch.nn.Parameter(expanded_weight, requires_grad=module_param.requires_grad),
-                )
-                module_param = expanded_weight
+                if isinstance(patch, FluxControlLoRALayer):
+                    # FLUX Control LoRAs intentionally expand layers - pad with zeros
+                    expanded_weight = pad_with_zeros(module_param, param_weight.shape)
+                    setattr(
+                        module_to_patch,
+                        param_name,
+                        torch.nn.Parameter(expanded_weight, requires_grad=module_param.requires_grad),
+                    )
+                    module_param = expanded_weight
+                else:
+                    # For other LoRAs, shape mismatch indicates architecture incompatibility - skip the layer
+                    logger = InvokeAILogger.get_logger(LayerPatcher.__name__)
+                    logger.warning(
+                        f"Skipping LoRA layer '{module_to_patch_key}.{param_name}' due to shape mismatch: "
+                        f"model has {module_param.nelement()} elements, LoRA expects {param_weight.nelement()}. "
+                        "This LoRA may be incompatible with this model architecture."
+                    )
+                    continue
 
             # Convert param_weight to the correct dtype and apply to model weights
             param_weight_converted = param_weight.to(dtype=dtype)

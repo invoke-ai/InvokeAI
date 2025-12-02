@@ -111,6 +111,28 @@ def _has_main_keys(state_dict: dict[str | int, Any]) -> bool:
     return False
 
 
+def _has_z_image_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict contains Z-Image S3-DiT transformer keys."""
+    # Z-Image specific keys that distinguish it from other models
+    z_image_specific_keys = {
+        "cap_embedder",  # Caption embedder - unique to Z-Image
+        "context_refiner",  # Context refiner blocks
+        "cap_pad_token",  # Caption padding token
+    }
+
+    for key in state_dict.keys():
+        if isinstance(key, int):
+            continue
+        # Check for Z-Image specific key prefixes
+        prefix = key.split(".")[0]
+        if prefix in z_image_specific_keys:
+            return True
+        # Also check for LoRA format with diffusion_model prefix
+        if key.startswith("diffusion_model.layers."):
+            return True
+    return False
+
+
 class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
     """Model config for main checkpoint models."""
 
@@ -684,3 +706,34 @@ class Main_Diffusers_ZImage_Config(Diffusers_Config_Base, Main_Config_Base, Conf
             **override_fields,
             repo_variant=repo_variant,
         )
+
+
+class Main_GGUF_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized Z-Image transformer models."""
+
+    base: Literal[BaseModelType.ZImage] = Field(default=BaseModelType.ZImage)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_z_image_model(mod)
+
+        cls._validate_looks_like_gguf_quantized(mod)
+
+        return cls(**override_fields)
+
+    @classmethod
+    def _validate_looks_like_z_image_model(cls, mod: ModelOnDisk) -> None:
+        has_z_image_keys = _has_z_image_keys(mod.load_state_dict())
+        if not has_z_image_keys:
+            raise NotAMatchError("state dict does not look like a Z-Image model")
+
+    @classmethod
+    def _validate_looks_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
+        has_ggml_tensors = _has_ggml_tensors(mod.load_state_dict())
+        if not has_ggml_tensors:
+            raise NotAMatchError("state dict does not look like GGUF quantized")

@@ -21,7 +21,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import LoRAField, TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.taxonomy import BaseModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.z_image_lora_constants import Z_IMAGE_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -284,15 +284,31 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         with ExitStack() as exit_stack:
             # Load transformer and apply LoRA patches
-            (_, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
+            (cached_weights, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
 
-            # Apply LoRA models to the transformer
+            # Get transformer config to determine if it's quantized
+            transformer_config = context.models.get_config(self.transformer.transformer)
+
+            # Determine if the model is quantized.
+            # If the model is quantized, then we need to apply the LoRA weights as sidecar layers. This results in
+            # slower inference than direct patching, but is agnostic to the quantization format.
+            if transformer_config.format in [ModelFormat.Diffusers]:
+                model_is_quantized = False
+            elif transformer_config.format in [ModelFormat.GGUFQuantized]:
+                model_is_quantized = True
+            else:
+                raise ValueError(f"Unsupported Z-Image model format: {transformer_config.format}")
+
+            # Apply LoRA models to the transformer.
+            # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.
             exit_stack.enter_context(
                 LayerPatcher.apply_smart_model_patches(
                     model=transformer,
                     patches=self._lora_iterator(context),
                     prefix=Z_IMAGE_LORA_TRANSFORMER_PREFIX,
                     dtype=inference_dtype,
+                    cached_weights=cached_weights,
+                    force_sidecar_patching=model_is_quantized,
                 )
             )
 

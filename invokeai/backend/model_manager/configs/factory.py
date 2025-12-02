@@ -68,6 +68,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_SDXLRefiner_Config,
     Main_Diffusers_ZImage_Config,
     Main_GGUF_FLUX_Config,
+    Main_GGUF_ZImage_Config,
     MainModelDefaultSettings,
 )
 from invokeai.backend.model_manager.configs.siglip import SigLIP_Diffusers_Config
@@ -76,6 +77,7 @@ from invokeai.backend.model_manager.configs.t2i_adapter import (
     T2IAdapter_Diffusers_SD1_Config,
     T2IAdapter_Diffusers_SDXL_Config,
 )
+from invokeai.backend.model_manager.configs.qwen3_encoder import Qwen3Encoder_Qwen3Encoder_Config
 from invokeai.backend.model_manager.configs.t5_encoder import T5Encoder_BnBLLMint8_Config, T5Encoder_T5Encoder_Config
 from invokeai.backend.model_manager.configs.textual_inversion import (
     TI_File_SD1_Config,
@@ -151,6 +153,7 @@ AnyModelConfig = Annotated[
         # Main (Pipeline) - quantized formats
         Annotated[Main_BnBNF4_FLUX_Config, Main_BnBNF4_FLUX_Config.get_tag()],
         Annotated[Main_GGUF_FLUX_Config, Main_GGUF_FLUX_Config.get_tag()],
+        Annotated[Main_GGUF_ZImage_Config, Main_GGUF_ZImage_Config.get_tag()],
         # VAE - checkpoint format
         Annotated[VAE_Checkpoint_SD1_Config, VAE_Checkpoint_SD1_Config.get_tag()],
         Annotated[VAE_Checkpoint_SD2_Config, VAE_Checkpoint_SD2_Config.get_tag()],
@@ -189,6 +192,8 @@ AnyModelConfig = Annotated[
         # T5 Encoder - all formats
         Annotated[T5Encoder_T5Encoder_Config, T5Encoder_T5Encoder_Config.get_tag()],
         Annotated[T5Encoder_BnBLLMint8_Config, T5Encoder_BnBLLMint8_Config.get_tag()],
+        # Qwen3 Encoder
+        Annotated[Qwen3Encoder_Qwen3Encoder_Config, Qwen3Encoder_Qwen3Encoder_Config.get_tag()],
         # TI - file format
         Annotated[TI_File_SD1_Config, TI_File_SD1_Config.get_tag()],
         Annotated[TI_File_SD2_Config, TI_File_SD2_Config.get_tag()],
