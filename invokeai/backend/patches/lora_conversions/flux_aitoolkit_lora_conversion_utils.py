@@ -12,23 +12,33 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.util import InvokeAILogger
 
 
+def _has_flux_layer_structure(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict has Flux-specific layer patterns (double_blocks/single_blocks)."""
+    return any(
+        k.startswith("diffusion_model.double_blocks.") or k.startswith("diffusion_model.single_blocks.")
+        for k in state_dict.keys()
+        if isinstance(k, str)
+    )
+
+
 def is_state_dict_likely_in_flux_aitoolkit_format(
     state_dict: dict[str | int, Any],
     metadata: dict[str, Any] | None = None,
 ) -> bool:
+    # Always check for Flux-specific layer structure first
+    # This prevents misidentifying Z-Image LoRAs (which use diffusion_model.layers.X) as Flux
+    if not _has_flux_layer_structure(state_dict):
+        return False
+
     if metadata:
         try:
             software = json.loads(metadata.get("software", "{}"))
         except json.JSONDecodeError:
             return False
         return software.get("name") == "ai-toolkit"
-    # metadata got lost somewhere - check for Flux-specific layer patterns
-    # Flux models use double_blocks and single_blocks, while other models (like Z-Image) use different patterns
-    return any(
-        k.startswith("diffusion_model.double_blocks.") or k.startswith("diffusion_model.single_blocks.")
-        for k in state_dict.keys()
-        if isinstance(k, str)
-    )
+
+    # No metadata - if it has Flux layer structure, assume it's AI Toolkit format
+    return True
 
 
 @dataclass
