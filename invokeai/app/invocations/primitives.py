@@ -1,6 +1,6 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Optional
+from typing import Any, Optional
 
 import torch
 
@@ -27,6 +27,7 @@ from invokeai.app.invocations.fields import (
     SD3ConditioningField,
     TensorField,
     UIComponent,
+    UIType,
 )
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -556,3 +557,27 @@ class BoundingBoxInvocation(BaseInvocation):
 
 
 # endregion
+
+
+@invocation_output("any_output")
+class AnyOutput(BaseInvocationOutput):
+    value: Any = OutputField(description="The output value", ui_type=UIType.Any)
+
+
+@invocation(
+    "switcher",
+    title="Switcher",
+    tags=["primitives", "switcher"],
+    category="primitives",
+    version="1.0.0",
+)
+class SwitcherInvocation(BaseInvocation):
+    a: Any = InputField(description="The first input", ui_type=UIType.Any)
+    b: Any = InputField(description="The second input", ui_type=UIType.Any)
+    switch: bool = InputField(
+        description="Switch between the two inputs. If false, the first input is returned. If true, the second input is returned."
+    )
+
+    def invoke(self, context: InvocationContext) -> AnyOutput:
+        value = self.b if self.switch else self.a
+        return AnyOutput(value=value)

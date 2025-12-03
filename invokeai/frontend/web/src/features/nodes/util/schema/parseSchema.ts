@@ -145,7 +145,7 @@ export const parseSchema = (
 
         const fieldType = fieldTypeOverride ?? originalFieldType;
         if (!fieldType) {
-          log.trace({ node: type, field: propertyName, schema: parseify(property) }, 'Unable to parse field type');
+          log.warn({ node: type, field: propertyName, schema: parseify(property) }, 'Unable to parse field type');
           return inputsAccumulator;
         }
 
@@ -222,7 +222,7 @@ export const parseSchema = (
 
         const fieldType = fieldTypeOverride ?? originalFieldType;
         if (!fieldType) {
-          log.trace({ node: type, field: propertyName, schema: parseify(property) }, 'Unable to parse field type');
+          log.warn({ node: type, field: propertyName, schema: parseify(property) }, 'Unable to parse field type');
           return outputsAccumulator;
         }
 
@@ -284,7 +284,7 @@ const getFieldType = (
   } catch (e) {
     const tKey = kind === 'input' ? 'nodes.inputFieldTypeParseError' : 'nodes.outputFieldTypeParseError';
     if (e instanceof FieldParseError) {
-      log.warn(
+      log.trace(
         {
           node: type,
           field: propertyName,
@@ -297,7 +297,7 @@ const getFieldType = (
         })
       );
     } else {
-      log.warn(
+      log.trace(
         {
           node: type,
           field: propertyName,
