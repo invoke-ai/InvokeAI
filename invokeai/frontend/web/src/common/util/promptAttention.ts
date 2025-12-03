@@ -31,7 +31,7 @@ const log = logger('events');
  * - Whitespace and punctuation are ignored for content selection
  */
 
-type AttentionDirection = 'up' | 'down';
+type AttentionDirection = 'increment' | 'decrement';
 
 type SelectionBounds = {
   start: number;
@@ -82,10 +82,10 @@ function isNumericAttention(attention: Attention | undefined): attention is numb
  */
 function adjustSymbolAttention(direction: AttentionDirection, attention: string | undefined): string | undefined {
   if (!attention) {
-    return direction === 'up' ? '+' : '-';
+    return direction === 'increment' ? '+' : '-';
   }
 
-  if (direction === 'up') {
+  if (direction === 'increment') {
     // Going up: remove '-' if present, otherwise add '+'
     if (attention.endsWith('-')) {
       const result = attention.slice(0, -1);
@@ -107,7 +107,7 @@ function adjustSymbolAttention(direction: AttentionDirection, attention: string 
  * Only used for groups.
  */
 function adjustNumericAttention(direction: AttentionDirection, attention: number): number | undefined {
-  const step = direction === 'up' ? 0.1 : -0.1;
+  const step = direction === 'increment' ? 0.1 : -0.1;
   const result = parseFloat((attention + step).toFixed(1));
 
   // 1.0 is default - return undefined to signal unwrapping
@@ -131,9 +131,9 @@ function computeAttention(
   if (attention === undefined) {
     if (isGroup) {
       // Groups going down from neutral get 0.9
-      return direction === 'up' ? '+' : 0.9;
+      return direction === 'increment' ? '+' : 0.9;
     }
-    return direction === 'up' ? '+' : '-';
+    return direction === 'increment' ? '+' : '-';
   }
 
   // Symbol attention (+, -, ++, etc.)
@@ -153,7 +153,7 @@ function computeAttention(
   }
 
   // Fallback: treat as no attention
-  return direction === 'up' ? '+' : '-';
+  return direction === 'increment' ? '+' : '-';
 }
 
 // ============================================================================
