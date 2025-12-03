@@ -7,8 +7,9 @@ import {
   selectZImageQwen3SourceModel,
   selectZImageVaeModel,
 } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
+import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import { addZImageControl } from 'features/nodes/util/graph/generation/addControlAdapters';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
@@ -100,6 +101,8 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
   g.addEdge(modelLoader, 'qwen3_encoder', posCond, 'qwen3_encoder');
   g.addEdge(modelLoader, 'qwen3_encoder', negCond, 'qwen3_encoder');
   g.addEdge(modelLoader, 'vae', l2i, 'vae');
+  // Connect VAE to denoise for control image encoding
+  g.addEdge(modelLoader, 'vae', denoise, 'vae');
 
   g.addEdge(positivePrompt, 'value', posCond, 'prompt');
   g.addEdge(posCond, 'conditioning', denoise, 'positive_conditioning');
@@ -114,6 +117,19 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
 
   // Add Z-Image LoRAs if any are enabled
   addZImageLoRAs(state, g, denoise, modelLoader, posCond, negCond);
+
+  // Add Z-Image Control layers if any are enabled
+  if (manager !== null) {
+    const canvas = selectCanvasSlice(state);
+    const rect = canvas.bbox.rect;
+    await addZImageControl({
+      manager,
+      entities: canvas.controlLayers.entities,
+      g,
+      rect,
+      denoise,
+    });
+  }
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
   assert(modelConfig.base === 'z-image');

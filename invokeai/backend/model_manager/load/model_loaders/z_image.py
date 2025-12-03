@@ -372,6 +372,111 @@ class Qwen3EncoderLoader(ModelLoader):
         )
 
 
+@ModelLoaderRegistry.register(base=BaseModelType.ZImage, type=ModelType.ControlNet, format=ModelFormat.Checkpoint)
+class ZImageControlCheckpointModel(ModelLoader):
+    """Class to load Z-Image Control adapter models from safetensors checkpoint.
+
+    Z-Image Control models are standalone adapters containing control layers
+    (control_layers, control_all_x_embedder, control_noise_refiner) that can be
+    combined with a base ZImageTransformer2DModel at runtime for spatial conditioning
+    (Canny, HED, Depth, Pose, MLSD).
+    """
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, Checkpoint_Config_Base):
+            raise ValueError("Only CheckpointConfigBase models are supported here.")
+
+        # ControlNet type models don't use submodel_type - load the adapter directly
+        return self._load_control_adapter(config)
+
+    def _load_control_adapter(
+        self,
+        config: AnyModelConfig,
+    ) -> AnyModel:
+        from safetensors.torch import load_file
+
+        from invokeai.backend.z_image.z_image_control_adapter import ZImageControlAdapter
+
+        assert isinstance(config, ControlNet_Checkpoint_ZImage_Config)
+        model_path = Path(config.path)
+
+        # Load the safetensors state dict
+        sd = load_file(model_path)
+
+        # Determine number of control blocks from state dict
+        # Control blocks are named control_layers.0, control_layers.1, etc.
+        control_block_indices = set()
+        for key in sd.keys():
+            if key.startswith("control_layers."):
+                parts = key.split(".")
+                if len(parts) > 1 and parts[1].isdigit():
+                    control_block_indices.add(int(parts[1]))
+        num_control_blocks = len(control_block_indices) if control_block_indices else 6
+
+        # Determine number of refiner layers from state dict
+        refiner_indices: set[int] = set()
+        for key in sd.keys():
+            if key.startswith("control_noise_refiner."):
+                parts = key.split(".")
+                if len(parts) > 1 and parts[1].isdigit():
+                    refiner_indices.add(int(parts[1]))
+        n_refiner_layers = len(refiner_indices) if refiner_indices else 2
+
+        # Determine control_in_dim from embedder weight shape
+        # control_in_dim = weight.shape[1] / (f_patch_size * patch_size * patch_size)
+        # For patch_size=2, f_patch_size=1: control_in_dim = weight.shape[1] / 4
+        control_in_dim = 16  # Default for V1
+        embedder_key = "control_all_x_embedder.2-1.weight"
+        if embedder_key in sd:
+            weight_shape = sd[embedder_key].shape
+            # weight_shape[1] = f_patch_size * patch_size * patch_size * control_in_dim
+            control_in_dim = weight_shape[1] // 4  # 4 = 1 * 2 * 2
+
+        # Log detected configuration for debugging
+        from invokeai.backend.util.logging import InvokeAILogger
+
+        logger = InvokeAILogger.get_logger(self.__class__.__name__)
+        version = "V2.0" if control_in_dim > 16 else "V1"
+        logger.info(
+            f"Z-Image ControlNet detected: {version} "
+            f"(control_in_dim={control_in_dim}, num_control_blocks={num_control_blocks}, "
+            f"n_refiner_layers={n_refiner_layers})"
+        )
+
+        # Create an empty control adapter
+        dim = 3840
+        with accelerate.init_empty_weights():
+            model = ZImageControlAdapter(
+                num_control_blocks=num_control_blocks,
+                control_in_dim=control_in_dim,
+                all_patch_size=(2,),
+                all_f_patch_size=(1,),
+                dim=dim,
+                n_refiner_layers=n_refiner_layers,
+                n_heads=30,
+                n_kv_heads=30,
+                norm_eps=1e-05,
+                qk_norm=True,
+            )
+
+        # Load state dict with strict=False to handle missing keys like x_pad_token
+        # Some control adapters may not include x_pad_token in their checkpoint
+        missing_keys, unexpected_keys = model.load_state_dict(sd, assign=True, strict=False)
+
+        # Initialize x_pad_token if it was missing from the checkpoint
+        if "x_pad_token" in missing_keys:
+            import torch.nn as nn
+
+            model.x_pad_token = nn.Parameter(torch.empty(dim))
+            nn.init.normal_(model.x_pad_token, std=0.02)
+
+        return model
+
+
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Qwen3Encoder, format=ModelFormat.Checkpoint)
 class Qwen3EncoderCheckpointLoader(ModelLoader):
     """Class to load single-file Qwen3 Encoder models for Z-Image (safetensors format)."""
