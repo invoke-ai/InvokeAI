@@ -31,14 +31,14 @@ const log = logger('events');
  * - Whitespace and punctuation are ignored for content selection
  */
 
-export type AttentionDirection = 'up' | 'down';
+type AttentionDirection = 'up' | 'down';
 
 type SelectionBounds = {
   start: number;
   end: number;
 };
 
-export type AdjustmentResult = {
+type AdjustmentResult = {
   prompt: string;
   selectionStart: number;
   selectionEnd: number;

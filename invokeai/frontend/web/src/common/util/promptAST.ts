@@ -11,7 +11,7 @@ type Whitespace = string;
 
 type Embedding = string;
 
-export type Token =
+type Token =
   | { type: 'word'; value: Word }
   | { type: 'whitespace'; value: Whitespace }
   | { type: 'punct'; value: Punct }
