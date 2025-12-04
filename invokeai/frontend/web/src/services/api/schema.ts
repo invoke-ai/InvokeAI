@@ -13126,14 +13126,14 @@ export type components = {
              * Convert Cache Dir
              * Format: path
              * @description Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).
-             * @default models/.convert_cache
+             * @default models\.convert_cache
              */
             convert_cache_dir?: string;
             /**
              * Download Cache Dir
              * Format: path
              * @description Path to the directory that contains dynamically downloaded models.
-             * @default models/.download_cache
+             * @default models\.download_cache
              */
             download_cache_dir?: string;
             /**
@@ -25222,6 +25222,11 @@ export type components = {
              * @description The name of conditioning tensor
              */
             conditioning_name: string;
+            /**
+             * @description The mask associated with this conditioning tensor for regional prompting. Excluded regions should be set to False, included regions should be set to True.
+             * @default null
+             */
+            mask?: components["schemas"]["TensorField"] | null;
         };
         /**
          * ZImageConditioningOutput
@@ -25349,6 +25354,8 @@ export type components = {
         /**
          * Denoise - Z-Image
          * @description Run the denoising process with a Z-Image model.
+         *
+         *     Supports regional prompting by connecting multiple conditioning inputs with masks.
          */
         ZImageDenoiseInvocation: {
             /**
@@ -25397,15 +25404,17 @@ export type components = {
              */
             transformer?: components["schemas"]["TransformerField"] | null;
             /**
+             * Positive Conditioning
              * @description Positive conditioning tensor
              * @default null
              */
-            positive_conditioning?: components["schemas"]["ZImageConditioningField"] | null;
+            positive_conditioning?: components["schemas"]["ZImageConditioningField"] | components["schemas"]["ZImageConditioningField"][] | null;
             /**
+             * Negative Conditioning
              * @description Negative conditioning tensor
              * @default null
              */
-            negative_conditioning?: components["schemas"]["ZImageConditioningField"] | null;
+            negative_conditioning?: components["schemas"]["ZImageConditioningField"] | components["schemas"]["ZImageConditioningField"][] | null;
             /**
              * Guidance Scale
              * @description Guidance scale for classifier-free guidance. 1.0 = no CFG (recommended for Z-Image-Turbo). Values > 1.0 amplify guidance.
@@ -25762,6 +25771,8 @@ export type components = {
         /**
          * Prompt - Z-Image
          * @description Encodes and preps a prompt for a Z-Image image.
+         *
+         *     Supports regional prompting by connecting a mask input.
          */
         ZImageTextEncoderInvocation: {
             /**
@@ -25793,6 +25804,11 @@ export type components = {
              * @default null
              */
             qwen3_encoder?: components["schemas"]["Qwen3EncoderField"] | null;
+            /**
+             * @description A mask defining the region that this conditioning prompt applies to.
+             * @default null
+             */
+            mask?: components["schemas"]["TensorField"] | null;
             /**
              * type
              * @default z_image_text_encoder
