@@ -24948,7 +24948,7 @@ export type components = {
         };
         /**
          * Image to Latents - Z-Image
-         * @description Generates latents from an image using Z-Image VAE.
+         * @description Generates latents from an image using Z-Image VAE (supports both Diffusers and FLUX VAE).
          */
         ZImageImageToLatentsInvocation: {
             /**
@@ -24997,7 +24997,7 @@ export type components = {
         };
         /**
          * Latents to Image - Z-Image
-         * @description Generates an image from latents using Z-Image VAE.
+         * @description Generates an image from latents using Z-Image VAE (supports both Diffusers and FLUX VAE).
          */
         ZImageLatentsToImageInvocation: {
             /**
