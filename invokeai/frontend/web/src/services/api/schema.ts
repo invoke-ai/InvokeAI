@@ -1688,6 +1688,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workflows/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get All Tags
+         * @description Gets all unique tags from workflows
+         */
+        get: operations["get_all_tags"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workflows/counts_by_tag": {
         parameters: {
             query?: never;
@@ -28132,6 +28152,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkflowRecordDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_all_tags: {
+        parameters: {
+            query?: {
+                /** @description The categories to include */
+                categories?: components["schemas"]["WorkflowCategory"][] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string[];
                 };
             };
             /** @description Validation Error */
