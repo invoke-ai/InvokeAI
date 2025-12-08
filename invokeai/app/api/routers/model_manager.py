@@ -447,6 +447,59 @@ async def delete_model(
         raise HTTPException(status_code=404, detail=str(e))
 
 
+class BulkDeleteModelsRequest(BaseModel):
+    """Request body for bulk model deletion."""
+
+    keys: List[str] = Field(description="List of model keys to delete")
+
+
+class BulkDeleteModelsResponse(BaseModel):
+    """Response body for bulk model deletion."""
+
+    deleted: List[str] = Field(description="List of successfully deleted model keys")
+    failed: List[dict] = Field(description="List of failed deletions with error messages")
+
+
+@model_manager_router.post(
+    "/i/bulk_delete",
+    operation_id="bulk_delete_models",
+    responses={
+        200: {"description": "Models deleted (possibly with some failures)"},
+    },
+    status_code=200,
+)
+async def bulk_delete_models(
+    request: BulkDeleteModelsRequest = Body(description="List of model keys to delete"),
+) -> BulkDeleteModelsResponse:
+    """
+    Delete multiple model records from database.
+
+    The configuration records will be removed. The corresponding weights files will be
+    deleted as well if they reside within the InvokeAI "models" directory.
+    Returns a list of successfully deleted keys and failed deletions with error messages.
+    """
+    logger = ApiDependencies.invoker.services.logger
+    installer = ApiDependencies.invoker.services.model_manager.install
+
+    deleted = []
+    failed = []
+
+    for key in request.keys:
+        try:
+            installer.delete(key)
+            deleted.append(key)
+            logger.info(f"Deleted model: {key}")
+        except UnknownModelException as e:
+            logger.error(f"Failed to delete model {key}: {str(e)}")
+            failed.append({"key": key, "error": str(e)})
+        except Exception as e:
+            logger.error(f"Failed to delete model {key}: {str(e)}")
+            failed.append({"key": key, "error": str(e)})
+
+    logger.info(f"Bulk delete completed: {len(deleted)} deleted, {len(failed)} failed")
+    return BulkDeleteModelsResponse(deleted=deleted, failed=failed)
+
+
 @model_manager_router.delete(
     "/i/{key}/image",
     operation_id="delete_model_image",

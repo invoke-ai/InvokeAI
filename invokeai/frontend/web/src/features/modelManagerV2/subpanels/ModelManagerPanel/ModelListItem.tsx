@@ -1,12 +1,18 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Flex, Spacer, Text } from '@invoke-ai/ui-library';
+import { Checkbox, Flex, Spacer, Text } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectModelManagerV2Slice, setSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
+import {
+  selectModelManagerV2Slice,
+  selectSelectedModelKeys,
+  setSelectedModelKey,
+  toggleModelSelection,
+} from 'features/modelManagerV2/store/modelManagerV2Slice';
 import ModelBaseBadge from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
 import ModelFormatBadge from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelFormatBadge';
 import { ModelDeleteButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelDeleteButton';
 import { filesize } from 'filesize';
+import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import type { AnyModelConfig } from 'services/api/types';
 
@@ -62,15 +68,40 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
     [model.key]
   );
   const isSelected = useAppSelector(selectIsSelected);
+  const selectedModelKeys = useAppSelector(selectSelectedModelKeys);
+  const isChecked = selectedModelKeys.includes(model.key);
 
-  const handleSelectModel = useCallback(() => {
-    dispatch(setSelectedModelKey(model.key));
+  const handleSelectModel = useCallback(
+    (e: MouseEvent<HTMLDivElement>) => {
+      // Check if clicked on checkbox or delete button - if so, don't handle selection
+      const target = e.target as HTMLElement;
+      if (target.closest('input[type="checkbox"]') || target.closest('button')) {
+        return;
+      }
+
+      // Clicking the row opens detail view (single select)
+      // Ctrl/Cmd+Click still works as a power user feature for multi-select
+      if (e.ctrlKey || e.metaKey) {
+        dispatch(toggleModelSelection(model.key));
+      } else {
+        dispatch(setSelectedModelKey(model.key));
+      }
+    },
+    [model.key, dispatch]
+  );
+
+  const handleCheckboxChange = useCallback(() => {
+    dispatch(toggleModelSelection(model.key));
   }, [model.key, dispatch]);
+
+  const handleCheckboxClick = useCallback((e: MouseEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+  }, []);
 
   return (
     <Flex
       sx={sx}
-      aria-selected={isSelected}
+      aria-selected={isSelected || isChecked}
       justifyContent="flex-start"
       w="full"
       alignItems="flex-start"
@@ -78,6 +109,13 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
       cursor="pointer"
       onClick={handleSelectModel}
     >
+      <Checkbox
+        isChecked={isChecked}
+        onChange={handleCheckboxChange}
+        mt={1}
+        pointerEvents="auto"
+        onClick={handleCheckboxClick}
+      />
       <Flex gap={2} w="full" h="full" minW={0}>
         <ModelImage image_url={model.cover_image} />
         <Flex alignItems="flex-start" flexDir="column" w="full" minW={0}>

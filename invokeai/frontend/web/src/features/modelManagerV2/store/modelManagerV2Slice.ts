@@ -18,6 +18,7 @@ const zModelManagerState = z.object({
   filteredModelType: zFilterableModelType.nullable(),
   scanPath: z.string().optional(),
   shouldInstallInPlace: z.boolean(),
+  selectedModelKeys: z.array(z.string()),
 });
 
 type ModelManagerState = z.infer<typeof zModelManagerState>;
@@ -30,6 +31,7 @@ const getInitialState = (): ModelManagerState => ({
   searchTerm: '',
   scanPath: undefined,
   shouldInstallInPlace: true,
+  selectedModelKeys: [],
 });
 
 const slice = createSlice({
@@ -55,6 +57,20 @@ const slice = createSlice({
     shouldInstallInPlaceChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldInstallInPlace = action.payload;
     },
+    modelSelectionChanged: (state, action: PayloadAction<string[]>) => {
+      state.selectedModelKeys = action.payload;
+    },
+    toggleModelSelection: (state, action: PayloadAction<string>) => {
+      const index = state.selectedModelKeys.indexOf(action.payload);
+      if (index > -1) {
+        state.selectedModelKeys.splice(index, 1);
+      } else {
+        state.selectedModelKeys.push(action.payload);
+      }
+    },
+    clearModelSelection: (state) => {
+      state.selectedModelKeys = [];
+    },
   },
 });
 
@@ -65,6 +81,9 @@ export const {
   setSelectedModelMode,
   setScanPath,
   shouldInstallInPlaceChanged,
+  modelSelectionChanged,
+  toggleModelSelection,
+  clearModelSelection,
 } = slice.actions;
 
 export const modelManagerSliceConfig: SliceConfig<typeof slice> = {
@@ -79,7 +98,7 @@ export const modelManagerSliceConfig: SliceConfig<typeof slice> = {
       }
       return zModelManagerState.parse(state);
     },
-    persistDenylist: ['selectedModelKey', 'selectedModelMode', 'filteredModelType', 'searchTerm'],
+    persistDenylist: ['selectedModelKey', 'selectedModelMode', 'filteredModelType', 'searchTerm', 'selectedModelKeys'],
   },
 };
 
@@ -93,3 +112,4 @@ export const selectSelectedModelMode = createModelManagerSelector((modelManager)
 export const selectSearchTerm = createModelManagerSelector((mm) => mm.searchTerm);
 export const selectFilteredModelType = createModelManagerSelector((mm) => mm.filteredModelType);
 export const selectShouldInstallInPlace = createModelManagerSelector((mm) => mm.shouldInstallInPlace);
+export const selectSelectedModelKeys = createModelManagerSelector((mm) => mm.selectedModelKeys);
