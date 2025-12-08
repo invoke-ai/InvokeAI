@@ -201,7 +201,12 @@ export const ParamPositivePrompt = memo(() => {
       if (isPromptFocused() && textareaRef.current) {
         e.preventDefault();
         const textarea = textareaRef.current;
-        const result = adjustPromptAttention(textarea.value, textarea.selectionStart, textarea.selectionEnd, 'increment');
+        const result = adjustPromptAttention(
+          textarea.value,
+          textarea.selectionStart,
+          textarea.selectionEnd,
+          'increment'
+        );
 
         // Update the prompt
         dispatch(positivePromptChanged(result.prompt));
@@ -227,7 +232,12 @@ export const ParamPositivePrompt = memo(() => {
       if (isPromptFocused() && textareaRef.current) {
         e.preventDefault();
         const textarea = textareaRef.current;
-        const result = adjustPromptAttention(textarea.value, textarea.selectionStart, textarea.selectionEnd, 'decrement');
+        const result = adjustPromptAttention(
+          textarea.value,
+          textarea.selectionStart,
+          textarea.selectionEnd,
+          'decrement'
+        );
 
         // Update the prompt
         dispatch(positivePromptChanged(result.prompt));
