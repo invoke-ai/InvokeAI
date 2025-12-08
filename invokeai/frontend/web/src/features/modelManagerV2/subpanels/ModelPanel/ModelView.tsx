@@ -14,14 +14,35 @@ import { MainModelDefaultSettings } from './MainModelDefaultSettings/MainModelDe
 import { ModelAttrView } from './ModelAttrView';
 import { ModelDeleteButton } from './ModelDeleteButton';
 import { ModelReidentifyButton } from './ModelReidentifyButton';
+import { ModelUpdatePathButton } from './ModelUpdatePathButton';
 import { RelatedModels } from './RelatedModels';
 
 type Props = {
   modelConfig: AnyModelConfig;
 };
 
+/**
+ * Checks if a model path is absolute (external model) or relative (Invoke-controlled).
+ * External models have absolute paths like "X:/ModelPath/model.safetensors" or "/home/user/models/model.safetensors".
+ * Invoke-controlled models have relative paths like "uuid/model.safetensors".
+ */
+const isExternalModel = (path: string): boolean => {
+  // Unix absolute path
+  if (path.startsWith('/')) {
+    return true;
+  }
+  // Windows absolute path (e.g., "X:/..." or "X:\...")
+  if (path.length > 1 && path[1] === ':') {
+    return true;
+  }
+  return false;
+};
+
 export const ModelView = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
+
+  // Only allow path updates for external models (not Invoke-controlled)
+  const canUpdatePath = useMemo(() => isExternalModel(modelConfig.path), [modelConfig.path]);
 
   const withSettings = useMemo(() => {
     if (modelConfig.type === 'main' && modelConfig.base !== 'sdxl-refiner') {
@@ -44,6 +65,7 @@ export const ModelView = memo(({ modelConfig }: Props) => {
   return (
     <Flex flexDir="column" gap={4} h="full">
       <ModelHeader modelConfig={modelConfig}>
+        {canUpdatePath && <ModelUpdatePathButton modelConfig={modelConfig} />}
         <ModelReidentifyButton modelConfig={modelConfig} />
         {modelConfig.format === 'checkpoint' && modelConfig.type === 'main' && (
           <ModelConvertButton modelConfig={modelConfig} />
