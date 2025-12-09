@@ -292,7 +292,7 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             # Determine if the model is quantized.
             # If the model is quantized, then we need to apply the LoRA weights as sidecar layers. This results in
             # slower inference than direct patching, but is agnostic to the quantization format.
-            if transformer_config.format in [ModelFormat.Diffusers]:
+            if transformer_config.format in [ModelFormat.Diffusers, ModelFormat.Checkpoint]:
                 model_is_quantized = False
             elif transformer_config.format in [ModelFormat.GGUFQuantized]:
                 model_is_quantized = True
