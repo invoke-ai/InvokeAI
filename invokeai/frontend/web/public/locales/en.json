@@ -839,6 +839,7 @@
         "parameterSet": "Parameter {{parameter}} set",
         "parsingFailed": "Parsing Failed",
         "positivePrompt": "Positive Prompt",
+        "qwen3Encoder": "Qwen3 Encoder",
         "recallParameters": "Recall Parameters",
         "recallParameter": "Recall {{label}}",
         "scheduler": "Scheduler",
