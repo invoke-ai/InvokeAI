@@ -63,27 +63,41 @@ class ZImageTextEncoderInvocation(BaseInvocation):
             (_, tokenizer) = exit_stack.enter_context(tokenizer_info.model_on_device())
 
             # Apply LoRA models to the text encoder
+            lora_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
             exit_stack.enter_context(
                 LayerPatcher.apply_smart_model_patches(
                     model=text_encoder,
                     patches=self._lora_iterator(context),
                     prefix=Z_IMAGE_LORA_QWEN3_PREFIX,
-                    dtype=torch.bfloat16,
+                    dtype=lora_dtype,
                 )
             )
 
             context.util.signal_progress("Running Qwen3 text encoder")
-            assert isinstance(text_encoder, PreTrainedModel)
-            assert isinstance(tokenizer, PreTrainedTokenizerBase)
+            if not isinstance(text_encoder, PreTrainedModel):
+                raise TypeError(
+                    f"Expected PreTrainedModel for text encoder, got {type(text_encoder).__name__}. "
+                    "The Qwen3 encoder model may be corrupted or incompatible."
+                )
+            if not isinstance(tokenizer, PreTrainedTokenizerBase):
+                raise TypeError(
+                    f"Expected PreTrainedTokenizerBase for tokenizer, got {type(tokenizer).__name__}. "
+                    "The Qwen3 tokenizer may be corrupted or incompatible."
+                )
 
             # Apply chat template similar to diffusers ZImagePipeline
             # The chat template formats the prompt for the Qwen3 model
-            prompt_formatted = tokenizer.apply_chat_template(
-                [{"role": "user", "content": prompt}],
-                tokenize=False,
-                add_generation_prompt=True,
-                enable_thinking=True,
-            )
+            try:
+                prompt_formatted = tokenizer.apply_chat_template(
+                    [{"role": "user", "content": prompt}],
+                    tokenize=False,
+                    add_generation_prompt=True,
+                    enable_thinking=True,
+                )
+            except (AttributeError, TypeError) as e:
+                # Fallback if tokenizer doesn't support apply_chat_template or enable_thinking
+                context.logger.warning(f"Chat template failed ({e}), using raw prompt.")
+                prompt_formatted = prompt
 
             # Tokenize the formatted prompt
             text_inputs = tokenizer(
@@ -97,8 +111,16 @@ class ZImageTextEncoderInvocation(BaseInvocation):
 
             text_input_ids = text_inputs.input_ids
             attention_mask = text_inputs.attention_mask
-            assert isinstance(text_input_ids, torch.Tensor)
-            assert isinstance(attention_mask, torch.Tensor)
+            if not isinstance(text_input_ids, torch.Tensor):
+                raise TypeError(
+                    f"Expected torch.Tensor for input_ids, got {type(text_input_ids).__name__}. "
+                    "Tokenizer returned unexpected type."
+                )
+            if not isinstance(attention_mask, torch.Tensor):
+                raise TypeError(
+                    f"Expected torch.Tensor for attention_mask, got {type(attention_mask).__name__}. "
+                    "Tokenizer returned unexpected type."
+                )
 
             # Check for truncation
             untruncated_ids = tokenizer(prompt_formatted, padding="longest", return_tensors="pt").input_ids
@@ -119,6 +141,18 @@ class ZImageTextEncoderInvocation(BaseInvocation):
                 attention_mask=prompt_mask,
                 output_hidden_states=True,
             )
+
+            # Validate hidden_states output
+            if not hasattr(outputs, "hidden_states") or outputs.hidden_states is None:
+                raise RuntimeError(
+                    "Text encoder did not return hidden_states. "
+                    "Ensure output_hidden_states=True is supported by this model."
+                )
+            if len(outputs.hidden_states) < 2:
+                raise RuntimeError(
+                    f"Expected at least 2 hidden states from text encoder, got {len(outputs.hidden_states)}. "
+                    "This may indicate an incompatible model or configuration."
+                )
             prompt_embeds = outputs.hidden_states[-2]
 
             # Z-Image expects a 2D tensor [seq_len, hidden_dim] with only valid tokens
@@ -127,13 +161,21 @@ class ZImageTextEncoderInvocation(BaseInvocation):
             # Since batch_size=1, we take the first item and filter by mask
             prompt_embeds = prompt_embeds[0][prompt_mask[0]]
 
-        assert isinstance(prompt_embeds, torch.Tensor)
+        if not isinstance(prompt_embeds, torch.Tensor):
+            raise TypeError(
+                f"Expected torch.Tensor for prompt embeddings, got {type(prompt_embeds).__name__}. "
+                "Text encoder returned unexpected type."
+            )
         return prompt_embeds
 
     def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
         """Iterate over LoRA models to apply to the Qwen3 text encoder."""
         for lora in self.qwen3_encoder.loras:
             lora_info = context.models.load(lora.lora)
-            assert isinstance(lora_info.model, ModelPatchRaw)
+            if not isinstance(lora_info.model, ModelPatchRaw):
+                raise TypeError(
+                    f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}. "
+                    "The LoRA model may be corrupted or incompatible."
+                )
             yield (lora_info.model, lora.weight)
             del lora_info

@@ -15,9 +15,6 @@ from invokeai.backend.patches.lora_conversions.z_image_lora_constants import (
     Z_IMAGE_LORA_TRANSFORMER_PREFIX,
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
-from invokeai.backend.util import InvokeAILogger
-
-logger = InvokeAILogger.get_logger(__name__)
 
 
 def is_state_dict_likely_z_image_lora(state_dict: dict[str | int, torch.Tensor]) -> bool:
@@ -69,25 +66,8 @@ def lora_model_from_z_image_state_dict(
     """
     layers: dict[str, BaseLayerPatch] = {}
 
-    # Debug: Log sample keys and check for alpha keys
-    sample_keys = list(state_dict.keys())[:10]
-    alpha_keys = [k for k in state_dict.keys() if isinstance(k, str) and "alpha" in k.lower()]
-    logger.info(f"Z-Image LoRA state dict: {len(state_dict)} keys, sample: {sample_keys}")
-    if alpha_keys:
-        logger.info(f"Z-Image LoRA alpha keys found: {alpha_keys[:5]}")
-        # Log first alpha value
-        first_alpha_key = alpha_keys[0]
-        first_alpha_val = state_dict[first_alpha_key]
-        logger.info(f"First alpha: key={first_alpha_key}, value={first_alpha_val}")
-
     # Group keys by layer
     grouped_state_dict = _group_by_layer(state_dict)
-
-    # Debug: Log first grouped layer to see what keys are present
-    first_layer_key = next(iter(grouped_state_dict.keys()), None)
-    if first_layer_key:
-        first_layer_dict = grouped_state_dict[first_layer_key]
-        logger.info(f"First grouped layer: key={first_layer_key}, sub_keys={list(first_layer_dict.keys())}")
 
     for layer_key, layer_dict in grouped_state_dict.items():
         # Convert PEFT format keys to internal format
@@ -135,19 +115,6 @@ def lora_model_from_z_image_state_dict(
 
         layer = any_lora_layer_from_state_dict(values)
         layers[final_key] = layer
-
-    # Log sample of converted keys and first layer's scale info
-    sample_converted = list(layers.keys())[:5]
-    logger.info(f"Z-Image LoRA converted {len(layers)} layers. Sample keys: {sample_converted}")
-
-    # Debug: Log scale info for first layer
-    if layers:
-        first_layer = next(iter(layers.values()))
-        if hasattr(first_layer, '_rank') and hasattr(first_layer, '_alpha'):
-            rank = first_layer._rank() if callable(first_layer._rank) else first_layer._rank
-            alpha = first_layer._alpha
-            scale = first_layer.scale() if hasattr(first_layer, 'scale') else None
-            logger.info(f"First layer scale info: rank={rank}, alpha={alpha}, scale={scale}")
 
     return ModelPatchRaw(layers=layers)
 

@@ -41,10 +41,18 @@ class ZImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     @staticmethod
     def vae_encode(vae_info: LoadedModel, image_tensor: torch.Tensor) -> torch.Tensor:
-        assert isinstance(vae_info.model, (AutoencoderKL, FluxAutoEncoder))
+        if not isinstance(vae_info.model, (AutoencoderKL, FluxAutoEncoder)):
+            raise TypeError(
+                f"Expected AutoencoderKL or FluxAutoEncoder for Z-Image VAE, got {type(vae_info.model).__name__}. "
+                "Ensure you are using a compatible VAE model."
+            )
 
         with vae_info.model_on_device() as (_, vae):
-            assert isinstance(vae, (AutoencoderKL, FluxAutoEncoder))
+            if not isinstance(vae, (AutoencoderKL, FluxAutoEncoder)):
+                raise TypeError(
+                    f"Expected AutoencoderKL or FluxAutoEncoder, got {type(vae).__name__}. "
+                    "VAE model type changed unexpectedly after loading."
+                )
 
             vae_dtype = next(iter(vae.parameters())).dtype
             image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=vae_dtype)
@@ -80,7 +88,11 @@ class ZImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
             image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
 
         vae_info = context.models.load(self.vae.vae)
-        assert isinstance(vae_info.model, (AutoencoderKL, FluxAutoEncoder))
+        if not isinstance(vae_info.model, (AutoencoderKL, FluxAutoEncoder)):
+            raise TypeError(
+                f"Expected AutoencoderKL or FluxAutoEncoder for Z-Image VAE, got {type(vae_info.model).__name__}. "
+                "Ensure you are using a compatible VAE model."
+            )
 
         context.util.signal_progress("Running VAE")
         latents = self.vae_encode(vae_info=vae_info, image_tensor=image_tensor)

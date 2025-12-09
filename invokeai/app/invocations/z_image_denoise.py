@@ -111,9 +111,17 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     ) -> torch.Tensor:
         """Load Z-Image text conditioning."""
         cond_data = context.conditioning.load(conditioning_name)
-        assert len(cond_data.conditionings) == 1
+        if len(cond_data.conditionings) != 1:
+            raise ValueError(
+                f"Expected exactly 1 conditioning entry for Z-Image, got {len(cond_data.conditionings)}. "
+                "Ensure you are using the Z-Image text encoder."
+            )
         z_image_conditioning = cond_data.conditionings[0]
-        assert isinstance(z_image_conditioning, ZImageConditioningInfo)
+        if not isinstance(z_image_conditioning, ZImageConditioningInfo):
+            raise TypeError(
+                f"Expected ZImageConditioningInfo, got {type(z_image_conditioning).__name__}. "
+                "Ensure you are using the Z-Image text encoder."
+            )
         z_image_conditioning = z_image_conditioning.to(dtype=dtype, device=device)
         return z_image_conditioning.prompt_embeds
 
@@ -128,8 +136,10 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         seed: int,
     ) -> torch.Tensor:
         """Generate initial noise tensor."""
+        # Generate noise as float32 on CPU for maximum compatibility,
+        # then cast to target dtype/device
         rand_device = "cpu"
-        rand_dtype = torch.float16
+        rand_dtype = torch.float32
 
         return torch.randn(
             batch_size,
@@ -185,8 +195,8 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         return sigmas
 
     def _run_diffusion(self, context: InvocationContext) -> torch.Tensor:
-        inference_dtype = torch.bfloat16
         device = TorchDevice.choose_torch_device()
+        inference_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
 
         transformer_info = context.models.load(self.transformer.transformer)
 
@@ -202,7 +212,8 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         neg_prompt_embeds: torch.Tensor | None = None
         do_classifier_free_guidance = self.guidance_scale > 0.0 and self.negative_conditioning is not None
         if do_classifier_free_guidance:
-            assert self.negative_conditioning is not None
+            if self.negative_conditioning is None:
+                raise ValueError("Negative conditioning is required when guidance_scale > 0")
             neg_prompt_embeds = self._load_text_conditioning(
                 context=context,
                 conditioning_name=self.negative_conditioning.conditioning_name,
@@ -264,7 +275,8 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         inpaint_mask = self._prep_inpaint_mask(context, latents)
         inpaint_extension: RectifiedFlowInpaintExtension | None = None
         if inpaint_mask is not None:
-            assert init_latents is not None
+            if init_latents is None:
+                raise ValueError("Initial latents are required when using an inpaint mask (image-to-image inpainting)")
             inpaint_extension = RectifiedFlowInpaintExtension(
                 init_latents=init_latents,
                 inpaint_mask=inpaint_mask,
@@ -387,6 +399,10 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         """Iterate over LoRA models to apply to the transformer."""
         for lora in self.transformer.loras:
             lora_info = context.models.load(lora.lora)
-            assert isinstance(lora_info.model, ModelPatchRaw)
+            if not isinstance(lora_info.model, ModelPatchRaw):
+                raise TypeError(
+                    f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}. "
+                    "The LoRA model may be corrupted or incompatible."
+                )
             yield (lora_info.model, lora.weight)
             del lora_info

@@ -27,6 +27,7 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
+from invokeai.backend.util.devices import TorchDevice
 
 
 def _convert_z_image_gguf_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
@@ -70,6 +71,11 @@ def _convert_z_image_gguf_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
             # Split the fused QKV tensor into Q, K, V
             tensor = value
             if hasattr(tensor, "shape"):
+                if tensor.shape[0] % 3 != 0:
+                    raise ValueError(
+                        f"Cannot split QKV tensor '{key}': first dimension ({tensor.shape[0]}) "
+                        "is not divisible by 3. The model file may be corrupted or incompatible."
+                    )
                 dim = tensor.shape[0] // 3
                 q = tensor[:dim]
                 k = tensor[dim : 2 * dim]
@@ -115,8 +121,9 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
         variant = repo_variant.value if repo_variant else None
         model_path = model_path / submodel_type.value
 
-        # Z-Image requires bfloat16 for correct inference.
-        dtype = torch.bfloat16
+        # Z-Image prefers bfloat16, but use safe dtype based on target device capabilities.
+        target_device = TorchDevice.choose_torch_device()
+        dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
         try:
             result: AnyModel = load_class.from_pretrained(
                 model_path,
@@ -161,7 +168,11 @@ class ZImageCheckpointModel(ModelLoader):
         from diffusers import ZImageTransformer2DModel
         from safetensors.torch import load_file
 
-        assert isinstance(config, Main_Checkpoint_ZImage_Config)
+        if not isinstance(config, Main_Checkpoint_ZImage_Config):
+            raise TypeError(
+                f"Expected Main_Checkpoint_ZImage_Config, got {type(config).__name__}. "
+                "Model configuration type mismatch."
+            )
         model_path = Path(config.path)
 
         # Load the state dict from safetensors/checkpoint file
@@ -210,13 +221,17 @@ class ZImageCheckpointModel(ModelLoader):
                 axes_lens=[1024, 512, 512],
             )
 
+        # Determine safe dtype based on target device capabilities
+        target_device = TorchDevice.choose_torch_device()
+        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+
         # Handle memory management and dtype conversion
-        new_sd_size = sum([ten.nelement() * torch.bfloat16.itemsize for ten in sd.values()])
+        new_sd_size = sum([ten.nelement() * model_dtype.itemsize for ten in sd.values()])
         self._ram_cache.make_room(new_sd_size)
 
-        # Convert to bfloat16 (required for Z-Image)
+        # Convert to target dtype
         for k in sd.keys():
-            sd[k] = sd[k].to(torch.bfloat16)
+            sd[k] = sd[k].to(model_dtype)
 
         model.load_state_dict(sd, assign=True)
         return model
@@ -248,11 +263,19 @@ class ZImageGGUFCheckpointModel(ModelLoader):
     ) -> AnyModel:
         from diffusers import ZImageTransformer2DModel
 
-        assert isinstance(config, Main_GGUF_ZImage_Config)
+        if not isinstance(config, Main_GGUF_ZImage_Config):
+            raise TypeError(
+                f"Expected Main_GGUF_ZImage_Config, got {type(config).__name__}. "
+                "Model configuration type mismatch."
+            )
         model_path = Path(config.path)
 
+        # Determine safe dtype based on target device capabilities
+        target_device = TorchDevice.choose_torch_device()
+        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+
         # Load the GGUF state dict
-        sd = gguf_sd_loader(model_path, compute_dtype=torch.bfloat16)
+        sd = gguf_sd_loader(model_path, compute_dtype=compute_dtype)
 
         # Some Z-Image GGUF models have keys prefixed with "diffusion_model."
         # Check if we need to strip this prefix
@@ -312,9 +335,12 @@ class Qwen3EncoderLoader(ModelLoader):
             case SubModelType.Tokenizer:
                 return AutoTokenizer.from_pretrained(Path(config.path) / "tokenizer")
             case SubModelType.TextEncoder:
+                # Determine safe dtype based on target device capabilities
+                target_device = TorchDevice.choose_torch_device()
+                model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
                 return Qwen3ForCausalLM.from_pretrained(
                     Path(config.path) / "text_encoder",
-                    torch_dtype=torch.bfloat16,
+                    torch_dtype=model_dtype,
                     low_cpu_mem_usage=True,
                 )
 
@@ -359,8 +385,16 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
 
         logger = InvokeAILogger.get_logger(self.__class__.__name__)
 
-        assert isinstance(config, Qwen3Encoder_Checkpoint_Config)
+        if not isinstance(config, Qwen3Encoder_Checkpoint_Config):
+            raise TypeError(
+                f"Expected Qwen3Encoder_Checkpoint_Config, got {type(config).__name__}. "
+                "Model configuration type mismatch."
+            )
         model_path = Path(config.path)
+
+        # Determine safe dtype based on target device capabilities
+        target_device = TorchDevice.choose_torch_device()
+        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
         # Load the state dict from safetensors file
         sd = load_file(model_path)
@@ -382,6 +416,11 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
         embed_weight = sd.get("model.embed_tokens.weight")
         if embed_weight is None:
             raise ValueError("Could not find model.embed_tokens.weight in state dict")
+        if embed_weight.ndim != 2:
+            raise ValueError(
+                f"Expected 2D embed_tokens weight tensor, got shape {embed_weight.shape}. "
+                "The model file may be corrupted or incompatible."
+            )
         hidden_size = embed_weight.shape[1]
         vocab_size = embed_weight.shape[0]
 
@@ -422,16 +461,16 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
             use_sliding_window=False,
             attention_bias=False,
             attention_dropout=0.0,
-            torch_dtype=torch.bfloat16,
+            torch_dtype=model_dtype,
         )
 
         # Handle memory management
-        new_sd_size = sum([ten.nelement() * torch.bfloat16.itemsize for ten in sd.values()])
+        new_sd_size = sum([ten.nelement() * model_dtype.itemsize for ten in sd.values()])
         self._ram_cache.make_room(new_sd_size)
 
-        # Convert to bfloat16
+        # Convert to target dtype
         for k in sd.keys():
-            sd[k] = sd[k].to(torch.bfloat16)
+            sd[k] = sd[k].to(model_dtype)
 
         # Use Qwen3ForCausalLM - the correct model class for Z-Image text encoder
         # Use init_empty_weights for fast model creation, then load weights with assign=True
@@ -466,7 +505,7 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
                     # Compute inv_freq from config (same logic as Qwen3RotaryEmbedding.__init__)
                     base = qwen_config.rope_theta
                     inv_freq = 1.0 / (base ** (torch.arange(0, head_dim, 2, dtype=torch.float32) / head_dim))
-                    parent.register_buffer(buffer_name, inv_freq.to(torch.bfloat16), persistent=False)
+                    parent.register_buffer(buffer_name, inv_freq.to(model_dtype), persistent=False)
                 else:
                     # For other buffers, log warning
                     logger.warning(f"Re-initializing unknown meta buffer: {name}")

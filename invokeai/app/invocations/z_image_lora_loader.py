@@ -136,7 +136,11 @@ class ZImageLoRACollectionLoader(BaseInvocation):
             if not context.models.exists(lora.lora.key):
                 raise Exception(f"Unknown lora: {lora.lora.key}!")
 
-            assert lora.lora.base is BaseModelType.ZImage
+            if lora.lora.base is not BaseModelType.ZImage:
+                raise ValueError(
+                    f"LoRA '{lora.lora.key}' is for {lora.lora.base.value if lora.lora.base else 'unknown'} models, "
+                    "not Z-Image models. Ensure you are using a Z-Image compatible LoRA."
+                )
 
             added_loras.append(lora.lora.key)
 

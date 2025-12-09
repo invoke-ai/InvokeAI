@@ -213,8 +213,8 @@ class LayerPatcher:
                     )
                     continue
 
-            # Convert param_weight to the correct dtype and apply to model weights
-            param_weight_converted = param_weight.to(dtype=dtype)
+            # Convert param_weight to the correct device and dtype, then apply to model weights
+            param_weight_converted = param_weight.to(device=device, dtype=dtype)
             module_param.data.copy_(module_param.data + param_weight_converted)
 
         patch.to(device=TorchDevice.CPU_DEVICE)
