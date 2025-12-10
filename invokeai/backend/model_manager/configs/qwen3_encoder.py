@@ -3,6 +3,7 @@ from typing import Any, Literal, Self
 from pydantic import Field
 
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base
+from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.model_manager.configs.identification_utils import (
     NotAMatchError,
     raise_for_class_name,
@@ -15,15 +16,33 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, 
 
 
 def _has_qwen3_keys(state_dict: dict[str | int, Any]) -> bool:
-    """Check if state dict contains Qwen3 model keys."""
-    # Qwen3 models have keys starting with "model.layers." and "model.embed_tokens"
-    qwen3_indicators = ["model.layers.0.", "model.embed_tokens.weight"]
+    """Check if state dict contains Qwen3 model keys.
+
+    Supports both:
+    - PyTorch/diffusers format: model.layers.0., model.embed_tokens.weight
+    - GGUF/llama.cpp format: blk.0., token_embd.weight
+    """
+    # PyTorch/diffusers format indicators
+    pytorch_indicators = ["model.layers.0.", "model.embed_tokens.weight"]
+    # GGUF/llama.cpp format indicators
+    gguf_indicators = ["blk.0.", "token_embd.weight"]
+
     for key in state_dict.keys():
         if isinstance(key, str):
-            for indicator in qwen3_indicators:
+            # Check PyTorch format
+            for indicator in pytorch_indicators:
+                if key.startswith(indicator) or key == indicator:
+                    return True
+            # Check GGUF format
+            for indicator in gguf_indicators:
                 if key.startswith(indicator) or key == indicator:
                     return True
     return False
+
+
+def _has_ggml_tensors(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict contains GGML tensors (GGUF quantized)."""
+    return any(isinstance(v, GGMLTensor) for v in state_dict.values())
 
 
 class Qwen3Encoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
@@ -41,6 +60,8 @@ class Qwen3Encoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
 
         cls._validate_looks_like_qwen3_model(mod)
 
+        cls._validate_does_not_look_like_gguf_quantized(mod)
+
         return cls(**override_fields)
 
     @classmethod
@@ -48,6 +69,12 @@ class Qwen3Encoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
         has_qwen3_keys = _has_qwen3_keys(mod.load_state_dict())
         if not has_qwen3_keys:
             raise NotAMatchError("state dict does not look like a Qwen3 model")
+
+    @classmethod
+    def _validate_does_not_look_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
+        has_ggml = _has_ggml_tensors(mod.load_state_dict())
+        if has_ggml:
+            raise NotAMatchError("state dict looks like GGUF quantized")
 
 
 class Qwen3Encoder_Qwen3Encoder_Config(Config_Base):
@@ -80,3 +107,35 @@ class Qwen3Encoder_Qwen3Encoder_Config(Config_Base):
         )
 
         return cls(**override_fields)
+
+
+class Qwen3Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
+    """Configuration for GGUF-quantized Qwen3 Encoder models."""
+
+    base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
+    type: Literal[ModelType.Qwen3Encoder] = Field(default=ModelType.Qwen3Encoder)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_qwen3_model(mod)
+
+        cls._validate_looks_like_gguf_quantized(mod)
+
+        return cls(**override_fields)
+
+    @classmethod
+    def _validate_looks_like_qwen3_model(cls, mod: ModelOnDisk) -> None:
+        has_qwen3_keys = _has_qwen3_keys(mod.load_state_dict())
+        if not has_qwen3_keys:
+            raise NotAMatchError("state dict does not look like a Qwen3 model")
+
+    @classmethod
+    def _validate_looks_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
+        has_ggml = _has_ggml_tensors(mod.load_state_dict())
+        if not has_ggml:
+            raise NotAMatchError("state dict does not look like GGUF quantized")

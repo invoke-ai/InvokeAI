@@ -41,7 +41,7 @@ class MainModelDefaultSettings(BaseModel):
     vae_precision: DEFAULTS_PRECISION | None = Field(default=None, description="Default VAE precision for this model")
     scheduler: SCHEDULER_NAME_VALUES | None = Field(default=None, description="Default scheduler for this model")
     steps: int | None = Field(default=None, gt=0, description="Default number of steps for this model")
-    cfg_scale: float | None = Field(default=None, ge=1, description="Default CFG Scale for this model")
+    cfg_scale: float | None = Field(default=None, ge=0, description="Default CFG Scale for this model")
     cfg_rescale_multiplier: float | None = Field(
         default=None, ge=0, lt=1, description="Default CFG Rescale Multiplier for this model"
     )
@@ -60,6 +60,8 @@ class MainModelDefaultSettings(BaseModel):
                 return cls(width=768, height=768)
             case BaseModelType.StableDiffusionXL:
                 return cls(width=1024, height=1024)
+            case BaseModelType.ZImage:
+                return cls(steps=9, cfg_scale=0.0, width=1024, height=1024)
             case _:
                 # TODO(psyche): Do we want defaults for other base types?
                 return None
@@ -126,9 +128,6 @@ def _has_z_image_keys(state_dict: dict[str | int, Any]) -> bool:
         # Check for Z-Image specific key prefixes
         prefix = key.split(".")[0]
         if prefix in z_image_specific_keys:
-            return True
-        # Also check for LoRA format with diffusion_model prefix
-        if key.startswith("diffusion_model.layers."):
             return True
     return False
 
