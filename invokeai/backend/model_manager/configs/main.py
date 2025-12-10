@@ -126,9 +126,12 @@ def _has_z_image_keys(state_dict: dict[str | int, Any]) -> bool:
         if isinstance(key, int):
             continue
         # Check for Z-Image specific key prefixes
-        prefix = key.split(".")[0]
-        if prefix in z_image_specific_keys:
-            return True
+        # Handle both direct keys (cap_embedder.0.weight) and
+        # ComfyUI-style keys (model.diffusion_model.cap_embedder.0.weight)
+        key_parts = key.split(".")
+        for part in key_parts:
+            if part in z_image_specific_keys:
+                return True
     return False
 
 
