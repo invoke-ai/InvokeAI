@@ -379,7 +379,8 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
     """Class to load single-file Qwen3 Encoder models for Z-Image (safetensors format)."""
 
     # Default HuggingFace model to load tokenizer from when using single-file Qwen3 encoder
-    DEFAULT_TOKENIZER_SOURCE = "Qwen/Qwen2.5-3B"
+    # Must be Qwen3 (not Qwen2.5) to match Z-Image's text encoder architecture and special tokens
+    DEFAULT_TOKENIZER_SOURCE = "Qwen/Qwen3-4B"
 
     def _load_model(
         self,
@@ -543,7 +544,8 @@ class Qwen3EncoderGGUFLoader(ModelLoader):
     """Class to load GGUF-quantized Qwen3 Encoder models for Z-Image."""
 
     # Default HuggingFace model to load tokenizer from when using GGUF Qwen3 encoder
-    DEFAULT_TOKENIZER_SOURCE = "Qwen/Qwen2.5-3B"
+    # Must be Qwen3 (not Qwen2.5) to match Z-Image's text encoder architecture and special tokens
+    DEFAULT_TOKENIZER_SOURCE = "Qwen/Qwen3-4B"
 
     def _load_model(
         self,
