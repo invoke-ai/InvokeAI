@@ -465,12 +465,6 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
         num_kv_heads = k_proj_weight.shape[0] // head_dim
         intermediate_size = gate_proj_weight.shape[0]
 
-        logger.info(
-            f"Qwen3 Encoder config detected: layers={layer_count}, hidden={hidden_size}, "
-            f"heads={num_attention_heads}, kv_heads={num_kv_heads}, intermediate={intermediate_size}, "
-            f"head_dim={head_dim}"
-        )
-
         # Create Qwen3 config - matches the diffusers text_encoder/config.json
         qwen_config = Qwen3Config(
             vocab_size=vocab_size,
