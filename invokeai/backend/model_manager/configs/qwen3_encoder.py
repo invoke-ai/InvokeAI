@@ -3,7 +3,6 @@ from typing import Any, Literal, Self
 from pydantic import Field
 
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base
-from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.model_manager.configs.identification_utils import (
     NotAMatchError,
     raise_for_class_name,
@@ -13,6 +12,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
 )
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
+from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 
 
 def _has_qwen3_keys(state_dict: dict[str | int, Any]) -> bool:

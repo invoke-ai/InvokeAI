@@ -28,17 +28,18 @@ def is_state_dict_likely_z_image_lora(state_dict: dict[str | int, torch.Tensor])
     # Check for Z-Image transformer keys (S3-DiT architecture)
     # Various training frameworks use different prefixes
     has_transformer_keys = any(
-        k.startswith((
-            "transformer.",
-            "base_model.model.transformer.",
-            "diffusion_model.",
-        )) for k in str_keys
+        k.startswith(
+            (
+                "transformer.",
+                "base_model.model.transformer.",
+                "diffusion_model.",
+            )
+        )
+        for k in str_keys
     )
 
     # Check for Qwen3 text encoder keys
-    has_qwen3_keys = any(
-        k.startswith(("text_encoder.", "base_model.model.text_encoder.")) for k in str_keys
-    )
+    has_qwen3_keys = any(k.startswith(("text_encoder.", "base_model.model.text_encoder.")) for k in str_keys)
 
     return has_transformer_keys or has_qwen3_keys
 
@@ -96,7 +97,7 @@ def lora_model_from_z_image_state_dict(
         # Check and strip text encoder prefixes first
         for prefix in text_encoder_prefixes:
             if layer_key.startswith(prefix):
-                clean_key = layer_key[len(prefix):]
+                clean_key = layer_key[len(prefix) :]
                 is_text_encoder = True
                 break
 
@@ -104,7 +105,7 @@ def lora_model_from_z_image_state_dict(
         if not is_text_encoder:
             for prefix in transformer_prefixes:
                 if layer_key.startswith(prefix):
-                    clean_key = layer_key[len(prefix):]
+                    clean_key = layer_key[len(prefix) :]
                     break
 
         # Apply the appropriate internal prefix

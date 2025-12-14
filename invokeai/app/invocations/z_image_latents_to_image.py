@@ -55,9 +55,7 @@ class ZImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         # FLUX VAE doesn't support seamless, so only apply for AutoencoderKL
         seamless_context = (
-            nullcontext()
-            if is_flux_vae
-            else SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes)
+            nullcontext() if is_flux_vae else SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes)
         )
 
         with seamless_context, vae_info.model_on_device() as (_, vae):

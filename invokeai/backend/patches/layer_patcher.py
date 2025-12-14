@@ -175,9 +175,7 @@ class LayerPatcher:
 
         # TODO(ryand): Using torch.autocast(...) over explicit casting may offer a speed benefit on CUDA
         # devices here. Experimentally, it was found to be very slow on CPU. More investigation needed.
-        params_dict = patch.get_parameters(
-            dict(module_to_patch.named_parameters(recurse=False)), weight=patch_weight
-        )
+        params_dict = patch.get_parameters(dict(module_to_patch.named_parameters(recurse=False)), weight=patch_weight)
         if not params_dict:
             logger = InvokeAILogger.get_logger(LayerPatcher.__name__)
             logger.warning(f"LoRA patch returned no parameters for module: {module_to_patch_key}")

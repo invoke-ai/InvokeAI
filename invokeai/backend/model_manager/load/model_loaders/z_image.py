@@ -6,7 +6,6 @@ from typing import Any, Optional
 
 import accelerate
 import torch
-
 from transformers import AutoTokenizer, Qwen3ForCausalLM
 
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Diffusers_Config_Base
@@ -287,8 +286,7 @@ class ZImageGGUFCheckpointModel(ModelLoader):
 
         if not isinstance(config, Main_GGUF_ZImage_Config):
             raise TypeError(
-                f"Expected Main_GGUF_ZImage_Config, got {type(config).__name__}. "
-                "Model configuration type mismatch."
+                f"Expected Main_GGUF_ZImage_Config, got {type(config).__name__}. Model configuration type mismatch."
             )
         model_path = Path(config.path)
 
@@ -405,9 +403,10 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
         self,
         config: AnyModelConfig,
     ) -> AnyModel:
-        from invokeai.backend.util.logging import InvokeAILogger
         from safetensors.torch import load_file
         from transformers import Qwen3Config, Qwen3ForCausalLM
+
+        from invokeai.backend.util.logging import InvokeAILogger
 
         logger = InvokeAILogger.get_logger(self.__class__.__name__)
 
@@ -564,15 +563,15 @@ class Qwen3EncoderGGUFLoader(ModelLoader):
         self,
         config: AnyModelConfig,
     ) -> AnyModel:
-        from invokeai.backend.util.logging import InvokeAILogger
         from transformers import Qwen3Config, Qwen3ForCausalLM
+
+        from invokeai.backend.util.logging import InvokeAILogger
 
         logger = InvokeAILogger.get_logger(self.__class__.__name__)
 
         if not isinstance(config, Qwen3Encoder_GGUF_Config):
             raise TypeError(
-                f"Expected Qwen3Encoder_GGUF_Config, got {type(config).__name__}. "
-                "Model configuration type mismatch."
+                f"Expected Qwen3Encoder_GGUF_Config, got {type(config).__name__}. Model configuration type mismatch."
             )
         model_path = Path(config.path)
 
