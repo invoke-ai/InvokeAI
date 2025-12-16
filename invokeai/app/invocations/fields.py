@@ -241,6 +241,12 @@ class BoardField(BaseModel):
     board_id: str = Field(description="The id of the board")
 
 
+class StylePresetField(BaseModel):
+    """A style preset primitive field"""
+
+    style_preset_id: str = Field(description="The id of the style preset")
+
+
 class DenoiseMaskField(BaseModel):
     """An inpaint mask field"""
 

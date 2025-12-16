@@ -1,5 +1,5 @@
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
-from invokeai.app.invocations.fields import InputField, OutputField, UIComponent
+from invokeai.app.invocations.fields import InputField, OutputField, StylePresetField, UIComponent
 from invokeai.app.services.shared.invocation_context import InvocationContext
 
 
@@ -25,8 +25,8 @@ class PromptTemplateInvocation(BaseInvocation):
     {prompt} placeholders in the template with your input prompts.
     """
 
-    style_preset_id: str = InputField(
-        description="The ID of the Style Preset to use as a template",
+    style_preset: StylePresetField = InputField(
+        description="The Style Preset to use as a template",
     )
     positive_prompt: str = InputField(
         default="",
@@ -41,7 +41,7 @@ class PromptTemplateInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> PromptTemplateOutput:
         # Fetch the style preset from the database
-        style_preset = context._services.style_preset_records.get(self.style_preset_id)
+        style_preset = context._services.style_preset_records.get(self.style_preset.style_preset_id)
 
         # Get the template prompts
         positive_template = style_preset.preset_data.positive_prompt
