@@ -501,6 +501,14 @@
                 "title": "Next Prompt in History",
                 "desc": "When the prompt is focused, move to the next (newer) prompt in your history."
             },
+            "promptWeightUp": {
+                "title": "Increase Weight of Prompt Selection",
+                "desc": "When the prompt is focused and text is selected, increase the weight of the selected prompt."
+            },
+            "promptWeightDown": {
+                "title": "Decrease Weight of Prompt Selection",
+                "desc": "When the prompt is focused and text is selected, decrease the weight of the selected prompt."
+            },
             "toggleLeftPanel": {
                 "title": "Toggle Left Panel",
                 "desc": "Show or hide the left panel."
