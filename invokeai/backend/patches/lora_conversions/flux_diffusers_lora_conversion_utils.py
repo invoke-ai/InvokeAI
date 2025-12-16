@@ -7,6 +7,7 @@ from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch,
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.util.logging import InvokeAILogger
 
 
 def is_state_dict_likely_in_flux_diffusers_format(state_dict: dict[str | int, torch.Tensor]) -> bool:
@@ -241,10 +242,19 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
         )
 
     # Final layer.
+    # Hyper FLUX LoRA support: patch norm_out.linear if present
+    # add_lora_layer_if_present("norm_out.linear", "norm_out.linear")
+    add_lora_layer_if_present("norm_out.linear", "final_layer.adaLN_modulation.1")
+
     add_lora_layer_if_present("proj_out", "final_layer.linear")
 
     # Assert that all keys were processed.
-    assert len(grouped_state_dict) == 0
+    if len(grouped_state_dict) > 0:
+        logger = InvokeAILogger.get_logger()
+        logger.warning(
+            f"The following unexpected LoRA layers were not loaded: {list(grouped_state_dict.keys())}."
+            " This is not necessarily a problem, but the LoRA may not be fully applied."
+        )
 
     layers_with_prefix = {f"{FLUX_LORA_TRANSFORMER_PREFIX}{k}": v for k, v in layers.items()}
 
