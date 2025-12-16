@@ -35,6 +35,10 @@ const isExternalModel = (path: string): boolean => {
   if (path.length > 1 && path[1] === ':') {
     return true;
   }
+  // Windows UNC path (e.g., "\\ServerName\ShareName\..." or "//ServerName/ShareName/...")
+  if (path.startsWith('\\\\') || path.startsWith('//')) {
+    return true;
+  }
   return false;
 };
 
