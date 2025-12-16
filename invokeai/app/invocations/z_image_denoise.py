@@ -14,8 +14,6 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
-    WithBoard,
-    WithMetadata,
     ZImageConditioningField,
 )
 from invokeai.app.invocations.model import TransformerField
@@ -36,10 +34,10 @@ from invokeai.backend.util.devices import TorchDevice
     title="Denoise - Z-Image",
     tags=["image", "z-image"],
     category="image",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
-class ZImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
+class ZImageDenoiseInvocation(BaseInvocation):
     """Run the denoising process with a Z-Image model."""
 
     # If latents is provided, this means we are doing image-to-image.
