@@ -104,7 +104,7 @@ const HotkeyRecorderConflictSx: SystemStyleObject = {
   bg: 'error.900',
 };
 
-export const HotkeyItem = memo(
+const HotkeyItem = memo(
   ({
     hotkeyIndex,
     keyString,
@@ -379,7 +379,7 @@ const HotkeyItemsDisplaySx: SystemStyleObject = {
   gap: 1,
 };
 
-export const HotkeyItemsDisplay = memo(
+const HotkeyItemsDisplay = memo(
   ({
     hotkeys,
     sx,
