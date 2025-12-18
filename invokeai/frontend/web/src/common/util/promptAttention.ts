@@ -5,151 +5,102 @@ import { type ASTNode, type Attention, parseTokens, serialize, tokenize } from '
 
 const log = logger('events');
 
-/**
- * Behavior Rules:
- *
- * ATTENTION SYNTAX:
- * - Words support +/- attention: `word+`, `word-`, `word++`, `word--`, etc.
- * - Groups support both +/- and numeric: `(words)+`, `(words)1.2`, `(words)0.8`
- * - `word++` is roughly equivalent to `(word)1.2` in effect
- * - Mixed attention like `word+-` or numeric on words `word1.2` is invalid
- *
- * ADJUSTMENT RULES:
- * - `word++` down → `word+`
- * - `word+` down → `word` (attention removed)
- * - `word` down → `word-`
- * - `word-` down → `word--`
- * - `(content)1.2` down → `(content)1.1`
- * - `(content)1.1` down → `content` (group unwrapped)
- * - `content content` down → `(content content)0.9` (new group created)
- *
- * SELECTION BEHAVIOR:
- * - Cursor/selection within a word → expand to full word, adjust word attention
- * - Cursor touching group boundary (parens or weight) → adjust group attention
- * - Selection entirely within a group → adjust that group's attention
- * - Selection spans multiple content nodes → create new group with initial attention
- * - Whitespace and punctuation are ignored for content selection
- */
-
 type AttentionDirection = 'increment' | 'decrement';
+type SelectionBounds = { start: number; end: number };
+type AdjustmentResult = { prompt: string; selectionStart: number; selectionEnd: number };
 
-type SelectionBounds = {
-  start: number;
-  end: number;
-};
-
-type AdjustmentResult = {
-  prompt: string;
-  selectionStart: number;
-  selectionEnd: number;
-};
-
-/**
- * A node with its position in the serialized prompt string.
- */
 type PositionedNode = {
   node: ASTNode;
   start: number;
   end: number;
-  /** Position of content start (after opening paren for groups) */
   contentStart: number;
-  /** Position of content end (before closing paren for groups) */
   contentEnd: number;
   parent: PositionedNode | null;
 };
 
 // ============================================================================
-// ATTENTION COMPUTATION
+// ATTENTION HELPERS
 // ============================================================================
 
-/**
- * Checks if attention is symbol-based (+, -, ++, etc.)
- */
-function isSymbolAttention(attention: Attention | undefined): attention is string {
-  return typeof attention === 'string' && /^[+-]+$/.test(attention);
+function isSymbolAttention(a: Attention | undefined): a is string {
+  return typeof a === 'string' && /^[+-]+$/.test(a);
 }
 
-/**
- * Checks if attention is numeric (1.2, 0.8, etc.)
- */
-function isNumericAttention(attention: Attention | undefined): attention is number {
-  return typeof attention === 'number';
+function isNumericAttention(a: Attention | undefined): a is number {
+  return typeof a === 'number';
 }
 
-/**
- * Computes adjusted attention for symbol-based attention (+/-).
- * Used for both words and groups with symbol attention.
- */
-function adjustSymbolAttention(direction: AttentionDirection, attention: string | undefined): string | undefined {
+/** Convert attention to numeric level: + = 1, ++ = 2, - = -1, 1.1 = 1, etc. */
+function attentionToLevel(attention: Attention | undefined): number {
+  if (isNumericAttention(attention)) {
+    return Math.round((attention - 1.0) * 10);
+  }
   if (!attention) {
-    return direction === 'increment' ? '+' : '-';
+    return 0;
   }
-
-  if (direction === 'increment') {
-    // Going up: remove '-' if present, otherwise add '+'
-    if (attention.endsWith('-')) {
-      const result = attention.slice(0, -1);
-      return result || undefined;
+  let level = 0;
+  for (const c of String(attention)) {
+    if (c === '+') {
+      level++;
+    } else if (c === '-') {
+      level--;
     }
-    return `${attention}+`;
-  } else {
-    // Going down: remove '+' if present, otherwise add '-'
-    if (attention.endsWith('+')) {
-      const result = attention.slice(0, -1);
-      return result || undefined;
-    }
-    return `${attention}-`;
   }
+  return level;
 }
 
-/**
- * Computes adjusted attention for numeric attention.
- * Only used for groups.
- */
-function adjustNumericAttention(direction: AttentionDirection, attention: number): number | undefined {
-  const step = direction === 'increment' ? 0.1 : -0.1;
-  const result = parseFloat((attention + step).toFixed(1));
-
-  // 1.0 is default - return undefined to signal unwrapping
-  if (result === 1.0) {
+/** Convert level back to symbol attention */
+function levelToSymbol(level: number): string | undefined {
+  if (level === 0) {
     return undefined;
   }
-
-  return result;
+  return level > 0 ? '+'.repeat(level) : '-'.repeat(-level);
 }
 
-/**
- * Computes the new attention value based on direction and current attention.
- * Returns undefined if attention should be removed (normalize to default).
- */
-function computeAttention(
-  direction: AttentionDirection,
-  attention: Attention | undefined,
-  _isGroup: boolean
-): Attention | undefined {
-  // No current attention
-  if (attention === undefined) {
-    return direction === 'increment' ? '+' : '-';
-  }
+/** Combine two attention values (for flattening group attention onto children) */
+function combineAttention(a: Attention | undefined, b: Attention | undefined): Attention | undefined {
+  return levelToSymbol(attentionToLevel(a) + attentionToLevel(b));
+}
 
-  // Symbol attention (+, -, ++, etc.)
-  if (isSymbolAttention(attention)) {
-    return adjustSymbolAttention(direction, attention);
-  }
-
-  // Numeric attention (only valid for groups)
+/** Adjust attention by one step in the given direction */
+function computeAttention(direction: AttentionDirection, attention: Attention | undefined): Attention | undefined {
   if (isNumericAttention(attention)) {
-    return adjustNumericAttention(direction, attention);
+    const result = parseFloat((attention + (direction === 'increment' ? 0.1 : -0.1)).toFixed(1));
+    return result === 1.0 ? undefined : result;
   }
-
-  // Parse string numbers
-  const numValue = parseFloat(String(attention));
-  if (!isNaN(numValue)) {
-    return adjustNumericAttention(direction, numValue);
+  if (isSymbolAttention(attention)) {
+    const level = attentionToLevel(attention);
+    return levelToSymbol(direction === 'increment' ? level + 1 : level - 1);
   }
-
-  // Fallback: treat as no attention
   return direction === 'increment' ? '+' : '-';
+}
+
+/** Apply attention to a node, flattening groups if combined attention is neutral */
+function applyAttentionToNode(node: ASTNode, attention: Attention | undefined): ASTNode[] {
+  if (node.type === 'word') {
+    const combined = combineAttention(attention, node.attention);
+    return combined === node.attention ? [node] : [{ ...node, attention: combined }];
+  }
+  if (node.type === 'group') {
+    const combined = combineAttention(attention, node.attention);
+    if (combined === undefined) {
+      return node.children.flatMap((c) => applyAttentionToNode(c, undefined));
+    }
+    return [{ ...node, attention: combined }];
+  }
+  return [node];
+}
+
+/** Adjust a content node's attention, unwrapping groups if result is neutral */
+function adjustContentNode(node: ASTNode, direction: AttentionDirection): ASTNode[] {
+  if (node.type === 'word') {
+    return [{ ...node, attention: computeAttention(direction, node.attention) }];
+  }
+  if (node.type === 'group') {
+    const newAttn = computeAttention(direction, node.attention);
+    return newAttn === undefined ? node.children : [{ ...node, attention: newAttn }];
+  }
+  return [node];
 }
 
 // ============================================================================
@@ -423,7 +374,22 @@ type AdjustmentStrategy =
   | { type: 'adjust-word'; node: PositionedNode }
   | { type: 'adjust-group'; node: PositionedNode }
   | { type: 'create-group'; nodes: PositionedNode[] }
+  | { type: 'split-group'; group: PositionedNode; selectedChildren: PositionedNode[]; allPositions: PositionedNode[] }
   | { type: 'no-op' };
+
+/**
+ * Gets direct children of a group from the position map.
+ */
+function getGroupChildren(positions: PositionedNode[], group: PositionedNode): PositionedNode[] {
+  return positions.filter((p) => p.parent === group);
+}
+
+/**
+ * Checks if a positioned node is a content node (word, group, or embedding).
+ */
+function isContentNode(p: PositionedNode): boolean {
+  return p.node.type === 'word' || p.node.type === 'group' || p.node.type === 'embedding';
+}
 
 function determineStrategy(positions: PositionedNode[], selection: SelectionBounds): AdjustmentStrategy {
   const contentNodes = findContentNodes(positions, selection);
@@ -470,7 +436,36 @@ function determineStrategy(positions: PositionedNode[], selection: SelectionBoun
     return { type: 'create-group', nodes: contentNodes };
   }
 
-  // Multiple content nodes - create a new group
+  // Multiple content nodes - check if selection crosses group boundaries
+  // This happens when some nodes are inside a group and some are outside
+  const hasRootLevel = contentNodes.some((n) => n.parent === null);
+  const nestedNodes = contentNodes.filter((n) => n.parent !== null);
+
+  if (hasRootLevel && nestedNodes.length > 0) {
+    // Selection crosses group boundaries - need to split groups
+    // Find all unique parent groups that are partially selected
+    const parentGroups = new Set<PositionedNode>();
+    for (const node of nestedNodes) {
+      if (node.parent) {
+        parentGroups.add(node.parent);
+      }
+    }
+
+    // For each parent group, check if it's partially selected
+    for (const group of parentGroups) {
+      const groupChildren = getGroupChildren(positions, group).filter(isContentNode);
+      const selectedChildren = groupChildren.filter((child) =>
+        contentNodes.some((cn) => cn === child || (cn.start >= child.start && cn.end <= child.end))
+      );
+
+      // If not all children are selected, we need to split
+      if (selectedChildren.length > 0 && selectedChildren.length < groupChildren.length) {
+        return { type: 'split-group', group, selectedChildren, allPositions: positions };
+      }
+    }
+  }
+
+  // No partial group selections - create a new group
   return { type: 'create-group', nodes: contentNodes };
 }
 
@@ -484,23 +479,17 @@ export function adjustPromptAttention(
   direction: AttentionDirection
 ): AdjustmentResult {
   try {
-    // Handle empty prompt
     if (!prompt.trim()) {
       return { prompt, selectionStart, selectionEnd };
     }
 
-    // Normalize selection
     const selection: SelectionBounds = {
       start: Math.min(selectionStart, selectionEnd),
       end: Math.max(selectionStart, selectionEnd),
     };
 
-    // Parse and build position map
-    const tokens = tokenize(prompt);
-    const ast = parseTokens(tokens);
+    const ast = parseTokens(tokenize(prompt));
     const { positions } = buildPositionMap(ast);
-
-    // Determine what to do
     const strategy = determineStrategy(positions, selection);
 
     switch (strategy.type) {
@@ -508,96 +497,117 @@ export function adjustPromptAttention(
         return { prompt, selectionStart, selectionEnd };
 
       case 'adjust-word': {
-        const wordPos = strategy.node;
-        const word = wordPos.node as ASTNode & { type: 'word' };
-        const newAttention = computeAttention(direction, word.attention, false);
-
-        const updatedWord: ASTNode = {
-          type: 'word',
-          text: word.text,
-          attention: newAttention,
-        };
-
-        const newAST = replaceNodeInAST(ast, word, updatedWord);
-        const newPrompt = serialize(newAST);
-        const newWordText = serialize([updatedWord]);
-
+        const { node: pos } = strategy;
+        const word = pos.node as ASTNode & { type: 'word' };
+        const updated: ASTNode = { ...word, attention: computeAttention(direction, word.attention) };
+        const newPrompt = serialize(replaceNodeInAST(ast, word, updated));
         return {
           prompt: newPrompt,
-          selectionStart: wordPos.start,
-          selectionEnd: wordPos.start + newWordText.length,
+          selectionStart: pos.start,
+          selectionEnd: pos.start + serialize([updated]).length,
         };
       }
 
       case 'adjust-group': {
-        const groupPos = strategy.node;
-        const group = groupPos.node as ASTNode & { type: 'group' };
-        const newAttention = computeAttention(direction, group.attention, true);
+        const { node: pos } = strategy;
+        const group = pos.node as ASTNode & { type: 'group' };
+        const newAttn = computeAttention(direction, group.attention);
 
-        // If attention becomes undefined (1.0), unwrap the group
-        if (newAttention === undefined) {
-          const newAST = replaceNodeInAST(ast, group, group.children);
-          const newPrompt = serialize(newAST);
-          const childrenText = serialize(group.children);
-
+        if (newAttn === undefined) {
+          const newPrompt = serialize(replaceNodeInAST(ast, group, group.children));
           return {
             prompt: newPrompt,
-            selectionStart: groupPos.start,
-            selectionEnd: groupPos.start + childrenText.length,
+            selectionStart: pos.start,
+            selectionEnd: pos.start + serialize(group.children).length,
           };
         }
 
-        const updatedGroup: ASTNode = {
-          type: 'group',
-          children: group.children,
-          attention: newAttention,
+        const updated: ASTNode = { ...group, attention: newAttn };
+        const newPrompt = serialize(replaceNodeInAST(ast, group, updated));
+        return {
+          prompt: newPrompt,
+          selectionStart: pos.start,
+          selectionEnd: pos.start + serialize([updated]).length,
         };
+      }
 
-        const newAST = replaceNodeInAST(ast, group, updatedGroup);
+      case 'split-group': {
+        const { group: groupPos, selectedChildren, allPositions } = strategy;
+        const group = groupPos.node as ASTNode & { type: 'group' };
+        const groupAttn = group.attention;
+        const selectedSet = new Set(selectedChildren.map((c) => c.node));
+
+        // Rebuild group children with proper attention handling
+        const rebuiltNodes: ASTNode[] = [];
+        for (const childPos of getGroupChildren(allPositions, groupPos)) {
+          if (!isContentNode(childPos)) {
+            rebuiltNodes.push(childPos.node); // Preserve whitespace/punct
+            continue;
+          }
+
+          const isSelected = selectedSet.has(childPos.node);
+          if (!isSelected) {
+            // Not selected: flatten group attention onto child
+            rebuiltNodes.push(...applyAttentionToNode(childPos.node, groupAttn));
+          } else {
+            // Selected: adjust based on whether child has own attention
+            const hasOwnAttn =
+              childPos.node.type === 'word' || childPos.node.type === 'group'
+                ? childPos.node.attention !== undefined
+                : false;
+            const effectiveAttn = hasOwnAttn
+              ? (childPos.node as { attention?: Attention }).attention
+              : combineAttention(groupAttn, undefined);
+
+            rebuiltNodes.push(
+              ...adjustContentNode(
+                childPos.node.type === 'word' || childPos.node.type === 'group'
+                  ? { ...childPos.node, attention: effectiveAttn }
+                  : childPos.node,
+                direction
+              )
+            );
+          }
+        }
+
+        // Replace group and adjust root-level selected nodes
+        let newAST = replaceNodeInAST(ast, group, rebuiltNodes);
+        for (const rootNode of findContentNodes(allPositions, selection).filter((n) => n.parent === null)) {
+          newAST = replaceNodeInAST(newAST, rootNode.node, adjustContentNode(rootNode.node, direction));
+        }
+
         const newPrompt = serialize(newAST);
-        const newGroupText = serialize([updatedGroup]);
+        const allSelected = [
+          ...selectedChildren,
+          ...findContentNodes(allPositions, selection).filter((n) => n.parent === null),
+        ];
+        const sorted = allSelected.sort((a, b) => a.start - b.start);
 
         return {
           prompt: newPrompt,
-          selectionStart: groupPos.start,
-          selectionEnd: groupPos.start + newGroupText.length,
+          selectionStart: sorted[0]?.start ?? selectionStart,
+          selectionEnd: newPrompt.length - (prompt.length - (sorted[sorted.length - 1]?.end ?? selectionEnd)),
         };
       }
 
       case 'create-group': {
-        // Elevate any nested nodes to their parent groups when selection crosses boundaries
-        const elevatedNodes = elevateToTopLevelNodes(strategy.nodes);
-        const sortedNodes = elevatedNodes.sort((a, b) => a.start - b.start);
-        const firstNode = sortedNodes[0]!;
-        const lastNode = sortedNodes[sortedNodes.length - 1]!;
+        const elevated = elevateToTopLevelNodes(strategy.nodes);
+        const sorted = elevated.sort((a, b) => a.start - b.start);
+        const wrapStart = sorted[0]!.start;
+        const wrapEnd = sorted[sorted.length - 1]!.end;
 
-        // Get the text range to wrap
-        const wrapStart = firstNode.start;
-        const wrapEnd = lastNode.end;
-
-        // Parse just the selected portion
-        const selectedText = prompt.substring(wrapStart, wrapEnd);
-        const selectedTokens = tokenize(selectedText);
-        const selectedAST = parseTokens(selectedTokens);
-
-        // Create new group with appropriate attention
-        const newAttention = computeAttention(direction, undefined, true);
+        const selectedAST = parseTokens(tokenize(prompt.substring(wrapStart, wrapEnd)));
         const newGroup: ASTNode = {
           type: 'group',
           children: selectedAST,
-          attention: newAttention,
+          attention: computeAttention(direction, undefined),
         };
 
-        // Reconstruct prompt
-        const before = prompt.substring(0, wrapStart);
-        const after = prompt.substring(wrapEnd);
-        const newGroupText = serialize([newGroup]);
-        const newPrompt = before + newGroupText + after;
-
+        const newPrompt = prompt.substring(0, wrapStart) + serialize([newGroup]) + prompt.substring(wrapEnd);
         return {
           prompt: newPrompt,
           selectionStart: wrapStart,
-          selectionEnd: wrapStart + newGroupText.length,
+          selectionEnd: wrapStart + serialize([newGroup]).length,
         };
       }
     }
