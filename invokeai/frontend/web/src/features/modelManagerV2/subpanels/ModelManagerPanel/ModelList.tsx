@@ -2,7 +2,7 @@ import { Flex, Text, useToast } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { buildUseDisclosure } from 'common/hooks/useBoolean'
+import { buildUseDisclosure } from 'common/hooks/useBoolean';
 import { MODEL_CATEGORIES_AS_LIST } from 'features/modelManagerV2/models';
 import {
   clearModelSelection,

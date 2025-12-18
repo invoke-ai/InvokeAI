@@ -1,25 +1,30 @@
-import type { SystemStyleObject} from '@invoke-ai/ui-library';
-import { Button, Checkbox, Flex, Menu, MenuButton, MenuItem, MenuList, Text } from '@invoke-ai/ui-library'
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks'
-import type { FilterableModelType} from 'features/modelManagerV2/store/modelManagerV2Slice';
-import { modelSelectionChanged, selectFilteredModelType, selectSearchTerm, selectSelectedModelKeys } from 'features/modelManagerV2/store/modelManagerV2Slice'
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { Button, Checkbox, Flex, Menu, MenuButton, MenuItem, MenuList, Text } from '@invoke-ai/ui-library';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import type { FilterableModelType } from 'features/modelManagerV2/store/modelManagerV2Slice';
+import {
+  modelSelectionChanged,
+  selectFilteredModelType,
+  selectSearchTerm,
+  selectSelectedModelKeys,
+} from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { t } from 'i18next';
-import { memo, useCallback, useMemo } from 'react'
-import { PiCaretDownBold, PiTrashSimpleBold } from 'react-icons/pi'
-import { modelConfigsAdapterSelectors, useGetModelConfigsQuery } from 'services/api/endpoints/models'
-import type { AnyModelConfig } from 'services/api/types'
+import { memo, useCallback, useMemo } from 'react';
+import { PiCaretDownBold, PiTrashSimpleBold } from 'react-icons/pi';
+import { modelConfigsAdapterSelectors, useGetModelConfigsQuery } from 'services/api/endpoints/models';
+import type { AnyModelConfig } from 'services/api/types';
 
-import { useBulkDeleteModal } from './ModelList'
+import { useBulkDeleteModal } from './ModelList';
 
 const ModelListBulkActionsSx: SystemStyleObject = {
   alignItems: 'center',
   justifyContent: 'space-between',
   width: '100%',
-}
+};
 
 type ModelListBulkActionsProps = {
-  sx?: SystemStyleObject
-}
+  sx?: SystemStyleObject;
+};
 
 export const ModelListBulkActions = memo(({ sx }: ModelListBulkActionsProps) => {
   const dispatch = useAppDispatch();
@@ -104,10 +109,10 @@ export const ModelListBulkActions = memo(({ sx }: ModelListBulkActionsProps) => 
         </Menu>
       </Flex>
     </Flex>
-  )
-})
+  );
+});
 
-ModelListBulkActions.displayName = 'ModelListBulkActions'
+ModelListBulkActions.displayName = 'ModelListBulkActions';
 
 const modelsFilter = <T extends AnyModelConfig>(
   data: T[],

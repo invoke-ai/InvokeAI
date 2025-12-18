@@ -1,15 +1,12 @@
 import { Flex, IconButton, Input, InputGroup, InputRightElement } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  selectSearchTerm,
-  setSearchTerm,
-} from 'features/modelManagerV2/store/modelManagerV2Slice';
+import { selectSearchTerm, setSearchTerm } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { t } from 'i18next';
 import type { ChangeEventHandler } from 'react';
 import { memo, useCallback } from 'react';
 import { PiXBold } from 'react-icons/pi';
 
-import { ModelListBulkActions } from './ModelListBulkActions'
+import { ModelListBulkActions } from './ModelListBulkActions';
 import { ModelTypeFilter } from './ModelTypeFilter';
 
 export const ModelListNavigation = memo(() => {
