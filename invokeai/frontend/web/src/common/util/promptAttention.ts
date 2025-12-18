@@ -125,14 +125,10 @@ function adjustNumericAttention(direction: AttentionDirection, attention: number
 function computeAttention(
   direction: AttentionDirection,
   attention: Attention | undefined,
-  isGroup: boolean
+  _isGroup: boolean
 ): Attention | undefined {
   // No current attention
   if (attention === undefined) {
-    if (isGroup) {
-      // Groups going down from neutral get 0.9
-      return direction === 'increment' ? '+' : 0.9;
-    }
     return direction === 'increment' ? '+' : '-';
   }
 
@@ -335,6 +331,51 @@ function findContentNodes(positions: PositionedNode[], selection: SelectionBound
 }
 
 /**
+ * Elevates nodes to their parent groups when selection crosses group boundaries.
+ * This ensures we don't try to extract partial groups which would break parsing.
+ *
+ * For example, if selection spans from inside a group to outside it,
+ * the nodes inside the group are replaced with the group itself.
+ */
+function elevateToTopLevelNodes(nodes: PositionedNode[]): PositionedNode[] {
+  if (nodes.length === 0) {
+    return nodes;
+  }
+
+  // Check if any nodes have different parent contexts
+  const hasRootLevel = nodes.some((n) => n.parent === null);
+  const hasNestedNodes = nodes.some((n) => n.parent !== null);
+
+  // If all nodes are at the same level (all root or all same parent), no elevation needed
+  if (!hasRootLevel || !hasNestedNodes) {
+    return nodes;
+  }
+
+  // We have nodes at different levels - elevate nested nodes to their parent groups
+  const result: PositionedNode[] = [];
+  const seenNodes = new Set<PositionedNode>();
+
+  for (const node of nodes) {
+    if (node.parent === null) {
+      // Root level node - keep as is (if not already added)
+      if (!seenNodes.has(node)) {
+        seenNodes.add(node);
+        result.push(node);
+      }
+    } else {
+      // Nested node - elevate to parent group (if not already added)
+      if (!seenNodes.has(node.parent)) {
+        seenNodes.add(node.parent);
+        result.push(node.parent);
+      }
+    }
+  }
+
+  // Sort by start position to maintain correct order
+  return result.sort((a, b) => a.start - b.start);
+}
+
+/**
  * Finds the single word the cursor is within (not just touching).
  */
 function findWordAtCursor(positions: PositionedNode[], selection: SelectionBounds): PositionedNode | null {
@@ -524,9 +565,11 @@ export function adjustPromptAttention(
       }
 
       case 'create-group': {
-        const nodes = strategy.nodes;
-        const firstNode = nodes[0]!;
-        const lastNode = nodes[nodes.length - 1]!;
+        // Elevate any nested nodes to their parent groups when selection crosses boundaries
+        const elevatedNodes = elevateToTopLevelNodes(strategy.nodes);
+        const sortedNodes = elevatedNodes.sort((a, b) => a.start - b.start);
+        const firstNode = sortedNodes[0]!;
+        const lastNode = sortedNodes[sortedNodes.length - 1]!;
 
         // Get the text range to wrap
         const wrapStart = firstNode.start;
