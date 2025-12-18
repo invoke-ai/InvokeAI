@@ -863,6 +863,7 @@
     },
     "modelManager": {
         "active": "active",
+        "actions": "Bulk Actions",
         "addModel": "Add Model",
         "addModels": "Add Models",
         "advanced": "Advanced",
@@ -898,6 +899,7 @@
         "delete": "Delete",
         "deleteConfig": "Delete Config",
         "deleteModel": "Delete Model",
+        "deleteModels": "Delete Models",
         "deleteModelImage": "Delete Model Image",
         "deleteMsg1": "Are you sure you want to delete this model from InvokeAI?",
         "deleteMsg2": "This WILL delete the model from disk if it is in the InvokeAI root folder. If you are using a custom location, then the model WILL NOT be deleted from disk.",
@@ -1029,6 +1031,7 @@
         "triggerPhrases": "Trigger Phrases",
         "loraTriggerPhrases": "LoRA Trigger Phrases",
         "mainModelTriggerPhrases": "Main Model Trigger Phrases",
+        "selectAll": "Select All",
         "typePhraseHere": "Type phrase here",
         "t5Encoder": "T5 Encoder",
         "upcastAttention": "Upcast Attention",
