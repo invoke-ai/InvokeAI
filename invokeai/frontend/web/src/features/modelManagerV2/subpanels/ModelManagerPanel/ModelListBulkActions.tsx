@@ -91,13 +91,14 @@ export const ModelListBulkActions = memo(({ sx }: ModelListBulkActionsProps) => 
         <Text variant="subtext" color="base.400">
           {selectionCount} {t('common.selected')}
         </Text>
-        <Menu>
+        <Menu placement="bottom-end">
           <MenuButton
             as={Button}
             disabled={selectionCount === 0}
             size="sm"
             rightIcon={<PiCaretDownBold />}
             flexShrink={0}
+            variant="outline"
           >
             {t('modelManager.actions')}
           </MenuButton>
