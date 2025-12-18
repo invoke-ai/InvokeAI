@@ -105,7 +105,7 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
                 onChange={onChange}
                 tabIndex={1}
               />
-              {hotkeyFilter.length && (
+              {hotkeyFilter.length > 0 ? (
                 <InputRightElement h="full" pe={2}>
                   <IconButton
                     onClick={clearHotkeyFilter}
@@ -116,7 +116,7 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
                     icon={<PiXBold />}
                   />
                 </InputRightElement>
-              )}
+              ) : null}
             </InputGroup>
 
             <ScrollableContent>
