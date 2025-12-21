@@ -97,7 +97,13 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
           <ModalCloseButton />
           <ModalBody display="flex" flexDir="column" gap={4}>
             <InputGroup>
-              <Input autoFocus placeholder={t('hotkeys.searchHotkeys')} value={hotkeyFilter} onChange={onChange} tabIndex={1} />
+              <Input
+                autoFocus
+                placeholder={t('hotkeys.searchHotkeys')}
+                value={hotkeyFilter}
+                onChange={onChange}
+                tabIndex={1}
+              />
               {hotkeyFilter.length && (
                 <InputRightElement h="full" pe={2}>
                   <IconButton
