@@ -1,10 +1,10 @@
+import math
 from contextlib import ExitStack
-from typing import Callable, Iterator, Optional, Tuple, cast
+from typing import Callable, Iterator, Optional, Tuple
 
 import einops
 import torch
 import torchvision.transforms as tv_transforms
-from diffusers.models.transformers.transformer_z_image import ZImageTransformer2DModel
 from PIL import Image
 from torchvision.transforms.functional import resize as tv_resize
 from tqdm import tqdm
@@ -33,7 +33,10 @@ from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineInterme
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ZImageConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.z_image.z_image_control_adapter import ZImageControlAdapter
-from invokeai.backend.z_image.z_image_control_transformer import ZImageControlTransformer2DModel
+from invokeai.backend.z_image.z_image_controlnet_extension import (
+    ZImageControlNetExtension,
+    z_image_forward_with_control,
+)
 
 
 @invocation(
@@ -66,11 +69,12 @@ class ZImageDenoiseInvocation(BaseInvocation):
     negative_conditioning: Optional[ZImageConditioningField] = InputField(
         default=None, description=FieldDescriptions.negative_cond, input=Input.Connection
     )
-    # Z-Image-Turbo uses guidance_scale=0.0 by default (no CFG)
+    # Z-Image-Turbo works best without CFG (guidance_scale=1.0)
     guidance_scale: float = InputField(
-        default=0.0,
-        ge=0.0,
-        description="Guidance scale for classifier-free guidance. Use 0.0 for Z-Image-Turbo.",
+        default=1.0,
+        ge=1.0,
+        description="Guidance scale for classifier-free guidance. 1.0 = no CFG (recommended for Z-Image-Turbo). "
+        "Values > 1.0 amplify guidance.",
         title="Guidance Scale",
     )
     width: int = InputField(default=1024, multiple_of=16, description="Width of the generated image.")
@@ -225,12 +229,15 @@ class ZImageDenoiseInvocation(BaseInvocation):
             device=device,
         )
 
-        # Load negative conditioning if provided and guidance_scale > 0
+        # Load negative conditioning if provided and guidance_scale != 1.0
+        # CFG formula: pred = pred_uncond + cfg_scale * (pred_cond - pred_uncond)
+        # At cfg_scale=1.0: pred = pred_cond (no effect, skip uncond computation)
+        # This matches FLUX's convention where 1.0 means "no CFG"
         neg_prompt_embeds: torch.Tensor | None = None
-        do_classifier_free_guidance = self.guidance_scale > 0.0 and self.negative_conditioning is not None
+        do_classifier_free_guidance = not math.isclose(self.guidance_scale, 1.0) and self.negative_conditioning is not None
         if do_classifier_free_guidance:
             if self.negative_conditioning is None:
-                raise ValueError("Negative conditioning is required when guidance_scale > 0")
+                raise ValueError("Negative conditioning is required when guidance_scale != 1.0")
             neg_prompt_embeds = self._load_text_conditioning(
                 context=context,
                 conditioning_name=self.negative_conditioning.conditioning_name,
@@ -325,79 +332,29 @@ class ZImageDenoiseInvocation(BaseInvocation):
             else:
                 raise ValueError(f"Unsupported Z-Image model format: {transformer_config.format}")
 
-            # Load control adapter and prepare combined transformer if control is provided
-            control_context: list[torch.Tensor] | None = None
-            control_context_scale = 0.75
-            begin_step_percent = 0.0
-            end_step_percent = 1.0
-            cached_weights = None
-            control_in_dim = 16  # Default, will be set from adapter config if control is used
+            # Load transformer - always use base transformer, control is handled via extension
+            (cached_weights, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
+
+            # Prepare control extension if control is provided
+            control_extension: ZImageControlNetExtension | None = None
 
             if self.control is not None:
-                # Load base transformer config (NOT to GPU yet - just get the model reference)
-                base_transformer = cast(ZImageTransformer2DModel, transformer_info.model)
-                base_config = base_transformer.config
-
-                # Load control adapter
+                # Load control adapter using context manager (proper GPU memory management)
                 control_model_info = context.models.load(self.control.control_model)
-                control_adapter = control_model_info.model
+                (_, control_adapter) = exit_stack.enter_context(control_model_info.model_on_device())
                 assert isinstance(control_adapter, ZImageControlAdapter)
 
                 # Get control_in_dim from adapter config (16 for V1, 33 for V2.0)
                 adapter_config = control_adapter.config
                 control_in_dim = adapter_config.get("control_in_dim", 16)
                 num_control_blocks = adapter_config.get("num_control_blocks", 6)
-                n_refiner_layers = adapter_config.get("n_refiner_layers", 2)
-
-                # Calculate control_layers_places based on num_control_blocks
-                control_layers_places = [i * 2 for i in range(num_control_blocks)]
 
                 # Log control configuration for debugging
                 version = "V2.0" if control_in_dim > 16 else "V1"
                 context.util.signal_progress(
-                    f"Using Z-Image ControlNet {version}: control_in_dim={control_in_dim}, "
+                    f"Using Z-Image ControlNet {version} (Extension): control_in_dim={control_in_dim}, "
                     f"num_blocks={num_control_blocks}, scale={self.control.control_context_scale}"
                 )
-
-                # Create control transformer structure with empty weights
-                import accelerate
-
-                with accelerate.init_empty_weights():
-                    control_transformer = ZImageControlTransformer2DModel(
-                        control_layers_places=control_layers_places,
-                        control_in_dim=control_in_dim,
-                        all_patch_size=base_config.all_patch_size,
-                        all_f_patch_size=base_config.all_f_patch_size,
-                        in_channels=base_config.in_channels,
-                        dim=base_config.dim,
-                        n_layers=base_config.n_layers,
-                        n_refiner_layers=n_refiner_layers,
-                        n_heads=base_config.n_heads,
-                        n_kv_heads=base_config.n_kv_heads,
-                        norm_eps=base_config.norm_eps,
-                        qk_norm=base_config.qk_norm,
-                        cap_feat_dim=base_config.cap_feat_dim,
-                        rope_theta=base_config.rope_theta,
-                        t_scale=base_config.t_scale,
-                        axes_dims=base_config.axes_dims,
-                        axes_lens=base_config.axes_lens,
-                    )
-
-                # Load base weights with assign=True (assigns tensors directly, no copy of data)
-                control_transformer.load_state_dict(base_transformer.state_dict(), strict=False, assign=True)
-
-                # Load control adapter weights on top
-                adapter_weights = {k: v for k, v in control_adapter.state_dict().items() if k.startswith("control_")}
-                control_transformer.load_state_dict(adapter_weights, strict=False, assign=True)
-
-                # Move combined model to device
-                control_transformer = control_transformer.to(device=device, dtype=inference_dtype)
-                active_transformer = control_transformer
-
-                # Clean up to save memory # need to check
-                # del control_adapter
-                # if torch.cuda.is_available():
-                #    torch.cuda.empty_cache()
 
                 # Load and prepare control image - must be VAE-encoded!
                 if self.vae is None:
@@ -426,40 +383,56 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 # Move to inference device/dtype
                 control_latents = control_latents.to(device=device, dtype=inference_dtype)
 
-                # Add frame dimension: [B, C, H, W] -> [B, C, 1, H, W]
-                control_latents = control_latents.unsqueeze(2)
+                # Add frame dimension: [B, C, H, W] -> [C, 1, H, W] (single image)
+                control_latents = control_latents.squeeze(0).unsqueeze(1)
 
-                # Prepare control_context based on control_in_dim
+                # Prepare control_cond based on control_in_dim
                 # V1: 16 channels (just control latents)
-                # V2.0: 33 channels (control latents + zero padding)
-                # Following diffusers approach: simple zero-padding to match control_in_dim
-                b, c, f, h, w = control_latents.shape
+                # V2.0: 33 channels = 16 control + 16 reference + 1 mask
+                #   - Channels 0-15: control image latents (from VAE encoding)
+                #   - Channels 16-31: reference/inpaint image latents (zeros for pure control)
+                #   - Channel 32: inpaint mask (1.0 = don't inpaint, 0.0 = inpaint region)
+                # For pure control (no inpainting), we set mask=1 to tell model "use control, don't inpaint"
+                c, f, h, w = control_latents.shape
                 if c < control_in_dim:
-                    # Pad with zeros to match control_in_dim (diffusers approach)
                     padding_channels = control_in_dim - c
-                    zero_padding = torch.zeros(
-                        (b, padding_channels, f, h, w),
-                        device=device,
-                        dtype=inference_dtype,
-                    )
-                    control_latents = torch.cat([control_latents, zero_padding], dim=1)
-                control_context = list(control_latents.unbind(dim=0))
+                    if padding_channels == 17:
+                        # V2.0: 16 reference channels (zeros) + 1 mask channel (ones)
+                        ref_padding = torch.zeros(
+                            (16, f, h, w),
+                            device=device,
+                            dtype=inference_dtype,
+                        )
+                        # Mask channel = 1.0 means "don't inpaint this region, use control signal"
+                        mask_channel = torch.ones(
+                            (1, f, h, w),
+                            device=device,
+                            dtype=inference_dtype,
+                        )
+                        control_latents = torch.cat([control_latents, ref_padding, mask_channel], dim=0)
+                    else:
+                        # Generic padding with zeros for other cases
+                        zero_padding = torch.zeros(
+                            (padding_channels, f, h, w),
+                            device=device,
+                            dtype=inference_dtype,
+                        )
+                        control_latents = torch.cat([control_latents, zero_padding], dim=0)
 
-                control_context_scale = self.control.control_context_scale
-                begin_step_percent = self.control.begin_step_percent
-                end_step_percent = self.control.end_step_percent
-            else:
-                # No control - load transformer normally
-                (cached_weights, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
-                active_transformer = transformer
+                # Create control extension (adapter is already on device from model_on_device)
+                control_extension = ZImageControlNetExtension(
+                    control_adapter=control_adapter,
+                    control_cond=control_latents,
+                    weight=self.control.control_context_scale,
+                    begin_step_percent=self.control.begin_step_percent,
+                    end_step_percent=self.control.end_step_percent,
+                )
 
-            # Apply LoRA models to the active transformer.
+            # Apply LoRA models to the transformer.
             # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.
-            # cached_weights is None when using control (since we create a new combined model),
-            # otherwise it comes from model_on_device() context.
             exit_stack.enter_context(
                 LayerPatcher.apply_smart_model_patches(
-                    model=active_transformer,
+                    model=transformer,
                     patches=self._lora_iterator(context),
                     prefix=Z_IMAGE_LORA_TRANSFORMER_PREFIX,
                     dtype=inference_dtype,
@@ -482,53 +455,54 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 # Run transformer for positive prediction
                 # Z-Image transformer expects: x as list of [C, 1, H, W] tensors, t, cap_feats as list
                 # Prepare latent input: [B, C, H, W] -> [B, C, 1, H, W] -> list of [C, 1, H, W]
-                latent_model_input = latents.to(active_transformer.dtype)
+                latent_model_input = latents.to(transformer.dtype)
                 latent_model_input = latent_model_input.unsqueeze(2)  # Add frame dimension
                 latent_model_input_list = list(latent_model_input.unbind(dim=0))
 
                 # Determine if control should be applied at this step
-                step_percent = step_idx / total_steps
-                use_control = self.control is not None
-                apply_control = use_control and step_percent >= begin_step_percent and step_percent <= end_step_percent
+                apply_control = (
+                    control_extension is not None and control_extension.should_apply(step_idx, total_steps)
+                )
 
-                # Transformer returns (List[torch.Tensor], dict) - we only need the tensor list
-                # If control is active, pass control_context to the control transformer
-                if apply_control and control_context is not None:
-                    model_output = active_transformer(
+                # Run forward pass - use custom forward with control if extension is active
+                if apply_control:
+                    model_out_list, _ = z_image_forward_with_control(
+                        transformer=transformer,
                         x=latent_model_input_list,
                         t=timestep,
                         cap_feats=[pos_prompt_embeds],
-                        control_context=control_context,
-                        control_context_scale=control_context_scale,
+                        control_extension=control_extension,
                     )
                 else:
-                    model_output = active_transformer(
+                    model_output = transformer(
                         x=latent_model_input_list,
                         t=timestep,
                         cap_feats=[pos_prompt_embeds],
                     )
-                model_out_list = model_output[0]  # Extract list of tensors from tuple
+                    model_out_list = model_output[0]  # Extract list of tensors from tuple
+
                 noise_pred_cond = torch.stack([t.float() for t in model_out_list], dim=0)
                 noise_pred_cond = noise_pred_cond.squeeze(2)  # Remove frame dimension
                 noise_pred_cond = -noise_pred_cond  # Z-Image uses v-prediction with negation
 
                 # Apply CFG if enabled
                 if do_classifier_free_guidance and neg_prompt_embeds is not None:
-                    if apply_control and control_context is not None:
-                        model_output_uncond = active_transformer(
+                    if apply_control:
+                        model_out_list_uncond, _ = z_image_forward_with_control(
+                            transformer=transformer,
                             x=latent_model_input_list,
                             t=timestep,
                             cap_feats=[neg_prompt_embeds],
-                            control_context=control_context,
-                            control_context_scale=control_context_scale,
+                            control_extension=control_extension,
                         )
                     else:
-                        model_output_uncond = active_transformer(
+                        model_output_uncond = transformer(
                             x=latent_model_input_list,
                             t=timestep,
                             cap_feats=[neg_prompt_embeds],
                         )
-                    model_out_list_uncond = model_output_uncond[0]  # Extract list of tensors from tuple
+                        model_out_list_uncond = model_output_uncond[0]  # Extract list of tensors from tuple
+
                     noise_pred_uncond = torch.stack([t.float() for t in model_out_list_uncond], dim=0)
                     noise_pred_uncond = noise_pred_uncond.squeeze(2)
                     noise_pred_uncond = -noise_pred_uncond

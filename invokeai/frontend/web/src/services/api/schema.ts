@@ -25388,8 +25388,8 @@ export type components = {
             negative_conditioning?: components["schemas"]["ZImageConditioningField"] | null;
             /**
              * Guidance Scale
-             * @description Guidance scale for classifier-free guidance. Use 0.0 for Z-Image-Turbo.
-             * @default 0
+             * @description Guidance scale for classifier-free guidance. 1.0 = no CFG (recommended for Z-Image-Turbo). Values > 1.0 amplify guidance.
+             * @default 1
              */
             guidance_scale?: number;
             /**

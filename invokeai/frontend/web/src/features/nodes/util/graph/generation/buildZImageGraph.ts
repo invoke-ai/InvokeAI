@@ -50,7 +50,8 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
 
   const params = selectParamsSlice(state);
 
-  // Z-Image-Turbo uses guidance_scale (stored as cfgScale), defaults to 0.0 for no CFG
+  // Z-Image-Turbo uses guidance_scale (stored as cfgScale), defaults to 1.0 for no CFG
+  // (1.0 means no CFG effect, matching FLUX convention)
   const { cfgScale: guidance_scale, steps } = params;
 
   const prompts = selectPresetModifiedPrompts(state);
