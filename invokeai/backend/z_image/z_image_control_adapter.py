@@ -220,9 +220,7 @@ class ZImageControlAdapter(ModelMixin, ConfigMixin):
         for i in range(bsz):
             x_len = x_item_seqlens[i]
             cap_len = cap_item_seqlens[i]
-            control_context_unified.append(
-                torch.cat([control_context_padded[i][:x_len], cap_feats[i][:cap_len]])
-            )
+            control_context_unified.append(torch.cat([control_context_padded[i][:x_len], cap_feats[i][:cap_len]]))
         control_context_unified = pad_sequence(control_context_unified, batch_first=True, padding_value=0.0)
         c = control_context_unified
 

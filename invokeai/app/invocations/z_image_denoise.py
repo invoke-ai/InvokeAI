@@ -395,8 +395,8 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 active_transformer = control_transformer
 
                 # Clean up to save memory # need to check
-                #del control_adapter
-                #if torch.cuda.is_available():
+                # del control_adapter
+                # if torch.cuda.is_available():
                 #    torch.cuda.empty_cache()
 
                 # Load and prepare control image - must be VAE-encoded!
@@ -489,11 +489,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 # Determine if control should be applied at this step
                 step_percent = step_idx / total_steps
                 use_control = self.control is not None
-                apply_control = (
-                    use_control
-                    and step_percent >= begin_step_percent
-                    and step_percent <= end_step_percent
-                )
+                apply_control = use_control and step_percent >= begin_step_percent and step_percent <= end_step_percent
 
                 # Transformer returns (List[torch.Tensor], dict) - we only need the tensor list
                 # If control is active, pass control_context to the control transformer
