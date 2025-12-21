@@ -15,7 +15,6 @@ import torch
 import torch.nn as nn
 from diffusers.configuration_utils import register_to_config
 from diffusers.models.transformers.transformer_z_image import (
-    ADALN_EMBED_DIM,
     SEQ_MULTI_OF,
     ZImageTransformer2DModel,
     ZImageTransformerBlock,
@@ -151,8 +150,8 @@ class ZImageControlTransformer2DModel(ZImageTransformer2DModel):
         cap_feat_dim: int = 2560,
         rope_theta: float = 256.0,
         t_scale: float = 1000.0,
-        axes_dims: List[int] = [32, 48, 48],
-        axes_lens: List[int] = [1024, 512, 512],
+        axes_dims: tuple[int, ...] = (32, 48, 48),
+        axes_lens: tuple[int, ...] = (1024, 512, 512),
     ):
         super().__init__(
             all_patch_size=all_patch_size,
@@ -174,7 +173,7 @@ class ZImageControlTransformer2DModel(ZImageTransformer2DModel):
 
         # Control layer configuration
         self.control_layers_places = (
-            [i for i in range(0, n_layers, 2)] if control_layers_places is None else control_layers_places
+            list(range(0, n_layers, 2)) if control_layers_places is None else control_layers_places
         )
         self.control_in_dim = in_channels if control_in_dim is None else control_in_dim
 
@@ -216,7 +215,7 @@ class ZImageControlTransformer2DModel(ZImageTransformer2DModel):
 
         # Control patch embeddings
         all_x_embedder = {}
-        for patch_size, f_patch_size in zip(all_patch_size, all_f_patch_size):
+        for patch_size, f_patch_size in zip(all_patch_size, all_f_patch_size, strict=True):
             x_embedder = nn.Linear(
                 f_patch_size * patch_size * patch_size * self.control_in_dim,
                 dim,
@@ -585,7 +584,7 @@ class ZImageControlTransformer2DModel(ZImageTransformer2DModel):
             cap_len = cap_item_seqlens[i]
             unified.append(torch.cat([x[i][:x_len], cap_feats[i][:cap_len]]))
             unified_freqs_cis.append(torch.cat([x_freqs_cis[i][:x_len], cap_freqs_cis[i][:cap_len]]))
-        unified_item_seqlens = [a + b for a, b in zip(cap_item_seqlens, x_item_seqlens)]
+        unified_item_seqlens = [a + b for a, b in zip(cap_item_seqlens, x_item_seqlens, strict=True)]
         unified_max_item_seqlen = max(unified_item_seqlens)
 
         unified = pad_sequence(unified, batch_first=True, padding_value=0.0)
@@ -595,11 +594,11 @@ class ZImageControlTransformer2DModel(ZImageTransformer2DModel):
             unified_attn_mask[i, :seq_len] = 1
 
         # Generate control hints
-        kwargs = dict(
-            attn_mask=unified_attn_mask,
-            freqs_cis=unified_freqs_cis,
-            adaln_input=adaln_input,
-        )
+        kwargs = {
+            "attn_mask": unified_attn_mask,
+            "freqs_cis": unified_freqs_cis,
+            "adaln_input": adaln_input,
+        }
         hints = self.forward_control(
             unified,
             cap_feats,
@@ -612,13 +611,13 @@ class ZImageControlTransformer2DModel(ZImageTransformer2DModel):
 
         # Main transformer with control hints
         for layer in self.layers:
-            layer_kwargs = dict(
-                attn_mask=unified_attn_mask,
-                freqs_cis=unified_freqs_cis,
-                adaln_input=adaln_input,
-                hints=hints,
-                context_scale=control_context_scale,
-            )
+            layer_kwargs = {
+                "attn_mask": unified_attn_mask,
+                "freqs_cis": unified_freqs_cis,
+                "adaln_input": adaln_input,
+                "hints": hints,
+                "context_scale": control_context_scale,
+            }
             if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module, **static_kwargs):

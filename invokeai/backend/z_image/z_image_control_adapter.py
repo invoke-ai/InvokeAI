@@ -10,18 +10,16 @@ a base ZImageTransformer2DModel at runtime. The adapter contains only the
 control-specific layers (control_layers, control_all_x_embedder, control_noise_refiner).
 """
 
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 import torch
 import torch.nn as nn
 from diffusers.configuration_utils import ConfigMixin, register_to_config
 from diffusers.models.modeling_utils import ModelMixin
 from diffusers.models.transformers.transformer_z_image import (
-    ADALN_EMBED_DIM,
     SEQ_MULTI_OF,
     ZImageTransformerBlock,
 )
-from diffusers.utils import is_torch_version
 from torch.nn.utils.rnn import pad_sequence
 
 
@@ -105,7 +103,7 @@ class ZImageControlAdapter(ModelMixin, ConfigMixin):
 
         # Control patch embeddings
         all_x_embedder = {}
-        for patch_size, f_patch_size in zip(all_patch_size, all_f_patch_size):
+        for patch_size, f_patch_size in zip(all_patch_size, all_f_patch_size, strict=True):
             x_embedder = nn.Linear(
                 f_patch_size * patch_size * patch_size * control_in_dim,
                 dim,

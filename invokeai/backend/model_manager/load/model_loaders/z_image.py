@@ -9,6 +9,7 @@ import torch
 from transformers import AutoTokenizer, Qwen3ForCausalLM
 
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Diffusers_Config_Base
+from invokeai.backend.model_manager.configs.controlnet import ControlNet_Checkpoint_ZImage_Config
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_ZImage_Config, Main_GGUF_ZImage_Config
 from invokeai.backend.model_manager.configs.qwen3_encoder import (

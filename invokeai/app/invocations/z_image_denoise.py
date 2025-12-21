@@ -19,10 +19,10 @@ from invokeai.app.invocations.fields import (
     LatentsField,
     ZImageConditioningField,
 )
-from invokeai.app.invocations.z_image_control import ZImageControlField
-from invokeai.app.invocations.z_image_image_to_latents import ZImageImageToLatentsInvocation
 from invokeai.app.invocations.model import TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
+from invokeai.app.invocations.z_image_control import ZImageControlField
+from invokeai.app.invocations.z_image_image_to_latents import ZImageImageToLatentsInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher
