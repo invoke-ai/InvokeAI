@@ -60,7 +60,8 @@ class LoRALayerBase(BaseLayerPatch):
 
     def get_parameters(self, orig_parameters: dict[str, torch.Tensor], weight: float) -> dict[str, torch.Tensor]:
         scale = self.scale()
-        params = {"weight": self.get_weight(orig_parameters["weight"]) * (weight * scale)}
+        lora_weight = self.get_weight(orig_parameters["weight"])
+        params = {"weight": lora_weight * (weight * scale)}
         bias = self.get_bias(orig_parameters.get("bias", None))
         if bias is not None:
             params["bias"] = bias * (weight * scale)

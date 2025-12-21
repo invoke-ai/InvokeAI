@@ -3,7 +3,14 @@ import type { AppStartListening } from 'app/store/store';
 import { bboxSyncedToOptimalDimension, rgRefImageModelChanged } from 'features/controlLayers/store/canvasSlice';
 import { buildSelectIsStaging, selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraIsEnabledChanged } from 'features/controlLayers/store/lorasSlice';
-import { modelChanged, syncedToOptimalDimension, vaeSelected } from 'features/controlLayers/store/paramsSlice';
+import {
+  modelChanged,
+  syncedToOptimalDimension,
+  vaeSelected,
+  zImageQwen3EncoderModelSelected,
+  zImageQwen3SourceModelSelected,
+  zImageVaeModelSelected,
+} from 'features/controlLayers/store/paramsSlice';
 import { refImageModelChanged, selectReferenceImageEntities } from 'features/controlLayers/store/refImagesSlice';
 import {
   selectAllEntitiesOfType,
@@ -55,6 +62,23 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         if (vae && vae.base !== newBase) {
           dispatch(vaeSelected(null));
           modelsUpdatedDisabledOrCleared += 1;
+        }
+
+        // handle incompatible Z-Image models - clear if switching away from z-image
+        const { zImageVaeModel, zImageQwen3EncoderModel, zImageQwen3SourceModel } = state.params;
+        if (newBase !== 'z-image') {
+          if (zImageVaeModel) {
+            dispatch(zImageVaeModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+          if (zImageQwen3EncoderModel) {
+            dispatch(zImageQwen3EncoderModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+          if (zImageQwen3SourceModel) {
+            dispatch(zImageQwen3SourceModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
         }
 
         if (SUPPORTS_REF_IMAGES_BASE_MODELS.includes(newModel.base)) {

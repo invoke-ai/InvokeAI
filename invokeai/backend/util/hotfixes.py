@@ -5,7 +5,7 @@ import torch
 from diffusers.configuration_utils import ConfigMixin, register_to_config
 from diffusers.loaders.single_file_model import FromOriginalModelMixin
 from diffusers.models.attention_processor import AttentionProcessor, AttnProcessor
-from diffusers.models.controlnet import ControlNetConditioningEmbedding, ControlNetOutput, zero_module
+from diffusers.models.controlnets.controlnet import ControlNetConditioningEmbedding, ControlNetOutput, zero_module
 from diffusers.models.embeddings import (
     TextImageProjection,
     TextImageTimeEmbedding,
@@ -777,7 +777,7 @@ class ControlNetModel(ModelMixin, ConfigMixin, FromOriginalModelMixin):
 
 
 diffusers.ControlNetModel = ControlNetModel
-diffusers.models.controlnet.ControlNetModel = ControlNetModel
+diffusers.models.controlnets.controlnet.ControlNetModel = ControlNetModel
 
 
 # patch LoRACompatibleConv to use original Conv2D forward function
