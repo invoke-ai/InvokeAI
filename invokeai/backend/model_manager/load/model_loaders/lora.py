@@ -43,6 +43,7 @@ from invokeai.backend.patches.lora_conversions.flux_onetrainer_lora_conversion_u
 )
 from invokeai.backend.patches.lora_conversions.sd_lora_conversion_utils import lora_model_from_sd_state_dict
 from invokeai.backend.patches.lora_conversions.sdxl_lora_conversion_utils import convert_sdxl_keys_to_diffusers_format
+from invokeai.backend.patches.lora_conversions.z_image_lora_conversion_utils import lora_model_from_z_image_state_dict
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.LoRA, format=ModelFormat.OMI)
@@ -124,6 +125,10 @@ class LoRALoader(ModelLoader):
         elif self._model_base in [BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2]:
             # Currently, we don't apply any conversions for SD1 and SD2 LoRA models.
             model = lora_model_from_sd_state_dict(state_dict=state_dict)
+        elif self._model_base == BaseModelType.ZImage:
+            # Z-Image LoRAs use diffusers PEFT format with transformer and/or Qwen3 encoder layers.
+            # We set alpha=None to use rank as alpha (common default).
+            model = lora_model_from_z_image_state_dict(state_dict=state_dict, alpha=None)
         else:
             raise ValueError(f"Unsupported LoRA base model: {self._model_base}")
 

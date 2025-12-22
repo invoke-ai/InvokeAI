@@ -161,6 +161,30 @@ const slice = createSlice({
       }
       state.clipGEmbedModel = result.data;
     },
+    zImageVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
+      const result = zParamsState.shape.zImageVaeModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.zImageVaeModel = result.data;
+    },
+    zImageQwen3EncoderModelSelected: (
+      state,
+      action: PayloadAction<{ key: string; name: string; base: string } | null>
+    ) => {
+      const result = zParamsState.shape.zImageQwen3EncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.zImageQwen3EncoderModel = result.data;
+    },
+    zImageQwen3SourceModelSelected: (state, action: PayloadAction<ParameterModel | null>) => {
+      const result = zParamsState.shape.zImageQwen3SourceModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.zImageQwen3SourceModel = result.data;
+    },
     vaePrecisionChanged: (state, action: PayloadAction<ParameterPrecision>) => {
       state.vaePrecision = action.payload;
     },
@@ -169,6 +193,9 @@ const slice = createSlice({
     },
     shouldUseCpuNoiseChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldUseCpuNoise = action.payload;
+    },
+    setColorCompensation: (state, action: PayloadAction<boolean>) => {
+      state.colorCompensation = action.payload;
     },
     positivePromptChanged: (state, action: PayloadAction<ParameterPositivePrompt>) => {
       state.positivePrompt = action.payload;
@@ -401,6 +428,9 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.t5EncoderModel = oldState.t5EncoderModel;
   newState.clipEmbedModel = oldState.clipEmbedModel;
   newState.refinerModel = oldState.refinerModel;
+  newState.zImageVaeModel = oldState.zImageVaeModel;
+  newState.zImageQwen3EncoderModel = oldState.zImageQwen3EncoderModel;
+  newState.zImageQwen3SourceModel = oldState.zImageQwen3SourceModel;
   return newState;
 };
 
@@ -434,8 +464,12 @@ export const {
   clipEmbedModelSelected,
   clipLEmbedModelSelected,
   clipGEmbedModelSelected,
+  zImageVaeModelSelected,
+  zImageQwen3EncoderModelSelected,
+  zImageQwen3SourceModelSelected,
   setClipSkip,
   shouldUseCpuNoiseChanged,
+  setColorCompensation,
   positivePromptChanged,
   positivePromptAddedToHistory,
   promptRemovedFromHistory,
@@ -497,6 +531,7 @@ export const selectIsSDXL = createParamsSelector((params) => params.model?.base 
 export const selectIsFLUX = createParamsSelector((params) => params.model?.base === 'flux');
 export const selectIsSD3 = createParamsSelector((params) => params.model?.base === 'sd-3');
 export const selectIsCogView4 = createParamsSelector((params) => params.model?.base === 'cogview4');
+export const selectIsZImage = createParamsSelector((params) => params.model?.base === 'z-image');
 export const selectIsFluxKontext = createParamsSelector((params) => {
   if (params.model?.base === 'flux' && params.model?.name.toLowerCase().includes('kontext')) {
     return true;
@@ -514,6 +549,9 @@ export const selectCLIPEmbedModel = createParamsSelector((params) => params.clip
 export const selectCLIPLEmbedModel = createParamsSelector((params) => params.clipLEmbedModel);
 
 export const selectCLIPGEmbedModel = createParamsSelector((params) => params.clipGEmbedModel);
+export const selectZImageVaeModel = createParamsSelector((params) => params.zImageVaeModel);
+export const selectZImageQwen3EncoderModel = createParamsSelector((params) => params.zImageQwen3EncoderModel);
+export const selectZImageQwen3SourceModel = createParamsSelector((params) => params.zImageQwen3SourceModel);
 
 export const selectCFGScale = createParamsSelector((params) => params.cfgScale);
 export const selectGuidance = createParamsSelector((params) => params.guidance);
@@ -557,6 +595,7 @@ export const selectShouldRandomizeSeed = createParamsSelector((params) => params
 export const selectVAEPrecision = createParamsSelector((params) => params.vaePrecision);
 export const selectIterations = createParamsSelector((params) => params.iterations);
 export const selectShouldUseCPUNoise = createParamsSelector((params) => params.shouldUseCpuNoise);
+export const selectColorCompensation = createParamsSelector((params) => params.colorCompensation);
 
 export const selectUpscaleScheduler = createParamsSelector((params) => params.upscaleScheduler);
 export const selectUpscaleCfgScale = createParamsSelector((params) => params.upscaleCfgScale);
