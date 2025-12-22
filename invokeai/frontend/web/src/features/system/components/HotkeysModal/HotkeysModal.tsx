@@ -23,7 +23,7 @@ import { useHotkeyData } from 'features/system/components/HotkeysModal/useHotkey
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
 import { allHotkeysReset } from 'features/system/store/hotkeysSlice';
 import type { ChangeEventHandler, ReactElement } from 'react';
-import { cloneElement, Fragment, memo, useCallback, useMemo, useRef, useState } from 'react';
+import { cloneElement, Fragment, memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 
@@ -45,7 +45,6 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
   const dispatch = useAppDispatch();
   const [hotkeyFilter, setHotkeyFilter] = useState('');
   const [isEditMode, setIsEditMode] = useState(false);
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const clearHotkeyFilter = useCallback(() => setHotkeyFilter(''), []);
   const onChange = useCallback<ChangeEventHandler<HTMLInputElement>>((e) => setHotkeyFilter(e.target.value), []);
   const toggleEditMode = useCallback(() => setIsEditMode((prev) => !prev), []);
@@ -91,14 +90,20 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
       {cloneElement(children, {
         onClick: onOpen,
       })}
-      <Modal isOpen={isOpen} onClose={onClose} isCentered size="2xl" useInert={false} initialFocusRef={inputRef}>
+      <Modal isOpen={isOpen} onClose={onClose} isCentered size="2xl" useInert={false}>
         <ModalOverlay />
         <ModalContent maxH="80vh" h="80vh">
           <ModalHeader>{t('hotkeys.hotkeys')}</ModalHeader>
           <ModalCloseButton />
           <ModalBody display="flex" flexDir="column" gap={4}>
             <InputGroup>
-              <Input ref={inputRef} placeholder={t('hotkeys.searchHotkeys')} value={hotkeyFilter} onChange={onChange} />
+              <Input
+                autoFocus
+                placeholder={t('hotkeys.searchHotkeys')}
+                value={hotkeyFilter}
+                onChange={onChange}
+                tabIndex={1}
+              />
               {hotkeyFilter.length && (
                 <InputRightElement h="full" pe={2}>
                   <IconButton
