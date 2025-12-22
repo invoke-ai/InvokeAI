@@ -77,6 +77,18 @@ class CogView4ConditioningInfo:
 
 
 @dataclass
+class ZImageConditioningInfo:
+    """Z-Image text conditioning information from Qwen3 text encoder."""
+
+    prompt_embeds: torch.Tensor
+    """Text embeddings from Qwen3 encoder. Shape: (batch_size, seq_len, hidden_size)."""
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
+        return self
+
+
+@dataclass
 class ConditioningFieldData:
     # If you change this class, adding more types, you _must_ update the instantiation of ObjectSerializerDisk in
     # invokeai/app/api/dependencies.py, adding the types to the list of safe globals. If you do not, torch will be
@@ -87,6 +99,7 @@ class ConditioningFieldData:
         | List[FLUXConditioningInfo]
         | List[SD3ConditioningInfo]
         | List[CogView4ConditioningInfo]
+        | List[ZImageConditioningInfo]
     )
 
 
