@@ -27,7 +27,9 @@ def create_coordinate_grid(
     if start is None:
         start = tuple(0 for _ in size)
 
-    axes = [torch.arange(x0, x0 + span, dtype=torch.int32, device=device) for x0, span in zip(start, size, strict=False)]
+    axes = [
+        torch.arange(x0, x0 + span, dtype=torch.int32, device=device) for x0, span in zip(start, size, strict=False)
+    ]
     grids = torch.meshgrid(axes, indexing="ij")
     return torch.stack(grids, dim=-1)
 

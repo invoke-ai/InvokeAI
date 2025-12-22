@@ -234,7 +234,9 @@ class ZImageDenoiseInvocation(BaseInvocation):
         # At cfg_scale=1.0: pred = pred_cond (no effect, skip uncond computation)
         # This matches FLUX's convention where 1.0 means "no CFG"
         neg_prompt_embeds: torch.Tensor | None = None
-        do_classifier_free_guidance = not math.isclose(self.guidance_scale, 1.0) and self.negative_conditioning is not None
+        do_classifier_free_guidance = (
+            not math.isclose(self.guidance_scale, 1.0) and self.negative_conditioning is not None
+        )
         if do_classifier_free_guidance:
             if self.negative_conditioning is None:
                 raise ValueError("Negative conditioning is required when guidance_scale != 1.0")
@@ -460,9 +462,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 latent_model_input_list = list(latent_model_input.unbind(dim=0))
 
                 # Determine if control should be applied at this step
-                apply_control = (
-                    control_extension is not None and control_extension.should_apply(step_idx, total_steps)
-                )
+                apply_control = control_extension is not None and control_extension.should_apply(step_idx, total_steps)
 
                 # Run forward pass - use custom forward with control if extension is active
                 if apply_control:

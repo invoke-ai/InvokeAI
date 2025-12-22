@@ -134,7 +134,7 @@ class ZImageControlNetExtension:
         control_padded = pad_sequence(control_list, batch_first=True, padding_value=0.0)
 
         # Use x_freqs_cis from main path for aligned position encoding
-        ctrl_freqs_cis_for_refiner = x_freqs_cis[:, :control_padded.shape[1]]
+        ctrl_freqs_cis_for_refiner = x_freqs_cis[:, : control_padded.shape[1]]
 
         ctrl_attn_mask = torch.zeros((bsz, ctrl_max_seqlen), dtype=torch.bool, device=device)
         for i, seq_len in enumerate(ctrl_item_seqlens):
@@ -283,7 +283,7 @@ class ZImageControlNetExtension:
 
         # Use x_freqs_cis from main path for control patches (same spatial structure)
         # This ensures control and image have aligned position encodings
-        ctrl_freqs_cis_for_refiner = x_freqs_cis[:, :control_padded.shape[1]]
+        ctrl_freqs_cis_for_refiner = x_freqs_cis[:, : control_padded.shape[1]]
 
         ctrl_attn_mask = torch.zeros((bsz, ctrl_max_seqlen), dtype=torch.bool, device=device)
         for i, seq_len in enumerate(ctrl_item_seqlens):
@@ -345,7 +345,9 @@ class ZImageControlNetExtension:
                 print(f"[DEBUG] First hint shape: {hints[0].shape}")
                 # Also check hint statistics for each hint
                 for i, h in enumerate(hints[:3]):  # First 3 hints
-                    print(f"[DEBUG] Hint[{i}] mean: {h.mean().item():.6f}, std: {h.std().item():.6f}, min: {h.min().item():.6f}, max: {h.max().item():.6f}")
+                    print(
+                        f"[DEBUG] Hint[{i}] mean: {h.mean().item():.6f}, std: {h.std().item():.6f}, min: {h.min().item():.6f}, max: {h.max().item():.6f}"
+                    )
 
         return hints
 
@@ -409,9 +411,7 @@ def z_image_forward_with_control(
     x_cat[torch.cat(x_inner_pad_mask)] = transformer.x_pad_token
 
     x_list = list(x_cat.split(x_item_seqlens, dim=0))
-    x_freqs_cis = list(
-        transformer.rope_embedder(torch.cat(x_pos_ids, dim=0)).split([len(p) for p in x_pos_ids], dim=0)
-    )
+    x_freqs_cis = list(transformer.rope_embedder(torch.cat(x_pos_ids, dim=0)).split([len(p) for p in x_pos_ids], dim=0))
 
     x_padded = pad_sequence(x_list, batch_first=True, padding_value=0.0)
     x_freqs_cis = pad_sequence(x_freqs_cis, batch_first=True, padding_value=0.0)
