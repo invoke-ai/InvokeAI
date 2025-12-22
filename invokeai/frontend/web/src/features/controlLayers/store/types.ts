@@ -612,6 +612,10 @@ export const zParamsState = z.object({
   clipLEmbedModel: zParameterCLIPLEmbedModel.nullable(),
   clipGEmbedModel: zParameterCLIPGEmbedModel.nullable(),
   controlLora: zParameterControlLoRAModel.nullable(),
+  // Z-Image model components - can use separate models or extract from a Diffusers source
+  zImageVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX VAE
+  zImageQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder
+  zImageQwen3SourceModel: zParameterModel.nullable(), // Diffusers Z-Image model (fallback for VAE/Encoder)
   dimensions: zDimensionsState,
 });
 export type ParamsState = z.infer<typeof zParamsState>;
@@ -662,6 +666,9 @@ export const getInitialParamsState = (): ParamsState => ({
   clipLEmbedModel: null,
   clipGEmbedModel: null,
   controlLora: null,
+  zImageVaeModel: null,
+  zImageQwen3EncoderModel: null,
+  zImageQwen3SourceModel: null,
   dimensions: {
     width: 512,
     height: 512,

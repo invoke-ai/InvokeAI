@@ -74,3 +74,11 @@ class WorkflowRecordsStorageBase(ABC):
     def update_opened_at(self, workflow_id: str) -> None:
         """Open a workflow."""
         pass
+
+    @abstractmethod
+    def get_all_tags(
+        self,
+        categories: Optional[list[WorkflowCategory]] = None,
+    ) -> list[str]:
+        """Gets all unique tags from workflows."""
+        pass

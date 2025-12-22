@@ -158,6 +158,10 @@ GENERATION_MODES = Literal[
     "cogview4_img2img",
     "cogview4_inpaint",
     "cogview4_outpaint",
+    "z_image_txt2img",
+    "z_image_img2img",
+    "z_image_inpaint",
+    "z_image_outpaint",
 ]
 
 
@@ -166,7 +170,7 @@ GENERATION_MODES = Literal[
     title="Core Metadata",
     tags=["metadata"],
     category="metadata",
-    version="2.0.0",
+    version="2.1.0",
     classification=Classification.Internal,
 )
 class CoreMetadataInvocation(BaseInvocation):
@@ -216,6 +220,10 @@ class CoreMetadataInvocation(BaseInvocation):
     vae: Optional[ModelIdentifierField] = InputField(
         default=None,
         description="The VAE used for decoding, if the main model's default was not used",
+    )
+    qwen3_encoder: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="The Qwen3 text encoder model used for Z-Image inference",
     )
 
     # High resolution fix metadata.
