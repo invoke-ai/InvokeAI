@@ -41,11 +41,23 @@ def _convert_z_image_gguf_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
     - x_embedder.* -> all_x_embedder.2-1.*
     - final_layer.* -> all_final_layer.2-1.*
     - norm_final.* -> skipped (diffusers uses non-learnable LayerNorm)
+    - x_pad_token, cap_pad_token: [dim] -> [1, dim] (diffusers expects batch dimension)
     """
     new_sd: dict[str, Any] = {}
 
     for key, value in sd.items():
         if not isinstance(key, str):
+            new_sd[key] = value
+            continue
+
+        # Handle padding tokens: GGUF has shape [dim], diffusers expects [1, dim]
+        if key in ("x_pad_token", "cap_pad_token"):
+            if hasattr(value, "shape") and len(value.shape) == 1:
+                # GGMLTensor doesn't support unsqueeze, so dequantize first if needed
+                if hasattr(value, "get_dequantized_tensor"):
+                    value = value.get_dequantized_tensor()
+                # Use reshape instead of unsqueeze for better compatibility
+                value = torch.as_tensor(value).reshape(1, -1)
             new_sd[key] = value
             continue
 
