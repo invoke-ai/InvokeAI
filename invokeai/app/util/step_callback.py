@@ -164,6 +164,9 @@ def diffusion_step_callback(
         latent_rgb_factors = COGVIEW4_LATENT_RGB_FACTORS
     elif base_model == BaseModelType.Flux:
         latent_rgb_factors = FLUX_LATENT_RGB_FACTORS
+    elif base_model == BaseModelType.ZImage:
+        # Z-Image uses FLUX-compatible VAE with 16 latent channels
+        latent_rgb_factors = FLUX_LATENT_RGB_FACTORS
     else:
         raise ValueError(f"Unsupported base model: {base_model}")
 

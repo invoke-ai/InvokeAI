@@ -18,11 +18,13 @@ import {
   isIPAdapterModelConfig,
   isLoRAModelConfig,
   isNonRefinerMainModelConfig,
+  isQwen3EncoderModelConfig,
   isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
   isT5EncoderModelConfigOrSubmodel,
   isTIModelConfig,
   isVAEModelConfigOrSubmodel,
+  isZImageDiffusersMainModelConfig,
 } from 'services/api/types';
 
 const buildModelsHook =
@@ -53,6 +55,8 @@ export const useSpandrelImageToImageModels = buildModelsHook(isSpandrelImageToIm
 export const useEmbeddingModels = buildModelsHook(isTIModelConfig);
 export const useVAEModels = () => buildModelsHook(isVAEModelConfigOrSubmodel)();
 export const useFluxVAEModels = () => buildModelsHook(isFluxVAEModelConfig)();
+export const useZImageDiffusersModels = () => buildModelsHook(isZImageDiffusersMainModelConfig)();
+export const useQwen3EncoderModels = () => buildModelsHook(isQwen3EncoderModelConfig)();
 export const useGlobalReferenceImageModels = buildModelsHook(
   (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config) || isFluxKontextModelConfig(config)
 );
