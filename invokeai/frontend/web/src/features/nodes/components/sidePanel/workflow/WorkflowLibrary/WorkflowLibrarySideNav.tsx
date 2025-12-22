@@ -31,7 +31,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiStarFill } from 'react-icons/pi';
 import { useDispatch } from 'react-redux';
-import { useGetCountsByTagQuery } from 'services/api/endpoints/workflows';
+import { useGetAllTagsQuery, useGetCountsByTagQuery } from 'services/api/endpoints/workflows';
 
 export const WorkflowLibrarySideNav = () => {
   const { t } = useTranslation();
@@ -40,11 +40,11 @@ export const WorkflowLibrarySideNav = () => {
     <Flex h="full" minH={0} overflow="hidden" flexDir="column" w={64} gap={0}>
       <Flex flexDir="column" w="full" pb={2} gap={2}>
         <WorkflowLibraryViewButton view="recent">{t('workflows.recentlyOpened')}</WorkflowLibraryViewButton>
-        <WorkflowLibraryViewButton view="yours">{t('workflows.yourWorkflows')}</WorkflowLibraryViewButton>
+        <YourWorkflowsButton />
       </Flex>
       <Flex h="full" minH={0} overflow="hidden" flexDir="column">
         <BrowseWorkflowsButton />
-        <DefaultsViewCheckboxesCollapsible />
+        <TagCheckboxesCollapsible />
       </Flex>
       <Spacer />
       <NewWorkflowButton />
@@ -52,6 +52,40 @@ export const WorkflowLibrarySideNav = () => {
     </Flex>
   );
 };
+
+const YourWorkflowsButton = memo(() => {
+  const { t } = useTranslation();
+  const view = useAppSelector(selectWorkflowLibraryView);
+  const dispatch = useAppDispatch();
+  const selectedTags = useAppSelector(selectWorkflowLibrarySelectedTags);
+  const resetTags = useCallback(() => {
+    dispatch(workflowLibraryTagsReset());
+  }, [dispatch]);
+
+  if (view === 'yours' && selectedTags.length > 0) {
+    return (
+      <ButtonGroup>
+        <WorkflowLibraryViewButton view="yours" w="auto">
+          {t('workflows.yourWorkflows')}
+        </WorkflowLibraryViewButton>
+        <Tooltip label={t('workflows.deselectAll')}>
+          <IconButton
+            onClick={resetTags}
+            size="md"
+            aria-label={t('workflows.deselectAll')}
+            icon={<PiArrowCounterClockwiseBold size={12} />}
+            variant="ghost"
+            bg="base.700"
+            color="base.50"
+          />
+        </Tooltip>
+      </ButtonGroup>
+    );
+  }
+
+  return <WorkflowLibraryViewButton view="yours">{t('workflows.yourWorkflows')}</WorkflowLibraryViewButton>;
+});
+YourWorkflowsButton.displayName = 'YourWorkflowsButton';
 
 const BrowseWorkflowsButton = memo(() => {
   const { t } = useTranslation();
@@ -89,31 +123,114 @@ BrowseWorkflowsButton.displayName = 'BrowseWorkflowsButton';
 
 const overlayscrollbarsOptions = getOverlayScrollbarsParams({ visibility: 'visible' }).options;
 
-const DefaultsViewCheckboxesCollapsible = memo(() => {
+const TagCheckboxesCollapsible = memo(() => {
   const view = useAppSelector(selectWorkflowLibraryView);
 
   return (
-    <Collapse in={view === 'defaults'}>
+    <Collapse in={view === 'defaults' || view === 'yours'}>
       <Flex flexDir="column" gap={2} pl={4} py={2} overflow="hidden" h="100%" minH={0}>
         <OverlayScrollbarsComponent style={overlayScrollbarsStyles} options={overlayscrollbarsOptions}>
           <Flex flexDir="column" gap={2} overflow="auto">
-            {WORKFLOW_LIBRARY_TAG_CATEGORIES.map((tagCategory) => (
-              <TagCategory key={tagCategory.categoryTKey} tagCategory={tagCategory} />
-            ))}
+            {view === 'yours' ? <DynamicTagsList /> : <StaticTagCategories />}
           </Flex>
         </OverlayScrollbarsComponent>
       </Flex>
     </Collapse>
   );
 });
-DefaultsViewCheckboxesCollapsible.displayName = 'DefaultsViewCheckboxes';
+TagCheckboxesCollapsible.displayName = 'TagCheckboxesCollapsible';
 
-const tagCountQueryArg = {
-  tags: WORKFLOW_LIBRARY_TAGS.map((tag) => tag.label),
-  categories: ['default'],
-} satisfies Parameters<typeof useGetCountsByTagQuery>[0];
+const StaticTagCategories = memo(() => {
+  return (
+    <>
+      {WORKFLOW_LIBRARY_TAG_CATEGORIES.map((tagCategory) => (
+        <TagCategory key={tagCategory.categoryTKey} tagCategory={tagCategory} />
+      ))}
+    </>
+  );
+});
+StaticTagCategories.displayName = 'StaticTagCategories';
+
+const DynamicTagsList = memo(() => {
+  const { t } = useTranslation();
+  const { data: tags, isLoading } = useGetAllTagsQuery({ categories: ['user'] });
+
+  if (isLoading) {
+    return <Text color="base.400">{t('common.loading')}</Text>;
+  }
+
+  if (!tags || tags.length === 0) {
+    return null;
+  }
+
+  return (
+    <Flex flexDir="column" gap={2}>
+      {tags.map((tag) => (
+        <DynamicTagCheckbox key={tag} tag={tag} />
+      ))}
+    </Flex>
+  );
+});
+DynamicTagsList.displayName = 'DynamicTagsList';
+
+const DynamicTagCheckbox = memo(({ tag }: { tag: string }) => {
+  const dispatch = useAppDispatch();
+  const selectedTags = useAppSelector(selectWorkflowLibrarySelectedTags);
+  const isChecked = selectedTags.includes(tag);
+  const count = useDynamicTagCount(tag);
+
+  const onChange = useCallback(() => {
+    dispatch(workflowLibraryTagToggled(tag));
+  }, [dispatch, tag]);
+
+  if (count === 0) {
+    return null;
+  }
+
+  return (
+    <Flex alignItems="center" gap={2}>
+      <Checkbox isChecked={isChecked} onChange={onChange} flexShrink={0} />
+      <Text>{`${tag} (${count})`}</Text>
+    </Flex>
+  );
+});
+DynamicTagCheckbox.displayName = 'DynamicTagCheckbox';
+
+const useDynamicTagCount = (tag: string) => {
+  const queryArg = useMemo(
+    () => ({
+      tags: [tag],
+      categories: ['user'] as ('user' | 'default')[],
+    }),
+    [tag]
+  );
+
+  const queryOptions = useMemo(
+    () => ({
+      selectFromResult: ({ data }: { data?: Record<string, number> }) => ({
+        count: data?.[tag] ?? 0,
+      }),
+    }),
+    [tag]
+  );
+
+  const { count } = useGetCountsByTagQuery(queryArg, queryOptions);
+  return count;
+};
+
+const useTagCountQueryArg = () => {
+  const view = useAppSelector(selectWorkflowLibraryView);
+  return useMemo(
+    () => ({
+      tags: WORKFLOW_LIBRARY_TAGS.map((tag) => tag.label),
+      categories: view === 'yours' ? ['user'] : ['default'],
+    }),
+    [view]
+  ) satisfies Parameters<typeof useGetCountsByTagQuery>[0];
+};
 
 const useCountForIndividualTag = (tag: string) => {
+  const tagCountQueryArg = useTagCountQueryArg();
   const queryOptions = useMemo(
     () =>
       ({
@@ -130,6 +247,7 @@ const useCountForIndividualTag = (tag: string) => {
 };
 
 const useCountForTagCategory = (tagCategory: WorkflowTagCategory) => {
+  const tagCountQueryArg = useTagCountQueryArg();
   const queryOptions = useMemo(
     () =>
       ({
