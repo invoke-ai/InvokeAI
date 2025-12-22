@@ -41,7 +41,7 @@ class MainModelDefaultSettings(BaseModel):
     vae_precision: DEFAULTS_PRECISION | None = Field(default=None, description="Default VAE precision for this model")
     scheduler: SCHEDULER_NAME_VALUES | None = Field(default=None, description="Default scheduler for this model")
     steps: int | None = Field(default=None, gt=0, description="Default number of steps for this model")
-    cfg_scale: float | None = Field(default=None, ge=1, description="Default CFG Scale for this model")
+    cfg_scale: float | None = Field(default=None, ge=0, description="Default CFG Scale for this model")
     cfg_rescale_multiplier: float | None = Field(
         default=None, ge=0, lt=1, description="Default CFG Rescale Multiplier for this model"
     )
@@ -60,6 +60,8 @@ class MainModelDefaultSettings(BaseModel):
                 return cls(width=768, height=768)
             case BaseModelType.StableDiffusionXL:
                 return cls(width=1024, height=1024)
+            case BaseModelType.ZImage:
+                return cls(steps=9, cfg_scale=0.0, width=1024, height=1024)
             case _:
                 # TODO(psyche): Do we want defaults for other base types?
                 return None
@@ -108,6 +110,28 @@ def _has_main_keys(state_dict: dict[str | int, Any]) -> bool:
             # FLUX models in the official BFL format contain keys with the "double_blocks." prefix, but we must be
             # careful to avoid false positives on XLabs FLUX IP-Adapter models.
             return True
+    return False
+
+
+def _has_z_image_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict contains Z-Image S3-DiT transformer keys."""
+    # Z-Image specific keys that distinguish it from other models
+    z_image_specific_keys = {
+        "cap_embedder",  # Caption embedder - unique to Z-Image
+        "context_refiner",  # Context refiner blocks
+        "cap_pad_token",  # Caption padding token
+    }
+
+    for key in state_dict.keys():
+        if isinstance(key, int):
+            continue
+        # Check for Z-Image specific key prefixes
+        # Handle both direct keys (cap_embedder.0.weight) and
+        # ComfyUI-style keys (model.diffusion_model.cap_embedder.0.weight)
+        key_parts = key.split(".")
+        for part in key_parts:
+            if part in z_image_specific_keys:
+                return True
     return False
 
 
@@ -657,3 +681,92 @@ class Main_Diffusers_CogView4_Config(Diffusers_Config_Base, Main_Config_Base, Co
             **override_fields,
             repo_variant=repo_variant,
         )
+
+
+class Main_Diffusers_ZImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Z-Image diffusers models (Z-Image-Turbo, Z-Image-Base, Z-Image-Edit)."""
+
+    base: Literal[BaseModelType.ZImage] = Field(BaseModelType.ZImage)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # This check implies the base type - no further validation needed.
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "ZImagePipeline",
+            },
+        )
+
+        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant_or_raise(mod)
+
+        return cls(
+            **override_fields,
+            repo_variant=repo_variant,
+        )
+
+
+class Main_Checkpoint_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Z-Image single-file checkpoint models (safetensors, etc)."""
+
+    base: Literal[BaseModelType.ZImage] = Field(default=BaseModelType.ZImage)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_z_image_model(mod)
+
+        cls._validate_does_not_look_like_gguf_quantized(mod)
+
+        return cls(**override_fields)
+
+    @classmethod
+    def _validate_looks_like_z_image_model(cls, mod: ModelOnDisk) -> None:
+        has_z_image_keys = _has_z_image_keys(mod.load_state_dict())
+        if not has_z_image_keys:
+            raise NotAMatchError("state dict does not look like a Z-Image model")
+
+    @classmethod
+    def _validate_does_not_look_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
+        has_ggml_tensors = _has_ggml_tensors(mod.load_state_dict())
+        if has_ggml_tensors:
+            raise NotAMatchError("state dict looks like GGUF quantized")
+
+
+class Main_GGUF_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized Z-Image transformer models."""
+
+    base: Literal[BaseModelType.ZImage] = Field(default=BaseModelType.ZImage)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_z_image_model(mod)
+
+        cls._validate_looks_like_gguf_quantized(mod)
+
+        return cls(**override_fields)
+
+    @classmethod
+    def _validate_looks_like_z_image_model(cls, mod: ModelOnDisk) -> None:
+        has_z_image_keys = _has_z_image_keys(mod.load_state_dict())
+        if not has_z_image_keys:
+            raise NotAMatchError("state dict does not look like a Z-Image model")
+
+    @classmethod
+    def _validate_looks_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
+        has_ggml_tensors = _has_ggml_tensors(mod.load_state_dict())
+        if not has_ggml_tensors:
+            raise NotAMatchError("state dict does not look like GGUF quantized")
