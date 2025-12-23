@@ -16,23 +16,37 @@ import {
 } from 'react-icons/pi';
 
 // Normalize key names for consistent storage
+// Maps platform-specific modifier keys to the cross-platform 'mod' format used by react-hotkeys-hook
+// On Mac: Meta (Command) → mod
+// On Linux/Windows: Control → mod
 const normalizeKey = (key: string): string => {
-  const keyMap: Record<string, string> = {
-    Control: 'ctrl',
-    Meta: 'mod',
-    Command: 'mod',
-    Alt: 'alt',
-    Shift: 'shift',
-    ' ': 'space',
-  };
+  const keyMap: Record<string, string> = IS_MAC_OS
+    ? {
+        Meta: 'mod',
+        Command: 'mod',
+        Control: 'ctrl',
+        Alt: 'alt',
+        Shift: 'shift',
+        ' ': 'space',
+      }
+    : {
+        Control: 'mod', // On non-Mac, Ctrl is the primary modifier (mapped to 'mod')
+        Meta: 'meta', // Windows key - rarely used for hotkeys
+        Alt: 'alt',
+        Shift: 'shift',
+        ' ': 'space',
+      };
   return keyMap[key] || key.toLowerCase();
 };
 
 // Order of modifiers for consistent output
-const MODIFIER_ORDER = ['mod', 'ctrl', 'shift', 'alt'];
+// 'mod' is the cross-platform primary modifier (Cmd on Mac, Ctrl on Linux/Windows)
+// 'ctrl' is only used on Mac (when Ctrl is pressed separately from Cmd)
+// 'meta' is only used on non-Mac (Windows key)
+const MODIFIER_ORDER = ['mod', 'ctrl', 'meta', 'shift', 'alt'];
 
 const isModifierKey = (key: string): boolean => {
-  return ['mod', 'ctrl', 'shift', 'alt', 'control', 'meta', 'command'].includes(key.toLowerCase());
+  return ['mod', 'ctrl', 'meta', 'shift', 'alt', 'control', 'command'].includes(key.toLowerCase());
 };
 
 // Build hotkey string from pressed keys
