@@ -132,8 +132,8 @@ class ZImageRegionalPromptingExtension:
 
                 # 4. img self-attention within region
                 # mask @ mask.T creates pairwise attention within the masked region
-                regional_attention_mask[:img_seq_len, :img_seq_len] += (
-                    mask_flat.view(img_seq_len, 1) @ mask_flat.view(1, img_seq_len)
+                regional_attention_mask[:img_seq_len, :img_seq_len] += mask_flat.view(img_seq_len, 1) @ mask_flat.view(
+                    1, img_seq_len
                 )
             else:
                 # Global prompt: allow attention to/from background regions only

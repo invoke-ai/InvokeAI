@@ -84,7 +84,9 @@ def create_regional_forward(
         # Process through noise_refiner
         if torch.is_grad_enabled() and self.gradient_checkpointing:
             for layer in self.noise_refiner:
-                x_padded = self._gradient_checkpointing_func(layer, x_padded, x_attn_mask, x_freqs_cis_padded, adaln_input)
+                x_padded = self._gradient_checkpointing_func(
+                    layer, x_padded, x_attn_mask, x_freqs_cis_padded, adaln_input
+                )
         else:
             for layer in self.noise_refiner:
                 x_padded = layer(x_padded, x_attn_mask, x_freqs_cis_padded, adaln_input)
