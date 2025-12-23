@@ -123,7 +123,7 @@ def create_regional_forward(
             unified.append(torch.cat([x_padded[i][:x_len], cap_padded[i][:cap_len]]))
             unified_freqs_cis.append(torch.cat([x_freqs_cis_padded[i][:x_len], cap_freqs_cis_padded[i][:cap_len]]))
 
-        unified_item_seqlens = [a + b for a, b in zip(cap_item_seqlens, x_item_seqlens)]
+        unified_item_seqlens = [a + b for a, b in zip(cap_item_seqlens, x_item_seqlens, strict=False)]
         assert unified_item_seqlens == [len(_) for _ in unified]
         unified_max_item_seqlen = max(unified_item_seqlens)
 
