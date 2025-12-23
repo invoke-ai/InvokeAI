@@ -795,15 +795,9 @@ class ModelInstallService(ModelInstallServiceBase):
         # (e.g., sdxl-turbo_text_encoder_tokenizer) and keep each subfolder's contents in its own
         # subdirectory within the model folder.
 
-        # Get the top-level directory from the first file path
-        # Handle edge cases: empty remote_files or path="." (no parts)
-        if remote_files and remote_files[0].path.parts:
-            top = Path(remote_files[0].path.parts[0])
-        else:
-            top = Path(".")
-
         if subfolders and len(subfolders) > 1:
             # Multiple subfolders: create combined name and keep subfolder structure
+            top = Path(remote_files[0].path.parts[0])  # e.g. "Z-Image-Turbo/"
             subfolder_names = [sf.name.replace("/", "_").replace("\\", "_") for sf in subfolders]
             combined_name = "_".join(subfolder_names)
             path_to_add = Path(f"{top}_{combined_name}")
@@ -831,6 +825,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 parts.append(RemoteModelFile(url=model_file.url, path=new_path))
         elif subfolder:
             # Single subfolder: flatten into renamed folder
+            top = Path(remote_files[0].path.parts[0])  # e.g. "sdxl-turbo/"
             path_to_remove = top / subfolder  # sdxl-turbo/vae/
             subfolder_rename = subfolder.name.replace("/", "_").replace("\\", "_")
             path_to_add = Path(f"{top}_{subfolder_rename}")
@@ -845,7 +840,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     )
                 )
         else:
-            # No subfolder specified
+            # No subfolder specified - pass through unchanged
             parts = []
             for model_file in remote_files:
                 assert model_file.size is not None
