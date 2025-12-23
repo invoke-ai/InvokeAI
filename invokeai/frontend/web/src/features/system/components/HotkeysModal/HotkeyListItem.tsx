@@ -458,7 +458,13 @@ export const HotkeyItemsDisplay = memo(
           )}
           {!isAddingNew && (
             <Tooltip label={t('hotkeys.addHotkey')}>
-              <IconButton aria-label={t('hotkeys.addHotkey')} icon={<PiPlusBold />} variant="ghost" size="sm" onClick={onAddHotkey} />
+              <IconButton
+                aria-label={t('hotkeys.addHotkey')}
+                icon={<PiPlusBold />}
+                variant="ghost"
+                size="sm"
+                onClick={onAddHotkey}
+              />
             </Tooltip>
           )}
         </Flex>
