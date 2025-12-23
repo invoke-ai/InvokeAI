@@ -82,11 +82,11 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
     id: getPrefixedId('pos_cond_collect'),
   });
 
-  // Z-Image supports negative conditioning when guidance_scale > 0
+  // Z-Image supports negative conditioning when guidance_scale > 1
   // Only create negative conditioning nodes if guidance is used
   let negCond: Invocation<'z_image_text_encoder'> | null = null;
   let negCondCollect: Invocation<'collect'> | null = null;
-  if (guidance_scale > 0) {
+  if (guidance_scale > 1) {
     negCond = g.addNode({
       type: 'z_image_text_encoder',
       id: getPrefixedId('neg_prompt'),
@@ -130,7 +130,7 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
   g.addEdge(posCond, 'conditioning', posCondCollect, 'item');
   g.addEdge(posCondCollect, 'collection', denoise, 'positive_conditioning');
 
-  // Connect negative conditioning if guidance_scale > 0
+  // Connect negative conditioning if guidance_scale > 1
   if (negCond !== null && negCondCollect !== null) {
     g.addEdge(modelLoader, 'qwen3_encoder', negCond, 'qwen3_encoder');
     g.addEdge(negCond, 'conditioning', negCondCollect, 'item');
