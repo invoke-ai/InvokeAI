@@ -880,6 +880,7 @@
         "newPathPlaceholder": "Enter new path...",
         "pathUpdated": "Model path updated successfully",
         "pathUpdateFailed": "Failed to update model path",
+        "invalidPathFormat": "Path must be an absolute path (e.g., C:\\Models\\... or /home/user/models/...)",
         "convert": "Convert",
         "convertingModelBegin": "Converting Model. Please wait.",
         "convertToDiffusers": "Convert To Diffusers",

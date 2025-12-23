@@ -2,6 +2,7 @@ import {
   Button,
   Flex,
   FormControl,
+  FormErrorMessage,
   FormLabel,
   Input,
   Modal,
@@ -14,9 +15,10 @@ import {
   Text,
   useDisclosure,
 } from '@invoke-ai/ui-library';
+import { isExternalModel } from 'features/modelManagerV2/subpanels/ModelPanel/ModelView';
 import { toast } from 'features/toast/toast';
 import type { ChangeEvent } from 'react';
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFolderOpenFill } from 'react-icons/pi';
 import { useUpdateModelMutation } from 'services/api/endpoints/models';
@@ -41,8 +43,11 @@ export const ModelUpdatePathButton = memo(({ modelConfig }: Props) => {
     setNewPath(e.target.value);
   }, []);
 
+  // Validate that the new path is still a valid external model path format
+  const isValidPath = useMemo(() => isExternalModel(newPath.trim()), [newPath]);
+
   const handleSubmit = useCallback(() => {
-    if (!newPath.trim() || newPath === modelConfig.path) {
+    if (!newPath.trim() || newPath === modelConfig.path || !isValidPath) {
       onClose();
       return;
     }
@@ -67,9 +72,10 @@ export const ModelUpdatePathButton = memo(({ modelConfig }: Props) => {
           status: 'error',
         });
       });
-  }, [newPath, modelConfig.path, modelConfig.key, updateModel, onClose, t]);
+  }, [newPath, modelConfig.path, modelConfig.key, updateModel, onClose, t, isValidPath]);
 
   const hasChanges = newPath.trim() !== modelConfig.path;
+  const showError = hasChanges && !isValidPath;
 
   return (
     <>
@@ -99,9 +105,10 @@ export const ModelUpdatePathButton = memo(({ modelConfig }: Props) => {
                   {modelConfig.path}
                 </Text>
               </FormControl>
-              <FormControl>
+              <FormControl isInvalid={showError}>
                 <FormLabel>{t('modelManager.newPath')}</FormLabel>
                 <Input value={newPath} onChange={handlePathChange} placeholder={t('modelManager.newPathPlaceholder')} />
+                {showError && <FormErrorMessage>{t('modelManager.invalidPathFormat')}</FormErrorMessage>}
               </FormControl>
             </Flex>
           </ModalBody>
@@ -110,7 +117,7 @@ export const ModelUpdatePathButton = memo(({ modelConfig }: Props) => {
               <Button variant="ghost" onClick={onClose}>
                 {t('common.cancel')}
               </Button>
-              <Button colorScheme="invokeYellow" onClick={handleSubmit} isLoading={isLoading} isDisabled={!hasChanges}>
+              <Button colorScheme="invokeYellow" onClick={handleSubmit} isLoading={isLoading} isDisabled={!hasChanges || showError}>
                 {t('common.save')}
               </Button>
             </Flex>

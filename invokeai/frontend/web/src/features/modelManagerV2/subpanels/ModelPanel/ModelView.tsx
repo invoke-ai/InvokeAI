@@ -26,7 +26,7 @@ type Props = {
  * External models have absolute paths like "X:/ModelPath/model.safetensors" or "/home/user/models/model.safetensors".
  * Invoke-controlled models have relative paths like "uuid/model.safetensors".
  */
-const isExternalModel = (path: string): boolean => {
+export const isExternalModel = (path: string): boolean => {
   // Unix absolute path
   if (path.startsWith('/')) {
     return true;
