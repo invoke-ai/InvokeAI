@@ -2152,6 +2152,7 @@
         "clearCaches": "Clear Caches",
         "recalculateRects": "Recalculate Rects",
         "clipToBbox": "Clip Strokes to Bbox",
+        "extractRegion": "Extract Region",
         "outputOnlyMaskedRegions": "Output Only Generated Regions",
         "addLayer": "Add Layer",
         "duplicate": "Duplicate",
