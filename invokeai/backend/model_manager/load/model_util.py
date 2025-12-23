@@ -10,7 +10,7 @@ import onnxruntime as ort
 import torch
 from diffusers.pipelines.pipeline_utils import DiffusionPipeline
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
-from transformers import CLIPTokenizer, T5Tokenizer, T5TokenizerFast
+from transformers import CLIPTokenizer, PreTrainedTokenizerBase, T5Tokenizer, T5TokenizerFast
 
 from invokeai.backend.image_util.depth_anything.depth_anything_pipeline import DepthAnythingPipeline
 from invokeai.backend.image_util.grounding_dino.grounding_dino_pipeline import GroundingDinoPipeline
@@ -73,6 +73,10 @@ def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
         # relative to the text encoder that it's used with, so shouldn't matter too much, but we should fix this at some
         # point.
         return len(model)
+    elif isinstance(model, PreTrainedTokenizerBase):
+        # Catch-all for other tokenizer types (e.g., Qwen2Tokenizer, Qwen3Tokenizer).
+        # Tokenizers are small relative to models, so returning 0 is acceptable.
+        return 0
     else:
         # TODO(ryand): Promote this from a log to an exception once we are confident that we are handling all of the
         # supported model types.
@@ -156,6 +160,7 @@ def calc_model_size_by_fs(model_path: Path, subfolder: Optional[str] = None, var
         (".msgpack",),  # flax
         (".ckpt",),  # tf
         (".h5",),  # tf2
+        (".gguf",),  # gguf quantized
     ]
 
     for file_format in formats:

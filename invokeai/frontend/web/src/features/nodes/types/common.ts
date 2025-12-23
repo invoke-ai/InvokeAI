@@ -72,10 +72,11 @@ export const zBaseModelType = z.enum([
   'sdxl-refiner',
   'flux',
   'cogview4',
+  'z-image',
   'unknown',
 ]);
 export type BaseModelType = z.infer<typeof zBaseModelType>;
-export const zMainModelBase = z.enum(['sd-1', 'sd-2', 'sd-3', 'sdxl', 'flux', 'cogview4']);
+export const zMainModelBase = z.enum(['sd-1', 'sd-2', 'sd-3', 'sdxl', 'flux', 'cogview4', 'z-image']);
 type MainModelBase = z.infer<typeof zMainModelBase>;
 export const isMainModelBase = (base: unknown): base is MainModelBase => zMainModelBase.safeParse(base).success;
 export const zModelType = z.enum([
@@ -92,6 +93,7 @@ export const zModelType = z.enum([
   'clip_vision',
   'spandrel_image_to_image',
   't5_encoder',
+  'qwen3_encoder',
   'clip_embed',
   'siglip',
   'flux_redux',
@@ -130,6 +132,7 @@ export const zModelFormat = z.enum([
   'embedding_folder',
   'invokeai',
   't5_encoder',
+  'qwen3_encoder',
   'bnb_quantized_int8b',
   'bnb_quantized_nf4b',
   'gguf_quantized',

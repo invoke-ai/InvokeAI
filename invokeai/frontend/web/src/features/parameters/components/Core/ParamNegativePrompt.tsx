@@ -63,7 +63,6 @@ export const ParamNegativePrompt = memo(() => {
           value={prompt}
           onChange={onChange}
           onKeyDown={onKeyDown}
-          fontSize="sm"
           variant="darkFilled"
           minH={28}
           borderTopWidth={24} // This prevents the prompt from being hidden behind the header
@@ -71,6 +70,8 @@ export const ParamNegativePrompt = memo(() => {
           paddingInlineStart={3}
           paddingTop={0}
           paddingBottom={3}
+          fontFamily="mono"
+          fontSize="sm"
         />
         <PromptOverlayButtonWrapper>
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
