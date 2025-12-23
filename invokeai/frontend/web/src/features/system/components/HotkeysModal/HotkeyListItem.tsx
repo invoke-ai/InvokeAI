@@ -80,11 +80,6 @@ type HotkeyItemProps = HotkeyEditProps & {
   conflictMap: Map<string, HotkeyConflictInfo>;
 };
 
-const HotkeyItemSx: SystemStyleObject = {
-  gap: 1,
-  alignItems: 'center',
-};
-
 const HotkeyRecorderSx: SystemStyleObject = {
   px: 2,
   py: 1,
@@ -297,6 +292,7 @@ export const HotkeyItem = memo(
           rightIcon={<PiPencilSimpleBold />}
           gap={0.5}
           alignItems="center"
+          px={2}
         >
           {displayKeyParts.map((part, j) => (
             <Fragment key={j}>
@@ -315,7 +311,7 @@ export const HotkeyItem = memo(
     };
 
     return (
-      <Flex sx={{ ...HotkeyItemSx, ...sx }}>
+      <Flex sx={sx}>
         {renderHotkeyKeys()}
         <Flex gap={1}>
           {isEditing && (
@@ -433,7 +429,7 @@ export const HotkeyItemsDisplay = memo(
             conflictMap={conflictMap}
           />
         )}
-        <Flex gap={1}>
+        <Flex>
           {isCustomized && (
             <Tooltip label={t('hotkeys.resetToDefault')}>
               <IconButton
@@ -446,10 +442,10 @@ export const HotkeyItemsDisplay = memo(
               />
             </Tooltip>
           )}
-          {isAddingNew ? null : (
-            <Button rightIcon={<PiPlusBold />} variant="ghost" size="sm" onClick={onAddHotkey}>
-              {t('hotkeys.addHotkey')}
-            </Button>
+          {!isAddingNew && (
+            <Tooltip label={t('hotkeys.addHotkey')}>
+              <IconButton aria-label={t('hotkeys.addHotkey')} icon={<PiPlusBold />} variant="ghost" size="sm" onClick={onAddHotkey} />
+            </Tooltip>
           )}
         </Flex>
       </Flex>
