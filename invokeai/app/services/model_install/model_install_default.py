@@ -422,7 +422,9 @@ class ModelInstallService(ModelInstallServiceBase):
         job = self._multifile_download(
             dest=model_path,
             remote_files=remote_files,
-            subfolder=model_source.subfolder if isinstance(model_source, HFModelSource) and len(subfolders) <= 1 else None,
+            subfolder=model_source.subfolder
+            if isinstance(model_source, HFModelSource) and len(subfolders) <= 1
+            else None,
             subfolders=subfolders if len(subfolders) > 1 else None,
         )
         files_string = "file" if len(remote_files) == 1 else "files"
