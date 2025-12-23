@@ -15,7 +15,7 @@ import {
   Text,
   useDisclosure,
 } from '@invoke-ai/ui-library';
-import { isExternalModel } from 'features/modelManagerV2/subpanels/ModelPanel/ModelView';
+import { isExternalModel } from 'features/modelManagerV2/subpanels/ModelPanel/isExternalModel';
 import { toast } from 'features/toast/toast';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
@@ -117,7 +117,12 @@ export const ModelUpdatePathButton = memo(({ modelConfig }: Props) => {
               <Button variant="ghost" onClick={onClose}>
                 {t('common.cancel')}
               </Button>
-              <Button colorScheme="invokeYellow" onClick={handleSubmit} isLoading={isLoading} isDisabled={!hasChanges || showError}>
+              <Button
+                colorScheme="invokeYellow"
+                onClick={handleSubmit}
+                isLoading={isLoading}
+                isDisabled={!hasChanges || showError}
+              >
                 {t('common.save')}
               </Button>
             </Flex>
