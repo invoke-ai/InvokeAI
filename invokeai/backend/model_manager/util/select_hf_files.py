@@ -24,12 +24,14 @@ def filter_files(
     files: List[Path],
     variant: Optional[ModelRepoVariant] = None,
     subfolder: Optional[Path] = None,
+    subfolders: Optional[List[Path]] = None,
 ) -> List[Path]:
     """
     Take a list of files in a HuggingFace repo root and return paths to files needed to load the model.
 
     :param files: List of files relative to the repo root.
-    :param subfolder: Filter by the indicated subfolder.
+    :param subfolder: Filter by the indicated subfolder (deprecated, use subfolders instead).
+    :param subfolders: Filter by multiple subfolders. Files from any of these subfolders will be included.
     :param variant: Filter by files belonging to a particular variant, such as fp16.
 
     The file list can be obtained from the `files` field of HuggingFaceMetadata,
@@ -39,9 +41,18 @@ def filter_files(
     paths: List[Path] = []
     root = files[0].parts[0]
 
+    # Build list of subfolders to filter by
+    filter_subfolders: List[Path] = []
+    if subfolders:
+        filter_subfolders = subfolders
+    elif subfolder:
+        filter_subfolders = [subfolder]
+
     # if the subfolder is a single file, then bypass the selection and just return it
-    if subfolder and subfolder.suffix in [".safetensors", ".bin", ".onnx", ".xml", ".pth", ".pt", ".ckpt", ".msgpack"]:
-        return [root / subfolder]
+    if len(filter_subfolders) == 1:
+        sf = filter_subfolders[0]
+        if sf.suffix in [".safetensors", ".bin", ".onnx", ".xml", ".pth", ".pt", ".ckpt", ".msgpack"]:
+            return [root / sf]
 
     # Start by filtering on model file extensions, discarding images, docs, etc
     for file in files:
@@ -66,10 +77,10 @@ def filter_files(
         elif re.search(r"model.*\.(safetensors|bin|onnx|xml|pth|pt|ckpt|msgpack)$", file.name):
             paths.append(file)
 
-    # limit search to subfolder if requested
-    if subfolder:
-        subfolder = root / subfolder
-        paths = [x for x in paths if Path(subfolder) in x.parents]
+    # limit search to subfolder(s) if requested
+    if filter_subfolders:
+        absolute_subfolders = [root / sf for sf in filter_subfolders]
+        paths = [x for x in paths if any(Path(sf) in x.parents for sf in absolute_subfolders)]
 
     # _filter_by_variant uniquifies the paths and returns a set
     return sorted(_filter_by_variant(paths, variant))

@@ -85,9 +85,12 @@ class LocalModelSource(StringLikeSource):
 
 class HFModelSource(StringLikeSource):
     """
-    A HuggingFace repo_id with optional variant, sub-folder and access token.
+    A HuggingFace repo_id with optional variant, sub-folder(s) and access token.
     Note that the variant option, if not provided to the constructor, will default to fp16, which is
     what people (almost) always want.
+
+    The subfolder can be a single path or multiple paths joined by '+' (e.g., "text_encoder+tokenizer").
+    When multiple subfolders are specified, all of them will be downloaded and combined into the model directory.
     """
 
     repo_id: str
@@ -102,6 +105,16 @@ class HFModelSource(StringLikeSource):
         if not re.match(r"^([.\w-]+/[.\w-]+)$", v):
             raise ValueError(f"{v}: invalid repo_id format")
         return v
+
+    @property
+    def subfolders(self) -> list[Path]:
+        """Return list of subfolders (supports '+' separated multiple subfolders)."""
+        if self.subfolder is None:
+            return []
+        subfolder_str = self.subfolder.as_posix()
+        if "+" in subfolder_str:
+            return [Path(s.strip()) for s in subfolder_str.split("+")]
+        return [self.subfolder]
 
     def __str__(self) -> str:
         """Return string version of repoid when string rep needed."""
