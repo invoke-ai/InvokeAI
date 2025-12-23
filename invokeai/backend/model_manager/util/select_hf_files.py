@@ -39,7 +39,11 @@ def filter_files(
     """
     variant = variant or ModelRepoVariant.Default
     paths: List[Path] = []
-    root = files[0].parts[0]
+
+    if not files:
+        return []
+
+    root = files[0].parts[0] if files[0].parts else Path(".")
 
     # Build list of subfolders to filter by
     filter_subfolders: List[Path] = []
