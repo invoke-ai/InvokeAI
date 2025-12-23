@@ -795,7 +795,12 @@ class ModelInstallService(ModelInstallServiceBase):
         # (e.g., sdxl-turbo_text_encoder_tokenizer) and keep each subfolder's contents in its own
         # subdirectory within the model folder.
 
-        top = Path(remote_files[0].path.parts[0]) if remote_files else Path(".")
+        # Get the top-level directory from the first file path
+        # Handle edge cases: empty remote_files or path="." (no parts)
+        if remote_files and remote_files[0].path.parts:
+            top = Path(remote_files[0].path.parts[0])
+        else:
+            top = Path(".")
 
         if subfolders and len(subfolders) > 1:
             # Multiple subfolders: create combined name and keep subfolder structure
