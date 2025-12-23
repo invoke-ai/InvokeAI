@@ -29,7 +29,6 @@ const sx: SystemStyleObject = {
   paddingInlineStart: 10,
   paddingInlineEnd: 3,
   paddingBlock: 2,
-  zIndex: 1,
   position: 'relative',
   rounded: 'base',
   '&:after,&:before': {
