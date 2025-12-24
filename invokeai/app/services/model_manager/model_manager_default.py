@@ -92,6 +92,8 @@ class ModelManagerService(ModelManagerServiceBase):
             max_ram_cache_size_gb=app_config.max_cache_ram_gb,
             max_vram_cache_size_gb=app_config.max_cache_vram_gb,
             execution_device=execution_device or TorchDevice.choose_torch_device(),
+            storage_device="cpu",
+            log_memory_usage=app_config.log_memory_usage,
             logger=logger,
             keep_alive_minutes=app_config.model_cache_keep_alive,
         )
