@@ -1,4 +1,5 @@
 """Tests for model cache keep-alive timeout functionality."""
+
 import time
 from unittest.mock import MagicMock
 
