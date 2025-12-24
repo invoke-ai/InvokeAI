@@ -532,7 +532,9 @@ class ModelInstallService(ModelInstallServiceBase):
                     try:
                         rmtree(job._install_tmpdir)
                     except OSError as e:
-                        self._logger.warning(f"Failed to remove temporary directory {job._install_tmpdir}: {e}. It will be removed on next server start.")
+                        self._logger.warning(
+                            f"Failed to remove temporary directory {job._install_tmpdir}: {e}. It will be removed on next server start."
+                        )
                 self._install_completed_event.set()
                 self._install_queue.task_done()
         self._logger.info(f"Installer thread {threading.get_ident()} exiting")
