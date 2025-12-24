@@ -133,7 +133,7 @@ export const ToolFillColorPicker = memo(() => {
         </Flex>
       </PopoverTrigger>
       <Portal>
-        <PopoverContent minW={96}>
+        <PopoverContent minW={96} data-text-tool-safezone="true">
           <PopoverArrow />
           <PopoverBody minH={64}>
             <Flex direction="column" gap={2}>

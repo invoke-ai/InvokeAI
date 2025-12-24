@@ -1,5 +1,6 @@
 import { Divider, Flex } from '@invoke-ai/ui-library';
 import { CanvasSettingsPopover } from 'features/controlLayers/components/Settings/CanvasSettingsPopover';
+import { TextToolOptions } from 'features/controlLayers/components/Text/TextToolOptions';
 import { useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
 import { ToolFillColorPicker } from 'features/controlLayers/components/Tool/ToolFillColorPicker';
 import { ToolWidthPicker } from 'features/controlLayers/components/Tool/ToolWidthPicker';
@@ -26,9 +27,10 @@ import { memo, useMemo } from 'react';
 export const CanvasToolbar = memo(() => {
   const isBrushSelected = useToolIsSelected('brush');
   const isEraserSelected = useToolIsSelected('eraser');
+  const isTextSelected = useToolIsSelected('text');
   const showToolWithPicker = useMemo(() => {
-    return isBrushSelected || isEraserSelected;
-  }, [isBrushSelected, isEraserSelected]);
+    return !isTextSelected && (isBrushSelected || isEraserSelected);
+  }, [isBrushSelected, isEraserSelected, isTextSelected]);
 
   useCanvasResetLayerHotkey();
   useCanvasDeleteLayerHotkey();
@@ -44,8 +46,14 @@ export const CanvasToolbar = memo(() => {
   return (
     <Flex w="full" gap={2} alignItems="center" px={2}>
       <Flex alignItems="center" h="full" flexGrow={1}>
-        <ToolFillColorPicker />
-        {showToolWithPicker && <ToolWidthPicker />}
+        {isTextSelected ? (
+          <TextToolOptions />
+        ) : (
+          <>
+            <ToolFillColorPicker />
+            {showToolWithPicker && <ToolWidthPicker />}
+          </>
+        )}
       </Flex>
       <Flex alignItems="center" h="full">
         <CanvasToolbarScale />

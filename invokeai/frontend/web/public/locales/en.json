@@ -2369,7 +2369,19 @@
             "bbox": "Bbox",
             "move": "Move",
             "view": "View",
-            "colorPicker": "Color Picker"
+            "colorPicker": "Color Picker",
+            "text": "Text"
+        },
+        "text": {
+            "font": "Font",
+            "size": "Size",
+            "bold": "Bold",
+            "italic": "Italic",
+            "underline": "Underline",
+            "strikethrough": "Strikethrough",
+            "alignLeft": "Align Left",
+            "alignCenter": "Align Center",
+            "alignRight": "Align Right"
         },
         "filter": {
             "filter": "Filter",
