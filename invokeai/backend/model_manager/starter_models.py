@@ -694,8 +694,8 @@ flux_fill = StarterModel(
 z_image_qwen3_encoder = StarterModel(
     name="Z-Image Qwen3 Text Encoder",
     base=BaseModelType.Any,
-    source="Tongyi-MAI/Z-Image-Turbo::text_encoder",
-    description="Qwen3 4B text encoder for Z-Image (full precision). ~8GB",
+    source="Tongyi-MAI/Z-Image-Turbo::text_encoder+tokenizer",
+    description="Qwen3 4B text encoder with tokenizer for Z-Image (full precision). ~8GB",
     type=ModelType.Qwen3Encoder,
 )
 
