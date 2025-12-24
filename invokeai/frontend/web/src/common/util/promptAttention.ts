@@ -6,7 +6,6 @@ import { type ASTNode, type Attention, parseTokens, serialize, tokenize } from '
 const log = logger('events');
 
 type AttentionDirection = 'increment' | 'decrement';
-type SelectionBounds = { start: number; end: number };
 type AdjustmentResult = { prompt: string; selectionStart: number; selectionEnd: number };
 
 const ATTENTION_STEP = 1.1;
